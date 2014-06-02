@@ -439,20 +439,21 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		}
 
 		/*
-		 * Close any cursors we no longer need.
+		 * Close any cursors we no longer need.  If the cursor is a
+		 * pure update cursor, close everything -- we usually only need
+		 * a single chunk open in that case and we haven't walked all
+		 * of the other slots in the loop above.
 		 *
 		 * Drop the LSM tree lock while we do this: if the cache is
 		 * full, we may block while closing a cursor.  Save the
 		 * generation number and retry if it has changed under us.
 		 */
-		if (clsm->cursors != NULL && (ngood < clsm->nchunks ||
-		    (!F_ISSET(clsm, WT_CLSM_OPEN_READ) && nupdates > 0))) {
+		if (!F_ISSET(clsm, WT_CLSM_OPEN_READ) && nupdates > 0)
+			ngood = 0;
+		if (clsm->cursors != NULL && ngood < clsm->nchunks) {
 			saved_gen = lsm_tree->dsk_gen;
 			locked = 0;
 			WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
-			if (!F_ISSET(clsm, WT_CLSM_OPEN_READ) && nupdates > 0)
-				WT_ERR(__clsm_close_cursors(
-				    clsm, 0, nchunks - nupdates));
 			WT_ERR(__clsm_close_cursors(
 			    clsm, ngood, clsm->nchunks));
 			WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 0));

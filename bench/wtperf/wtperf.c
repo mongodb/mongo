@@ -120,18 +120,32 @@ async_next_incr(uint64_t *val)
 	return (ATOMIC_ADD_PTR(val, 1));
 }
 
+static inline void
+generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
+{
+	/*
+	 * Don't change to snprintf, sprintf is faster in some tests.
+	 */
+	sprintf(key_buf, "%0*" PRIu64, cfg->key_sz - 1, keyno);
+}
+
 static void
 randomize_value(CONFIG *cfg, char *value_buf)
 {
 	uint32_t i;
 
 	/*
-	 * Each time we're called overwrite value_buf[0] and one
-	 * other randomly chosen uint32_t.
+	 * Each time we're called overwrite value_buf[0] and one other
+	 * randomly chosen byte (other than the trailing NUL).
+	 * Make sure we don't write a NUL: keep the value the same length.
 	 */
-	i = __wt_random() % (cfg->value_sz / sizeof(uint32_t));
-	value_buf[0] = __wt_random();
-	value_buf[i] = __wt_random();
+	i = __wt_random() % (cfg->value_sz - 1);
+	while (value_buf[i] == '\0' && i > 0)
+		--i;
+	if (i > 0) {
+		value_buf[0] = (__wt_random() % 255) + 1;
+		value_buf[i] = (__wt_random() % 255) + 1;
+	}
 	return;
 }
 
@@ -321,7 +335,7 @@ worker_async(void *arg)
 			goto err;		/* can't happen */
 		}
 
-		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
+		generate_key(cfg, key_buf, next_val);
 
 		/*
 		 * Spread the data out around the multiple databases.
@@ -466,7 +480,7 @@ worker(void *arg)
 			goto err;		/* can't happen */
 		}
 
-		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
+		generate_key(cfg, key_buf, next_val);
 
 		/*
 		 * Spread the data out around the multiple databases.
@@ -532,7 +546,12 @@ worker(void *arg)
 					    "get_value in update.");
 					goto err;
 				}
-				memcpy(value_buf, value, strlen(value));
+				/*
+				 * Copy as much of the previous value as is
+				 * safe, and be sure to NUL-terminate.
+				 */
+				strncpy(value_buf, value, cfg->value_sz);
+				value_buf[cfg->value_sz - 1] = '\0';
 				if (value_buf[0] == 'a')
 					value_buf[0] = 'b';
 				else
@@ -784,7 +803,7 @@ populate_thread(void *arg)
 		 * Figure out which table this op belongs to.
 		 */
 		cursor = cursors[op % cfg->table_count];
-		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
+		generate_key(cfg, key_buf, op);
 		measure_latency = 
 		    cfg->sample_interval != 0 && trk->ops != 0 && (
 		    trk->ops % cfg->sample_rate == 0);
@@ -913,7 +932,7 @@ retry:		if ((ret = conn->async_new_op(
 		}
 		asyncop->app_private = thread;
 
-		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
+		generate_key(cfg, key_buf, op);
 		asyncop->set_key(asyncop, key_buf);
 		if (cfg->random_value)
 			randomize_value(cfg, value_buf);
@@ -1655,8 +1674,8 @@ start_all_runs(CONFIG *cfg)
 			ret = ENOMEM;
 			goto err;
 		}
-		sprintf(new_home, "%s/D%02d", cfg->home, (int)i);
-		next_cfg->home = (const char *)new_home;
+		snprintf(new_home, home_len + 5, "%s/D%02d", cfg->home, (int)i);
+		next_cfg->home = new_home;
 
 		/* If the monitor dir is default, update it too. */
 		if (strcmp(cfg->monitor_dir, cfg->home) == 0)
@@ -2080,11 +2099,12 @@ start_threads(CONFIG *cfg,
 		/*
 		 * Every thread gets a key/data buffer because we don't bother
 		 * to distinguish between threads needing them and threads that
-		 * don't, it's not enough memory to bother.
+		 * don't, it's not enough memory to bother.  These buffers hold
+		 * strings: trailing NUL is included in the size.
 		 */
-		if ((thread->key_buf = calloc(cfg->key_sz + 1, 1)) == NULL)
+		if ((thread->key_buf = calloc(cfg->key_sz, 1)) == NULL)
 			return (enomem(cfg));
-		if ((thread->value_buf = calloc(cfg->value_sz + 1, 1)) == NULL)
+		if ((thread->value_buf = calloc(cfg->value_sz, 1)) == NULL)
 			return (enomem(cfg));
 		/*
 		 * Initialize and then toss in a bit of random values if needed.
@@ -2168,17 +2188,20 @@ wtperf_rand(CONFIG *cfg)
 #define	PARETO_SHAPE	1.5
 		S1 = (-1 / PARETO_SHAPE);
 		S2 = wtperf_value_range(cfg) * 0.2 * (PARETO_SHAPE - 1);
-		U = 1 - (double)rval / (double)RAND_MAX;
+		U = 1 - (double)rval / (double)UINT32_MAX;
 		rval = (pow(U, S1) - 1) * S2;
 		/*
 		 * This Pareto calculation chooses out of range values about
 		 * about 2% of the time, from my testing. That will lead to the
-		 * last item in the table being "hot".
+		 * first item in the table being "hot".
 		 */
 		if (rval > wtperf_value_range(cfg))
 			rval = wtperf_value_range(cfg);
 	}
-	/* Avoid zero - LSM doesn't like it. */
+	/*
+	 * Wrap the key to within the expected range and avoid zero: we never
+	 * insert that key.
+	 */
 	rval = (rval % wtperf_value_range(cfg)) + 1;
 	return (rval);
 }

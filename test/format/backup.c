@@ -65,7 +65,7 @@ hot_copy(const char *name)
 
 	len = strlen(g.home) + strlen(g.home_backup) + strlen(name) * 2 + 20;
 	if ((cmd = malloc(len)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	(void)snprintf(cmd, len,
 	    "cp %s/%s %s/%s", g.home, name, g.home_backup, name);
 	if ((ret = system(cmd)) != 0)

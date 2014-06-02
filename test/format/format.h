@@ -89,16 +89,16 @@ typedef struct {
 	char *progname;				/* Program name */
 
 	char *home;				/* Home directory */
-	char *home_init;			/* Initialize home command */
 	char *home_backup;			/* Hot-backup directory */
 	char *home_backup_init;			/* Initialize backup command */
 	char *home_bdb;				/* BDB directory */
+	char *home_config;			/* Run CONFIG file path */
+	char *home_init;			/* Initialize home command */
 	char *home_kvs;				/* KVS directory */
 	char *home_log;				/* Operation log file path */
 	char *home_rand;			/* RNG log file path */
-	char *home_run;				/* Run file path */
-	char *home_stats;			/* Statistics file path */
 	char *home_salvage_copy;		/* Salvage copy command */
+	char *home_stats;			/* Statistics file path */
 
 	char *helium_mount;			/* Helium volume */
 
@@ -253,7 +253,6 @@ void	 key_gen(uint8_t *, size_t *, uint64_t, int);
 void	 path_setup(const char *);
 uint32_t rng(void);
 void	 rng_init(void);
-void	 syserr(const char *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);
 void	 value_gen(uint8_t *, size_t *, uint64_t);

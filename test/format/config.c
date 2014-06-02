@@ -98,7 +98,7 @@ config_setup(void)
 	 * tested as well.
 	 */
 	if ((g.uri = malloc(256)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	strcpy(g.uri, DATASOURCE("file") ? "file:" : "table:");
 	if (DATASOURCE("helium"))
 		strcat(g.uri, "dev1/");
@@ -317,8 +317,8 @@ config_print(int error_display)
 	if (error_display)
 		fp = stdout;
 	else
-		if ((fp = fopen(g.home_run, "w")) == NULL)
-			die(errno, "fopen: %s", g.home_run);
+		if ((fp = fopen(g.home_config, "w")) == NULL)
+			die(errno, "fopen: %s", g.home_config);
 
 	fprintf(fp, "############################################\n");
 	fprintf(fp, "#  RUN PARAMETERS\n");
@@ -434,7 +434,7 @@ config_single(const char *s, int perm)
 		} else
 			*cp->vstr = strdup(ep);
 		if (*cp->vstr == NULL)
-			syserr("malloc");
+			die(errno, "malloc");
 
 		return;
 	}

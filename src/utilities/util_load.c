@@ -226,6 +226,12 @@ config_read(char ***listp, int *hexp)
 			if ((tlist = realloc(list, (size_t)
 			    (max_entry += 100) * sizeof(char *))) == NULL) {
 				ret = util_err(errno, NULL);
+
+				/*
+				 * List already freed by realloc, still use err
+				 * label for consistency.
+				 */
+				list = NULL;
 				goto err;
 			}
 			list = tlist;

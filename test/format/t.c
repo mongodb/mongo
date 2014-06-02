@@ -100,6 +100,18 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	/* Set up paths. */
+	path_setup(home);
+
+	/* If it's a replay, use the home directory's CONFIG file. */
+	if (g.replay) {
+		if (config != NULL)
+			die(EINVAL, "-c incompatible with -r");
+		if (access(g.home_config, R_OK) != 0)
+			die(ENOENT, "%s", g.home_config);
+		config = g.home_config;
+	}
+
 	/*
 	 * If we weren't given a configuration file, set values from "CONFIG",
 	 * if it exists.
@@ -151,9 +163,6 @@ main(int argc, char *argv[])
 
 	/* Seed the random number generator. */
 	srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
-
-	/* Set up paths. */
-	path_setup(home);
 
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
@@ -328,19 +337,8 @@ onint(int signo)
 }
 
 /*
- * syserr --
- *	Die on a system error.
- */
-void
-syserr(const char *f)
-{
-	fprintf(stderr, "%s: %s: %s\n", g.progname, f, strerror(errno));
-	exit(EXIT_FAILURE);
-}
-
-/*
  * die --
- *	Report an error and quit.
+ *	Report an error and quit, dumping the configuration.
  */
 void
 die(int e, const char *fmt, ...)
@@ -364,7 +362,8 @@ die(int e, const char *fmt, ...)
 		(void)fclose(g.rand_log);
 
 	/* Display the configuration that failed. */
-	config_print(1);
+	if (g.run_cnt)
+		config_print(1);
 
 	exit(EXIT_FAILURE);
 }
@@ -377,8 +376,8 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s [-1Llqr]\n    "
-	    "[-C wiredtiger-config] [-c config-file] [-H mount] [-h home] "
+	    "usage: %s [-1Llqr] [-C wiredtiger-config]\n    "
+	    "[-c config-file] [-H mount] [-h home] "
 	    "[name=value ...]\n",
 	    g.progname);
 	fprintf(stderr, "%s",
@@ -391,8 +390,6 @@ usage(void)
 	    "\t-l log operations (implies -L)\n"
 	    "\t-q run quietly\n"
 	    "\t-r replay the last run\n");
-
-	fprintf(stderr, "\n");
 
 	config_error();
 	exit(EXIT_FAILURE);

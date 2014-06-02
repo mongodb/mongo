@@ -70,7 +70,7 @@ key_gen_setup(uint8_t **keyp)
 	*keyp = NULL;
 
 	if ((key = malloc(g.c_key_max)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	for (i = 0; i < g.c_key_max; ++i)
 		key[i] = (uint8_t)("abcdefghijklmnopqrstuvwxyz"[i % 26]);
 	*keyp = key;
@@ -120,7 +120,7 @@ val_gen_setup(uint8_t **valp)
 	 */
 	len = g.c_value_max + 20;
 	if ((val = malloc(len)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	for (i = 0; i < len; ++i)
 		val[i] = (uint8_t)("ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26]);
 
@@ -227,48 +227,48 @@ path_setup(const char *home)
 
 	/* Home directory. */
 	if ((g.home = strdup(home == NULL ? "RUNDIR" : home)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 
 	/* Log file. */
 	len = strlen(g.home) + strlen("log") + 2;
 	if ((g.home_log = malloc(len)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	snprintf(g.home_log, len, "%s/%s", g.home, "log");
 
 	/* RNG log file. */
 	len = strlen(g.home) + strlen("rand") + 2;
 	if ((g.home_rand = malloc(len)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	snprintf(g.home_rand, len, "%s/%s", g.home, "rand");
 
 	/* Run file. */
-	len = strlen(g.home) + strlen("run") + 2;
-	if ((g.home_run = malloc(len)) == NULL)
-		syserr("malloc");
-	snprintf(g.home_run, len, "%s/%s", g.home, "run");
+	len = strlen(g.home) + strlen("CONFIG") + 2;
+	if ((g.home_config = malloc(len)) == NULL)
+		die(errno, "malloc");
+	snprintf(g.home_config, len, "%s/%s", g.home, "CONFIG");
 
 	/* Statistics file. */
 	len = strlen(g.home) + strlen("stats") + 2;
 	if ((g.home_stats = malloc(len)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	snprintf(g.home_stats, len, "%s/%s", g.home, "stats");
 
 	/* Hot-backup directory. */
 	len = strlen(g.home) + strlen("BACKUP") + 2;
 	if ((g.home_backup = malloc(len)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	snprintf(g.home_backup, len, "%s/%s", g.home, "BACKUP");
 
 	/* BDB directory. */
 	len = strlen(g.home) + strlen("bdb") + 2;
 	if ((g.home_bdb = malloc(len)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	snprintf(g.home_bdb, len, "%s/%s", g.home, "bdb");
 
 	/* KVS directory. */
 	len = strlen(g.home) + strlen("KVS") + 2;
 	if ((g.home_kvs = malloc(len)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	snprintf(g.home_kvs, len, "%s/%s", g.home, "KVS");
 
 	/*
@@ -279,7 +279,7 @@ path_setup(const char *home)
 #define	CMD	"cd %s && rm -rf `ls | sed /rand/d`"
 	len = strlen(g.home) + strlen(CMD) + 1;
 	if ((g.home_init = malloc(len)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	snprintf(g.home_init, len, CMD, g.home);
 
 	/* Hot backup directory initialize command, remove and re-create it. */
@@ -287,7 +287,7 @@ path_setup(const char *home)
 #define	CMD	"rm -rf %s && mkdir %s"
 	len = strlen(g.home_backup) * 2 + strlen(CMD) + 1;
 	if ((g.home_backup_init = malloc(len)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	snprintf(g.home_backup_init, len, CMD, g.home_backup, g.home_backup);
 
 	/*
@@ -301,7 +301,7 @@ path_setup(const char *home)
 	"cp WiredTiger* wt* slvg.copy/"
 	len = strlen(g.home) + strlen(CMD) + 1;
 	if ((g.home_salvage_copy = malloc(len)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	snprintf(g.home_salvage_copy, len, CMD, g.home);
 }
 

@@ -354,7 +354,7 @@ wts_dump(const char *tag, int dump_bdb)
 
 	len = strlen(g.home) + strlen(BERKELEY_DB_PATH) + strlen(g.uri) + 100;
 	if ((cmd = malloc(len)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	(void)snprintf(cmd, len,
 	    "sh s_dumpcmp -h %s %s %s %s %s %s",
 	    g.home,
@@ -493,7 +493,7 @@ wts_stats(void)
 	fprintf(fp, "\n\n====== Data source statistics:\n");
 	if ((stat_name =
 	    malloc(strlen("statistics:") + strlen(g.uri) + 1)) == NULL)
-		syserr("malloc");
+		die(errno, "malloc");
 	sprintf(stat_name, "statistics:%s", g.uri);
 	if ((ret = session->open_cursor(
 	    session, stat_name, NULL, NULL, &cursor)) != 0)
