@@ -132,7 +132,7 @@ namespace mongo {
     }
 
     MemoryMappedFile::MemoryMappedFile()
-        : _flushMutex(new mutex("flushMutex")), _uniqueId(0) {
+        : _uniqueId(0) {
         fd = 0;
         maphandle = 0;
         len = 0;
@@ -141,6 +141,10 @@ namespace mongo {
 
     void MemoryMappedFile::close() {
         LockMongoFilesShared::assertExclusivelyLocked();
+
+        // Prevent flush and close from concurrently running
+        boost::lock_guard<boost::mutex> lk(_flushMutex);
+
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
             clearWritableBits(*i);
             UnmapViewOfFile(*i);
@@ -483,7 +487,7 @@ namespace mongo {
                           void * view,
                           HANDLE fd,
                           const std::string& filename,
-                          boost::shared_ptr<mutex> flushMutex )
+                          boost::mutex& flushMutex )
             : _theFile(theFile), _view(view), _fd(fd), _filename(filename),
               _flushMutex(flushMutex)
         {}
@@ -492,13 +496,18 @@ namespace mongo {
             if (!_view || !_fd)
                 return;
 
-            LockMongoFilesShared mmfilesLock;
-            if ( MongoFile::getAllFiles().count( _theFile ) == 0 ) {
-                // this was deleted while we were unlocked
-                return;
+            {
+                LockMongoFilesShared mmfilesLock;
+                if ( MongoFile::getAllFiles().count(_theFile) == 0 ) {
+                    // this was deleted while we were unlocked
+                    return;
+                }
+
+                // Hold the flush mutex to ensure the file is not closed during flush
+                _flushMutex.lock();
             }
 
-            scoped_lock lk(*_flushMutex);
+            boost::lock_guard<boost::mutex> lk(_flushMutex, boost::adopt_lock_t());
 
             const int maximumTimeInSeconds = 60 * 15;
             const unsigned long long chunkSize = 2 * 1024 * 1024;
@@ -562,7 +571,7 @@ namespace mongo {
         void * _view;
         HANDLE _fd;
         string _filename;
-        boost::shared_ptr<mutex> _flushMutex;
+        boost::mutex& _flushMutex;
     };
 
     void MemoryMappedFile::flush(bool sync) {

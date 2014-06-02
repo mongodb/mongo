@@ -237,7 +237,9 @@ namespace mongo {
         unsigned long long len;
         const uint64_t _uniqueId;
 #ifdef _WIN32
-        boost::shared_ptr<mutex> _flushMutex;
+        // NOTE: Locking Order:
+        // LockMongoFilesShared must be taken before _flushMutex if both are taken
+        boost::mutex _flushMutex;
         void clearWritableBits(void *privateView);
     public:
         static const unsigned ChunkSize = 64 * 1024 * 1024;
