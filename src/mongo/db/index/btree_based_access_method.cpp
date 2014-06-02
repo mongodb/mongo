@@ -146,8 +146,8 @@ namespace mongo {
         try {
             ret = _newInterface->unindex(txn, key, loc);
         } catch (AssertionException& e) {
-            problem() << "Assertion failure: _unindex failed "
-                << _descriptor->indexNamespace() << endl;
+            log() << "Assertion failure: _unindex failed "
+                  << _descriptor->indexNamespace() << endl;
             out() << "Assertion failure: _unindex failed: " << e.what() << '\n';
             out() << "  key:" << key.toString() << '\n';
             out() << "  dl:" << loc.toString() << endl;

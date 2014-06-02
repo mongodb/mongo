@@ -240,8 +240,8 @@ namespace {
     }
 
     void dataSyncFailedHandler() {
-        problem() << "error syncing data to disk, probably a disk error";
-        problem() << " shutting down immediately to avoid corruption";
+        log() << "error syncing data to disk, probably a disk error";
+        log() << " shutting down immediately to avoid corruption";
         fassertFailed( 17346 );
     }
 

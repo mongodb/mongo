@@ -104,7 +104,7 @@ namespace mongo {
                            << ", link number " << chain
                            << ", invalid link is " << cur.toString()
                            << ", throwing Fatal Assertion";
-                        problem() << sb.str() << endl;
+                        log() << sb.str() << endl;
                         fassertFailed(16469);
                     }
                 }

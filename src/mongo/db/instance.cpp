@@ -1347,7 +1347,7 @@ namespace {
         string name = ss.str();
         f = new ofstream(name.c_str(), ios::out | ios::binary);
         if ( ! f->good() ) {
-            problem() << "diagLogging couldn't open " << name << endl;
+            log() << "diagLogging couldn't open " << name << endl;
             // todo what is this? :
             throw 1717;
         }

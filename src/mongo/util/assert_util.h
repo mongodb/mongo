@@ -311,10 +311,10 @@ namespace mongo {
     try { \
         expression; \
     } catch ( const std::exception &e ) { \
-        problem() << "caught exception (" << e.what() << ") in destructor (" << __FUNCTION__ \
-                  << ")" << std::endl; \
+        ::mongo::log() << "caught exception (" << e.what() << ") in destructor (" << __FUNCTION__ \
+              << ")" << std::endl; \
     } catch ( ... ) { \
-        problem() << "caught unknown exception in destructor (" << __FUNCTION__ << ")" \
-                  << std::endl; \
+        ::mongo::log() << "caught unknown exception in destructor (" << __FUNCTION__ << ")" \
+              << std::endl; \
     }
 

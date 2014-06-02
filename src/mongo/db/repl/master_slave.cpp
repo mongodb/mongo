@@ -414,7 +414,7 @@ namespace repl {
                     return;
                 }
                 else {
-                    problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
+                    log() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
                     throw SyncException();
                 }
             }
@@ -570,12 +570,12 @@ namespace repl {
         nsToDatabase(ns, clientName);
 
         if ( *ns == '.' ) {
-            problem() << "skipping bad op in oplog: " << op.toString() << endl;
+            log() << "skipping bad op in oplog: " << op.toString() << endl;
             return;
         }
         else if ( *ns == 0 ) {
             /*if( op.getStringField("op")[0] != 'n' )*/ {
-                problem() << "halting replication, bad op in oplog:\n  " << op.toString() << endl;
+                log() << "halting replication, bad op in oplog:\n  " << op.toString() << endl;
                 replAllDead = "bad object in oplog";
                 throw SyncException();
             }
@@ -803,7 +803,7 @@ namespace repl {
         }
 
         if( !oplogReader.haveCursor() ) {
-            problem() << "repl: dbclient::query returns null (conn closed?)" << endl;
+            log() << "repl: dbclient::query returns null (conn closed?)" << endl;
             oplogReader.resetConnection();
             return -1;
         }
@@ -846,16 +846,16 @@ namespace repl {
                 if ( !err.empty() ) {
                     // 13051 is "tailable cursor requested on non capped collection"
                     if (op.getIntField("code") == 13051) {
-                        problem() << "trying to slave off of a non-master" << '\n';
+                        log() << "trying to slave off of a non-master" << '\n';
                         massert( 13344 ,  "trying to slave off of a non-master", false );
                     }
                     else {
-                        problem() << "repl: $err reading remote oplog: " + err << '\n';
+                        log() << "repl: $err reading remote oplog: " + err << '\n';
                         massert( 10390 ,  "got $err reading remote oplog", false );
                     }
                 }
                 else {
-                    problem() << "repl: bad object read from remote oplog: " << op.toString() << '\n';
+                    log() << "repl: bad object read from remote oplog: " << op.toString() << '\n';
                     massert( 10391 , "repl: bad object read from remote oplog", false);
                 }
             }
@@ -1223,16 +1223,16 @@ namespace repl {
             }
             catch ( AssertionException& ) {
                 ReplInfo r("Assertion in replSlaveThread(): sleeping 5 minutes before retry");
-                problem() << "Assertion in replSlaveThread(): sleeping 5 minutes before retry" << endl;
+                log() << "Assertion in replSlaveThread(): sleeping 5 minutes before retry" << endl;
                 sleepsecs(300);
             }
             catch ( DBException& e ) {
-                problem() << "exception in replSlaveThread(): " << e.what()
-                          << ", sleeping 5 minutes before retry" << endl;
+                log() << "exception in replSlaveThread(): " << e.what()
+                      << ", sleeping 5 minutes before retry" << endl;
                 sleepsecs(300);
             }
             catch ( ... ) {
-                problem() << "error in replSlaveThread(): sleeping 5 minutes before retry" << endl;
+                log() << "error in replSlaveThread(): sleeping 5 minutes before retry" << endl;
                 sleepsecs(300);
             }
         }

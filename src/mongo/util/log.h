@@ -96,10 +96,6 @@ namespace logger {
 
 #define LOG MONGO_LOG
 
-    inline LogstreamBuilder problem() {
-        return log();
-    }
-
     /**
      * Rotates the log files.  Returns true if all logs rotate successfully.
      */

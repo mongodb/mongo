@@ -109,7 +109,7 @@ namespace mongo {
         lastWhen = time(0);
         lastLine = line;
 
-        problem() << "warning assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
+        log() << "warning assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         logContext();
         setLastError(0,msg && *msg ? msg : "wassertion failure");
         assertionCount.condrollover( ++assertionCount.warning );
@@ -122,7 +122,7 @@ namespace mongo {
 
     NOINLINE_DECL void verifyFailed(const char *msg, const char *file, unsigned line) {
         assertionCount.condrollover( ++assertionCount.regular );
-        problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
+        log() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         logContext();
         setLastError(0,msg && *msg ? msg : "assertion failure");
         stringstream temp;
@@ -138,7 +138,7 @@ namespace mongo {
     }
 
     NOINLINE_DECL void invariantFailed(const char *msg, const char *file, unsigned line) {
-        problem() << "Invariant failure " << msg << ' ' << file << ' ' << dec << line << endl;
+        log() << "Invariant failure " << msg << ' ' << file << ' ' << dec << line << endl;
         logContext();
         breakpoint();
         log() << "\n\n***aborting after invariant() failure\n\n" << endl;
@@ -146,7 +146,7 @@ namespace mongo {
     }
 
     NOINLINE_DECL void fassertFailed( int msgid ) {
-        problem() << "Fatal Assertion " << msgid << endl;
+        log() << "Fatal Assertion " << msgid << endl;
         logContext();
         breakpoint();
         log() << "\n\n***aborting after fassert() failure\n\n" << endl;
@@ -154,14 +154,14 @@ namespace mongo {
     }
 
     NOINLINE_DECL void fassertFailedNoTrace( int msgid ) {
-        problem() << "Fatal Assertion " << msgid << endl;
+        log() << "Fatal Assertion " << msgid << endl;
         breakpoint();
         log() << "\n\n***aborting after fassert() failure\n\n" << endl;
         ::_exit(EXIT_ABRUPT); // bypass our handler for SIGABRT, which prints a stack trace.
     }
 
     MONGO_COMPILER_NORETURN void fassertFailedWithStatus(int msgid, const Status& status) {
-        problem() << "Fatal assertion " <<  msgid << " " << status;
+        log() << "Fatal assertion " <<  msgid << " " << status;
         logContext();
         breakpoint();
         log() << "\n\n***aborting after fassert() failure\n\n" << endl;

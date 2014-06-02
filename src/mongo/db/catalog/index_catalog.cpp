@@ -1022,9 +1022,9 @@ namespace mongo {
         Status status = index->accessMethod()->remove(txn, obj, loc, options, &removed);
 
         if ( !status.isOK() ) {
-            problem() << "Couldn't unindex record " << obj.toString()
-                      << " from collection " << _collection->ns()
-                      << ". Status: " << status.toString();
+            log() << "Couldn't unindex record " << obj.toString()
+                  << " from collection " << _collection->ns()
+                  << ". Status: " << status.toString();
         }
 
         return Status::OK();

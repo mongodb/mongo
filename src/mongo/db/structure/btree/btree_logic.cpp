@@ -69,7 +69,7 @@ namespace mongo {
             string msg = str::stream() << "Btree::insert: key too large to index, failing "
                                        << _logic->_indexName
                                        << ' ' << key->dataSize() << ' ' << key->toString();
-            problem() << msg << endl;
+            log() << msg << endl;
             return Status(ErrorCodes::KeyTooLong, msg);
         }
 
@@ -2163,7 +2163,7 @@ namespace mongo {
                 int z = k1.data.woCompare(k2.data, ordering);
                 //wassert( z <= 0 );
                 if (z > 0) {
-                    problem() << "Btree keys out of order in collection " << ns;
+                    log() << "Btree keys out of order in collection " << ns;
                     ONCE {
                         dumpBucket(bucket);
                     }
