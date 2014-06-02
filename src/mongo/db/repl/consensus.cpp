@@ -224,7 +224,7 @@ namespace repl {
             vTot += m->config().votes;
         if( vTot % 2 == 0 && vTot && complain++ == 0 )
             log() << "replSet warning: even number of voting members in replica set config - "
-                     "add an arbiter or set votes to 0 on one of the extisting members" << rsLog;
+                     "add an arbiter or set votes to 0 on one of the existing members" << rsLog;
         return vTot;
     }
 
