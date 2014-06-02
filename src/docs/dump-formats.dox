@@ -1,10 +1,18 @@
 /*! @page dump_formats Dump Formats
 
-The @ref util_dump command produces a text representation of a table
-that can be loaded by @ref util_load.  This page describes the output
-format of the @ref util_dump command.
+The @ref util_dump command produces a flat-text representation of a
+table that can be loaded by @ref util_load.  This page describes the
+output formats of the @ref util_dump command.
 
-Dump files have three parts, a prefix, a header and a body.
+@section dump_formats_json JSON format
+
+JSON (<a href="http://www.json.org">JavaScript Object Notation</a>)
+dump files use the standard JSON data-interchange format to specify
+the objects, and may be interpreted by any JSON reader.
+
+@section dump_formats_text Text format
+
+Text dump files have three parts, a prefix, a header and a body.
 
 The dump prefix includes basic information about the dump including the
 WiredTiger version that created the dump and the dump format.  The dump
