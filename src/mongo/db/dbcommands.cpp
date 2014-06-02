@@ -684,7 +684,7 @@ namespace mongo {
             set<string> allShortNames;
             {
                 Lock::GlobalRead lk(txn->lockState());
-                dbHolder().getAllShortNames( allShortNames );
+                dbHolder().getAllShortNames(allShortNames);
             }
             
             for ( set<string>::iterator i = allShortNames.begin(); i != allShortNames.end(); i++ ) {
@@ -741,7 +741,7 @@ namespace mongo {
             Client::Context ctx(dbname);
 
             try {
-                return dbHolderW().closeAll(storageGlobalParams.dbpath, result, false);
+                return dbHolder().closeAll(storageGlobalParams.dbpath, result, false);
             }
             catch(DBException&) { 
                 throw;

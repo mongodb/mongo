@@ -556,8 +556,6 @@ namespace mongo {
          * @return true if we are NOT in the critical section
          */
         bool waitTillNotInCriticalSection( int maxSecondsToWait ) {
-            verify( !Lock::isLocked() );
-
             boost::xtime xt;
             boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
             xt.sec += maxSecondsToWait;
@@ -1094,7 +1092,7 @@ namespace mongo {
             // Track last result from TO shard for sanity check
             BSONObj res;
             for ( int i=0; i<86400; i++ ) { // don't want a single chunk move to take more than a day
-                verify( !Lock::isLocked() );
+                verify(!txn->lockState()->threadState());
                 // Exponential sleep backoff, up to 1024ms. Don't sleep much on the first few
                 // iterations, since we want empty chunk migrations to be fast.
                 sleepmillis( 1 << std::min( i , 10 ) );

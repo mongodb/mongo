@@ -276,6 +276,9 @@ namespace mongo {
                            string dbName,
                            bool preserveClonedFilesOnFailure,
                            bool backupOriginalFiles ) {
+        // We must hold some form of lock here
+        invariant(txn->lockState()->threadState());
+
         scoped_ptr<RepairFileDeleter> repairFileDeleter;
         doingRepair dr;
         dbName = nsToDatabase( dbName );
@@ -311,14 +314,17 @@ namespace mongo {
                                                             reservedPath ) );
 
         {
-            Database* originalDatabase = dbHolder().get( dbName, storageGlobalParams.dbpath );
-            if ( originalDatabase == NULL )
-                return Status( ErrorCodes::NamespaceNotFound, "database does not exist to repair" );
+            Database* originalDatabase = 
+                            dbHolder().get(dbName, storageGlobalParams.dbpath);
+            if (originalDatabase == NULL) {
+                return Status(ErrorCodes::NamespaceNotFound, "database does not exist to repair");
+            }
 
             Database* tempDatabase = NULL;
             {
                 bool justCreated = false;
-                tempDatabase = dbHolderW().getOrCreate(txn, dbName, reservedPathString, justCreated);
+                tempDatabase = 
+                    dbHolder().getOrCreate(txn, dbName, reservedPathString, justCreated);
                 invariant( justCreated );
             }
 

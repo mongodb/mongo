@@ -427,6 +427,7 @@ namespace repl {
                                             const BSONObj &op,
                                             const char* ns,
                                             const char* db ) {
+        // We are already locked at this point
         if (dbHolder()._isLoaded(ns, storageGlobalParams.dbpath)) {
             // Database is already present.
             return true;   
@@ -437,7 +438,7 @@ namespace repl {
             // missing from master after optime "ts".
             return false;   
         }
-        if (Database::duplicateUncasedName(false, db, storageGlobalParams.dbpath).empty()) {
+        if (Database::duplicateUncasedName(db, storageGlobalParams.dbpath).empty()) {
             // No duplicate database names are present.
             return true;
         }
@@ -446,7 +447,7 @@ namespace repl {
         bool dbOk = false;
         {
             dbtemprelease release(txn->lockState());
-        
+
             // We always log an operation after executing it (never before), so
             // a database list will always be valid as of an oplog entry generated
             // before it was retrieved.
@@ -490,7 +491,7 @@ namespace repl {
         
         // Check for duplicates again, since we released the lock above.
         set< string > duplicates;
-        Database::duplicateUncasedName(false, db, storageGlobalParams.dbpath, &duplicates);
+        Database::duplicateUncasedName(db, storageGlobalParams.dbpath, &duplicates);
         
         // The database is present on the master and no conflicting databases
         // are present on the master.  Drop any local conflicts.
@@ -502,8 +503,8 @@ namespace repl {
             dropDatabase(txn, ctx.db());
         }
         
-        massert( 14034, "Duplicate database names present after attempting to delete duplicates",
-                Database::duplicateUncasedName(false, db, storageGlobalParams.dbpath).empty() );
+        massert(14034, "Duplicate database names present after attempting to delete duplicates",
+                Database::duplicateUncasedName(db, storageGlobalParams.dbpath).empty());
         return true;
     }
 

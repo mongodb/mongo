@@ -53,7 +53,7 @@ namespace mongo {
         dbtemprelease(LockState* lockState) {
             const Client& c = cc();
             _context = c.getContext();
-            verify( Lock::isLocked() );
+            invariant(lockState->threadState());
             if( Lock::nested() ) {
                 massert(10298 , "can't temprelease nested lock", false);
             }

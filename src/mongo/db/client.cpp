@@ -282,7 +282,7 @@ namespace mongo {
         }
         
         OperationContextImpl txn; // TODO get rid of this once reads require transactions
-        _db = dbHolderUnchecked().getOrCreate(&txn, _ns, _path, _justCreated);
+        _db = dbHolder().getOrCreate(&txn, _ns, _path, _justCreated);
         verify(_db);
         if( _doVersion ) checkNotStale();
         massert(16107,

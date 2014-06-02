@@ -131,14 +131,5 @@ namespace mongo {
         }
     };
 
-    DatabaseHolder& dbHolderUnchecked();
-    inline const DatabaseHolder& dbHolder() { 
-        dassert( Lock::isLocked() );
-        return dbHolderUnchecked();
-    }
-    inline DatabaseHolder& dbHolderW() { 
-        dassert( Lock::isW() );
-        return dbHolderUnchecked();
-    }
-
+    DatabaseHolder& dbHolder();
 }

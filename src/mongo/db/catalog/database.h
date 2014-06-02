@@ -148,8 +148,7 @@ namespace mongo {
          * 'duplicates' is specified, it is filled with all duplicate names.
          // TODO move???
          */
-        static string duplicateUncasedName( bool inholderlockalready,
-                                            const std::string &name,
+        static string duplicateUncasedName( const std::string &name,
                                             const std::string &path,
                                             std::set< std::string > *duplicates = 0 );
 

@@ -86,7 +86,7 @@ namespace mongo {
 
     DatabaseHolder _dbHolder;
 
-    DatabaseHolder& dbHolderUnchecked() {
+    DatabaseHolder& dbHolder() {
         return _dbHolder;
     }
 

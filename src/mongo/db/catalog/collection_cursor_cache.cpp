@@ -218,7 +218,7 @@ namespace mongo {
         for ( unsigned i = 0; i < todo.size(); i++ ) {
             const string& ns = todo[i];
             Lock::DBRead lock(txn->lockState(), ns);
-            Database* db = dbHolder().get( ns, storageGlobalParams.dbpath );
+            Database* db = dbHolder().get(ns, storageGlobalParams.dbpath);
             if ( !db )
                 continue;
             Client::Context context( ns, db );

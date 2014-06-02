@@ -110,7 +110,7 @@ namespace mongo {
     }
 
     void MMAP1DatabaseCatalogEntry::_checkDuplicateUncasedNames() const {
-        string duplicate = Database::duplicateUncasedName(true, name(), _path );
+        string duplicate = Database::duplicateUncasedName(name(), _path);
         if ( !duplicate.empty() ) {
             stringstream ss;
             ss << "db already exists with different case already have: [" << duplicate

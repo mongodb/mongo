@@ -560,7 +560,7 @@ namespace mongo {
         string prefix(db);
         prefix += '.';
 
-        dbHolderW().erase( db, path );
+        dbHolder().erase(db, path);
         ctx->_clear();
         delete database; // closes files
     }

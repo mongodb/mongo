@@ -130,9 +130,7 @@ namespace mongo {
 
 
     /*static*/
-    string Database::duplicateUncasedName( bool inholderlock, const string &name, const string &path, set< string > *duplicates ) {
-        Lock::assertAtLeastReadLocked(name);
-
+    string Database::duplicateUncasedName(const string &name, const string &path, set< string > *duplicates) {
         if ( duplicates ) {
             duplicates->clear();
         }
@@ -141,7 +139,7 @@ namespace mongo {
         getDatabaseNames( others , path );
 
         set<string> allShortNames;
-        dbHolder().getAllShortNames( allShortNames );
+        dbHolder().getAllShortNames(allShortNames);
 
         others.insert( others.end(), allShortNames.begin(), allShortNames.end() );
 

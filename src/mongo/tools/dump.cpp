@@ -338,7 +338,7 @@ public:
         OperationContextImpl txn;
         Client::WriteContext cx(&txn, dbname);
 
-        Database* db = dbHolderUnchecked().get(dbname, storageGlobalParams.dbpath);
+        Database* db = dbHolder().get(dbname, storageGlobalParams.dbpath);
 
         list<string> namespaces;
         db->getDatabaseCatalogEntry()->getCollectionNamespaces( &namespaces );
