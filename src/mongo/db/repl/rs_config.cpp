@@ -362,6 +362,11 @@ namespace repl {
         uassert(13308, "replSet bad config version #", version > 0);
         uassert(13133, "replSet bad config no members", members.size() >= 1);
         uassert(13309, "replSet bad config maximum number of members is 12", members.size() <= 12);
+        if (!getLastErrorDefaults.isEmpty() && getLastErrorDefaults.hasField("w")
+                && getLastErrorDefaults["w"].isNumber()) {
+            uassert(17505, "replSet illegal config: getLastErrorDefaults w:0",
+                    getLastErrorDefaults["w"].safeNumberLong() != 0);
+        }
         {
             unsigned voters = 0;
             for( vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); ++i ) {
