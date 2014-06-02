@@ -6,6 +6,7 @@
  */
 #include "leveldb_wt.h"
 #include <sys/stat.h>
+#include <unistd.h>
 #include <sstream>
 
 using leveldb::Cache;
@@ -28,7 +29,8 @@ using leveldb::Value;
 #endif
 
 #define	WT_URI	"table:data"
-#define	WT_CONFIG	"type=lsm,leaf_page_max=4KB,leaf_item_max=1KB,"
+#define	WT_CONN_CONFIG	"session_max=256,"
+#define	WT_TABLE_CONFIG	"type=lsm,leaf_page_max=4KB,leaf_item_max=1KB,"
 
 /* Destructors required for interfaces. */
 leveldb::DB::~DB() {}
@@ -128,10 +130,11 @@ Cache *NewLRUCache(size_t capacity) {
 Status DestroyDB(const std::string& name, const Options& options) {
   fprintf(stderr, "DestroyDB %s", name.c_str());
   WT_CONNECTION *conn;
-  int ret = ::wiredtiger_open(name.c_str(), NULL, NULL, &conn);
-  /* If the database cannot be opened, there is nothing to destroy. */
-  if (ret != 0)
+  /* If the database doesn't exist, there is nothing to destroy. */
+  if (access((name + "/WiredTiger").c_str(), F_OK) != 0)
 	  return Status::OK();
+  int ret = ::wiredtiger_open(name.c_str(), NULL, NULL, &conn);
+  assert(ret == 0);
   WT_SESSION *session;
   ret = conn->open_session(conn, NULL, NULL, &session);
   assert(ret == 0);
@@ -331,6 +334,7 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
 {
 	// Build the wiredtiger_open config.
 	std::stringstream s_conn;
+	s_conn << WT_CONN_CONFIG;
 	if (options.create_if_missing) {
 		(void)mkdir(name.c_str(), 0777);
 		s_conn << "create,";
@@ -349,7 +353,7 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
 
 	if (options.create_if_missing) {
 		std::stringstream s_table;
-		s_table << WT_CONFIG;
+		s_table << WT_TABLE_CONFIG;
 		s_table << "internal_page_max=" << options.block_size << ",";
 		s_table << "leaf_page_max=" << options.block_size << ",";
 		if (options.compression == kSnappyCompression)
