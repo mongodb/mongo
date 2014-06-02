@@ -1354,6 +1354,8 @@ extern int __wt_session_create_strip(WT_SESSION *wt_session,
     const char *v1,
     const char *v2,
     const char **value_ret);
+extern int __wt_rollback_transaction(WT_SESSION_IMPL *session,
+    const char *cfg[]);
 extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
     int internal,
     WT_EVENT_HANDLER *event_handler,

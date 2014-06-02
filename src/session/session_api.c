@@ -8,7 +8,6 @@
 #include "wt_internal.h"
 
 static int __session_checkpoint(WT_SESSION *, const char *);
-static int __session_rollback_transaction(WT_SESSION *, const char *);
 
 /*
  * __session_reset_cursors --
@@ -82,7 +81,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	/* Rollback any active transaction. */
 	if (F_ISSET(&session->txn, TXN_RUNNING))
-		WT_TRET(__session_rollback_transaction(wt_session, NULL));
+		WT_TRET(__wt_rollback_transaction(session, NULL));
 
 	/* Close all open cursors. */
 	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL) {
@@ -666,6 +665,20 @@ err:	API_END(session, ret);
 }
 
 /*
+ * __wt_rollback_transaction --
+ *	Reset cursors and rollback the session's transaction.
+ */
+int
+__wt_rollback_transaction(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_DECL_RET;
+
+	WT_TRET(__session_reset_cursors(session));
+	WT_TRET(__wt_txn_rollback(session, cfg));
+	return (ret);
+}
+
+/*
  * __session_rollback_transaction --
  *	WT_SESSION->rollback_transaction method.
  */
@@ -679,9 +692,7 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, rollback_transaction, config, cfg);
 	WT_STAT_FAST_CONN_INCR(session, txn_rollback);
 
-	WT_TRET(__session_reset_cursors(session));
-
-	WT_TRET(__wt_txn_rollback(session, cfg));
+	ret = __wt_rollback_transaction(session, cfg);
 
 err:	API_END(session, ret);
 	return (ret);

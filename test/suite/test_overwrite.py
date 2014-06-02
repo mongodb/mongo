@@ -58,6 +58,8 @@ class test_overwrite(wttest.WiredTigerTestCase):
         # is only for the insert method because the remove and update method
         # failure modes are for non-existent records, and you cannot duplicate
         # cursor pointing to non-existent records.
+        cursor = self.session.open_cursor(uri, None, "overwrite=false")
+        cursor.set_key(key_populate(cursor, 5))
         dupc = self.session.open_cursor(None, cursor, "overwrite=true")
         dupc.set_value('XXXXXXXXXX')
         self.assertEquals(dupc.insert(), 0)
