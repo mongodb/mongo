@@ -128,7 +128,6 @@ Cache *NewLRUCache(size_t capacity) {
 }
 
 Status DestroyDB(const std::string& name, const Options& options) {
-  fprintf(stderr, "DestroyDB %s", name.c_str());
   WT_CONNECTION *conn;
   /* If the database doesn't exist, there is nothing to destroy. */
   if (access((name + "/WiredTiger").c_str(), F_OK) != 0)
