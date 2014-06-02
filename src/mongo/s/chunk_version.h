@@ -68,10 +68,6 @@ namespace mongo {
             : _minor(minor),_major(major), _epoch(epoch) {
         }
 
-        ChunkVersion( unsigned long long ll, const OID& epoch )
-            : _combined( ll ), _epoch(epoch) {
-        }
-
         static ChunkVersion DROPPED() {
             return ChunkVersion( 0, 0, OID() ); // dropped OID is zero time, zero machineId/inc
         }
@@ -84,6 +80,12 @@ namespace mongo {
         static ChunkVersion IGNORED() {
             ChunkVersion version = ChunkVersion();
             version._epoch.init( 0, true ); // ignored OID is zero time, max machineId/inc
+            return version;
+        }
+
+        static ChunkVersion fromDeprecatedLong(unsigned long long num, const OID& epoch) {
+            ChunkVersion version(0, 0, epoch);
+            version._combined = num;
             return version;
         }
 
@@ -262,17 +264,13 @@ namespace mongo {
                 return ChunkVersion( 0, 0, el.OID() );
             }
 
-            if( el.isNumber() ){
-                return ChunkVersion( static_cast<unsigned long long>(el.numberLong()), OID() );
-            }
-
             if( type == Timestamp || type == Date ){
-                return ChunkVersion( el._numberLong(), OID() );
+                return fromDeprecatedLong( el._numberLong(), OID() );
             }
 
             *canParse = false;
 
-            return ChunkVersion( 0, OID() );
+            return ChunkVersion( 0, 0, OID() );
         }
 
         //

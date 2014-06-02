@@ -17,7 +17,7 @@ var fooEpoch = s.getDB('config').chunks.findOne({ ns: 'alleyinsider.foo' }).last
 assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
                        configdb: s._configDB,
                        authoritative: true,
-                       version: new NumberLong( 4294967296 ), // 1|0
+                       version: new Timestamp(1, 0),
                        versionEpoch: fooEpoch,
                        shard: "shard0000",
                        shardHost: "localhost:30000" }).ok == 1 );
@@ -41,7 +41,7 @@ function simpleFindOne(){
 var barEpoch = s.getDB('config').chunks.findOne({ ns: 'alleyinsider.bar' }).lastmodEpoch;
 assert.commandWorked( a2.runCommand({ setShardVersion: "alleyinsider.bar",
                                       configdb: s._configDB,
-                                      version: new NumberLong( 4294967296 ),
+                                      version: new Timestamp(1, 0),
                                       versionEpoch: barEpoch,
                                       authoritative: true }),
                       "setShardVersion bar temp" );

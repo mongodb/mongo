@@ -76,7 +76,7 @@ namespace mongo {
     bool Chunk::ShouldAutoSplit = true;
 
     Chunk::Chunk(const ChunkManager * manager, BSONObj from)
-        : _manager(manager), _lastmod(0, OID()), _dataWritten(mkDataWritten())
+        : _manager(manager), _lastmod(0, 0, OID()), _dataWritten(mkDataWritten())
     {
         string ns = from.getStringField(ChunkType::ns().c_str());
         _shard.reset(from.getStringField(ChunkType::shard().c_str()));
@@ -806,7 +806,7 @@ namespace mongo {
     {
 
         // Reset the max version, but not the epoch, when we aren't loading from the oldManager
-        _version = ChunkVersion( 0, _version.epoch() );
+        _version = ChunkVersion( 0, 0, _version.epoch() );
         set<ChunkVersion> minorVersions;
 
         // If we have a previous version of the ChunkManager to work from, use that info to reduce
@@ -872,7 +872,7 @@ namespace mongo {
             // Set all our data to empty
             chunkMap.clear();
             shardVersions.clear();
-            _version = ChunkVersion( 0, OID() );
+            _version = ChunkVersion( 0, 0, OID() );
 
             return true;
         }
@@ -896,7 +896,7 @@ namespace mongo {
             // Set all our data to empty to be extra safe
             chunkMap.clear();
             shardVersions.clear();
-            _version = ChunkVersion( 0, OID() );
+            _version = ChunkVersion( 0, 0, OID() );
 
             return allInconsistent;
         }
@@ -1110,7 +1110,7 @@ namespace mongo {
             }
         }
 
-        _version = ChunkVersion( 0, version.epoch() );
+        _version = ChunkVersion( 0, 0, version.epoch() );
     }
 
     ChunkPtr ChunkManager::findIntersectingChunk( const BSONObj& point ) const {
@@ -1437,7 +1437,7 @@ namespace mongo {
 
             if ( ! setShardVersion( conn.conn(),
                                     _ns,
-                                    ChunkVersion( 0, OID() ),
+                                    ChunkVersion( 0, 0, OID() ),
                                     ChunkManagerPtr(),
                                     true, res ) )
             {

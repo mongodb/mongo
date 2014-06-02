@@ -180,7 +180,7 @@ namespace mongo {
             return p->getShardVersion();
         }
         else {
-            return ChunkVersion( 0, OID() );
+            return ChunkVersion( 0, 0, OID() );
         }
     }
 
@@ -785,7 +785,7 @@ namespace mongo {
             return it->second;
         }
         else {
-            return ChunkVersion( 0, OID() );
+            return ChunkVersion( 0, 0, OID() );
         }
     }
 

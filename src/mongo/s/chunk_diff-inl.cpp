@@ -157,7 +157,9 @@ namespace mongo {
 
                 warning() << "got invalid chunk version " << chunkVersion << " in document " << diffChunkDoc
                           << " when trying to load differing chunks at version "
-                          << ChunkVersion( _maxVersion->toLong(), currEpoch ) << endl;
+                          << ChunkVersion( _maxVersion->majorVersion(),
+                                           _maxVersion->minorVersion(),
+                                           currEpoch ) << endl;
 
                 // Don't keep loading, since we know we'll be broken here
                 return -1;

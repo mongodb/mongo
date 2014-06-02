@@ -1266,7 +1266,14 @@ namespace mongo {
                 if ( conns[i]->setVersion() ) {
                     conns[i]->done();
                     // Version is zero b/c this is deprecated codepath
-                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ), true ).what() + errLoc );
+                    staleConfigExs.push_back(
+                            str::stream() << "stale config detected for "
+                                          << RecvStaleConfigException( _ns,
+                                                                       "ParallelCursor::_init",
+                                                                       ChunkVersion( 0, 0, OID() ),
+                                                                       ChunkVersion( 0, 0, OID() ),
+                                                                       true ).what()
+                                          << errLoc );
                     break;
                 }
 
@@ -1420,7 +1427,11 @@ namespace mongo {
 
             if( throwException && staleConfigExs.size() > 0 ){
                 // Version is zero b/c this is deprecated codepath
-                throw RecvStaleConfigException( _ns , errMsg.str() , ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ), ! allConfigStale );
+                throw RecvStaleConfigException( _ns,
+                                                errMsg.str(),
+                                                ChunkVersion( 0, 0, OID() ),
+                                                ChunkVersion( 0, 0, OID() ),
+                                                !allConfigStale );
             }
             else if( throwException )
                 throw DBException( errMsg.str(), 14827 );

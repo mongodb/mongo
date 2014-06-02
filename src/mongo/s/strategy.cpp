@@ -106,7 +106,10 @@ namespace mongo {
             if ( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
                 dbcon.done();
                 // Version is zero b/c this is deprecated codepath
-                throw RecvStaleConfigException( r.getns() , "Strategy::doQuery", ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ) );
+                throw RecvStaleConfigException( r.getns(),
+                                                "Strategy::doQuery",
+                                                ChunkVersion( 0, 0, OID() ),
+                                                ChunkVersion( 0, 0, OID() ));
             }
         }
 

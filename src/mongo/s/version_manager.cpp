@@ -242,7 +242,7 @@ namespace mongo {
                         << conn_in->getServerAddress() << ")" );
 
             throw SendStaleConfigException( ns, msg,
-                    refManager->getVersion( shard ), ChunkVersion( 0, OID() ));
+                    refManager->getVersion( shard ), ChunkVersion( 0, 0, OID() ));
         }
 
         // has the ChunkManager been reloaded since the last time we updated the connection-level version?
@@ -252,8 +252,7 @@ namespace mongo {
             return false;
         }
 
-
-        ChunkVersion version = ChunkVersion( 0, OID() );
+        ChunkVersion version = ChunkVersion( 0, 0, OID() );
         if ( isSharded && manager ) {
             version = manager->getVersion( Shard::make( conn->getServerAddress() ) );
         }

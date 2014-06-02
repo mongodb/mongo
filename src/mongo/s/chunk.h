@@ -75,7 +75,7 @@ namespace mongo {
         // serialization support
         //
 
-        void serialize(BSONObjBuilder& to, ChunkVersion myLastMod=ChunkVersion(0,OID()));
+        void serialize(BSONObjBuilder& to, ChunkVersion myLastMod = ChunkVersion(0, 0, OID()));
 
         //
         // chunk boundary support
