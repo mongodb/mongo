@@ -229,7 +229,7 @@ config_read(char ***listp, int *hexp)
 
 				/*
 				 * List already freed by realloc, still use err
-				 * lable for consistency.
+				 * label for consistency.
 				 */
 				list = NULL;
 				goto err;
