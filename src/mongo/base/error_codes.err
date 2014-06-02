@@ -89,6 +89,8 @@ error_code("IndexKeySpecsConflict", 86 )
 error_code("CannotSplit", 87)
 error_code("SplitFailed", 88)
 error_code("NetworkTimeout", 89)
+error_code("CallbackCanceled", 90)
+error_code("ShutdownInProgress", 91)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h

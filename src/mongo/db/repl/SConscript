@@ -1,0 +1,11 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library('replication_executor',
+            'replication_executor.cpp',
+            LIBDEPS=['$BUILD_DIR/mongo/foundation'])
+
+env.CppUnitTest('replication_executor_test',
+                'replication_executor_test.cpp',
+                LIBDEPS=['replication_executor'])
