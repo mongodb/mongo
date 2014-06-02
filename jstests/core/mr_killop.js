@@ -1,5 +1,7 @@
 // Test killop applied to m/r operations and child ops of m/r operations.
 
+if (0) {// SERVER-14143
+
 t = db.jstests_mr_killop;
 t.drop();
 t2 = db.jstests_mr_killop_out;
@@ -153,3 +155,4 @@ var loop = function() {
 }
 runMRTests( loop, false );
 runFinalizeTests( loop, false );
+}

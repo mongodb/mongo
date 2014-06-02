@@ -11,6 +11,9 @@
  * after 30 seconds of wall clock time have passed.  For these operations to take a long time, the
  * counted collection must not be empty; hence an initial write to the collection is required.
  */
+
+if (0) {// SERVER-14143
+
 t = db.jstests_killop
 t.drop();
 
@@ -59,3 +62,4 @@ finally {
 // time from the moment the operation starts, but "start" measures from shortly after the test sends
 // the killop message to the server.
 assert( ( new Date() ) - start < 30000 );
+}

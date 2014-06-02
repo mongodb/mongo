@@ -53,6 +53,8 @@ assert.eq(1, x.count, "XXX1");
 assert.eq("test.bar", x.ns, "XXX2");
 assert(!x.sharded, "XXX3: " + tojson(x));
 
+if (0) {// SERVER-14143
+
 // fork shell and start querying the data
 var start = new Date();
 
@@ -137,6 +139,8 @@ assert.gt(whereKillSleepTime * numDocs / 20, killTime, "took too long to kill");
 join();
 var end = new Date();
 print("elapsed: " + (end.getTime() - start.getTime()));
+
+}
 
 // test fsync command on non-admin db
 x = db.runCommand("fsync");

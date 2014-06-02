@@ -1,5 +1,7 @@
 print("BEGIN currentop.js");
 
+if (0) {// SERVER-14143
+
 // test basic currentop functionality + querying of nested documents
 t = db.jstests_currentop
 t.drop();
@@ -77,3 +79,4 @@ s2();
 
 // don't want to pass if timeout killed the js function
 assert( ( new Date() ) - start < 30000 );
+}
