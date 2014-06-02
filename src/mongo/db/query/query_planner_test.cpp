@@ -890,7 +890,7 @@ namespace {
                                 "pattern: {name: 1}}}}}");
     }
 
-    // SERVER-13960
+    // SERVER-13960: multiple indices, each with an inexact covered predicate.
     TEST_F(QueryPlannerTest, OrInexactWithExact2) {
         addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
@@ -903,6 +903,135 @@ namespace {
                                     "pattern: {a: 1}}},"
                                 "{ixscan: {filter: {$or:[{b:'foo'},{b:/bar/}]},"
                                     "pattern: {b: 1}}}]}}}}");
+    }
+
+    // SERVER-13960: an exact, inexact covered, and inexact fetch predicate.
+    TEST_F(QueryPlannerTest, OrAllThreeTightnesses) {
+        addIndex(BSON("names" << 1));
+        runQuery(fromjson("{$or: [{names: 'frank'}, {names: /^al(ice)|(ex)/},"
+                                 "{names: {$elemMatch: {$eq: 'thomas'}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: "
+                                "{$or: [{names: 'frank'}, {names: /^al(ice)|(ex)/},"
+                                    "{names: {$elemMatch: {$eq: 'thomas'}}}]}, "
+                                "node: {ixscan: {filter: null, pattern: {names: 1}}}}}");
+    }
+
+    // SERVER-13960: two inexact fetch predicates.
+    TEST_F(QueryPlannerTest, OrTwoInexactFetch) {
+        // true means multikey
+        addIndex(BSON("names" << 1), true);
+        runQuery(fromjson("{$or: [{names: {$elemMatch: {$eq: 'alexandra'}}},"
+                                 "{names: {$elemMatch: {$eq: 'thomas'}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: "
+                                "{$or: [{names: {$elemMatch: {$eq: 'alexandra'}}},"
+                                    "{names: {$elemMatch: {$eq: 'thomas'}}}]}, "
+                                "node: {ixscan: {filter: null, pattern: {names: 1}}}}}");
+    }
+
+    // SERVER-13960: multikey with exact and inexact covered predicates.
+    TEST_F(QueryPlannerTest, OrInexactCoveredMultikey) {
+        // true means multikey
+        addIndex(BSON("names" << 1), true);
+        runQuery(fromjson("{$or: [{names: 'dave'}, {names: /joe/}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {$or: [{names: 'dave'}, {names: /joe/}]}, "
+                                "node: {ixscan: {filter: null, pattern: {names: 1}}}}}");
+    }
+
+    // SERVER-13960: $elemMatch object with $or.
+    TEST_F(QueryPlannerTest, OrElemMatchObject) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1), true);
+        runQuery(fromjson("{$or: [{a: {$elemMatch: {b: {$lte: 1}}}},"
+                                 "{a: {$elemMatch: {b: {$gte: 4}}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{or: {nodes: ["
+                                "{fetch: {filter: {a:{$elemMatch:{b:{$gte:4}}}}, node: "
+                                    "{ixscan: {filter: null, pattern: {'a.b': 1}}}}},"
+                                "{fetch: {filter: {a:{$elemMatch:{b:{$lte:1}}}}, node: "
+                                    "{ixscan: {filter: null, pattern: {'a.b': 1}}}}}]}}");
+    }
+
+    // SERVER-13960: $elemMatch object inside an $or, below an AND.
+    TEST_F(QueryPlannerTest, OrElemMatchObjectBeneathAnd) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1), true);
+        runQuery(fromjson("{$or: [{'a.b': 0, a: {$elemMatch: {b: {$lte: 1}}}},"
+                                 "{a: {$elemMatch: {b: {$gte: 4}}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{or: {nodes: ["
+                                "{fetch: {filter: {$and:[{a:{$elemMatch:{b:{$lte:1}}}},{'a.b':0}]},"
+                                    "node: {ixscan: {filter: null, pattern: {'a.b': 1}, "
+                                        "bounds: {'a.b': [[-Infinity,1,true,true]]}}}}},"
+                                "{fetch: {filter: {a:{$elemMatch:{b:{$gte:4}}}}, node: "
+                                    "{ixscan: {filter: null, pattern: {'a.b': 1},"
+                                        "bounds: {'a.b': [[4,Infinity,true,true]]}}}}}]}}");
+    }
+
+    // SERVER-13960: $or below $elemMatch with an inexact covered predicate.
+    TEST_F(QueryPlannerTest, OrBelowElemMatchInexactCovered) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {$or: [{b: 'x'}, {b: /z/}]}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a: {$elemMatch: {$or: [{b: 'x'}, {b: /z/}]}}},"
+                                "node: {ixscan: {filter: null, pattern: {'a.b': 1}}}}}");
+    }
+
+    // SERVER-13960: $in with exact and inexact covered predicates.
+    TEST_F(QueryPlannerTest, OrWithExactAndInexact) {
+        addIndex(BSON("name" << 1));
+        runQuery(fromjson("{name: {$in: ['thomas', /^alexand(er|ra)/]}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: "
+                                "{filter: {name: {$in: ['thomas', /^alexand(er|ra)/]}}, "
+                                "pattern: {name: 1}}}}}");
+    }
+
+    // SERVER-13960: $in with exact, inexact covered, and inexact fetch predicates.
+    TEST_F(QueryPlannerTest, OrWithExactAndInexact2) {
+        addIndex(BSON("name" << 1));
+        runQuery(fromjson("{$or: [{name: {$in: ['thomas', /^alexand(er|ra)/]}},"
+                                 "{name: {$exists: false}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {$or: [{name: {$in: ['thomas', /^alexand(er|ra)/]}},"
+                                                     "{name: {$exists: false}}]}, "
+                                "node: {ixscan: {filter: null, pattern: {name: 1}}}}}");
+    }
+
+    // SERVER-13960: $in with exact, inexact covered, and inexact fetch predicates
+    // over two indices.
+    TEST_F(QueryPlannerTest, OrWithExactAndInexact3) {
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        runQuery(fromjson("{$or: [{a: {$in: [/z/, /x/]}}, {a: 'w'},"
+                                 "{b: {$exists: false}}, {b: {$in: ['p']}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {or: {nodes: ["
+                                "{ixscan: {filter: {$or:[{a:{$in:[/z/, /x/]}}, {a:'w'}]}, "
+                                    "pattern: {a: 1}}}, "
+                                "{fetch: {filter: {$or:[{b:{$exists:false}}, {b:{$in:['p']}}]},"
+                                    "node: {ixscan: {filter: null, pattern: {b: 1}}}}}]}}}}");
     }
 
     //

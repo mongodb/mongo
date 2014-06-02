@@ -563,4 +563,29 @@ namespace {
         assertSolutionExists("{fetch: {node: {text: {search: 'foo'}}}}");
     }
 
+    // SERVER-13960: $text beneath $or with exact predicates.
+    TEST_F(QueryPlannerTest, OrTextExact) {
+        addIndex(BSON("pre" << 1 << "_fts" << "text" << "_ftsx" << 1));
+        addIndex(BSON("other" << 1));
+        runQuery(fromjson("{$or: [{$text: {$search: 'dave'}, pre: 3}, {other: 2}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: null, node: {or: {nodes: ["
+                                "{text: {search: 'dave', prefix: {pre: 3}}},"
+                                "{ixscan: {filter: null, pattern: {other: 1}}}]}}}}");
+    }
+
+    // SERVER-13960: $text beneath $or with an inexact covered predicate.
+    TEST_F(QueryPlannerTest, OrTextInexactCovered) {
+        addIndex(BSON("pre" << 1 << "_fts" << "text" << "_ftsx" << 1));
+        addIndex(BSON("other" << 1));
+        runQuery(fromjson("{$or: [{$text: {$search: 'dave'}, pre: 3}, {other: /bar/}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: null, node: {or: {nodes: ["
+                                "{text: {search: 'dave', prefix: {pre: 3}}},"
+                                "{ixscan: {filter: {$or: [{other: /bar/}]}, "
+                                          "pattern: {other: 1}}}]}}}}");
+    }
+
 }  // namespace
