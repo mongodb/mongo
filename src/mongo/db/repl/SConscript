@@ -2,6 +2,14 @@
 
 Import("env")
 
+env.Library(
+    'network_interface_impl',
+    'network_interface_impl.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/clientdriver'
+        ])
+
 env.Library('replication_executor',
             'replication_executor.cpp',
             LIBDEPS=['$BUILD_DIR/mongo/foundation'])
