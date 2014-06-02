@@ -46,9 +46,10 @@ namespace mongo {
     AuthzSessionExternalStateMongod::~AuthzSessionExternalStateMongod() {}
 
     void AuthzSessionExternalStateMongod::startRequest(OperationContext* txn) {
-        if (!Lock::isLocked()) {
-            _checkShouldAllowLocalhost(txn);
-        }
+        // No locks should be held as this happens before any database accesses occur
+        fassert(17506, txn->lockState()->threadState() == 0);
+
+        _checkShouldAllowLocalhost(txn);
     }
 
     bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {
