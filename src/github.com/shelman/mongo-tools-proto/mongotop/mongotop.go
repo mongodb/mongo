@@ -9,10 +9,6 @@ import (
 	"time"
 )
 
-const (
-	DEFAULT_SLEEP_TIME = 1 * time.Second
-)
-
 // Wrapper for the mongotop functionality
 type MongoTop struct {
 	// generic mongo tool options
@@ -23,6 +19,9 @@ type MongoTop struct {
 
 	// for outputting the results
 	output.Outputter
+
+	// the sleep time
+	Sleeptime time.Duration
 }
 
 // Connect to the database and spin, running the top command and outputting
@@ -36,6 +35,9 @@ func (self *MongoTop) Run() error {
 	}
 
 	for {
+
+		// sleep
+		time.Sleep(self.Sleeptime)
 
 		// run the top command against the database
 		topResults, err := self.runTopCommand()
@@ -54,8 +56,6 @@ func (self *MongoTop) Run() error {
 		// update the previous results
 		previousResults = topResults
 
-		// sleep
-		time.Sleep(DEFAULT_SLEEP_TIME)
 	}
 
 	return nil

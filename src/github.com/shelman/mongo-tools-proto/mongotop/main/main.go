@@ -7,11 +7,12 @@ import (
 	"github.com/shelman/mongo-tools-proto/mongotop"
 	"github.com/shelman/mongo-tools-proto/mongotop/options"
 	"github.com/shelman/mongo-tools-proto/mongotop/output"
+	"strconv"
 	"time"
 )
 
 const (
-	DEFAULT_SLEEP_TIME = 1 * time.Second
+	DEFAULT_SLEEP_TIME = 1
 )
 
 func main() {
@@ -23,7 +24,7 @@ func main() {
 	outputOpts := &options.Output{}
 	opts.AddOptions(outputOpts)
 
-	_, err := opts.Parse()
+	extra, err := opts.Parse()
 	if err != nil {
 		util.Panicf("error parsing command line options: %v", err)
 	}
@@ -38,6 +39,16 @@ func main() {
 		return
 	}
 
+	// pull out the sleeptime
+	// TODO: validate args length
+	sleeptime := DEFAULT_SLEEP_TIME
+	if len(extra) > 0 {
+		sleeptime, err = strconv.Atoi(extra[0])
+		if err != nil {
+			util.Panicf("bad sleep time: %v", extra[0])
+		}
+	}
+
 	// create a session provider to connect to the db
 	sessionProvider, err := db.InitSessionProvider(opts)
 	if err != nil {
@@ -49,6 +60,7 @@ func main() {
 		Options:         opts,
 		Outputter:       &output.TerminalOutputter{},
 		SessionProvider: sessionProvider,
+		Sleeptime:       time.Duration(sleeptime) * time.Second,
 	}
 
 	// kick it off
