@@ -486,7 +486,7 @@ namespace mongo {
                     processSection((const JSectHeader*) hdr, data, dataLen, (const JSectFooter*) footer);
 
                     // ctrl c check
-                    killCurrentOp.checkForInterrupt(false);
+                    uassert(ErrorCodes::Interrupted, "interrupted during journal recovery", !inShutdown());
                 }
             }
             catch( BufReader::eof& ) {
