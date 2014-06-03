@@ -65,12 +65,13 @@
 		else if (ret == 0 && !F_ISSET(&(s)->txn, TXN_ERROR))	\
 			ret = __wt_txn_commit((s), NULL);		\
 		else {							\
-			WT_TRET(__wt_rollback_transaction((s), NULL));	\
+			WT_TRET(__wt_txn_rollback((s), NULL));		\
 			if ((ret == 0 || ret == WT_DEADLOCK) &&		\
 			    (retry)) {					\
 				ret = 0;				\
 				continue;				\
 			}						\
+			WT_TRET(__wt_session_reset_cursors(s));		\
 		}							\
 	}								\
 	break;								\
