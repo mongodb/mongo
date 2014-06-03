@@ -364,6 +364,29 @@ namespace repl {
         dropDatabase(txn, ctx.db());
     }
 
+    /**
+     * @param errmsg out  - Error message (if encountered).
+     * @param errCode out - If provided, this will be set on error to the server's error code.
+     *                      Currently this will only be set if there is an error in the initial
+     *                      system.namespaces query.
+     */
+    bool cloneFrom(OperationContext* txn,
+                           Client::Context& context,
+                           const string& masterHost,
+                           const CloneOptions& options,
+                           string& errmsg,
+                           int* errCode) {
+
+        Cloner cloner;
+        return cloner.go(txn,
+                         context,
+                         masterHost.c_str(),
+                         options,
+                         NULL,
+                         errmsg,
+                         errCode);
+    }
+
     /* grab initial copy of a database from the master */
     void ReplSource::resync(OperationContext* txn, const std::string& dbName) {
         const std::string db(dbName);   // need local copy of the name, we're dropping the original
@@ -382,7 +405,7 @@ namespace repl {
             cloneOptions.snapshot = true;
             cloneOptions.mayYield = true;
             cloneOptions.mayBeInterrupted = false;
-            bool ok = Cloner::cloneFrom(txn, ctx,hostName, cloneOptions, errmsg, &errCode);
+            bool ok = cloneFrom(txn, ctx,hostName, cloneOptions, errmsg, &errCode);
 
             if ( !ok ) {
                 if ( errCode == DatabaseDifferCaseCode ) {

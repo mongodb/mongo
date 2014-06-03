@@ -345,6 +345,21 @@ namespace repl {
         }
     }
 
+    bool copyCollectionFromRemote(OperationContext* txn,
+                                          const string& host,
+                                          const string& ns,
+                                          string& errmsg) {
+        Cloner cloner;
+
+        DBClientConnection *tmpConn = new DBClientConnection();
+        // cloner owns _conn in auto_ptr
+        cloner.setConnection(tmpConn);
+        uassert(15908, errmsg,
+                tmpConn->connect(host, errmsg) && repl::replAuthenticate(tmpConn));
+
+        return cloner.copyCollection(txn, ns, BSONObj(), errmsg, true, false, true, false);
+    }
+
     void ReplSetImpl::syncFixUp(FixUpInfo& fixUpInfo, OplogReader& oplogreader) {
         DBClientConnection* them = oplogreader.conn();
         OperationContextImpl txn;
@@ -429,8 +444,7 @@ namespace repl {
                 {
                     string errmsg;
                     dbtemprelease release(txn.lockState());
-                    bool ok = Cloner::copyCollectionFromRemote(&txn, them->getServerAddress(),
-                                                               ns, errmsg);
+                    bool ok = copyCollectionFromRemote(&txn, them->getServerAddress(), ns, errmsg);
                     uassert(15909, str::stream() << "replSet rollback error resyncing collection "
                                                  << ns << ' ' << errmsg, ok);
                 }

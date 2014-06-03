@@ -258,7 +258,13 @@ namespace mongo {
         }
     }
 
-    bool Cloner::validateQueryResults(const auto_ptr<DBClientCursor>& cur,
+    /**
+     * validate the cloner query was successful
+     * @param cur   Cursor the query was executed on
+     * @param errCode out  Error code encountered during the query
+     * @param errmsg out  Error message encountered during the query
+     */
+    bool validateQueryResults(const auto_ptr<DBClientCursor>& cur,
                                       int32_t* errCode,
                                       string& errmsg) {
         if ( cur.get() == 0 )
@@ -275,21 +281,6 @@ namespace mongo {
             cur->putBack(first);
         }
         return true;
-    }
-
-    bool Cloner::copyCollectionFromRemote(OperationContext* txn,
-                                          const string& host,
-                                          const string& ns,
-                                          string& errmsg) {
-        Cloner cloner;
-
-        DBClientConnection *tmpConn = new DBClientConnection();
-        // cloner owns _conn in auto_ptr
-        cloner.setConnection(tmpConn);
-        uassert(15908, errmsg,
-                tmpConn->connect(host, errmsg) && repl::replAuthenticate(tmpConn));
-
-        return cloner.copyCollection(txn, ns, BSONObj(), errmsg, true, false, true, false);
     }
 
     bool Cloner::copyCollection(OperationContext* txn,
@@ -527,23 +518,6 @@ namespace mongo {
                  opts.logForRepl, masterSameProcess, opts.slaveOk, opts.mayYield, opts.mayBeInterrupted, query );
         }
         return true;
-    }
-
-    bool Cloner::cloneFrom(OperationContext* txn,
-                           Client::Context& context,
-                           const string& masterHost,
-                           const CloneOptions& options,
-                           string& errmsg,
-                           int* errCode,
-                           set<string>* clonedCollections) {
-        Cloner cloner;
-        return cloner.go(txn,
-                         context,
-                         masterHost.c_str(),
-                         options,
-                         clonedCollections,
-                         errmsg,
-                         errCode);
     }
 
 } // namespace mongo
