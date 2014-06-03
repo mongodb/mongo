@@ -116,7 +116,7 @@ namespace mongo {
                 responseCode = 400;
                 headers.push_back( "X_err: bad request" );
                 ss << "don't know how to handle a [" << method << "]";
-                out() << "don't know how to handle a [" << method << "]" << endl;
+                log() << "don't know how to handle a [" << method << "]" << endl;
             }
 
             if( html )

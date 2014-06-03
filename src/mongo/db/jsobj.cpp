@@ -1018,7 +1018,7 @@ namespace mongo {
     }
 
     void BSONObj::dump() const {
-        LogstreamBuilder builder = out();
+        LogstreamBuilder builder = log();
         builder << hex;
         const char *p = objdata();
         for ( int i = 0; i < objsize(); i++ ) {

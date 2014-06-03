@@ -1052,10 +1052,12 @@ namespace JSTests {
             // This can be overriden if a different meaning of equality besides woCompare is needed
             virtual void bsonEquals( const BSONObj &expected, const BSONObj &actual ) {
                 if ( expected.woCompare( actual ) ) {
-                    out() << "want:" << expected.jsonString() << " size: " << expected.objsize() << endl;
-                    out() << "got :" << actual.jsonString() << " size: " << actual.objsize() << endl;
-                    out() << expected.hexDump() << endl;
-                    out() << actual.hexDump() << endl;
+                    ::mongo::log() << "want:" << expected.jsonString()
+                                   << " size: " << expected.objsize() << endl;
+                    ::mongo::log() << "got :" << actual.jsonString()
+                                   << " size: " << actual.objsize() << endl;
+                    ::mongo::log() << expected.hexDump() << endl;
+                    ::mongo::log() << actual.hexDump() << endl;
                 }
                 ASSERT( !expected.woCompare( actual ) );
             }

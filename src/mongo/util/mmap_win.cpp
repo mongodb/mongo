@@ -539,7 +539,7 @@ namespace mongo {
             success = FALSE != FlushFileBuffers(_fd);
             if (!success) {
                 int err = GetLastError();
-                out() << "FlushFileBuffers failed: " << errnoWithDescription( err )
+                log() << "FlushFileBuffers failed: " << errnoWithDescription( err )
                       << " file: " << _filename << endl;
                 dataSyncFailedHandler();
             }

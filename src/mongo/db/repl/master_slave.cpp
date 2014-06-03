@@ -1144,7 +1144,7 @@ namespace repl {
                 }
             }
             catch (...) {
-                out() << "caught exception in _replMain" << endl;
+                log() << "caught exception in _replMain" << endl;
                 s = 4;
             }
 

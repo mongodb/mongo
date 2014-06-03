@@ -87,7 +87,7 @@ namespace mongo {
 
                 if ( nodes(i).hash == h && nodes(i).k == k ) {
                     if ( chain >= 200 )
-                        out() << "warning: hashtable " << name << " long chain " << std::endl;
+                        log() << "warning: hashtable " << name << " long chain " << std::endl;
                     found = true;
                     return i;
                 }
@@ -95,13 +95,13 @@ namespace mongo {
                 i = (i+1) % n;
                 if ( i == start ) {
                     // shouldn't get here / defensive for infinite loops
-                    out() << "error: hashtable " << name << " is full n:" << n << std::endl;
+                    log() << "error: hashtable " << name << " is full n:" << n << std::endl;
                     return -1;
                 }
                 if( chain >= maxChain ) {
                     if ( firstNonUsed >= 0 )
                         return firstNonUsed;
-                    out() << "error: hashtable " << name << " max chain reached:" << maxChain << std::endl;
+                    log() << "error: hashtable " << name << " max chain reached:" << maxChain << std::endl;
                     return -1;
                 }
             }
@@ -111,7 +111,7 @@ namespace mongo {
         /* buf must be all zeroes on initialization. */
         HashTable(void* buf, int buflen, const char *_name) : name(_name) {
             int m = sizeof(Node);
-            // out() << "hashtab init, buflen:" << buflen << " m:" << m << std::endl;
+            // log() << "hashtab init, buflen:" << buflen << " m:" << m << std::endl;
             n = buflen / m;
             if ( (n & 1) == 0 )
                 n--;
@@ -120,7 +120,7 @@ namespace mongo {
             //nodes = (Node *) buf;
 
             if ( sizeof(Node) != 628 ) {
-                out() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << " sizeof(Key): " << sizeof(Key) << " sizeof(Type):" << sizeof(Type) << std::endl;
+                log() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << " sizeof(Key): " << sizeof(Key) << " sizeof(Type):" << sizeof(Type) << std::endl;
                 verify( sizeof(Node) == 628 );
             }
 

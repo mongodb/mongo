@@ -140,7 +140,7 @@ namespace mongo {
                 /* assure object is valid.  note this will slow us down a little. */
                 const Status status = validateBSON(tmp.objdata(), tmp.objsize());
                 if (!status.isOK()) {
-                    out() << "Cloner: skipping corrupt object from " << from_collection
+                    log() << "Cloner: skipping corrupt object from " << from_collection
                           << ": " << status.reason();
                     continue;
                 }

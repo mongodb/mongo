@@ -330,13 +330,13 @@ static int _main() {
             }
 
             if ( configAddr.isLocalHost() != grid.allowLocalHost() ) {
-                out() << "cannot mix localhost and ip addresses in configdbs" << endl;
+                log() << "cannot mix localhost and ip addresses in configdbs" << endl;
                 return 10;
             }
 
         }
         catch ( DBException& e) {
-            out() << "configdb: " << e.what() << endl;
+            log() << "configdb: " << e.what() << endl;
             return 9;
         }
     }

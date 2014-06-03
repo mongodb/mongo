@@ -449,15 +449,15 @@ namespace mongo {
 
     namespace {
         void sysRuntimeInfo() {
-            out() << "sysinfo:" << endl;
+            log() << "sysinfo:" << endl;
 #if defined(_SC_PAGE_SIZE)
-            out() << "  page size: " << (int) sysconf(_SC_PAGE_SIZE) << endl;
+            log() << "  page size: " << (int) sysconf(_SC_PAGE_SIZE) << endl;
 #endif
 #if defined(_SC_PHYS_PAGES)
-            out() << "  _SC_PHYS_PAGES: " << sysconf(_SC_PHYS_PAGES) << endl;
+            log() << "  _SC_PHYS_PAGES: " << sysconf(_SC_PHYS_PAGES) << endl;
 #endif
 #if defined(_SC_AVPHYS_PAGES)
-            out() << "  _SC_AVPHYS_PAGES: " << sysconf(_SC_AVPHYS_PAGES) << endl;
+            log() << "  _SC_AVPHYS_PAGES: " << sysconf(_SC_AVPHYS_PAGES) << endl;
 #endif
         }
     } // namespace

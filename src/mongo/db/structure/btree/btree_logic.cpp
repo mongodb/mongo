@@ -1580,10 +1580,10 @@ namespace mongo {
             }
         }
 
-        out() << "ERROR: can't find ref to child bucket.\n";
-        out() << "child: " << bucketLoc << "\n";
+        log() << "ERROR: can't find ref to child bucket.\n";
+        log() << "child: " << bucketLoc << "\n";
         //dump();
-        out() << "Parent: " << bucket->parent << "\n";
+        log() << "Parent: " << bucket->parent << "\n";
         //p->dump();
         invariant(false);
         return -1; // just to compile
@@ -2133,10 +2133,10 @@ namespace mongo {
                 FullKey secondKey = getFullKey(bucket, i + 1);
                 int z = firstKey.data.woCompare(secondKey.data, ordering);
                 if (z > 0) {
-                    out() << "ERROR: btree key order corrupt.  Keys:" << endl;
+                    log() << "ERROR: btree key order corrupt.  Keys:" << endl;
                     if (++nDumped < 5) {
                         for (int j = 0; j < bucket->n; j++) {
-                            out() << "  " << getFullKey(bucket, j).data.toString() << endl;
+                            log() << "  " << getFullKey(bucket, j).data.toString() << endl;
                         }
                         dumpBucket(bucket);
                     }
@@ -2145,10 +2145,10 @@ namespace mongo {
                 }
                 else if (z == 0) {
                     if (!(firstKey.header.recordLoc < secondKey.header.recordLoc)) {
-                        out() << "ERROR: btree key order corrupt (recordlocs wrong):" << endl;
-                        out() << " k(" << i << ")" << firstKey.data.toString()
+                        log() << "ERROR: btree key order corrupt (recordlocs wrong):" << endl;
+                        log() << " k(" << i << ")" << firstKey.data.toString()
                               << " RL:" << firstKey.header.recordLoc.toString() << endl;
-                        out() << " k(" << i + 1 << ")" << secondKey.data.toString()
+                        log() << " k(" << i + 1 << ")" << secondKey.data.toString()
                               << " RL:" << secondKey.header.recordLoc.toString() << endl;
                         wassert(firstKey.header.recordLoc < secondKey.header.recordLoc);
                     }
@@ -2258,10 +2258,10 @@ namespace mongo {
         BucketType* bucket = getBucket(bucketLoc);
 
         if (*posInOut < 0 || *posInOut >= bucket->n ) {
-            out() << "ASSERT failure advancing btree bucket" << endl;
-            out() << "  thisLoc: " << bucketLoc.toString() << endl;
-            out() << "  keyOfs: " << *posInOut << " n:" << bucket->n << " direction: " << direction << endl;
-            // out() << bucketSummary() << endl;
+            log() << "ASSERT failure advancing btree bucket" << endl;
+            log() << "  thisLoc: " << bucketLoc.toString() << endl;
+            log() << "  keyOfs: " << *posInOut << " n:" << bucket->n << " direction: " << direction << endl;
+            // log() << bucketSummary() << endl;
             invariant(false);
         }
 

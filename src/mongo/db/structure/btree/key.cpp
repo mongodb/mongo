@@ -140,7 +140,7 @@ namespace mongo {
             return 0;
         }
         default:
-            out() << "oldCompareElementValues: bad type " << (int) l.type() << endl;
+            log() << "oldCompareElementValues: bad type " << (int) l.type() << endl;
             verify(false);
         }
         return -1;

@@ -90,8 +90,8 @@ namespace mongo {
             if ( argsElement.type() == Array ) {
                 args = argsElement.embeddedObject();
                 if ( edebug ) {
-                    out() << "args:" << args.toString() << endl;
-                    out() << "code:\n" << code << endl;
+                    log() << "args:" << args.toString() << endl;
+                    log() << "code:\n" << code << endl;
                 }
             }
         }
@@ -102,7 +102,7 @@ namespace mongo {
             res = s->invoke(f, &args, 0, storageGlobalParams.quota ? 10 * 60 * 1000 : 0);
             int m = t.millis();
             if (m > serverGlobalParams.slowMS) {
-                out() << "dbeval slow, time: " << dec << m << "ms " << dbName << endl;
+                log() << "dbeval slow, time: " << dec << m << "ms " << dbName << endl;
                 if ( m >= 1000 ) log() << code << endl;
                 else OCCASIONALLY log() << code << endl;
             }

@@ -876,7 +876,7 @@ namespace mongo {
            jscode    source code for a javascript function.
            info      the command object which contains any information on the invocation result including
                       the return value and other information.  If an error occurs running the jscode, error
-                     information will be in info.  (try "out() << info.toString()")
+                     information will be in info.  (try "log() << info.toString()")
            retValue  return value from the jscode function.
            args      args to pass to the jscode function.  when invoked, the 'args' variable will be defined
                      for use by the jscode.

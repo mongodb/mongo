@@ -939,7 +939,6 @@ namespace mongo {
         WinsockInit() {
             WSADATA d;
             if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
-                out() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
                 log() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
                 _exit(EXIT_NTSERVICE_ERROR);
             }

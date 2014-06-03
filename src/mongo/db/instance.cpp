@@ -434,7 +434,7 @@ namespace mongo {
             char *p = m.singleData()->_data;
             int len = strlen(p);
             if ( len > 400 )
-                out() << curTimeMillis64() % 10000 <<
+                log() << curTimeMillis64() % 10000 <<
                       " long msg received, len:" << len << endl;
 
             Message *resp = new Message();

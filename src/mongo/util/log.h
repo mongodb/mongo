@@ -85,11 +85,6 @@ namespace logger {
     }
 
 
-    /**
-     * Synonym for log().
-     */
-    inline LogstreamBuilder out() { return log(); }
-
 #define MONGO_LOG(DLEVEL) \
     if (!(::mongo::logger::globalLogDomain())->shouldLog(::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
     else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))

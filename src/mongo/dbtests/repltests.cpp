@@ -111,8 +111,8 @@ namespace ReplTests {
         }
         void check( const BSONObj &expected, const BSONObj &got ) const {
             if ( expected.woCompare( got ) ) {
-                out() << "expected: " << expected.toString()
-                      << ", got: " << got.toString() << endl;
+                ::mongo::log() << "expected: " << expected.toString()
+                               << ", got: " << got.toString() << endl;
             }
             ASSERT_EQUALS( expected , got );
         }
@@ -202,10 +202,10 @@ namespace ReplTests {
 
             RecordIterator* it = coll->getIterator( DiskLoc(), false,
                                                         CollectionScanParams::FORWARD );
-            out() << "all for " << ns << endl;
+            ::mongo::log() << "all for " << ns << endl;
             while ( !it->isEOF() ) {
                 DiskLoc currLoc = it->getNext();
-                out() << coll->docFor(currLoc).toString() << endl;
+                ::mongo::log() << coll->docFor(currLoc).toString() << endl;
             }
             delete it;
         }
