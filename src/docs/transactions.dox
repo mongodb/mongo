@@ -24,7 +24,7 @@ properties:
 
 @section transactions_api Transactional API
 
-In WiredTiger, transaction operations are methods off the WT_SESSION::
+In WiredTiger, transaction operations are methods off the WT_SESSION
 class.
 
 Applications call WT_SESSION::begin_transaction to start a new transaction.
