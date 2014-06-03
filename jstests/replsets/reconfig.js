@@ -30,7 +30,7 @@ var oldVersion = config.version++;
 config.members[0].votes = 2;
 config.members[3].votes = 2;
 try {
-    master.getDB("admin").runCommand({replSetReconfig : config});
+    assert.commandWorked(master.getDB("admin").runCommand({replSetReconfig : config}));
 }
 catch(e) {
     print(e);
@@ -62,7 +62,7 @@ oldVersion = config.version;
 config.version++;
 master = replTest.getMaster();
 try {
-    master.getDB("admin").runCommand({replSetReconfig : config});
+    assert.commandWorked(master.getDB("admin").runCommand({replSetReconfig : config}));
 }
 catch (e) {
     print(e);
