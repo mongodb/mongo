@@ -416,6 +416,8 @@ config_clear(void)
 	}
 	free(g.uri);
 	g.uri = NULL;
+	free(g.session_config);
+	g.session_config = NULL;
 }
 
 /*
@@ -459,9 +461,10 @@ config_single(const char *s, int perm)
 			config_map_compression(ep, &g.c_compression_flag);
 			*cp->vstr = strdup(ep);
 		} else if (strncmp(s, "isolation", strlen("isolation")) == 0) {
-			*cp->vstr =
+			*cp->vstr = strdup(ep);
+			g.session_config =
 			    malloc(strlen("isolation=") + strlen(ep) + 1);
-			sprintf(*cp->vstr, "isolation=%s", ep);
+			sprintf(g.session_config, "isolation=%s", ep);
 		} else if (strncmp(s, "file_type", strlen("file_type")) == 0) {
 			config_map_file_type(ep, &g.type);
 			*cp->vstr = strdup(config_file_type(g.type));
