@@ -51,6 +51,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h" // this is ugly
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
@@ -538,7 +539,9 @@ namespace mongo {
         if ( !IndexDescriptor::isIdIndexPattern( key ) ) {
             // for non _id indexes, we check to see if replication has turned off all indexes
             // we _always_ created _id index
-            if (repl::theReplSet && !repl::theReplSet->buildIndexes()) {
+            repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+            if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
+                    !repl::theReplSet->buildIndexes()) {
                 // this is not exactly the right error code, but I think will make the most sense
                 return Status( ErrorCodes::IndexAlreadyExists, "no indexes per repl" );
             }

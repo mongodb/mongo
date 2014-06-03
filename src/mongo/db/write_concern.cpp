@@ -30,6 +30,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/timer_stats.h"
@@ -53,10 +54,10 @@ namespace mongo {
         }
 
         const bool isConfigServer = serverGlobalParams.configsvr;
-        const bool isMasterSlaveNode = repl::anyReplEnabled() && !repl::theReplSet;
-        const bool isReplSetNode = repl::anyReplEnabled() && repl::theReplSet;
+        const repl::ReplicationCoordinator::Mode replMode =
+                repl::getGlobalReplicationCoordinator()->getReplicationMode();
 
-        if ( isConfigServer || ( !isMasterSlaveNode && !isReplSetNode ) ) {
+        if ( isConfigServer || replMode == repl::ReplicationCoordinator::modeNone ) {
 
             // Note that config servers can be replicated (have an oplog), but we still don't allow
             // w > 1
@@ -69,7 +70,9 @@ namespace mongo {
             }
         }
 
-        if ( !isReplSetNode && !writeConcern.wMode.empty() && writeConcern.wMode != "majority" ) {
+        if ( replMode != repl::ReplicationCoordinator::modeReplSet &&
+                !writeConcern.wMode.empty() &&
+                writeConcern.wMode != "majority" ) {
             return Status( ErrorCodes::BadValue,
                            string( "cannot use non-majority 'w' mode " ) + writeConcern.wMode
                            + " when a host is not a member of a replica set" );
@@ -167,13 +170,15 @@ namespace mongo {
             return Status::OK();
         }
 
-        if (!repl::anyReplEnabled() || serverGlobalParams.configsvr) {
+        const repl::ReplicationCoordinator::Mode replMode =
+                repl::getGlobalReplicationCoordinator()->getReplicationMode();
+        if (replMode == repl::ReplicationCoordinator::modeNone || serverGlobalParams.configsvr) {
             // no replication check needed (validated above)
             return Status::OK();
         }
 
-        const bool isMasterSlaveNode = repl::anyReplEnabled() && !repl::theReplSet;
-        if ( writeConcern.wMode == "majority" && isMasterSlaveNode ) {
+        if ( writeConcern.wMode == "majority" &&
+                replMode == repl::ReplicationCoordinator::modeMasterSlave ) {
             // with master/slave, majority is equivalent to w=1
             return Status::OK();
         }

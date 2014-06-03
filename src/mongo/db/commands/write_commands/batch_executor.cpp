@@ -45,6 +45,7 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/server_parameters.h"
@@ -353,9 +354,11 @@ namespace mongo {
                 response->setWriteConcernError( wcError.release() );
             }
 
-            if (repl::anyReplEnabled()) {
+            const repl::ReplicationCoordinator::Mode replMode =
+                    repl::getGlobalReplicationCoordinator()->getReplicationMode();
+            if (replMode != repl::ReplicationCoordinator::modeNone) {
                 response->setLastOp( _client->getLastOp() );
-                if (repl::theReplSet) {
+                if (replMode == repl::ReplicationCoordinator::modeReplSet) {
                     response->setElectionId(repl::theReplSet->getElectionId());
                 }
             }

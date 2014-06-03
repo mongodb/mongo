@@ -54,6 +54,8 @@ namespace repl {
 
         virtual bool isReplEnabled() const;
 
+        virtual Mode getReplicationMode() const;
+
         virtual const MemberState& getCurrentMemberState() const;
 
         virtual Status awaitReplication(const OpTime& ts,

@@ -51,7 +51,7 @@ namespace repl {
 
         virtual bool isShutdownOkay() const;
 
-        virtual bool isReplEnabled() const;
+        virtual Mode getReplicationMode() const;
 
         virtual const MemberState& getCurrentMemberState() const;
 

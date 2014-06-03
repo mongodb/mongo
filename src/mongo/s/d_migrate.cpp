@@ -61,6 +61,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
@@ -802,7 +803,9 @@ namespace mongo {
             // if we do a w=2 after every write
             bool secondaryThrottle = cmdObj["secondaryThrottle"].trueValue();
             if ( secondaryThrottle ) {
-                if (repl::theReplSet) {
+                const repl::ReplicationCoordinator::Mode replMode =
+                        repl::getGlobalReplicationCoordinator()->getReplicationMode();
+                if (replMode == repl::ReplicationCoordinator::modeReplSet) {
                     if (repl::theReplSet->config().getMajority() <= 1) {
                         secondaryThrottle = false;
                         warning() << "not enough nodes in set to use secondaryThrottle: "
@@ -810,7 +813,7 @@ namespace mongo {
                                   << endl;
                     }
                 }
-                else if (!repl::anyReplEnabled() ) {
+                else if (replMode == repl::ReplicationCoordinator::modeNone) {
                     secondaryThrottle = false;
                     warning() << "secondaryThrottle selected but no replication" << endl;
                 }
@@ -1606,8 +1609,12 @@ namespace mongo {
             verify( ! min.isEmpty() );
             verify( ! max.isEmpty() );
             
-            replSetMajorityCount = repl::theReplSet ?
-                                        repl::theReplSet->config().getMajority() : 0;
+            if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                    repl::ReplicationCoordinator::modeReplSet) {
+                replSetMajorityCount = repl::theReplSet->config().getMajority();
+            } else {
+                replSetMajorityCount = 0;
+            }
 
             log() << "starting receiving-end of migration of chunk " << min << " -> " << max <<
                     " for collection " << ns << " from " << from
@@ -2231,8 +2238,9 @@ namespace mongo {
                 migrateStatus.shardKeyPattern = keya.getOwned();
             }
 
-            if (migrateStatus.secondaryThrottle && ! repl::anyReplEnabled()) {
-                warning() << "secondaryThrottle asked for, but not replication" << endl;
+            if (migrateStatus.secondaryThrottle &&
+                    !repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
+                warning() << "secondaryThrottle asked for, but no replication is enabled" << endl;
                 migrateStatus.secondaryThrottle = false;
             }
 

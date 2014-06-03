@@ -56,6 +56,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
@@ -306,7 +307,8 @@ namespace mongo {
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {
         // _lastOp is never set if replication is off
-        if (repl::theReplSet || !_lastOp.isNull()) {
+        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                repl::ReplicationCoordinator::modeReplSet || !_lastOp.isNull()) {
             b.appendTimestamp( "lastOp" , _lastOp.asDate() );
         }
     }
@@ -348,7 +350,8 @@ namespace mongo {
 
         _handshake = b.obj();
 
-        if (!repl::theReplSet || !o.hasField("member")) {
+        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+                repl::ReplicationCoordinator::modeReplSet || !o.hasField("member")) {
             return false;
         }
 

@@ -80,11 +80,22 @@ namespace repl {
          */
         virtual bool isShutdownOkay() const = 0;
 
+        enum Mode {
+            modeNone = 0,
+            modeReplSet,
+            modeMasterSlave
+        };
+
+        /**
+         * Returns a value indicating whether this node is a standalone, master/slave, or replicaset
+         */
+        virtual Mode getReplicationMode() const = 0;
+
         /**
          * Returns true if this node is configured to be a member of a replica set or master/slave
          * setup.
          */
-        virtual bool isReplEnabled() const = 0;
+        virtual bool isReplEnabled() const { return getReplicationMode() != modeNone; }
 
         /**
          * Returns the current replica set state of this node (PRIMARY, SECONDARY, STARTUP, etc).

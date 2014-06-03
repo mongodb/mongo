@@ -34,6 +34,7 @@
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/commands/user_management_commands.h"
 #include "mongo/db/repl/multicmd.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/util/mongoutils/str.h"
@@ -43,7 +44,8 @@ namespace mongo {
 namespace {
 
     Status checkReplicaMemberVersions() {
-        if (!repl::theReplSet)
+        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+                repl::ReplicationCoordinator::modeReplSet)
             return Status::OK();
 
 

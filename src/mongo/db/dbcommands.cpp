@@ -65,6 +65,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repair_database.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -96,7 +97,8 @@ namespace mongo {
         bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
         if (!force &&
-                repl::theReplSet &&
+                repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                        repl::ReplicationCoordinator::modeReplSet &&
                 repl::theReplSet->getConfig().members.size() > 1 &&
                 repl::theReplSet->isPrimary()) {
             long long timeout, now, start;
@@ -1426,7 +1428,8 @@ namespace mongo {
         }
 
         if (!c->maintenanceOk()
-                && repl::theReplSet
+                && repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                        repl::ReplicationCoordinator::modeReplSet
                 && !repl::isMasterNs(dbname.c_str())
                 && !repl::theReplSet->isSecondary()) {
             result.append( "note" , "from execCommand" );
@@ -1440,7 +1443,9 @@ namespace mongo {
 
         client.curop()->setCommand(c);
 
-        if (c->maintenanceMode() && repl::theReplSet) {
+        if (c->maintenanceMode() &&
+                repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                        repl::ReplicationCoordinator::modeReplSet) {
             mmSetter.reset(new MaintenanceModeSetter());
         }
 
@@ -1484,7 +1489,8 @@ namespace mongo {
         appendCommandStatus(result, retval, errmsg);
         
         // For commands from mongos, append some info to help getLastError(w) work.
-        if (repl::theReplSet) {
+        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                repl::ReplicationCoordinator::modeReplSet) {
             // Detect mongos connections by looking for setShardVersion to have been run previously
             // on this connection.
             if (shardingState.needCollectionMetadata(dbname)) {

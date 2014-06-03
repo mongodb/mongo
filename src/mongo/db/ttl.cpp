@@ -42,6 +42,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/background.h"
@@ -167,7 +168,9 @@ namespace mongo {
                 }
 
                 // if part of replSet but not in a readable state (e.g. during initial sync), skip.
-                if (repl::theReplSet && !repl::theReplSet->state().readable())
+                if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                        repl::ReplicationCoordinator::modeReplSet &&
+                        !repl::theReplSet->state().readable())
                     continue;
 
                 set<string> dbs;

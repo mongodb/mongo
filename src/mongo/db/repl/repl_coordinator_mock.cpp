@@ -56,6 +56,10 @@ namespace repl {
         return false;
     }
 
+    ReplicationCoordinator::Mode ReplicationCoordinatorMock::getReplicationMode() const {
+        return modeNone;
+    }
+
     const MemberState& ReplicationCoordinatorMock::getCurrentMemberState() const {
         // TODO
         invariant(false);

@@ -387,7 +387,7 @@ namespace repl {
         _logOp = _logOpRS;
     }
     void newRepl() {
-        replSettings.master = true;
+        replSettings.master = true; // TODO(spencer): is this necessary even when a replset?
         _logOp = _logOpUninitialized;
     }
     void oldRepl() { _logOp = _logOpOld; }

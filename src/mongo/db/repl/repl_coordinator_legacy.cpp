@@ -31,6 +31,8 @@
 #include "mongo/db/repl/repl_coordinator_legacy.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/rs.h"
 #include "mongo/util/assert_util.h" // TODO: remove along with invariant from getCurrentMemberState
 
 namespace mongo {
@@ -52,9 +54,13 @@ namespace repl {
         return false;
     }
 
-    bool LegacyReplicationCoordinator::isReplEnabled() const {
-        // TODO
-        return false;
+    ReplicationCoordinator::Mode LegacyReplicationCoordinator::getReplicationMode() const {
+        if (theReplSet) {
+            return modeReplSet;
+        } else if (replSettings.slave || replSettings.master) {
+            return modeMasterSlave;
+        }
+        return modeNone;
     }
 
     const MemberState& LegacyReplicationCoordinator::getCurrentMemberState() const {

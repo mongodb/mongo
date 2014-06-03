@@ -76,6 +76,7 @@
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/process_id.h"
@@ -1124,7 +1125,8 @@ namespace {
 
     void exitCleanly( ExitCode code ) {
         killCurrentOp.killAll();
-        if (repl::theReplSet) {
+        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                repl::ReplicationCoordinator::modeReplSet) {
             repl::theReplSet->shutdown();
         }
 

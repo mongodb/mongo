@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/write_concern.h"
 
@@ -212,7 +213,8 @@ namespace mongo {
 
             // If we got an electionId, make sure it matches
             if (electionIdPresent) {
-                if (!repl::theReplSet) {
+                if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+                        repl::ReplicationCoordinator::modeReplSet) {
                     // Ignore electionIds of 0 from mongos.
                     if (electionId != OID()) {
                         errmsg = "wElectionId passed but no replication active";

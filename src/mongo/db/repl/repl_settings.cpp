@@ -39,6 +39,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
@@ -51,10 +52,6 @@ namespace repl {
 
     // our config from command line etc.
     ReplSettings replSettings;
-
-    bool anyReplEnabled() {
-        return replSettings.slave || replSettings.master || theReplSet;
-    }
 
     void appendReplicationInfo(OperationContext* txn, BSONObjBuilder& result, int level) {
         if ( replSet ) {
@@ -148,7 +145,7 @@ namespace repl {
         bool includeByDefault() const { return true; }
         
         BSONObj generateSection(const BSONElement& configElement) const {
-            if ( ! anyReplEnabled() )
+            if ( ! getGlobalReplicationCoordinator()->isReplEnabled() )
                 return BSONObj();
             
             int level = configElement.numberInt();
