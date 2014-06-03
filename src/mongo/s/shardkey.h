@@ -86,7 +86,13 @@ namespace mongo {
 
              see unit test for more examples
          */
-        bool hasShardKey( const BSONObj& obj ) const;
+        bool hasShardKey( const BSONObj& doc ) const;
+
+        /**
+         * Same as the above, but disallow certain shard key values which are interpreted for
+         * targeting as a multi-shard query (i.e. RegExes)
+         */
+        bool hasTargetableShardKey( const BSONObj& doc ) const;
 
         BSONObj key() const { return pattern.toBSON(); }
 

@@ -376,7 +376,9 @@ namespace mongo {
 
         const ShardKeyPattern& getShardKey() const {  return _key; }
 
-        bool hasShardKey( const BSONObj& obj ) const;
+        bool hasShardKey(const BSONObj& doc) const;
+
+        bool hasTargetableShardKey(const BSONObj& doc) const;
 
         bool isUnique() const { return _unique; }
 

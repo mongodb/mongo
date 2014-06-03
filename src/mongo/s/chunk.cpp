@@ -994,8 +994,12 @@ namespace mongo {
         }
     }
 
-    bool ChunkManager::hasShardKey( const BSONObj& obj ) const {
-        return _key.hasShardKey( obj );
+    bool ChunkManager::hasShardKey(const BSONObj& doc) const {
+        return _key.hasShardKey(doc);
+    }
+
+    bool ChunkManager::hasTargetableShardKey(const BSONObj& doc) const {
+        return _key.hasTargetableShardKey(doc);
     }
 
     void ChunkManager::calcInitSplitsAndShards( const Shard& primary,
