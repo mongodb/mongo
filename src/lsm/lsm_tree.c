@@ -718,8 +718,7 @@ __wt_lsm_tree_throttle(
 	 * check that the new value is sane: otherwise, after a long idle
 	 * period, we can calculate a crazy value.
 	 */
-	if (in_memory > 1 &&
-            in_memory != lsm_tree->nchunks) {
+	if (in_memory > 1 && ondisk != NULL) {
 		prev_chunk = lsm_tree->chunk[lsm_tree->nchunks - 2];
 		WT_ASSERT(session, prev_chunk->generation == 0);
 		WT_ASSERT(session, WT_TIMECMP(
