@@ -23,7 +23,7 @@ const (
 
 var (
 	// timeout for dialing the database server
-	DialTimeout = 3 * time.Second
+	DialTimeout = 5 * time.Second
 )
 
 // Used to manage database sessions
