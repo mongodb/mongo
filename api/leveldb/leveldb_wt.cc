@@ -24,8 +24,6 @@ using leveldb::Status;
 namespace leveldb {
 class ReplayIterator;
 }
-#else
-using leveldb::Value;
 #endif
 
 #define	WT_URI	"table:data"
@@ -286,9 +284,6 @@ public:
 	virtual Status GetReplayIterator(const std::string& timestamp,
 					   leveldb::ReplayIterator** iter) { return Status::NotSupported("sorry!"); }
 	virtual void ReleaseReplayIterator(leveldb::ReplayIterator* iter) {}
-#else
-	virtual Status Get(const ReadOptions& options,
-		     const Slice& key, Value* value);
 #endif
 
 	virtual Iterator* NewIterator(const ReadOptions& options);
@@ -494,28 +489,6 @@ DbImpl::Get(const ReadOptions& options,
 	*value = std::string((const char *)item.data, item.size);
 	return Status::OK();
 }
-
-#ifndef HAVE_HYPERLEVELDB
-Status
-DbImpl::Get(const ReadOptions& options,
-	     const Slice& key, Value* value)
-{
-	WT_CURSOR *cursor = getCursor();
-	WT_ITEM item;
-
-	item.data = key.data();
-	item.size = key.size();
-	cursor->set_key(cursor, &item);
-	int ret = cursor->search(cursor);
-	if (ret == WT_NOTFOUND)
-		return Status::NotFound("DB::Get key not found");
-	assert(ret == 0);
-	ret = cursor->get_value(cursor, &item);
-	assert(ret == 0);
-	value->assign((const char *)item.data, item.size);
-	return Status::OK();
-}
-#endif
 
 // Return a heap-allocated iterator over the contents of the database.
 // The result of NewIterator() is initially invalid (caller must
