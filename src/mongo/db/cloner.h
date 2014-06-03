@@ -81,7 +81,7 @@ namespace mongo {
                   bool mayBeInterrupted,
                   Query q);
 
-        class Fun;
+        struct Fun;
         std::auto_ptr<DBClientBase> _conn;
     };
 
