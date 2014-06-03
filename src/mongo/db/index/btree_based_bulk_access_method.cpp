@@ -28,7 +28,7 @@
 
 #include "mongo/db/index/btree_based_bulk_access_method.h"
 
-#include "mongo/db/kill_current_op.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/pdfile_private.h"  // This is for inDBRepair.
 #include "mongo/db/repl/rs.h"         // This is for ignoreUniqueIndex.
 #include "mongo/db/operation_context.h"
@@ -112,7 +112,6 @@ namespace mongo {
     }
 
     Status BtreeBasedBulkAccessMethod::commit(set<DiskLoc>* dupsToDrop,
-                                              CurOp* op,
                                               bool mayInterrupt) {
         DiskLoc oldHead = _real->_btreeState->head();
 
@@ -136,10 +135,10 @@ namespace mongo {
         scoped_ptr<BSONObjExternalSorter::Iterator> i(_sorter->done());
 
         // verifies that pm and op refer to the same ProgressMeter
-        ProgressMeter& pm = op->setMessage("Index Bulk Build: (2/3) btree bottom up",
-                                           "Index: (2/3) BTree Bottom Up Progress",
-                                           _keysInserted,
-                                           10);
+        ProgressMeter& pm = _txn->getCurOp()->setMessage("Index Bulk Build: (2/3) btree bottom up",
+                                                         "Index: (2/3) BTree Bottom Up Progress",
+                                                         _keysInserted,
+                                                         10);
 
         scoped_ptr<BtreeBuilderInterface> builder;
 
@@ -176,8 +175,8 @@ namespace mongo {
 
         pm.finished();
 
-        op->setMessage("Index Bulk Build: (3/3) btree-middle",
-                       "Index: (3/3) BTree Middle Progress");
+        _txn->getCurOp()->setMessage("Index Bulk Build: (3/3) btree-middle",
+                                     "Index: (3/3) BTree Middle Progress");
 
         LOG(timer.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit";
 

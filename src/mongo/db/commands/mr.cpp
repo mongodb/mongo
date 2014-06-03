@@ -1456,8 +1456,7 @@ namespace mongo {
                     inputNS = dbname + "." + shardedOutputCollection;
                 }
 
-                Client& client = cc();
-                CurOp * op = client.curop();
+                CurOp * op = txn->getCurOp();
 
                 Config config( dbname , cmdObj.firstElement().embeddedObjectUserCheck() );
                 State state(txn, config);

@@ -182,7 +182,8 @@ namespace {
         return true;
     }
 
-    static void handleCursorCommand(const string& ns,
+    static void handleCursorCommand(OperationContext* txn,
+                                    const string& ns,
                                     ClientCursorPin* pin,
                                     PipelineRunner* runner,
                                     const BSONObj& cmdObj,
@@ -242,7 +243,7 @@ namespace {
         if (cursor) {
             // If a time limit was set on the pipeline, remaining time is "rolled over" to the
             // cursor (for use by future getmore ops).
-            cursor->setLeftoverMaxTimeMicros( cc().curop()->getRemainingMaxTimeMicros() );
+            cursor->setLeftoverMaxTimeMicros( txn->getCurOp()->getRemainingMaxTimeMicros() );
         }
 
         BSONObjBuilder cursorObj(result.subobjStart("cursor"));
@@ -355,7 +356,7 @@ namespace {
                     result << "stages" << Value(pPipeline->writeExplainOps());
                 }
                 else if (isCursorCommand(cmdObj)) {
-                    handleCursorCommand(ns, pin.get(), runner, cmdObj, result);
+                    handleCursorCommand(txn, ns, pin.get(), runner, cmdObj, result);
                     keepCursor = true;
                 }
                 else {

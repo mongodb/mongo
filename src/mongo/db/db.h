@@ -62,7 +62,6 @@ namespace mongo {
             }
             tr.reset(new Lock::TempRelease(lockState));
             verify( c.curop() );
-            c.curop()->yielded();
         }
         ~dbtemprelease() throw(DBException) {
             tr.reset();

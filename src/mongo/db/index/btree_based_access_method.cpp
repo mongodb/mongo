@@ -342,7 +342,7 @@ namespace mongo {
         }
 
         BtreeBasedBulkAccessMethod* bulk = static_cast<BtreeBasedBulkAccessMethod*>(bulkRaw);
-        return bulk->commit(dupsToDrop, cc().curop(), mayInterrupt);
+        return bulk->commit(dupsToDrop, mayInterrupt);
     }
 
 }  // namespace mongo

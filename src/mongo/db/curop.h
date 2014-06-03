@@ -299,7 +299,6 @@ namespace mongo {
         void kill(); 
         bool killPendingStrict() const { return _killPending.load(); }
         bool killPending() const { return _killPending.loadRelaxed(); }
-        void yielded() { _numYields++; }
         int numYields() const { return _numYields; }
         void suppressFromCurop() { _suppressFromCurop = true; }
         

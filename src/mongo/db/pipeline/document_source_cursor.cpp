@@ -106,7 +106,6 @@ namespace mongo {
             if (memUsageBytes > MaxBytesToReturnToClientAtOnce) {
                 // End this batch and prepare Runner for yielding.
                 _runner->saveState();
-                cc().curop()->yielded();
                 return;
             }
         }

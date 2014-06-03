@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/index/btree_based_access_method.h"
 #include "mongo/db/index/index_access_method.h"
@@ -60,7 +59,7 @@ namespace mongo {
                               const InsertDeleteOptions& options,
                               int64_t* numInserted);
 
-        Status commit(std::set<DiskLoc>* dupsToDrop, CurOp* op, bool mayInterrupt);
+        Status commit(std::set<DiskLoc>* dupsToDrop, bool mayInterrupt);
 
         // Exposed for testing.
         static ExternalSortComparison* getComparison(int version, const BSONObj& keyPattern);
