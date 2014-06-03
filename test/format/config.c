@@ -304,8 +304,10 @@ config_isolation(void)
 		switch (MMRAND(1, 3)) {
 		case 1:
 			cstr = "isolation=read-uncommitted";
+			break;
 		case 2:
 			cstr = "isolation=read-committed";
+			break;
 		case 3:
 			cstr = "isolation=snapshot";
 			break;
