@@ -61,7 +61,6 @@ namespace mongo {
                         invalidates(0),
                         advanced(0),
                         needTime(0),
-                        needFetch(0),
                         isEOF(false) { }
 
         // Count calls into the stage.
@@ -73,15 +72,12 @@ namespace mongo {
         // How many times was this state the return value of work(...)?
         size_t advanced;
         size_t needTime;
-        size_t needFetch;
 
         // TODO: have some way of tracking WSM sizes (or really any series of #s).  We can measure
         // the size of our inputs and the size of our outputs.  We can do a lot with the WS here.
 
         // TODO: once we've picked a plan, collect different (or additional) stats for display to
         // the user, eg. time_t totalTimeSpent;
-
-        // TODO: keep track of total yield time / fetch time for a plan (done by runner)
 
         bool isEOF;
     };

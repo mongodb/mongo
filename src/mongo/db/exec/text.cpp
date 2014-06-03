@@ -88,9 +88,6 @@ namespace mongo {
         case PlanStage::NEED_TIME:
             ++_commonStats.needTime;
             break;
-        case PlanStage::NEED_FETCH:
-            ++_commonStats.needFetch;
-            break;
         default:
             break;
         }

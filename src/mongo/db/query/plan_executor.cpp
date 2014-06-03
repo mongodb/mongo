@@ -119,17 +119,6 @@ namespace mongo {
             else if (PlanStage::NEED_TIME == code) {
                 // Fall through to yield check at end of large conditional.
             }
-            else if (PlanStage::NEED_FETCH == code) {
-                // id has a loc and refers to an obj we need to fetch.
-                WorkingSetMember* member = _workingSet->get(id);
-
-                // This must be true for somebody to request a fetch and can only change when an
-                // invalidation happens, which is when we give up a lock.  Don't give up the
-                // lock between receiving the NEED_FETCH and actually fetching(?).
-                verify(member->hasLoc());
-
-                // XXX: remove NEED_FETCH
-            }
             else if (PlanStage::IS_EOF == code) {
                 return Runner::RUNNER_EOF;
             }

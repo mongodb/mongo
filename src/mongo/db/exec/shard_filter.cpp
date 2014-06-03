@@ -71,10 +71,7 @@ namespace mongo {
             return status;
         }
         else {
-            if (PlanStage::NEED_FETCH == status) {
-                ++_commonStats.needFetch;
-            }
-            else if (PlanStage::NEED_TIME == status) {
+            if (PlanStage::NEED_TIME == status) {
                 ++_commonStats.needTime;
             }
             return status;

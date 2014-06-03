@@ -272,17 +272,6 @@ namespace mongo {
                     doneWorking = true;
                 }
             }
-            else if (PlanStage::NEED_FETCH == state) {
-                // id has a loc and refers to an obj we need to fetch.
-                WorkingSetMember* member = candidate.ws->get(id);
-
-                // This must be true for somebody to request a fetch and can only change when an
-                // invalidation happens, which is when we give up a lock.  Don't give up the
-                // lock between receiving the NEED_FETCH and actually fetching(?).
-                verify(member->hasLoc());
-
-                // XXX: remove NEED_FETCH
-            }
             else if (PlanStage::IS_EOF == state) {
                 // First plan to hit EOF wins automatically.  Stop evaluating other plans.
                 // Assumes that the ranking will pick this plan.

@@ -140,11 +140,7 @@ namespace mongo {
                 return code;
             }
             else {
-                if (PlanStage::NEED_FETCH == code) {
-                    *out = id;
-                    ++_commonStats.needFetch;
-                }
-                else if (PlanStage::NEED_TIME == code) {
+                if (PlanStage::NEED_TIME == code) {
                     ++_commonStats.needTime;
                 }
                 return code;

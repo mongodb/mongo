@@ -88,9 +88,6 @@ namespace mongo {
      *     case PlanStage::FAILURE:
      *         // Throw exception or return error
      *         break;
-     *     case PlanStage::NEED_FETCH:
-     *         // Go to disk and fetch stuff.
-     *         break;
      *     }
      *
      *     if (shouldYield) {
@@ -131,18 +128,6 @@ namespace mongo {
             // Any class implementing this interface must set the WSID out parameter to
             // INVALID_ID or a valid WSM ID if FAILURE is returned.
             FAILURE,
-
-            // Something isn't in memory.  Fetch it.
-            //
-            // Full fetch semantics:
-            // The fetch-requesting stage populates the out parameter of work(...) with a WSID that
-            // refers to a WSM with a valid loc.  Each stage that receives a NEED_FETCH from a child
-            // must propagate the NEED_FETCH up and perform no work.  The plan runner is responsible
-            // for paging in the data upon receipt of a NEED_FETCH. The plan runner does NOT free
-            // the WSID of the requested fetch.  The stage that requested the fetch holds the WSID
-            // of the loc it wants fetched.  On the next call to work() that stage can assume a
-            // fetch was performed on the WSM that the held WSID refers to.
-            NEED_FETCH,
         };
 
         static std::string stateStr(const StageState& state) {
@@ -154,9 +139,6 @@ namespace mongo {
             }
             else if (NEED_TIME == state) {
                 return "NEED_TIME";
-            }
-            else if (NEED_FETCH == state) {
-                return "NEED_FETCH";
             }
             else {
                 verify(FAILURE == state);

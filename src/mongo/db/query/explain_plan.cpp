@@ -466,7 +466,6 @@ namespace mongo {
         bob->appendNumber("invalidates", stats.common.invalidates);
         bob->appendNumber("advanced", stats.common.advanced);
         bob->appendNumber("needTime", stats.common.needTime);
-        bob->appendNumber("needFetch", stats.common.needFetch);
         bob->appendNumber("isEOF", stats.common.isEOF);
 
         // Stage-specific stats

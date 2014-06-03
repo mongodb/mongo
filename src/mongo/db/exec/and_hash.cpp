@@ -155,8 +155,7 @@ namespace mongo {
                         _dataMap.clear();
                         return PlanStage::FAILURE;
                     }
-                    // We ignore NEED_TIME.  TODO: What do we want to do if the child provides
-                    // NEED_FETCH?
+                    // We ignore NEED_TIME.
                 }
             }
 
@@ -318,11 +317,7 @@ namespace mongo {
             return childStatus;
         }
         else {
-            if (PlanStage::NEED_FETCH == childStatus) {
-                *out = id;
-                ++_commonStats.needFetch;
-            }
-            else if (PlanStage::NEED_TIME == childStatus) {
+            if (PlanStage::NEED_TIME == childStatus) {
                 ++_commonStats.needTime;
             }
 
@@ -421,11 +416,7 @@ namespace mongo {
             return childStatus;
         }
         else {
-            if (PlanStage::NEED_FETCH == childStatus) {
-                *out = id;
-                ++_commonStats.needFetch;
-            }
-            else if (PlanStage::NEED_TIME == childStatus) {
+            if (PlanStage::NEED_TIME == childStatus) {
                 ++_commonStats.needTime;
             }
 

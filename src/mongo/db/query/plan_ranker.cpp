@@ -192,8 +192,8 @@ namespace mongo {
         double baseScore = 1;
 
         // How many "units of work" did the plan perform. Each call to work(...)
-        // counts as one unit, and each NEED_FETCH is penalized as an additional work unit.
-        size_t workUnits = stats->common.works + stats->common.needFetch;
+        // counts as one unit.
+        size_t workUnits = stats->common.works;
 
         // How much did a plan produce?
         // Range: [0, 1]
@@ -242,9 +242,7 @@ namespace mongo {
                                 <<  " + productivity((" << stats->common.advanced
                                                         << " advanced)/("
                                                         << stats->common.works
-                                                        << " works + "
-                                                        << stats->common.needFetch
-                                                        << " needFetch) = "
+                                                        << " works) = "
                                                         << productivity << ")"
                                 <<  " + tieBreakers(" << noFetchBonus
                                                       << " noFetchBonus + "

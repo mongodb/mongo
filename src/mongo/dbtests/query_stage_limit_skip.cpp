@@ -57,7 +57,6 @@ namespace {
             wsm.obj = BSON("x" << i);
             ms->pushBack(wsm);
             ms->pushBack(PlanStage::NEED_TIME);
-            ms->pushBack(PlanStage::NEED_FETCH);
         }
 
         return ms.release();
