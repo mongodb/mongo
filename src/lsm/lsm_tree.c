@@ -641,11 +641,11 @@ __wt_lsm_tree_throttle(
 			record_count += (*cp)->count;
 			++in_memory;
 		} else {
-                        /*
-                         * Assign ondisk to the last chunk that has been
-                         * flushed since the tree was last opened (i.e it's on
-                         * disk and stable is not set).
-                         */
+			/*
+			 * Assign ondisk to the last chunk that has been
+			 * flushed since the tree was last opened (i.e it's on
+			 * disk and stable is not set).
+			 */
 			if (ondisk == NULL &&
 			    ((*cp)->generation == 0 &&
 			    !F_ISSET(*cp, WT_LSM_CHUNK_STABLE)))
@@ -674,7 +674,7 @@ __wt_lsm_tree_throttle(
 		WT_ASSERT(session,
 		    WT_TIMECMP(last_chunk->create_ts, ondisk->create_ts) >= 0);
 		timediff =
-                    WT_TIMEDIFF(last_chunk->create_ts, ondisk->create_ts);
+		    WT_TIMEDIFF(last_chunk->create_ts, ondisk->create_ts);
 		lsm_tree->ckpt_throttle =
 		    (long)((in_memory - 2) * timediff / (20 * record_count));
 
@@ -724,7 +724,7 @@ __wt_lsm_tree_throttle(
 		WT_ASSERT(session, WT_TIMECMP(
 		    last_chunk->create_ts, prev_chunk->create_ts) >= 0);
 		timediff =
-                    WT_TIMEDIFF(last_chunk->create_ts, prev_chunk->create_ts);
+		    WT_TIMEDIFF(last_chunk->create_ts, prev_chunk->create_ts);
 		WT_ASSERT(session,
 		    WT_TIMECMP(prev_chunk->create_ts, ondisk->create_ts) >= 0);
 		oldtime = WT_TIMEDIFF(prev_chunk->create_ts, ondisk->create_ts);
