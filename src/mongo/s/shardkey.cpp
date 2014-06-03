@@ -56,21 +56,34 @@ namespace mongo {
         gMax = max.obj();
     }
 
-    bool ShardKeyPattern::hasShardKey( const BSONObj& obj ) const {
-        /* this is written s.t. if obj has lots of fields, if the shard key fields are early,
-           it is fast.  so a bit more work to try to be semi-fast.
-           */
+    static bool _hasShardKey(const BSONObj& doc,
+                             const set<string>& patternFields,
+                             bool allowRegex) {
 
-        for(set<string>::const_iterator it = patternfields.begin(); it != patternfields.end(); ++it) {
-            BSONElement e = obj.getFieldDotted(it->c_str());
-            if(     e.eoo() ||
-                    e.type() == Array ||
-                    (e.type() == Object && !e.embeddedObject().okForStorage())) {
+        // this is written s.t. if doc has lots of fields, if the shard key fields are early,
+        // it is fast.  so a bit more work to try to be semi-fast.
+
+        for (set<string>::const_iterator it = patternFields.begin(); it != patternFields.end();
+            ++it) {
+            BSONElement shardKeyField = doc.getFieldDotted(it->c_str());
+            if (shardKeyField.eoo()
+                || shardKeyField.type() == Array
+                || (!allowRegex && shardKeyField.type() == RegEx)
+                || (shardKeyField.type() == Object &&
+                    !shardKeyField.embeddedObject().okForStorage())) {
                 // Don't allow anything for a shard key we can't store -- like $gt/$lt ops
                 return false;
             }
         }
         return true;
+    }
+
+    bool ShardKeyPattern::hasShardKey(const BSONObj& doc) const {
+        return _hasShardKey(doc, patternfields, true);
+    }
+
+    bool ShardKeyPattern::hasTargetableShardKey(const BSONObj& doc) const {
+        return _hasShardKey(doc, patternfields, false);
     }
 
     bool ShardKeyPattern::isUniqueIndexCompatible( const KeyPattern& uniqueIndexPattern ) const {

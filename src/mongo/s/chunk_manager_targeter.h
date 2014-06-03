@@ -122,6 +122,11 @@ namespace mongo {
          */
         Status targetQuery( const BSONObj& query, std::vector<ShardEndpoint*>* endpoints ) const;
 
+        /**
+         * Returns a ShardEndpoint for an exact shard key query.
+         */
+        Status targetShardKey( const BSONObj& doc, ShardEndpoint** endpoint ) const;
+
         NamespaceString _nss;
 
         // Zero or one of these are filled at all times
