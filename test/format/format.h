@@ -135,6 +135,8 @@ typedef struct {
 	size_t	  append_cnt;			/* Current unresolved records */
 	pthread_rwlock_t append_lock;		/* Single-thread resolution */
 
+	char *session_config;			/* Session configuration */
+
 	char *uri;				/* Object name */
 
 	char *config_open;			/* Command-line configuration */
