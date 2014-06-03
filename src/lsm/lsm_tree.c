@@ -608,7 +608,7 @@ __wt_lsm_tree_throttle(
 {
 	WT_LSM_CHUNK *last_chunk, **cp, *ondisk, *prev_chunk;
 	uint64_t cache_sz, cache_used, oldtime, record_count, timediff;
-	uint32_t i, in_memory, gen0_chunks;
+	uint32_t in_memory, gen0_chunks;
 
 	/* Never throttle in small trees. */
 	if (lsm_tree->nchunks < 3) {
@@ -634,9 +634,9 @@ __wt_lsm_tree_throttle(
 	record_count = 1;
 	gen0_chunks = in_memory = 0;
 	ondisk = NULL;
-	for (i = 0, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
-	    i < lsm_tree->nchunks;
-	    ++i, --cp)
+	for (cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
+	    cp >= lsm_tree->chunk;
+	    --cp)
 		if (!F_ISSET(*cp, WT_LSM_CHUNK_ONDISK)) {
 			record_count += (*cp)->count;
 			++in_memory;
