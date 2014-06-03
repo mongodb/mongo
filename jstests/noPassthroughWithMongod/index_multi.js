@@ -31,6 +31,18 @@ assert.writeOK(bulk.execute());
 var specs = [];
 var multikey = [];
 
+var setupDBStr =
+        "var conn = null;" +
+        "assert.soon(function() {" +
+        "  try {" +
+        "    conn = new Mongo(\"" + db.getMongo().host + "\");" +
+        "    return conn;" +
+        "  } catch (x) {" +
+        "    return false;" +
+        "  }" +
+        "}, 'Timed out waiting for temporary connection to connect', 30000, 5000);" +
+        "var db = conn.getDB('" + db.getName() + "');";
+
 var indexJobs = [];
 print("Create 3 triple indexes");
 for (var i = 90; i < 93; i++) {
@@ -38,9 +50,12 @@ for (var i = 90; i < 93; i++) {
     spec["field"+i] = 1;
     spec["field"+(i+1)] = 1;
     spec["field"+(i+2)] = 1;
-    indexJobs.push(startParallelShell("db.index_multi.createIndex(" + tojson(spec) + "," +
+    indexJobs.push(startParallelShell(setupDBStr +
+                                      "db.index_multi.createIndex(" + tojson(spec) + "," +
                                                                   "{ background: true });" +
-                                      "db.results.insert(db.runCommand({ getlasterror: 1 }));"));
+                                      "db.results.insert(db.runCommand({ getlasterror: 1 }));",
+                                      null, // port
+                                      false)); // noconnect
     specs.push(spec);
     multikey.push(i % 10 == 0 || (i+1) % 10 == 0 || (i+2) % 10 == 0);
 }
@@ -50,9 +65,12 @@ for (var i = 30; i < 90; i += 2) {
     var spec = {};
     spec["field"+i] = 1;
     spec["field"+(i+1)] = 1;
-    indexJobs.push(startParallelShell("db.index_multi.createIndex(" + tojson(spec) + ", " +
+    indexJobs.push(startParallelShell(setupDBStr +
+                                      "db.index_multi.createIndex(" + tojson(spec) + ", " +
                                                                   "{ background: true });" +
-                                      "db.results.insert(db.runCommand({ getlasterror: 1 }));"));
+                                      "db.results.insert(db.runCommand({ getlasterror: 1 }));",
+                                      null, // port
+                                      false)); // noconnect
     specs.push(spec);
     multikey.push(i % 10 == 0 || (i+1) % 10 == 0);
 }
@@ -61,9 +79,12 @@ print("Create 30 indexes");
 for (var i = 0; i < 30; i++) {
     var spec = {};
     spec["field"+i] = 1;
-    indexJobs.push(startParallelShell("db.index_multi.createIndex(" + tojson(spec) + ", " +
+    indexJobs.push(startParallelShell(setupDBStr +
+                                      "db.index_multi.createIndex(" + tojson(spec) + ", " +
                                                                   "{ background: true });" +
-                                      "db.results.insert(db.runCommand({ getlasterror: 1 }));"));
+                                      "db.results.insert(db.runCommand({ getlasterror: 1 }));",
+                                      null, // port
+                                      false)); // noconnect
     specs.push(spec);
     multikey.push(i % 10 == 0);
 }
