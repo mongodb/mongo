@@ -96,6 +96,7 @@ void Static::InitStaticVars() {
   // in is caches as pointers that are sources of heap object liveness,
   // which leads to it missing some memory leaks.
   pageheap_ = new (MetaDataAlloc(sizeof(PageHeap))) PageHeap;
+  pageheap_->SetAggressiveDecommit(EnvToBool("TCMALLOC_AGGRESSIVE_DECOMMIT", false));
   DLL_Init(&sampled_objects_);
   Sampler::InitStatics();
 }
@@ -113,12 +114,5 @@ void SetupAtForkLocksHandler()
 REGISTER_MODULE_INITIALIZER(tcmalloc_fork_handler, SetupAtForkLocksHandler());
 
 #endif
-
-static
-void SetupAggressiveDecommit()
-{
-  Static::pageheap()->SetAggressiveDecommit(EnvToBool("TCMALLOC_AGGRESSIVE_DECOMMIT", false));
-}
-REGISTER_MODULE_INITIALIZER(tcmalloc_setup_aggressive_decommit, SetupAggressiveDecommit());
 
 }  // namespace tcmalloc
