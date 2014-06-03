@@ -196,7 +196,7 @@ func createDialerFunc(opts *options.ToolOptions) (dialerFunc, error) {
 		// create a new certificate
 		clientCert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
 		if err != nil {
-			return nil, fmt.Errorf("error creating client certificate: %v")
+			return nil, fmt.Errorf("error creating client certificate: %v", err)
 		}
 
 		// add the certificate in
