@@ -606,7 +606,7 @@ void
 __wt_lsm_tree_throttle(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int decrease_only)
 {
-	WT_LSM_CHUNK *chunk, **cp, *ondisk, *prev_chunk;
+	WT_LSM_CHUNK *last_chunk, **cp, *ondisk, *prev_chunk;
 	uint64_t cache_sz, cache_used, oldtime, record_count, timediff;
 	uint32_t i, in_memory, gen0_chunks;
 
@@ -641,27 +641,29 @@ __wt_lsm_tree_throttle(
 			record_count += (*cp)->count;
 			++in_memory;
 		} else {
+                        /*
+                         * Assign ondisk to the last chunk that has been
+                         * flushed since the tree was last opened (i.e it's on
+                         * disk and stable is not set).
+                         */
 			if (ondisk == NULL &&
-			    ((*cp)->generation == 0 ||
-			    F_ISSET(*cp, WT_LSM_CHUNK_STABLE)))
+			    ((*cp)->generation == 0 &&
+			    !F_ISSET(*cp, WT_LSM_CHUNK_STABLE)))
 				ondisk = *cp;
 
 			if ((*cp)->generation == 0 &&
 			    !F_ISSET(*cp, WT_LSM_CHUNK_MERGING))
 				++gen0_chunks;
-			else if (ondisk != NULL)
-				break;
 		}
 
-	chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
+	last_chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
 
 	/* Checkpoint throttling, based on the number of in-memory chunks. */
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 3)
 		lsm_tree->ckpt_throttle = 0;
 	else if (decrease_only)
 		; /* Nothing to do */
-	else if (i == lsm_tree->nchunks ||
-	    F_ISSET(ondisk, WT_LSM_CHUNK_STABLE)) {
+	else if (ondisk == NULL) {
 		/*
 		 * No checkpoint has completed this run.  Keep slowing down
 		 * inserts until one does.
@@ -670,8 +672,9 @@ __wt_lsm_tree_throttle(
 		    WT_MAX(WT_LSM_THROTTLE_START, 2 * lsm_tree->ckpt_throttle);
 	} else {
 		WT_ASSERT(session,
-		    WT_TIMECMP(chunk->create_ts, ondisk->create_ts) >= 0);
-		timediff = WT_TIMEDIFF(chunk->create_ts, ondisk->create_ts);
+		    WT_TIMECMP(last_chunk->create_ts, ondisk->create_ts) >= 0);
+		timediff =
+                    WT_TIMEDIFF(last_chunk->create_ts, ondisk->create_ts);
 		lsm_tree->ckpt_throttle =
 		    (long)((in_memory - 2) * timediff / (20 * record_count));
 
@@ -716,13 +719,13 @@ __wt_lsm_tree_throttle(
 	 * period, we can calculate a crazy value.
 	 */
 	if (in_memory > 1 &&
-	    i != lsm_tree->nchunks &&
-	    !F_ISSET(ondisk, WT_LSM_CHUNK_STABLE)) {
+            in_memory != lsm_tree->nchunks) {
 		prev_chunk = lsm_tree->chunk[lsm_tree->nchunks - 2];
 		WT_ASSERT(session, prev_chunk->generation == 0);
-		WT_ASSERT(session,
-		    WT_TIMECMP(chunk->create_ts, prev_chunk->create_ts) >= 0);
-		timediff = WT_TIMEDIFF(chunk->create_ts, prev_chunk->create_ts);
+		WT_ASSERT(session, WT_TIMECMP(
+		    last_chunk->create_ts, prev_chunk->create_ts) >= 0);
+		timediff =
+                    WT_TIMEDIFF(last_chunk->create_ts, prev_chunk->create_ts);
 		WT_ASSERT(session,
 		    WT_TIMECMP(prev_chunk->create_ts, ondisk->create_ts) >= 0);
 		oldtime = WT_TIMEDIFF(prev_chunk->create_ts, ondisk->create_ts);
