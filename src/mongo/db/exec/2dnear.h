@@ -76,6 +76,8 @@ namespace mongo {
 
         virtual PlanStageStats* getStats();
 
+        static const char* kStageType;
+
     private:
         WorkingSet* _workingSet;
 

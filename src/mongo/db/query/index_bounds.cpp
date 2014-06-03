@@ -184,7 +184,7 @@ namespace mongo {
         return ss;
     }
 
-    BSONObj IndexBounds::toBSON() const {
+    BSONObj IndexBounds::toLegacyBSON() const {
         BSONObjBuilder builder;
         if (isSimpleRange) {
             // TODO
@@ -236,6 +236,25 @@ namespace mongo {
         }
 
         return builder.obj();
+    }
+
+    BSONObj IndexBounds::toBSON() const {
+        BSONObjBuilder bob;
+        vector<OrderedIntervalList>::const_iterator itField;
+        for (itField = fields.begin(); itField != fields.end(); ++itField) {
+            BSONArrayBuilder fieldBuilder(bob.subarrayStart(itField->name));
+
+            vector<Interval>::const_iterator itInterval;
+            for (itInterval = itField->intervals.begin()
+                    ; itInterval != itField->intervals.end()
+                    ; ++itInterval) {
+                fieldBuilder.append(itInterval->toString());
+            }
+
+            fieldBuilder.doneFast();
+        }
+
+        return bob.obj();
     }
 
     //

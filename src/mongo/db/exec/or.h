@@ -60,6 +60,8 @@ namespace mongo {
 
         virtual PlanStageStats* getStats();
 
+        static const char* kStageType;
+
     private:
         // Not owned by us.
         WorkingSet* _ws;

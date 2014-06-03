@@ -127,6 +127,17 @@ namespace mongo {
         _sub->debugString( debug, level + 1 );
     }
 
+    void ElemMatchObjectMatchExpression::toBSON(BSONObjBuilder* out) const {
+        BSONObjBuilder subBob;
+        _sub->toBSON(&subBob);
+        if (path().empty()) {
+            out->append("$elemMatch", subBob.obj());
+        }
+        else {
+            out->append(path(), BSON("$elemMatch" << subBob.obj()));
+        }
+    }
+
 
     // -------
 
@@ -187,6 +198,19 @@ namespace mongo {
         debug << "\n";
         for ( unsigned i = 0; i < _subs.size(); i++ ) {
             _subs[i]->debugString( debug, level + 1 );
+        }
+    }
+
+    void ElemMatchValueMatchExpression::toBSON(BSONObjBuilder* out) const {
+        BSONObjBuilder emBob;
+        for ( unsigned i = 0; i < _subs.size(); i++ ) {
+            _subs[i]->toBSON(&emBob);
+        }
+        if (path().empty()) {
+            out->append("$elemMatch", emBob.obj());
+        }
+        else {
+            out->append(path(), BSON("$elemMatch" << emBob.obj()));
         }
     }
 
@@ -254,7 +278,19 @@ namespace mongo {
         for ( size_t i = 0; i < _list.size(); i++ ) {
             _list[i]->debugString( debug, level + 1);
         }
+    }
 
+    void AllElemMatchOp::toBSON(BSONObjBuilder* out) const {
+        BSONObjBuilder allBob(out->subobjStart(path()));
+
+        BSONArrayBuilder arrBob(allBob.subarrayStart("$all"));
+        for (unsigned i = 0; i < _list.size(); i++) {
+            BSONObjBuilder childBob(arrBob.subobjStart());
+            _list[i]->toBSON(&childBob);
+        }
+        arrBob.doneFast();
+
+        allBob.doneFast();
     }
 
     bool AllElemMatchOp::equivalent( const MatchExpression* other ) const {
@@ -298,6 +334,10 @@ namespace mongo {
             debug << " ";
             td->debugString(&debug);
         }
+    }
+
+    void SizeMatchExpression::toBSON(BSONObjBuilder* out) const {
+        out->append(path(), BSON("$size" << _size));
     }
 
     bool SizeMatchExpression::equivalent( const MatchExpression* other ) const {

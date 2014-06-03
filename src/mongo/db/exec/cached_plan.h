@@ -62,6 +62,8 @@ namespace mongo {
 
         virtual PlanStageStats* getStats();
 
+        static const char* kStageType;
+
     private:
         PlanStage* getActiveChild() const;
         void updateCache();

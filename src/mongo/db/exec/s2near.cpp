@@ -40,7 +40,11 @@
 
 namespace mongo {
 
-    S2NearStage::S2NearStage(const S2NearParams& params, WorkingSet* ws) {
+    // static
+    const char* S2NearStage::kStageType = "GEO_NEAR_2DSPHERE";
+
+    S2NearStage::S2NearStage(const S2NearParams& params, WorkingSet* ws)
+        : _commonStats(kStageType) {
         _initted = false;
         _params = params;
         _ws = ws;
@@ -207,6 +211,9 @@ namespace mongo {
         //
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const {
+        }
+
+        virtual void toBSON(BSONObjBuilder* out) const {
         }
 
         virtual bool equivalent( const MatchExpression* other ) const {

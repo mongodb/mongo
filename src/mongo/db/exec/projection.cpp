@@ -39,11 +39,15 @@ namespace mongo {
 
     static const char* kIdField = "_id";
 
+    // static
+    const char* ProjectionStage::kStageType = "PROJECTION";
+
     ProjectionStage::ProjectionStage(const ProjectionStageParams& params,
                                      WorkingSet* ws,
                                      PlanStage* child)
         : _ws(ws),
           _child(child),
+          _commonStats(kStageType),
           _projImpl(params.projImpl) {
 
         if (ProjectionStageParams::NO_FAST_PATH == _projImpl) {
@@ -245,7 +249,9 @@ namespace mongo {
 
     PlanStageStats* ProjectionStage::getStats() {
         _commonStats.isEOF = isEOF();
+        _specificStats.projObj = _projObj;
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_PROJECTION));
+        ret->specific.reset(new ProjectionStats(_specificStats));
         ret->children.push_back(_child->getStats());
         return ret.release();
     }

@@ -37,7 +37,11 @@
 
 namespace mongo {
 
-    TwoDNear::TwoDNear(const TwoDNearParams& params, WorkingSet* ws) {
+    // static
+    const char* TwoDNear::kStageType = "GEO_NEAR_2D";
+
+    TwoDNear::TwoDNear(const TwoDNearParams& params, WorkingSet* ws)
+        : _commonStats(kStageType) {
         _params = params;
         _workingSet = ws;
         _initted = false;
@@ -149,6 +153,7 @@ namespace mongo {
 
     PlanStageStats* TwoDNear::getStats() {
         _commonStats.isEOF = isEOF();
+        _specificStats.keyPattern = _params.indexKeyPattern;
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_GEO_NEAR_2D));
         ret->specific.reset(new TwoDNearStats(_specificStats));
         return ret.release();

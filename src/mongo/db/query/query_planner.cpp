@@ -168,6 +168,9 @@ namespace mongo {
         return !sortIt.more();
     }
 
+    // static
+    const int QueryPlanner::kPlannerVersion = 1;
+
     Status QueryPlanner::cacheDataFromTaggedTree(const MatchExpression* const taggedTree,
                                                  const vector<IndexEntry>& relevantIndices,
                                                  PlanCacheIndexTree** out) {

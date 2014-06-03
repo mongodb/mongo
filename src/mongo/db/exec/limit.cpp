@@ -32,8 +32,11 @@
 
 namespace mongo {
 
+    // static
+    const char* LimitStage::kStageType = "LIMIT";
+
     LimitStage::LimitStage(int limit, WorkingSet* ws, PlanStage* child)
-        : _ws(ws), _child(child), _numToReturn(limit) { }
+        : _ws(ws), _child(child), _numToReturn(limit), _commonStats(kStageType) { }
 
     LimitStage::~LimitStage() { }
 
@@ -94,7 +97,9 @@ namespace mongo {
 
     PlanStageStats* LimitStage::getStats() {
         _commonStats.isEOF = isEOF();
+        _specificStats.limit = _numToReturn;
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_LIMIT));
+        ret->specific.reset(new LimitStats(_specificStats));
         ret->children.push_back(_child->getStats());
         return ret.release();
     }

@@ -67,6 +67,8 @@ namespace mongo {
     protected:
         void _debugList( StringBuilder& debug, int level ) const;
 
+        void _listToBSON(BSONArrayBuilder* out) const;
+
     private:
         std::vector< MatchExpression* > _expressions;
     };
@@ -91,6 +93,8 @@ namespace mongo {
         }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
     };
 
     class OrMatchExpression : public ListOfMatchExpression {
@@ -113,6 +117,8 @@ namespace mongo {
         }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
     };
 
     class NorMatchExpression : public ListOfMatchExpression {
@@ -135,6 +141,8 @@ namespace mongo {
         }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
     };
 
     class NotMatchExpression : public MatchExpression {
@@ -168,6 +176,8 @@ namespace mongo {
         }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         bool equivalent( const MatchExpression* other ) const;
 

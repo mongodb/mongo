@@ -39,13 +39,17 @@
 
 namespace mongo {
 
+    // static
+    const char* CollectionScan::kStageType = "COLLSCAN";
+
     CollectionScan::CollectionScan(const CollectionScanParams& params,
                                    WorkingSet* workingSet,
                                    const MatchExpression* filter)
         : _workingSet(workingSet),
           _filter(filter),
           _params(params),
-          _nsDropped(false) { }
+          _nsDropped(false),
+          _commonStats(kStageType) { }
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
         ++_commonStats.works;
@@ -152,6 +156,14 @@ namespace mongo {
 
     PlanStageStats* CollectionScan::getStats() {
         _commonStats.isEOF = isEOF();
+
+        // Add a BSON representation of the filter to the stats tree, if there is one.
+        if (NULL != _filter) {
+            BSONObjBuilder bob;
+            _filter->toBSON(&bob);
+            _commonStats.filter = bob.obj();
+        }
+
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COLLSCAN));
         ret->specific.reset(new CollectionScanStats(_specificStats));
         return ret.release();

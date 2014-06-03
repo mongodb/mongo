@@ -30,9 +30,11 @@
 
 #include "mongo/db/matcher/expression_tree.h"
 
-#include "mongo/bson/bsonobjiterator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsonobjiterator.h"
+#include "mongo/bson/bson-inl.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -52,6 +54,14 @@ namespace mongo {
     void ListOfMatchExpression::_debugList( StringBuilder& debug, int level ) const {
         for ( unsigned i = 0; i < _expressions.size(); i++ )
             _expressions[i]->debugString( debug, level + 1 );
+    }
+
+    void ListOfMatchExpression::_listToBSON(BSONArrayBuilder* out) const {
+        for ( unsigned i = 0; i < _expressions.size(); i++ ) {
+            BSONObjBuilder childBob(out->subobjStart());
+            _expressions[i]->toBSON(&childBob);
+        }
+        out->doneFast();
     }
 
     bool ListOfMatchExpression::equivalent( const MatchExpression* other ) const {
@@ -100,6 +110,11 @@ namespace mongo {
         _debugList( debug, level );
     }
 
+    void AndMatchExpression::toBSON(BSONObjBuilder* out) const {
+        BSONArrayBuilder arrBob(out->subarrayStart("$and"));
+        _listToBSON(&arrBob);
+    }
+
     // -----
 
     bool OrMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
@@ -125,6 +140,11 @@ namespace mongo {
         _debugAddSpace( debug, level );
         debug << "$or\n";
         _debugList( debug, level );
+    }
+
+    void OrMatchExpression::toBSON(BSONObjBuilder* out) const {
+        BSONArrayBuilder arrBob(out->subarrayStart("$or"));
+        _listToBSON(&arrBob);
     }
 
     // ----
@@ -153,12 +173,23 @@ namespace mongo {
         _debugList( debug, level );
     }
 
+    void NorMatchExpression::toBSON(BSONObjBuilder* out) const {
+        BSONArrayBuilder arrBob(out->subarrayStart("$nor"));
+        _listToBSON(&arrBob);
+    }
+
     // -------
 
     void NotMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << "$not\n";
         _exp->debugString( debug, level + 1 );
+    }
+
+    void NotMatchExpression::toBSON(BSONObjBuilder* out) const {
+        BSONObjBuilder childBob(out->subobjStart("$not"));
+        _exp->toBSON(&childBob);
+        childBob.doneFast();
     }
 
     bool NotMatchExpression::equivalent( const MatchExpression* other ) const {

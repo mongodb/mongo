@@ -55,6 +55,8 @@ namespace mongo {
 
         virtual PlanStageStats* getStats();
 
+        static const char* kStageType;
+
     private:
         WorkingSet* _ws;
         scoped_ptr<PlanStage> _child;
@@ -64,6 +66,7 @@ namespace mongo {
 
         // Stats
         CommonStats _commonStats;
+        LimitStats _specificStats;
     };
 
 }  // namespace mongo

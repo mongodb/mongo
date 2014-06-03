@@ -93,6 +93,25 @@ namespace mongo {
         size_t getNumIntervals(size_t i) const;
         Interval getInterval(size_t i, size_t j) const;
         std::string toString() const;
+
+        /**
+         * Legacy BSON format for explain. The format is an array of arrays for each field.
+         *
+         * TODO remove this function once the new explain format is on by default.
+         *
+         * Ex.
+         *   {a: [ [1, 1], [3, 10] ], b: [ [Infinity, 10] ] }
+         */
+        BSONObj toLegacyBSON() const;
+
+        /**
+         * BSON format for explain. The format is an array of strings for each field.
+         * Each string represents an interval. The strings use "[" and "]" if the interval
+         * bounds are inclusive, and "(" / ")" if exclusive.
+         *
+         * Ex.
+         *  {a: ["[1, 1]", "(3, 10)"], b: ["[Infinity, 10)"] }
+         */
         BSONObj toBSON() const;
 
         // TODO: we use this for max/min scan.  Consider migrating that.

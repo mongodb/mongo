@@ -72,6 +72,10 @@ namespace mongo {
         debug << "\n";
     }
 
+    void GeoMatchExpression::toBSON(BSONObjBuilder* out) const {
+        out->appendElements(_rawObj);
+    }
+
     bool GeoMatchExpression::equivalent( const MatchExpression* other ) const {
         if ( matchType() != other->matchType() )
             return false;
@@ -123,6 +127,10 @@ namespace mongo {
             td->debugString(&debug);
         }
         debug << "\n";
+    }
+
+    void GeoNearMatchExpression::toBSON(BSONObjBuilder* out) const {
+        out->appendElements(_rawObj);
     }
 
     bool GeoNearMatchExpression::equivalent( const MatchExpression* other ) const {

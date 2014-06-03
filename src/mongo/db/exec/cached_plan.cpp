@@ -40,6 +40,9 @@
 
 namespace mongo {
 
+    // static
+    const char* CachedPlanStage::kStageType = "CACHED_PLAN";
+
     CachedPlanStage::CachedPlanStage(const Collection* collection,
                                      CanonicalQuery* cq,
                                      PlanStage* mainChild,
@@ -50,7 +53,8 @@ namespace mongo {
           _backupChildPlan(backupChild),
           _usingBackupChild(false),
           _alreadyProduced(false),
-          _updatedCache(false) { }
+          _updatedCache(false),
+          _commonStats(kStageType) {}
 
     CachedPlanStage::~CachedPlanStage() {
         // We may have produced all necessary results without hitting EOF.

@@ -92,6 +92,8 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
 
+        virtual void toBSON(BSONObjBuilder* out) const;
+
         virtual bool equivalent( const MatchExpression* other ) const;
 
         const BSONElement& getData() const { return _rhs; }
@@ -204,6 +206,8 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level ) const;
 
+        virtual void toBSON(BSONObjBuilder* out) const;
+
         void shortDebugString( StringBuilder& debug ) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
@@ -236,6 +240,8 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level ) const;
 
+        virtual void toBSON(BSONObjBuilder* out) const;
+
         virtual bool equivalent( const MatchExpression* other ) const;
 
         int getDivisor() const { return _divisor; }
@@ -264,6 +270,8 @@ namespace mongo {
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
     };
@@ -300,6 +308,8 @@ namespace mongo {
 
         void debugString( StringBuilder& debug ) const;
 
+        void toBSON(BSONArrayBuilder* out) const;
+
     private:
         bool _hasNull; // if _equalities has a jstNULL element in it
         bool _hasEmptyArray;
@@ -322,6 +332,8 @@ namespace mongo {
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
 
@@ -362,6 +374,8 @@ namespace mongo {
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
 

@@ -32,8 +32,11 @@
 
 namespace mongo {
 
+    // static
+    const char* SkipStage::kStageType = "SKIP";
+
     SkipStage::SkipStage(int toSkip, WorkingSet* ws, PlanStage* child)
-        : _ws(ws), _child(child), _toSkip(toSkip) { }
+        : _ws(ws), _child(child), _toSkip(toSkip), _commonStats(kStageType) { }
 
     SkipStage::~SkipStage() { }
 
@@ -98,7 +101,9 @@ namespace mongo {
 
     PlanStageStats* SkipStage::getStats() {
         _commonStats.isEOF = isEOF();
+        _specificStats.skip = _toSkip;
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SKIP));
+        ret->specific.reset(new SkipStats(_specificStats));
         ret->children.push_back(_child->getStats());
         return ret.release();
     }

@@ -45,6 +45,9 @@ namespace mongo {
 
     const size_t kMaxBytes = 32 * 1024 * 1024;
 
+    // static
+    const char* SortStage::kStageType = "SORT";
+
     SortStageKeyGenerator::SortStageKeyGenerator(const Collection* collection,
                                                  const BSONObj& sortSpec,
                                                  const BSONObj& queryObj) {
@@ -286,6 +289,7 @@ namespace mongo {
           _limit(params.limit),
           _sorted(false),
           _resultIterator(_data.end()),
+          _commonStats(kStageType),
           _memUsage(0) {
     }
 
@@ -449,6 +453,8 @@ namespace mongo {
         _commonStats.isEOF = isEOF();
         _specificStats.memLimit = kMaxBytes;
         _specificStats.memUsage = _memUsage;
+        _specificStats.limit = _limit;
+        _specificStats.sortPattern = _pattern.getOwned();
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SORT));
         ret->specific.reset(new SortStats(_specificStats));

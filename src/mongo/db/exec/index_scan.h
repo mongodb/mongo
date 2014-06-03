@@ -93,6 +93,8 @@ namespace mongo {
 
         virtual PlanStageStats* getStats();
 
+        static const char* kStageType;
+
     private:
         /**
          * Initialize the underlying IndexCursor, grab information from the catalog for stats.

@@ -59,6 +59,10 @@ namespace mongo {
         debug << "\n";
     }
 
+    void TextMatchExpression::toBSON(BSONObjBuilder* out) const {
+        out->append("$text", BSON("$search" << _query << "$language" << _language));
+    }
+
     bool TextMatchExpression::equivalent( const MatchExpression* other ) const {
         if ( matchType() != other->matchType() ) {
             return false;

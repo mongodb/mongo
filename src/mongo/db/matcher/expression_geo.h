@@ -51,6 +51,8 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
 
+        virtual void toBSON(BSONObjBuilder* out) const;
+
         virtual bool equivalent( const MatchExpression* other ) const;
 
         virtual LeafMatchExpression* shallowClone() const;
@@ -75,6 +77,8 @@ namespace mongo {
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
 

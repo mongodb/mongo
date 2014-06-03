@@ -35,6 +35,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/matchable.h"
 #include "mongo/db/matcher/match_details.h"
 
@@ -192,6 +193,7 @@ namespace mongo {
         //
         virtual std::string toString() const;
         virtual void debugString( StringBuilder& debug, int level = 0 ) const = 0;
+        virtual void toBSON(BSONObjBuilder* out) const = 0;
 
     protected:
         void _debugAddSpace( StringBuilder& debug, int level ) const;
@@ -223,6 +225,8 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
 
+        virtual void toBSON(BSONObjBuilder* out) const;
+
         virtual bool equivalent( const MatchExpression* other ) const {
             return other->matchType() == ATOMIC;
         }
@@ -245,6 +249,8 @@ namespace mongo {
         }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         virtual bool equivalent( const MatchExpression* other ) const {
             return other->matchType() == ALWAYS_FALSE;

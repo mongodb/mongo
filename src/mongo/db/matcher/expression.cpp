@@ -62,9 +62,17 @@ namespace mongo {
         debug << "$atomic\n";
     }
 
+    void AtomicMatchExpression::toBSON(BSONObjBuilder* out) const {
+        out->append("$isolated", 1);
+    }
+
     void FalseMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << "$false\n";
+    }
+
+    void FalseMatchExpression::toBSON(BSONObjBuilder* out) const {
+        out->append("$false", 1);
     }
 
 }

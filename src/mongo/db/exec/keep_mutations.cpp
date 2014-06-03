@@ -31,6 +31,9 @@
 
 namespace mongo {
 
+    // static
+    const char* KeepMutationsStage::kStageType = "KEEP_MUTATIONS";
+
     KeepMutationsStage::KeepMutationsStage(const MatchExpression* filter,
                                            WorkingSet* ws,
                                            PlanStage* child)
@@ -38,7 +41,8 @@ namespace mongo {
           _child(child),
           _filter(filter),
           _doneReadingChild(false),
-          _doneReturningFlagged(false) { }
+          _doneReturningFlagged(false),
+          _commonStats(kStageType) { }
 
     KeepMutationsStage::~KeepMutationsStage() { }
 

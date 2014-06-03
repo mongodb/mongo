@@ -34,6 +34,9 @@
 
 namespace mongo {
 
+    // static
+    const char* MergeSortStage::kStageType = "SORT_MERGE";
+
     MergeSortStage::MergeSortStage(const MergeSortStageParams& params,
                                    WorkingSet* ws,
                                    const Collection* collection)
@@ -41,7 +44,8 @@ namespace mongo {
           _ws(ws),
           _pattern(params.pattern),
           _dedup(params.dedup),
-          _merging(StageWithValueComparison(ws, params.pattern)) { }
+          _merging(StageWithValueComparison(ws, params.pattern)),
+          _commonStats(kStageType) { }
 
     MergeSortStage::~MergeSortStage() {
         for (size_t i = 0; i < _children.size(); ++i) { delete _children[i]; }
@@ -244,6 +248,8 @@ namespace mongo {
 
     PlanStageStats* MergeSortStage::getStats() {
         _commonStats.isEOF = isEOF();
+
+        _specificStats.sortPattern = _pattern;
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SORT_MERGE));
         ret->specific.reset(new MergeSortStats(_specificStats));
