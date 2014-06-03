@@ -85,10 +85,8 @@ namespace mongo {
         static long long _countsPerSecond;
 
     private:
-        inline long long now() const;
+        long long now() const;
 
         long long _old;
     };
 }  // namespace mongo
-
-#include "mongo/util/timer-inl.h"

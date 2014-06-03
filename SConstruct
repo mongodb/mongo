@@ -1343,6 +1343,32 @@ def doConfigure(myenv):
     posix_system = conf.CheckPosixSystem()
     conf.Finish()
 
+    # Check if we are on a system that support the POSIX clock_gettime function
+    #  and the "monotonic" clock.
+    posix_monotonic_clock = False
+    if posix_system:
+        def CheckPosixMonotonicClock(context):
+
+            test_body = """
+            #include <unistd.h>
+            #if !(defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0)
+            #error POSIX clock_gettime not supported
+            #elif !(defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0)
+            #error POSIX monotonic clock not supported
+            #endif
+            """
+
+            context.Message('Checking if the POSIX monotonic clock is supported... ')
+            ret = context.TryCompile(textwrap.dedent(test_body), ".c")
+            context.Result(ret)
+            return ret
+
+        conf = Configure(myenv, help=False, custom_tests = {
+            'CheckPosixMonotonicClock' : CheckPosixMonotonicClock,
+        })
+        posix_monotonic_clock = conf.CheckPosixMonotonicClock()
+        conf.Finish()
+
     if has_option('sanitize'):
 
         if not (using_clang() or using_gcc()):
@@ -1614,6 +1640,9 @@ def doConfigure(myenv):
         conf.env.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
         conf.CheckLib('rt')
         conf.CheckLib('dl')
+
+    if posix_monotonic_clock:
+        conf.env.Append(CPPDEFINES=['MONGO_HAVE_POSIX_MONOTONIC_CLOCK'])
 
     if (conf.CheckCXXHeader( "execinfo.h" ) and
         conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
