@@ -85,4 +85,8 @@ namespace mongo {
     // Do we want to plan each child of the OR independently?
     extern bool internalQueryPlanOrChildrenIndependently;
 
+    // How many index scans are we willing to produce in order to obtain a sort order
+    // during explodeForSort?
+    extern int internalQueryMaxScansToExplode;
+
 }  // namespace mongo
