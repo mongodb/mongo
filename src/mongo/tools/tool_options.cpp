@@ -74,7 +74,8 @@ namespace mongo {
 
     Status addRemoteServerToolOptions(moe::OptionSection* options) {
         options->addOptionChaining("host", "host,h", moe::String,
-                "mongo host to connect to ( <set name>/s1,s2 for sets)");
+                "mongo host to connect to ( <set name>/s1,s2 for sets)")
+                                  .incompatibleWith("dbpath");
 
         options->addOptionChaining("port", "port", moe::Int,
                 "server port. Can also use --host hostname:port")
@@ -130,7 +131,8 @@ namespace mongo {
         options->addOptionChaining("dbpath", "dbpath", moe::String,
                 "directly access mongod database files in the given path, instead of "
                 "connecting to a mongod  server - needs to lock the data directory, "
-                "so cannot be used if a mongod is currently accessing the same path");
+                "so cannot be used if a mongod is currently accessing the same path")
+                                  .incompatibleWith("host");
 
         options->addOptionChaining("directoryperdb", "directoryperdb", moe::Switch,
                 "each db is in a separate directory (relevant only if dbpath specified)");
