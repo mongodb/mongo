@@ -928,7 +928,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	} else {
 		WT_RET(__wt_config_gets(session, cfg, "exclusive", &cval));
 		if (cval.val != 0)
-			WT_ERR_MSG(session, EBUSY,
+			WT_ERR_MSG(session, EEXIST,
 			    "WiredTiger database already existed and "
 			    "exclusive option defined.");
 		created = 0;
