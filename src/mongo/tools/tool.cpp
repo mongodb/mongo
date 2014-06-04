@@ -82,7 +82,7 @@ namespace mongo {
 
     void Tool::mapOptions()
     {
-		REGISTER_MONGOOPTION_HANDLER(dump, Dump)
+        REGISTER_MONGOOPTION_HANDLER(dump, Dump)
         REGISTER_MONGOOPTION_HANDLER(export, Export)
         REGISTER_MONGOOPTION_HANDLER(import, Import)
         REGISTER_MONGOOPTION_HANDLER(stat, Stat)
@@ -463,8 +463,6 @@ int startProg(int argc, char* argv[], char** envp) {
         {
             argv[1] = argv[2];
             argv[2] = help;
-
-			//std::cout << argv[1] << " " << argv[2] << endl;
         }
         else
         {
@@ -477,6 +475,7 @@ int startProg(int argc, char* argv[], char** envp) {
         }
     }
 
+    // perf doesn't use the argument parser, skip that section and go straight to main
     if (strcmp(argv[1], "perf") == 0)
     {
         ::_exit(mongoPerfMain(argc - 1, &argv[1]));
@@ -488,18 +487,13 @@ int startProg(int argc, char* argv[], char** envp) {
         ::_exit(EXIT_FAILURE);
     }
 
-	/*
-	std::cout << "Count: " << argc << endl;
-	for(int i = 0; i < argc; i++) {
-		std::cout << "  Arg " << i << ": " << argv[i] << endl;
-	}
-	*/
-
+    // Add options to class variables for tool_options_init to use
     OptionHandler o = Tool::options[argv[1]];
     Tool::storeMongoOptions = o.store;
     Tool::handlePreValidationMongoOptions = o.handle;
     Tool::addMongoOptions = o.add;
 
+    // Bridge has its own main
     if (strcmp(argv[1], "bridge") == 0)
     {
         ::_exit(bridgeToolMain(argc - 1, &argv[1], envp));

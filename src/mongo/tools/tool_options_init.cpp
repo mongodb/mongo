@@ -1,3 +1,5 @@
+// This file replaces all the other _init files by letting the main Tool class decide which functions to call for argument parsing
+
 #include "mongo/tools/tool.h"
 
 #include "mongo/tools/tool_options.h"
