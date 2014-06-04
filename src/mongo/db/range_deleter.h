@@ -131,8 +131,7 @@ namespace mongo {
          * Returns true if the task is queued and false If the given range is blacklisted,
          * is already queued, or stopWorkers() was called.
          */
-        bool queueDelete(OperationContext::Factory transactionFactory,
-                         const std::string& ns,
+        bool queueDelete(const std::string& ns,
                          const BSONObj& min,
                          const BSONObj& max,
                          const BSONObj& shardKeyPattern,

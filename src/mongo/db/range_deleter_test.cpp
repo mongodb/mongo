@@ -64,8 +64,7 @@ namespace {
         deleter.stopWorkers();
 
         string errMsg;
-        ASSERT_FALSE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
-                                         "test.user",
+        ASSERT_FALSE(deleter.queueDelete("test.user",
                                          BSON("x" << 120),
                                          BSON("x" << 200),
                                          BSON("x" << 1),
@@ -87,8 +86,7 @@ namespace {
         env->addCursorId(ns, 345);
 
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
-                                        ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1),
+        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1),
                                         true, &notifyDone, NULL /* errMsg not needed */));
 
         env->waitForNthGetCursor(1u);
@@ -126,8 +124,7 @@ namespace {
         env->addCursorId(ns, 345);
 
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
-                                        ns, BSON("x" << 0), BSON("x" << 10),  BSON("x" << 1),
+        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10),  BSON("x" << 1),
                                         true, &notifyDone, NULL /* errMsg not needed */));
 
 
@@ -258,8 +255,7 @@ namespace {
         env->pauseDeletes();
 
         Notification notifyDone1;
-        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
-                                        ns,
+        ASSERT_TRUE(deleter.queueDelete(ns,
                                         BSON("x" << 10),
                                         BSON("x" << 20),
                                         BSON("x" << 1),
@@ -277,8 +273,7 @@ namespace {
         ASSERT_EQUALS(1, inProgressCount);
 
         Notification notifyDone2;
-        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
-                                        blockedNS,
+        ASSERT_TRUE(deleter.queueDelete(blockedNS,
                                         BSON("x" << 20),
                                         BSON("x" << 30),
                                         BSON("x" << 1),
@@ -287,8 +282,7 @@ namespace {
                                         NULL /* don't care errMsg */));
 
         Notification notifyDone3;
-        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
-                                        ns,
+        ASSERT_TRUE(deleter.queueDelete(ns,
                                         BSON("x" << 30),
                                         BSON("x" << 40),
                                         BSON("x" << 1),
@@ -375,8 +369,7 @@ namespace {
         ASSERT_TRUE(errMsg.empty());
 
         errMsg.clear();
-        ASSERT_FALSE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
-                                         ns, BSON("x" << 120), BSON("x" << 140),  BSON("x" << 1),
+        ASSERT_FALSE(deleter.queueDelete(ns, BSON("x" << 120), BSON("x" << 140),  BSON("x" << 1),
                                          false, NULL /* notifier not needed */, &errMsg));
         ASSERT_FALSE(errMsg.empty());
 
@@ -424,8 +417,7 @@ namespace {
         env->addCursorId(ns, 58);
 
         Notification notifyDone;
-        deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
-                            ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1),
+        deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1),
                             false, &notifyDone, NULL /* errMsg not needed */);
 
         string errMsg;

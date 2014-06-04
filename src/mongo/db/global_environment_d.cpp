@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2010 10gen Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,58 +26,23 @@
  *    it in the license file.
  */
 
+#include "mongo/db/global_environment_d.h"
 
-#pragma once
-
-#include <boost/thread/condition.hpp>
-#include <boost/thread/mutex.hpp>
-
-#include "mongo/bson/util/atomic_int.h"
-#include "mongo/base/disallow_copying.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
 
-    /* _globalKill: we are shutting down
-       otherwise kill attribute set on specified CurOp
-       this class does not handle races between interruptJs and the checkForInterrupt functions - those must be
-       handled by the client of this class
-    */
-    class KillCurrentOp {
-        MONGO_DISALLOW_COPYING(KillCurrentOp);
-    public:
-        KillCurrentOp() : _globalKill(false) {}
+    void GlobalEnvironmentMongoD::killAllOperations() {
+        killCurrentOp.killAll();
+    }
 
-        void killAll();
+    bool GlobalEnvironmentMongoD::killOperation(AtomicUInt opId) {
+        return killCurrentOp.kill(opId);
+    }
 
-        /**
-         * @param i opid of operation to kill
-         * @return if operation was found 
-         **/
-        bool kill(AtomicUInt i);
-
-        /**
-         * @param heedMutex if true and have a write lock, won't kill op since it might be unsafe
-         */
-        void checkForInterrupt( bool heedMutex = true );
-
-        /** @return "" if not interrupted.  otherwise, you should stop. */
-        const char* checkForInterruptNoAssert();
-
-        /** Reset the object to its initial state.  Only for testing. */
-        void reset();
-
-    private:
-        void interruptJs( AtomicUInt *op );
-
-        volatile bool _globalKill;
-
-        /** 
-         * @param i opid of operation to kill
-         * @return if operation was found 
-         **/
-        bool _killImpl_inclientlock(AtomicUInt i);
-    };
-
-    extern KillCurrentOp killCurrentOp;
+    OperationContext* GlobalEnvironmentMongoD::newOpCtx() {
+        return new OperationContextImpl();
+    }
 
 }  // namespace mongo

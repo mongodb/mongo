@@ -53,6 +53,8 @@
 #include "mongo/db/db.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dbwebserver.h"
+#include "mongo/db/global_environment_d.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/initialize_server_global_state.h"
@@ -939,6 +941,11 @@ MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
     AuthorizationManager* authzManager =
             new AuthorizationManager(new AuthzManagerExternalStateMongod());
     setGlobalAuthorizationManager(authzManager);
+    return Status::OK();
+}
+
+MONGO_INITIALIZER(SetGlobalConfigExperiment)(InitializerContext* context) {
+    setGlobalEnvironment(new GlobalEnvironmentMongoD());
     return Status::OK();
 }
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2010 10gen Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,58 +26,61 @@
  *    it in the license file.
  */
 
-
 #pragma once
 
-#include <boost/thread/condition.hpp>
-#include <boost/thread/mutex.hpp>
-
-#include "mongo/bson/util/atomic_int.h"
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/util/atomic_int.h"
 
 namespace mongo {
 
-    /* _globalKill: we are shutting down
-       otherwise kill attribute set on specified CurOp
-       this class does not handle races between interruptJs and the checkForInterrupt functions - those must be
-       handled by the client of this class
-    */
-    class KillCurrentOp {
-        MONGO_DISALLOW_COPYING(KillCurrentOp);
+    class OperationContext;
+
+    class GlobalEnvironmentExperiment {
+        MONGO_DISALLOW_COPYING(GlobalEnvironmentExperiment);
     public:
-        KillCurrentOp() : _globalKill(false) {}
+        virtual ~GlobalEnvironmentExperiment() { }
 
-        void killAll();
-
-        /**
-         * @param i opid of operation to kill
-         * @return if operation was found 
-         **/
-        bool kill(AtomicUInt i);
+        //
+        // Global operation management.  This may not belong here.
+        //
 
         /**
-         * @param heedMutex if true and have a write lock, won't kill op since it might be unsafe
+         * Signal all OperationContext(s) that they have been killed.
          */
-        void checkForInterrupt( bool heedMutex = true );
+        virtual void killAllOperations() = 0;
 
-        /** @return "" if not interrupted.  otherwise, you should stop. */
-        const char* checkForInterruptNoAssert();
-
-        /** Reset the object to its initial state.  Only for testing. */
-        void reset();
-
-    private:
-        void interruptJs( AtomicUInt *op );
-
-        volatile bool _globalKill;
-
-        /** 
+        /**
          * @param i opid of operation to kill
          * @return if operation was found 
          **/
-        bool _killImpl_inclientlock(AtomicUInt i);
+        virtual bool killOperation(AtomicUInt opId) = 0;
+
+        //
+        // Factories for storage interfaces
+        //
+
+        /**
+         * Returns a new OperationContext.  Caller owns pointer.
+         */
+        virtual OperationContext* newOpCtx() = 0;
+
+    protected:
+        GlobalEnvironmentExperiment() { }
     };
 
-    extern KillCurrentOp killCurrentOp;
+    /**
+     * Returns the singleton GlobalEnvironmentExperiment for this server process.
+     *
+     * Caller does not own pointer.
+     */
+    GlobalEnvironmentExperiment* getGlobalEnvironment();
+
+    /**
+     * Sets the GlobalEnvironmentExperiment.  If 'globalEnvironment' is NULL, un-sets and deletes the current
+     * GlobalEnvironmentExperiment.
+     *
+     * Takes ownership of 'globalEnvironment'.
+     */
+    void setGlobalEnvironment(GlobalEnvironmentExperiment* globalEnvironment);
 
 }  // namespace mongo

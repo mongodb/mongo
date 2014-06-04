@@ -31,8 +31,9 @@
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <memory>
 
-#include "mongo/s/range_arithmetic.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/range_deleter_stats.h"
+#include "mongo/s/range_arithmetic.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
@@ -73,9 +74,7 @@ namespace mongo {
     struct RangeDeleter::RangeDeleteEntry {
         RangeDeleteEntry():
                 secondaryThrottle(true),
-                notifyDone(NULL),
-                transactionFactory(OperationContext::factoryNULL) { // XXX SERVER-13931
-        }
+                notifyDone(NULL) { }
 
         std::string ns;
 
@@ -99,8 +98,6 @@ namespace mongo {
         // Not owned here.
         // Important invariant: Can only be set and used by one thread.
         Notification* notifyDone;
-
-        OperationContext::Factory transactionFactory;
 
         // For debugging only
         BSONObj toBSON() const {
@@ -196,8 +193,7 @@ namespace mongo {
         }
     }
 
-    bool RangeDeleter::queueDelete(OperationContext::Factory transactionFactory,
-                                   const std::string& ns,
+    bool RangeDeleter::queueDelete(const std::string& ns,
                                    const BSONObj& min,
                                    const BSONObj& max,
                                    const BSONObj& shardKeyPattern,
@@ -208,7 +204,6 @@ namespace mongo {
         if (errMsg == NULL) errMsg = &dummy;
 
         auto_ptr<RangeDeleteEntry> toDelete(new RangeDeleteEntry);
-        toDelete->transactionFactory = transactionFactory;
         toDelete->ns = ns;
         toDelete->min = min.getOwned();
         toDelete->max = max.getOwned();
@@ -233,7 +228,7 @@ namespace mongo {
         }
 
         {
-            boost::scoped_ptr<OperationContext> txn(transactionFactory());
+            boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
             _env->getCursorIds(txn.get(), ns, &toDelete->cursorsToWait);
         }
 
@@ -442,8 +437,7 @@ namespace mongo {
 
                             set<CursorId> cursorsNow;
                             {
-                                boost::scoped_ptr<OperationContext> txn(
-                                                        entry->transactionFactory()); // XXX?
+                                boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
                                 _env->getCursorIds(txn.get(), entry->ns, &cursorsNow);
                             }
 
@@ -482,7 +476,7 @@ namespace mongo {
             }
 
             {
-                boost::scoped_ptr<OperationContext> txn(nextTask->transactionFactory()); // XXX SERVER-13931
+                boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
                 if (!_env->deleteRange(txn.get(),
                                        nextTask->ns,
                                        nextTask->min,

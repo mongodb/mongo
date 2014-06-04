@@ -98,8 +98,7 @@ namespace {
 
         string errMsg;
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL,
-                                        ns,
+        ASSERT_TRUE(deleter.queueDelete(ns,
                                         BSON("x" << 0),
                                         BSON("x" << 10),
                                         BSON("x" << 1),
@@ -141,8 +140,7 @@ namespace {
 
         Notification deleteDone;
         string errMsg;
-        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
-                                        ns,
+        ASSERT_TRUE(deleter.queueDelete(ns,
                                         BSON("x" << 0),
                                         BSON("x" << 10),
                                         BSON("x" << 1),
@@ -185,8 +183,7 @@ namespace {
 
         string errMsg;
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
-                                        ns,
+        ASSERT_TRUE(deleter.queueDelete(ns,
                                         BSON("x" << 0),
                                         BSON("x" << 10),
                                         BSON("x" << 1),

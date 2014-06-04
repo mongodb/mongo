@@ -28,6 +28,9 @@
 
 #include "mongo/db/range_deleter_mock_env.h"
 
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/global_environment_noop.h"
+
 namespace mongo {
 
     bool DeletedRangeCmp::operator()(const DeletedRange& lhs,
@@ -53,6 +56,8 @@ namespace mongo {
         _pausedCount(0),
         _envStatMutex("envStat"),
         _getCursorsCallCount(0) {
+
+        setGlobalEnvironment(new GlobalEnvironmentNoop());
     }
 
     void RangeDeleterMockEnv::addCursorId(const StringData& ns, CursorId id) {

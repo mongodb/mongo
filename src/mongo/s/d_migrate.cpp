@@ -1505,8 +1505,7 @@ namespace mongo {
                 log() << "forking for cleanup of chunk data" << migrateLog;
 
                 string errMsg;
-                if (!deleter->queueDelete(OperationContextImpl::factory,
-                                          ns,
+                if (!deleter->queueDelete(ns,
                                           min.getOwned(),
                                           max.getOwned(),
                                           shardKeyPattern.getOwned(),
@@ -1724,8 +1723,7 @@ namespace mongo {
 
             if (state == FAIL || state == ABORT) {
                 string errMsg;
-                if (!getDeleter()->queueDelete(OperationContextImpl::factory, // XXX SERVER-13931
-                                               ns, min, max, shardKeyPattern, secondaryThrottle,
+                if (!getDeleter()->queueDelete(ns, min, max, shardKeyPattern, secondaryThrottle,
                                                NULL /* notifier */, &errMsg)) {
                     warning() << "Failed to queue delete for migrate abort: " << errMsg << endl;
                 }

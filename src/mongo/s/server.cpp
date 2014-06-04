@@ -46,6 +46,8 @@
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/dbwebserver.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/global_environment_noop.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/lasterror.h"
@@ -369,6 +371,11 @@ MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
     AuthorizationManager* authzManager =
                 new AuthorizationManager(new AuthzManagerExternalStateMongos());
     setGlobalAuthorizationManager(authzManager);
+    return Status::OK();
+}
+
+MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
+    setGlobalEnvironment(new GlobalEnvironmentNoop());
     return Status::OK();
 }
 
