@@ -36,6 +36,7 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/timer.h"
@@ -146,16 +147,22 @@ namespace JSTests {
         }
     };
 
-    /** Installs a tee for auditing log messages, including those logged with MONGO_TLOG(0)(). */
+    /** Installs a tee for auditing log messages. */
     class LogRecordingScope {
     public:
         LogRecordingScope() :
             _logged(false),
+            _durOptionsOld(storageGlobalParams.durOptions),
             _handle(mongo::logger::globalLogDomain()->attachAppender(
                             mongo::logger::MessageLogDomain::AppenderAutoPtr(new Tee(this)))) {
+            // Disable DurParanoid mode.
+            // This ensures that _logged will not be erroneously set due
+            // to occasional DurParanoid logging.
+            storageGlobalParams.durOptions = 0;
         }
         ~LogRecordingScope() {
             mongo::logger::globalLogDomain()->detachAppender(_handle);
+            storageGlobalParams.durOptions = _durOptionsOld;
         }
         /** @return most recent log entry. */
         bool logged() const { return _logged; }
@@ -172,6 +179,7 @@ namespace JSTests {
             LogRecordingScope* _scope;
         };
         bool _logged;
+        const int _durOptionsOld;
         mongo::logger::MessageLogDomain::AppenderHandle _handle;
     };
 
