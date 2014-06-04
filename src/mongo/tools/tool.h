@@ -67,18 +67,6 @@ namespace mongo {
         static void mapTools();
         static void mapOptions();
 
-        static std::auto_ptr<Tool> createInstanceOfThisTool();
-        static std::auto_ptr<Tool> (*createBSONDumpInstance)();
-        static std::auto_ptr<Tool> (*createDumpInstance)();
-        static std::auto_ptr<Tool> (*createExportInstance)();
-        static std::auto_ptr<Tool> (*createFilesInstance)();
-        static std::auto_ptr<Tool> (*createImportInstance)();
-        static std::auto_ptr<Tool> (*createOplogToolInstance)();
-        static std::auto_ptr<Tool> (*createRestoreInstance)();
-        static std::auto_ptr<Tool> (*createSnifferInstance)();
-        static std::auto_ptr<Tool> (*createStatInstance)();
-        static std::auto_ptr<Tool> (*createTopToolInstance)();
-
         static StoreOptions storeMongoOptions;
         static AddOptions addMongoOptions;
         static HandleOptions handlePreValidationMongoOptions;
@@ -132,13 +120,23 @@ namespace mongo {
 
     };
 
+
+    std::auto_ptr<Tool> (createInstanceOfBSONDump)();
+    std::auto_ptr<Tool> (createInstanceOfDump)();
+    std::auto_ptr<Tool> (createInstanceOfExport)();
+    std::auto_ptr<Tool> (createInstanceOfFiles)();
+    std::auto_ptr<Tool> (createInstanceOfImport)();
+    std::auto_ptr<Tool> (createInstanceOfOplogTool)();
+    std::auto_ptr<Tool> (createInstanceOfRestore)();
+    std::auto_ptr<Tool> (createInstanceOfSniffer)();
+    std::auto_ptr<Tool> (createInstanceOfStat)();
+    std::auto_ptr<Tool> (createInstanceOfTopTool)();
 }
 
-#define createInstance(TOKEN) create##TOKEN##Instance
-
 #define REGISTER_MONGO_TOOL(TYPENAME) \
-    std::auto_ptr<Tool> TYPENAME::createInstanceOfThisTool() {return std::auto_ptr<Tool>(new TYPENAME());} \
-    std::auto_ptr<Tool> (*Tool::createInstance(TYPENAME))() = TYPENAME::createInstanceOfThisTool;
+    namespace mongo { \
+        std::auto_ptr<Tool> createInstanceOf##TYPENAME() {return std::auto_ptr<Tool>(new TYPENAME());} \
+    }
 
 #define REGISTER_MONGOOPTION_HANDLER( TARGET, NAME )\
     REGISTER_OPTION_HANDLER( TARGET, Mongo##NAME )

@@ -52,7 +52,6 @@ namespace mongo {
         Stat() : Tool() {
             _autoreconnect = true;
         }
-        static std::auto_ptr<Tool> createInstanceOfThisTool();
 
         virtual void printHelp( ostream & out ) {
             printMongoStatHelp(&out);
