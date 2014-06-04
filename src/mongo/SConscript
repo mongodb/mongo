@@ -963,7 +963,8 @@ mongod = env.Install(
 Default( mongod )
 
 # tools
-allToolFiles = ["tools/tool.cpp",
+# Tool is now main, so it cannot be a dependency
+allToolFiles = [#"tools/tool.cpp",
                 "tools/stat_util.cpp",
                 "tools/tool_logger.cpp"]
 env.Library("tool_options", "tools/tool_options.cpp",
@@ -982,15 +983,29 @@ env.Library("alltools",
                      "$BUILD_DIR/mongo/db/auth/authmocks",
                      "$BUILD_DIR/mongo/db/auth/authmongod"])
 
-normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
+# Add the extra tools that are being packaged with mongotool
+normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog", "files", "bridge" ]
+
 env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + name + "${PROGSUFFIX}" for name in normalTools ] )
 for name in normalTools:
-    env.Install( '#/', env.Program("mongo" + name,
-                                   ["tools/" + name + ".cpp", "tools/mongo" + name + "_options_init.cpp"],
-                                   LIBDEPS=["alltools", "mongo" + name + "_options"]) )
+    # Old tools are no longer bing installed. Only options libraries are needed
     env.Library("mongo" + name + "_options", ["tools/mongo" + name + "_options.cpp"],
                 LIBDEPS=['tool_options'])
 
+env.Library("bsondump_options", ["tools/bsondump_options.cpp"], LIBDEPS=['tool_options'])
+
+# Add new tool, and new init options and their dependencies, as well as dependencies for perf, files, and bridge that were not included in the old tool.
+deps = ["tools/tool.cpp", "tools/tool_options_init.cpp", "tools/bsondump.cpp", "client/examples/mongoperf.cpp"]
+libdeps = ["alltools", "gridfs", "bsondump_options", "serveronly", "coreserver", "coredb"]
+for name in normalTools:
+	deps.append("tools/" + name + ".cpp")
+	libdeps.append("mongo" + name + "_options")
+
+tools = env.Install( '#/', env.Program("mongotools",
+								   deps,
+								   LIBDEPS=libdeps))
+
+""" Comment out old build system, all these tools are now packaged
 #some special tools
 env.Library("mongofiles_options", ["tools/mongofiles_options.cpp"],
             LIBDEPS=['tool_options'])
@@ -1009,7 +1024,7 @@ env.Install( '#/', [
         env.Program( "mongoperf", "client/examples/mongoperf.cpp",
                      LIBDEPS=["serveronly", "coreserver", "coredb"] ),
         ] )
-
+"""
 # mongos options
 env.Library("mongos_options", ["s/mongos_options.cpp"],
             LIBDEPS=['mongoscore',
@@ -1186,7 +1201,8 @@ def installBinary( e, name ):
     if nix:
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
-for t in ["mongo" + x for x in normalTools] + ["mongofiles", "bsondump", "mongoperf" ]:
+# Only one binary
+for t in [ "mongotools" ]:
     installBinary( env, t )
     env.Alias("tools", '#/' + add_exe(t))
 

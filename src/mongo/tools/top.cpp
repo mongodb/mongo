@@ -178,6 +178,8 @@ namespace mongo {
         }
     };
 
-    REGISTER_MONGO_TOOL(TopTool);
+    
 
 }
+
+REGISTER_MONGO_TOOL(TopTool);
