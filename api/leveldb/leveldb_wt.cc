@@ -358,6 +358,8 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
 	int ret = ::wiredtiger_open(name.c_str(), NULL, conn_config.c_str(), &conn);
 	if (ret == ENOENT)
 		return Status::NotFound(Slice("Database does not exist."));
+	if (ret == EBUSY)
+		return Status::NotFound(Slice("Database already exists."));
 	assert(ret == 0);
 
 	if (options.create_if_missing) {
