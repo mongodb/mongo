@@ -37,8 +37,6 @@
 
 namespace mongo {
 
-    const size_t QueryPlannerAnalysis::kMaxScansToExplode = 50;
-
     //
     // Helpers for bounds explosion AKA quick-and-dirty SERVER-1205.
     //
@@ -339,7 +337,7 @@ namespace mongo {
         }
 
         // Too many ixscans spoil the performance.
-        if (totalNumScans > QueryPlannerAnalysis::kMaxScansToExplode) {
+        if (totalNumScans > (size_t)internalQueryMaxScansToExplode) {
             QLOG() << "Could expand ixscans to pull out sort order but resulting scan count"
                    << "(" << totalNumScans << ") is too high.";
             return false;

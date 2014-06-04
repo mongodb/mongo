@@ -38,13 +38,6 @@ namespace mongo {
 
     class QueryPlannerAnalysis {
     public:
-
-        /**
-         * See explodeForSort.  Max number of index scans we're willing to create to pull
-         * a sort order out of an index scan with point intervals.
-         */
-        static const size_t kMaxScansToExplode;
-
         /**
          * In brief: performs sort and covering analysis.
          *

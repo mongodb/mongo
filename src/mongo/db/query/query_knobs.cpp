@@ -58,4 +58,6 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanOrChildrenIndependently, bool, true);
 
+    MONGO_EXPORT_SERVER_PARAMETER(internalQueryMaxScansToExplode, int, 50);
+
 }  // namespace mongo
