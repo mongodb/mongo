@@ -27,7 +27,7 @@ class ReplayIterator;
 #endif
 
 #define	WT_URI	"table:data"
-#define	WT_CONN_CONFIG	"session_max=256,"
+#define	WT_CONN_CONFIG	"log=(enabled),checkpoint_sync=false,transaction_sync=none,session_max=256,"
 #define	WT_TABLE_CONFIG	"type=lsm,leaf_page_max=4KB,leaf_item_max=1KB,"
 
 /* Destructors required for interfaces. */
