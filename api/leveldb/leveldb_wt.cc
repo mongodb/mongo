@@ -5,6 +5,7 @@
  * See the file LICENSE for redistribution information.
  */
 #include "leveldb_wt.h"
+#include <errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sstream>
@@ -355,6 +356,8 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
 
 	WT_CONNECTION *conn;
 	int ret = ::wiredtiger_open(name.c_str(), NULL, conn_config.c_str(), &conn);
+	if (ret == ENOENT)
+		return Status::NotFound(Slice("Database does not exist."));
 	assert(ret == 0);
 
 	if (options.create_if_missing) {

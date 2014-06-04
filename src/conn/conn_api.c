@@ -874,7 +874,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	off_t size;
 	size_t len;
-	int created;
+	int ok_create, exclusive, created;
 	char buf[256];
 
 	conn = S2C(session);
@@ -885,8 +885,11 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * only locker" tests are all that matter.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
+	ok_create = cval.val == 0 ? 0 : 1;
+	WT_RET(__wt_config_gets(session, cfg, "exclusive", &cval));
+	exclusive = cval.val == 0 ? 0 : 1;
 	WT_RET(__wt_open(session,
-	    WT_SINGLETHREAD, cval.val == 0 ? 0 : 1, 0, 0, &conn->lock_fh));
+	    WT_SINGLETHREAD, ok_create, exclusive, 0, &conn->lock_fh));
 
 	/*
 	 * Lock a byte of the file: if we don't get the lock, some other process

@@ -699,6 +699,11 @@ methods = {
 		WiredTiger data files opened at a checkpoint (i.e: read only) to
 		use \c O_DIRECT''',
 	    type='list', choices=['checkpoint', 'data', 'log']),
+	Config('exclusive', 'false', r'''
+	    fail if the database exists.  When false (the default), if the
+	    object exists, open the existing database. Should generally be
+	    paired with create option''',
+	    type='boolean'),
 	Config('extensions', '', r'''
 	    list of shared library extensions to load (using dlopen).
 	    Any values specified to an library extension are passed to
