@@ -107,8 +107,6 @@ namespace mongo {
     extern StorageGlobalParams storageGlobalParams;
 
     bool isJournalingEnabled();
-    void setJournalCommitInterval(unsigned newValue);
-    unsigned getJournalCommitInterval();
 
     // This is not really related to persistence, but mongos and the other executables share code
     // and we use this function to determine at runtime which executable we are in.

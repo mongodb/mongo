@@ -77,22 +77,6 @@ namespace mongo {
 
             int before = result.len();
 
-            // TODO: convert to ServerParameters -- SERVER-10515
-
-            if (isJournalingEnabled() && (all || cmdObj.hasElement("journalCommitInterval")) &&
-                !isMongos()) {
-                result.append("journalCommitInterval",
-                              getJournalCommitInterval());
-            }
-            if( all || cmdObj.hasElement( "traceExceptions" ) ) {
-                result.append("traceExceptions",
-                              DBException::traceExceptions);
-            }
-            if( all || cmdObj.hasElement( "replMonitorMaxFailedChecks" ) ) {
-                result.append("replMonitorMaxFailedChecks",
-                              ReplicaSetMonitor::maxConsecutiveFailedChecks);
-            }
-
             const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
             for ( ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i ) {
                 if ( all || cmdObj.hasElement( i->first.c_str() ) ) {
@@ -129,35 +113,6 @@ namespace mongo {
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int s = 0;
             bool found = false;
-
-            // TODO: convert to ServerParameters -- SERVER-10515
-
-            if( cmdObj.hasElement("journalCommitInterval") ) {
-                if (isMongos()) {
-                    errmsg = "cannot set journalCommitInterval on a mongos";
-                    return false;
-                }
-                if(!isJournalingEnabled()) {
-                    errmsg = "journaling is off";
-                    return false;
-                }
-                int x = (int) cmdObj["journalCommitInterval"].Number();
-                verify( x > 1 && x < 500 );
-                setJournalCommitInterval(x);
-                log() << "setParameter journalCommitInterval=" << x << endl;
-                s++;
-            }
-            if( cmdObj.hasElement( "traceExceptions" ) ) {
-                if( s == 0 ) result.append( "was", DBException::traceExceptions );
-                DBException::traceExceptions = cmdObj["traceExceptions"].Bool();
-                s++;
-            }
-            if( cmdObj.hasElement( "replMonitorMaxFailedChecks" ) ) {
-                if( s == 0 ) result.append( "was", ReplicaSetMonitor::maxConsecutiveFailedChecks );
-                ReplicaSetMonitor::maxConsecutiveFailedChecks =
-                    cmdObj["replMonitorMaxFailedChecks"].numberInt();
-                s++;
-            }
 
             const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
             BSONObjIterator i( cmdObj );
@@ -394,6 +349,19 @@ namespace mongo {
                                                     &serverGlobalParams.quiet,
                                                     true,
                                                     true );
+
+        ExportedServerParameter<int> MaxConsecutiveFailedChecksSetting(
+                                                    ServerParameterSet::getGlobal(),
+                                                    "replMonitorMaxFailedChecks",
+                                                    &ReplicaSetMonitor::maxConsecutiveFailedChecks,
+                                                    false, // allowedToChangeAtStartup
+                                                    true); // allowedToChangeAtRuntime
+
+        ExportedServerParameter<bool> TraceExceptionsSetting(ServerParameterSet::getGlobal(),
+                                                             "traceExceptions",
+                                                             &DBException::traceExceptions,
+                                                             false, // allowedToChangeAtStartup
+                                                             true); // allowedToChangeAtRuntime
     }
 
 }
