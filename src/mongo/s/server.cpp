@@ -393,7 +393,7 @@ int mongoSMain(int argc, char* argv[], char** envp) {
     if (argc < 1)
         return EXIT_FAILURE;
 
-    setupSignalHandlers();
+    setupSignalHandlers(false);
 
     mongosCommand = argv[0];
 

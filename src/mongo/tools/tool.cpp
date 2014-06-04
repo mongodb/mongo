@@ -41,6 +41,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/client.h"
 #include "mongo/db/json.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
@@ -51,6 +52,7 @@
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/password.h"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/signal_handlers.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
@@ -74,6 +76,8 @@ namespace mongo {
     }
 
     int Tool::main( int argc , char ** argv, char ** envp ) {
+        setupSignalHandlers(true);
+
         static StaticObserver staticObserver;
 
         mongo::runGlobalInitializersOrDie(argc, argv, envp);
@@ -387,7 +391,6 @@ namespace mongo {
 // and makes them available through the argv() and envp() members.  This enables toolMain()
 // to process UTF-8 encoded arguments and environment variables without regard to platform.
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
-    setWindowsUnhandledExceptionFilter();
     mongo::WindowsCommandLine wcl(argc, argvW, envpW);
     auto_ptr<Tool> instance = (*Tool::createInstance)();
     int exitCode = instance->main(argc, wcl.argv(), wcl.envp());

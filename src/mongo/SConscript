@@ -922,15 +922,18 @@ env.Library("serveronly", serverOnlyFiles,
 
 env.Library("message_server_port", "util/net/message_server_port.cpp")
 
+env.Library("signal_handlers", "util/signal_handlers.cpp",
+            LIBDEPS=["stacktrace", "foundation"]
+            )
+
 # These files go into mongos and mongod only, not into the shell or any tools.
 mongodAndMongosFiles = [
     "db/initialize_server_global_state.cpp",
     "db/server_extra_log_context.cpp",
     "db/dbwebserver.cpp",
-    "util/signal_handlers.cpp",
     ]
 env.Library("mongodandmongos", mongodAndMongosFiles,
-            LIBDEPS=["message_server_port"])
+            LIBDEPS=["message_server_port", "signal_handlers"])
 
 env.Library("mongodwebserver",
             [
@@ -987,6 +990,7 @@ env.Library("alltools",
             LIBDEPS=["serveronly",
                      "coreserver",
                      "coredb",
+                     "signal_handlers",
                      "$BUILD_DIR/mongo/util/options_parser/options_parser",
                      "$BUILD_DIR/mongo/db/auth/authmocks",
                      "$BUILD_DIR/mongo/db/auth/authmongod"])
@@ -1142,6 +1146,7 @@ if shellEnv is not None:
                          'db/index/external_key_generator',
                          'index_key_validate',
                          'scripting',
+                         "signal_handlers",
                          'mongocommon'])
     # mongo shell options
     env.Library("shell_options", ["shell/shell_options.cpp"],

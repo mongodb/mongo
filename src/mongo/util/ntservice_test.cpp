@@ -116,7 +116,6 @@ TEST(NtService, RegressionSERVER_7252) {
 namespace mongo {
     enum ExitCode;
     void exitCleanly(ExitCode ignored) { std::abort(); }
-    Client& Client::initThread(const char* desc, AbstractMessagingPort* mp) {
-        std::abort(); return *reinterpret_cast<Client*>(NULL);
+    void Client::initThread(const char* desc, AbstractMessagingPort* mp) {
     }
 }  // namespace mongo

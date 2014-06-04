@@ -77,7 +77,7 @@ namespace mongo {
         /** each thread which does db operations has a Client object in TLS.
          *  call this when your thread starts.
         */
-        static Client& initThread(const char *desc, AbstractMessagingPort *mp = 0);
+        static void initThread(const char *desc, AbstractMessagingPort *mp = 0);
 
         static void initThreadIfNotAlready(const char *desc) { 
             if( currentClient.get() )

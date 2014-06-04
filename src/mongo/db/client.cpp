@@ -77,7 +77,7 @@ namespace mongo {
     /* each thread which does db operations has a Client object in TLS.
        call this when your thread starts.
     */
-    Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
+    void Client::initThread(const char *desc, AbstractMessagingPort *mp) {
         verify( currentClient.get() == 0 );
 
         string fullDesc = desc;
@@ -92,7 +92,6 @@ namespace mongo {
         mongo::lastError.initThread();
         c->setAuthorizationSession(new AuthorizationSession(new AuthzSessionExternalStateMongod(
                 getGlobalAuthorizationManager())));
-        return *c;
     }
 
     Client::Client(const string& desc, AbstractMessagingPort *p) :

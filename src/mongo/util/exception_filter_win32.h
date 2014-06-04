@@ -32,4 +32,6 @@ namespace mongo {
 
     void setWindowsUnhandledExceptionFilter();
 
+    void doMinidump();
+
 } // namespace mongo

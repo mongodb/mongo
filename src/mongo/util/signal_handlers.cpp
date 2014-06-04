@@ -45,6 +45,7 @@
 #if defined(_WIN32)
 #  include "mongo/util/signal_win32.h"
 #  include "mongo/util/exception_filter_win32.h"
+#  include "mongo/util/text.h"
 #else
 #  include <signal.h>
 #  include <unistd.h>
@@ -149,6 +150,11 @@ namespace {
         boost::mutex::scoped_lock lk(streamMutex);
         printStackTrace(mallocFreeOStream << "terminate() called.\n");
         writeMallocFreeStreamToLog();
+
+#ifdef _WIN32
+        doMinidump();
+#endif
+
         ::_exit(EXIT_ABRUPT);
     }
 
@@ -170,8 +176,36 @@ namespace {
 
 #ifdef _WIN32
 
+    void myInvalidParameterHandler(
+        const wchar_t* expression,
+        const wchar_t* function,
+        const wchar_t* file,
+        unsigned int line,
+        uintptr_t pReserved) {
+        severe() << "Invalid parameter detected in function " << toUtf8String(function) <<
+            " File: " << toUtf8String(file) << " Line: " << line;
+        severe() << "Expression: " << toUtf8String(expression);
+
+        doMinidump();
+
+        severe() << "immediate exit due to invalid parameter";
+
+        abruptQuit(SIGABRT);
+    }
+
+    void myPureCallHandler() {
+        severe() << "Pure call handler invoked";
+
+        doMinidump();
+
+        severe() << "immediate exit due to invalid pure call";
+
+        abruptQuit(SIGABRT);
+    }
+
     void consoleTerminate( const char* controlCodeName ) {
         Client::initThread( "consoleTerminate" );
+
         log() << "got " << controlCodeName << ", will terminate after current cmd ends" << endl;
         exitCleanly( EXIT_KILL );
     }
@@ -236,6 +270,7 @@ namespace {
         }
 
         Client::initThread("eventTerminate");
+
         log() << "shutdown event signaled, will terminate after current cmd ends";
         exitCleanly(EXIT_CLEAN);
     }
@@ -263,6 +298,7 @@ namespace {
     sigset_t asyncSignals;
     void signalProcessingThread() {
         Client::initThread( "signalProcessingThread" );
+
         while (true) {
             int actualSignal = 0;
             int status = sigwait( &asyncSignals, &actualSignal );
@@ -288,7 +324,7 @@ namespace {
 #endif
 } // namespace
 
-    void setupSignalHandlers() {
+    void setupSignalHandlers(bool handleControlC) {
         set_terminate( myTerminate );
         set_new_handler( myNewHandler );
 
@@ -296,11 +332,14 @@ namespace {
         invariant( signal(SIGABRT, abruptQuit) != SIG_ERR );
 
 #ifdef _WIN32
-        _set_purecall_handler( ::abort ); // TODO improve?
+        _set_purecall_handler( myPureCallHandler );
+        _set_invalid_parameter_handler(myInvalidParameterHandler);
         setWindowsUnhandledExceptionFilter();
-        massert(10297,
+        if (!handleControlC) {
+            massert(10297,
                 "Couldn't register Windows Ctrl-C handler",
                 SetConsoleCtrlHandler(static_cast<PHANDLER_ROUTINE>(CtrlHandler), TRUE));
+        }
 
 #else
         invariant( signal(SIGHUP , SIG_IGN ) != SIG_ERR );
@@ -325,7 +364,9 @@ namespace {
         // interrupt thread, once it is started via startSignalProcessingThread().
         sigemptyset( &asyncSignals );
         sigaddset( &asyncSignals, SIGHUP );
-        sigaddset( &asyncSignals, SIGINT );
+        if (!handleControlC) {
+           sigaddset( &asyncSignals, SIGINT );
+        }
         sigaddset( &asyncSignals, SIGTERM );
         sigaddset( &asyncSignals, SIGQUIT );
         sigaddset( &asyncSignals, SIGUSR1 );

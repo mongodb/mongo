@@ -74,7 +74,7 @@ namespace mongo {
     Client::~Client() {}
     bool Client::shutdown() { return true; }
 
-    Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
+    void Client::initThread(const char *desc, AbstractMessagingPort *mp) {
         // mp is non-null only for client connections, and mongos uses ClientInfo for those
         massert(16478, "Client being used for incoming connection thread in mongos", mp == NULL);
 
@@ -91,7 +91,6 @@ namespace mongo {
         mongo::lastError.initThread();
         c->setAuthorizationSession(new AuthorizationSession(new AuthzSessionExternalStateMongos(
                 getGlobalAuthorizationManager())));
-        return *c;
     }
 
     string Client::clientAddress(bool includePort) const {

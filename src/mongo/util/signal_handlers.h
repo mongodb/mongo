@@ -36,8 +36,11 @@ namespace mongo {
      * Sets up handlers for signals and other events like terminate and new_handler.
      *
      * This must be called very early in main, before runGlobalInitializers().
+     *
+     * installControlCHandler - true means the program would like to setup its on Control-C handler
+     *                        - used by command line tools
      */
-    void setupSignalHandlers();
+    void setupSignalHandlers(bool installControlCHandler);
 
     /**
      * Starts the thread to handle asynchronous signals.

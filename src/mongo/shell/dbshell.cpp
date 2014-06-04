@@ -40,6 +40,8 @@
 #include "mongo/client/clientOnly-private.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/db/client.h"
+#include "mongo/db/log_process_details.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
@@ -48,9 +50,11 @@
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/file.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password.h"
+#include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
@@ -72,12 +76,6 @@ string historyFile;
 bool gotInterrupted = false;
 bool inMultiLine = false;
 static volatile bool atPrompt = false; // can eval before getting to prompt
-
-#if !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32)
-// this is for ctrl-c handling
-#include <setjmp.h>
-jmp_buf jbuf;
-#endif
 
 namespace mongo {
 
@@ -159,12 +157,6 @@ void shellHistoryAdd( const char * line ) {
     }
 }
 
-#ifdef CTRLC_HANDLE
-void intr( int sig ) {
-    longjmp( jbuf , 1 );
-}
-#endif
-
 void killOps() {
     if ( mongo::shell_utils::_nokillop )
         return;
@@ -178,103 +170,45 @@ void killOps() {
         killOperationsOnAllConnections(!shellGlobalParams.autoKillOp);
 }
 
-void quitNicely( int sig ) {
-    {
-        mongo::mutex::scoped_lock lk(mongo::shell_utils::mongoProgramOutputMutex);
-        mongo::dbexitCalled = true;
-    }
-    if ( sig == SIGINT && inMultiLine ) {
-        gotInterrupted = 1;
-        return;
-    }
+// Stubs for signal_handlers.cpp
+namespace mongo {
+    void Client::initThread(const char *desc, mongo::AbstractMessagingPort *mp) {}
+    void logProcessDetailsForLogRotate() {}
 
-    killOps();
-    shellHistoryDone();
-    ::_exit(0);
+    void exitCleanly( ExitCode code ) {
+        {
+            mongo::mutex::scoped_lock lk(mongo::shell_utils::mongoProgramOutputMutex);
+            mongo::dbexitCalled = true;
+        }
+
+        ::killOps();
+        ::shellHistoryDone();
+        ::_exit(0);
+    }
+}
+
+void quitNicely( int sig ) {
+    exitCleanly(EXIT_CLEAN);
 }
 
 // the returned string is allocated with strdup() or malloc() and must be freed by calling free()
 char * shellReadline( const char * prompt , int handlesigint = 0 ) {
     atPrompt = true;
 
-#ifdef CTRLC_HANDLE
-    if ( ! handlesigint ) {
-        char* ret = linenoise( prompt );
-        atPrompt = false;
-        return ret;
-    }
-    if ( setjmp( jbuf ) ) {
-        gotInterrupted = 1;
-        sigrelse(SIGINT);
-        signal( SIGINT , quitNicely );
-        return 0;
-    }
-    signal( SIGINT , intr );
-#endif
-
     char * ret = linenoise( prompt );
     if ( ! ret ) {
         gotInterrupted = true;  // got ^C, break out of multiline
     }
 
-    signal( SIGINT , quitNicely );
     atPrompt = false;
     return ret;
 }
 
-#ifdef _WIN32
-char * strsignal(int sig){
-    switch (sig){
-        case SIGINT: return "SIGINT";
-        case SIGTERM: return "SIGTERM";
-        case SIGABRT: return "SIGABRT";
-        case SIGSEGV: return "SIGSEGV";
-        case SIGFPE: return "SIGFPE";
-        default: return "unknown";
-    }
-}
-#endif
-
-void quitAbruptly( int sig ) {
-    log() << "mongo got signal " << sig << " (" << strsignal( sig ) << "), stack trace: ";
-    mongo::printStackTrace();
-
-    mongo::shell_utils::KillMongoProgramInstances();
-    ::_exit( 14 );
-}
-
-// this will be called in certain c++ error cases, for example if there are two active
-// exceptions
-void myterminate() {
-    mongo::printStackTrace(severe().stream() << "terminate() called in shell, printing stack:\n");
-    ::_exit( 14 );
-}
-
-static void ignoreSignal(int ignored) {}
-
 void setupSignals() {
     signal( SIGINT , quitNicely );
-    signal( SIGTERM , quitNicely );
-    signal( SIGABRT , quitAbruptly );
-    signal( SIGSEGV , quitAbruptly );
-    signal( SIGFPE , quitAbruptly );
-
-#if !defined(_WIN32) // surprisingly these are the only ones that don't work on windows
-    struct sigaction sigactionSignals;
-    sigactionSignals.sa_handler = ignoreSignal;
-    sigemptyset(&sigactionSignals.sa_mask);
-    sigactionSignals.sa_flags = 0;
-    sigaction(SIGPIPE, &sigactionSignals, NULL); // errors are handled in socket code directly
-
-    signal( SIGBUS , quitAbruptly );
-#endif
-
-    set_terminate( myterminate );
 }
 
 string fixHost( const std::string& url, const std::string& host, const std::string& port ) {
-    //cout << "fixHost url: " << url << " host: " << host << " port: " << port << endl;
-
     if ( host.size() == 0 && port.size() == 0 ) {
         if ( url.find( "/" ) == string::npos ) {
             // check for ips
@@ -649,6 +583,7 @@ static void edit( const string& whatToEdit ) {
 
 int _main( int argc, char* argv[], char **envp ) {
     mongo::isShell = true;
+    setupSignalHandlers(true);
     setupSignals();
 
     mongo::shell_utils::RecordMyLocation( argv[ 0 ] );
@@ -837,13 +772,9 @@ int _main( int argc, char* argv[], char **envp ) {
         string prompt;
         int promptType;
 
-        //v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
-
         while ( 1 ) {
             inMultiLine = false;
             gotInterrupted = false;
-//            shellMainScope->localConnect;
-            //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
             promptType = scope->type( "prompt" );
             if ( promptType == String ) {
