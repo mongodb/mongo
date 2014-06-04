@@ -54,10 +54,60 @@
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
+#include "mongo/tools/tool_options.h"
+#include "mongo/tools/mongotop_options.h"
+#include "mongo/tools/mongostat_options.h"
+#include "mongo/tools/mongorestore_options.h"
+#include "mongo/tools/mongooplog_options.h"
+#include "mongo/tools/mongoimport_options.h"
+#include "mongo/tools/mongofiles_options.h"
+#include "mongo/tools/mongoexport_options.h"
+#include "mongo/tools/mongodump_options.h"
+#include "mongo/tools/mongobridge_options.h"
+#include "mongo/tools/bsondump_options.h"
+
 using namespace std;
 using namespace mongo;
 
 namespace mongo {
+
+    typedef std::auto_ptr<Tool> (*InstanceFunction)();
+
+    std::map < std::string, InstanceFunction> Tool::tools;
+    std::map < std::string, OptionHandler> Tool::options;
+
+    StoreOptions Tool::storeMongoOptions;
+    AddOptions Tool::addMongoOptions;
+    HandleOptions Tool::handlePreValidationMongoOptions;
+
+    void Tool::mapOptions()
+    {
+        REGISTER_MONGOOPTION_HANDLER(dump, Dump)
+        REGISTER_MONGOOPTION_HANDLER(export, Export)
+        REGISTER_MONGOOPTION_HANDLER(import, Import)
+        REGISTER_MONGOOPTION_HANDLER(stat, Stat)
+        REGISTER_MONGOOPTION_HANDLER(oplog, Oplog)
+        REGISTER_MONGOOPTION_HANDLER(restore, Restore)
+        REGISTER_MONGOOPTION_HANDLER(top, Top)
+        REGISTER_MONGOOPTION_HANDLER(files, Files)
+        REGISTER_OPTION_HANDLER(bsondump, BSONDump)
+        REGISTER_MONGOOPTION_HANDLER(bridge, Bridge)
+    }
+
+    void Tool::mapTools()
+    {
+        Tool::tools["dump"] = *createInstanceOfDump;
+        Tool::tools["export"] = *createInstanceOfExport;
+        Tool::tools["import"] = *createInstanceOfImport;
+        Tool::tools["stat"] = *createInstanceOfStat;
+        Tool::tools["oplog"] = *createInstanceOfOplogTool;
+        Tool::tools["restore"] = *createInstanceOfRestore;
+        Tool::tools["top"] = *createInstanceOfTopTool;
+        Tool::tools["files"] = *createInstanceOfFiles;
+        Tool::tools["bsondump"] = *createInstanceOfBSONDump;
+        Tool::tools["bridge"] = 0;
+        Tool::tools["perf"] = 0;
+    }
 
     Tool::Tool() :
         _autoreconnect(false), _conn(0), _slaveConn(0) { }
@@ -75,7 +125,6 @@ namespace mongo {
 
     int Tool::main( int argc , char ** argv, char ** envp ) {
         static StaticObserver staticObserver;
-
         mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
         // hide password from ps output
@@ -87,7 +136,7 @@ namespace mongo {
                 }
             }
         }
-
+        
         if (!toolGlobalParams.useDirectClient) {
             if (toolGlobalParams.noconnection) {
                 // do nothing
@@ -380,6 +429,11 @@ namespace mongo {
 
 }
 
+int mongoPerfMain(int argc, char*argv[]);
+int snifferToolMain(int argc, char **argv, char** envp);
+int bridgeToolMain(int argc, char **argv, char** envp);
+int startProg(int argc, char* argv[], char** envp);
+
 #if defined(_WIN32)
 // In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
 // as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
@@ -389,14 +443,63 @@ namespace mongo {
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     setWindowsUnhandledExceptionFilter();
     mongo::WindowsCommandLine wcl(argc, argvW, envpW);
-    auto_ptr<Tool> instance = (*Tool::createInstance)();
-    int exitCode = instance->main(argc, wcl.argv(), wcl.envp());
-    ::_exit(exitCode);
+    int exitCode = startProg(argc, wcl.argv(), wcl.envp());
 }
 
 #else
 int main(int argc, char* argv[], char** envp) {
-    auto_ptr<Tool> instance = (*Tool::createInstance)();
-    ::_exit(instance->main(argc, argv, envp));
+    startProg(argc, argv, envp);
 }
 #endif
+
+int startProg(int argc, char* argv[], char** envp) {
+    Tool::mapTools();
+    Tool::mapOptions();
+	
+    char help[7] = {'-', '-', 'h', 'e', 'l', 'p', '\0' };
+    if (argc == 1 || std::string("help") == argv[1])
+    {
+        if (argc > 2)
+        {
+            argv[1] = argv[2];
+            argv[2] = help;
+        }
+        else
+        {
+            std::cout << "Valid commands: " << endl;
+            for(std::map<std::string, InstanceFunction>::iterator iter = Tool::tools.begin(); iter != Tool::tools.end(); ++iter)
+            {
+                std::cout << iter->first << endl;
+            }
+            ::_exit(EXIT_CLEAN);
+        }
+    }
+
+    // perf doesn't use the argument parser, skip that section and go straight to main
+    if (strcmp(argv[1], "perf") == 0)
+    {
+        ::_exit(mongoPerfMain(argc - 1, &argv[1]));
+    }
+
+    if(Tool::tools.find(argv[1]) == Tool::tools.end())
+    {
+        std::cout<<std::string(argv[1]) + " is not a tool."<<endl;
+        ::_exit(EXIT_FAILURE);
+    }
+
+    // Add options to class variables for tool_options_init to use
+    OptionHandler o = Tool::options[argv[1]];
+    Tool::storeMongoOptions = o.store;
+    Tool::handlePreValidationMongoOptions = o.handle;
+    Tool::addMongoOptions = o.add;
+
+    // Bridge has its own main
+    if (strcmp(argv[1], "bridge") == 0)
+    {
+        ::_exit(bridgeToolMain(argc - 1, &argv[1], envp));
+    }
+
+    auto_ptr<Tool> instance = Tool::tools[argv[1]]();
+    ::_exit(instance->main(argc - 1, &argv[1], envp));
+}
+

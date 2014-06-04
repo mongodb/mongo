@@ -45,13 +45,31 @@
 using std::string;
 
 namespace mongo {
+    typedef mongo::Status (*StoreOptions)(const mongo::moe::Environment& params, const std::vector<std::string>& args);
+    typedef bool (*HandleOptions)(const mongo::moe::Environment& params);
+    typedef mongo::Status (*AddOptions)(mongo::moe::OptionSection* options);
+
+    struct OptionHandler {
+        StoreOptions store;
+        HandleOptions handle;
+        AddOptions add;
+    };
 
     class Tool {
     public:
         Tool();
         virtual ~Tool();
 
-        static std::auto_ptr<Tool> (*createInstance)();
+        typedef std::auto_ptr<Tool> (*InstanceFunction)();
+
+        static std::map < std::string, InstanceFunction> tools;
+        static std::map < std::string, OptionHandler> options;
+        static void mapTools();
+        static void mapOptions();
+
+        static StoreOptions storeMongoOptions;
+        static AddOptions addMongoOptions;
+        static HandleOptions handlePreValidationMongoOptions;
 
         int main( int argc , char ** argv, char ** envp );
 
@@ -102,8 +120,29 @@ namespace mongo {
 
     };
 
+
+    std::auto_ptr<Tool> (createInstanceOfBSONDump)();
+    std::auto_ptr<Tool> (createInstanceOfDump)();
+    std::auto_ptr<Tool> (createInstanceOfExport)();
+    std::auto_ptr<Tool> (createInstanceOfFiles)();
+    std::auto_ptr<Tool> (createInstanceOfImport)();
+    std::auto_ptr<Tool> (createInstanceOfOplogTool)();
+    std::auto_ptr<Tool> (createInstanceOfRestore)();
+    std::auto_ptr<Tool> (createInstanceOfSniffer)();
+    std::auto_ptr<Tool> (createInstanceOfStat)();
+    std::auto_ptr<Tool> (createInstanceOfTopTool)();
 }
 
 #define REGISTER_MONGO_TOOL(TYPENAME) \
-    std::auto_ptr<Tool> createInstanceOfThisTool() {return std::auto_ptr<Tool>(new TYPENAME());} \
-    std::auto_ptr<Tool> (*Tool::createInstance)() = createInstanceOfThisTool;
+    namespace mongo { \
+        std::auto_ptr<Tool> createInstanceOf##TYPENAME() {return std::auto_ptr<Tool>(new TYPENAME());} \
+    }
+
+#define REGISTER_MONGOOPTION_HANDLER( TARGET, NAME )\
+    REGISTER_OPTION_HANDLER( TARGET, Mongo##NAME )
+
+#define REGISTER_OPTION_HANDLER( TARGET, NAME ) \
+	OptionHandler& TARGET##_temp = Tool::options[#TARGET]; \
+	TARGET##_temp.store = store##NAME##Options; \
+	TARGET##_temp.add = add##NAME##Options; \
+	TARGET##_temp.handle = handlePreValidation##NAME##Options;

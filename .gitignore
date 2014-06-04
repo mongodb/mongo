@@ -89,9 +89,11 @@ scratch
 /mongotop
 /mongooplog
 /mongoperf
+/mongotools
 /bsondump
 /loadgen
 /docgen
+
 
 *.tgz
 *.zip
