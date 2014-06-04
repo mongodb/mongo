@@ -117,18 +117,7 @@
  *    shared libraries.
  *
  *    Same correct/incorrect usage as for MONGO_COMPILER_API_EXPORT.
- *
- * MONGO_NOEXCEPT
- *
- *    Decorates functions that must not throw exceptions.  If a function so-decorated
- *    throws, the runtime will call std::terminate().
  */
-
-#if __cplusplus >= 201103L
-#define MONGO_NOEXCEPT noexcept
-#else
-#define MONGO_NOEXCEPT throw ()
-#endif
 
 #if defined(_MSC_VER)
 #include "mongo/platform/compiler_msvc.h"
