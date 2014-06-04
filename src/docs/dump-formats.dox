@@ -4,7 +4,7 @@ The @ref util_dump command produces a flat-text representation of a
 table that can be loaded by @ref util_load.  This page describes the
 output formats of the @ref util_dump command.
 
-@section dump_formats_json JSON format
+@section dump_formats_json JSON dump format
 
 JSON (<a href="http://www.json.org">JavaScript Object Notation</a>)
 dump files use the standard JSON data-interchange format to specify
@@ -55,7 +55,7 @@ Here is some sample output:
 }
 @endcode
 
-@section dump_formats_text Text format
+@section dump_formats_text Text dump format
 
 Text dump files have three parts, a prefix, a header and a body.
 
