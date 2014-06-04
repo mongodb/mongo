@@ -95,7 +95,7 @@ namespace mongo {
         }
         virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
 
-            if (Lock::isLocked()) {
+            if (txn->lockState()->isLocked()) {
                 errmsg = "fsync: Cannot execute fsync command from contexts that hold a data lock";
                 return false;
             }
@@ -200,7 +200,6 @@ namespace mongo {
     
     // @return true if unlocked
     bool _unlockFsync() {
-        verify(!Lock::isLocked());
         SimpleMutex::scoped_lock lk( fsyncCmd.m );
         if( !fsyncCmd.locked ) { 
             return false;

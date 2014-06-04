@@ -38,14 +38,23 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/util/file_allocator.h"
+
 
 namespace mongo {
 
-    Database* DatabaseHolder::getOrCreate(OperationContext* txn, const string& ns, const string& path, bool& justCreated) {
-        string dbname = _todb( ns );
+    Database* DatabaseHolder::getOrCreate(
+                OperationContext* txn, const string& ns, const string& path, bool& justCreated) {
+
+        const string dbname = _todb( ns );
+        invariant(txn->lockState()->isAtLeastReadLocked(dbname));
+
+        if (txn->lockState()->hasAnyWriteLock() && FileAllocator::get()->hasFailed()) {
+            uassert(17507, "Can't take a write lock while out of disk space", false);
+        }
+
         {
             SimpleMutex::scoped_lock lk(_m);
-            Lock::assertAtLeastReadLocked(ns);
             DBs& m = _paths[path];
             {
                 DBs::iterator i = m.find(dbname);

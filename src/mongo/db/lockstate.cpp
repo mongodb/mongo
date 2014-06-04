@@ -84,11 +84,19 @@ namespace mongo {
         return false;
     }
 
-    bool LockState::isWriteLocked(const StringData& ns) {
-        if (threadState() == 'W')
+    bool LockState::isLocked() const {
+        return threadState() != 0;
+    }
+
+    bool LockState::isWriteLocked() const {
+        return (threadState() == 'W' || threadState() == 'w');
+    }
+
+    bool LockState::isWriteLocked(const StringData& ns) const {
+        if (isWriteLocked()) {
             return true;
-        if (threadState() != 'w')
-            return false;
+        }
+
         return isLocked(ns);
     }
 

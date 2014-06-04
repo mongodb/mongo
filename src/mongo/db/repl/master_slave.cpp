@@ -331,6 +331,7 @@ namespace repl {
     void ReplSource::forceResync( OperationContext* txn, const char *requester ) {
         BSONObj info;
         {
+            // This is always a GlobalWrite lock (so no ns/db used from the context)
             dbtemprelease t(txn->lockState());
             if (!oplogReader.connect(hostName, _me)) {
                 msgassertedNoTrace( 14051 , "unable to connect to resync");
@@ -370,7 +371,7 @@ namespace repl {
      *                      Currently this will only be set if there is an error in the initial
      *                      system.namespaces query.
      */
-    bool cloneFrom(OperationContext* txn,
+    static bool cloneFrom(OperationContext* txn,
                            Client::Context& context,
                            const string& masterHost,
                            const CloneOptions& options,
@@ -469,6 +470,7 @@ namespace repl {
         OpTime lastTime;
         bool dbOk = false;
         {
+            // This is always a GlobalWrite lock (so no ns/db used from the context)
             dbtemprelease release(txn->lockState());
 
             // We always log an operation after executing it (never before), so
@@ -898,31 +900,23 @@ namespace repl {
             int n = 0;
             time_t saveLast = time(0);
             while ( 1 ) {
-
-                bool moreInitialSyncsPending = !addDbNextPass.empty() && n; // we need "&& n" to assure we actually process at least one op to get a sync point recorded in the first place.
+                // we need "&& n" to assure we actually process at least one op to get a sync
+                // point recorded in the first place.
+                const bool moreInitialSyncsPending = !addDbNextPass.empty() && n;
 
                 if ( moreInitialSyncsPending || !oplogReader.more() ) {
                     Lock::GlobalWrite lk(txn->lockState());
-
-                    // NOTE aaron 2011-03-29 This block may be unnecessary, but I'm leaving it in place to avoid changing timing behavior.
-                    {
-                        dbtemprelease t(txn->lockState());
-                        if ( !moreInitialSyncsPending && oplogReader.more() ) {
-                            continue;
-                        }
-                        // otherwise, break out of loop so we can set to completed or clone more dbs
-                    }
                     
-                    if( oplogReader.awaitCapable() && tailing )
+                    if (oplogReader.awaitCapable() && tailing) {
                         okResultCode = 0; // don't sleep
+                    }
+
                     syncedTo = nextOpTime;
                     save(); // note how far we are synced up to now
                     log() << "repl:   applied " << n << " operations" << endl;
                     nApplied = n;
                     log() << "repl:  end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
                     break;
-                }
-                else {
                 }
 
                 OCCASIONALLY if( n > 0 && ( n > 100000 || time(0) - saveLast > 60 ) ) {
@@ -1314,8 +1308,9 @@ namespace repl {
 
     void pretouchOperation(OperationContext* txn, const BSONObj& op) {
 
-        if( Lock::somethingWriteLocked() )
+        if (txn->lockState()->isWriteLocked()) {
             return; // no point pretouching if write locked. not sure if this will ever fire, but just in case.
+        }
 
         const char *which = "o";
         const char *opType = op.getStringField("op");

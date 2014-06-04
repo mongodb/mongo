@@ -136,7 +136,6 @@ namespace mongo {
             void note(void* p, int len);
 
             std::vector< shared_ptr<DurOp> >& ops() {
-                dassert( Lock::isLocked() );          // a rather weak check, we require more than that
                 groupCommitMutex.dassertLocked(); // this is what really makes the below safe
                 return _intentsAndDurOps._durOps;                
             }

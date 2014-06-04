@@ -291,7 +291,7 @@ namespace repl {
         void _syncThread();
         void syncTail();
         unsigned _syncRollback(OperationContext* txn, OplogReader& r);
-        void syncFixUp(FixUpInfo& h, OplogReader& r);
+        void syncFixUp(OperationContext* txn, FixUpInfo& h, OplogReader& r);
 
         // keep a list of hosts that we've tried recently that didn't work
         map<string,time_t> _veto;

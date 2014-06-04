@@ -60,7 +60,9 @@ namespace mongo {
         bool hasAnyWriteLock() const; // wW
         
         bool isLocked(const StringData& ns) const; // rwRW
-        bool isWriteLocked(const StringData& ns);
+        bool isLocked() const;
+        bool isWriteLocked() const;
+        bool isWriteLocked(const StringData& ns) const;
         bool isAtLeastReadLocked(const StringData& ns) const;
         bool isNested() const;
 

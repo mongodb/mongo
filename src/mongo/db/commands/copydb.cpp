@@ -153,11 +153,6 @@ namespace mongo {
                 return false;
             }
 
-            // SERVER-4328 todo lock just the two db's not everything for the fromself case
-            scoped_ptr<Lock::ScopedLock> lk( fromSelf ?
-                                             static_cast<Lock::ScopedLock*>(new Lock::GlobalWrite(txn->lockState())) :
-                                             static_cast<Lock::ScopedLock*>(new Lock::DBWrite(txn->lockState(), todb)));
-
             Cloner cloner;
             string username = cmdObj.getStringField( "username" );
             string nonce = cmdObj.getStringField( "nonce" );
@@ -166,7 +161,6 @@ namespace mongo {
                 uassert( 13008, "must call copydbgetnonce first", authConn_.get() );
                 BSONObj ret;
                 {
-                    dbtemprelease t(txn->lockState());
                     if ( !authConn_->runCommand( cloneOptions.fromDB,
                                                  BSON( "authenticate" << 1 << "user" << username
                                                        << "nonce" << nonce << "key" << key ), ret ) ) {
@@ -183,12 +177,20 @@ namespace mongo {
                 if (!cs.isValid()) {
                     return false;
                 }
+
                 DBClientBase* conn = cs.connect(errmsg);
                 if (!conn) {
                     return false;
                 }
                 cloner.setConnection(conn);
             }
+
+
+            // SERVER-4328 todo lock just the two db's not everything for the fromself case
+            scoped_ptr<Lock::ScopedLock> lk( fromSelf ?
+                                             static_cast<Lock::ScopedLock*>(new Lock::GlobalWrite(txn->lockState())) :
+                                             static_cast<Lock::ScopedLock*>(new Lock::DBWrite(txn->lockState(), todb)));
+
             Client::Context ctx(todb);
             return cloner.go(txn, ctx, fromhost, cloneOptions, NULL, errmsg );
         }

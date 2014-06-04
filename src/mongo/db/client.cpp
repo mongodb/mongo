@@ -269,25 +269,18 @@ namespace mongo {
         _db(db)
     {
         verify(_db);
-        checkNotStale();
+        if (_doVersion) checkNotStale();
         _client->_context = this;
         _client->_curOp->enter( this );
     }
        
     void Client::Context::_finishInit() {
-        dassert( Lock::isLocked() );
-        int writeLocked = Lock::somethingWriteLocked();
-        if ( writeLocked && FileAllocator::get()->hasFailed() ) {
-            uassert(14031, "Can't take a write lock while out of disk space", false);
-        }
-        
         OperationContextImpl txn; // TODO get rid of this once reads require transactions
         _db = dbHolder().getOrCreate(&txn, _ns, _path, _justCreated);
-        verify(_db);
+        invariant(_db);
+
         if( _doVersion ) checkNotStale();
-        massert(16107,
-                str::stream() << "Don't have a lock on: " << _ns,
-                txn.lockState()->isAtLeastReadLocked(_ns));
+
         _client->_context = this;
         _client->_curOp->enter( this );
     }

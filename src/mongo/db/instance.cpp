@@ -209,7 +209,7 @@ namespace mongo {
     }
 
     bool _unlockFsync();
-    void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
+    static void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
         BSONObj obj;
 
         const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnResource(
@@ -342,8 +342,12 @@ namespace mongo {
         const char *ns = m.singleData()->_data + 4;
 
         Client& c = cc();
-        if (!c.isGod())
+        if (!c.isGod()) {
             c.getAuthorizationSession()->startRequest(txn);
+
+            // We should not be holding any locks at this point
+            invariant(!txn->lockState()->isLocked());
+        }
 
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
