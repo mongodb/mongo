@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <string>
+
 namespace mongo {
 namespace repl {
 
@@ -76,7 +78,7 @@ namespace repl {
         bool operator!=(const MemberState& r) const { return s != r.s; }
     };
 
-    inline string MemberState::toString() const {
+    inline std::string MemberState::toString() const {
         switch ( s ) {
         case RS_STARTUP: return "STARTUP";
         case RS_PRIMARY: return "PRIMARY";
