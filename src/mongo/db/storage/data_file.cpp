@@ -199,13 +199,9 @@ namespace mongo {
                 }
             }
 
-            // The writes done in this function must not be rolled back. If the containing
-            // UnitOfWork rolls back it should roll back to the state *after* these writes. This
-            // will leave the file empty, but available for future use. That is why we go directly
-            // to the global dur dirty list rather than going through the OperationContext.
-            getDur().createdFile(filename, filelength);
+            txn->recoveryUnit()->createdFile(filename, filelength);
             verify( HeaderSize == 8192 );
-            DataFileHeader *h = getDur().writing(this);
+            DataFileHeader *h = txn->recoveryUnit()->writing(this);
             h->fileLength = filelength;
             h->version = PDFILE_VERSION;
             h->versionMinor = PDFILE_VERSION_MINOR_22_AND_OLDER; // All dbs start like this
