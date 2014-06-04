@@ -42,7 +42,6 @@ using namespace mongo;
 class OplogTool : public Tool {
 public:
     OplogTool() : Tool() { }
-    static std::auto_ptr<Tool> createInstanceOfThisTool();
 
     virtual void printHelp( ostream & out ) {
         printMongoOplogHelp(&out);

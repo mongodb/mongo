@@ -70,6 +70,7 @@ using namespace std;
 using namespace mongo;
 
 namespace mongo {
+
     typedef std::auto_ptr<Tool> (*InstanceFunction)();
 
     std::map < std::string, InstanceFunction> Tool::tools;
@@ -95,15 +96,15 @@ namespace mongo {
 
     void Tool::mapTools()
     {
-        Tool::tools["dump"] = *Tool::createDumpInstance;
-        Tool::tools["export"] = *Tool::createExportInstance;
-        Tool::tools["import"] = *Tool::createImportInstance;
-        Tool::tools["stat"] = *Tool::createStatInstance;
-        Tool::tools["oplog"] = *Tool::createOplogToolInstance;
-        Tool::tools["restore"] = *Tool::createRestoreInstance;
-        Tool::tools["top"] = *Tool::createTopToolInstance;
-        Tool::tools["files"] = *Tool::createFilesInstance;
-        Tool::tools["bsondump"] = *Tool::createBSONDumpInstance;
+        Tool::tools["dump"] = *createInstanceOfDump;
+        Tool::tools["export"] = *createInstanceOfExport;
+        Tool::tools["import"] = *createInstanceOfImport;
+        Tool::tools["stat"] = *createInstanceOfStat;
+        Tool::tools["oplog"] = *createInstanceOfOplogTool;
+        Tool::tools["restore"] = *createInstanceOfRestore;
+        Tool::tools["top"] = *createInstanceOfTopTool;
+        Tool::tools["files"] = *createInstanceOfFiles;
+        Tool::tools["bsondump"] = *createInstanceOfBSONDump;
         Tool::tools["bridge"] = 0;
         Tool::tools["perf"] = 0;
     }

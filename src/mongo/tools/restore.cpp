@@ -88,7 +88,6 @@ public:
     bool _serverAuthzVersionDocExists; // Whether the remote cluster has an admin.system.version doc
     Restore() : BSONTool(), _oplogEntrySkips(0), _oplogEntryApplies(0), _serverAuthzVersion(0),
             _dumpFileAuthzVersion(0), _serverAuthzVersionDocExists(false) { }
-    static std::auto_ptr<Tool> createInstanceOfThisTool();
 
     virtual void printHelp(ostream& out) {
         printMongoRestoreHelp(&out);

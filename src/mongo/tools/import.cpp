@@ -285,7 +285,6 @@ public:
     Import() : Tool() {
         _type = JSON;
     }
-    static std::auto_ptr<Tool> createInstanceOfThisTool();
 
     virtual void printHelp( ostream & out ) {
         printMongoImportHelp(&out);
