@@ -452,7 +452,7 @@ namespace mongo {
                     warning() << "Internal error while reading collection " << systemIndexes;
                 }
 
-                Database::closeDatabase(dbName.c_str(), storageGlobalParams.dbpath);
+                Database::closeDatabase(&txn, dbName.c_str(), storageGlobalParams.dbpath);
             }
         }
 

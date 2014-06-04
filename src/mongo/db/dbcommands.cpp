@@ -743,7 +743,7 @@ namespace mongo {
             Client::Context ctx(dbname);
 
             try {
-                return dbHolder().closeAll(storageGlobalParams.dbpath, result, false);
+                return dbHolder().closeAll(txn, storageGlobalParams.dbpath, result, false);
             }
             catch(DBException&) { 
                 throw;

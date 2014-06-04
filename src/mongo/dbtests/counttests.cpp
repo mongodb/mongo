@@ -190,36 +190,6 @@ namespace CountTests {
         mutable boost::condition _condition;
     };
 
-    /** A writer client will be registered for the lifetime of an object of this class. */
-    class WriterClientScope {
-    public:
-        WriterClientScope() :
-            _state( Initial ),
-            _dummyWriter( stdx::bind( &WriterClientScope::runDummyWriter, this ) ) {
-            _state.await( Ready );
-        }
-        ~WriterClientScope() {
-            // Terminate the writer thread even on exception.
-            _state.set( Finished );
-            DESTRUCTOR_GUARD( _dummyWriter.join() );
-        }
-    private:
-        enum State {
-            Initial,
-            Ready,
-            Finished
-        };
-        void runDummyWriter() {
-            Client::initThread( "dummy writer" );
-            scoped_ptr<Acquiring> a( new Acquiring( 0 , cc().lockState() ) );
-            _state.set( Ready );
-            _state.await( Finished );
-            a.reset(0);
-            cc().shutdown();
-        }
-        PendingValue _state;
-        boost::thread _dummyWriter;
-    };
     
     class All : public Suite {
     public:

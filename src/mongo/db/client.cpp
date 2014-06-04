@@ -96,7 +96,6 @@ namespace mongo {
 
     Client::Client(const string& desc, AbstractMessagingPort *p) :
         ClientBasic(p),
-        _context(0),
         _shutdown(false),
         _desc(desc),
         _god(0),
@@ -165,7 +164,6 @@ namespace mongo {
     BSONObj CachedBSONObjBase::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
     Client::Context::Context(const std::string& ns , Database * db) :
         _client( currentClient.get() ), 
-        _oldContext( _client->_context ),
         _path(storageGlobalParams.dbpath), // is this right? could be a different db?
                                                // may need a dassert for this
         _justCreated(false),
@@ -173,12 +171,11 @@ namespace mongo {
         _ns( ns ), 
         _db(db)
     {
-        _client->_context = this;
+
     }
 
     Client::Context::Context(const string& ns, const std::string& path, bool doVersion) :
         _client( currentClient.get() ), 
-        _oldContext( _client->_context ),
         _path( path ), 
         _justCreated(false), // set for real in finishInit
         _doVersion(doVersion),
@@ -260,7 +257,6 @@ namespace mongo {
     // invoked from ReadContext
     Client::Context::Context(const string& path, const string& ns, Database *db, bool doVersion) :
         _client( currentClient.get() ), 
-        _oldContext( _client->_context ),
         _path( path ), 
         _justCreated(false),
         _doVersion( doVersion ),
@@ -269,7 +265,6 @@ namespace mongo {
     {
         verify(_db);
         if (_doVersion) checkNotStale();
-        _client->_context = this;
         _client->_curOp->enter( this );
     }
        
@@ -280,28 +275,12 @@ namespace mongo {
 
         if( _doVersion ) checkNotStale();
 
-        _client->_context = this;
         _client->_curOp->enter( this );
     }
     
     Client::Context::~Context() {
         DEV verify( _client == currentClient.get() );
         _client->_curOp->recordGlobalTime( _timer.micros() );
-        _client->_context = _oldContext; // note: _oldContext may be null
-    }
-
-    bool Client::Context::inDB( const string& db , const string& path ) const {
-        if ( _path != path )
-            return false;
-
-        if ( db == _ns )
-            return true;
-
-        string::size_type idx = _ns.find( db );
-        if ( idx != 0 )
-            return false;
-
-        return  _ns[db.size()] == '.';
     }
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {

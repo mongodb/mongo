@@ -541,17 +541,13 @@ namespace mongo {
 
     }
 
-    /* db - database name
-       path - db directory
-    */
-    /*static*/ void Database::closeDatabase( const string& db, const string& path ) {
-        verify( Lock::isW() );
+    /*static*/ 
+    void Database::closeDatabase(OperationContext* txn, const string& db, const string& path) {
+        // XXX? - Do we need to close database under global lock or just DB-lock is sufficient ?
+        invariant(txn->lockState()->isW());
 
-        Client::Context * ctx = cc().getContext();
-        verify( ctx );
-        verify( ctx->inDB( db , path ) );
-        Database *database = ctx->db();
-        verify( database->name() == db );
+        Database* database = dbHolder().get(db, path);
+        invariant(database != NULL);
 
         repl::oplogCheckCloseDatabase(database); // oplog caches some things, dirty its caches
 
@@ -564,7 +560,6 @@ namespace mongo {
         prefix += '.';
 
         dbHolder().erase(db, path);
-        ctx->_clear();
         delete database; // closes files
     }
 

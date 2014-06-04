@@ -95,7 +95,10 @@ namespace mongo {
         }
 
         /** @param force - force close even if something underway - use at shutdown */
-        bool closeAll( const std::string& path , BSONObjBuilder& result, bool force );
+        bool closeAll(OperationContext* txn,
+                      const std::string& path,
+                      BSONObjBuilder& result,
+                      bool force);
 
         // "info" as this is informational only could change on you if you are not write locked
         int sizeInfo() const { return _size; }

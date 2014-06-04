@@ -1105,7 +1105,7 @@ namespace mongo {
             // Make sure no DB read locks are held, because we might try to acquire write lock and
             // upgrade is not supported.
             //
-            dassert(!cc().lockState().hasAnyReadLock());
+            dassert(!_txn->lockState()->hasAnyReadLock());
 
             if (_jsMode) {
                 // try to reduce if it is beneficial

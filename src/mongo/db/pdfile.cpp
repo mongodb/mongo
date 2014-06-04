@@ -173,7 +173,7 @@ namespace mongo {
 
         txn->recoveryUnit()->syncDataAndTruncateJournal();
 
-        Database::closeDatabase( name, db->path() );
+        Database::closeDatabase(txn, name, db->path());
         db = 0; // d is now deleted
 
         _deleteDataFiles( name );

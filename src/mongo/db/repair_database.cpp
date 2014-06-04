@@ -249,7 +249,7 @@ namespace mongo {
                 MongoFile::flushAll(true); // need both in case journaling is disabled
                 {
                     Client::Context tempContext( _dbName, _pathString );
-                    Database::closeDatabase( _dbName, _pathString );
+                    Database::closeDatabase(_txn, _dbName, _pathString);
                 }
                 MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( _path ) );
             }
@@ -433,7 +433,7 @@ namespace mongo {
             txn->checkForInterrupt(false);
 
             Client::Context tempContext( dbName, reservedPathString );
-            Database::closeDatabase( dbName, reservedPathString );
+            Database::closeDatabase(txn, dbName, reservedPathString);
         }
 
         // at this point if we abort, we don't want to delete new files
@@ -443,7 +443,7 @@ namespace mongo {
             repairFileDeleter->success();
 
         Client::Context ctx( dbName );
-        Database::closeDatabase(dbName, storageGlobalParams.dbpath);
+        Database::closeDatabase(txn, dbName, storageGlobalParams.dbpath);
 
         if ( backupOriginalFiles ) {
             _renameForBackup( dbName, reservedPath );

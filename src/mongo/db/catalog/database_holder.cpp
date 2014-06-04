@@ -95,9 +95,11 @@ namespace mongo {
         return db;
     }
 
-    bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result , bool force ) {
+    bool DatabaseHolder::closeAll(
+                OperationContext* txn, const string& path, BSONObjBuilder& result, bool force) {
         log() << "DatabaseHolder::closeAll path:" << path << endl;
-        verify( Lock::isW() );
+        invariant(txn->lockState()->isW());
+
         getDur().commitNow(); // bad things happen if we close a DB with outstanding writes
 
         map<string,Database*>& m = _paths[path];
@@ -109,8 +111,6 @@ namespace mongo {
             dbs.insert( i->first );
         }
 
-        currentClient.get()->getContext()->_clear();
-
         BSONObjBuilder bb( result.subarrayStart( "dbs" ) );
         int n = 0;
         int nNotClosed = 0;
@@ -119,11 +119,14 @@ namespace mongo {
             LOG(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
             Client::Context ctx( name , path );
             if( !force && BackgroundOperation::inProgForDb(name) ) {
-                log() << "WARNING: can't close database " << name << " because a bg job is in progress - try killOp command" << endl;
+                log() << "WARNING: can't close database "
+                      << name
+                      << " because a bg job is in progress - try killOp command" 
+                      << endl;
                 nNotClosed++;
             }
             else {
-                Database::closeDatabase( name.c_str() , path );
+                Database::closeDatabase(txn, name.c_str(), path);
                 bb.append( bb.numStr( n++ ) , name );
             }
         }
@@ -134,6 +137,4 @@ namespace mongo {
 
         return true;
     }
-
-
 }

@@ -66,7 +66,8 @@ namespace mongo {
         /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
            thus the destructor is private.  this could be cleaned up one day...
         */
-        static void closeDatabase( const std::string& db, const std::string& path );
+        static void closeDatabase(
+                        OperationContext* txn, const std::string& db, const std::string& path);
 
         const std::string& name() const { return _name; }
         const std::string& path() const { return _path; }

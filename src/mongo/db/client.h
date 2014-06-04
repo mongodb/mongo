@@ -92,7 +92,6 @@ namespace mongo {
 
         std::string clientAddress(bool includePort=false) const;
         CurOp* curop() const { return _curOp; }
-        Context* getContext() const { return _context; }
         const StringData desc() const { return _desc; }
         void setLastOp( OpTime op ) { _lastOp = op; }
         OpTime getLastOp() const { return _lastOp; }
@@ -127,7 +126,6 @@ namespace mongo {
         ConnectionId _connectionId; // > 0 for things "conn", 0 otherwise
         std::string _threadId; // "" on non support systems
         CurOp * _curOp;
-        Context * _context;
         bool _shutdown; // to track if Client::shutdown() gets called
         std::string _desc;
         bool _god;
@@ -184,14 +182,6 @@ namespace mongo {
             /** @return if the db was created by this Context */
             bool justCreated() const { return _justCreated; }
 
-            /** @return true iff the current Context is using db/path */
-            bool inDB(const std::string& db, const std::string& path=storageGlobalParams.dbpath) const;
-
-            void _clear() { // this is sort of an "early destruct" indication, _ns can never be uncleared
-                const_cast<std::string&>(_ns).clear();
-                _db = 0;
-            }
-
             /** call before unlocking, so clear any non-thread safe state
              *  _db gets restored on the relock
              */
@@ -207,7 +197,6 @@ namespace mongo {
             void checkNsAccess( bool doauth );
             void checkNsAccess( bool doauth, int lockState );
             Client * const _client;
-            Context * const _oldContext;
             const std::string _path;
             bool _justCreated;
             bool _doVersion;
