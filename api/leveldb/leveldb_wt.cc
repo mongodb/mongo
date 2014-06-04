@@ -219,7 +219,7 @@ private:
 
 class IteratorImpl : public Iterator {
 public:
-	IteratorImpl(WT_CURSOR *cursor, DbImpl *db, const ReadOptions &options) : cursor_(cursor), valid_(false) {}
+	IteratorImpl(WT_CURSOR *cursor, DbImpl *db, const ReadOptions &options) : cursor_(cursor), status_(Status::OK()), valid_(false) {}
 	virtual ~IteratorImpl() {}
 
 	// An iterator is either positioned at a key/value pair, or
@@ -423,6 +423,8 @@ DbImpl::Delete(const WriteOptions& options, const Slice& key)
 	cursor->set_key(cursor, &item);
 	int ret = cursor->remove(cursor);
 	assert(ret == 0);
+	ret = cursor->reset(cursor);
+	assert(ret == 0);
 	return Status::OK();
 }
 
@@ -472,6 +474,8 @@ DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
 	WriteBatchHandler handler(cursor);
 	Status status = updates->Iterate(&handler);
 	assert(handler.getStatus() == 0);
+	int ret = cursor->reset(cursor);
+	assert(ret == 0);
 	return status;
 }
 
@@ -665,9 +669,9 @@ IteratorImpl::Seek(const Slice& target)
 	int cmp, ret = cursor_->search_near(cursor_, &cmp);
 	if (ret == 0 && cmp < 0)
 		ret = cursor_->next(cursor_);
-	if (ret == WT_NOTFOUND)
-		status_ = Status::NotFound("Iterator::Seek key not found");
 	if (ret != 0) {
+		if (ret != WT_NOTFOUND)
+			status_ = Status::IOError(wiredtiger_strerror(ret));
 		valid_ = false;
 		return;
 	}
@@ -691,9 +695,9 @@ IteratorImpl::Next()
 	assert(valid_);
 
 	int ret = cursor_->next(cursor_);
-	if (ret == WT_NOTFOUND)
-		status_ = Status::NotFound("Iterator::Next no more records");
 	if (ret != 0) {
+		if (ret != WT_NOTFOUND)
+			status_ = Status::IOError(wiredtiger_strerror(ret));
 		valid_ = false;
 		return;
 	}
@@ -717,9 +721,9 @@ IteratorImpl::Prev()
 	assert(valid_);
 
 	int ret = cursor_->prev(cursor_);
-	if (ret == WT_NOTFOUND)
-		status_ = Status::NotFound("Iterator::Prev no more records");
 	if (ret != 0) {
+		if (ret != WT_NOTFOUND)
+			status_ = Status::IOError(wiredtiger_strerror(ret));
 		valid_ = false;
 		return;
 	}
