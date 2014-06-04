@@ -114,15 +114,25 @@ const FilterPolicy *NewBloomFilterPolicy(int bits_per_key) {
   return new FilterPolicyImpl(bits_per_key);
 }
 
-class Cache {
+Cache::~Cache() {}
+
+class CacheImpl : public Cache {
 public:
-	Cache(size_t capacity) : capacity_(capacity) {}
+	CacheImpl(size_t capacity) : Cache(), capacity_(capacity) {}
+
+	virtual Handle* Insert(const Slice& key, void* value, size_t charge,
+	    void (*deleter)(const Slice& key, void* value)) { return 0; }
+	virtual Handle* Lookup(const Slice& key) { return 0; }
+	virtual void Release(Handle* handle) {}
+	virtual void* Value(Handle* handle) { return 0; }
+	virtual void Erase(const Slice& key) {}
+	virtual uint64_t NewId() { return 0; }
 
 	size_t capacity_;
 };
 
 Cache *NewLRUCache(size_t capacity) {
-  return new Cache(capacity);
+  return new CacheImpl(capacity);
 }
 
 Status DestroyDB(const std::string& name, const Options& options) {
@@ -337,8 +347,10 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
 		s_conn << "exclusive,";
 	if (options.compression == kSnappyCompression)
 		s_conn << "extensions=[libwiredtiger_snappy.so],";
+	size_t cache_size = 25 * options.write_buffer_size;
 	if (options.block_cache)
-		s_conn << "cache_size=" << ((Cache *)options.block_cache)->capacity_ << ",";
+		cache_size += ((CacheImpl *)options.block_cache)->capacity_;
+	s_conn << "cache_size=" << cache_size << ",";
 	std::string conn_config = s_conn.str();
 
 	WT_CONNECTION *conn;

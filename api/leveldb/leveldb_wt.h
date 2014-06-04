@@ -1,6 +1,7 @@
 #include "wiredtiger_config.h"
 
 #ifdef HAVE_HYPERLEVELDB
+#include <hyperleveldb/cache.h>
 #include <hyperleveldb/comparator.h>
 #include <hyperleveldb/db.h>
 #include <hyperleveldb/env.h>
@@ -11,6 +12,7 @@
 #include <hyperleveldb/table_builder.h>
 #include <hyperleveldb/write_batch.h>
 #else
+#include <leveldb/cache.h>
 #include <leveldb/comparator.h>
 #include <leveldb/db.h>
 #include <leveldb/env.h>
