@@ -194,6 +194,7 @@ restart:	page = parent->page;
 		 * without application-specified collation.
 		 */
 		base = 0;
+		indx = 0;		/* -Werror=maybe-uninitialized */
 		limit = pindex->entries;
 		if (btree->collator == NULL)
 			for (; limit != 0; limit >>= 1) {
