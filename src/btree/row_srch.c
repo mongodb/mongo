@@ -89,7 +89,7 @@ __wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			    btree->collator, srch_key, &key, cmp, &match));
 		}
 
-		if (cmp > 0) {		/* Keep going at this level */
+		if (cmp == 1) {		/* Keep going at this level */
 			insp = &ret_ins->next[i];
 			skiplow = match;
 		} else if (cmp == 0)
@@ -199,9 +199,9 @@ restart:	page = parent->page;
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
 				child = pindex->index[indx];
-
 				__wt_ref_key(
 				    page, child, &item->data, &item->size);
+
 				match = WT_MIN(skiplow, skiphigh);
 				cmp = __wt_lex_compare_skip(
 				    srch_key, item, &match);
@@ -218,9 +218,9 @@ restart:	page = parent->page;
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
 				child = pindex->index[indx];
-
 				__wt_ref_key(
 				    page, child, &item->data, &item->size);
+
 				WT_ERR(WT_LEX_CMP(session,
 				    btree->collator, srch_key, item, cmp));
 				if (cmp == 0)
@@ -301,36 +301,33 @@ leaf_only:
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			rip = page->pg_row_d + indx;
-
 			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
+
 			match = WT_MIN(skiplow, skiphigh);
 			cmp = __wt_lex_compare_skip(srch_key, item, &match);
 			if (cmp == 0)
 				break;
-			if (cmp < 0) {
+			if (cmp == 1) {
+				skiplow = match;
+				base = indx + 1;
+				--limit;
+			} else
 				skiphigh = match;
-				continue;
-			}
-			skiplow = match;
-
-			base = indx + 1;
-			--limit;
 		}
 	else
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			rip = page->pg_row_d + indx;
-
 			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
+
 			WT_ERR(WT_LEX_CMP(
 			    session, btree->collator, srch_key, item, cmp));
 			if (cmp == 0)
 				break;
-			if (cmp < 0)
-				continue;
-
-			base = indx + 1;
-			--limit;
+			if (cmp == 1) {
+				base = indx + 1;
+				--limit;
+			}
 		}
 
 	/*
