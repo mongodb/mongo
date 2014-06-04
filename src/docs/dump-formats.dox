@@ -4,13 +4,58 @@ The @ref util_dump command produces a flat-text representation of a
 table that can be loaded by @ref util_load.  This page describes the
 output formats of the @ref util_dump command.
 
-@section dump_formats_json JSON format
+@section dump_formats_json JSON dump format
 
 JSON (<a href="http://www.json.org">JavaScript Object Notation</a>)
 dump files use the standard JSON data-interchange format to specify
 the objects, and may be interpreted by any JSON reader.
 
-@section dump_formats_text Text format
+The format is a JSON object where each key is the URI passed to
+WT_SESSION::create and the corresponding value is a JSON array of two
+entries.  The first entry in this array is a JSON object composed of
+configuration information: the "config" key has the configuration
+string used with WT_SESSION::create, the "colgroups" and "indices"
+keys have values that are arrays of objects that are in turn composed
+of configuration information.  The second entry is a JSON array, with
+each entry an object representing a row of data.  If the columns were
+named in the configuration string used with WT_SESSION::create, those
+names are used for keys, otherwise predictable names (for example,
+"key0", "value0", "value1") are generated.  The values in this object
+are the values for each column in the record.
+
+Here is some sample output:
+
+@code
+{
+    "table:planets" : [
+        {
+            "config" : "columns=(id,name,distance),key_format=i,value_format=Si",
+            "colgroups" : [],
+            "indices" : [
+                {
+                    "uri" : "index:planets:names",
+                    "config" : "columns=(name),key_format=Si,source=\"file:astronomy.wt\",type=file"
+                }
+            ]
+        },
+        [
+            {
+"id" : 1,
+"name" : "Mercury",
+"distance" : 57910000
+            },
+            {
+"id" : 2,
+"name" : "Venus",
+"distance" : 108200000
+            },
+            ...
+       ]
+   ]
+}
+@endcode
+
+@section dump_formats_text Text dump format
 
 Text dump files have three parts, a prefix, a header and a body.
 
