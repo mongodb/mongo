@@ -526,5 +526,7 @@ namespace mongo {
             BSONObj data;
         };
     };
-    REGISTER_MONGO_TOOL(Stat);
+    
 }
+
+REGISTER_MONGO_TOOL(Stat);
