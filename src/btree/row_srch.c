@@ -256,9 +256,17 @@ restart:	page = parent->page;
 		 * if we didn't find an exact match, base is the smallest index
 		 * greater than the key and may be the (last + 1) index.
 		 */
-		if (indx == 0)
+		if (indx == 0) {
+			/*
+			 * The last, meaningless comparison may have incorrectly
+			 * modified the leading bytes of the keys we can skip.
+			 * That's not a good thing, but searching the left-hand
+			 * side of the tree shouldn't be that common.
+			 */
+			skiphigh = skiplow = 0;
+
 			child = pindex->index[0];
-		else if (cmp != 0)
+		} else if (cmp != 0)
 			child = pindex->index[base - 1];
 
 descend:	WT_ASSERT(session, child != NULL);
