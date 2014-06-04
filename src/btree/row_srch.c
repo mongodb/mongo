@@ -89,19 +89,18 @@ __wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			    btree->collator, srch_key, &key, cmp, &match));
 		}
 
-		if (cmp == 1) {		/* Keep going at this level */
+		if (cmp == 1) {			/* Keep going at this level */
 			insp = &ret_ins->next[i];
 			skiplow = match;
-		} else if (cmp == 0)
+		} else if (cmp == -1) {		/* Drop down a level */
+			cbt->next_stack[i] = ret_ins;
+			cbt->ins_stack[i--] = insp--;
+			skiphigh = match;
+		} else
 			for (; i >= 0; i--) {
 				cbt->next_stack[i] = ret_ins->next[i];
 				cbt->ins_stack[i] = &ret_ins->next[i];
 			}
-		else {			/* Drop down a level */
-			cbt->next_stack[i] = ret_ins;
-			cbt->ins_stack[i--] = insp--;
-			skiphigh = match;
-		}
 	}
 
 	/*
@@ -206,14 +205,14 @@ restart:	page = parent->page;
 				match = WT_MIN(skiplow, skiphigh);
 				cmp = __wt_lex_compare_skip(
 				    srch_key, item, &match);
-				if (cmp == 0)
-					break;
 				if (cmp == 1) {
 					skiplow = match;
 					base = indx + 1;
 					--limit;
-				} else
+				} else if (cmp == -1)
 					skiphigh = match;
+				else
+					break;
 			}
 		else
 			for (; limit != 0; limit >>= 1) {
@@ -224,12 +223,11 @@ restart:	page = parent->page;
 
 				WT_ERR(WT_LEX_CMP(session,
 				    btree->collator, srch_key, item, cmp));
-				if (cmp == 0)
-					break;
 				if (cmp == 1) {
 					base = indx + 1;
 					--limit;
-				}
+				} else if (cmp == 0)
+					break;
 			}
 
 		/*
@@ -314,14 +312,14 @@ leaf_only:
 
 			match = WT_MIN(skiplow, skiphigh);
 			cmp = __wt_lex_compare_skip(srch_key, item, &match);
-			if (cmp == 0)
-				break;
 			if (cmp == 1) {
 				skiplow = match;
 				base = indx + 1;
 				--limit;
-			} else
+			} else if (cmp == -1)
 				skiphigh = match;
+			else
+				break;
 		}
 	else
 		for (; limit != 0; limit >>= 1) {
@@ -331,12 +329,11 @@ leaf_only:
 
 			WT_ERR(WT_LEX_CMP(
 			    session, btree->collator, srch_key, item, cmp));
-			if (cmp == 0)
-				break;
 			if (cmp == 1) {
 				base = indx + 1;
 				--limit;
-			}
+			} else if (cmp == 0)
+				break;
 		}
 
 	/*
