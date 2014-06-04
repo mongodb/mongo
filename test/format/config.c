@@ -301,6 +301,8 @@ config_isolation(void)
 	 */
 	cp = config_find("isolation", strlen("isolation"));
 	if (!(cp->flags & C_PERM)) {
+		/* Avoid "maybe uninitialized" warnings. */
+		cstr = "isolation=snapshot";
 		switch (MMRAND(1, 3)) {
 		case 1:
 			cstr = "isolation=read-uncommitted";
@@ -309,7 +311,6 @@ config_isolation(void)
 			cstr = "isolation=read-committed";
 			break;
 		case 3:
-			cstr = "isolation=snapshot";
 			break;
 		}
 		config_single(cstr, 0);
