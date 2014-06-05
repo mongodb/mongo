@@ -386,7 +386,7 @@ namespace ShardingTests {
             // log() << "Validating that all shard versions are up to date..." << endl;
 
             // Validate that all the versions are the same
-            ASSERT( foundMaxVersion.isEquivalentTo( maxVersion ) );
+            ASSERT( foundMaxVersion.equals( maxVersion ) );
 
             for( VersionMap::iterator it = foundMaxShardVersions.begin(); it != foundMaxShardVersions.end(); it++ ){
 
@@ -394,7 +394,7 @@ namespace ShardingTests {
                 VersionMap::const_iterator maxIt = maxShardVersions.find( it->first );
 
                 ASSERT( maxIt != maxShardVersions.end() );
-                ASSERT( foundVersion.isEquivalentTo( maxIt->second ) );
+                ASSERT( foundVersion.equals( maxIt->second ) );
             }
             // Make sure all shards are accounted for
             ASSERT( foundMaxShardVersions.size() == maxShardVersions.size() );

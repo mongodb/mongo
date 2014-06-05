@@ -390,7 +390,7 @@ namespace mongo {
             
             if ( ! newest.isEmpty() ) {
                 ChunkVersion v = ChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
-                if ( v.isEquivalentTo( oldVersion ) ) {
+                if ( v.equals( oldVersion ) ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
                     uassert( 15885 , str::stream() << "not sharded after reloading from chunks : " << ns , ci.isSharded() );
@@ -449,7 +449,7 @@ namespace mongo {
         uassert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() );
 
         // Reset if our versions aren't the same
-        bool shouldReset = ! temp->getVersion().isEquivalentTo( ci.getCM()->getVersion() );
+        bool shouldReset = ! temp->getVersion().equals( ci.getCM()->getVersion() );
         
         // Also reset if we're forced to do so
         if( ! shouldReset && forceReload ){

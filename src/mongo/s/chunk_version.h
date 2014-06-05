@@ -185,7 +185,7 @@ namespace mongo {
         }
 
         // Is this the same version?
-        bool isEquivalentTo( const ChunkVersion& otherVersion ) const {
+        bool equals( const ChunkVersion& otherVersion ) const {
             if( ! hasEqualEpoch( otherVersion ) ) return false;
             return otherVersion._combined == _combined;
         }

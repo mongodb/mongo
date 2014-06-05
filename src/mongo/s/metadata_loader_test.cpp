@@ -429,7 +429,7 @@ namespace {
         loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
                                        &metadata );
 
-        ASSERT_TRUE( getMaxCollVersion().isEquivalentTo( metadata.getCollVersion() ) );
+        ASSERT_TRUE( getMaxCollVersion().equals( metadata.getCollVersion() ) );
     }
 
     TEST_F(ConfigServerFixture, SingleChunkGetMaxShardVersion) {
@@ -440,7 +440,7 @@ namespace {
         loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
                                        &metadata );
 
-        ASSERT_TRUE( getMaxShardVersion().isEquivalentTo( metadata.getShardVersion() ) );
+        ASSERT_TRUE( getMaxShardVersion().equals( metadata.getShardVersion() ) );
     }
 
     TEST_F(ConfigServerFixture, NoChunks) {

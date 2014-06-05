@@ -1336,7 +1336,7 @@ namespace mongo {
     bool ChunkManager::compatibleWith( const ChunkManager& other, const Shard& shard ) const {
         // Return true if the shard version is the same in the two chunk managers
         // TODO: This doesn't need to be so strong, just major vs
-        return other.getVersion( shard ).isEquivalentTo( getVersion( shard ) );
+        return other.getVersion( shard ).equals( getVersion( shard ) );
 
     }
 

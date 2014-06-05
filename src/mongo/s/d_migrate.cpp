@@ -1446,7 +1446,7 @@ namespace mongo {
                         ChunkVersion checkVersion =
                             ChunkVersion::fromBSON(doc[ChunkType::DEPRECATED_lastmod()]);
 
-                        if ( checkVersion.isEquivalentTo( nextVersion ) ) {
+                        if ( checkVersion.equals( nextVersion ) ) {
                             log() << "moveChunk commit confirmed" << migrateLog;
                             errmsg.clear();
 

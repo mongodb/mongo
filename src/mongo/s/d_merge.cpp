@@ -124,7 +124,7 @@ namespace mongo {
             return false;
         }
 
-        dassert( metadata->getShardVersion().isEquivalentTo( shardVersion ) );
+        dassert( metadata->getShardVersion().equals( shardVersion ) );
 
         if ( !metadata->isValidKey( minKey ) || !metadata->isValidKey( maxKey ) ) {
 
