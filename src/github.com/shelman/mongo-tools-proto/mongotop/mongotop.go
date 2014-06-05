@@ -59,7 +59,6 @@ func (self *MongoTop) Run() error {
 
 	}
 
-	return nil
 }
 
 // Run the top command against the database, and return the results.
