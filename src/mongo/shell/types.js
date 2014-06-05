@@ -395,7 +395,7 @@ if (typeof(DBRef) != "undefined"){
     }
 
     DBRef.prototype.getDb = function(){
-        return this.$db || null;
+        return this.$db || undefined;
     }
 
     DBRef.prototype.getCollection = function(){
