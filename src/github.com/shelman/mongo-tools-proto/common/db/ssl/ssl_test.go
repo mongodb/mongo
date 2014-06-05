@@ -72,7 +72,7 @@ func TestSSLConnector(t *testing.T) {
 				},
 				SSL: &options.SSL{
 					UseSSL:    true,
-					SSLCaFile: "testdata/ca.pem",
+					SSLCAFile: "testdata/ca.pem",
 				},
 			}
 			So(connector.Configure(opts), ShouldBeNil)
@@ -94,7 +94,7 @@ func TestSSLConnector(t *testing.T) {
 				},
 				SSL: &options.SSL{
 					UseSSL:        true,
-					SSLCaFile:     "testdata/ca.pem",
+					SSLCAFile:     "testdata/ca.pem",
 					SSLPEMKeyFile: "testdata/server.pem",
 				},
 			}
