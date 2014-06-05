@@ -320,6 +320,25 @@ namespace mongo {
         return new BatchedCommandRequest(idRequest.release());
     }
 
+    bool BatchedCommandRequest::containsNoIDUpsert(const BatchedCommandRequest& request) {
+
+        if (request.getBatchType() != BatchedCommandRequest::BatchType_Update)
+            return false;
+
+        const vector<BatchedUpdateDocument*>& updates = 
+            request.getUpdateRequest()->getUpdates();
+
+        for (vector<BatchedUpdateDocument*>::const_iterator it = updates.begin(); 
+            it != updates.end(); ++it) {
+
+            const BatchedUpdateDocument* updateDoc = *it;
+            if (updateDoc->getUpsert() && updateDoc->getQuery()["_id"].eoo()) 
+                return true;
+        }
+
+        return false;
+    }
+
     bool BatchedCommandRequest::containsUpserts( const BSONObj& writeCmdObj ) {
 
         BSONElement updatesEl = writeCmdObj[BatchedUpdateRequest::updates()];

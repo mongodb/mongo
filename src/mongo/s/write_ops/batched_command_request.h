@@ -149,6 +149,12 @@ namespace mongo {
          */
         static BatchedCommandRequest* cloneWithIds(const BatchedCommandRequest& origCmdRequest);
 
+        /**
+         * Whether or not this batch contains an upsert without an _id - these can't be sent
+         * to multiple hosts.
+         */
+        static bool containsNoIDUpsert(const BatchedCommandRequest& request);
+
         //
         // Helpers for auth pre-parsing
         //
