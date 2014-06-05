@@ -32,6 +32,11 @@ namespace mongo {
 
     class RecoveryUnitNoop : public RecoveryUnit {
     public:
+        // TODO implement rollback
+        virtual void beginUnitOfWork() {}
+        virtual void commitUnitOfWork() {}
+        virtual void endUnitOfWork() {}
+
         virtual bool commitIfNeeded(bool force = false) {
             return false;
         }
@@ -47,8 +52,6 @@ namespace mongo {
         virtual void* writingPtr(void* data, size_t len) {
             return data;
         }
-
-        virtual void createdFile(const std::string& filename, unsigned long long len) { }
 
         virtual void syncDataAndTruncateJournal() { }
     };
