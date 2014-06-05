@@ -14,6 +14,10 @@ import (
 	"time"
 )
 
+var (
+	DefaultSSLDialTimeout = time.Second * 3
+)
+
 // For connecting to the database over ssl
 type SSLDBConnector struct {
 	dialInfo *mgo.DialInfo
@@ -33,7 +37,7 @@ func (self *SSLDBConnector) Configure(opts *options.ToolOptions) error {
 	// set up the dial info
 	self.dialInfo = &mgo.DialInfo{
 		Addrs:      connectionAddrs,
-		Timeout:    time.Second * 3,
+		Timeout:    DefaultSSLDialTimeout,
 		DialServer: dialer,
 	}
 
@@ -51,12 +55,6 @@ type dialerFunc func(addr *mgo.ServerAddr) (net.Conn, error)
 // Create the dialing function that will be passed into the DialInfo for
 // connecting to the server, based on the tool options specified.
 func createDialerFunc(opts *options.ToolOptions) (dialerFunc, error) {
-
-	// if ssl is not being used, we can return nil and mgo will just use a
-	// standard dialer
-	if !opts.UseSSL {
-		return nil, nil
-	}
 
 	// the tls config
 	config := &tls.Config{}
