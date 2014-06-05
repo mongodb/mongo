@@ -66,7 +66,7 @@ namespace mongo {
 
         void waitUntilFinished() const;
         
-        bool hasFailed() const;
+        bool hasFailed(const string &database) const;
 
         static void ensureLength(int fd, long size);
 
@@ -77,7 +77,7 @@ namespace mongo {
 
         FileAllocator();
 
-        void checkFailure();
+        void checkFailure(string &database);
 
         // caller must hold pendingMutex_ lock.  Returns size if allocated or
         // allocation requested, -1 otherwise.
@@ -101,10 +101,11 @@ namespace mongo {
         // unique number for temporary files
         static unsigned long long _uniqueNumber;
 
-        bool _failed;
+        map<string, bool> _failed;
 
         static FileAllocator* _instance;
 
     };
+        string getDbName(const string& filename);
 
 } // namespace mongo
