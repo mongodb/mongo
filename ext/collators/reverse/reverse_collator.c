@@ -49,10 +49,10 @@ collate_reverse(WT_COLLATOR *collator,
 		*ret = 1;
 	else if (cmp > 0)
 		*ret = -1;
+	else if (k1->size < k2->size)
+		*ret = 1;
 	else if (k1->size > k2->size)
 		*ret = -1;
-	else if (k2->size > k1->size)
-		*ret = 1;
 	else
 		*ret = 0;
 	return (0);
