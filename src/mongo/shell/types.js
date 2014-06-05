@@ -386,12 +386,8 @@ if (typeof(DBRef) != "undefined"){
     DBRef.prototype.fetch = function(){
         assert(this.$ref, "need a ns");
         assert(this.$id, "need an id");
-
-        if (this.$db) {
-            return db.getMongo().getDB(this.$db).getCollection(this.$ref).findOne({ _id : this.$id });
-        }
-
-        return db[ this.$ref ].findOne({ _id : this.$id });
+        var coll = this.$db ? db.getSiblingDB(this.$db).getCollection(this.$ref) : db[this.$ref];
+        return coll.findOne({ _id : this.$id }):
     }
 
     DBRef.prototype.tojson = function(indent){

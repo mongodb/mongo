@@ -18,10 +18,10 @@ other.n++;
 db.otherthings.save(other);
 assert( db.things.findOne().o.fetch().n == 2, "dbrefs broken" );
 
-db.getMongo().getDB("otherdb").dropDatabase();
+db.getSiblingDB("otherdb").dropDatabase();
 var objid = new ObjectId();
-db.getMongo().getDB("otherdb").getCollection("othercoll").insert({_id:objid, field:"value"});
-var subdoc = db.getMongo().getDB("otherdb").getCollection("othercoll").findOne({_id:objid})
+db.getSiblingDB("otherdb").getCollection("othercoll").insert({_id:objid, field:"value"});
+var subdoc = db.getSiblingDB("otherdb").getCollection("othercoll").findOne({_id:objid})
 
 db.mycoll.drop();
 db.mycoll.insert({_id:"asdf", asdf:new DBRef("othercoll", objid, "otherdb")});
