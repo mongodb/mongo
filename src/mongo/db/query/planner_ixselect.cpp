@@ -53,14 +53,12 @@ namespace mongo {
      * 2d indices don't handle wrapping so we can't use them for queries that wrap.
      */
     static bool twoDWontWrap(const Circle& circle, const IndexEntry& index) {
-        GeoHashConverter::Parameters params;
-        params.bits = static_cast<unsigned>(fieldWithDefault(index.infoObj, "bits", 26));
-        params.max = fieldWithDefault(index.infoObj, "max", 180.0);
-        params.min = fieldWithDefault(index.infoObj, "min", -180.0);
-        double numBuckets = (1024 * 1024 * 1024 * 4.0);
-        params.scaling = numBuckets / (params.max - params.min);
 
-        GeoHashConverter conv(params);
+        GeoHashConverter::Parameters hashParams;
+        Status paramStatus = GeoHashConverter::parseParameters(index.infoObj, &hashParams);
+        verify(paramStatus.isOK()); // we validated the params on index creation
+
+        GeoHashConverter conv(hashParams);
 
         // FYI: old code used flat not spherical error.
         double yscandist = rad2deg(circle.radius) + conv.getErrorSphere();

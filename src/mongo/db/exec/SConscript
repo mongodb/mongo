@@ -35,7 +35,6 @@ env.Library(
 env.Library(
     target = 'exec',
     source = [
-        "2d.cpp",
         "2dcommon.cpp",
         "2dnear.cpp",
         "and_hash.cpp",

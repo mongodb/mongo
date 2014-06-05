@@ -105,16 +105,18 @@ namespace mongo {
         // This should gracefully deal with the case where we have a pred over foo but no geo clause
         // over bar.  In that case there is no GEO_NEAR to appear first and it's treated like a
         // straight ixscan.
-        BSONElement elt = index.keyPattern.firstElement();
-        bool indexIs2D = (String == elt.type() && "2d" == elt.String());
 
         if (MatchExpression::GEO_NEAR == expr->matchType()) {
             // We must not keep the expression node around.
             *tightnessOut = IndexBoundsBuilder::EXACT;
             GeoNearMatchExpression* nearExpr = static_cast<GeoNearMatchExpression*>(expr);
+
             // 2d geoNear requires a hard limit and as such we take it out before it gets here.  If
             // this happens it's a bug.
+            BSONElement elt = index.keyPattern.firstElement();
+            bool indexIs2D = (String == elt.type() && "2d" == elt.String());
             verify(!indexIs2D);
+
             GeoNear2DSphereNode* ret = new GeoNear2DSphereNode();
             ret->indexKeyPattern = index.keyPattern;
             ret->nq = nearExpr->getData();
@@ -123,17 +125,6 @@ namespace mongo {
                 ret->addPointMeta = query.getProj()->wantGeoNearPoint();
                 ret->addDistMeta = query.getProj()->wantGeoNearDistance();
             }
-            return ret;
-        }
-        else if (indexIs2D) {
-            // We must not keep the expression node around.
-            *tightnessOut = IndexBoundsBuilder::EXACT;
-            verify(MatchExpression::GEO == expr->matchType());
-            GeoMatchExpression* nearExpr = static_cast<GeoMatchExpression*>(expr);
-            verify(indexIs2D);
-            Geo2DNode* ret = new Geo2DNode();
-            ret->indexKeyPattern = index.keyPattern;
-            ret->gq = nearExpr->getGeoQuery();
             return ret;
         }
         else if (MatchExpression::TEXT == expr->matchType()) {
@@ -206,13 +197,6 @@ namespace mongo {
         // by adding a filter to the special leaf type.
         //
 
-        if (STAGE_GEO_2D == type) {
-            // Don't merge GEO with a geo leaf. Instead, we will generate an AND_HASH solution
-            // with two separate leaves.
-            return MatchExpression::AND == mergeType
-                && MatchExpression::GEO != exprType;
-        }
-
         if (STAGE_TEXT == type) {
             // Currently only one text predicate is allowed, but to be safe, make sure that we
             // do not try to merge two text predicates.
@@ -268,11 +252,6 @@ namespace mongo {
         const StageType type = node->getType();
         verify(STAGE_GEO_NEAR_2D != type);
 
-        if (STAGE_GEO_2D == type) {
-            scanState->tightness = IndexBoundsBuilder::INEXACT_FETCH;
-            return;
-        }
-
         // Text data is covered, but not exactly.  Text covering is unlike any other covering
         // so we deal with it in addFilterToSolutionNode.
         if (STAGE_TEXT == type) {
@@ -289,6 +268,14 @@ namespace mongo {
         else {
             verify(type == STAGE_IXSCAN);
             IndexScanNode* scan = static_cast<IndexScanNode*>(node);
+
+            // 2D indexes can only support additional non-geometric criteria by filtering after the
+            // initial element - don't generate bounds if this is not the first field
+            if (INDEX_2D == index.type && pos > 0) {
+                scanState->tightness = IndexBoundsBuilder::INEXACT_COVERED;
+                return;
+            }
+
             boundsToFillOut = &scan->bounds;
         }
 
@@ -477,10 +464,6 @@ namespace mongo {
     void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntry& index) {
         const StageType type = node->getType();
         verify(STAGE_GEO_NEAR_2D != type);
-
-        if (STAGE_GEO_2D == type) {
-            return;
-        }
 
         if (STAGE_TEXT == type) {
             finishTextNode(node, index);

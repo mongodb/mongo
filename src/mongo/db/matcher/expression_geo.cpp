@@ -37,9 +37,9 @@ namespace mongo {
     // Geo queries we don't need an index to answer: geoWithin and geoIntersects
     //
 
-    Status GeoMatchExpression::init( const StringData& path, const GeoQuery& query,
+    Status GeoMatchExpression::init( const StringData& path, const GeoQuery* query,
                                      const BSONObj& rawObj ) {
-        _query = query;
+        _query.reset(query);
         _rawObj = rawObj;
         return initPath( path );
     }
@@ -52,12 +52,12 @@ namespace mongo {
         if ( !geometry.parseFrom( e.Obj() ) )
                 return false;
 
-        if (GeoQuery::WITHIN == _query.getPred()) {
-            return _query.getGeometry().contains(geometry);
+        if (GeoQuery::WITHIN == _query->getPred()) {
+            return _query->getGeometry().contains(geometry);
         }
         else {
-            verify(GeoQuery::INTERSECT == _query.getPred());
-            return _query.getGeometry().intersects(geometry);
+            verify(GeoQuery::INTERSECT == _query->getPred());
+            return _query->getGeometry().intersects(geometry);
         }
     }
 
@@ -88,7 +88,8 @@ namespace mongo {
 
     LeafMatchExpression* GeoMatchExpression::shallowClone() const {
         GeoMatchExpression* next = new GeoMatchExpression();
-        next->init( path(), _query, _rawObj);
+        next->init( path(), NULL, _rawObj);
+        next->_query = _query;
         if (getTag()) {
             next->setTag(getTag()->clone());
         }

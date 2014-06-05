@@ -29,7 +29,6 @@
 #include "mongo/db/query/stage_builder.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/exec/2d.h"
 #include "mongo/db/exec/2dnear.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
@@ -188,15 +187,6 @@ namespace mongo {
                 ret->addChild(childStage);
             }
             return ret.release();
-        }
-        else if (STAGE_GEO_2D == root->getType()) {
-            const Geo2DNode* node = static_cast<const Geo2DNode*>(root);
-            TwoDParams params;
-            params.gq = node->gq;
-            params.filter = node->filter.get();
-            params.indexKeyPattern = node->indexKeyPattern;
-            params.collection = collection;
-            return new TwoD(params, ws);
         }
         else if (STAGE_GEO_NEAR_2D == root->getType()) {
             const GeoNear2DNode* node = static_cast<const GeoNear2DNode*>(root);

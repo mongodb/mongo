@@ -24,29 +24,3 @@ var explain = t.find({loc : {$within : {$box : [[4,4],[6,6]]}}}).explain(true);
 print( 'explain = ' + tojson(explain) );
 assert.neq( undefined, explain.indexBounds.loc, "C1" );
 assert.gt( explain.indexBounds.loc.length, 0, "C2" );
-
-// Check covering.
-var covering = explain.indexBounds.loc[0];
-for (var i = 1; i < explain.indexBounds.loc.length; ++i) {
-    var currentBox = explain.indexBounds.loc[i];
-    // min X
-    covering[0][0] = Math.min(covering[0][0], currentBox[0][0]);
-    // min Y
-    covering[0][1] = Math.min(covering[0][1], currentBox[0][1]);
-    // max X
-    covering[1][0] = Math.max(covering[1][0], currentBox[1][0]);
-    // max Y
-    covering[1][1] = Math.max(covering[1][1], currentBox[1][1]);
-}
-print('covering computed from index bounds = ' +
-      '(' + covering[0][0] +  ',' + covering[0][1] + ') -->> ' +
-      '(' + covering[1][0] +  ',' + covering[1][1] + ')');
-// Compare covering against $box coordinates.
-// min X
-assert.lte(covering[0][0], 4);
-// min Y
-assert.lte(covering[0][1], 4);
-// max X
-assert.gte(covering[1][0], 6);
-// max Y
-assert.gte(covering[1][1], 6);

@@ -269,7 +269,7 @@ namespace mongo {
                     else continue;
                 }
 
-                params.geoHashConverter->hash(locObj, &obj).appendToBuilder(&b, "");
+                params.geoHashConverter->hash(locObj, &obj).appendHashMin(&b, "");
 
                 // Go through all the other index keys
                 for (vector<pair<string, int> >::const_iterator i = params.other.begin();

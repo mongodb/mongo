@@ -750,39 +750,6 @@ namespace mongo {
     }
 
     //
-    // Geo2DNode
-    //
-
-    void Geo2DNode::appendToString(mongoutils::str::stream* ss, int indent) const {
-        addIndent(ss, indent);
-        *ss << "GEO_2D\n";
-        addIndent(ss, indent + 1);
-        *ss << "keyPattern = " << indexKeyPattern.toString() << '\n';
-        addCommon(ss, indent);
-    }
-
-    bool Geo2DNode::hasField(const string& field) const {
-        BSONObjIterator it(indexKeyPattern);
-        while (it.more()) {
-            if (field == it.next().fieldName()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    QuerySolutionNode* Geo2DNode::clone() const {
-        Geo2DNode* copy = new Geo2DNode();
-        cloneBaseData(copy);
-
-        copy->_sorts = this->_sorts;
-        copy->indexKeyPattern = this->indexKeyPattern;
-        copy->gq = this->gq;
-
-        return copy;
-    }
-
-    //
     // ShardingFilterNode
     //
 

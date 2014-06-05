@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/util/mongoutils/str.h"
@@ -36,7 +37,13 @@
 namespace mongo {
 
     class GeometryContainer {
+        MONGO_DISALLOW_COPYING(GeometryContainer);
     public:
+
+        /**
+         * Creates an empty geometry container which may then only be loaded via parseFrom().
+         */
+        GeometryContainer();
 
         bool parseFrom(const BSONObj &obj);
 
@@ -79,11 +86,9 @@ namespace mongo {
         // Returns a string related to the type of the geometry (for debugging queries)
         std::string getDebugType() const;
 
-        // Needed for 2D wrapping check and 2d stage (for now)
+        // Needed for 2D wrapping check (for now)
         // TODO: Remove these hacks
         const CapWithCRS* getCapGeometryHack() const;
-        const BoxWithCRS* getBoxGeometryHack() const;
-        const PolygonWithCRS* getPolygonGeometryHack() const;
 
     private:
 
@@ -107,21 +112,20 @@ namespace mongo {
         // Only one of these shared_ptrs should be non-NULL.  S2Region is a
         // superclass but it only supports testing against S2Cells.  We need
         // the most specific class we can get.
-        // TODO: Make this non-copyable and change all these shared ptrs to scoped
-        shared_ptr<PointWithCRS> _point;
-        shared_ptr<LineWithCRS> _line;
-        shared_ptr<BoxWithCRS> _box;
-        shared_ptr<PolygonWithCRS> _polygon;
-        shared_ptr<CapWithCRS> _cap;
-        shared_ptr<MultiPointWithCRS> _multiPoint;
-        shared_ptr<MultiLineWithCRS> _multiLine;
-        shared_ptr<MultiPolygonWithCRS> _multiPolygon;
-        shared_ptr<GeometryCollection> _geometryCollection;
+        scoped_ptr<PointWithCRS> _point;
+        scoped_ptr<LineWithCRS> _line;
+        scoped_ptr<BoxWithCRS> _box;
+        scoped_ptr<PolygonWithCRS> _polygon;
+        scoped_ptr<CapWithCRS> _cap;
+        scoped_ptr<MultiPointWithCRS> _multiPoint;
+        scoped_ptr<MultiLineWithCRS> _multiLine;
+        scoped_ptr<MultiPolygonWithCRS> _multiPolygon;
+        scoped_ptr<GeometryCollection> _geometryCollection;
 
         // Cached for use during covering calculations
         // TODO: _s2Region is currently generated immediately - don't necessarily need to do this
-        shared_ptr<S2RegionUnion> _s2Region;
-        shared_ptr<R2Region> _r2Region;
+        scoped_ptr<S2RegionUnion> _s2Region;
+        scoped_ptr<R2Region> _r2Region;
     };
 
     // TODO: Make a struct, turn parse stuff into something like

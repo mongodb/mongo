@@ -42,7 +42,10 @@ namespace mongo {
         GeoMatchExpression() : LeafMatchExpression( GEO ){}
         virtual ~GeoMatchExpression(){}
 
-        Status init( const StringData& path, const GeoQuery& query, const BSONObj& rawObj );
+        /**
+         * Takes ownership of the passed-in GeoQuery.
+         */
+        Status init( const StringData& path, const GeoQuery* query, const BSONObj& rawObj );
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
@@ -52,12 +55,13 @@ namespace mongo {
 
         virtual LeafMatchExpression* shallowClone() const;
 
-        const GeoQuery& getGeoQuery() const { return _query; }
+        const GeoQuery& getGeoQuery() const { return *_query; }
         const BSONObj getRawObj() const { return _rawObj; }
 
     private:
         BSONObj _rawObj;
-        GeoQuery _query;
+        // Share ownership of our query with all of our clones
+        shared_ptr<const GeoQuery> _query;
     };
 
     class GeoNearMatchExpression : public LeafMatchExpression {

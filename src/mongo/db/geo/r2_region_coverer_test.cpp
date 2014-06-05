@@ -116,12 +116,35 @@ namespace {
         return params;
     }
 
-    class BoxRegion : public R2Region {
+    /**
+     * Test region which mimics the region of a geohash cell.
+     * NOTE: Technically this is not 100% correct, since geohash cells are inclusive on lower and
+     * exclusive on upper edges.  For now, this region is just exclusive on all edges.
+     * TODO: Create an explicit HashCell which correctly encapsulates this behavior, push to the
+     * R2Region interface.
+     */
+    class HashBoxRegion : public R2Region {
     public:
-        BoxRegion(Box box) : _box(box) { }
+
+        HashBoxRegion(Box box) : _box(box) {}
         Box getR2Bounds() const { return _box; }
-        bool fastContains(const Box& other) const { return _box.contains(other); }
-        bool fastDisjoint(const Box& other) const { return !_box.intersects(other); }
+
+        bool fastContains(const Box& other) const {
+            return _box.contains(other);
+        }
+
+        bool fastDisjoint(const Box& other) const {
+            if (!_box.intersects(other))
+                return true;
+
+            // Make outer edges exclusive
+            if (_box._max.x == other._min.x || _box._min.x == other._max.x
+                || _box._max.y == other._min.y || _box._min.y == other._max.y)
+                return true;
+
+            return false;
+        }
+
     private:
         Box _box;
     };
@@ -135,7 +158,7 @@ namespace {
             GeoHash id( (long long) rand.nextInt64(),
                 (unsigned) rand.nextInt32( GeoHash::kMaxBits + 1 ) );
             vector<GeoHash> covering;
-            BoxRegion region(converter.unhashToBox(id));
+            HashBoxRegion region(converter.unhashToBox(id));
             coverer.getCovering(region, &covering);
             ASSERT_EQUALS( covering.size(), (size_t)1 );
             ASSERT_EQUALS( covering[0], id );
@@ -213,12 +236,12 @@ namespace {
     }
 
     // Generate a circle within [0, MAXBOUND]
-    GeometryContainer getRandomCircle(double radius) {
+    GeometryContainer* getRandomCircle(double radius) {
         ASSERT_LESS_THAN(radius, MAXBOUND / 2);
 
         // Format: { $center : [ [-74, 40.74], 10 ] }
-        GeometryContainer container;
-        container.parseFrom(BSON("$center"
+        GeometryContainer* container = new GeometryContainer();
+        container->parseFrom(BSON("$center"
                 << BSON_ARRAY(
                         BSON_ARRAY(randDouble(radius, MAXBOUND - radius)
                                    << randDouble(radius, MAXBOUND - radius))
@@ -240,8 +263,8 @@ namespace {
             coverer.setMaxLevel( coverer.minLevel() + 4 );
 
             double radius = randDouble(0.0, MAXBOUND / 2);
-            GeometryContainer geometry = getRandomCircle(radius);
-            const R2Region& region = geometry.getR2Region();
+            auto_ptr<GeometryContainer> geometry(getRandomCircle(radius));
+            const R2Region& region = geometry->getR2Region();
 
             vector<GeoHash> covering;
             coverer.getCovering(region, &covering);
@@ -263,8 +286,8 @@ namespace {
 
                // 100 * 2 ^ -32 ~= 2.3E-8 (cell edge length)
                double radius = randDouble(1E-15, ldexp(100.0, -32) * 10);
-               GeometryContainer geometry = getRandomCircle(radius);
-               const R2Region& region = geometry.getR2Region();
+               auto_ptr<GeometryContainer> geometry(getRandomCircle(radius));
+               const R2Region& region = geometry->getR2Region();
 
                vector<GeoHash> covering;
                coverer.getCovering(region, &covering);

@@ -235,30 +235,6 @@ namespace mongo {
                 res->setIndexOnly(false);
                 res->setIsMultiKey(false);
             }
-            else if (leaf->stageType == STAGE_GEO_2D) {
-                // Cursor name depends on type of GeoBrowse.
-                // TODO: We could omit the shape from the cursor name.
-                TwoDStats* nStats = static_cast<TwoDStats*>(leaf->specific.get());
-                res->setCursor("GeoBrowse-" + nStats->type);
-                res->setNScanned(leaf->common.works);
-                res->setNScannedObjects(leaf->common.works);
-
-                // Generate index bounds from prefixes.
-                GeoHashConverter converter(nStats->converterParams);
-                BSONObjBuilder bob;
-                BSONArrayBuilder arrayBob(bob.subarrayStart(nStats->field));
-                for (size_t i = 0; i < nStats->expPrefixes.size(); ++i) {
-                    const GeoHash& prefix = nStats->expPrefixes[i];
-                    Box box = converter.unhashToBox(prefix);
-                    arrayBob.append(box.toBSON());
-                }
-                arrayBob.doneFast();
-                res->setIndexBounds(bob.obj());
-
-                // TODO: Could be multikey.
-                res->setIsMultiKey(false);
-                res->setIndexOnly(false);
-            }
             else if (leaf->stageType == STAGE_GEO_NEAR_2DSPHERE) {
                 // TODO: This is kind of a lie for STAGE_GEO_NEAR_2DSPHERE.
                 res->setCursor("S2NearCursor");
@@ -422,8 +398,6 @@ namespace mongo {
             return "DISTINCT";
         case STAGE_FETCH:
             return "FETCH";
-        case STAGE_GEO_2D:
-            return "GEO_2D";
         case STAGE_GEO_NEAR_2D:
             return "GEO_NEAR_2D";
         case STAGE_GEO_NEAR_2DSPHERE:
@@ -506,20 +480,6 @@ namespace mongo {
             bob->appendNumber("alreadyHasObj", spec->alreadyHasObj);
             bob->appendNumber("forcedFetches", spec->forcedFetches);
             bob->appendNumber("matchTested", spec->matchTested);
-        }
-        else if (STAGE_GEO_2D == stats.stageType) {
-            TwoDStats* spec = static_cast<TwoDStats*>(stats.specific.get());
-            bob->append("geometryType", spec->type);
-            bob->append("field", spec->field);
-
-            // Generate verbose index bounds from prefixes
-            GeoHashConverter converter(spec->converterParams);
-            BSONArrayBuilder arrayBob(bob->subarrayStart("boundsVerbose"));
-            for (size_t i = 0; i < spec->expPrefixes.size(); ++i) {
-                const GeoHash& prefix = spec->expPrefixes[i];
-                Box box = converter.unhashToBox(prefix);
-                arrayBob.append(box.toString());
-            }
         }
         else if (STAGE_GEO_NEAR_2D == stats.stageType) {
             TwoDNearStats* spec = static_cast<TwoDNearStats*>(stats.specific.get());
@@ -614,10 +574,6 @@ namespace mongo {
                 else if (STAGE_DISTINCT == node->getType()) {
                     const DistinctNode* dn = static_cast<const DistinctNode*>(node);
                     leafInfo << " " << dn->indexKeyPattern;
-                }
-                else if (STAGE_GEO_2D == node->getType()) {
-                    const Geo2DNode* g2d = static_cast<const Geo2DNode*>(node);
-                    leafInfo << " " << g2d->indexKeyPattern;
                 }
                 else if (STAGE_GEO_NEAR_2D == node->getType()) {
                     const GeoNear2DNode* g2dnear = static_cast<const GeoNear2DNode*>(node);

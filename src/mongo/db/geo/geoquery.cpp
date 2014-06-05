@@ -246,6 +246,9 @@ namespace mongo {
         return parseLegacyQuery(obj) || parseNewQuery(obj);
     }
 
+    GeometryContainer::GeometryContainer() {
+    }
+
     bool GeometryContainer::isSimpleContainer() const {
         return NULL != _point || NULL != _line || NULL != _polygon;
     }
@@ -338,15 +341,11 @@ namespace mongo {
     bool GeometryContainer::R2BoxRegion::fastContains(const Box& other) const {
 
         // TODO: Add more cases here to make coverings better
+
         if (_geometry->_box && FLAT == _geometry->_box->crs) {
             const Box& box = _geometry->_box->box;
-            if (box.inside(other._min) && box.inside(other._max)) {
-                return true;
-            }
+            return box.contains(other);
         }
-
-        // Fast bounds check
-        if (!_bounds.contains(other)) return false;
 
         if ( _geometry->_cap && FLAT == _geometry->_cap->crs ) {
             const Circle& circle = _geometry->_cap->circle;
@@ -369,6 +368,7 @@ namespace mongo {
     }
 
     bool GeometryContainer::R2BoxRegion::fastDisjoint(const Box& other) const {
+
         if (!_bounds.intersects(other))
             return true;
 
@@ -1023,7 +1023,6 @@ namespace mongo {
     }
 
     bool GeometryContainer::parseFrom(const BSONObj& obj) {
-        *this = GeometryContainer();
 
         if (GeoParser::isPolygon(obj)) {
             // We can't really pass these things around willy-nilly except by ptr.
@@ -1144,14 +1143,6 @@ namespace mongo {
 
     const CapWithCRS* GeometryContainer::getCapGeometryHack() const {
         return _cap.get();
-    }
-
-    const BoxWithCRS* GeometryContainer::getBoxGeometryHack() const {
-        return _box.get();
-    }
-
-    const PolygonWithCRS* GeometryContainer::getPolygonGeometryHack() const {
-        return _polygon.get();
     }
 
 }  // namespace mongo

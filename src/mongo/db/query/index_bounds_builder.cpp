@@ -572,17 +572,26 @@ namespace mongo {
             unionize(oilOut);
         }
         else if (MatchExpression::GEO == expr->matchType()) {
+
             const GeoMatchExpression* gme = static_cast<const GeoMatchExpression*>(expr);
-            // Can only do this for 2dsphere.
-            if (!mongoutils::str::equals("2dsphere", elt.valuestrsafe())) {
-                warning() << "Planner error, trying to build geo bounds for non-2dsphere"
-                          << " index element: "  << elt.toString() << endl;
+
+            if (mongoutils::str::equals("2dsphere", elt.valuestrsafe())) {
+                verify(gme->getGeoQuery().getGeometry().hasS2Region());
+                const S2Region& region = gme->getGeoQuery().getGeometry().getS2Region();
+                ExpressionMapping::cover2dsphere(region, index.infoObj, oilOut);
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
+            else if (mongoutils::str::equals("2d", elt.valuestrsafe())) {
+                verify(gme->getGeoQuery().getGeometry().hasR2Region());
+                const R2Region& region = gme->getGeoQuery().getGeometry().getR2Region();
+                ExpressionMapping::cover2d(region, index.infoObj, oilOut);
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
+            else {
+                warning() << "Planner error trying to build geo bounds for " << elt.toString()
+                          << " index element.";
                 verify(0);
             }
-
-            const S2Region& region = gme->getGeoQuery().getGeometry().getS2Region();
-            ExpressionMapping::cover2dsphere(region, index.infoObj, oilOut);
-            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
         else {
             warning() << "Planner error, trying to build bounds for expression: "
@@ -891,7 +900,7 @@ namespace mongo {
         }
 
         if (!bounds->isValidFor(kp, scanDir)) {
-            QLOG() << "INVALID BOUNDS: " << bounds->toString() << endl
+            log() << "INVALID BOUNDS: " << bounds->toString() << endl
                    << "kp = " << kp.toString() << endl
                    << "scanDir = " << scanDir << endl;
             verify(0);

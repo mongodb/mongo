@@ -54,10 +54,6 @@ namespace mongo {
 
         STAGE_FETCH,
 
-        // TODO: This is secretly an expression index but we need geometry -> covering for our
-        // geohash.
-        STAGE_GEO_2D,
-
         // The two $geoNear impls imply a fetch+sort and must be stages.
         STAGE_GEO_NEAR_2D,
         STAGE_GEO_NEAR_2DSPHERE,

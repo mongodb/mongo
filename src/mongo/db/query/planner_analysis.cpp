@@ -546,8 +546,7 @@ namespace mongo {
 
         // Only these stages can produce flagged results.  A stage has to hold state past one call
         // to work(...) in order to possibly flag a result.
-        bool couldProduceFlagged = hasNode(solnRoot, STAGE_GEO_2D)
-                                || hasAndHashStage
+        bool couldProduceFlagged = hasAndHashStage
                                 || hasNode(solnRoot, STAGE_AND_SORTED)
                                 || hasNode(solnRoot, STAGE_FETCH);
 

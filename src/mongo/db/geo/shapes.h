@@ -94,20 +94,24 @@ namespace mongo {
         bool onBoundary(double bound, double val, double fudge = 0) const;
         bool mid(double amin, double amax, double bmin, double bmax, bool min, double* res) const;
 
-        double intersects(const Box& other) const;
         double area() const;
         double maxDim() const;
         Point center() const;
 
+        // NOTE: Box boundaries are *inclusive*
         bool onBoundary(Point p, double fudge = 0) const;
         bool inside(Point p, double fudge = 0) const;
         bool inside(double x, double y, double fudge = 0) const;
         bool contains(const Box& other, double fudge = 0) const;
+        bool intersects(const Box& other) const;
 
         // Box modifications
         void truncate(double min, double max);
         void fudge(double error);
         void expandToInclude(const Point& pt);
+
+        // TODO: Remove after 2D near dependency goes away
+        double legacyIntersectFraction(const Box& other) const;
 
         Point _min;
         Point _max;
@@ -181,6 +185,26 @@ namespace mongo {
         UNSET,
         FLAT,
         SPHERE
+    };
+
+    class R2Annulus {
+    public:
+
+        R2Annulus();
+        R2Annulus(const Point& center, double inner, double outer);
+
+        const Point& center() const;
+
+        double getInner() const;
+        double getOuter() const;
+
+        bool contains(const Point& point, double maxError) const;
+
+    private:
+
+        Point _center;
+        double _inner;
+        double _outer;
     };
 
     struct PointWithCRS {

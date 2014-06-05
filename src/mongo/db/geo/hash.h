@@ -109,8 +109,11 @@ namespace mongo {
         GeoHash operator+(const char *s) const;
         GeoHash operator+(const std::string& s) const;
 
-        // Append the hash to the builder provided.
-        void appendToBuilder(BSONObjBuilder* b, const char * name) const;
+        // Append the minimum range of the hash to the builder provided (inclusive)
+        void appendHashMin(BSONObjBuilder* builder, const char* fieldName) const;
+        // Append the maximum range of the hash to the builder provided (inclusive)
+        void appendHashMax(BSONObjBuilder* builder, const char* fieldName) const;
+
         long long getHash() const;
         unsigned getBits() const;
 
@@ -126,9 +129,7 @@ namespace mongo {
         GeoHash parent() const;
 
     private:
-        // XXX not sure why this is done exactly.  Why does binary
-        // data need to be reversed?  byte ordering of some sort?
-        static void _copyAndReverse(char *dst, const char *src);
+
         // Create a hash from the provided string.  Used by the std::string and char* cons.
         void initFromString(const char *s);
         /* Keep the upper _bits*2 bits of _hash, clear the lower bits.
@@ -165,6 +166,11 @@ namespace mongo {
         };
 
         GeoHashConverter(const Parameters &params);
+
+        /**
+         * Returns hashing parameters parsed from a BSONObj
+         */
+        static Status parseParameters(const BSONObj& paramDoc, Parameters* params);
 
         /**
          * Return converter parameterss which can be used to
@@ -220,6 +226,9 @@ namespace mongo {
         // XXX: understand/clean this.
         double sizeEdge(const GeoHash& a) const;
     private:
+
+        void init();
+
         // Convert from an unsigned in [0, (max-min)*scaling] to [min, max]
         double convertFromHashScale(unsigned in) const;
 

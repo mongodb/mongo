@@ -3,9 +3,9 @@ t = db.geoarray
 
 function test(index) {
     t.drop();
-    t.insert( { zip : "10001", loc : { home : [ 10, 10 ], work : [ 50, 50 ] } } )
-    t.insert( { zip : "10002", loc : { home : [ 20, 20 ], work : [ 50, 50 ] } } )
-    var res = t.insert( { zip : "10003", loc : { home : [ 30, 30 ], work : [ 50, 50 ] } } );
+    t.insert( { zip : "10001", loc : [[ 10, 10 ], [ 50, 50 ]] } )
+    t.insert( { zip : "10002", loc : [[ 20, 20 ], [ 50, 50 ]] } )
+    var res = t.insert( { zip : "10003", loc : [[ 30, 30 ], [ 50, 50 ]] } );
     assert.writeOK( res );
 
     if (index) {
@@ -13,7 +13,7 @@ function test(index) {
         assert.eq( 2, t.getIndexKeys().length )
     }
 
-    res = t.insert( { zip : "10004", loc : { home : [ 40, 40 ], work : [ 50, 50 ] } } );
+    res = t.insert( { zip : "10004", loc : [[ 40, 40 ], [ 50, 50 ]] } );
     assert.writeOK( res );
 
     // test normal access

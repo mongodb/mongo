@@ -249,7 +249,7 @@ namespace twod_exec {
         // First field of start key goes (MINKEY, start] (in reverse)
         BSONObjBuilder firstBob;
         firstBob.appendMinKey("");
-        start.appendToBuilder(&firstBob, "");
+        start.appendHashMin(&firstBob, "");
         minParams.bounds.fields[0].intervals.push_back(Interval(firstBob.obj(), false, true));
 
         IndexScanParams maxParams;
@@ -260,7 +260,7 @@ namespace twod_exec {
         maxParams.doNotDedup = true;
         // First field of end key goes (start, MAXKEY)
         BSONObjBuilder secondBob;
-        start.appendToBuilder(&secondBob, "");
+        start.appendHashMin(&secondBob, "");
         secondBob.appendMaxKey("");
         maxParams.bounds.fields[0].intervals.push_back(Interval(secondBob.obj(), false, false));
 

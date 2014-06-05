@@ -39,5 +39,7 @@ for ( i=0; i<searches.length; i++ ){
     assert.eq( correct[i].length , t.find( q ).count() , "count : " + tojson( searches[i] ) );
     var explain = t.find( q ).explain();
     print( 'explain for ' + tojson( q , '' , true ) + ' = ' + tojson( explain ) );
-    assert.gt( correct[i].length * 2 , explain.nscanned , "nscanned : " + tojson( searches[i] ) );
+    // The index should be at least minimally effective in preventing the full collection
+    // scan.
+    assert.gt( t.find().count(), explain.nscanned , "nscanned : " + tojson( searches[i] ) );
 }

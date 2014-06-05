@@ -378,6 +378,67 @@ namespace mongo {
         return FIELD_INVALID;
     }
 
+    FieldParser::FieldState FieldParser::extract( BSONObj doc,
+                                                  const BSONField<double>& field,
+                                                  double* out,
+                                                  string* errMsg ) {
+        return extract( doc[field.name()], field, out, errMsg );
+    }
+
+    FieldParser::FieldState FieldParser::extract( BSONElement elem,
+                                                  const BSONField<double>& field,
+                                                  double* out,
+                                                  string* errMsg )
+    {
+        if (elem.eoo()) {
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
+        }
+
+        if (elem.type() == NumberDouble) {
+            *out = elem.numberDouble();
+            return FIELD_SET;
+        }
+
+        _genFieldErrMsg(elem, field, "double", errMsg);
+        return FIELD_INVALID;
+    }
+
+    FieldParser::FieldState FieldParser::extractNumber( BSONObj doc,
+                                                        const BSONField<double>& field,
+                                                        double* out,
+                                                        string* errMsg ) {
+        return extractNumber( doc[field.name()], field, out, errMsg );
+    }
+
+    FieldParser::FieldState FieldParser::extractNumber( BSONElement elem,
+                                                        const BSONField<double>& field,
+                                                        double* out,
+                                                        string* errMsg ) {
+        if (elem.eoo()) {
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
+        }
+
+        if (elem.isNumber()) {
+            *out = elem.numberDouble();
+            return FIELD_SET;
+        }
+
+        _genFieldErrMsg(elem, field, "number", errMsg);
+        return FIELD_INVALID;
+    }
+
     FieldParser::FieldState FieldParser::extractID( BSONObj doc,
                                                     const BSONField<BSONObj>& field,
                                                     BSONObj* out,

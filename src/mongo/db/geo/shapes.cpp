@@ -125,7 +125,21 @@ namespace mongo {
         return true;
     }
 
-    double Box::intersects(const Box& other) const {
+    bool Box::intersects(const Box& other) const {
+
+        bool intersectX = between(_min.x, _max.x, other._min.x) // contain part of other range
+                          || between(_min.x, _max.x, other._max.x) // contain part of other range
+                          || between(other._min.x, other._max.x, _min.x); // other range contains us
+
+        bool intersectY = between(_min.y, _max.y, other._min.y)
+                          || between(_min.y, _max.y, other._max.y)
+                          || between(other._min.y, other._max.y, _min.y);
+
+        return intersectX && intersectY;
+    }
+
+    double Box::legacyIntersectFraction(const Box& other) const {
+
         Point boundMin(0,0);
         Point boundMax(0,0);
 
@@ -382,6 +396,41 @@ namespace mongo {
         }
 
         return *_bounds;
+    }
+
+    R2Annulus::R2Annulus() :
+        _inner(0.0), _outer(0.0) {
+    }
+
+    R2Annulus::R2Annulus(const Point& center, double inner, double outer) :
+        _center(center), _inner(inner), _outer(outer) {
+    }
+
+    const Point& R2Annulus::center() const {
+        return _center;
+    }
+
+    double R2Annulus::getInner() const {
+        return _inner;
+    }
+
+    double R2Annulus::getOuter() const {
+        return _outer;
+    }
+
+    bool R2Annulus::contains(const Point& point, double maxError) const {
+
+        // See if we're inside the inner radius
+        if (distanceWithin(point, _center, getInner() - maxError)) {
+            return false;
+        }
+
+        // See if we're outside the outer radius
+        if (!distanceWithin(point, _center, getOuter() + maxError)) {
+            return false;
+        }
+
+        return true;
     }
 
     /////// Other methods

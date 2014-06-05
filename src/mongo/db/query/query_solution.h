@@ -562,31 +562,6 @@ namespace mongo {
         int skip;
     };
 
-    //
-    // Geo nodes.  A thin wrapper above an IXSCAN until we can yank functionality out of
-    // the IXSCAN layer into the stage layer.
-    //
-
-    // TODO: This is probably an expression index.
-    struct Geo2DNode : public QuerySolutionNode {
-        Geo2DNode() { }
-        virtual ~Geo2DNode() { }
-
-        virtual StageType getType() const { return STAGE_GEO_2D; }
-        virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
-
-        bool fetched() const { return false; }
-        bool hasField(const std::string& field) const;
-        bool sortedByDiskLoc() const { return false; }
-        const BSONObjSet& getSort() const { return _sorts; }
-        BSONObjSet _sorts;
-
-        QuerySolutionNode* clone() const;
-
-        BSONObj indexKeyPattern;
-        GeoQuery gq;
-    };
-
     // This is a standalone stage.
     struct GeoNear2DNode : public QuerySolutionNode {
         GeoNear2DNode() : numWanted(100), addPointMeta(false), addDistMeta(false) { }

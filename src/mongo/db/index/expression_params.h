@@ -56,15 +56,9 @@ namespace mongo {
 
             uassert(16802, "no geo field specified", out->geo.size());
 
-            double bits =  configValueWithDefaultDouble(infoObj, "bits", 26);  // for lat/long, ~ 1ft
-            uassert(16803, "bits in geo index must be between 1 and 32", bits > 0 && bits <= 32);
-
             GeoHashConverter::Parameters hashParams;
-            hashParams.bits = static_cast<unsigned>(bits);
-            hashParams.max = configValueWithDefaultDouble(infoObj, "max", 180.0);
-            hashParams.min = configValueWithDefaultDouble(infoObj, "min", -180.0);
-            double numBuckets = (1024 * 1024 * 1024 * 4.0);
-            hashParams.scaling = numBuckets / (hashParams.max - hashParams.min);
+            Status paramStatus = GeoHashConverter::parseParameters(infoObj, &hashParams);
+            uassertStatusOK(paramStatus);
 
             out->geoHashConverter.reset(new GeoHashConverter(hashParams));
         }

@@ -156,6 +156,16 @@ namespace mongo {
                                    long long* out,
                                    std::string* errMsg = NULL );
 
+        static FieldState extract( BSONElement elem,
+                                   const BSONField<double>& field,
+                                   double* out,
+                                   std::string* errMsg = NULL );
+
+        static FieldState extract( BSONObj doc,
+                                   const BSONField<double>& field,
+                                   double* out,
+                                   std::string* errMsg = NULL );
+
         /**
          * The following extractNumber methods do implicit conversion between any numeric type and
          * the BSONField type.  This can be useful when an exact numeric type is not needed, for
@@ -179,6 +189,16 @@ namespace mongo {
         static FieldState extractNumber( BSONElement elem,
                                          const BSONField<long long>& field,
                                          long long* out,
+                                         std::string* errMsg = NULL );
+
+        static FieldState extractNumber( BSONObj doc,
+                                         const BSONField<double>& field,
+                                         double* out,
+                                         std::string* errMsg = NULL );
+
+        static FieldState extractNumber( BSONElement elem,
+                                         const BSONField<double>& field,
+                                         double* out,
                                          std::string* errMsg = NULL );
 
         /**

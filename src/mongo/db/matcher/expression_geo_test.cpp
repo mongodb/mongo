@@ -43,11 +43,11 @@ namespace mongo {
     TEST( ExpressionGeoTest, Geo1 ) {
         BSONObj query = fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
 
-        GeoQuery gq;
-        ASSERT( gq.parseFrom( query["loc"].Obj() ) );
+        auto_ptr<GeoQuery> gq(new GeoQuery);
+        ASSERT( gq->parseFrom( query["loc"].Obj() ) );
 
         GeoMatchExpression ge;
-        ASSERT( ge.init("a", gq, query ).isOK() );
+        ASSERT( ge.init("a", gq.release(), query ).isOK() );
 
         ASSERT(!ge.matchesBSON(fromjson("{a: [3,4]}")));
         ASSERT(ge.matchesBSON(fromjson("{a: [4,4]}")));

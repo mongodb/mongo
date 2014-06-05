@@ -42,8 +42,8 @@ namespace mongo {
                                                                int type,
                                                                const BSONObj& section ) {
         if (BSONObj::opWITHIN == type || BSONObj::opGEO_INTERSECTS == type) {
-            GeoQuery gq(name);
-            if ( !gq.parseFrom( section ) )
+            auto_ptr<GeoQuery> gq(new GeoQuery(name));
+            if ( !gq->parseFrom( section ) )
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "bad geo query" );
 
             auto_ptr<GeoMatchExpression> e( new GeoMatchExpression() );
@@ -53,7 +53,7 @@ namespace mongo {
             // layer.
             BSONObjBuilder bob;
             bob.append(name, section);
-            Status s = e->init( name, gq, bob.obj() );
+            Status s = e->init( name, gq.release(), bob.obj() );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
             return StatusWithMatchExpression( e.release() );

@@ -1737,25 +1737,25 @@ namespace {
         runQuery(fromjson("{a : { $within: { $polygon : [[0,0], [2,0], [4,0]] } }}"));
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {node: {geo2d: {a: '2d'}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2d'}}}}}");
 
         // Center
         runQuery(fromjson("{a : { $within : { $center : [[ 5, 5 ], 7 ] } }}"));
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {node: {geo2d: {a: '2d'}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2d'}}}}}");
 
         // Centersphere
         runQuery(fromjson("{a : { $within : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}"));
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {node: {geo2d: {a: '2d'}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2d'}}}}}");
 
         // Within box.
         runQuery(fromjson("{a : {$within: {$box : [[0,0],[9,9]]}}}"));
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {node: {geo2d: {a: '2d'}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2d'}}}}}");
 
         // TODO: test that we *don't* annotate for things we shouldn't.
     }
@@ -1769,6 +1769,20 @@ namespace {
                                " $maxDistance :100}},a: 'mouse'}"));
         assertNumSolutions(1U);
         assertSolutionExists("{fetch: {node: {geoNear2dsphere: {loc: '2dsphere'}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, Basic2DCompound) {
+        addIndex(BSON("loc" << "2d" << "a" << 1));
+
+        runQuery(fromjson("{ loc: { $geoWithin: { $box : [[0, 0],[10, 10]] } },"
+                              "a: 'mouse' }"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {loc : '2d', a: 1},"
+                                                      "filter: {a: 'mouse'},"
+                                                      "bounds: {loc: []," // Ignored since complex
+                                                      "         a: [['MinKey','MaxKey',true,true]]}"
+                                                      "}}}}");
     }
 
     TEST_F(QueryPlannerTest, Multikey2DSphereCompound) {
@@ -1907,7 +1921,8 @@ namespace {
 
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {node: {or: {nodes: [{geo2d: {a: '2d'}}, {geo2d: {b: '2d'}}]}}}}");
+        assertSolutionExists("{or: {nodes: [{fetch: {node: {ixscan: {pattern: {a: '2d'}}}}},"
+                                           "{fetch: {node: {ixscan: {pattern: {b: '2d'}}}}}]}}");
     }
 
     // SERVER-3984, $or 2d index
@@ -1918,7 +1933,7 @@ namespace {
 
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {node: {or: {nodes: [{geo2d: {a: '2d'}}, {geo2d: {a: '2d'}}]}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2d'}}}}}");
     }
 
     // SERVER-3984, $or 2dsphere index
@@ -1957,8 +1972,9 @@ namespace {
 
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{fetch: {node: {andHash: {nodes: ["
-                                "{geo2d: {a: '2d'}}, {geo2d: {a: '2d'}}]}}}}");
+        // Bounds of the two 2d geo predicates are combined into
+        // a single index scan.
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2d'}}}}}");
     }
 
     TEST_F(QueryPlannerTest, And2DWith2DNearSameField) {

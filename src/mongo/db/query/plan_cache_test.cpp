@@ -1003,22 +1003,22 @@ namespace {
         // Polygon
         query = fromjson("{a : { $within: { $polygon : [[0,0], [2,0], [4,0]] } }}");
         runQuery(query);
-        assertNotCached("{fetch: {node: {geo2d: {a: '2d'}}}}");
+        assertNotCached("{fetch: {node: {ixscan: {pattern: {a: '2d'}}}}}");
 
         // Center
         query = fromjson("{a : { $within : { $center : [[ 5, 5 ], 7 ] } }}");
         runQuery(query);
-        assertNotCached("{fetch: {node: {geo2d: {a: '2d'}}}}");
+        assertNotCached("{fetch: {node: {ixscan: {pattern: {a: '2d'}}}}}");
 
         // Centersphere
         query = fromjson("{a : { $within : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}");
         runQuery(query);
-        assertNotCached("{fetch: {node: {geo2d: {a: '2d'}}}}");
+        assertNotCached("{fetch: {node: {ixscan: {pattern: {a: '2d'}}}}}");
 
         // Within box.
         query = fromjson("{a : {$within: {$box : [[0,0],[9,9]]}}}");
         runQuery(query);
-        assertNotCached("{fetch: {node: {geo2d: {a: '2d'}}}}");
+        assertNotCached("{fetch: {node: {ixscan: {pattern: {a: '2d'}}}}}");
     }
 
     TEST_F(CachePlanSelectionTest, Or2DNonNearNotCached) {
@@ -1028,7 +1028,8 @@ namespace {
                                         " {b : { $within : { $center : [[ 5, 5 ], 7 ] } }} ]}");
 
         runQuery(query);
-        assertNotCached("{fetch: {node: {or: {nodes: [{geo2d: {a: '2d'}}, {geo2d: {b: '2d'}}]}}}}");
+        assertNotCached("{or: {nodes: [{fetch: {node: {ixscan: {pattern: {a: '2d'}}}}},"
+                                      "{fetch: {node: {ixscan: {pattern: {b: '2d'}}}}}]}}");
     }
 
 }  // namespace

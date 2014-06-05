@@ -248,13 +248,6 @@ namespace mongo {
             }
             return filterMatches(filter.Obj(), trueSoln);
         }
-        else if (STAGE_GEO_2D == trueSoln->getType()) {
-            const Geo2DNode* node = static_cast<const Geo2DNode*>(trueSoln);
-            BSONElement el = testSoln["geo2d"];
-            if (el.eoo() || !el.isABSONObj()) { return false; }
-            BSONObj geoObj = el.Obj();
-            return geoObj == node->indexKeyPattern;
-        }
         else if (STAGE_GEO_NEAR_2D == trueSoln->getType()) {
             const GeoNear2DNode* node = static_cast<const GeoNear2DNode*>(trueSoln);
             BSONElement el = testSoln["geoNear2d"];

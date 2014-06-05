@@ -172,7 +172,7 @@ namespace twod_exec {
         virtual bool fitsInBox(double width) { return width >= _scanDistance; }
 
         // Whether the current box overlaps our search area
-        virtual double intersectsBox(Box& cur) { return cur.intersects(_want); }
+        virtual double intersectsBox(Box& cur) { return cur.legacyIntersectFraction(_want); }
 
         std::set< std::pair<DiskLoc,int> > _seen;
         GeoHash _start;
