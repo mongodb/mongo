@@ -59,6 +59,10 @@ func (self *SessionProvider) GetSession() (*mgo.Session, error) {
 func InitSessionProvider(opts *options.ToolOptions) (*SessionProvider,
 	error) {
 
+	if opts == nil {
+		return nil, fmt.Errorf("tool options cannot be nil")
+	}
+
 	// create the provider
 	provider := &SessionProvider{}
 

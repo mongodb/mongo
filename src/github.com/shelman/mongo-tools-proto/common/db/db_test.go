@@ -2,10 +2,12 @@ package db
 
 import (
 	"fmt"
+	"github.com/shelman/mongo-tools-proto/common/db/ssl"
 	"github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"labix.org/v2/mgo"
+	"reflect"
 	"testing"
 )
 
@@ -82,6 +84,54 @@ func TestGetSession(t *testing.T) {
 				provider.masterSession.Close()
 
 			})
+
+		})
+
+	})
+
+}
+
+func TestInitSessionProvider(t *testing.T) {
+
+	testutil.VerifyTestType(t, "db")
+
+	Convey("When initializing a session provider", t, func() {
+
+		Convey("if nil options are passed in, an error should be"+
+			" returned", func() {
+
+			provider, err := InitSessionProvider(nil)
+			So(err, ShouldNotBeNil)
+			So(provider, ShouldBeNil)
+
+		})
+
+		Convey("if the options passed in specify ssl, a provider with an ssl"+
+			" connector should be returned", func() {
+
+			opts := &options.ToolOptions{
+				Connection: &options.Connection{},
+				SSL: &options.SSL{
+					UseSSL: true,
+				},
+			}
+			provider, err := InitSessionProvider(opts)
+			So(err, ShouldBeNil)
+			So(reflect.TypeOf(provider.connector), ShouldEqual,
+				reflect.TypeOf(&ssl.SSLDBConnector{}))
+
+		})
+
+		Convey("otherwise, a provider with a standard connector should be"+
+			" returned", func() {
+			opts := &options.ToolOptions{
+				Connection: &options.Connection{},
+				SSL:        &options.SSL{},
+			}
+			provider, err := InitSessionProvider(opts)
+			So(err, ShouldBeNil)
+			So(reflect.TypeOf(provider.connector), ShouldEqual,
+				reflect.TypeOf(&VanillaDBConnector{}))
 
 		})
 
