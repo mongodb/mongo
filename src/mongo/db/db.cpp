@@ -69,11 +69,13 @@
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_coordinator_legacy.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/restapi.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/startup_warnings.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
@@ -949,11 +951,20 @@ MONGO_INITIALIZER(SetGlobalConfigExperiment)(InitializerContext* context) {
     setGlobalEnvironment(new GlobalEnvironmentMongoD());
     return Status::OK();
 }
+namespace {
+    // TODO(spencer): Remove this startup parameter once the new ReplicationCoordinator is fully
+    // working
+    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useNewReplCoordinator, bool, false);
+} // namespace
 
 MONGO_INITIALIZER_GENERAL(CreateReplicationManager,
                           MONGO_NO_PREREQUISITES,
                           MONGO_NO_DEPENDENTS)(InitializerContext* context) {
-    repl::setGlobalReplicationCoordinator(new repl::LegacyReplicationCoordinator());
+    if (useNewReplCoordinator) {
+        repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorImpl());
+    } else {
+        repl::setGlobalReplicationCoordinator(new repl::LegacyReplicationCoordinator());
+    }
     return Status::OK();
 }
 
