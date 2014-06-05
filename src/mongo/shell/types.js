@@ -387,7 +387,7 @@ if (typeof(DBRef) != "undefined"){
         assert(this.$ref, "need a ns");
         assert(this.$id, "need an id");
         var coll = this.$db ? db.getSiblingDB(this.$db).getCollection(this.$ref) : db[this.$ref];
-        return coll.findOne({ _id : this.$id }):
+        return coll.findOne({ _id : this.$id });
     }
 
     DBRef.prototype.tojson = function(indent){
