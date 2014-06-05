@@ -294,6 +294,15 @@ __wt_lsm_merge(
 		if (insert_count % LSM_MERGE_CHECK_INTERVAL == 0) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 				WT_ERR(EINTR);
+			/*
+			 * Help out with switching chunks in case the
+			 * checkpoint worker is busy.
+			 */
+			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+				WT_WITH_SCHEMA_LOCK(session, ret =
+				    __wt_lsm_tree_switch(session, lsm_tree));
+				WT_ERR(ret);
+			}
 			WT_STAT_FAST_CONN_INCRV(session,
 			    lsm_rows_merged, LSM_MERGE_CHECK_INTERVAL);
 			++lsm_tree->merge_progressing;
