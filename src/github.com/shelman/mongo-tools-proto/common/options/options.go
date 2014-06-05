@@ -1,3 +1,5 @@
+// Package options implements command-line options that are used by all of
+// the mongo tools.
 package options
 
 import (

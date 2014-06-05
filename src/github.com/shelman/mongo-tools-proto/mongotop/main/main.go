@@ -1,3 +1,4 @@
+// Main package for the mongotop tool.
 package main
 
 import (

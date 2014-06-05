@@ -1,3 +1,5 @@
+// Package result contains golang-specific code defining the output of the
+// "top" command in MongoDB.
 package result
 
 import (

@@ -1,3 +1,5 @@
+// Package db implements generic connection to MongoDB, and contains
+// subpackages for specific methods of connection.
 package db
 
 import (

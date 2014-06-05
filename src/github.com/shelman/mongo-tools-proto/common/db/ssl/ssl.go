@@ -1,3 +1,4 @@
+// Package ssl implements connection to MongoDB over ssl.
 package ssl
 
 import (
@@ -148,10 +149,10 @@ func sslKeyPairFromBytes(data []byte) ([]byte, []byte, error) {
 		if block == nil {
 			if certPEMBlock != nil && keyPEMBlock != nil {
 				return certPEMBlock, keyPEMBlock, nil
-			} else {
-				return nil, nil, fmt.Errorf("the file must contain both a" +
-					" certificate and a private key")
 			}
+
+			return nil, nil, fmt.Errorf("the file must contain both a" +
+				" certificate and a private key")
 		}
 
 		switch block.Type {

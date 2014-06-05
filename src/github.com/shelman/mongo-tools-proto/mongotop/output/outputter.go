@@ -1,3 +1,5 @@
+// Package output implements means of outputting the results of mongotop's
+// queries against MongoDB.
 package output
 
 import (

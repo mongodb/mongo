@@ -1,3 +1,4 @@
+// Package mongotop contains the logic for the mongotop tool.
 package mongotop
 
 import (
