@@ -39,12 +39,12 @@ namespace mongo {
     } // namespace
 
     GlobalEnvironmentExperiment* getGlobalEnvironment() {
-        fassert(17506, globalEnvironmentExperiment);
+        fassert(17508, globalEnvironmentExperiment);
         return globalEnvironmentExperiment;
     }
 
     void setGlobalEnvironment(GlobalEnvironmentExperiment* newGlobalEnvironment) {
-        fassert(17507, newGlobalEnvironment);
+        fassert(17509, newGlobalEnvironment);
 
         if (NULL != globalEnvironmentExperiment) {
             delete globalEnvironmentExperiment;
