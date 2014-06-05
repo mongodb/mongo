@@ -55,6 +55,12 @@ namespace mongo {
          **/
         virtual bool killOperation(AtomicUInt opId) = 0;
 
+        /**
+         * Reset the operation kill state after a killAllOperations.
+         * Used for testing.
+         */
+        virtual void resetOperationKillState() = 0;
+
         //
         // Factories for storage interfaces
         //

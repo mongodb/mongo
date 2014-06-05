@@ -43,4 +43,7 @@ namespace mongo {
         return new OperationContextNoop();
     }
 
+    void GlobalEnvironmentNoop::resetOperationKillState() {
+    }
+
 }  // namespace mongo

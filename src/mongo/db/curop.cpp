@@ -32,7 +32,6 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/util/fail_point_service.h"
 
 

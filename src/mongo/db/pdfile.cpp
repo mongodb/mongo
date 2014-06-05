@@ -61,7 +61,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/delete.h"

@@ -57,7 +57,6 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/ops/insert.h"

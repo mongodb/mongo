@@ -57,10 +57,10 @@
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/global_optime.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/mongod_options.h"
@@ -107,8 +107,6 @@ namespace mongo {
 #define LOGWITHRATELIMIT if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 
     string dbExecCommand;
-
-    KillCurrentOp killCurrentOp;
 
     int lockFile = 0;
 #ifdef _WIN32
@@ -203,7 +201,7 @@ namespace mongo {
             else {
                 log() << "going to kill op: " << e << endl;
                 obj = fromjson("{\"info\":\"attempting to kill op\"}");
-                killCurrentOp.kill( (unsigned) e.number() );
+                getGlobalEnvironment()->killOperation( (unsigned) e.number() );
             }
         }
         replyToQuery(0, m, dbresponse, obj);
@@ -1124,7 +1122,7 @@ namespace {
     }
 
     void exitCleanly( ExitCode code ) {
-        killCurrentOp.killAll();
+        getGlobalEnvironment()->killAllOperations();
         if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeReplSet) {
             repl::theReplSet->shutdown();

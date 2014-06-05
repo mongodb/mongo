@@ -42,13 +42,13 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
@@ -1209,7 +1209,7 @@ namespace mongo {
             // immediately after it recovers from yield, such that no further work is done
             // on the index build.  Thus this thread does not have to synchronize with the
             // bg index operation; we can just assume that it is safe to proceed.
-            killCurrentOp.kill(op->opNum());
+            getGlobalEnvironment()->killOperation(op->opNum());
         }
 
         if (indexes.size() > 0) {

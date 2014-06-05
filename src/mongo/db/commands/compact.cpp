@@ -42,7 +42,6 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/rs.h"
 

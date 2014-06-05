@@ -41,6 +41,10 @@ namespace mongo {
         return killCurrentOp.kill(opId);
     }
 
+    void GlobalEnvironmentMongoD::resetOperationKillState() {
+        killCurrentOp.reset();
+    }
+
     OperationContext* GlobalEnvironmentMongoD::newOpCtx() {
         return new OperationContextImpl();
     }

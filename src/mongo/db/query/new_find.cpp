@@ -35,7 +35,6 @@
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"

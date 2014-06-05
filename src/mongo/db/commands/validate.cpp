@@ -29,7 +29,6 @@
  */
 
 #include "mongo/db/commands.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/runner.h"

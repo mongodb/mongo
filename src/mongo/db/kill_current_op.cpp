@@ -53,6 +53,8 @@ namespace mongo {
     // operations are not targeted.  "chance" must be a double between 0 and 1, inclusive.
     MONGO_FP_DECLARE(checkForInterruptFail);
 
+    KillCurrentOp killCurrentOp;
+
     void KillCurrentOp::interruptJs( AtomicUInt *op ) {
         if ( !globalScriptEngine )
             return;

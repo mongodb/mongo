@@ -45,7 +45,6 @@
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage/mmap_v1/durop.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/storage_options.h"

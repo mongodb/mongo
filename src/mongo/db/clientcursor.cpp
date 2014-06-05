@@ -44,7 +44,6 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/db.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"

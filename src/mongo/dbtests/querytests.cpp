@@ -33,10 +33,11 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_d.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/global_optime.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/query/lite_parsed_query.h"
@@ -189,6 +190,7 @@ namespace QueryTests {
     public:
         ClientBase() {
             mongo::lastError.reset( new LastError() );
+            setGlobalEnvironment(new GlobalEnvironmentMongoD());
         }
         ~ClientBase() {
             //mongo::lastError.release();
@@ -272,7 +274,7 @@ namespace QueryTests {
     class GetMoreKillOp : public ClientBase {
     public:
         ~GetMoreKillOp() {
-            killCurrentOp.reset();
+            getGlobalEnvironment()->resetOperationKillState();
             client().dropCollection( "unittests.querytests.GetMoreKillOp" );
         }
         void run() {
@@ -295,13 +297,13 @@ namespace QueryTests {
             
             // Set the killop kill all flag, forcing the next get more to fail with a kill op
             // exception.
-            killCurrentOp.killAll();
+            getGlobalEnvironment()->killAllOperations();
             while( cursor->more() ) {
                 cursor->next();
             }
             
             // Revert the killop kill all flag.
-            killCurrentOp.reset();
+            getGlobalEnvironment()->resetOperationKillState();
 
             // Check that the cursor has been removed.
             {
@@ -324,7 +326,7 @@ namespace QueryTests {
     class GetMoreInvalidRequest : public ClientBase {
     public:
         ~GetMoreInvalidRequest() {
-            killCurrentOp.reset();
+            getGlobalEnvironment()->resetOperationKillState();
             client().dropCollection( "unittests.querytests.GetMoreInvalidRequest" );
         }
         void run() {

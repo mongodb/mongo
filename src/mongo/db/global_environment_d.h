@@ -40,6 +40,8 @@ namespace mongo {
 
         bool killOperation(AtomicUInt opId);
 
+        void resetOperationKillState();
+
         OperationContext* newOpCtx();
     };
 
