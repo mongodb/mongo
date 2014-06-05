@@ -275,6 +275,7 @@ Vv
 VxWorks
 WIREDTIGER
 WeakHashLen
+Werror
 Wformat
 WinNT
 WiredTiger
@@ -710,6 +711,7 @@ offpage
 oindex
 ok
 oldname
+ondisk
 onint
 onpage
 oo

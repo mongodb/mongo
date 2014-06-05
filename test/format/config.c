@@ -33,6 +33,7 @@ static void	   config_compression(void);
 static const char *config_file_type(u_int);
 static CONFIG	  *config_find(const char *, size_t);
 static int	   config_find_is_perm(const char *, size_t);
+static void	   config_isolation(void);
 static void	   config_map_checksum(const char *, u_int *);
 static void	   config_map_compression(const char *, u_int *);
 static void	   config_map_file_type(const char *, u_int *);
@@ -137,6 +138,7 @@ config_setup(void)
 
 	config_checksum();
 	config_compression();
+	config_isolation();
 
 	/* Clear operations values if the whole run is read-only. */
 	if (g.c_ops == 0)
@@ -285,6 +287,37 @@ config_compression(void)
 }
 
 /*
+ * config_isolation --
+ *	Isolation configuration.
+ */
+static void
+config_isolation(void)
+{
+	CONFIG *cp;
+	const char *cstr;
+
+	/*
+	 * Isolation: choose something if isolation wasn't specified.
+	 */
+	cp = config_find("isolation", strlen("isolation"));
+	if (!(cp->flags & C_PERM)) {
+		/* Avoid "maybe uninitialized" warnings. */
+		cstr = "isolation=snapshot";
+		switch (MMRAND(1, 3)) {
+		case 1:
+			cstr = "isolation=read-uncommitted";
+			break;
+		case 2:
+			cstr = "isolation=read-committed";
+			break;
+		case 3:
+			break;
+		}
+		config_single(cstr, 0);
+	}
+}
+
+/*
  * config_error --
  *	Display configuration information on error.
  */
@@ -386,6 +419,8 @@ config_clear(void)
 	}
 	free(g.uri);
 	g.uri = NULL;
+	free(g.session_config);
+	g.session_config = NULL;
 }
 
 /*
@@ -428,6 +463,11 @@ config_single(const char *s, int perm)
 		    s, "compression", strlen("compression")) == 0) {
 			config_map_compression(ep, &g.c_compression_flag);
 			*cp->vstr = strdup(ep);
+		} else if (strncmp(s, "isolation", strlen("isolation")) == 0) {
+			*cp->vstr = strdup(ep);
+			g.session_config =
+			    malloc(strlen("isolation=") + strlen(ep) + 1);
+			sprintf(g.session_config, "isolation=%s", ep);
 		} else if (strncmp(s, "file_type", strlen("file_type")) == 0) {
 			config_map_file_type(ep, &g.type);
 			*cp->vstr = strdup(config_file_type(g.type));

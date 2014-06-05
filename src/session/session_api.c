@@ -11,11 +11,11 @@ static int __session_checkpoint(WT_SESSION *, const char *);
 static int __session_rollback_transaction(WT_SESSION *, const char *);
 
 /*
- * __session_reset_cursors --
+ * __wt_session_reset_cursors --
  *	Reset all open cursors.
  */
-static int
-__session_reset_cursors(WT_SESSION_IMPL *session)
+int
+__wt_session_reset_cursors(WT_SESSION_IMPL *session)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
@@ -174,7 +174,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	if (F_ISSET(&session->txn, TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "transaction in progress");
 
-	WT_TRET(__session_reset_cursors(session));
+	WT_TRET(__wt_session_reset_cursors(session));
 
 	WT_ERR(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
 	if (cval.len != 0)
@@ -618,7 +618,7 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	if (F_ISSET(&session->txn, TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "Transaction already running");
 
-	WT_ERR(__session_reset_cursors(session));
+	WT_ERR(__wt_session_reset_cursors(session));
 
 	/*
 	 * Now there are no cursors open and no transaction active in this
@@ -654,7 +654,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 		ret = EINVAL;
 	}
 
-	WT_TRET(__session_reset_cursors(session));
+	WT_TRET(__wt_session_reset_cursors(session));
 
 	if (ret == 0)
 		ret = __wt_txn_commit(session, cfg);
@@ -679,7 +679,7 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, rollback_transaction, config, cfg);
 	WT_STAT_FAST_CONN_INCR(session, txn_rollback);
 
-	WT_TRET(__session_reset_cursors(session));
+	WT_TRET(__wt_session_reset_cursors(session));
 
 	WT_TRET(__wt_txn_rollback(session, cfg));
 
@@ -729,7 +729,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * the call to begin_transaction for the checkpoint, in case some
 	 * implementation of WT_CURSOR::reset needs the schema lock.
 	 */
-	WT_ERR(__session_reset_cursors(session));
+	WT_ERR(__wt_session_reset_cursors(session));
 
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_txn_checkpoint(session, cfg));

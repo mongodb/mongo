@@ -42,9 +42,9 @@ fail with the ::WT_DEADLOCK error.  If this error occurs, transactions
 should be rolled back with WT_SESSION::rollback_transaction and retried.
 
 The WT_SESSION::begin_transaction, WT_SESSION::commit_transaction and
-WT_SESSION::rollback_transaction methods all implicitly reset open
-cursors, as if WT_CURSOR::reset were called, discarding any position or
-key/value information they may have.
+WT_SESSION::rollback_transaction methods all implicitly reset all open
+cursors in the WT_SESSION, as if WT_CURSOR::reset were called, discarding
+any position or key/value information they may have.
 
 @snippet ex_all.c transaction commit/rollback
 
@@ -53,11 +53,15 @@ key/value information they may have.
 If a cursor is used when no explicit transaction is active in a session,
 reads are performed at the isolation level of the session, set with the
 \c isolation key to WT_CONNECTION::open_session, and successful updates
-are automatically committed before the update operation completes.
+are automatically committed before the update operation returns.
 
-Any operation that consists of multiple related updates should be
-enclosed in an explicit transaction to ensure that the updates are
-applied atomically.
+Any operation consisting of multiple related updates should be enclosed
+in an explicit transaction to ensure the updates are applied atomically.
+
+If an implicit transaction successfully commits, the open cursors in the
+WT_SESSION remain open and positioned.  If an implicit transaction fails,
+all open cursors in the WT_SESSION are reset, as if WT_CURSOR::reset were
+called, discarding any position or key/value information they may have.
 
 See @ref cursors_transactions for more information.
 

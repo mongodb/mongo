@@ -1345,6 +1345,7 @@ extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     int *),
     const char *cfg[],
     uint32_t open_flags);
+extern int __wt_session_reset_cursors(WT_SESSION_IMPL *session);
 extern int __wt_open_cursor(WT_SESSION_IMPL *session,
     const char *uri,
     WT_CURSOR *owner,

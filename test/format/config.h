@@ -167,6 +167,10 @@ static CONFIG c[] = {
 	  "maximum size of Btree internal nodes",
 	  0x0, 0x0, 9, 17, 27, &g.c_intl_page_max, NULL },
 
+	{ "isolation",
+	  "isolation level (read-uncommitted | read-committed | snapshot)",
+	  0x0, C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_isolation },
+
 	{ "key_gap",
 	  "gap between instantiated keys on a Btree page",
 	  0x0, 0x0, 0, 20, 20, &g.c_key_gap, NULL },

@@ -63,6 +63,14 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	argc -= util_optind;
 	argv += util_optind;
 
+	/* -j and -x are incompatible. */
+	if (hex && json) {
+		fprintf(stderr,
+		    "%s: the -j and -x dump options are incompatible\n",
+		    progname);
+		goto err;
+	}
+
 	/* The remaining argument is the uri. */
 	if (argc < 1 || (argc != 1 && !json))
 		return (usage());
@@ -686,9 +694,8 @@ static int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: \n"
-	    "  %s %s dump [-rx] [-c checkpoint] [-f output-file] uri\n"
-	    "  %s %s dump -j [-r] [-c checkpoint] [-f output-file] uri...\n",
-	    progname, usage_prefix, progname, usage_prefix);
+	    "usage: %s %s "
+	    "dump [-jrx] [-c checkpoint] [-f output-file] uri\n",
+	    progname, usage_prefix);
 	return (1);
 }
