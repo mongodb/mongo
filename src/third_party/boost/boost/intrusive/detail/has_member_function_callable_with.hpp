@@ -152,10 +152,16 @@
             struct BOOST_PP_CAT(BOOST_PP_CAT(has_member_function_callable_with_, BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_FUNCNAME),_impl)
                <Fun, true BOOST_PP_ENUM_TRAILING(BOOST_PP_SUB(BOOST_PP_ITERATION_FINISH(), BOOST_PP_ITERATION()), BOOST_INTRUSIVE_PP_IDENTITY, void)>
             {
-               template<class U>
-               static BOOST_PP_CAT(zeroarg_checker_, BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_FUNCNAME)<U>
-                  Test(BOOST_PP_CAT(zeroarg_checker_, BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_FUNCNAME)<U>*);
-
+#ifdef BOOST_MSVC
+                template<class U>
+                static decltype(boost::move_detail::declval<Fun>().BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_FUNCNAME()
+                    , boost_intrusive_has_member_function_callable_with::yes_type())
+                    Test(Fun*);
+#else
+                template<class U>
+                static BOOST_PP_CAT(zeroarg_checker_, BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_FUNCNAME)
+                    <U> Test(BOOST_PP_CAT(zeroarg_checker_, BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_FUNCNAME)<U>*);
+#endif
                template <class U> 
                static boost_intrusive_has_member_function_callable_with::no_type Test(...);
                
