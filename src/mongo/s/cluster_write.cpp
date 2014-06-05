@@ -378,7 +378,7 @@ namespace mongo {
             if ( request.isWriteConcernSet() && !validConfigWC( request.getWriteConcern() )) {
                 toBatchError( Status( ErrorCodes::InvalidOptions,
                                       mongoutils::str::stream() << "Invalid write concern for write"
-				              " to config servers: " << request.getWriteConcern() ),
+                                      " to config servers: " << request.getWriteConcern() ),
                               response );
                 return;
             }
@@ -432,7 +432,21 @@ namespace mongo {
                                      bool fsyncCheck ) {
 
         DBClientMultiCommand dispatcher;
-        ConfigCoordinator exec( &dispatcher, getConfigHosts() );
+        vector<ConnectionString> configHosts = getConfigHosts();
+
+        if (configHosts.size() > 1) {
+
+            // We can't support no-_id upserts to multiple config servers - the _ids will differ
+            if (BatchedCommandRequest::containsNoIDUpsert(request)) {
+                toBatchError(Status(ErrorCodes::InvalidOptions,
+                                    mongoutils::str::stream() << "upserts to multiple config servers must"
+                                    " include _id"),
+                             response);
+                return;
+            }
+        }
+
+        ConfigCoordinator exec( &dispatcher, configHosts );
         exec.executeBatch( request, response, fsyncCheck );
     }
 

@@ -77,6 +77,29 @@ assert.eq(1000, coll.count());
 
 //
 //
+// Config server upserts (against admin db, for example) require _id test
+var adminColl = admin.getCollection(coll.getName());
+
+//
+// Without _id
+adminColl.remove({});
+printjson( request = {update : adminColl.getName(),
+                      updates : [{ q : { a : 1 }, u : { a : 1 }, upsert : true }]});
+printjson( result = adminColl.runCommand(request) );
+assert(!result.ok);
+
+//
+// With _id
+adminColl.remove({});
+printjson( request = {update : adminColl.getName(),
+                      updates : [{ q : { _id : 1, a : 1 }, u : { a : 1 }, upsert : true }]});
+printjson( result = adminColl.runCommand(request) );
+assert(result.ok);
+assert.eq(1, result.n);
+assert.eq(1, adminColl.count());
+
+//
+//
 // Stale config progress tests
 // Set up a new collection across two shards, then revert the chunks to an earlier state to put
 // mongos and mongod permanently out of sync.
