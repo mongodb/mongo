@@ -415,10 +415,18 @@ namespace mongo {
             return Status::OK();
         }
 
-        // The hint can be $natural: 1.  If this happens, output a collscan.
-        if (!query.getParsed().getHint().isEmpty()) {
-            BSONElement natural = query.getParsed().getHint().getFieldDotted("$natural");
-            if (!natural.eoo()) {
+        // The hint or sort can be $natural: 1.  If this happens, output a collscan. If both
+        // a $natural hint and a $natural sort are specified, then the direction of the collscan
+        // is determined by the sign of the sort (not the sign of the hint).
+        if (!query.getParsed().getHint().isEmpty() || !query.getParsed().getSort().isEmpty()) {
+            BSONObj hintObj = query.getParsed().getHint();
+            BSONObj sortObj = query.getParsed().getSort();
+            BSONElement naturalHint = hintObj.getFieldDotted("$natural");
+            BSONElement naturalSort = sortObj.getFieldDotted("$natural");
+
+            // A hint overrides a $natural sort. This means that we don't force a table
+            // scan if there is a $natural sort with a non-$natural hint.
+            if (!naturalHint.eoo() || (!naturalSort.eoo() && hintObj.isEmpty())) {
                 QLOG() << "Forcing a table scan due to hinted $natural\n";
                 // min/max are incompatible with $natural.
                 if (canTableScan && query.getParsed().getMin().isEmpty()

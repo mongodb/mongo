@@ -69,18 +69,19 @@ namespace mongo {
         csn->tailable = tailable;
         csn->maxScan = query.getParsed().getMaxScan();
 
-        // If the sort is {$natural: +-1} this changes the direction of the collection scan.
-        const BSONObj& sortObj = query.getParsed().getSort();
-        if (!sortObj.isEmpty()) {
-            BSONElement natural = sortObj.getFieldDotted("$natural");
+        // If the hint is {$natural: +-1} this changes the direction of the collection scan.
+        if (!query.getParsed().getHint().isEmpty()) {
+            BSONElement natural = query.getParsed().getHint().getFieldDotted("$natural");
             if (!natural.eoo()) {
                 csn->direction = natural.numberInt() >= 0 ? 1 : -1;
             }
         }
 
-        // The hint can specify $natural as well.
-        if (!query.getParsed().getHint().isEmpty()) {
-            BSONElement natural = query.getParsed().getHint().getFieldDotted("$natural");
+        // The sort can specify $natural as well. The sort direction should override the hint
+        // direction if both are specified.
+        const BSONObj& sortObj = query.getParsed().getSort();
+        if (!sortObj.isEmpty()) {
+            BSONElement natural = sortObj.getFieldDotted("$natural");
             if (!natural.eoo()) {
                 csn->direction = natural.numberInt() >= 0 ? 1 : -1;
             }

@@ -2587,6 +2587,84 @@ namespace {
                                 "{cscan: {filter: {a: 1}, dir: 1}}}}");
     }
 
+    // Test $natural sort and its interaction with $natural hint.
+    TEST_F(QueryPlannerTest, NaturalSortAndHint) {
+        addIndex(BSON("x" << 1));
+
+        // Non-empty query, -1 sort, no hint.
+        runQuerySortHint(fromjson("{x: {$exists: true}}"), BSON("$natural" << -1), BSONObj());
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: -1}}");
+
+        // Non-empty query, 1 sort, no hint.
+        runQuerySortHint(fromjson("{x: {$exists: true}}"), BSON("$natural" << 1), BSONObj());
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+
+        // Non-empty query, -1 sort, -1 hint.
+        runQuerySortHint(fromjson("{x: {$exists: true}}"), BSON("$natural" << -1),
+                                                           BSON("$natural" << -1));
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: -1}}");
+
+        // Non-empty query, 1 sort, -1 hint.
+        runQuerySortHint(fromjson("{x: {$exists: true}}"), BSON("$natural" << 1),
+                                                           BSON("$natural" << -1));
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+
+        // Non-empty query, -1 sort, 1 hint.
+        runQuerySortHint(fromjson("{x: {$exists: true}}"), BSON("$natural" << -1),
+                                                           BSON("$natural" << 1));
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: -1}}");
+
+        // Non-empty query, 1 sort, 1 hint.
+        runQuerySortHint(fromjson("{x: {$exists: true}}"), BSON("$natural" << 1),
+                                                           BSON("$natural" << 1));
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+
+        // Empty query, -1 sort, no hint.
+        runQuerySortHint(BSONObj(), BSON("$natural" << -1), BSONObj());
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: -1}}");
+
+        // Empty query, 1 sort, no hint.
+        runQuerySortHint(BSONObj(), BSON("$natural" << 1), BSONObj());
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+
+        // Empty query, -1 sort, -1 hint.
+        runQuerySortHint(BSONObj(), BSON("$natural" << -1), BSON("$natural" << -1));
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: -1}}");
+
+        // Empty query, 1 sort, -1 hint.
+        runQuerySortHint(BSONObj(), BSON("$natural" << 1), BSON("$natural" << -1));
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+
+        // Empty query, -1 sort, 1 hint.
+        runQuerySortHint(BSONObj(), BSON("$natural" << -1), BSON("$natural" << 1));
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: -1}}");
+
+        // Empty query, 1 sort, 1 hint.
+        runQuerySortHint(BSONObj(), BSON("$natural" << 1), BSON("$natural" << 1));
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    TEST_F(QueryPlannerTest, HintOverridesNaturalSort) {
+        addIndex(BSON("x" << 1));
+        runQuerySortHint(fromjson("{x: {$exists: true}}"), BSON("$natural" << -1), BSON("x" << 1));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {x:{$exists:true}}, node: "
+                                "{ixscan: {filter: null, pattern: {x: 1}}}}}");
+    }
+
     TEST_F(QueryPlannerTest, HintValid) {
         addIndex(BSON("a" << 1));
         runQueryHint(BSONObj(), fromjson("{a: 1}"));
