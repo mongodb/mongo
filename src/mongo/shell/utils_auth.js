@@ -72,7 +72,7 @@ var authutil;
         authutil.assertAuthenticate(conn, 'local', {
             user: '__system',
             mechanism: 'MONGODB-CR',
-            pwd: cat(keyfile).replace(/[ \n]/g, '')
+            pwd: cat(keyfile).replace(/[\011-\015\040]/g, '')
         });
 
         try {
