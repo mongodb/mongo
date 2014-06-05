@@ -30,6 +30,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/query/find_constants.h"
@@ -117,7 +118,7 @@ namespace mongo {
         uassert(16028, "collection or index disappeared when cursor yielded",
                 state != Runner::RUNNER_DEAD);
 
-        uassert(17285, "cursor encountered an error",
+        uassert(17285, "cursor encountered an error: " + WorkingSetCommon::toStatusString(obj),
                 state != Runner::RUNNER_ERROR);
 
         massert(17286, str::stream() << "Unexpected return from Runner::getNext: " << state,
