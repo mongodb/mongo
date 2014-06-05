@@ -174,8 +174,11 @@ namespace mongo {
          * canonical to get all would be
          * getIterator( DiskLoc(), false, CollectionScanParams::FORWARD )
          */
-        virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
-                                             const CollectionScanParams::Direction& dir) const = 0;
+        virtual RecordIterator* getIterator( const DiskLoc& start = DiskLoc(),
+                                             bool tailable = false,
+                                             const CollectionScanParams::Direction& dir =
+                                             CollectionScanParams::FORWARD
+                                             ) const = 0;
 
         /**
          * Constructs an iterator over a potentially corrupted store, which can be used to salvage

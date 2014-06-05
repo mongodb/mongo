@@ -92,9 +92,12 @@ namespace mongo {
         virtual void updateTTLSetting( OperationContext* txn,
                                        const StringData& idxName,
                                        long long newExpireSeconds );
-    private:
+
+        // not part of interface, but available to my storage engine
+
         int _findIndexNumber( const StringData& indexName) const;
 
+    private:
         NamespaceDetails* _details;
         RecordStore* _indexRecordStore;
         MMAP1DatabaseCatalogEntry* _db;

@@ -37,6 +37,7 @@
 
 namespace mongo {
 
+    class BSONObjBuilder;
     class OperationContext;
 
     class DatabaseCatalogEntry {
@@ -49,9 +50,15 @@ namespace mongo {
 
         const std::string& name() const { return _name; }
 
+        virtual bool isEmpty() const = 0;
+
+        virtual void appendExtraStats( BSONObjBuilder* out, double scale ) const = 0;
+
         // ----
 
         virtual void getCollectionNamespaces( std::list<std::string>* out ) const = 0;
+
+        virtual Status dropCollection( OperationContext* txn, const StringData& ns ) = 0;
 
     private:
         std::string _name;

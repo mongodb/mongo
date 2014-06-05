@@ -672,7 +672,7 @@ namespace mongo {
                 
                 {
                     Client::ReadContext rc(txn, *i + ".system.namespaces");
-                    b.appendBool( "empty", rc.ctx().db()->isEmpty() );
+                    b.appendBool( "empty", rc.ctx().db()->getDatabaseCatalogEntry()->isEmpty() );
                 }
                 
                 dbInfos.push_back( b.obj() );
@@ -700,7 +700,7 @@ namespace mongo {
 
                 {
                     Client::ReadContext ctx(txn, name);
-                    b.appendBool( "empty", ctx.ctx().db()->isEmpty() );
+                    b.appendBool( "empty", ctx.ctx().db()->getDatabaseCatalogEntry()->isEmpty() );
                 }
 
                 dbInfos.push_back( b.obj() );

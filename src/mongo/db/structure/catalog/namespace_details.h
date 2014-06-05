@@ -154,7 +154,7 @@ namespace mongo {
                            int nindexessofar );
 
         void copyingFrom( OperationContext* txn,
-                          const char* thisns,
+                          const StringData& thisns,
                           NamespaceIndex& ni,
                           NamespaceDetails *src); // must be called when renaming a NS to fix up extra
 

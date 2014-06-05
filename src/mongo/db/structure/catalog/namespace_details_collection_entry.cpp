@@ -180,12 +180,27 @@ namespace mongo {
     Status NamespaceDetailsCollectionCatalogEntry::removeIndex( OperationContext* txn,
                                                                 const StringData& indexName ) {
         int idxNo = _findIndexNumber( indexName );
-        invariant( idxNo >= 0 );
+        if ( idxNo < 0 )
+            return Status( ErrorCodes::NamespaceNotFound, "index not found to remove" );
 
         DiskLoc infoLocation = _details->idx( idxNo ).info;
 
-        // all info in the .ns file
-        {
+        { // sanity check
+            Record* record = _indexRecordStore->recordFor( infoLocation );
+            invariant( record );
+            BSONObj info( record->data() );
+            invariant( info["name"].String() == indexName );
+        }
+
+        { // drop the namespace
+            string indexNamespace = IndexDescriptor::makeIndexNamespace( ns().ns(), indexName );
+            Status status = _db->dropCollection( txn, indexNamespace );
+            if ( !status.isOK() ) {
+                return status;
+            }
+        }
+
+        { // all info in the .ns file
             NamespaceDetails* d = _details->writingWithExtra( txn );
 
             // fix the _multiKeyIndexBits, by moving all bits above me down one
@@ -203,14 +218,6 @@ namespace mongo {
         }
 
         // remove from system.indexes
-
-        { // sanity check
-            Record* record = _indexRecordStore->recordFor( infoLocation );
-            invariant( record );
-            BSONObj info( record->data() );
-            invariant( info["name"].String() == indexName );
-        }
-
         _indexRecordStore->deleteRecord( txn, infoLocation );
 
         return Status::OK();
@@ -235,7 +242,7 @@ namespace mongo {
         catch( DBException& ) {
             _details->allocExtra(txn,
                                  ns().ns(),
-                                 _db->namespaceIndex(),
+                                 _db->_namespaceIndex,
                                  getTotalIndexCount());
             id = &_details->idx(getTotalIndexCount(), false);
         }
@@ -246,7 +253,7 @@ namespace mongo {
         txn->recoveryUnit()->writingInt( _details->indexBuildsInProgress ) += 1;
 
         // 3) indexes entry in .ns file
-        NamespaceIndex& nsi = _db->namespaceIndex();
+        NamespaceIndex& nsi = _db->_namespaceIndex;
         invariant( nsi.details( desc->indexNamespace() ) == NULL );
         nsi.add_ns( txn, desc->indexNamespace(), DiskLoc(), false );
 

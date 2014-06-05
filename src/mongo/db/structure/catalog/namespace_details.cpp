@@ -180,7 +180,7 @@ namespace mongo {
 
     // must be called when renaming a NS to fix up extra
     void NamespaceDetails::copyingFrom( OperationContext* txn,
-                                        const char* thisns,
+                                        const StringData& thisns,
                                         NamespaceIndex& ni,
                                         NamespaceDetails* src) {
         _extraOffset = 0; // we are a copy -- the old value is wrong.  fixing it up below.

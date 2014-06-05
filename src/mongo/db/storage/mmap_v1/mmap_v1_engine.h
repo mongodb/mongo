@@ -56,12 +56,24 @@ namespace mongo {
 
         virtual ~MMAP1DatabaseCatalogEntry();
 
+        // these two seem the same and yet different
+        // TODO(ERH): consolidate into one ideally
         bool exists() const { return _namespaceIndex.pathExists(); }
+        bool isEmpty() const { return !_namespaceIndex.allocated(); }
+
+        virtual void appendExtraStats( BSONObjBuilder* out, double scale ) const;
 
         Status createCollection( OperationContext* txn,
                                  const StringData& ns,
                                  const CollectionOptions& options,
                                  bool allocateDefaultSpace );
+
+        Status dropCollection( OperationContext* txn, const StringData& ns );
+
+        Status renameCollection( OperationContext* txn,
+                                 const StringData& fromNS,
+                                 const StringData& toNS,
+                                 bool stayTemp );
 
         void getCollectionNamespaces( std::list<std::string>* tofill ) const;
 
@@ -72,20 +84,17 @@ namespace mongo {
         CollectionCatalogEntry* getCollectionCatalogEntry( OperationContext* txn,
                                                            const StringData& ns );
 
-        // ownership passes to caller
+        // TODO(ERH): ownership passes to caller (i think this is wrong)
         RecordStore* getRecordStore( OperationContext* txn,
                                      const StringData& ns );
 
-        // ownership passes to caller
+        // TODO(ERH): ownership passes to caller (i think this is wrong)
         IndexAccessMethod* getIndex( OperationContext* txn,
                                      const CollectionCatalogEntry* collection,
                                      IndexCatalogEntry* index );
 
         const MmapV1ExtentManager* getExtentManager() const { return &_extentManager; } // TODO(ERH): remove
         MmapV1ExtentManager* getExtentManager() { return &_extentManager; } // TODO(ERH): remove
-
-        const NamespaceIndex& namespaceIndex() const { return _namespaceIndex; } // TODO(ERH): remove
-        NamespaceIndex& namespaceIndex() { return _namespaceIndex; } // TODO(ERH): remove
 
     private:
 
@@ -99,6 +108,15 @@ namespace mongo {
         void _addNamespaceToNamespaceCollection( OperationContext* txn,
                                                  const StringData& ns,
                                                  const BSONObj* options );
+
+        void _removeNamespaceFromNamespaceCollection( OperationContext* txn,
+                                                      const StringData& ns );
+
+        Status _renameSingleNamespace( OperationContext* txn,
+                                       const StringData& fromNS,
+                                       const StringData& toNS,
+                                       bool stayTemp );
+
         /**
          * @throws DatabaseDifferCaseCode if the name is a duplicate based on
          * case insensitive matching.

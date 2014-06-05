@@ -56,7 +56,6 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/catalog/collection.h"
 
 namespace mongo {
@@ -203,10 +202,6 @@ namespace mongo {
         }
     }
 
-    long long Database::fileSize() const { return getExtentManager()->fileSize(); }
-
-    int Database::numFiles() const { return getExtentManager()->numFiles(); }
-
     void Database::flushFiles( bool sync ) { return getExtentManager()->flushFiles( sync ); }
 
     bool Database::setProfilingLevel( OperationContext* txn, int newLevel , string& errmsg ) {
@@ -263,7 +258,7 @@ namespace mongo {
     }
 
     void Database::getStats( OperationContext* opCtx, BSONObjBuilder* output, double scale ) {
-        bool empty = isEmpty() || getExtentManager()->numFiles() == 0;
+        bool empty = _dbEntry->isEmpty() || getExtentManager()->numFiles() == 0;
 
         list<string> collections;
         if ( !empty )
@@ -305,13 +300,7 @@ namespace mongo {
         output->appendNumber( "numExtents" , numExtents );
         output->appendNumber( "indexes" , indexes );
         output->appendNumber( "indexSize" , indexSize / scale );
-        if ( !empty ) {
-            output->appendNumber( "fileSize" , fileSize() / scale );
-            output->appendNumber( "nsSizeMB", (int)_dbEntry->namespaceIndex().fileLength() / 1024 / 1024 );
-        }
-        else {
-            output->appendNumber( "fileSize" , 0 );
-        }
+        _dbEntry->appendExtraStats( output, scale );
 
         BSONObjBuilder dataFileVersion( output->subobjStart( "dataFileVersion" ) );
         if ( !empty ) {
@@ -387,7 +376,7 @@ namespace mongo {
 
         Top::global.collectionDropped( fullns );
 
-        Status s = _dropNS( txn, fullns );
+        Status s = _dbEntry->dropCollection( txn, fullns );
 
         _clearCollectionCache( fullns ); // we want to do this always
 
@@ -434,21 +423,8 @@ namespace mongo {
         scoped_lock lk( _collectionLock );
 
         CollectionMap::const_iterator it = _collections.find( ns );
-        if ( it != _collections.end() ) {
-            if ( it->second ) {
-                DEV {
-                    /* XXX put back?
-                    NamespaceDetails* details = _dbEntry->namespaceIndex().details( ns );
-                    if ( details != it->second->_details ) {
-                        log() << "about to crash for mismatch on ns: " << ns
-                              << " current: " << (void*)details
-                              << " cached: " << (void*)it->second->_details;
-                    }
-                    verify( details == it->second->_details );
-                    */
-                }
-                return it->second;
-            }
+        if ( it != _collections.end() && it->second ) {
+            return it->second;
         }
 
         auto_ptr<CollectionCatalogEntry> catalogEntry( _dbEntry->getCollectionCatalogEntry( txn, ns ) );
@@ -470,154 +446,30 @@ namespace mongo {
                                        const StringData& toNS,
                                        bool stayTemp ) {
 
-        // move data namespace
-        Status s = _renameSingleNamespace( txn, fromNS, toNS, stayTemp );
-        if ( !s.isOK() )
-            return s;
-
-        NamespaceDetails* details = _dbEntry->namespaceIndex().details( toNS );
-        verify( details );
-
         audit::logRenameCollection( currentClient.get(), fromNS, toNS );
 
-        Collection* systemIndexCollection = getCollection(txn, _indexesName);
-
-        // move index namespaces
-        BSONObj oldIndexSpec;
-        while (Helpers::findOne(txn, systemIndexCollection, BSON("ns" << fromNS), oldIndexSpec)) {
-            oldIndexSpec = oldIndexSpec.getOwned();
-
-            BSONObj newIndexSpec;
-            {
-                BSONObjBuilder b;
-                BSONObjIterator i( oldIndexSpec );
-                while( i.more() ) {
-                    BSONElement e = i.next();
-                    if ( strcmp( e.fieldName(), "ns" ) != 0 )
-                        b.append( e );
-                    else
-                        b << "ns" << toNS;
-                }
-                newIndexSpec = b.obj();
-            }
-
-            StatusWith<DiskLoc> newIndexSpecLoc =
-                systemIndexCollection->insertDocument( txn, newIndexSpec, false );
-            if ( !newIndexSpecLoc.isOK() )
-                return newIndexSpecLoc.getStatus();
-
-            const string& indexName = oldIndexSpec.getStringField( "name" );
-
-            {
-                // fix IndexDetails pointer
-                int indexI = details->_catalogFindIndexByName(
-                                        systemIndexCollection, indexName, false);
-
-                IndexDetails& indexDetails = details->idx(indexI);
-                *txn->recoveryUnit()->writing(&indexDetails.info) = newIndexSpecLoc.getValue(); // XXX: dur
+        { // remove anything cached
+            Collection* coll = getCollection( txn, fromNS );
+            if ( !coll )
+                return Status( ErrorCodes::NamespaceNotFound, "collection not found to rename" );
+            IndexCatalog::IndexIterator ii = coll->getIndexCatalog()->getIndexIterator( true );
+            while ( ii.more() ) {
+                IndexDescriptor* desc = ii.next();
+                _clearCollectionCache( desc->indexNamespace() );
             }
 
             {
-                // move underlying namespac
-                string oldIndexNs = IndexDescriptor::makeIndexNamespace( fromNS, indexName );
-                string newIndexNs = IndexDescriptor::makeIndexNamespace( toNS, indexName );
-
-                Status s = _renameSingleNamespace( txn, oldIndexNs, newIndexNs, false );
-                if ( !s.isOK() )
-                    return s;
+                scoped_lock lk( _collectionLock );
+                _clearCollectionCache_inlock( fromNS );
+                _clearCollectionCache_inlock( toNS );
             }
 
-            deleteObjects(txn, this, _indexesName, oldIndexSpec, true, false, true);
+            Top::global.collectionDropped( fromNS.toString() );
         }
 
-        Top::global.collectionDropped( fromNS.toString() );
-
-        return Status::OK();
+        return _dbEntry->renameCollection( txn, fromNS, toNS, stayTemp );
     }
 
-    Status Database::_renameSingleNamespace( OperationContext* txn,
-                                             const StringData& fromNS,
-                                             const StringData& toNS,
-                                             bool stayTemp ) {
-        // TODO: make it so we dont't need to do this
-        string fromNSString = fromNS.toString();
-        string toNSString = toNS.toString();
-
-        // some sanity checking
-        NamespaceDetails* fromDetails = _dbEntry->namespaceIndex().details( fromNS );
-        if ( !fromDetails )
-            return Status( ErrorCodes::BadValue, "from namespace doesn't exist" );
-
-        if ( _dbEntry->namespaceIndex().details( toNS ) )
-            return Status( ErrorCodes::BadValue, "to namespace already exists" );
-
-        // remove anything cached
-        {
-            scoped_lock lk( _collectionLock );
-            _clearCollectionCache_inlock( fromNSString );
-            _clearCollectionCache_inlock( toNSString );
-        }
-
-        // at this point, we haven't done anything destructive yet
-
-        // ----
-        // actually start moving
-        // ----
-
-        // this could throw, but if it does we're ok
-        _dbEntry->namespaceIndex().add_ns( txn, toNS, fromDetails );
-        NamespaceDetails* toDetails = _dbEntry->namespaceIndex().details( toNS );
-
-        try {
-            toDetails->copyingFrom(txn,
-                                   toNSString.c_str(),
-                                   _dbEntry->namespaceIndex(),
-                                   fromDetails); // fixes extraOffset
-        }
-        catch( DBException& ) {
-            // could end up here if .ns is full - if so try to clean up / roll back a little
-            _dbEntry->namespaceIndex().kill_ns( txn, toNSString );
-            _clearCollectionCache(toNSString);
-            throw;
-        }
-
-        // at this point, code .ns stuff moved
-
-        _dbEntry->namespaceIndex().kill_ns( txn, fromNSString );
-        _clearCollectionCache(fromNSString);
-        fromDetails = NULL;
-
-        // fix system.namespaces
-        BSONObj newSpec;
-        {
-
-            BSONObj oldSpec;
-            if ( !Helpers::findOne( txn, getCollection( txn, _namespacesName ),
-                                    BSON( "name" << fromNS ),
-                                    oldSpec ) )
-                return Status( ErrorCodes::InternalError, "can't find system.namespaces entry" );
-
-            BSONObjBuilder b;
-            BSONObjIterator i( oldSpec.getObjectField( "options" ) );
-            while( i.more() ) {
-                BSONElement e = i.next();
-                if ( strcmp( e.fieldName(), "create" ) != 0 ) {
-                    if (stayTemp || (strcmp(e.fieldName(), "temp") != 0))
-                        b.append( e );
-                }
-                else {
-                    b << "create" << toNS;
-                }
-            }
-            newSpec = b.obj();
-        }
-
-        _addNamespaceToCatalog( txn, toNSString, newSpec.isEmpty() ? 0 : &newSpec );
-
-        deleteObjects(txn, this, _namespacesName, BSON("name" << fromNS), false, false, true);
-
-        return Status::OK();
-    }
 
     Collection* Database::getOrCreateCollection(OperationContext* txn, const StringData& ns) {
         Collection* c = getCollection( txn, ns );
@@ -702,34 +554,6 @@ namespace mongo {
         uassertStatusOK( loc.getStatus() );
     }
 
-    Status Database::_dropNS( OperationContext* txn, const StringData& ns ) {
-
-        NamespaceDetails* d = _dbEntry->namespaceIndex().details( ns );
-        if ( !d )
-            return Status( ErrorCodes::NamespaceNotFound,
-                           str::stream() << "ns not found: " << ns );
-
-        BackgroundOperation::assertNoBgOpInProgForNs( ns );
-
-        {
-            // remove from the system catalog
-            BSONObj cond = BSON( "name" << ns );   // { name: "colltodropname" }
-            deleteObjects(txn, this, _namespacesName, cond, false, false, true);
-        }
-
-        // free extents
-        if( !d->firstExtent.isNull() ) {
-            getExtentManager()->freeExtents(txn, d->firstExtent, d->lastExtent);
-            *txn->recoveryUnit()->writing( &d->firstExtent ) = DiskLoc().setInvalid();
-            *txn->recoveryUnit()->writing( &d->lastExtent ) = DiskLoc().setInvalid();
-        }
-
-        // remove from the catalog hashtable
-        _dbEntry->namespaceIndex().kill_ns( txn, ns );
-
-        return Status::OK();
-    }
-
     void Database::getFileFormat( OperationContext* txn, int* major, int* minor ) {
         if ( getExtentManager()->numFiles() == 0 ) {
             *major = 0;
@@ -747,10 +571,6 @@ namespace mongo {
 
     const MmapV1ExtentManager* Database::getExtentManager() const {
         return _dbEntry->getExtentManager();
-    }
-
-    bool Database::isEmpty() const {
-        return !_dbEntry->namespaceIndex().allocated();
     }
 
     const DatabaseCatalogEntry* Database::getDatabaseCatalogEntry() const {

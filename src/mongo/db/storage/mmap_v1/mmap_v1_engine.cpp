@@ -105,6 +105,201 @@ namespace mongo {
     MMAP1DatabaseCatalogEntry::~MMAP1DatabaseCatalogEntry() {
     }
 
+    Status MMAP1DatabaseCatalogEntry::dropCollection( OperationContext* txn, const StringData& ns ) {
+        invariant( txn->lockState()->isWriteLocked( ns ) );
+
+        NamespaceDetails* details = _namespaceIndex.details( ns );
+
+        if ( !details ) {
+            return Status( ErrorCodes::NamespaceNotFound, str::stream() << "ns not found: " << ns );
+        }
+
+        invariant( details->nIndexes == 0 ); // TODO: delete instead?
+        invariant( details->indexBuildsInProgress == 0 ); // TODO: delete instead?
+
+        _removeNamespaceFromNamespaceCollection( txn, ns );
+
+        // free extents
+        if( !details->firstExtent.isNull() ) {
+            _extentManager.freeExtents(txn, details->firstExtent, details->lastExtent);
+            *txn->recoveryUnit()->writing( &details->firstExtent ) = DiskLoc().setInvalid();
+            *txn->recoveryUnit()->writing( &details->lastExtent ) = DiskLoc().setInvalid();
+        }
+
+        // remove from the catalog hashtable
+        _namespaceIndex.kill_ns( txn, ns );
+
+        return Status::OK();
+    }
+
+
+    Status MMAP1DatabaseCatalogEntry::renameCollection( OperationContext* txn,
+                                                        const StringData& fromNS,
+                                                        const StringData& toNS,
+                                                        bool stayTemp ) {
+        Status s = _renameSingleNamespace( txn, fromNS, toNS, stayTemp );
+        if ( !s.isOK() )
+            return s;
+
+        NamespaceDetails* details = _namespaceIndex.details( toNS );
+        invariant( details );
+
+        RecordStoreV1Base* systemIndexRecordStore = _getIndexRecordStore( txn );
+        scoped_ptr<RecordIterator> it( systemIndexRecordStore->getIterator() );
+
+        while ( !it->isEOF() ) {
+            DiskLoc loc = it->getNext();
+            const Record* rec = it->recordFor( loc );
+            BSONObj oldIndexSpec( rec->data() );
+            if ( fromNS != oldIndexSpec["ns"].valuestrsafe() )
+                continue;
+
+            BSONObj newIndexSpec;
+            {
+                BSONObjBuilder b;
+                BSONObjIterator i( oldIndexSpec );
+                while( i.more() ) {
+                    BSONElement e = i.next();
+                    if ( strcmp( e.fieldName(), "ns" ) != 0 )
+                        b.append( e );
+                    else
+                        b << "ns" << toNS;
+                }
+                newIndexSpec = b.obj();
+            }
+
+            StatusWith<DiskLoc> newIndexSpecLoc =
+                systemIndexRecordStore->insertRecord( txn,
+                                                      newIndexSpec.objdata(),
+                                                      newIndexSpec.objsize(),
+                                                      -1 );
+            if ( !newIndexSpecLoc.isOK() )
+                return newIndexSpecLoc.getStatus();
+
+            const string& indexName = oldIndexSpec.getStringField( "name" );
+
+            {
+                // fix IndexDetails pointer
+                NamespaceDetailsCollectionCatalogEntry ce( toNS, details,
+                                                           _getIndexRecordStore( txn ), this );
+                int indexI = ce._findIndexNumber( indexName );
+
+                IndexDetails& indexDetails = details->idx(indexI);
+                *txn->recoveryUnit()->writing(&indexDetails.info) = newIndexSpecLoc.getValue(); // XXX: dur
+            }
+
+            {
+                // move underlying namespac
+                string oldIndexNs = IndexDescriptor::makeIndexNamespace( fromNS, indexName );
+                string newIndexNs = IndexDescriptor::makeIndexNamespace( toNS, indexName );
+
+                Status s = _renameSingleNamespace( txn, oldIndexNs, newIndexNs, false );
+                if ( !s.isOK() )
+                    return s;
+            }
+
+            systemIndexRecordStore->deleteRecord( txn, loc );
+        }
+
+        return Status::OK();
+    }
+
+    Status MMAP1DatabaseCatalogEntry::_renameSingleNamespace( OperationContext* txn,
+                                                              const StringData& fromNS,
+                                                              const StringData& toNS,
+                                                              bool stayTemp ) {
+        // some sanity checking
+        NamespaceDetails* fromDetails = _namespaceIndex.details( fromNS );
+        if ( !fromDetails )
+            return Status( ErrorCodes::BadValue, "from namespace doesn't exist" );
+
+        if ( _namespaceIndex.details( toNS ) )
+            return Status( ErrorCodes::BadValue, "to namespace already exists" );
+
+        // at this point, we haven't done anything destructive yet
+
+        // ----
+        // actually start moving
+        // ----
+
+        // this could throw, but if it does we're ok
+        _namespaceIndex.add_ns( txn, toNS, fromDetails );
+        NamespaceDetails* toDetails = _namespaceIndex.details( toNS );
+
+        try {
+            toDetails->copyingFrom(txn,
+                                   toNS,
+                                   _namespaceIndex,
+                                   fromDetails); // fixes extraOffset
+        }
+        catch( DBException& ) {
+            // could end up here if .ns is full - if so try to clean up / roll back a little
+            _namespaceIndex.kill_ns( txn, toNS );
+            throw;
+        }
+
+        // at this point, code .ns stuff moved
+
+        _namespaceIndex.kill_ns( txn, fromNS );
+        fromDetails = NULL;
+
+        // fix system.namespaces
+        BSONObj newSpec;
+        DiskLoc oldSpecLocation;
+        {
+
+            BSONObj oldSpec;
+            {
+                RecordStoreV1Base* rs = _getNamespaceRecordStore( txn, fromNS );
+                scoped_ptr<RecordIterator> it( rs->getIterator() );
+                while ( !it->isEOF() ) {
+                    DiskLoc loc = it->getNext();
+                    const Record* rec = it->recordFor( loc );
+                    BSONObj entry( rec->data() );
+                    if ( fromNS == entry["name"].String() ) {
+                        oldSpecLocation = loc;
+                        oldSpec = entry.getOwned();
+                        break;
+                    }
+                }
+            }
+            invariant( !oldSpec.isEmpty() );
+            invariant( !oldSpecLocation.isNull() );
+
+            BSONObjBuilder b;
+            BSONObjIterator i( oldSpec.getObjectField( "options" ) );
+            while( i.more() ) {
+                BSONElement e = i.next();
+                if ( strcmp( e.fieldName(), "create" ) != 0 ) {
+                    if (stayTemp || (strcmp(e.fieldName(), "temp") != 0))
+                        b.append( e );
+                }
+                else {
+                    b << "create" << toNS;
+                }
+            }
+            newSpec = b.obj();
+        }
+
+        _addNamespaceToNamespaceCollection( txn, toNS, newSpec.isEmpty() ? 0 : &newSpec );
+
+        _getNamespaceRecordStore( txn, fromNS )->deleteRecord( txn, oldSpecLocation );
+
+        return Status::OK();
+    }
+
+    void MMAP1DatabaseCatalogEntry::appendExtraStats( BSONObjBuilder* output, double scale ) const {
+        if ( isEmpty() ) {
+            output->appendNumber( "fileSize", 0 );
+        }
+        else {
+            output->appendNumber( "fileSize", _extentManager.fileSize() / scale );
+            output->appendNumber( "nsSizeMB", static_cast<int>( _namespaceIndex.fileLength() /
+                                                                ( 1024 * 1024 ) ) );
+        }
+
+    }
+
     void MMAP1DatabaseCatalogEntry::getCollectionNamespaces( std::list<std::string>* tofill ) const {
         _namespaceIndex.getCollectionNamespaces( tofill );
     }
@@ -336,4 +531,26 @@ namespace mongo {
         massertStatusOK( loc.getStatus() );
     }
 
+    void MMAP1DatabaseCatalogEntry::_removeNamespaceFromNamespaceCollection( OperationContext* txn,
+                                                                             const StringData& ns ) {
+        if ( nsToCollectionSubstring( ns ) == "system.namespaces" ) {
+            // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
+            return;
+        }
+
+        RecordStoreV1Base* rs = _getNamespaceRecordStore( txn, ns );
+        invariant( rs );
+
+        scoped_ptr<RecordIterator> it( rs->getIterator() );
+        while ( !it->isEOF() ) {
+            DiskLoc loc = it->getNext();
+            const Record* rec = it->recordFor( loc );
+            BSONObj entry( rec->data() );
+            BSONElement name = entry["name"];
+            if ( name.type() == String && name.String() == ns ) {
+                rs->deleteRecord( txn, loc );
+                break;
+            }
+        }
+    }
 }

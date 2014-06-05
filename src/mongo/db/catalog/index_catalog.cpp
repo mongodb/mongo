@@ -813,19 +813,14 @@ namespace mongo {
     void IndexCatalog::_deleteIndexFromDisk( OperationContext* txn,
                                              const string& indexName,
                                              const string& indexNamespace ) {
-        // data + system.namespacesa
-        Status status = _collection->_database->_dropNS( txn, indexNamespace );
+        Status status = _collection->getCatalogEntry()->removeIndex( txn, indexName );
         if ( status.code() == ErrorCodes::NamespaceNotFound ) {
             // this is ok, as we may be partially through index creation
         }
         else if ( !status.isOK() ) {
-            warning() << "couldn't drop extents for " << indexNamespace << " " << status.toString();
-        }
-
-        status = _collection->getCatalogEntry()->removeIndex( txn, indexName );
-        if ( !status.isOK() ) {
-            warning() << "couldn't remove index from catalog " << indexNamespace
-                      << " " << status.toString();
+            warning() << "couldn't drop index " << indexName
+                      << " on collection: " << _collection->ns()
+                      << " because of " << status.toString();
         }
     }
 

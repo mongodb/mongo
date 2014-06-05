@@ -43,6 +43,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
@@ -632,7 +633,7 @@ namespace repl {
         Client::Context ctx(ns, storageGlobalParams.dbpath, false);
         ctx.getClient()->curop()->reset();
 
-        bool empty = ctx.db()->isEmpty();
+        bool empty = ctx.db()->getDatabaseCatalogEntry()->isEmpty();
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
 
         LOG(6) << "ns: " << ns << ", justCreated: " << ctx.justCreated() << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;

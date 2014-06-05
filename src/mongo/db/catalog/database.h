@@ -48,7 +48,6 @@ namespace mongo {
     class MMAP1DatabaseCatalogEntry;
     class MmapV1ExtentManager;
     class NamespaceDetails;
-    class NamespaceIndex;
     class OperationContext;
 
     /**
@@ -73,15 +72,6 @@ namespace mongo {
         const std::string& path() const { return _path; }
 
         void clearTmpCollections(OperationContext* txn);
-
-        bool isEmpty() const;
-
-        /**
-         * total file size of Database in bytes
-         */
-        long long fileSize() const;
-
-        int numFiles() const;
 
         void getFileFormat( OperationContext* txn, int* major, int* minor );
 
@@ -163,23 +153,10 @@ namespace mongo {
 
         ~Database(); // closes files and other cleanup see below.
 
+        // TODO(ERH) remove XXX
         void _addNamespaceToCatalog( OperationContext* txn,
                                      const StringData& ns,
                                      const BSONObj* options );
-
-
-        /**
-         * removes from *.system.namespaces
-         * frees extents
-         * removes from NamespaceIndex
-         * NOT RIGHT NOW, removes cache entry in Database TODO?
-         */
-        Status _dropNS( OperationContext* txn, const StringData& ns );
-
-        Status _renameSingleNamespace( OperationContext* txn,
-                                       const StringData& fromNS,
-                                       const StringData& toNS,
-                                       bool stayTemp );
 
         const std::string _name; // "alleyinsider"
         const std::string _path; // "/data/db"
