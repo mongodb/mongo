@@ -74,10 +74,12 @@ namespace logger {
         /**
          * Rotates all managed files, renaming each file by appending "renameTargetSuffix".
          *
+         * renameFiles - true we rename the log file, false we expect it was renamed externally
+         *
          * Returns a vector of <filename, Status> pairs for filenames with non-OK rotate status.
          * An empty vector indicates that all files were rotated successfully.
          */
-        FileNameStatusPairVector rotateAll(const std::string& renameTargetSuffix);
+        FileNameStatusPairVector rotateAll(bool renameFiles, const std::string& renameTargetSuffix);
 
     private:
         typedef unordered_map<std::string, RotatableFileWriter*> WriterByNameMap;

@@ -42,8 +42,8 @@ namespace mongo {
             configsvr(false), cpu(false), objcheck(true), defaultProfile(0),
             slowMS(100), defaultLocalThresholdMillis(15), moveParanoia(true),
             noUnixSocket(false), doFork(0), socket("/tmp"), maxConns(DEFAULT_MAX_CONN), 
-            unixSocketPermissions(DEFAULT_UNIX_PERMS), logAppend(false), logWithSyslog(false), 
-            isHttpInterfaceEnabled(false)
+            unixSocketPermissions(DEFAULT_UNIX_PERMS), logAppend(false), logRenameOnRotate(true),
+            logWithSyslog(false), isHttpInterfaceEnabled(false)
         {
             started = time(0);
         }
@@ -91,6 +91,7 @@ namespace mongo {
 
         std::string logpath;   // Path to log file, if logging to a file; otherwise, empty.
         bool logAppend;        // True if logging to a file in append mode.
+        bool logRenameOnRotate;// True if logging should rename log files on rotate
         bool logWithSyslog;    // True if logging to syslog; must not be set if logpath is set.
         int syslogFacility;    // Facility used when appending messages to the syslog.
 

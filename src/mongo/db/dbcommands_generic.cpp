@@ -244,7 +244,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual bool run(OperationContext* txn, const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            bool didRotate = rotateLogs();
+            bool didRotate = rotateLogs(serverGlobalParams.logRenameOnRotate);
             if (didRotate)
                 logProcessDetailsForLogRotate();
             return didRotate;

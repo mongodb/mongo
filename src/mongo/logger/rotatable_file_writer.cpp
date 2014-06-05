@@ -251,28 +251,31 @@ namespace {
         return _openFileStream(append);
     }
 
-    Status RotatableFileWriter::Use::rotate(const std::string& renameTarget) {
+    Status RotatableFileWriter::Use::rotate(bool renameOnRotate, const std::string& renameTarget) {
         if (_writer->_stream) {
             _writer->_stream->flush();
-            try {
-                if (boost::filesystem::exists(renameTarget)) {
-                    return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
-                                  "Renaming file " << _writer->_fileName << " to " <<
-                                  renameTarget << " failed; destination already exists");
-                }
-            } catch (const std::exception& e) {
-                    return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
-                                  "Renaming file " << _writer->_fileName << " to " <<
-                                  renameTarget << " failed; Cannot verify whether destination "
-                                  "already exists: " << e.what());
-            }
 
-            if (0 != renameFile(_writer->_fileName, renameTarget)) {
-                return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
-                              "Failed  to rename \"" << _writer->_fileName << "\" to \"" <<
-                              renameTarget << "\": " << strerror(errno) << " (" << errno << ')');
-                //TODO(schwerin): Make errnoWithDescription() available in the logger library, and
-                //use it here.
+            if(renameOnRotate) {
+                try {
+                    if (boost::filesystem::exists(renameTarget)) {
+                        return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
+                                      "Renaming file " << _writer->_fileName << " to " <<
+                                      renameTarget << " failed; destination already exists");
+                    }
+                } catch (const std::exception& e) {
+                        return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
+                                      "Renaming file " << _writer->_fileName << " to " <<
+                                      renameTarget << " failed; Cannot verify whether destination "
+                                      "already exists: " << e.what());
+                }
+
+                if (0 != renameFile(_writer->_fileName, renameTarget)) {
+                    return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
+                                  "Failed  to rename \"" << _writer->_fileName << "\" to \"" <<
+                                  renameTarget << "\": " << strerror(errno) << " (" << errno << ')');
+                    //TODO(schwerin): Make errnoWithDescription() available in the logger library, and
+                    //use it here.
+                }
             }
         }
         return _openFileStream(false);

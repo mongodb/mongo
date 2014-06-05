@@ -93,8 +93,16 @@ namespace logger {
 
     /**
      * Rotates the log files.  Returns true if all logs rotate successfully.
+     *
+     * renameFiles - true means we rename files, false means we expect the file to be renamed
+     *               externally
+     *
+     * logrotate on *nix systems expects us not to rename the file, it is expected that the program
+     * simply open the file again with the same name.
+     * We expect logrotate to rename the existing file before we rotate, and so the next open
+     * we do should result in a file create.
      */
-    bool rotateLogs();
+    bool rotateLogs(bool renameFiles);
 
     /** output the error # and error message with prefix.
         handy for use as parm in uassert/massert.

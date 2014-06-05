@@ -306,7 +306,7 @@ namespace {
             switch (actualSignal) {
             case SIGUSR1:
                 // log rotate signal
-                fassert(16782, rotateLogs());
+                fassert(16782, rotateLogs(serverGlobalParams.logRenameOnRotate));
                 logProcessDetailsForLogRotate();
                 break;
             case SIGQUIT:

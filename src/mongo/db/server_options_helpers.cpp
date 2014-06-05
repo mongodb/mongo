@@ -198,6 +198,9 @@ namespace {
         options->addOptionChaining("systemLog.logAppend", "logappend", moe::Switch,
                 "append to logpath instead of over-writing");
 
+        options->addOptionChaining("systemLog.logRotate", "logRotate", moe::String,
+                "set the log rotation behavior (rename|reopen)");
+
         options->addOptionChaining("systemLog.timeStampFormat", "timeStampFormat", moe::String,
                 "Desired format for timestamps in log messages. One of ctime, "
                 "iso8601-utc or iso8601-local");
@@ -812,6 +815,25 @@ namespace {
         if (params.count("systemLog.logAppend") &&
             params["systemLog.logAppend"].as<bool>() == true) {
             serverGlobalParams.logAppend = true;
+        }
+
+        if (params.count("systemLog.logRotate")) {
+            std::string logRotateParam = params["systemLog.logRotate"].as<string>();
+            if (logRotateParam == "reopen") {
+                serverGlobalParams.logRenameOnRotate = false;
+
+                if(serverGlobalParams.logAppend == false) {
+                    return Status(ErrorCodes::BadValue,
+                                  "logAppend must equal true if logRotate is set to reopen" );
+                }
+            }
+            else if (logRotateParam == "rename") {
+                serverGlobalParams.logRenameOnRotate = true;
+            }
+            else {
+                return Status(ErrorCodes::BadValue,
+                              "unsupported value for logRotate " + logRotateParam );
+            }
         }
 
         if (!serverGlobalParams.logpath.empty() && serverGlobalParams.logWithSyslog) {

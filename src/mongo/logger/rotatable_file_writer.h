@@ -80,13 +80,15 @@ namespace logger {
              * Rotates the currently opened file into "renameTarget", and open a new file
              * with the name previously set via setFileName().
              *
+             * renameFiles - true we rename the log file, false we expect it was renamed externally
+             *
              * Returns Status::OK() on success.  If the rename fails, returns
              * ErrorCodes::FileRenameFailed, and the stream continues to write to the unrotated
              * file.  If the rename succeeds but the subsequent file open fails, returns
              * ErrorCodes::FileNotOpen, and the stream continues to target the original file, though
              * under its new name.
              */
-            Status rotate(const std::string& renameTarget);
+            Status rotate(bool renameFile, const std::string& renameTarget);
 
             /**
              * Returns the status of the stream.

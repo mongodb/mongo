@@ -63,7 +63,7 @@ namespace {
             ASSERT_OK(writerUse.setFileName(logFileName, false));
             ASSERT_TRUE(writerUse.stream() << "Level 1 message." << std::endl);
             ASSERT_TRUE(writerUse.stream() << "Level 2 message." << std::endl);
-            ASSERT_OK(writerUse.rotate(logFileNameRotated));
+            ASSERT_OK(writerUse.rotate(true, logFileNameRotated));
             ASSERT_TRUE(writerUse.stream() << "Level 3 message." << std::endl);
             ASSERT_TRUE(writerUse.stream() << "Level 4 message." << std::endl);
         }

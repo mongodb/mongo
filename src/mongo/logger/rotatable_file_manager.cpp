@@ -63,13 +63,14 @@ namespace logger {
     }
 
     RotatableFileManager::FileNameStatusPairVector RotatableFileManager::rotateAll(
-            const std::string& renameTargetSuffix) {
+            bool renameFiles, const std::string& renameTargetSuffix) {
 
         FileNameStatusPairVector badStatuses;
         for (WriterByNameMap::const_iterator iter = _writers.begin();
              iter != _writers.end(); ++iter) {
 
             Status status = RotatableFileWriter::Use(iter->second).rotate(
+                    renameFiles,
                     iter->first + renameTargetSuffix);
             if (!status.isOK()) {
                 badStatuses.push_back(std::make_pair(iter->first, status));
