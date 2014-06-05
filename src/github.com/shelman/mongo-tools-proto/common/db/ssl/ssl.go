@@ -121,11 +121,9 @@ func createDialerFunc(opts *options.ToolOptions) (dialerFunc, error) {
 	// return the dialing func
 	return func(addr *mgo.ServerAddr) (net.Conn, error) {
 		conn, err := tls.Dial("tcp", addr.String(), config)
-		/*
-			if err != nil {
-				util.Printlnf("Error dialing %v: %v", addr.String(), err)
-			}
-		*/
+		if err != nil {
+			util.Printlnf("Error dialing %v: %v", addr.String(), err)
+		}
 		return conn, err
 	}, nil
 
