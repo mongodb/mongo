@@ -54,16 +54,55 @@ func TestSSLConnector(t *testing.T) {
 				},
 			}
 			So(connector.Configure(opts), ShouldBeNil)
+			session, err := connector.GetNewSession()
+			So(session, ShouldBeNil)
+			So(err, ShouldNotBeNil)
 
 		})
 
 		Convey("without a valid client certificate, connection should"+
 			" fail", func() {
 
+			connector = &SSLDBConnector{}
+
+			opts := &options.ToolOptions{
+				Connection: &options.Connection{
+					Host: "localhost",
+					Port: "27017",
+				},
+				SSL: &options.SSL{
+					UseSSL:    true,
+					SSLCaFile: "testdata/ca.pem",
+				},
+			}
+			So(connector.Configure(opts), ShouldBeNil)
+			session, err := connector.GetNewSession()
+			So(session, ShouldBeNil)
+			So(err, ShouldNotBeNil)
+
 		})
 
 		Convey("with a ca file that validates the server, and a valid client"+
 			" certificate, connection should work", func() {
+
+			connector = &SSLDBConnector{}
+
+			opts := &options.ToolOptions{
+				Connection: &options.Connection{
+					Host: "localhost",
+					Port: "27017",
+				},
+				SSL: &options.SSL{
+					UseSSL:        true,
+					SSLCaFile:     "testdata/ca.pem",
+					SSLPEMKeyFile: "testdata/server.pem",
+				},
+			}
+			So(connector.Configure(opts), ShouldBeNil)
+			session, err := connector.GetNewSession()
+			So(session, ShouldNotBeNil)
+			So(err, ShouldBeNil)
+			session.Close()
 
 		})
 

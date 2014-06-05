@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+
+set -eu
+
+## Functions/
+usage() {
+cat << EOF
+SYNOPSIS
+
+    gpm leverages the power of the go get command and the underlying version
+    control systems used by it to set your Go dependencies to desired versions,
+    thus allowing easily reproducible builds in your Go projects.
+
+    A Godeps file in the root of your Go application is expected containing
+    the import paths of your packages and a specific tag or commit hash
+    from its version control system, an example Godeps file looks like this:
+
+    $ cat Godeps
+    # This is a comment
+    github.com/nu7hatch/gotrail         v0.0.2
+    github.com/replicon/fast-archiver   v1.02   #This is another comment!
+    github.com/nu7hatch/gotrail         2eb79d1f03ab24bacbc32b15b75769880629a865
+
+    gpm has a companion tool, called [gvp](https://github.com/pote/gvp) which
+    provides vendoring functionalities, it alters your GOPATH so every project
+    has its own isolated dependency directory, its usage is recommended.
+
+USAGE
+      $ gpm             # Same as 'install'.
+      $ gpm install     # Parses the Godeps file, installs dependencies and sets
+                        # them to the appropriate version.
+      $ gpm version     # Outputs version information
+      $ gpm help        # Prints this message
+EOF
+}
+
+# Iterates over Godep file dependencies and sets
+# the specified version on each of them.
+set_dependencies() {
+  local pids=()
+  while read line; do
+    local line=`echo $line | sed 's/#.*//;/^\s*$/d' || echo ""`
+    [ ! "$line" ] && continue
+    (
+      line=($line)
+      local package=${line[0]}
+      local version=${line[1]}
+
+      if [[ "$OSTYPE" == "cygwin" || "$OSTYPE" == "msys" ]]
+      then
+        local install_path="${GOPATH%%;*}/src/${package%%/...}"
+      else
+        local install_path="${GOPATH%%:*}/src/${package%%/...}"
+      fi
+
+      [[ -e "$install_path/.git/index.lock" ||
+         -e "$install_path/.hg/store/lock"  ||
+         -e "$install_path/.bzr/checkout/lock" ]] && wait
+
+      echo ">> Getting package "$package""
+      go get -u -d "$package"
+
+      cd $install_path
+      hg update     "$version" > /dev/null 2>&1 || \
+      git checkout  "$version" > /dev/null 2>&1 || \
+      bzr revert -r "$version" > /dev/null 2>&1 || \
+      #svn has exit status of 0 when there is no .svn
+      { [ -d .svn ] && svn update -r "$version" > /dev/null 2>&1; } || \
+      { echo ">> Failed to set $package to version $version"; exit 1; }
+
+      echo ">> Set $package to version $version"
+    ) &
+    pids=(${pids[@]-} $!)
+  done < $1
+
+  for pid in "${pids[@]-}"; do
+      wait $pid
+      local status=$?
+      [ $status -ne 0 ] && exit $status
+  done
+
+  echo ">> All Done"
+}
+## /Functions
+
+## Command Line Parsing
+case "${1:-"install"}" in
+  "version")
+    echo ">> gpm v1.2.1"
+    ;;
+  "install")
+    deps_file="${2:-"Godeps"}"
+    [[ -f "$deps_file" ]] || (echo ">> $deps_file file does not exist." && exit 1)
+    (which go > /dev/null) ||
+      ( echo ">> Go is currently not installed or in your PATH" && exit 1)
+    set_dependencies $deps_file
+    ;;
+  "help")
+    usage
+    ;;
+  *)
+    ## Support for Plugins: if command is unknown search for a gpm-command executable.
+    if command -v "gpm-$1" > /dev/null
+    then
+      plugin=$1 &&
+      shift     &&
+      gpm-$plugin $@ &&
+      exit
+    else
+      usage && exit 1
+    fi
+    ;;
+esac
