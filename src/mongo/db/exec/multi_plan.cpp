@@ -30,6 +30,8 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/util/mongoutils/str.h"
 
+#include <algorithm>
+
 // for updateCache
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -155,10 +157,23 @@ namespace mongo {
                                 size_t(fraction * _collection->numRecords()));
         }
 
+        // We treat ntoreturn as though it is a limit during plan ranking.
+        // This means that ranking might not be great for sort + batchSize.
+        // But it also means that we don't buffer too much data for sort + limit.
+        // See SERVER-14174 for details.
+        size_t numToReturn = _query->getParsed().getNumToReturn();
+
+        // Determine the number of results which we will produce during the plan
+        // ranking phase before stopping.
+        size_t numResults = (size_t)internalQueryPlanEvaluationMaxResults;
+        if (numToReturn > 0) {
+            numResults = std::min(numToReturn, numResults);
+        }
+
         // Work the plans, stopping when a plan hits EOF or returns some
         // fixed number of results.
         for (size_t ix = 0; ix < numWorks; ++ix) {
-            bool moreToDo = workAllPlans();
+            bool moreToDo = workAllPlans(numResults);
             if (!moreToDo) { break; }
         }
 
@@ -252,7 +267,7 @@ namespace mongo {
         }
     }
 
-    bool MultiPlanStage::workAllPlans() {
+    bool MultiPlanStage::workAllPlans(size_t numResults) {
         bool doneWorking = false;
 
         for (size_t ix = 0; ix < _candidates.size(); ++ix) {
@@ -267,8 +282,7 @@ namespace mongo {
                 candidate.results.push_back(id);
 
                 // Once a plan returns enough results, stop working.
-                if (candidate.results.size()
-                    >= size_t(internalQueryPlanEvaluationMaxResults)) {
+                if (candidate.results.size() >= numResults) {
                     doneWorking = true;
                 }
             }
