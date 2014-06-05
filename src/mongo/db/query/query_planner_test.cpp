@@ -1612,6 +1612,28 @@ namespace {
                                 "{ixscan: {filter: null, pattern: {'a.b': 1}}}}}");
     }
 
+    // SERVER-14180
+    TEST_F(QueryPlannerTest, ElemMatchEmbeddedRegexAnd) {
+        addIndex(BSON("a.b" << 1));
+        runQuery(fromjson("{a: {$elemMatch: {b: /foo/}}, z: 1}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a:{$elemMatch:{b:/foo/}}, z:1}, node: "
+                                "{ixscan: {filter: null, pattern: {'a.b': 1}}}}}");
+    }
+
+    // SERVER-14180
+    TEST_F(QueryPlannerTest, ElemMatchEmbeddedRegexAnd2) {
+        addIndex(BSON("a.b" << 1));
+        runQuery(fromjson("{a: {$elemMatch: {b: /foo/, b: 3}}, z: 1}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a:{$elemMatch:{b:/foo/,b:3}}, z:1}, node: "
+                                "{ixscan: {filter: null, pattern: {'a.b': 1}}}}}");
+    }
+
     // $not can appear as a value operator inside of an elemMatch (value).  We shouldn't crash if we
     // see it.
     TEST_F(QueryPlannerTest, ElemMatchWithNotInside) {

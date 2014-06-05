@@ -737,16 +737,6 @@ namespace mongo {
 
                 scanState->tightness = IndexBoundsBuilder::INEXACT_FETCH;
                 mergeWithLeafNode(emChild, scanState);
-
-                if (scanState->tightness == IndexBoundsBuilder::INEXACT_COVERED
-                         && !indices[scanState->currentIndexNumber].multikey) {
-                    // Add the filter to the current index scan. This is optional because
-                    // the entire filter will get affixed to the parent AND. It is here
-                    // as an optimization---an additional filter during the index scan
-                    // stage will cause fewer documents to bubble up to the parent node
-                    // of the execution tree.
-                    addFilterToSolutionNode(scanState->currentScan.get(), emChild, root->matchType());
-                }
             }
             else {
                 if (NULL != scanState->currentScan.get()) {
@@ -762,16 +752,6 @@ namespace mongo {
                 scanState->currentScan.reset(makeLeafNode(query, indices[scanState->currentIndexNumber],
                                                           scanState->ixtag->pos,
                                                           emChild, &scanState->tightness));
-
-                if (scanState->tightness == IndexBoundsBuilder::INEXACT_COVERED
-                         && !indices[scanState->currentIndexNumber].multikey) {
-                    // Add the filter to the current index scan. This is optional because
-                    // the entire filter will get affixed to the parent AND. It is here
-                    // as an optimization---an additional filter during the index scan
-                    // stage will cause fewer documents to bubble up to the parent node
-                    // of the execution tree.
-                    addFilterToSolutionNode(scanState->currentScan.get(), emChild, root->matchType());
-                }
             }
         }
 
