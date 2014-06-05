@@ -572,6 +572,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_MULTI *multi, WT_REF **refp, size_t *incrp)
 {
 	WT_ADDR *addr;
+	WT_IKEY *ikey;
 	WT_REF *ref;
 	size_t incr;
 
@@ -614,10 +615,10 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	switch (page->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
+		ikey = multi->key.ikey;
 		WT_RET(__wt_row_ikey(session, 0,
-		    WT_IKEY_DATA(multi->key.ikey), multi->key.ikey->size,
-		    &ref->key.ikey));
-		incr += sizeof(WT_IKEY) + multi->key.ikey->size;
+		    WT_IKEY_DATA(ikey), ikey->size, &ref->key.ikey));
+		incr += sizeof(WT_IKEY) + ikey->size;
 		break;
 	default:
 		ref->key.recno = multi->key.recno;
