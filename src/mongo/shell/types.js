@@ -353,6 +353,39 @@ ObjectId.prototype.equals = function(other){
     return this.str == other.str;
 }
 
+// Creates an ObjectId from a Date.
+// Based on solution discussed here:
+//     http://stackoverflow.com/questions/8749971/can-i-query-mongodb-objectid-by-date
+ObjectId.fromDate = function(source) {
+    if (!source) {
+        throw Error("date missing or undefined");
+    }
+
+    var sourceDate;
+
+    // Extract Date from input.
+    // If input is a string, assume ISO date string and
+    // create a Date from the string.
+    if (source instanceof Date) {
+        sourceDate = source;
+    } else {
+        throw Error("Cannot create ObjectId from " + typeof(source) + ": " + tojson(source));
+    }
+
+    // Convert date object to seconds since Unix epoch.
+    var seconds = Math.floor(sourceDate.getTime()/1000);
+
+    // Generate hex timestamp with padding.
+    var hexSeconds = seconds.toString(16);
+    var padding = "0000000000000000";
+    var hexTimestamp = hexSeconds + padding;
+
+    // Create an ObjectId with hex timestamp.
+    var objectId = ObjectId(hexTimestamp);
+
+    return objectId;
+}
+
 // DBPointer
 if (typeof(DBPointer) != "undefined"){
     DBPointer.prototype.fetch = function(){
