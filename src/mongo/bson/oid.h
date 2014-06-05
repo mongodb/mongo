@@ -171,6 +171,4 @@ namespace mongo {
         JS
     };
 
-     std::ostream& operator<<( std::ostream &s, const OID &o );
-
 }
