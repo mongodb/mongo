@@ -68,9 +68,8 @@ namespace repl {
         return modeNone;
     }
 
-    const MemberState& LegacyReplicationCoordinator::getCurrentMemberState() const {
-        // TODO
-        invariant(false);
+    MemberState LegacyReplicationCoordinator::getCurrentMemberState() const {
+        return theReplSet->state();
     }
 
     Status LegacyReplicationCoordinator::awaitReplication(const OpTime& ts,

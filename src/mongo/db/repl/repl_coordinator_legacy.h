@@ -53,7 +53,7 @@ namespace repl {
 
         virtual Mode getReplicationMode() const;
 
-        virtual const MemberState& getCurrentMemberState() const;
+        virtual MemberState getCurrentMemberState() const;
 
         virtual Status awaitReplication(const OpTime& ts,
                                         const WriteConcernOptions& writeConcern,

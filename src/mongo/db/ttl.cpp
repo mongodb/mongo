@@ -170,7 +170,7 @@ namespace mongo {
                 // if part of replSet but not in a readable state (e.g. during initial sync), skip.
                 if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                         repl::ReplicationCoordinator::modeReplSet &&
-                        !repl::theReplSet->state().readable())
+                        !repl::getGlobalReplicationCoordinator()->getCurrentMemberState().readable())
                     continue;
 
                 set<string> dbs;

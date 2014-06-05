@@ -99,7 +99,7 @@ namespace mongo {
                 repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                         repl::ReplicationCoordinator::modeReplSet &&
                 repl::theReplSet->getConfig().members.size() > 1 &&
-                repl::theReplSet->isPrimary()) {
+                repl::getGlobalReplicationCoordinator()->getCurrentMemberState().primary()) {
             long long timeout, now, start;
             timeout = now = start = curTimeMicros64()/1000000;
             if (cmdObj.hasField("timeoutSecs")) {
@@ -1430,7 +1430,7 @@ namespace mongo {
                 && repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                         repl::ReplicationCoordinator::modeReplSet
                 && !repl::isMasterNs(dbname.c_str())
-                && !repl::theReplSet->isSecondary()) {
+                && !repl::getGlobalReplicationCoordinator()->getCurrentMemberState().secondary()) {
             result.append( "note" , "from execCommand" );
             appendCommandStatus(result, false, "node is recovering");
             return;

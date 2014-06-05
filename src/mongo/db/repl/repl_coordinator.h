@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/repl/member_state.h"
 
 namespace mongo {
 
@@ -45,8 +46,6 @@ namespace mongo {
     struct WriteConcernOptions;
 
 namespace repl {
-
-    struct MemberState;
 
     /**
      * The ReplicationCoordinator is responsible for coordinating the interaction of replication
@@ -103,7 +102,7 @@ namespace repl {
         /**
          * Returns the current replica set state of this node (PRIMARY, SECONDARY, STARTUP, etc).
          */
-        virtual const MemberState& getCurrentMemberState() const = 0;
+        virtual MemberState getCurrentMemberState() const = 0;
 
         /**
          * Blocks the calling thread for up to "timeout" millis, or until "ts" has been replicated
