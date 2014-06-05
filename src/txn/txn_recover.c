@@ -23,6 +23,7 @@ typedef struct {
 
 	WT_LSN ckpt_lsn;		/* Start LSN for main recovery loop. */
 
+	int missing;			/* Were there missing files? */
 	int modified;			/* Did recovery make any changes? */
 	int metadata_only;		/*
 					 * Set during the first recovery pass,
@@ -45,27 +46,38 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 
 	c = NULL;
 
+	/* Track the largest file ID we have seen. */
+	if (id > r->max_fileid)
+		r->max_fileid = id;
+
 	/*
 	 * Metadata operations have an id of 0.  Match operations based
 	 * on the id and the current pass of recovery for metadata.
 	 *
 	 * Only apply operations in the correct metadata phase, and if the LSN
 	 * is more recent than the last checkpoint.  If there is no entry for a
-	 * file, assume it was dropped.
+	 * file, assume it was dropped or missing after a hot backup.
 	 */
 	metadata_op = (id == 0);
-	if (r->metadata_only != metadata_op ||
-	    LOG_CMP(lsnp, &r->files[id].ckpt_lsn) < 0)
+	if (r->metadata_only != metadata_op)
 		;
-	else if (id > r->max_fileid)
-		r->max_fileid = id;
-	else if (id >= r->nfiles || r->files[id].uri == NULL)
-		WT_RET(__wt_verbose(session, WT_VERB_RECOVERY,
-		    "No file found with ID %u (max %u)", id, r->nfiles));
-	else if ((c = r->files[id].c) == NULL) {
-		WT_RET(__wt_open_cursor(
-		    session, r->files[id].uri, NULL, cfg, &c));
-		r->files[id].c = c;
+	else if (id >= r->nfiles || r->files[id].uri == NULL) {
+		/* If a file is missing, output a verbose message once. */
+		if (!r->missing)
+			WT_RET(__wt_verbose(session, WT_VERB_RECOVERY,
+			    "No file found with ID %u (max %u)",
+			    id, r->nfiles));
+		r->missing = 1;
+	} else if (LOG_CMP(lsnp, &r->files[id].ckpt_lsn) >= 0) {
+		/*
+		 * We're going to apply the operation.  Get the cursor, opening
+		 * one if none is cached.
+		 */
+		if ((c = r->files[id].c) == NULL) {
+			WT_RET(__wt_open_cursor(
+			    session, r->files[id].uri, NULL, cfg, &c));
+			r->files[id].c = c;
+		}
 	}
 
 	if (duplicate && c != NULL)
@@ -378,7 +390,8 @@ __recovery_file_scan(WT_RECOVERY *r)
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-err:	r->max_fileid = r->nfiles;
+err:	if (r->nfiles > r->max_fileid)
+		r->max_fileid = r->nfiles;
 	return (ret);
 }
 
