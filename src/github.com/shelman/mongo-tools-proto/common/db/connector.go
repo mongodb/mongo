@@ -16,6 +16,10 @@ type DBConnector interface {
 	GetNewSession() (*mgo.Session, error)
 }
 
+var (
+	DefaultDialTimeout = time.Second * 3
+)
+
 // Basic connector for dialing the database, with no auth.
 type VanillaDBConnector struct {
 	dialInfo *mgo.DialInfo
@@ -29,7 +33,7 @@ func (self *VanillaDBConnector) Configure(opts *options.ToolOptions) error {
 	// set up the dial info
 	self.dialInfo = &mgo.DialInfo{
 		Addrs:   connectionAddrs,
-		Timeout: time.Second * 3,
+		Timeout: DefaultDialTimeout,
 	}
 
 	return nil
