@@ -31,7 +31,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/fail_point_service.h"
@@ -168,8 +170,8 @@ namespace mongo {
     }
 
     bool OperationContextImpl::isPrimaryFor( const StringData& ns ) {
-        string s = ns.toString(); // TODO: fix copy
-        return repl::isMasterNs(s.c_str());
+        return repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                NamespaceString(ns).db());
     }
 
 }  // namespace mongo

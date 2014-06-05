@@ -68,14 +68,5 @@ namespace repl {
         return false;
     }
 
-    inline bool isMasterNs( const char *ns ) {
-        if ( _isMaster() )
-            return true;
-        verify( ns );
-        if ( ! str::startsWith( ns , "local" ) )
-            return false;
-        return ns[5] == 0 || ns[5] == '.';
-    }
-
 } // namespace repl
 } // namespace mongo

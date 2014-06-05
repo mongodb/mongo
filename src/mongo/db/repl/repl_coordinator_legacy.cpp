@@ -31,6 +31,7 @@
 #include "mongo/db/repl/repl_coordinator_legacy.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
@@ -79,8 +80,11 @@ namespace repl {
         return Status::OK();
     }
 
-    bool LegacyReplicationCoordinator::canAcceptWritesFor(const NamespaceString& collection) {
-        // TODO
+    bool LegacyReplicationCoordinator::canAcceptWritesForDatabase(const StringData& dbName) {
+        if (_isMaster())
+            return true;
+        if (dbName == "local")
+            return true;
         return false;
     }
 

@@ -31,6 +31,7 @@
 #include "mongo/db/ops/delete_executor.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/ops/delete_request.h"
@@ -38,7 +39,7 @@
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -110,7 +111,8 @@ namespace mongo {
 
         uassert(ErrorCodes::NotMaster,
                 str::stream() << "Not primary while removing from " << ns.ns(),
-                !logop || repl::isMasterNs(ns.ns().c_str()));
+                !logop ||
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(ns.db()));
 
         long long nDeleted = 0;
 
@@ -138,7 +140,9 @@ namespace mongo {
             if (oldYieldCount != curOp->numYields()) {
                 uassert(ErrorCodes::NotMaster,
                         str::stream() << "No longer primary while removing from " << ns.ns(),
-                        !logop || repl::isMasterNs(ns.ns().c_str()));
+                        !logop ||
+                        repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                                ns.db()));
                 oldYieldCount = curOp->numYields();
             }
             BSONObj toDelete;

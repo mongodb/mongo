@@ -120,11 +120,11 @@ namespace repl {
         // handle_t onReplication(OpTime ts, writeConcern, callbackFunction); // TODO
 
         /**
-         * Returns true if it is valid for this node to accept writes on the given collection.
+         * Returns true if it is valid for this node to accept writes on the given database.
          * Currently this is true only if this node is Primary, master in master/slave,
          * a standalone, or is writing to the local database.
          */
-        virtual bool canAcceptWritesFor(const NamespaceString& collection) = 0;
+        virtual bool canAcceptWritesForDatabase(const StringData& dbName) = 0;
 
         /**
          * Returns true if it is valid for this node to serve reads on the given collection.

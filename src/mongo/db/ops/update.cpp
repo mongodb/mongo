@@ -47,7 +47,7 @@
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
@@ -511,7 +511,9 @@ namespace mongo {
 
         uassert(ErrorCodes::NotMaster,
                 mongoutils::str::stream() << "Not primary while updating " << nsString.ns(),
-                !request.shouldCallLogOp() || repl::isMasterNs(nsString.ns().c_str()));
+                !request.shouldCallLogOp()
+                || repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                        nsString.db()));
 
         while (true) {
             // Get next doc, and location

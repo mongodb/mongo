@@ -68,7 +68,7 @@ namespace mongo {
         
         void doTTLForDB( const string& dbName ) {
 
-            if (!repl::isMasterNs(dbName.c_str()))
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName))
                 return;
 
             vector<BSONObj> indexes;
@@ -124,7 +124,8 @@ namespace mongo {
                         continue;
                     }
 
-                    if (!repl::isMasterNs(dbName.c_str())) {
+                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                            collection->ns().db())) {
                         // we've stepped down since we started this function,
                         // so we should stop working as we only do deletes on the primary
                         break;

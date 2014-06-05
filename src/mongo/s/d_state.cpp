@@ -51,6 +51,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/client/connpool.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
@@ -1249,7 +1250,8 @@ namespace mongo {
         if ( ! shardingState.enabled() )
             return true;
 
-        if (!repl::isMasterNs(ns.c_str()))  {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                NamespaceString(ns).db()))  {
             // right now connections to secondaries aren't versioned at all
             return true;
         }

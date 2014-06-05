@@ -863,6 +863,7 @@ namespace mongo {
     void receivedInsert(OperationContext* txn, Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
+        const NamespaceString nsString(ns);
         op.debug().ns = ns;
 
         uassertStatusOK( userAllowedWriteNS( ns ) );
@@ -879,7 +880,6 @@ namespace mongo {
 
             // Check auth for insert (also handles checking if this is an index build and checks
             // for the proper privileges in that case).
-            const NamespaceString nsString(ns);
             Status status = cc().getAuthorizationSession()->checkAuthForInsert(nsString, obj);
             audit::logInsertAuthzCheck(&cc(), nsString, obj, status.code());
             uassertStatusOK(status);
@@ -889,7 +889,8 @@ namespace mongo {
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
-        uassert(10058 , "not master", repl::isMasterNs(ns));
+        uassert(10058 , "not master",
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db()));
 
         if ( handlePossibleShardedMessage( m , 0 ) )
             return;

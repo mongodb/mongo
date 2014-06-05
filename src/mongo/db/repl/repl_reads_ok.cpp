@@ -31,6 +31,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/assert_util.h"
@@ -43,9 +44,11 @@ namespace repl {
         if( replSet ) {
             // todo: speed up the secondary case.  as written here there are 2 mutex entries, it
             // can b 1.
-            if (isMasterNs(ns.c_str())) return;
+            if (getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                    NamespaceString(ns).db())) return;
             if ( cc().isGod() ) return;
 
+            // TODO(dannenberg) this seems wrong; what if readPref is PRIMARY_ONLY
             uassert(NotMasterNoSlaveOkCode, "not master and slaveOk=false",
                     !pq || pq->hasOption(QueryOption_SlaveOk) || pq->hasReadPref());
             uassert(NotMasterOrSecondaryCode,
@@ -54,12 +57,14 @@ namespace repl {
         }
         else {
             // master/slave
+            // TODO(dannenberg) this seems wrong; what if it's a master/slave slave without SlaveOk set?
             uassert(NotMaster,
                     "not master",
-                    isMasterNs(ns.c_str()) ||
-                        pq == NULL || 
-                        pq->hasOption(QueryOption_SlaveOk) ||
-                        replSettings.slave == SimpleSlave );
+                    getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                        NamespaceString(ns).db()) ||
+                    pq == NULL || 
+                    pq->hasOption(QueryOption_SlaveOk) ||
+                    replSettings.slave == SimpleSlave );
         }
     }
 

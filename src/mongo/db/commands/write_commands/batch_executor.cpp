@@ -36,6 +36,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/delete_executor.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
@@ -435,8 +436,9 @@ namespace mongo {
         return true;
     }
 
-    static bool checkIsMasterForCollection(const std::string& ns, WriteOpResult* result) {
-        if (!repl::isMasterNs(ns.c_str())) {
+    static bool checkIsMasterForDatabase(const std::string& ns, WriteOpResult* result) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                NamespaceString(ns).db())) {
             WriteErrorDetail* errorDetail = new WriteErrorDetail;
             result->setError(errorDetail);
             errorDetail->setErrCode(ErrorCodes::NotMaster);
@@ -905,7 +907,7 @@ namespace mongo {
 
         invariant(!_context.get());
         _writeLock.reset(new Lock::DBWrite(txn->lockState(), request->getNS()));
-        if (!checkIsMasterForCollection(request->getNS(), result)) {
+        if (!checkIsMasterForDatabase(request->getNS(), result)) {
             return false;
         }
         if (!checkShardVersion(&shardingState, *request, result)) {

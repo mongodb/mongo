@@ -58,6 +58,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/get_runner.h"
@@ -1414,8 +1415,9 @@ namespace mongo {
             return;
         }
 
+        repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
         bool canRunHere =
-            repl::isMasterNs(dbname.c_str()) ||
+            replCoord->canAcceptWritesForDatabase(dbname) ||
             c->slaveOk() ||
             ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
             fromRepl;
@@ -1427,10 +1429,9 @@ namespace mongo {
         }
 
         if (!c->maintenanceOk()
-                && repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
-                        repl::ReplicationCoordinator::modeReplSet
-                && !repl::isMasterNs(dbname.c_str())
-                && !repl::getGlobalReplicationCoordinator()->getCurrentMemberState().secondary()) {
+                && replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet
+                && !replCoord->canAcceptWritesForDatabase(dbname)
+                && !replCoord->getCurrentMemberState().secondary()) {
             result.append( "note" , "from execCommand" );
             appendCommandStatus(result, false, "node is recovering");
             return;

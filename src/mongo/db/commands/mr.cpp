@@ -46,7 +46,9 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/range_preserver.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/scripting/engine.h"
@@ -1246,7 +1248,8 @@ namespace mongo {
                 if (repl::replSet && state.isOnDisk()) {
                     // this means that it will be doing a write operation, make sure we are on Master
                     // ideally this check should be in slaveOk(), but at that point config is not known
-                    if (!repl::isMasterNs(dbname.c_str())) {
+                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                            dbname)) {
                         errmsg = "not master";
                         return false;
                     }

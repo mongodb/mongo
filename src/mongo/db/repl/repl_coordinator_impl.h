@@ -60,13 +60,13 @@ namespace repl {
 
         virtual Mode getReplicationMode() const;
 
-        virtual const MemberState& getCurrentMemberState() const;
+        virtual MemberState getCurrentMemberState() const;
 
         virtual Status awaitReplication(const OpTime& ts,
                                         const WriteConcernOptions& writeConcern,
                                         Milliseconds timeout);
 
-        virtual bool canAcceptWritesFor(const NamespaceString& collection);
+        virtual bool canAcceptWritesForDatabase(const StringData& database);
 
         virtual bool canServeReadsFor(const NamespaceString& collection);
 

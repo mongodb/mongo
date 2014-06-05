@@ -63,7 +63,7 @@ namespace repl {
                                         Milliseconds timeout);
 
 
-        virtual bool canAcceptWritesFor(const NamespaceString& collection);
+        virtual bool canAcceptWritesForDatabase(const StringData& dbName);
 
         virtual bool canServeReadsFor(const NamespaceString& collection);
 

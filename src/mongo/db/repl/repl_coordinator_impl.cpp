@@ -63,7 +63,7 @@ namespace repl {
         // TODO
     }
 
-    const MemberState& ReplicationCoordinatorImpl::getCurrentMemberState() const {
+    MemberState ReplicationCoordinatorImpl::getCurrentMemberState() const {
         // TODO
         invariant(false);
     }
@@ -75,7 +75,7 @@ namespace repl {
         return Status::OK();
     }
 
-    bool ReplicationCoordinatorImpl::canAcceptWritesFor(const NamespaceString& collection) {
+    bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(const StringData& collection) {
         // TODO
         return false;
     }

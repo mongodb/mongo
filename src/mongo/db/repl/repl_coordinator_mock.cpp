@@ -72,7 +72,7 @@ namespace repl {
         return Status::OK();
     }
 
-    bool ReplicationCoordinatorMock::canAcceptWritesFor(const NamespaceString& collection) {
+    bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(const StringData& dbName) {
         // TODO
         return false;
     }

@@ -41,6 +41,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/processinfo.h"
@@ -271,7 +272,8 @@ namespace mongo {
                                             false /* cappedOk */,
                                             true /* noWarn */,
                                             &toDelete );
-                if (repl::isMasterNs(ns.c_str())) {
+                if (repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                        collection->ns().db())) {
                     repl::logOp(txn, "d", ns.c_str(), toDelete);
                 }
                 
