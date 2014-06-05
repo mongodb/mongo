@@ -190,8 +190,7 @@ namespace mongo {
                                              static_cast<Lock::ScopedLock*>(new Lock::GlobalWrite(txn->lockState())) :
                                              static_cast<Lock::ScopedLock*>(new Lock::DBWrite(txn->lockState(), todb)));
 
-            Client::Context ctx(todb);
-            return cloner.go(txn, ctx, fromhost, cloneOptions, NULL, errmsg );
+            return cloner.go(txn, todb, fromhost, cloneOptions, NULL, errmsg );
         }
 
     } cmdCopyDB;

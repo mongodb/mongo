@@ -332,7 +332,9 @@ namespace repl {
         BSONObj info;
         {
             // This is always a GlobalWrite lock (so no ns/db used from the context)
-            dbtemprelease t(txn->lockState());
+            invariant(txn->lockState()->isW());
+            Lock::TempRelease tempRelease(txn->lockState());
+
             if (!oplogReader.connect(hostName, _me)) {
                 msgassertedNoTrace( 14051 , "unable to connect to resync");
             }
@@ -365,34 +367,11 @@ namespace repl {
         dropDatabase(txn, ctx.db());
     }
 
-    /**
-     * @param errmsg out  - Error message (if encountered).
-     * @param errCode out - If provided, this will be set on error to the server's error code.
-     *                      Currently this will only be set if there is an error in the initial
-     *                      system.namespaces query.
-     */
-    static bool cloneFrom(OperationContext* txn,
-                           Client::Context& context,
-                           const string& masterHost,
-                           const CloneOptions& options,
-                           string& errmsg,
-                           int* errCode) {
-
-        Cloner cloner;
-        return cloner.go(txn,
-                         context,
-                         masterHost.c_str(),
-                         options,
-                         NULL,
-                         errmsg,
-                         errCode);
-    }
-
     /* grab initial copy of a database from the master */
     void ReplSource::resync(OperationContext* txn, const std::string& dbName) {
         const std::string db(dbName);   // need local copy of the name, we're dropping the original
         resyncDrop( txn, db );
-        Client::Context ctx( db );
+
         {
             log() << "resync: cloning database " << db << " to get an initial copy" << endl;
             ReplInfo r("resync: cloning a database");
@@ -406,7 +385,15 @@ namespace repl {
             cloneOptions.snapshot = true;
             cloneOptions.mayYield = true;
             cloneOptions.mayBeInterrupted = false;
-            bool ok = cloneFrom(txn, ctx,hostName, cloneOptions, errmsg, &errCode);
+
+            Cloner cloner;
+            bool ok = cloner.go(txn,
+                                db,
+                                hostName.c_str(),
+                                cloneOptions,
+                                NULL,
+                                errmsg,
+                                &errCode);
 
             if ( !ok ) {
                 if ( errCode == DatabaseDifferCaseCode ) {
@@ -471,7 +458,8 @@ namespace repl {
         bool dbOk = false;
         {
             // This is always a GlobalWrite lock (so no ns/db used from the context)
-            dbtemprelease release(txn->lockState());
+            invariant(txn->lockState()->isW());
+            Lock::TempRelease(txn->lockState());
 
             // We always log an operation after executing it (never before), so
             // a database list will always be valid as of an oplog entry generated
@@ -638,7 +626,10 @@ namespace repl {
             return;   
         }
                 
-        Client::Context ctx( ns );
+        // This code executes on the slaves only, so it doesn't need to be sharding-aware since
+        // mongos will not send requests there. That's why the last argument is false (do not do
+        // version checking).
+        Client::Context ctx(ns, storageGlobalParams.dbpath, false);
         ctx.getClient()->curop()->reset();
 
         bool empty = ctx.db()->isEmpty();

@@ -86,11 +86,14 @@ namespace repl {
         fassert( 16233, failedAttempts < maxFailedAttempts);
     }
 
-    bool ReplSetImpl::_syncDoInitialSync_clone(Cloner& cloner, const char *master,
-                                               const list<string>& dbs, bool dataPass) {
+    bool ReplSetImpl::_syncDoInitialSync_clone(OperationContext* txn,
+                                               Cloner& cloner,
+                                               const char *master,
+                                               const list<string>& dbs,
+                                               bool dataPass) {
 
         for( list<string>::const_iterator i = dbs.begin(); i != dbs.end(); i++ ) {
-            string db = *i;
+            const string db = *i;
             if( db == "local" ) 
                 continue;
             
@@ -98,9 +101,6 @@ namespace repl {
                 sethbmsg( str::stream() << "initial sync cloning db: " << db , 0);
             else
                 sethbmsg( str::stream() << "initial sync cloning indexes for : " << db , 0);
-
-            OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, db);
 
             string err;
             int errCode;
@@ -115,7 +115,10 @@ namespace repl {
             options.syncData = dataPass;
             options.syncIndexes = ! dataPass;
 
-            if (!cloner.go(&txn, ctx.ctx(), master, options, NULL, err, &errCode)) {
+            // Make database stable
+            Lock::DBWrite dbWrite(txn->lockState(), db);
+
+            if (!cloner.go(txn, db, master, options, NULL, err, &errCode)) {
                 sethbmsg(str::stream() << "initial sync: error while "
                                        << (dataPass ? "cloning " : "indexing ") << db
                                        << ".  " << (err.empty() ? "" : err + ".  ")
@@ -417,7 +420,7 @@ namespace repl {
             list<string> dbs = r.conn()->getDatabaseNames();
 
             Cloner cloner;
-            if (!_syncDoInitialSync_clone(cloner, sourceHostname.c_str(), dbs, true)) {
+            if (!_syncDoInitialSync_clone(&txn, cloner, sourceHostname.c_str(), dbs, true)) {
                 veto(source->fullName(), 600);
                 sleepsecs(300);
                 return;
@@ -444,7 +447,7 @@ namespace repl {
             lastOp = minValid;
 
             sethbmsg("initial sync building indexes",0);
-            if (!_syncDoInitialSync_clone(cloner, sourceHostname.c_str(), dbs, false)) {
+            if (!_syncDoInitialSync_clone(&txn, cloner, sourceHostname.c_str(), dbs, false)) {
                 veto(source->fullName(), 600);
                 sleepsecs(300);
                 return;

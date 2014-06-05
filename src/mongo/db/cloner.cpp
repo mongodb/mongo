@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
@@ -42,7 +42,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/rename_collection.h"
-#include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
@@ -51,8 +50,8 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
+
 
 namespace mongo {
 
@@ -95,22 +94,26 @@ namespace mongo {
     Cloner::Cloner() { }
 
     struct Cloner::Fun {
-        Fun( OperationContext* txn, Client::Context& ctx )
+        Fun(OperationContext* txn, const string& dbName)
             :lastLog(0),
              txn(txn),
-             context(ctx)
+             _dbName(dbName)
         {}
 
         void operator()( DBClientCursorBatchIterator &i ) {
             // XXX: can probably take dblock instead
             Lock::GlobalWrite lk(txn->lockState());
-            context.relocked();
+            
+            // Make sure database still exists after we resume from the temp release
+            bool unused;
+            Database* db = dbHolder().getOrCreate(
+                                        txn, _dbName, storageGlobalParams.dbpath, unused);
 
             bool createdCollection = false;
             Collection* collection = NULL;
 
             if ( isindex == false ) {
-                collection = context.db()->getCollection( txn, to_collection );
+                collection = db->getCollection( txn, to_collection );
                 if ( !collection ) {
                     massert( 17321,
                              str::stream()
@@ -118,7 +121,7 @@ namespace mongo {
                              << to_collection << "]",
                              !createdCollection );
                     createdCollection = true;
-                    collection = context.db()->createCollection( txn, to_collection );
+                    collection = db->createCollection( txn, to_collection );
                     verify( collection );
                 }
             }
@@ -149,7 +152,7 @@ namespace mongo {
                 BSONObj js = tmp;
                 if ( isindex ) {
                     verify(nsToCollectionSubstring(from_collection) == "system.indexes");
-                    js = fixindex(context.db()->name(), tmp);
+                    js = fixindex(db->name(), tmp);
                     indexesToBuild->push_back( js.getOwned() );
                     continue;
                 }
@@ -176,7 +179,7 @@ namespace mongo {
 
         time_t lastLog;
         OperationContext* txn;
-        Client::Context& context;
+        const string _dbName;
 
         int64_t numSeen;
         bool isindex;
@@ -193,7 +196,7 @@ namespace mongo {
        isindex - if true, this is system.indexes collection, in which we do some transformation when copying.
     */
     void Cloner::copy(OperationContext* txn,
-                      Client::Context& ctx,
+                      const string& toDBName,
                       const char *from_collection,
                       const char *to_collection,
                       bool isindex,
@@ -207,7 +210,7 @@ namespace mongo {
         list<BSONObj> indexesToBuild;
         LOG(2) << "\t\tcloning collection " << from_collection << " to " << to_collection << " on " << _conn->getServerAddress() << " with filter " << query.toString() << endl;
 
-        Fun f( txn, ctx );
+        Fun f(txn, toDBName);
         f.numSeen = 0;
         f.isindex = isindex;
         f.from_collection = from_collection;
@@ -220,10 +223,15 @@ namespace mongo {
 
         int options = QueryOption_NoCursorTimeout | ( slaveOk ? QueryOption_SlaveOk : 0 );
         {
-            dbtemprelease r(txn->lockState());
+            Lock::TempRelease tempRelease(txn->lockState());
             _conn->query(stdx::function<void(DBClientCursorBatchIterator &)>(f), from_collection,
                          query, 0, options);
         }
+
+        // We are under lock here again, so reload the database in case it may have disappeared
+        // during the temp release
+        bool unused;
+        Database* db = dbHolder().getOrCreate(txn, toDBName, storageGlobalParams.dbpath, unused);
 
         if ( indexesToBuild.size() ) {
             for (list<BSONObj>::const_iterator i = indexesToBuild.begin();
@@ -232,9 +240,9 @@ namespace mongo {
 
                 BSONObj spec = *i;
                 string ns = spec["ns"].String(); // this was fixed when pulled off network
-                Collection* collection = f.context.db()->getCollection( txn, ns );
+                Collection* collection = db->getCollection( txn, ns );
                 if ( !collection ) {
-                    collection = f.context.db()->createCollection( txn, ns );
+                    collection = db->createCollection( txn, ns );
                     verify( collection );
                 }
 
@@ -291,13 +299,19 @@ namespace mongo {
                                 bool copyIndexes,
                                 bool logForRepl) {
 
-        Client::WriteContext ctx(txn, ns);
+        const NamespaceString nss(ns);
+        Lock::DBWrite dbWrite(txn->lockState(), nss.db());
+
+        const string dbName = nss.db().toString();
+
+        bool unused;
+        Database* db = dbHolder().getOrCreate(txn, dbName, storageGlobalParams.dbpath, unused);
 
         // config
-        string temp = ctx.ctx().db()->name() + ".system.namespaces";
+        string temp = dbName + ".system.namespaces";
         BSONObj config = _conn->findOne(temp , BSON("name" << ns));
         if (config["options"].isABSONObj()) {
-            Status status = userCreateNS(txn, ctx.ctx().db(), ns, config["options"].Obj(), logForRepl, 0);
+            Status status = userCreateNS(txn, db, ns, config["options"].Obj(), logForRepl, 0);
             if ( !status.isOK() ) {
                 errmsg = status.toString();
                 return false;
@@ -305,7 +319,7 @@ namespace mongo {
         }
 
         // main data
-        copy(txn, ctx.ctx(),
+        copy(txn, dbName,
              ns.c_str(), ns.c_str(), false, logForRepl, false, true, mayYield, mayBeInterrupted,
              Query(query).snapshot());
 
@@ -315,8 +329,8 @@ namespace mongo {
         }
 
         // indexes
-        temp = ctx.ctx().db()->name() + ".system.indexes";
-        copy(txn, ctx.ctx(), temp.c_str(), temp.c_str(), true, logForRepl, false, true, mayYield,
+        temp = dbName + ".system.indexes";
+        copy(txn, dbName, temp.c_str(), temp.c_str(), true, logForRepl, false, true, mayYield,
              mayBeInterrupted, BSON( "ns" << ns ));
 
         txn->recoveryUnit()->commitIfNeeded();
@@ -326,18 +340,18 @@ namespace mongo {
     extern bool inDBRepair;
 
     bool Cloner::go(OperationContext* txn,
-                    Client::Context& context,
+                    const std::string& toDBName,
                     const string& masterHost,
                     const CloneOptions& opts,
                     set<string>* clonedColls,
                     string& errmsg,
                     int* errCode) {
+
         if ( errCode ) {
             *errCode = 0;
         }
         massert( 10289 ,  "useReplAuth is not written to replication log", !opts.useReplAuth || !opts.logForRepl );
 
-        string todb = context.db()->name();
 #if !defined(_WIN32) && !defined(__sunos__)
         // isSelf() only does the necessary comparisons on os x and linux (SERVER-14165)
         bool masterSameProcess = HostAndPort(masterHost).isSelf();
@@ -347,8 +361,9 @@ namespace mongo {
         b << "127.0.0.1:" << serverGlobalParams.port;
         bool masterSameProcess = (a.str() == masterHost || b.str() == masterHost);
 #endif
+
         if (masterSameProcess) {
-            if (opts.fromDB == todb && context.db()->path() == storageGlobalParams.dbpath) {
+            if (opts.fromDB == toDBName) {
                 // guard against an "infinite" loop
                 /* if you are replicating, the local.sources config may be wrong if you get this */
                 errmsg = "can't clone from self (localhost).";
@@ -384,7 +399,7 @@ namespace mongo {
             /* todo: we can put these releases inside dbclient or a dbclient specialization.
                or just wait until we get rid of global lock anyway.
                */
-            dbtemprelease r(txn->lockState());
+            Lock::TempRelease tempRelease(txn->lockState());
 
             // just using exhaust for collection copying right now
 
@@ -461,10 +476,17 @@ namespace mongo {
             /* change name "<fromdb>.collection" -> <todb>.collection */
             const char *p = strchr(from_name, '.');
             verify(p);
-            string to_name = todb + p;
+            const string to_name = toDBName + p;
+
+            // Copy releases the lock, so we need to re-load the database. This should probably
+            // throw if the database has changed in between, but for now preserve the existing
+            // behaviour.
+            bool unused;
+            Database* db = 
+                dbHolder().getOrCreate(txn, toDBName, storageGlobalParams.dbpath, unused);
 
             /* we defer building id index for performance - building it in batch is much faster */
-            Status createStatus = userCreateNS( txn, context.db(), to_name, options,
+            Status createStatus = userCreateNS( txn, db, to_name, options,
                                                 opts.logForRepl, false );
             if ( !createStatus.isOK() ) {
                 errmsg = str::stream() << "failed to create collection \"" << to_name << "\": "
@@ -476,8 +498,18 @@ namespace mongo {
             Query q;
             if( opts.snapshot )
                 q.snapshot();
-            copy(txn, context,from_name, to_name.c_str(), false, opts.logForRepl, masterSameProcess,
-                 opts.slaveOk, opts.mayYield, opts.mayBeInterrupted, q);
+
+            copy(txn,
+                 toDBName,
+                 from_name,
+                 to_name.c_str(),
+                 false,
+                 opts.logForRepl,
+                 masterSameProcess,
+                 opts.slaveOk,
+                 opts.mayYield,
+                 opts.mayBeInterrupted,
+                 q);
 
             {
                 /* we need dropDups to be true as we didn't do a true snapshot and this is before applying oplog operations
@@ -486,7 +518,7 @@ namespace mongo {
                 bool old = inDBRepair;
                 try {
                     inDBRepair = true;
-                    Collection* c = context.db()->getCollection( txn, to_name );
+                    Collection* c = db->getCollection( txn, to_name );
                     if ( c )
                         c->getIndexCatalog()->ensureHaveIdIndex(txn);
                     inDBRepair = old;
@@ -502,7 +534,7 @@ namespace mongo {
         
         if ( opts.syncIndexes ) {
             string system_indexes_from = opts.fromDB + ".system.indexes";
-            string system_indexes_to = todb + ".system.indexes";
+            string system_indexes_to = toDBName + ".system.indexes";
             
             /* [dm]: is the ID index sometimes not called "_id_"?  There is other code in the system that looks for a "_id" prefix
                rather than this exact value.  we should standardize.  OR, remove names - which is in the bugdb.  Anyway, this
@@ -518,7 +550,7 @@ namespace mongo {
             BSONObj query = BSON( "name" << NE << "_id_" << "ns" << NIN << arr );
             
             // won't need a snapshot of the query of system.indexes as there can never be very many.
-            copy(txn, context,system_indexes_from.c_str(), system_indexes_to.c_str(), true,
+            copy(txn, toDBName, system_indexes_from.c_str(), system_indexes_to.c_str(), true,
                  opts.logForRepl, masterSameProcess, opts.slaveOk, opts.mayYield, opts.mayBeInterrupted, query );
         }
         return true;

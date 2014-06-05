@@ -123,6 +123,8 @@ namespace repl {
         // populates _me so that it can be passed to oplogreader for handshakes
         void ensureMe();
 
+        void forceResync(OperationContext* txn, const char *requester);
+
     public:
         OplogReader oplogReader;
 
@@ -165,7 +167,6 @@ namespace repl {
 
         static bool throttledForceResyncDead( OperationContext* txn, const char *requester );
         static void forceResyncDead( OperationContext* txn, const char *requester );
-        void forceResync( OperationContext* txn, const char *requester );
     };
 
     /**

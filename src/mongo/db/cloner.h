@@ -52,7 +52,7 @@ namespace mongo {
 
         /** copy the entire database */
         bool go(OperationContext* txn,
-                Client::Context& ctx,
+                const std::string& toDBName,
                 const std::string& masterHost,
                 const CloneOptions& opts,
                 std::set<std::string>* clonedColls,
@@ -70,7 +70,7 @@ namespace mongo {
 
     private:
         void copy(OperationContext* txn,
-                  Client::Context& ctx,
+                  const std::string& toDBName,
                   const char *from_ns,
                   const char *to_ns,
                   bool isindex,

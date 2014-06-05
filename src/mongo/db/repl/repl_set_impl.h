@@ -281,7 +281,7 @@ namespace repl {
         friend class Consensus;
 
     private:
-        bool _syncDoInitialSync_clone(Cloner &cloner, const char *master,
+        bool _syncDoInitialSync_clone(OperationContext* txn, Cloner &cloner, const char *master,
                                       const list<string>& dbs, bool dataPass);
         bool _syncDoInitialSync_applyToHead( SyncTail& syncer, OplogReader* r ,
                                              const Member* source, const BSONObj& lastOp,

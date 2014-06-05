@@ -118,10 +118,9 @@ namespace mongo {
             set<string> clonedColls;
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context context( dbname );
 
             Cloner cloner;
-            bool rval = cloner.go(txn, context, from, opts, &clonedColls, errmsg);
+            bool rval = cloner.go(txn, dbname, from, opts, &clonedColls, errmsg);
 
             BSONArrayBuilder barr;
             barr.append( clonedColls );
