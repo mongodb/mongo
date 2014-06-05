@@ -274,7 +274,7 @@ namespace QueryTests {
     class GetMoreKillOp : public ClientBase {
     public:
         ~GetMoreKillOp() {
-            getGlobalEnvironment()->resetOperationKillState();
+            getGlobalEnvironment()->unsetKillAllOperations();
             client().dropCollection( "unittests.querytests.GetMoreKillOp" );
         }
         void run() {
@@ -297,13 +297,13 @@ namespace QueryTests {
             
             // Set the killop kill all flag, forcing the next get more to fail with a kill op
             // exception.
-            getGlobalEnvironment()->killAllOperations();
+            getGlobalEnvironment()->setKillAllOperations();
             while( cursor->more() ) {
                 cursor->next();
             }
             
             // Revert the killop kill all flag.
-            getGlobalEnvironment()->resetOperationKillState();
+            getGlobalEnvironment()->unsetKillAllOperations();
 
             // Check that the cursor has been removed.
             {
@@ -326,7 +326,7 @@ namespace QueryTests {
     class GetMoreInvalidRequest : public ClientBase {
     public:
         ~GetMoreInvalidRequest() {
-            getGlobalEnvironment()->resetOperationKillState();
+            getGlobalEnvironment()->unsetKillAllOperations();
             client().dropCollection( "unittests.querytests.GetMoreInvalidRequest" );
         }
         void run() {

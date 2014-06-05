@@ -34,15 +34,20 @@ namespace mongo {
 
     class GlobalEnvironmentMongoD : public GlobalEnvironmentExperiment {
     public:
-        GlobalEnvironmentMongoD() { }
+        GlobalEnvironmentMongoD();
 
-        void killAllOperations();
+        void setKillAllOperations();
+
+        void unsetKillAllOperations();
+
+        bool getKillAllOperations();
 
         bool killOperation(AtomicUInt opId);
 
-        void resetOperationKillState();
-
         OperationContext* newOpCtx();
+
+    private:
+        bool _globalKill;
     };
 
 }  // namespace mongo

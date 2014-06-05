@@ -30,10 +30,11 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/kill_current_op.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
-
+#include "mongo/platform/random.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
@@ -65,16 +66,105 @@ namespace mongo {
         return cc().curop();
     }
 
+    // Enabling the checkForInterruptFail fail point will start a game of random chance on the
+    // connection specified in the fail point data, generating an interrupt with a given fixed
+    // probability.  Example invocation:
+    //
+    // {configureFailPoint: "checkForInterruptFail",
+    //  mode: "alwaysOn",
+    //  data: {conn: 17, chance: .01, allowNested: true}}
+    //
+    // All three data fields must be specified.  In the above example, all interrupt points on
+    // connection 17 will generate a kill on the current operation with probability p(.01),
+    // including interrupt points of nested operations.  If "allowNested" is false, nested
+    // operations are not targeted.  "chance" must be a double between 0 and 1, inclusive.
+    MONGO_FP_DECLARE(checkForInterruptFail);
+
+    namespace {
+
+        // Global state for checkForInterrupt fail point.
+        PseudoRandom checkForInterruptPRNG(static_cast<int64_t>(time(NULL)));
+
+        // Helper function for checkForInterrupt fail point.  Decides whether the operation currently
+        // being run by the given Client meet the (probabilistic) conditions for interruption as
+        // specified in the fail point info.
+        bool opShouldFail(const Client& c, const BSONObj& failPointInfo) {
+            // Only target the client with the specified connection number.
+            if (c.getConnectionId() != failPointInfo["conn"].safeNumberLong()) {
+                return false;
+            }
+
+            // Only target nested operations if requested.
+            if (!failPointInfo["allowNested"].trueValue() && c.curop()->parent() != NULL) {
+                return false;
+            }
+
+            // Return true with (approx) probability p = "chance".  Recall: 0 <= chance <= 1.
+            double next = static_cast<double>(std::abs(checkForInterruptPRNG.nextInt64()));
+            double upperBound =
+                std::numeric_limits<int64_t>::max() * failPointInfo["chance"].numberDouble();
+            if (next > upperBound) {
+                return false;
+            }
+            return true;
+        }
+
+    } // namespace
+
     void OperationContextImpl::checkForInterrupt(bool heedMutex) const {
-        killCurrentOp.checkForInterrupt(heedMutex);
+        Client& c = cc();
+
+        if (heedMutex && Lock::somethingWriteLocked() && c.hasWrittenSinceCheckpoint()) {
+            return;
+        }
+
+        uassert(ErrorCodes::InterruptedAtShutdown,
+                "interrupted at shutdown",
+                !getGlobalEnvironment()->getKillAllOperations());
+
+        if (c.curop()->maxTimeHasExpired()) {
+            c.curop()->kill();
+            uasserted(ErrorCodes::ExceededTimeLimit, "operation exceeded time limit");
+        }
+
+        MONGO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
+            if (opShouldFail(c, scopedFailPoint.getData())) {
+                log() << "set pending kill on " << (c.curop()->parent() ? "nested" : "top-level")
+                      << " op " << c.curop()->opNum().get() << ", for checkForInterruptFail";
+                c.curop()->kill();
+            }
+        }
+
+        if (c.curop()->killPending()) {
+            uasserted(11601, "operation was interrupted");
+        }
     }
 
     Status OperationContextImpl::checkForInterruptNoAssert() const {
-        const char* killed = killCurrentOp.checkForInterruptNoAssert();
-        if ( !killed || !killed[0] )
-            return Status::OK();
+        Client& c = cc();
 
-        return Status( ErrorCodes::Interrupted, killed );
+        if (getGlobalEnvironment()->getKillAllOperations()) {
+            return Status(ErrorCodes::Interrupted, "interrupted at shutdown");
+        }
+
+        if (c.curop()->maxTimeHasExpired()) {
+            c.curop()->kill();
+            return Status(ErrorCodes::Interrupted, "exceeded time limit");
+        }
+
+        MONGO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
+            if (opShouldFail(c, scopedFailPoint.getData())) {
+                log() << "set pending kill on " << (c.curop()->parent() ? "nested" : "top-level")
+                      << " op " << c.curop()->opNum().get() << ", for checkForInterruptFail";
+                c.curop()->kill();
+            }
+        }
+
+        if (c.curop()->killPending()) {
+            return Status(ErrorCodes::Interrupted, "interrupted");
+        }
+
+        return Status::OK();
     }
 
     bool OperationContextImpl::isPrimaryFor( const StringData& ns ) {

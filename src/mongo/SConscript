@@ -539,7 +539,6 @@ env.Library('global_environment_experiment',
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [ "db/curop.cpp",
-                    "db/kill_current_op.cpp",
                     "db/global_environment_d.cpp",
                     "db/d_globals.cpp",
                     "util/compress.cpp",

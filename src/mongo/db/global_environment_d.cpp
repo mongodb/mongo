@@ -28,21 +28,73 @@
 
 #include "mongo/db/global_environment_d.h"
 
-#include "mongo/db/kill_current_op.h"
+#include <set>
+
+#include "mongo/bson/util/atomic_int.h"
+#include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/scripting/engine.h"
 
 namespace mongo {
 
-    void GlobalEnvironmentMongoD::killAllOperations() {
-        killCurrentOp.killAll();
+    GlobalEnvironmentMongoD::GlobalEnvironmentMongoD() : _globalKill(false) { }
+
+    namespace {
+        void interruptJs(AtomicUInt* op) {
+            if (!globalScriptEngine) {
+                return;
+            }
+
+            if (!op) {
+                globalScriptEngine->interruptAll();
+            }
+            else {
+                globalScriptEngine->interrupt(*op);
+            }
+        }
+    }  // namespace
+
+    void GlobalEnvironmentMongoD::setKillAllOperations() {
+        _globalKill = true;
+        interruptJs(0);
+    }
+
+    bool GlobalEnvironmentMongoD::getKillAllOperations() {
+        return _globalKill;
     }
 
     bool GlobalEnvironmentMongoD::killOperation(AtomicUInt opId) {
-        return killCurrentOp.kill(opId);
+        scoped_lock clientLock(Client::clientsMutex);
+        bool found = false;
+
+        // XXX clean up
+        {
+            for( set< Client* >::const_iterator j = Client::clients.begin();
+                 !found && j != Client::clients.end();
+                 ++j ) {
+
+                for( CurOp *k = ( *j )->curop(); !found && k; k = k->parent() ) {
+                    if ( k->opNum() != opId )
+                        continue;
+
+                    k->kill();
+                    for( CurOp *l = ( *j )->curop(); l; l = l->parent() ) {
+                        l->kill();
+                    }
+
+                    found = true;
+                }
+            }
+        }
+        if ( found ) {
+            interruptJs( &opId );
+        }
+        return found;
     }
 
-    void GlobalEnvironmentMongoD::resetOperationKillState() {
-        killCurrentOp.reset();
+    void GlobalEnvironmentMongoD::unsetKillAllOperations() {
+        _globalKill = false;
     }
 
     OperationContext* GlobalEnvironmentMongoD::newOpCtx() {

@@ -1122,7 +1122,7 @@ namespace {
     }
 
     void exitCleanly( ExitCode code ) {
-        getGlobalEnvironment()->killAllOperations();
+        getGlobalEnvironment()->setKillAllOperations();
         if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeReplSet) {
             repl::theReplSet->shutdown();

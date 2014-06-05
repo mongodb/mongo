@@ -41,25 +41,31 @@ namespace mongo {
         virtual ~GlobalEnvironmentExperiment() { }
 
         //
-        // Global operation management.  This may not belong here.
+        // Global operation management.  This may not belong here and there may be too many methods
+        // here.
         //
 
         /**
          * Signal all OperationContext(s) that they have been killed.
          */
-        virtual void killAllOperations() = 0;
+        virtual void setKillAllOperations() = 0;
+
+        /**
+         * Reset the operation kill state after a killAllOperations.
+         * Used for testing.
+         */
+        virtual void unsetKillAllOperations() = 0;
+
+        /**
+         * Get the state for killing all operations.
+         */
+        virtual bool getKillAllOperations() = 0;
 
         /**
          * @param i opid of operation to kill
          * @return if operation was found 
          **/
         virtual bool killOperation(AtomicUInt opId) = 0;
-
-        /**
-         * Reset the operation kill state after a killAllOperations.
-         * Used for testing.
-         */
-        virtual void resetOperationKillState() = 0;
 
         //
         // Factories for storage interfaces

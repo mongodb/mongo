@@ -32,7 +32,12 @@
 
 namespace mongo {
 
-    void GlobalEnvironmentNoop::killAllOperations() {
+    void GlobalEnvironmentNoop::setKillAllOperations() { }
+
+    void GlobalEnvironmentNoop::unsetKillAllOperations() { }
+
+    bool GlobalEnvironmentNoop::getKillAllOperations() {
+        return false;
     }
 
     bool GlobalEnvironmentNoop::killOperation(AtomicUInt opId) {
@@ -41,9 +46,6 @@ namespace mongo {
 
     OperationContext* GlobalEnvironmentNoop::newOpCtx() {
         return new OperationContextNoop();
-    }
-
-    void GlobalEnvironmentNoop::resetOperationKillState() {
     }
 
 }  // namespace mongo

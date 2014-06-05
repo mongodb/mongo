@@ -32,11 +32,13 @@ namespace mongo {
 
     class GlobalEnvironmentNoop : public GlobalEnvironmentExperiment {
     public:
-        void killAllOperations();
-
         bool killOperation(AtomicUInt opId);
 
-        void resetOperationKillState();
+        void setKillAllOperations();
+
+        void unsetKillAllOperations();
+
+        bool getKillAllOperations();
 
         OperationContext* newOpCtx();
     };
