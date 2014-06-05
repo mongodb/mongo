@@ -38,38 +38,6 @@
 
 namespace mongo {
 
-    // todo: relocked is being called when there was no unlock below. 
-    //       that is weird.
-
-    /**
-     * Releases the current lock for the duration of its lifetime.
-     *
-     * WARNING: do not put in a smart pointer or any other class. If you absolutely must, you need
-     * to add the throw(DBException) annotation to it's destructor.
-     */
-    struct dbtemprelease {
-        Client::Context * _context;
-        scoped_ptr<Lock::TempRelease> tr;
-        dbtemprelease(LockState* lockState) {
-            const Client& c = cc();
-            _context = c.getContext();
-            invariant(lockState->threadState());
-            if( Lock::nested() ) {
-                massert(10298 , "can't temprelease nested lock", false);
-            }
-            if ( _context ) {
-                _context->unlocked();
-            }
-            tr.reset(new Lock::TempRelease(lockState));
-            verify( c.curop() );
-        }
-        ~dbtemprelease() throw(DBException) {
-            tr.reset();
-            if ( _context ) 
-                _context->relocked();
-        }
-    };
-
     extern void (*snmpInit)();
 
 } // namespace mongo

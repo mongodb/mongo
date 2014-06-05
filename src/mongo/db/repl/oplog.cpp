@@ -704,17 +704,24 @@ namespace repl {
             while (!done) {
                 BufBuilder bb;
                 BSONObjBuilder ob;
+
+                // Applying commands in repl is done under Global W-lock, so it is safe to not
+                // perform the current DB checks after reacquiring the lock.
+                invariant(txn->lockState()->isW());
+
                 _runCommands(txn, ns, o, bb, ob, true, 0);
                 // _runCommands takes care of adjusting opcounters for command counting.
                 Status status = Command::getStatusFromCommandResult(ob.done());
                 switch (status.code()) {
                 case ErrorCodes::BackgroundOperationInProgressForDatabase: {
-                    dbtemprelease release(txn->lockState());
+                    Lock::TempRelease release(txn->lockState());
+
                     BackgroundOperation::awaitNoBgOpInProgForDb(nsToDatabaseSubstring(ns));
                     break;
                 }
                 case ErrorCodes::BackgroundOperationInProgressForNamespace: {
-                    dbtemprelease release(txn->lockState());;
+                    Lock::TempRelease release(txn->lockState());
+
                     Command* cmd = Command::findCommand(o.firstElement().fieldName());
                     invariant(cmd);
                     BackgroundOperation::awaitNoBgOpInProgForNs(cmd->parseNs(nsToDatabase(ns), o));

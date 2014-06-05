@@ -343,10 +343,10 @@ namespace repl {
         }
     }
 
-    bool copyCollectionFromRemote(OperationContext* txn,
-                                          const string& host,
-                                          const string& ns,
-                                          string& errmsg) {
+    static bool copyCollectionFromRemote(OperationContext* txn,
+                                         const string& host,
+                                         const string& ns,
+                                         string& errmsg) {
         Cloner cloner;
 
         DBClientConnection *tmpConn = new DBClientConnection();
@@ -437,11 +437,24 @@ namespace repl {
                 string ns = *it;
                 sethbmsg(str::stream() << "rollback 4.1 coll resync " << ns);
 
-                Client::Context ctx(ns);
-                ctx.db()->dropCollection(txn, ns);
+                const NamespaceString nss(ns);
+
+                bool unused;
+                Database* db = dbHolder().getOrCreate(
+                                    txn, nss.db().toString(), storageGlobalParams.dbpath, unused);
+                invariant(db);
+
+                db->dropCollection(txn, ns);
                 {
                     string errmsg;
-                    dbtemprelease release(txn->lockState());
+
+                    // This comes as a GlobalWrite lock, so there is no DB to be acquired after
+                    // resume, so we can skip the DB stability checks. Also 
+                    // copyCollectionFromRemote will acquire its own database pointer, under the
+                    // appropriate locks, so just releasing and acquiring the lock is safe.
+                    invariant(txn->lockState()->isW());
+                    Lock::TempRelease release(txn->lockState());
+
                     bool ok = copyCollectionFromRemote(txn, them->getServerAddress(), ns, errmsg);
                     uassert(15909, str::stream() << "replSet rollback error resyncing collection "
                                                  << ns << ' ' << errmsg, ok);
@@ -734,7 +747,12 @@ namespace repl {
             }
             catch (DBException& e) {
                 sethbmsg(string("rollback 2 exception ") + e.toString() + "; sleeping 1 min");
-                dbtemprelease release(txn->lockState());
+
+                // Release the GlobalWrite lock while sleeping. We should always come here with a
+                // GlobalWrite lock
+                invariant(txn->lockState()->isW());
+                Lock::TempRelease(txn->lockState());
+
                 sleepsecs(60);
                 throw;
             }
