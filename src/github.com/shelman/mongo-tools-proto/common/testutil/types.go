@@ -28,6 +28,6 @@ func VerifyTestType(t *testing.T, testType string) {
 			return
 		}
 	}
-	t.Skip()
+	t.SkipNow()
 
 }
