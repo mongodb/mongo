@@ -93,9 +93,9 @@ namespace {
     }
 
     void ReplicationExecutor::finishShutdown() {
+        _networkWorkers.join();
         boost::unique_lock<boost::mutex> lk(_mutex);
         invariant(_inShutdown);
-        _networkWorkers.join();
         invariant(_exclusiveLockInProgressQueue.empty());
         invariant(_readyQueue.empty());
         invariant(_sleepersQueue.empty());
