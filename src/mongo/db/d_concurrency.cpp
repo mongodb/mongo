@@ -278,9 +278,10 @@ namespace mongo {
         fassert(16117, _lockState->threadState() != 0);
         
         scopedLk = _lockState->leaveScopedLock();
+        fassert(16118, scopedLk);
+
         invariant(_lockState == scopedLk->_lockState);
 
-        fassert(16118, scopedLk);
         scopedLk->tempRelease();
     }
     Lock::TempRelease::~TempRelease()
