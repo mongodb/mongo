@@ -1473,18 +1473,6 @@ namespace mongo {
             return;
         }
 
-        bool canRunHere =
-            isMaster( dbname.c_str() ) ||
-            c->slaveOk() ||
-            ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
-            fromRepl;
-
-        if ( ! canRunHere ) {
-            result.append( "note" , "from execCommand" );
-            appendCommandStatus(result, false, "not master");
-            return;
-        }
-
         if ( ! c->maintenanceOk() && theReplSet && ! isMaster( dbname.c_str() ) && ! theReplSet->isSecondary() ) {
             result.append( "note" , "from execCommand" );
             appendCommandStatus(result, false, "node is recovering");
@@ -1536,6 +1524,19 @@ namespace mongo {
         if ( c->locktype() == Command::NONE ) {
             verify( !c->lockGlobally() );
 
+
+            bool canRunHere =
+                isMaster( dbname.c_str() ) ||
+                c->slaveOk() ||
+                ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
+                fromRepl;
+
+            if ( ! canRunHere ) {
+                result.append( "note" , "from execCommand" );
+                appendCommandStatus(result, false, "not master");
+                return;
+            }
+
             // we also trust that this won't crash
             retval = true;
 
@@ -1552,6 +1553,19 @@ namespace mongo {
             if( c->lockGlobally() )
                 lk.reset( new Lock::GlobalRead() );
             Client::ReadContext ctx(ns, storageGlobalParams.dbpath); // read locks
+
+            bool canRunHere =
+                isMaster( dbname.c_str() ) ||
+                c->slaveOk() ||
+                ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
+                fromRepl;
+
+            if ( ! canRunHere ) {
+                result.append( "note" , "from execCommand" );
+                appendCommandStatus(result, false, "not master");
+                return;
+            }
+
             client.curop()->ensureStarted();
             retval = _execCommand(c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
         }
@@ -1570,6 +1584,19 @@ namespace mongo {
             scoped_ptr<Lock::ScopedLock> lk( global ? 
                                              static_cast<Lock::ScopedLock*>( new Lock::GlobalWrite() ) :
                                              static_cast<Lock::ScopedLock*>( new Lock::DBWrite( dbname ) ) );
+
+            bool canRunHere =
+                isMaster( dbname.c_str() ) ||
+                c->slaveOk() ||
+                ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
+                fromRepl;
+
+            if ( ! canRunHere ) {
+                result.append( "note" , "from execCommand" );
+                appendCommandStatus(result, false, "not master");
+                return;
+            }
+
             client.curop()->ensureStarted();
             Client::Context ctx(dbname, storageGlobalParams.dbpath);
             retval = _execCommand(c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);

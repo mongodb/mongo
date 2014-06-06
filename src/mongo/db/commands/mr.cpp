@@ -393,6 +393,7 @@ namespace mongo {
             {
                 // create temp collection and insert the indexes from temporary storage
                 Client::WriteContext tempCtx( _config.tempNamespace );
+                uassert(10001, "no longer master", isMasterNs(_config.tempNamespace.c_str()));
                 Collection* tempColl = tempCtx.ctx().db()->getCollection( _config.tempNamespace );
                 if ( !tempColl ) {
                     CollectionOptions options;
@@ -618,6 +619,7 @@ namespace mongo {
             verify( _onDisk );
 
             Client::WriteContext ctx( ns );
+            uassert(10004, "no longer master", isMasterNs(ns.c_str()));
             Collection* coll = ctx.ctx().db()->getCollection( ns );
             if ( !coll )
                 uasserted(13630, str::stream() << "attempted to insert into nonexistent" <<
