@@ -1,4 +1,4 @@
-// Package options contains mongotop-specific command-line options.
+// Package options implements mongotop-specific command-line options.
 package options
 
 import ()
