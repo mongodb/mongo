@@ -1,3 +1,3 @@
-// Package common contains subpackages that are used by all of the mongo
+// Package common contains subpackages that are shared amongst the mongo
 // tools.
 package common
