@@ -281,6 +281,11 @@ add_option( "use-system-tcmalloc", "use system version of tcmalloc library", 0, 
 
 add_option( "use-system-pcre", "use system version of pcre library", 0, True )
 
+# library choices
+boost_choices = ['1.49', '1.55']
+add_option( "internal-boost", "Specify internal boost version to use", 1, True,
+           type='choice', default=boost_choices[0], choices=boost_choices)
+
 add_option( "use-system-boost", "use system version of boost libraries", 0, True )
 
 add_option( "use-system-snappy", "use system version of snappy library", 0, True )
@@ -859,9 +864,15 @@ if not windows:
 if not use_system_version_of_library("pcre"):
     env.Prepend(CPPPATH=[ '$BUILD_DIR/third_party/pcre-${PCRE_VERSION}' ])
 
+boostSuffix = "";
+
 if not use_system_version_of_library("boost"):
-    env.Prepend(CPPPATH=['$BUILD_DIR/third_party/boost'],
-                CPPDEFINES=['BOOST_ALL_NO_LIB'])
+    if get_option( "internal-boost") == "1.49":
+        env.Prepend(CPPPATH=['$BUILD_DIR/third_party/boost'])
+    else:
+        env.Prepend(CPPPATH=['$BUILD_DIR/third_party/boost-1.55.0'])
+        boostSuffix = "-1.55.0"
+    env.Prepend(CPPDEFINES=['BOOST_ALL_NO_LIB'])
 
 env.Prepend(CPPPATH=['$BUILD_DIR/third_party/s2'])
 
@@ -1938,6 +1949,7 @@ Export("has_option use_system_version_of_library")
 Export("mongoCodeVersion")
 Export("usev8")
 Export("v8version v8suffix")
+Export("boostSuffix")
 Export("darwin windows solaris linux freebsd nix openbsd")
 Export('module_sconscripts')
 Export("debugBuild optBuild")

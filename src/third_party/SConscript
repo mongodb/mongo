@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env use_system_version_of_library windows darwin usev8 v8suffix solaris")
+Import("env use_system_version_of_library windows darwin usev8 v8suffix solaris boostSuffix")
 
 env.SConscript( [
         "murmurhash3/SConscript",
@@ -33,12 +33,13 @@ if use_system_version_of_library("boost"):
                         env['LIBDEPS_BOOST_SYSTEM_SYSLIBDEP']
                     ] )
 else:
-    env.SConscript('boost/SConscript')
+    boostDirectory = 'boost' + boostSuffix
+    env.SConscript(boostDirectory + '/SConscript')
     env.Library( "shim_boost", ['shim_boost.cpp'],
-                 LIBDEPS=[ 'boost/boost_program_options',
-                           'boost/boost_filesystem',
-                           'boost/boost_thread',
-                           'boost/boost_system',
+                 LIBDEPS=[ boostDirectory + '/boost_program_options',
+                           boostDirectory + '/boost_filesystem',
+                           boostDirectory + '/boost_thread',
+                           boostDirectory + '/boost_system',
                            ] )
 
 if use_system_version_of_library("snappy"):
