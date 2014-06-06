@@ -310,19 +310,6 @@ namespace mongo {
             dataFileVersion.append( "minor", minor );
         }
         dataFileVersion.done();
-
-        if ( !empty ){
-            int freeListSize = 0;
-            int64_t freeListSpace = 0;
-            getExtentManager()->freeListStats( &freeListSize, &freeListSpace );
-
-            BSONObjBuilder extentFreeList( output->subobjStart( "extentFreeList" ) );
-            extentFreeList.append( "num", freeListSize );
-            extentFreeList.appendNumber( "totalSize",
-                                         static_cast<long long>( freeListSpace / scale ) );
-            extentFreeList.done();
-        }
-
     }
 
     Status Database::dropCollection( OperationContext* txn, const StringData& fullns ) {

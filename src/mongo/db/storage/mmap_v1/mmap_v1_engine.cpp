@@ -296,6 +296,16 @@ namespace mongo {
             output->appendNumber( "fileSize", _extentManager.fileSize() / scale );
             output->appendNumber( "nsSizeMB", static_cast<int>( _namespaceIndex.fileLength() /
                                                                 ( 1024 * 1024 ) ) );
+
+            int freeListSize = 0;
+            int64_t freeListSpace = 0;
+            _extentManager.freeListStats( &freeListSize, &freeListSpace );
+
+            BSONObjBuilder extentFreeList( output->subobjStart( "extentFreeList" ) );
+            extentFreeList.append( "num", freeListSize );
+            extentFreeList.appendNumber( "totalSize",
+                                         static_cast<long long>( freeListSpace / scale ) );
+            extentFreeList.done();
         }
 
     }
