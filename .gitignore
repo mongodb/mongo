@@ -1,1 +1,13 @@
 *.swp
+
+bin/
+pkg/
+
+src/code.google.com/
+src/github.com/3rf/
+src/github.com/golang/
+src/github.com/jacobsa/
+src/github.com/jessevdk/
+src/github.com/ogier/
+src/github.com/smartystreets/
+src/labix.org/v2/mgo/
