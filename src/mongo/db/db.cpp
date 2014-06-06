@@ -289,9 +289,8 @@ namespace mongo {
         logStartup();
         repl::startReplication();
         if (serverGlobalParams.isHttpInterfaceEnabled)
-            boost::thread web( stdx::bind(&webServerThread,
-                                           new RestAdminAccess(), // takes ownership
-                                           OperationContextImpl::factory) ); // XXX SERVER-13931
+            boost::thread web(stdx::bind(&webServerThread,
+                                         new RestAdminAccess())); // takes ownership
 
 #if(TESTEXHAUST)
         boost::thread thr(testExhaust);

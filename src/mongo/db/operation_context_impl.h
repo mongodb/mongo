@@ -60,11 +60,6 @@ namespace mongo {
 
         virtual bool isPrimaryFor( const StringData& ns );
 
-        /**
-         * Returns an OperationContext. Caller takes ownership.
-         */
-        static OperationContext* factory();
-
     private:
         boost::scoped_ptr<RecoveryUnit> _recovery;
     };

@@ -108,23 +108,6 @@ namespace mongo {
          */
         virtual bool isPrimaryFor( const StringData& ns ) = 0;
 
-        /**
-         * Returns a OperationContext. Caller takes ownership.
-         *
-         * This interface is used for functions that need to create transactions (aka OpCtx), but
-         * don't know which implementation they should create. It allows the calling code to make
-         * that decision for them.
-         *
-         * TODO come up with a better Factory API once we split this class up (SERVER-13931).
-         */
-        typedef OperationContext* (*Factory)();
-
-        /**
-         * A OperationContext::Factory that always returns NULL. For things that shouldn't be
-         * touching their txns such as mongos or some unittests.
-         */
-        static OperationContext* factoryNULL() { return NULL; }
-
     protected:
         OperationContext() { }
     };

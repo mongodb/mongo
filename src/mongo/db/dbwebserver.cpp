@@ -48,6 +48,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/stats/snapshots.h"
 #include "mongo/util/admin_access.h"
@@ -75,18 +76,15 @@ namespace mongo {
     public:
         DbWebServer(const string& ip,
                     int port,
-                    const AdminAccess* webUsers,
-                    OperationContext::Factory transactionFactory)
+                    const AdminAccess* webUsers)
                 : MiniWebServer("admin web console", ip, port),
-                  _webUsers(webUsers),
-                  _transactionFactory(transactionFactory) {
+                  _webUsers(webUsers) {
 
             WebStatusPlugin::initAll();
         }
 
     private:
         const AdminAccess* _webUsers; // not owned here
-        const OperationContext::Factory _transactionFactory;
 
         void doUnlockedStuff(stringstream& ss) {
             /* this is in the header already ss << "port:      " << port << '\n'; */
@@ -191,7 +189,7 @@ namespace mongo {
             const SockAddr &from
         ) {
 
-            boost::scoped_ptr<OperationContext> txn(_transactionFactory()); // XXX SERVER-13931
+            boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
 
             if ( url.size() > 1 ) {
 
@@ -579,12 +577,11 @@ namespace mongo {
 
     // --- external ----
 
-    void webServerThread(const AdminAccess* adminAccess,
-                         OperationContext::Factory transactionFactory) {
+    void webServerThread(const AdminAccess* adminAccess) {
         boost::scoped_ptr<const AdminAccess> adminAccessPtr(adminAccess); // adminAccess is owned here
         Client::initThread("websvr");
         const int p = serverGlobalParams.port + 1000;
-        DbWebServer mini(serverGlobalParams.bind_ip, p, adminAccessPtr.get(), transactionFactory);
+        DbWebServer mini(serverGlobalParams.bind_ip, p, adminAccessPtr.get());
         mini.setupSockets();
         mini.initAndListen();
         cc().shutdown();

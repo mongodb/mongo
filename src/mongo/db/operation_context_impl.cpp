@@ -172,8 +172,4 @@ namespace mongo {
         return repl::isMasterNs(s.c_str());
     }
 
-    OperationContext* OperationContextImpl::factory() {
-        return new OperationContextImpl();
-    }
-
 }  // namespace mongo

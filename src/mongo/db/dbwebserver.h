@@ -96,7 +96,7 @@ namespace mongo {
         static std::vector<WebStatusPlugin*> * _plugins;
 
     };
-    void webServerThread( const AdminAccess* admins, OperationContext::Factory transactionFactory );
+    void webServerThread(const AdminAccess* admins);
     std::string prettyHostName();
 
 };

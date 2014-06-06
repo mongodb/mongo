@@ -271,8 +271,7 @@ static bool runMongosServer( bool doUpgrade ) {
 
     if (serverGlobalParams.isHttpInterfaceEnabled)
         boost::thread web( stdx::bind(&webServerThread,
-                                       new NoAdminAccess(), // takes ownership
-                                       OperationContext::factoryNULL) ); // XXX SERVER-13931
+                                       new NoAdminAccess())); // takes ownership
 
     Status status = getGlobalAuthorizationManager()->initialize();
     if (!status.isOK()) {
