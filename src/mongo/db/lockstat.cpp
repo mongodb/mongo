@@ -41,13 +41,13 @@ namespace mongo {
         BSONObjBuilder b;
 
         BSONObjBuilder t( b.subobjStart( "timeLockedMicros" ) );
-        _append( b , timeLocked );
+        _append( b, timeLocked, timeAcquiring );
         t.done();
-        
+
         BSONObjBuilder a( b.subobjStart( "timeAcquiringMicros" ) );
-        _append( a , timeAcquiring );
+        _append( a, timeAcquiring, timeLocked );
         a.done();
-        
+
         return b.obj();
     }
 
@@ -67,13 +67,22 @@ namespace mongo {
         
     }
 
-    void LockStat::_append( BSONObjBuilder& builder, const AtomicInt64* data ) {
-        if ( data[0].load() || data[1].load() ) {
+    void LockStat::_append( BSONObjBuilder& builder,
+                            const AtomicInt64* data,
+                            const AtomicInt64* additionalIndicator ) {
+
+        if ( data[0].load() ||
+             data[1].load() ||
+             ( additionalIndicator && ( additionalIndicator[0].load() ||
+                                        additionalIndicator[1].load() ) ) ) {
             builder.append( "R" , data[0].load() );
             builder.append( "W" , data[1].load() );
         }
-        
-        if ( data[2].load() || data[3].load() ) {
+
+        if ( data[2].load() ||
+             data[3].load() ||
+             ( additionalIndicator && ( additionalIndicator[2].load() ||
+                                        additionalIndicator[3].load() ) ) ) {
             builder.append( "r" , data[2].load() );
             builder.append( "w" , data[3].load() );
         }

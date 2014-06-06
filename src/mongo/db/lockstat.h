@@ -51,7 +51,9 @@ namespace mongo {
 
         long long getTimeLocked( char type ) const { return timeLocked[mapNo(type)].load(); }
     private:
-        static void _append( BSONObjBuilder& builder, const AtomicInt64* data );
+        static void _append( BSONObjBuilder& builder,
+                             const AtomicInt64* data,
+                             const AtomicInt64* additionalIndicator );
         
         // RWrw
         // in micros

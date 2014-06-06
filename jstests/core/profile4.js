@@ -55,10 +55,11 @@ try {
     o = lastOp();
     assert.eq('insert', o.op);
 
+    printjson( o );
     assert.eq( 0, o.lockStats.timeLockedMicros.r );
     assert.lt( 0, o.lockStats.timeLockedMicros.w );
     assert.eq( 0, o.lockStats.timeAcquiringMicros.r );
-    //assert.lt( 0, o.lockStats.timeAcquiringMicros.w );    // Removed due to SERVER-8331
+    assert.lte( 0, o.lockStats.timeAcquiringMicros.w );
 
     // check read lock stats are set
     t.find();
@@ -66,8 +67,8 @@ try {
     assert.eq('query', o.op);
     assert.lt( 0, o.lockStats.timeLockedMicros.r );
     assert.eq( 0, o.lockStats.timeLockedMicros.w );
-    //assert.lt( 0, o.lockStats.timeAcquiringMicros.r );    // Removed due to SERVER-8331
-    //assert.lt( 0, o.lockStats.timeAcquiringMicros.w );    // Removed due to SERVER-8331
+    assert.lte( 0, o.lockStats.timeAcquiringMicros.r );
+    assert.lte( 0, o.lockStats.timeAcquiringMicros.w );
 
     t.save( {} );
     t.save( {} );
