@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+// Does not need a mongod to be running.  Only tests configuring the connector,
+// without actually connecting.
 func TestConfigureSSLConnector(t *testing.T) {
 
 	testutil.VerifyTestType(t, "ssl")
@@ -110,6 +112,30 @@ func TestBidirectionalSSL(t *testing.T) {
 					UseSSL:        true,
 					SSLCAFile:     "testdata/ca.pem",
 					SSLPEMKeyFile: "testdata/server.pem",
+				},
+			}
+			So(connector.Configure(opts), ShouldBeNil)
+			session, err := connector.GetNewSession()
+			So(session, ShouldNotBeNil)
+			So(err, ShouldBeNil)
+			session.Close()
+
+		})
+
+		Convey("without a ca file that validates the server, but with invalid"+
+			" certificates allowed, connection should work", func() {
+
+			connector = &SSLDBConnector{}
+
+			opts := &options.ToolOptions{
+				Connection: &options.Connection{
+					Host: "localhost",
+					Port: "20000",
+				},
+				SSL: &options.SSL{
+					UseSSL:                      true,
+					SSLPEMKeyFile:               "testdata/server.pem",
+					SSLAllowInvalidCertificates: true,
 				},
 			}
 			So(connector.Configure(opts), ShouldBeNil)
