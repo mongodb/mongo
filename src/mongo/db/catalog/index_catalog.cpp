@@ -999,7 +999,9 @@ namespace mongo {
             KeyPattern::isIdKeyPattern(index->descriptor()->keyPattern()) ||
             index->descriptor()->unique();
 
-        options.dupsAllowed = repl::ignoreUniqueIndex(index->descriptor()) || !isUnique;
+        options.dupsAllowed =
+            repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(index->descriptor())
+            || !isUnique;
 
         int64_t inserted;
         return index->accessMethod()->insert(txn, obj, loc, options, &inserted);
@@ -1092,7 +1094,7 @@ namespace mongo {
             if ( !descriptor->unique() )
                 continue;
 
-            if (repl::ignoreUniqueIndex(descriptor))
+            if (repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor))
                 continue;
 
             IndexAccessMethod* iam = getIndex( descriptor );

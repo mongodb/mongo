@@ -30,7 +30,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/pdfile_private.h"  // This is for inDBRepair.
-#include "mongo/db/repl/rs.h"         // This is for ignoreUniqueIndex.
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/progress_meter.h"
@@ -127,8 +127,8 @@ namespace mongo {
         Timer timer;
         IndexCatalogEntry* entry = _real->_btreeState;
 
-        bool dupsAllowed = !entry->descriptor()->unique()
-                           || repl::ignoreUniqueIndex(entry->descriptor());
+        bool dupsAllowed = !entry->descriptor()->unique() ||
+            repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(entry->descriptor());
 
         bool dropDups = entry->descriptor()->dropDups() || inDBRepair;
 

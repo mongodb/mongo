@@ -63,7 +63,7 @@ namespace mongo {
         options.dupsAllowed = true;
 
         if ( descriptor->isIdIndex() || descriptor->unique() ) {
-            if (!repl::ignoreUniqueIndex(descriptor)) {
+            if (!repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor)) {
                 options.dupsAllowed = false;
             }
         }

@@ -41,7 +41,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/structure/record_store_v1_capped.h"
-#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
 
@@ -329,7 +329,7 @@ namespace mongo {
             options.logIfError = false;
             options.dupsAllowed =
                 !(KeyPattern::isIdKeyPattern(descriptor->keyPattern()) || descriptor->unique())
-                || repl::ignoreUniqueIndex(descriptor);
+                || repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor);
             UpdateTicket* updateTicket = new UpdateTicket();
             updateTickets.mutableMap()[descriptor] = updateTicket;
             Status ret = iam->validateUpdate(objOld, objNew, oldLocation, options, updateTicket );
