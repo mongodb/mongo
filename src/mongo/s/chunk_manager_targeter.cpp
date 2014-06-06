@@ -48,7 +48,7 @@ namespace mongo {
             *errMsg = ex.toString();
         }
 
-        return config;
+        return config.get();
     }
 
     ChunkManagerTargeter::ChunkManagerTargeter() :

@@ -141,7 +141,7 @@ namespace mongo {
 
         if (!_limit) {
             _limit = dynamic_cast<DocumentSourceLimit*>(nextSource.get());
-            return _limit; // false if next is not a $limit
+            return _limit.get(); // false if next is not a $limit
         }
         else {
             return _limit->coalesce(nextSource);

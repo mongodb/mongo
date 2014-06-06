@@ -92,7 +92,7 @@ namespace mongo {
     bool DocumentSourceSort::coalesce(const intrusive_ptr<DocumentSource> &pNextSource) {
         if (!limitSrc) {
             limitSrc = dynamic_cast<DocumentSourceLimit*>(pNextSource.get());
-            return limitSrc; // false if next is not a $limit
+            return limitSrc.get(); // false if next is not a $limit
         }
         else {
             return limitSrc->coalesce(pNextSource);
