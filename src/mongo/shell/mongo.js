@@ -81,7 +81,7 @@ Mongo.prototype.tojson = Mongo.prototype.toString;
 /**
  * Sets the read preference.
  *
- * @param mode {string} read prefrence mode to use. Pass null to disable read
+ * @param mode {string} read preference mode to use. Pass null to disable read
  *     preference.
  * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
  *     Note that this object only keeps a shallow copy of this array.

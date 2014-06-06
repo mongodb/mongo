@@ -9,7 +9,7 @@
  * infinitely looping operation, we ensure that killall interrupts the drop command (drop is
  * normally a short lived operation and is otherwise difficult to kill deterministically).  The
  * subsequent drop() on restart would historically assert if the data integrity issue caused by
- * SERVER-1818 occured.
+ * SERVER-1818 occurred.
  */
 
 port = allocatePorts( 1 )[ 0 ]

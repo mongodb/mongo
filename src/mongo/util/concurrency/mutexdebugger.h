@@ -52,9 +52,9 @@ namespace mongo {
     */
     class MutexDebugger {
         typedef const char * mid; // mid = mutex ID
-        typedef std::map<mid,int> Preceeding;
+        typedef std::map<mid,int> Preceding;
         std::map< mid, int > maxNest;
-        boost::thread_specific_ptr< Preceeding > us;
+        boost::thread_specific_ptr< Preceding > us;
         std::map< mid, std::set<mid> > followers;
         boost::mutex &x;
         unsigned magic;
@@ -74,12 +74,12 @@ namespace mongo {
         MutexDebugger();
 
         std::string currentlyLocked() const { 
-            Preceeding *_preceeding = us.get();
-            if( _preceeding == 0 )
+            Preceding *_preceding = us.get();
+            if( _preceding == 0 )
                 return "";
-            Preceeding &preceeding = *_preceeding;
+            Preceding &preceding = *_preceding;
             std::stringstream q;
-            for( Preceeding::const_iterator i = preceeding.begin(); i != preceeding.end(); i++ ) {
+            for( Preceding::const_iterator i = preceding.begin(); i != preceding.end(); i++ ) {
                 if( i->second > 0 )
                     q << "  " << i->first << ' ' << i->second << '\n';
             }
@@ -90,24 +90,24 @@ namespace mongo {
             if( this == 0 || m == 0 ) return;
             verify( magic == 0x12345678 );
 
-            Preceeding *_preceeding = us.get();
-            if( _preceeding == 0 )
-                us.reset( _preceeding = new Preceeding() );
-            Preceeding &preceeding = *_preceeding;
+            Preceding *_preceding = us.get();
+            if( _preceding == 0 )
+                us.reset( _preceding = new Preceding() );
+            Preceding &preceding = *_preceding;
 
             if( a == m ) {
                 aBreakPoint();
-                if( preceeding[b.c_str()] ) {
+                if( preceding[b.c_str()] ) {
                     std::cout << "****** MutexDebugger error! warning " << b << " was locked before " << a << std::endl;
                     verify(false);
                 }
             }
 
-            preceeding[m]++;
-            if( preceeding[m] > 1 ) {
+            preceding[m]++;
+            if( preceding[m] > 1 ) {
                 // recursive re-locking.
-                if( preceeding[m] > maxNest[m] )
-                    maxNest[m] = preceeding[m];
+                if( preceding[m] > maxNest[m] )
+                    maxNest[m] = preceding[m];
                 return;
             }
 
@@ -116,7 +116,7 @@ namespace mongo {
             {
                 boost::mutex::scoped_lock lk(x);
                 followers[m];
-                for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) {
+                for( Preceding::iterator i = preceding.begin(); i != preceding.end(); i++ ) {
                     if( m != i->first && i->second > 0 ) {
                         followers[i->first].insert(m);
                         if( followers[m].count(i->first) != 0 ) {
@@ -128,7 +128,7 @@ namespace mongo {
                                "\n  " << bad << " was already locked and should not be."
                                "\n  set a and b above to debug.\n";
                             std::stringstream q;
-                            for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) {
+                            for( Preceding::iterator i = preceding.begin(); i != preceding.end(); i++ ) {
                                 if( i->first != m && i->first != bad && i->second > 0 )
                                     q << "  " << i->first << '\n';
                             }
@@ -148,11 +148,11 @@ namespace mongo {
         }
         void leaving(mid m) {
             if( this == 0 || m == 0 ) return; // still in startup pre-main()
-            Preceeding& preceeding = *us.get();
-            preceeding[m]--;
-            if( preceeding[m] < 0 ) {
-                std::cout << "ERROR: lock count for " << m << " is " << preceeding[m] << std::endl;
-                verify( preceeding[m] >= 0 );
+            Preceding& preceding = *us.get();
+            preceding[m]--;
+            if( preceding[m] < 0 ) {
+                std::cout << "ERROR: lock count for " << m << " is " << preceding[m] << std::endl;
+                verify( preceding[m] >= 0 );
             }
         }
     };

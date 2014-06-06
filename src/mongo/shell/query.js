@@ -258,7 +258,7 @@ DBQuery.prototype.maxTimeMS = function( maxTimeMS ) {
 /**
  * Sets the read preference for this cursor.
  * 
- * @param mode {string} read prefrence mode to use.
+ * @param mode {string} read preference mode to use.
  * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
  *     Note that this object only keeps a shallow copy of this array.
  * 

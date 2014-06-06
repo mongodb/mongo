@@ -201,7 +201,7 @@ namespace ThreadedTests {
                             ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("local"));
                         }
                         else if( q == 1 ) {
-                            // test locking local only -- with no preceeding lock
+                            // test locking local only -- with no preceding lock
                             { 
                                 Lock::DBRead x(&lockState, "local");
                                 //Lock::DBRead y("q");

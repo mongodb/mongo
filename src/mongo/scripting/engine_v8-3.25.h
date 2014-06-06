@@ -593,7 +593,7 @@ namespace mongo {
     /**
      * Check for an error condition (e.g. empty handle, JS exception, OOM) after executing
      * a v8 operation.
-     * @resultHandle         handle storing the result of the preceeding v8 operation
+     * @resultHandle         handle storing the result of the preceding v8 operation
      * @try_catch            the active v8::TryCatch exception handler
      * @param reportError    if true, log an error message
      * @param assertOnError  if true, throw an exception if an error is detected

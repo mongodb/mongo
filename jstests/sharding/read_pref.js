@@ -1,5 +1,5 @@
 /**
- * Integration test for read prefrence and tagging. The more comprehensive unit test
+ * Integration test for read preference and tagging. The more comprehensive unit test
  * can be found in dbtests/replica_set_monitor_test.cpp.
  */
 

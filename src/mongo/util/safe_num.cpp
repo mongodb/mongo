@@ -107,7 +107,7 @@ namespace mongo {
             return _value.doubleVal == rhs._value.doubleVal;
         }
 
-        // If we're mixing integers and doubles, we should be carefull. Some integers are
+        // If we're mixing integers and doubles, we should be careful. Some integers are
         // too big to be accuratelly represented in a double. If we're within a safe range
         // we compare both sides as doubles.
         const double lhsDouble = getDouble(*this);

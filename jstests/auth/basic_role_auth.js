@@ -122,7 +122,7 @@ var checkErr = function(shouldPass, opFunc) {
  *
  * @param db {DB} the database object to use.
  * @param allowedActions {Object} the lists of operations that are allowed for the
- *     current user. The data structure is represented as a map with the presense of
+ *     current user. The data structure is represented as a map with the presence of
  *     a field name means that the operation is allowed and not allowed if it is
  *     not present. The list of field names are: insert, update, remove, query, killOp,
  *     currentOp, index_r, index_w, profile_r, profile_w, user_r, user_w, killCursor,
