@@ -72,7 +72,6 @@
 #include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_coordinator_legacy.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/restapi.h"
 #include "mongo/db/server_parameters.h"
@@ -287,7 +286,7 @@ namespace mongo {
         server->setupSockets();
 
         logStartup();
-        repl::startReplication();
+        repl::getGlobalReplicationCoordinator()->startReplication();
         if (serverGlobalParams.isHttpInterfaceEnabled)
             boost::thread web(stdx::bind(&webServerThread,
                                          new RestAdminAccess())); // takes ownership

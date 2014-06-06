@@ -54,9 +54,5 @@ namespace repl {
         set<HostAndPort> seedSet;
     };
 
-    // Entry point for replication at server startup.
-    // This function starts replica set or master/slave replication
-    // based on command line/config parameters.
-    void startReplication();
 } // namespace repl
 } // namespace mongo

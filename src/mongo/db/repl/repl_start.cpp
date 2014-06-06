@@ -90,25 +90,5 @@ namespace repl {
         }
     }
 
-    void startReplication() {
-        /* if we are going to be a replica set, we aren't doing other forms of replication. */
-        if (!replSettings.replSet.empty()) {
-            if( replSettings.slave || replSettings.master ) {
-                log() << "***" << endl;
-                log() << "ERROR: can't use --slave or --master replication options with --replSet";
-                log() << "***" << endl;
-            }
-            newRepl();
-
-            replSet = true;
-            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(replSettings.replSet);
-            boost::thread t( stdx::bind( &startReplSets, replSetCmdline) );
-        } else {
-            startMasterSlave();
-        }
-
-        getGlobalReplicationCoordinator()->startReplication();
-    }
-
 } // namespace repl
 } // namespace mongo

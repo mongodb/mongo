@@ -30,10 +30,15 @@
 
 #include "mongo/db/repl/repl_coordinator_legacy.h"
 
+#include <boost/thread/thread.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/master_slave.h"
+#include "mongo/db/repl/oplog.h" // for newRepl()
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replset_commands.h"
+#include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/assert_util.h" // TODO: remove along with invariant from getCurrentMemberState
 #include "mongo/util/fail_point_service.h"
@@ -48,7 +53,21 @@ namespace repl {
     LegacyReplicationCoordinator::~LegacyReplicationCoordinator() {}
 
     void LegacyReplicationCoordinator::startReplication() {
-        // TODO
+        // if we are going to be a replica set, we aren't doing other forms of replication.
+        if (!replSettings.replSet.empty()) {
+            if (replSettings.slave || replSettings.master) {
+                log() << "***" << endl;
+                log() << "ERROR: can't use --slave or --master replication options with --replSet";
+                log() << "***" << endl;
+            }
+            newRepl();
+
+            replSet = true;
+            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(replSettings.replSet);
+            boost::thread t(stdx::bind(&startReplSets, replSetCmdline));
+        } else {
+            startMasterSlave();
+        }
     }
 
     void LegacyReplicationCoordinator::shutdown() {
