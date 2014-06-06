@@ -1206,7 +1206,12 @@ __clsm_put(WT_SESSION_IMPL *session,
 			    strcmp(current_chunk->uri,
 			    clsm->cursors[(clsm->nchunks - i) - 1]->uri) == 0);
 			WT_ASSERT(session, i == 0 || 
-			    !__wt_txn_visible_all(session, current_chunk->txnid_max));
+			    !__wt_txn_visible_all(
+			    session, current_chunk->txnid_max));
+			if (i != 0 &&
+			    TXNID_LT(current_chunk->txnid_max, session->txn.id))
+					current_chunk->update_txn_max =
+					    session->txn.id;
 		}
 	}
 

@@ -255,6 +255,7 @@ __wt_lsm_tree_setup_chunk(
 		if (exists)
 			WT_RET(__wt_schema_drop(session, chunk->uri, cfg));
 	}
+	chunk->update_txn_max = WT_TXN_NONE;
 	return (__wt_schema_create(session, chunk->uri, lsm_tree->file_config));
 }
 

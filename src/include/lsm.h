@@ -55,6 +55,7 @@ struct __wt_lsm_chunk {
 	uint64_t count;			/* Approximate count of records */
 	uint64_t size;			/* Final chunk size */
 	uint64_t txnid_max;		/* Newest transactional update */
+	uint64_t update_txn_max;	/* Newest txn to apply an update */
 
 	uint32_t id;			/* ID used to generate URIs */
 	uint32_t generation;		/* Merge generation */
