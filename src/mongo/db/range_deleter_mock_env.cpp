@@ -106,11 +106,9 @@ namespace mongo {
     }
 
     bool RangeDeleterMockEnv::deleteRange(OperationContext* txn,
-                                          const StringData& ns,
-                                          const BSONObj& min,
-                                          const BSONObj& max,
-                                          const BSONObj& shardKeyPattern,
-                                          bool secondaryThrottle,
+                                          const RangeDeleteEntry& taskDetails,
+                                          long long int* deletedDocs,
+                                          ReplTime* lastOp,
                                           string* errMsg) {
 
         {
@@ -133,14 +131,21 @@ namespace mongo {
             scoped_lock sl(_deleteListMutex);
 
             DeletedRange entry;
-            entry.ns = ns.toString();
-            entry.min = min.getOwned();
-            entry.max = max.getOwned();
-            entry.shardKeyPattern = shardKeyPattern.getOwned();
+            entry.ns = taskDetails.ns;
+            entry.min = taskDetails.min.getOwned();
+            entry.max = taskDetails.max.getOwned();
+            entry.shardKeyPattern = taskDetails.shardKeyPattern.getOwned();
 
             _deleteList.push_back(entry);
         }
 
+        return true;
+    }
+
+    bool RangeDeleterMockEnv::waitForReplication(ReplTime lastOp,
+                                                 const BSONObj& writeConcern,
+                                                 long long int timeoutSecs,
+                                                 string* errMsg) {
         return true;
     }
 

@@ -55,21 +55,26 @@ namespace mongo {
      * 6. Wait until the majority of the secondaries catch up.
      */
     bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
-                                        const StringData& ns,
-                                        const BSONObj& inclusiveLower,
-                                        const BSONObj& exclusiveUpper,
-                                        const BSONObj& keyPattern,
-                                        bool secondaryThrottle,
+                                        const RangeDeleteEntry& taskDetails,
+                                        long long int* deletedDocs,
+                                        ReplTime* lastOp,
                                         std::string* errMsg) {
+        const string ns(taskDetails.ns);
+        const BSONObj inclusiveLower(taskDetails.min);
+        const BSONObj exclusiveUpper(taskDetails.max);
+        const BSONObj keyPattern(taskDetails.shardKeyPattern);
+        const bool secondaryThrottle(taskDetails.secondaryThrottle);
+
         const bool initiallyHaveClient = haveClient();
 
         if (!initiallyHaveClient) {
             Client::initThread("RangeDeleter");
         }
 
+        *deletedDocs = 0;
         ShardForceVersionOkModeBlock forceVersion;
         {
-            Helpers::RemoveSaver removeSaver("moveChunk", ns.toString(), "post-cleanup");
+            Helpers::RemoveSaver removeSaver("moveChunk", ns, "post-cleanup");
 
             // log the opId so the user can use it to cancel the delete using killOp.
             unsigned int opId = txn->getCurOp()->opNum();
@@ -80,9 +85,9 @@ namespace mongo {
                   << endl;
 
             try {
-                long long numDeleted =
+                *deletedDocs =
                         Helpers::removeRange(txn,
-                                             KeyRange(ns.toString(),
+                                             KeyRange(ns,
                                                       inclusiveLower,
                                                       exclusiveUpper,
                                                       keyPattern),
@@ -92,7 +97,7 @@ namespace mongo {
                                              true, /*fromMigrate*/
                                              true); /*onlyRemoveOrphans*/
 
-                if (numDeleted < 0) {
+                if (*deletedDocs < 0) {
                     *errMsg = "collection or index dropped before data could be cleaned";
                     warning() << *errMsg << endl;
 
@@ -103,7 +108,7 @@ namespace mongo {
                     return false;
                 }
 
-                log() << "rangeDeleter deleted " << numDeleted
+                log() << "rangeDeleter deleted " << *deletedDocs
                       << " documents for " << ns
                       << " from " << inclusiveLower
                       << " -> " << exclusiveUpper
@@ -124,19 +129,27 @@ namespace mongo {
             }
         }
 
+        *lastOp = cc().getLastOp().asDate();
+
+        if (!initiallyHaveClient) {
+            cc().shutdown();
+        }
+
+        return true;
+    }
+
+    bool RangeDeleterDBEnv::waitForReplication(ReplTime lastOp,
+                                               const BSONObj& writeConcern,
+                                               long long int timeoutSecs,
+                                               string* errMsg) {
         if (repl::replSet) {
             Timer elapsedTime;
-            ReplTime lastOpApplied = cc().getLastOp().asDate();
-            while (!repl::opReplicatedEnough(lastOpApplied,
-                                       BSON("w" << "majority").firstElement())) {
-                if (elapsedTime.seconds() >= 3600) {
+
+            while (!repl::opReplicatedEnough(lastOp, writeConcern["w"])) {
+                if (elapsedTime.seconds() >= timeoutSecs) {
                     *errMsg = str::stream() << "rangeDeleter timed out after "
                                             << elapsedTime.seconds() << " seconds while waiting"
                                             << " for deletions to be replicated to majority nodes";
-
-                    if (!initiallyHaveClient) {
-                        cc().shutdown();
-                    }
 
                     return false;
                 }
@@ -147,10 +160,6 @@ namespace mongo {
             LOG(elapsedTime.seconds() < 30 ? 1 : 0)
                 << "rangeDeleter took " << elapsedTime.seconds() << " seconds "
                 << " waiting for deletes to be replicated to majority nodes" << endl;
-        }
-
-        if (!initiallyHaveClient) {
-            cc().shutdown();
         }
 
         return true;

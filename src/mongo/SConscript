@@ -719,7 +719,7 @@ env.Library('stacktrace',
 
 serverOnlyFiles += mmapFiles
 
-serverOnlyFiles += [ "db/stats/snapshots.cpp" ]
+serverOnlyFiles += [ "db/stats/snapshots.cpp", "db/stats/range_deleter_server_status.cpp" ]
 
 env.Library('coreshard', ['s/distlock.cpp',
                           's/config.cpp',
@@ -879,7 +879,6 @@ env.CppUnitTest(
 env.Library('range_deleter',
             [ 'db/range_deleter.cpp',
               'db/range_deleter_mock_env.cpp',
-              'db/range_deleter_stats.cpp'
             ],
             LIBDEPS = [
                 '$BUILD_DIR/mongo/s/base', # range_arithmetic.cpp
@@ -891,10 +890,6 @@ env.Library('range_deleter',
 
 env.CppUnitTest('range_deleter_test',
                 [ 'db/range_deleter_test.cpp' ],
-                LIBDEPS = [ 'range_deleter', 'db/common' ]);
-
-env.CppUnitTest('range_deleter_stat_test',
-                [ 'db/range_deleter_stat_test.cpp' ],
                 LIBDEPS = [ 'range_deleter', 'db/common' ]);
 
 env.Library("serveronly", serverOnlyFiles,

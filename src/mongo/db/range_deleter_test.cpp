@@ -32,7 +32,6 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/range_deleter.h"
 #include "mongo/db/range_deleter_mock_env.h"
-#include "mongo/db/range_deleter_stats.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 
@@ -47,7 +46,6 @@ namespace {
     using mongo::Notification;
     using mongo::RangeDeleter;
     using mongo::RangeDeleterMockEnv;
-    using mongo::RangeDeleterStats;
     using mongo::OperationContext;
 
     OperationContext* const noTxn = NULL; // MockEnv doesn't need txn XXX SERVER-13931
@@ -91,11 +89,7 @@ namespace {
 
         env->waitForNthGetCursor(1u);
 
-        const BSONObj stats(deleter.getStats()->toBSON());
-        int pendingCount = 0;
-        ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::PendingDeletesField,
-                                         &pendingCount, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(1, pendingCount);
+        ASSERT_EQUALS(1U, deleter.getPendingDeletes());
         ASSERT_FALSE(env->deleteOccured());
 
         // Set the open cursors to a totally different sets of cursorIDs.
@@ -171,11 +165,7 @@ namespace {
 
         // Note: immediate deletes has no pending state, it goes directly to inProgress
         // even while waiting for cursors.
-        const BSONObj stats(deleter.getStats()->toBSON());
-        int inProgCount = 0;
-        ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::InProgressDeletesField,
-                                         &inProgCount, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(1, inProgCount);
+        ASSERT_EQUALS(1U, deleter.getDeletesInProgress());
 
         ASSERT_FALSE(env->deleteOccured());
 
@@ -222,11 +212,7 @@ namespace {
 
         // Note: immediate deletes has no pending state, it goes directly to inProgress
         // even while waiting for cursors.
-        const BSONObj stats(deleter.getStats()->toBSON());
-        int inProgCount = 0;
-        ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::InProgressDeletesField,
-                                         &inProgCount, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(1, inProgCount);
+        ASSERT_EQUALS(1U, deleter.getDeletesInProgress());
 
         ASSERT_FALSE(env->deleteOccured());
 
@@ -266,11 +252,7 @@ namespace {
         env->waitForNthPausedDelete(1u);
 
         // Make sure that the delete is already in progress before proceeding.
-        const BSONObj stats(deleter.getStats()->toBSON());
-        int inProgressCount = 0;
-        ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::InProgressDeletesField,
-                                         &inProgressCount, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(1, inProgressCount);
+        ASSERT_EQUALS(1U, deleter.getDeletesInProgress());
 
         Notification notifyDone2;
         ASSERT_TRUE(deleter.queueDelete(blockedNS,
@@ -296,21 +278,9 @@ namespace {
         // { x: 30 } => { x: 40 } waiting to be picked up by worker.
 
         // Make sure that the current state matches the setup.
-        const BSONObj stats2(deleter.getStats()->toBSON());
-        int totalCount = 0;
-        ASSERT_TRUE(FieldParser::extract(stats2, RangeDeleterStats::TotalDeletesField,
-                                         &totalCount, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(3, totalCount);
-
-        int pendingCount = 0;
-        ASSERT_TRUE(FieldParser::extract(stats2, RangeDeleterStats::PendingDeletesField,
-                                         &pendingCount, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(2, pendingCount);
-
-        int inProgressCount2 = 0;
-        ASSERT_TRUE(FieldParser::extract(stats2, RangeDeleterStats::InProgressDeletesField,
-                                         &inProgressCount2, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(1, inProgressCount2);
+        ASSERT_EQUALS(3U, deleter.getTotalDeletes());
+        ASSERT_EQUALS(2U, deleter.getPendingDeletes());
+        ASSERT_EQUALS(1U, deleter.getDeletesInProgress());
 
         // Let the first delete proceed.
         env->resumeOneDelete();

@@ -2240,7 +2240,7 @@ namespace mongo {
             // Pending deletes (for migrations) are serialized by the distributed collection lock,
             // we are sure we registered a delete for a range *before* we can migrate-in a
             // subrange.
-            int numDeletes = getDeleter()->getStats()->getCurrentDeletes();
+            const size_t numDeletes = getDeleter()->getTotalDeletes();
             if (numDeletes > 0) {
                 errmsg = str::stream() << "can't accept new chunks because "
                         << " there are still " << numDeletes

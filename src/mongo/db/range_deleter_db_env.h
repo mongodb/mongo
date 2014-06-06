@@ -44,20 +44,30 @@ namespace mongo {
          *
          * The keyPattern will be used to determine the right index to use to perform
          * the deletion and it can be a prefix of an existing index. Caller is responsible
-         * of making sure that both inclusiveLower and exclusiveUpper is a prefix of keyPattern.
+         * of making sure that both min and max is a prefix of keyPattern.
          *
          * Note that secondaryThrottle will be ignored if current process is not part
          * of a replica set.
          *
+         * docsDeleted would contain the number of docs deleted if the deletion was successful.
+         *
          * Does not throw Exceptions.
          */
         virtual bool deleteRange(OperationContext* txn,
-                                 const StringData& ns,
-                                 const BSONObj& inclusiveLower,
-                                 const BSONObj& exclusiveUpper,
-                                 const BSONObj& keyPattern,
-                                 bool secondaryThrottle,
+                                 const RangeDeleteEntry& taskDetails,
+                                 long long int* deletedDocs,
+                                 ReplTime* lastOp,
                                  std::string* errMsg);
+
+        /**
+         * Waits for replication to reach lastOp while obeying the given writeConcern.
+         * Note that only the "w" parameter of the writeConcern is recognized at the moment.
+         * No-op if replication is not active.
+         */
+        bool waitForReplication(ReplTime lastOp,
+                                const BSONObj& writeConcern,
+                                long long int timeoutSecs,
+                                std::string* errMsg);
 
         /**
          * Gets the list of open cursors on a given namespace.
