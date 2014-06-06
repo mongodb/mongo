@@ -8,6 +8,15 @@ var st = new ShardingTest({ shards : 2, verbose : 4 });
 st.stopBalancer();
 
 var mongos = st.s0;
+
+//
+// Set up write command mode, this is a backport of a new test
+//
+
+mongos.forceWriteMode("commands");
+st.shard0.forceWriteMode("commands");
+st.shard1.forceWriteMode("commands");
+
 var coll = mongos.getCollection("foo.bar");
 var admin = mongos.getDB("admin");
 var shards = mongos.getDB("config").shards.find().toArray();
