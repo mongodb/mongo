@@ -133,9 +133,9 @@ func TestBidirectionalSSL(t *testing.T) {
 					Port: "20000",
 				},
 				SSL: &options.SSL{
-					UseSSL:                      true,
-					SSLPEMKeyFile:               "testdata/server.pem",
-					SSLAllowInvalidCertificates: true,
+					UseSSL:          true,
+					SSLPEMKeyFile:   "testdata/server.pem",
+					SSLAllowInvalid: true,
 				},
 			}
 			So(connector.Configure(opts), ShouldBeNil)
