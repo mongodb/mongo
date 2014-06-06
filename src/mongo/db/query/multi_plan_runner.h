@@ -120,13 +120,22 @@ namespace mongo {
                                PlanInfo** planInfo) const;
 
     private:
+        //
+        // Have all our candidate plans do something.
+        // If all our candidate plans fail, *objOut will contain
+        // information on the failure.
+        //
+
         /**
-         * Have all our candidate plans do something.
-         * If all our candidate plans fail, *objOut will contain
-         * information on the failure.
+         * Calls work on each child plan in a round-robin fashion. We stop when any plan
+         * hits EOF or returns 'numResults' results.
+         *
+         * Returns true if we need to keep working the plans and false otherwise.
          */
-        bool workAllPlans(BSONObj* objOut);
+        bool workAllPlans(BSONObj* objOut, size_t numResults);
+
         void allPlansSaveState();
+
         void allPlansRestoreState();
 
         const Collection* _collection;

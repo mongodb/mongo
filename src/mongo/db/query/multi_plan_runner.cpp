@@ -337,10 +337,23 @@ namespace mongo {
                                 size_t(fraction * _collection->numRecords()));
         }
 
+        // We treat ntoreturn as though it is a limit during plan ranking.
+        // This means that ranking might not be great for sort + batchSize.
+        // But it also means that we don't buffer too much data for sort + limit.
+        // See SERVER-14174 for details.
+        size_t numToReturn = _query->getParsed().getNumToReturn();
+
+        // Determine the number of results which we will produce during the plan
+        // ranking phase before stopping.
+        size_t numResults = (size_t)internalQueryPlanEvaluationMaxResults;
+        if (numToReturn > 0) {
+            numResults = std::min(numToReturn, numResults);
+        }
+
         // Work the plans, stopping when a plan hits EOF or returns some
         // fixed number of results.
         for (size_t i = 0; i < numWorks; ++i) {
-            bool moreToDo = workAllPlans(objOut);
+            bool moreToDo = workAllPlans(objOut, numResults);
             if (!moreToDo) { break; }
         }
 
@@ -461,7 +474,7 @@ namespace mongo {
         return NULL != _backupPlan;
     }
 
-    bool MultiPlanRunner::workAllPlans(BSONObj* objOut) {
+    bool MultiPlanRunner::workAllPlans(BSONObj* objOut, size_t numResults) {
         bool doneWorking = false;
 
         for (size_t i = 0; i < _candidates.size(); ++i) {
@@ -484,8 +497,7 @@ namespace mongo {
                 candidate.results.push_back(id);
 
                 // Once a plan returns enough results, stop working.
-                if (candidate.results.size()
-                    >= size_t(internalQueryPlanEvaluationMaxResults)) {
+                if (candidate.results.size() >= numResults) {
                     doneWorking = true;
                 }
             }
