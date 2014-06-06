@@ -42,6 +42,8 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/client.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/global_environment_noop.h"
 #include "mongo/db/json.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_coordinator_mock.h"
@@ -75,6 +77,7 @@ namespace mongo {
         setGlobalAuthorizationManager(new AuthorizationManager(
                 new AuthzManagerExternalStateMock()));
         repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock());
+        setGlobalEnvironment(new GlobalEnvironmentNoop());
         return Status::OK();
     }
 
