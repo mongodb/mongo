@@ -643,6 +643,9 @@ __checkpoint_worker(
 				continue;
 			if (ret == EBUSY &&
 			    WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT)) {
+				fprintf(stderr,
+				    "skipping delete of %s due to not getting "
+				    "checkpoint lock\n", dhandle->name);
 				F_CLR(ckpt, WT_CKPT_DELETE);
 				continue;
 			}
@@ -729,6 +732,9 @@ __checkpoint_worker(
 	 * dirty pages), we do a checkpoint without any writes, no checkpoint
 	 * is created, and then things get bad.
 	 */
+	if (btree->modified == 0)
+		fprintf(stderr,
+		    "Checkpointing clean tree: %s\n", dhandle->name);
 	WT_ERR(__wt_bt_cache_force_write(session));
 
 	/* Tell logging that a file checkpoint is starting. */

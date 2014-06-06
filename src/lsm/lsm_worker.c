@@ -377,6 +377,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 			WT_ERR(__wt_session_get_btree(
 			    session, chunk->uri, NULL, NULL, 0));
 			__wt_btree_evictable(session, 1);
+			S2BT(session)->readonly = 1;
+			WT_ASSERT(session, S2BT(session)->modified == 0);
 			WT_ERR(__wt_session_release_btree(session));
 
 			++j;
@@ -534,8 +536,6 @@ __lsm_discard_handle(
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 
-	WT_ASSERT(session, S2BT(session)->modified == 0);
-
 	/*
 	 * We need the checkpoint lock to discard in-memory handles: otherwise,
 	 * an application checkpoint could see this file locked and fail with
@@ -550,6 +550,13 @@ __lsm_discard_handle(
 		locked = 1;
 	if (ret == 0)
 		F_SET(session->dhandle, WT_DHANDLE_DISCARD);
+
+	/*
+	 * This check must come after taking the checkpoint lock - since
+	 * otherwise an in progress checkpoint may have set the modified
+	 * flag in the file we're discarding.
+	 */
+	WT_ASSERT(session, S2BT(session)->modified == 0);
 	WT_TRET(__wt_session_release_btree(session));
 	if (locked)
 		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);

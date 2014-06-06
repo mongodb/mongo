@@ -115,12 +115,17 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 		clsm->nupdates = 1;
 		if (session->txn.isolation == TXN_ISO_SNAPSHOT &&
 		    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
+			WT_ASSERT(session,
+			    F_ISSET(&session->txn, TXN_HAS_SNAPSHOT));
 			snap_min = session->txn.snap_min;
 			for (txnid_maxp = &clsm->txnid_max[clsm->nchunks - 2];
 			    clsm->nupdates < clsm->nchunks;
-			    clsm->nupdates++, txnid_maxp--)
+			    clsm->nupdates++, txnid_maxp--) {
 				if (TXNID_LT(*txnid_maxp, snap_min))
 					break;
+				WT_ASSERT(session, !__wt_txn_visible_all(
+				    session, *txnid_maxp));
+			}
 		}
 
 		/*
@@ -1187,6 +1192,24 @@ __clsm_put(WT_SESSION_IMPL *session,
 	 * Update the primary, plus any older chunks needed to detect
 	 * write-write conflicts across chunk boundaries.
 	 */
+	if (clsm->nupdates > 1) {
+		WT_LSM_CHUNK *current_chunk;
+		unsigned int j;
+		// Find the offset of the primary in the lsm_tree chunks
+		for (j = 0; j < lsm_tree->nchunks; j++)
+			if (lsm_tree->chunk[j]->id == clsm->primary_chunk->id)
+				break;
+		for (i = 0; i < clsm->nupdates; i++) {
+			current_chunk = lsm_tree->chunk[j - i];
+			WT_ASSERT(session,
+			    !F_ISSET(current_chunk, WT_LSM_CHUNK_ONDISK) &&
+			    strcmp(current_chunk->uri,
+			    clsm->cursors[(clsm->nchunks - i) - 1]->uri) == 0);
+			WT_ASSERT(session, i == 0 || 
+			    !__wt_txn_visible_all(session, current_chunk->txnid_max));
+		}
+	}
+
 	for (i = 0; i < clsm->nupdates; i++) {
 		c = clsm->cursors[(clsm->nchunks - i) - 1];
 		c->set_key(c, key);
