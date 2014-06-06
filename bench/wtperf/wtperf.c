@@ -784,6 +784,10 @@ populate_thread(void *arg)
 		}
 	}
 
+	/* Avoid a race on startup that results in WT_DEADLOCK. */
+	if (thread->thread_index != 0)
+		usleep(3000);
+
 	/* Populate the databases. */
 	for (intxn = 0, opcount = 0;;) {
 		op = get_next_incr(cfg);
