@@ -28,6 +28,7 @@ type ToolOptions struct {
 	*Connection
 	*SSL
 	*Auth
+	*Namespace
 
 	// Extra tool-specific options that can be specified by calling
 	// AddOptions
@@ -38,16 +39,18 @@ type ToolOptions struct {
 
 	////////
 
-	// Specified database and collection
-	DB         string
-	Collection string
-
 	// TODO below: kill this?
 
 	// Bookkeeping for filtering on database and collection
 	FilterNS       string // the full namespace for filtering
 	FilterOnlyColl bool   // filter only on collection
 	FilterBoth     bool   // filter on both db and collection
+}
+
+type Namespace struct {
+	// Specified database and collection
+	DB         string `short:"d" long:"database" description:"database to use"`
+	Collection string `short:"c" long:"collection" description:"collection to use"`
 }
 
 // Struct holding generic options
@@ -99,6 +102,7 @@ func New(appName, versionStr, usageStr string) *ToolOptions {
 		Connection: &Connection{},
 		SSL:        &SSL{},
 		Auth:       &Auth{},
+		Namespace:  &Namespace{},
 	}
 }
 
@@ -145,6 +149,7 @@ func (self *ToolOptions) Parse() ([]string, error) {
 	_, err = self.parser.AddGroup("connection options", "", self.Connection)
 	_, err = self.parser.AddGroup("ssl options", "", self.SSL)
 	_, err = self.parser.AddGroup("authentication options", "", self.Auth)
+	_, err = self.parser.AddGroup("namespace options", "", self.Namespace)
 
 	// register all of the extra options
 	for _, eo := range self.Extra {
