@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestSSLConnector(t *testing.T) {
+func TestConfigureSSLConnector(t *testing.T) {
 
 	testutil.VerifyTestType(t, "ssl")
 
@@ -38,6 +38,20 @@ func TestSSLConnector(t *testing.T) {
 
 		})
 
+	})
+
+}
+
+// Relies on a mongod running on port 20000, with --sslCAFile and
+// --sslPEMKeyFile defined.
+func TestBidirectionalSSL(t *testing.T) {
+
+	testutil.VerifyTestType(t, "ssl")
+
+	Convey("When running ssl with bidirectional auth", t, func() {
+
+		var connector *SSLDBConnector
+
 		Convey("without the correct ca file to verify the server, connection"+
 			" should fail", func() {
 
@@ -46,7 +60,7 @@ func TestSSLConnector(t *testing.T) {
 			opts := &options.ToolOptions{
 				Connection: &options.Connection{
 					Host: "localhost",
-					Port: "27017",
+					Port: "20000",
 				},
 				SSL: &options.SSL{
 					UseSSL:        true,
@@ -68,7 +82,7 @@ func TestSSLConnector(t *testing.T) {
 			opts := &options.ToolOptions{
 				Connection: &options.Connection{
 					Host: "localhost",
-					Port: "27017",
+					Port: "20000",
 				},
 				SSL: &options.SSL{
 					UseSSL:    true,
@@ -90,7 +104,7 @@ func TestSSLConnector(t *testing.T) {
 			opts := &options.ToolOptions{
 				Connection: &options.Connection{
 					Host: "localhost",
-					Port: "27017",
+					Port: "20000",
 				},
 				SSL: &options.SSL{
 					UseSSL:        true,
