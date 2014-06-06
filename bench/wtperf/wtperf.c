@@ -132,6 +132,7 @@ generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 static void
 randomize_value(CONFIG *cfg, char *value_buf)
 {
+	uint8_t *vb;
 	uint32_t i;
 
 	/*
@@ -143,10 +144,10 @@ randomize_value(CONFIG *cfg, char *value_buf)
 	while (value_buf[i] == '\0' && i > 0)
 		--i;
 	if (i > 0) {
-		value_buf[0] = (__wt_random() % 255) + 1;
-		value_buf[i] = (__wt_random() % 255) + 1;
+		vb = (uint8_t *)value_buf;
+		vb[0] = (__wt_random() % 255) + 1;
+		vb[i] = (__wt_random() % 255) + 1;
 	}
-	return;
 }
 
 static int
