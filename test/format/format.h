@@ -171,6 +171,7 @@ typedef struct {
 	uint32_t c_key_max;
 	uint32_t c_key_min;
 	uint32_t c_leaf_page_max;
+	uint32_t c_leak_memory;
 	uint32_t c_logging;
 	uint32_t c_merge_max;
 	uint32_t c_merge_threads;

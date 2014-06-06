@@ -183,6 +183,10 @@ static CONFIG c[] = {
 	  "minimum size of keys",
 	  C_ROW, 0x0, 10, 32, 256, &g.c_key_min, NULL },
 
+	{ "leak_memory",
+	  "if memory should be leaked on close",
+	  0x0, C_BOOL, 0, 0, 0, &g.c_leak_memory, NULL },
+
 	{ "leaf_page_max",
 	  "maximum size of Btree leaf nodes",
 	  0x0, 0x0, 9, 17, 27, &g.c_leaf_page_max, NULL },
