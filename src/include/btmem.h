@@ -676,9 +676,6 @@ struct __wt_ref {
  * multiple times), and we obscure the field name and use a copy macro in all
  * references to the field (so the code doesn't read it multiple times), all
  * to make sure we don't introduce this bug (again).
- *
- * Casting the read to a (void *) is safe as we are not taking the address of
- * the object.
  */
 struct __wt_row {
 	void * volatile __key;		/* On-page cell or off-page WT_IKEY */
