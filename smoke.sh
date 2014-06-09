@@ -7,6 +7,8 @@ then
     exit 1
 fi
 
+chmod 755 mongotop
+
 ./mongotop > output.out &
 mongotop_pid=$!
 
