@@ -28,52 +28,31 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/db/repl/repl_coordinator.h"
+#include <map>
+
+#include "mongo/db/repl/replication_executor.h"
 
 namespace mongo {
 namespace repl {
 
-    /**
-     * An implementation of ReplicationCoordinator that simply delegates to existing code.
-     */
-    class LegacyReplicationCoordinator : public ReplicationCoordinator {
-        MONGO_DISALLOW_COPYING(LegacyReplicationCoordinator);
-
+    class NetworkInterfaceMock : public ReplicationExecutor::NetworkInterface {
     public:
+        NetworkInterfaceMock() {}
+        virtual ~NetworkInterfaceMock() {}
+        virtual Date_t now();
+        virtual StatusWith<BSONObj> runCommand(
+                const ReplicationExecutor::RemoteCommandRequest& request);
+        virtual void runCallbackWithGlobalExclusiveLock(
+                const stdx::function<void ()>& callback);
 
-        LegacyReplicationCoordinator();
-        virtual ~LegacyReplicationCoordinator();
+        bool addResponse(const ReplicationExecutor::RemoteCommandRequest& request,
+                         const StatusWith<BSONObj>& response);
 
-        virtual void startReplication(TopologyCoordinator*,
-                                      ReplicationExecutor::NetworkInterface*);
-
-        virtual void shutdown();
-
-        virtual bool isShutdownOkay() const;
-
-        virtual Mode getReplicationMode() const;
-
-        virtual MemberState getCurrentMemberState() const;
-
-        virtual Status awaitReplication(const OpTime& ts,
-                                        const WriteConcernOptions& writeConcern,
-                                        Milliseconds timeout);
-
-
-        virtual bool canAcceptWritesForDatabase(const StringData& dbName);
-
-        virtual bool canServeReadsFor(const NamespaceString& collection);
-
-        virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
-
-        virtual Status setLastOptime(const HostAndPort& member, const OpTime& ts);
-
-        virtual bool processHeartbeat(OperationContext* txn, 
-                                      const BSONObj& cmdObj, 
-                                      std::string* errmsg, 
-                                      BSONObjBuilder* result);
+    private:
+        typedef std::map<ReplicationExecutor::RemoteCommandRequest,
+                         StatusWith<BSONObj> > RequestResponseMap;
+        RequestResponseMap _responses;
     };
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

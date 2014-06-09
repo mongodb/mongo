@@ -52,7 +52,8 @@ namespace repl {
     LegacyReplicationCoordinator::LegacyReplicationCoordinator() {}
     LegacyReplicationCoordinator::~LegacyReplicationCoordinator() {}
 
-    void LegacyReplicationCoordinator::startReplication(ReplicationExecutor::NetworkInterface*) {
+    void LegacyReplicationCoordinator::startReplication(TopologyCoordinator*,
+                                                        ReplicationExecutor::NetworkInterface*) {
         // if we are going to be a replica set, we aren't doing other forms of replication.
         if (!replSettings.replSet.empty()) {
             if (replSettings.slave || replSettings.master) {

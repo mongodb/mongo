@@ -36,7 +36,6 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h" // TODO: remove along with invariant from getCurrentMemberState
 
@@ -48,12 +47,13 @@ namespace repl {
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
     void ReplicationCoordinatorImpl::startReplication(
+            TopologyCoordinator* topCoord,
             ReplicationExecutor::NetworkInterface* network) {
         if (!isReplEnabled()) {
             return;
         }
 
-        _topCoord.reset(new TopologyCoordinatorImpl());
+        _topCoord.reset(topCoord);
         _topCoord->registerConfigChangeCallback(
                 stdx::bind(&ReplicationCoordinatorImpl::setCurrentReplicaSetConfig,
                            this,
