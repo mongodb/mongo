@@ -30,23 +30,51 @@
 
 #include "mongo/db/repl/repl_coordinator_impl.h"
 
+#include <boost/thread.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h" // TODO: remove along with invariant from getCurrentMemberState
 
 namespace mongo {
 namespace repl {
 
     ReplicationCoordinatorImpl::ReplicationCoordinatorImpl() {}
+
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
-    void ReplicationCoordinatorImpl::startReplication() {
-        // TODO
+    void ReplicationCoordinatorImpl::startReplication(
+            ReplicationExecutor::NetworkInterface* network) {
+        if (!isReplEnabled()) {
+            return;
+        }
+
+        _topCoord.reset(new TopologyCoordinatorImpl());
+        _topCoord->registerConfigChangeCallback(
+                stdx::bind(&ReplicationCoordinatorImpl::setCurrentReplicaSetConfig,
+                           this,
+                           stdx::placeholders::_1));
+        _topCoord->registerStateChangeCallback(
+                stdx::bind(&ReplicationCoordinatorImpl::setCurrentMemberState,
+                           this,
+                           stdx::placeholders::_1));
+
+        _replExecutor.reset(new ReplicationExecutor(network));
+        _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
+                                                                 _replExecutor.get())));
     }
 
     void ReplicationCoordinatorImpl::shutdown() {
-        // TODO
+        if (!isReplEnabled()) {
+            return;
+        }
+
+        _replExecutor->shutdown();
+        _topCoordDriverThread->join();
     }
 
     bool ReplicationCoordinatorImpl::isShutdownOkay() const {
@@ -55,7 +83,12 @@ namespace repl {
     }
 
     ReplicationCoordinator::Mode ReplicationCoordinatorImpl::getReplicationMode() const {
-        // TODO
+        // TODO(spencer): Don't rely on global replSettings object
+        if (replSettings.usingReplSets()) {
+            return modeReplSet;
+        } else if (replSettings.slave || replSettings.master) {
+            return modeMasterSlave;
+        }
         return modeNone;
     }
 
@@ -104,7 +137,7 @@ namespace repl {
     }
 
     void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(
-            const TopologyCoordinatorImpl::ReplicaSetConfig& newConfig) {
+            const TopologyCoordinator::ReplicaSetConfig& newConfig) {
         // TODO
     }
 

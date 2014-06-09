@@ -41,10 +41,10 @@ namespace mongo {
 
 namespace repl {
 
-    class ReplicaSetConfig;
     class HeartbeatInfo;
     class Member;
     struct MemberState;
+    class TagSubgroup;
 
     /**
      * Replication Topology Coordinator interface.
@@ -53,11 +53,57 @@ namespace repl {
      * Tasks include consensus and leader election, chaining, and configuration management.
      * Methods of this class should be non-blocking.
      */
-
-
     class TopologyCoordinator {
         MONGO_DISALLOW_COPYING(TopologyCoordinator);
     public:
+
+        // TODO(spencer): Move this and ReplicaSetConfig out of TopologyCoordinator
+        class MemberConfig {
+        public:
+        MemberConfig() :
+            _id(-1),
+                votes(1),
+                priority(1.0),
+                arbiterOnly(false),
+                slaveDelay(0),
+                hidden(false),
+                buildIndexes(true) { }
+            int _id;              /* ordinal */
+            unsigned votes;       /* how many votes this node gets. default 1. */
+            HostAndPort h;
+            double priority;      /* 0 means can never be primary */
+            bool arbiterOnly;
+            int slaveDelay;       /* seconds.  */
+            bool hidden;          /* if set, don't advertise to drivers in isMaster. */
+                                  /* for non-primaries (priority 0) */
+            bool buildIndexes;    /* if false, do not create any non-_id indexes */
+            std::map<std::string,std::string> tags;     /* tagging for data center, rack, etc. */
+        private:
+            std::set<TagSubgroup*> _groups; // the subgroups this member belongs to
+        };
+
+        struct ReplicaSetConfig {
+            std::vector<MemberConfig> members;
+            std::string replSetName;
+            int version;
+            MemberConfig* self;
+
+            /**
+             * If replication can be chained. If chaining is disallowed, it can still be explicitly
+             * enabled via the replSetSyncFrom command, but it will not happen automatically.
+             */
+            bool chainingAllowed;
+
+            // Number of nodes needed for w:majority writes
+            int majorityNumber;
+
+            BSONObj asBson() const;
+
+            // Calculate majority number based on current config and store in majorityNumber;
+            // done as part of reconfig.
+            void calculateMajorityNumber();
+        };
+
         virtual ~TopologyCoordinator() {}
         
         // The optime of the last op actually applied to the data

@@ -33,6 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_executor.h"
 
 namespace mongo {
 
@@ -66,7 +67,7 @@ namespace repl {
          * components of the replication system to start up whatever threads and do whatever
          * initialization they need.
          */
-        virtual void startReplication() = 0;
+        virtual void startReplication(ReplicationExecutor::NetworkInterface* network) = 0;
 
         /**
          * Does whatever cleanup is required to stop replication, including instructing the other

@@ -46,7 +46,7 @@ namespace repl {
         ReplicationCoordinatorMock();
         virtual ~ReplicationCoordinatorMock();
 
-        virtual void startReplication();
+        virtual void startReplication(ReplicationExecutor::NetworkInterface* network);
 
         virtual void shutdown();
 

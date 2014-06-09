@@ -68,6 +68,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repair_database.h"
+#include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_coordinator_legacy.h"
@@ -286,7 +287,7 @@ namespace mongo {
         server->setupSockets();
 
         logStartup();
-        repl::getGlobalReplicationCoordinator()->startReplication();
+        repl::getGlobalReplicationCoordinator()->startReplication(new repl::NetworkInterfaceImpl());
         if (serverGlobalParams.isHttpInterfaceEnabled)
             boost::thread web(stdx::bind(&webServerThread,
                                          new RestAdminAccess())); // takes ownership
@@ -949,15 +950,14 @@ MONGO_INITIALIZER(SetGlobalConfigExperiment)(InitializerContext* context) {
     setGlobalEnvironment(new GlobalEnvironmentMongoD());
     return Status::OK();
 }
+
 namespace {
     // TODO(spencer): Remove this startup parameter once the new ReplicationCoordinator is fully
     // working
     MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useNewReplCoordinator, bool, false);
 } // namespace
 
-MONGO_INITIALIZER_GENERAL(CreateReplicationManager,
-                          MONGO_NO_PREREQUISITES,
-                          MONGO_NO_DEPENDENTS)(InitializerContext* context) {
+MONGO_INITIALIZER(CreateReplicationManager)(InitializerContext* context) {
     if (useNewReplCoordinator) {
         repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorImpl());
     } else {

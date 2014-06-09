@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <map>
@@ -36,6 +37,7 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_coordinator.h"
+#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -52,7 +54,7 @@ namespace repl {
 
         // ================== Members of public ReplicationCoordinator API ===================
 
-        virtual void startReplication();
+        virtual void startReplication(ReplicationExecutor::NetworkInterface* network);
 
         virtual void shutdown();
 
@@ -85,7 +87,7 @@ namespace repl {
         void setCurrentMemberState(const MemberState& newState);
 
         // Called by the TopologyCoordinator whenever the replica set configuration is updated
-        void setCurrentReplicaSetConfig(const TopologyCoordinatorImpl::ReplicaSetConfig& newConfig);
+        void setCurrentReplicaSetConfig(const TopologyCoordinator::ReplicaSetConfig& newConfig);
 
 
     private:
@@ -98,7 +100,13 @@ namespace repl {
         boost::condition_variable _optimeUpdatedCondition;
 
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator
-        TopologyCoordinator* _topCoord;
+        boost::scoped_ptr<TopologyCoordinator> _topCoord;
+
+        // Pointer to the ReplicationExecutor owned by this ReplicationCoordinator
+        boost::scoped_ptr<ReplicationExecutor> _replExecutor;
+
+        // Thread that drives actions in the topology coordinator
+        boost::scoped_ptr<boost::thread> _topCoordDriverThread;
 
         // Maps nodes in this replication group to the last oplog operation they have committed
         std::map<HostAndPort, OpTime> _hostOptimeMap;
