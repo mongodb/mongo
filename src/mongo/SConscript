@@ -306,7 +306,6 @@ commonFiles = [ "pch.cpp",
                 "util/concurrency/task.cpp",
                 "util/password.cpp",
                 "util/concurrency/rwlockimpl.cpp",
-                "util/histogram.cpp",
                 "util/text_startuptest.cpp",
                 'util/signal_win32.cpp',
                 "util/version_reporting.cpp",
@@ -487,7 +486,6 @@ env.Library("coredb", [
 coreServerFiles = [ "db/client_basic.cpp",
                     "util/net/miniwebserver.cpp",
                     "db/stats/counters.cpp",
-                    "db/stats/service_stats.cpp",
                     "db/log_process_details.cpp",
                     "db/conn_pool_options.cpp"
                     ]
