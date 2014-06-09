@@ -362,10 +362,7 @@ namespace mongo {
                 _inProgressIndexes.erase(it);            
             }
 
-            ErrorCodes::Error codeToUse = ErrorCodes::fromInt( exc.getCode() );
-            if ( codeToUse == ErrorCodes::UnknownError )
-                return Status( ErrorCodes::InternalError, exc.what(), exc.getCode() );
-            return Status( codeToUse, exc.what() );
+            return exc.toStatus();
         }
     }
 
