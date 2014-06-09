@@ -36,7 +36,7 @@ namespace repl {
 
     class ReplSet : public ReplSetImpl {
     public:
-        static ReplSet* make(ReplSetCmdline& replSetCmdline);
+        static ReplSet* make(ReplSetSeedList& replSetSeedList);
         virtual ~ReplSet() {}
 
         // for the replSetStepDown command

@@ -66,9 +66,9 @@ namespace repl {
     ReplSet::ReplSet() {
     }
 
-    ReplSet* ReplSet::make(ReplSetCmdline& replSetCmdline) {
+    ReplSet* ReplSet::make(ReplSetSeedList& replSetSeedList) {
         auto_ptr<ReplSet> ret(new ReplSet());
-        ret->init(replSetCmdline);
+        ret->init(replSetSeedList);
         return ret.release();
     }
 
@@ -119,16 +119,16 @@ namespace repl {
        a separate thread takes over as ReplSetImpl::Manager, and this thread
        terminates.
     */
-    void startReplSets(ReplSetCmdline *replSetCmdline) {
+    void startReplSets(ReplSetSeedList *replSetSeedList) {
         Client::initThread("rsStart");
         try {
             verify( theReplSet == 0 );
-            if( replSetCmdline == 0 ) {
+            if( replSetSeedList == 0 ) {
                 verify(!replSet);
                 return;
             }
             replLocalAuth();
-            (theReplSet = ReplSet::make(*replSetCmdline))->go();
+            (theReplSet = ReplSet::make(*replSetSeedList))->go();
         }
         catch(std::exception& e) {
             log() << "replSet caught exception in startReplSets thread: " << e.what() << rsLog;

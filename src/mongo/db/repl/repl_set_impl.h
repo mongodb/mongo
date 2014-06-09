@@ -48,7 +48,7 @@ namespace mongo {
 namespace repl {
 
     struct FixUpInfo;
-    class ReplSetCmdline;
+    class ReplSetSeedList;
     class ReplSetHealthPollTask;
 
     class ReplicationStartSynchronizer {
@@ -236,7 +236,7 @@ namespace repl {
 
         ReplSetImpl();
         /* throws exception if a problem initializing. */
-        void init(ReplSetCmdline&);
+        void init(ReplSetSeedList&);
 
         void setSelfTo(Member *); // use this as it sets buildIndexes var
     private:

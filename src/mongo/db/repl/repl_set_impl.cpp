@@ -37,8 +37,8 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
-#include "mongo/db/repl/repl_start.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
@@ -374,7 +374,7 @@ namespace {
         b.append("me", myConfig().h.toString());
     }
 
-    void ReplSetImpl::init(ReplSetCmdline& replSetCmdline) {
+    void ReplSetImpl::init(ReplSetSeedList& replSetSeedList) {
         mgr = new Manager(this);
 
         _cfg = 0;
@@ -383,18 +383,18 @@ namespace {
         lastH = 0;
         changeState(MemberState::RS_STARTUP);
 
-        _seeds = &replSetCmdline.seeds;
+        _seeds = &replSetSeedList.seeds;
 
         LOG(1) << "replSet beginning startup..." << rsLog;
 
         loadConfig();
 
-        unsigned sss = replSetCmdline.seedSet.size();
+        unsigned sss = replSetSeedList.seedSet.size();
         for (Member *m = head(); m; m = m->next()) {
-            replSetCmdline.seedSet.erase(m->h());
+            replSetSeedList.seedSet.erase(m->h());
         }
-        for (set<HostAndPort>::iterator i = replSetCmdline.seedSet.begin();
-                i != replSetCmdline.seedSet.end();
+        for (set<HostAndPort>::iterator i = replSetSeedList.seedSet.begin();
+                i != replSetSeedList.seedSet.end();
                 i++) {
             if (i->isSelf()) {
                 if (sss == 1) {

@@ -68,10 +68,10 @@ namespace repl {
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
 
-    class ReplSetCmdline;
+    class ReplSetSeedList;
 
     // Main entry point for replica sets
-    void startReplSets(ReplSetCmdline *replSetCmdline);
+    void startReplSets(ReplSetSeedList *replSetSeedList);
 
     bool isCurrentlyAReplSetPrimary();
 

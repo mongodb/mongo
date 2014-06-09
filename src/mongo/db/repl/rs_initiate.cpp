@@ -41,8 +41,8 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/heartbeat.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_set_seed_list.h"  // parseReplSetSeedList
 #include "mongo/db/repl/repl_settings.h"  // replSettings
-#include "mongo/db/repl/repl_start.h"  // parseReplsetCmdLine
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
@@ -234,7 +234,7 @@ namespace repl {
                 string name;
                 vector<HostAndPort> seeds;
                 set<HostAndPort> seedSet;
-                parseReplsetCmdLine(replSettings.replSet, name, seeds, seedSet); // may throw...
+                parseReplSetSeedList(replSettings.replSet, name, seeds, seedSet); // may throw...
 
                 bob b;
                 b.append("_id", name);

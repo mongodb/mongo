@@ -36,18 +36,18 @@
 namespace mongo {
 namespace repl {
 
-    void parseReplsetCmdLine(const std::string& cfgString,
-                             std::string& setname,
-                             vector<HostAndPort>& seeds,
-                             set<HostAndPort>& seedSet);
+    void parseReplSetSeedList(const std::string& cfgString,
+                              std::string& setname,
+                              vector<HostAndPort>& seeds,
+                              set<HostAndPort>& seedSet);
 
     /** Parameter given to the --replSet command line option (parsed).
         Syntax is "<setname>/<seedhost1>,<seedhost2>"
         where setname is a name and seedhost is "<host>[:<port>]" */
-    class ReplSetCmdline {
+    class ReplSetSeedList {
     public:
-        ReplSetCmdline(const std::string& cfgString) {
-            parseReplsetCmdLine(cfgString, setname, seeds, seedSet);
+        ReplSetSeedList(const std::string& cfgString) {
+            parseReplSetSeedList(cfgString, setname, seeds, seedSet);
         }
         std::string setname;
         vector<HostAndPort> seeds;

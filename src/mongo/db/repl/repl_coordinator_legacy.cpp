@@ -36,9 +36,9 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
+#include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replset_commands.h"
-#include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/assert_util.h" // TODO: remove along with invariant from getCurrentMemberState
 #include "mongo/util/fail_point_service.h"
@@ -63,8 +63,8 @@ namespace repl {
             newRepl();
 
             replSet = true;
-            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(replSettings.replSet);
-            boost::thread t(stdx::bind(&startReplSets, replSetCmdline));
+            ReplSetSeedList *replSetSeedList = new ReplSetSeedList(replSettings.replSet);
+            boost::thread t(stdx::bind(&startReplSets, replSetSeedList));
         } else {
             startMasterSlave();
         }

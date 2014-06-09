@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/db/repl/repl_start.h"
+#include "mongo/db/repl/repl_set_seed_list.h"
 
 #include <boost/thread.hpp>
 #include <iostream>
@@ -43,10 +43,10 @@ namespace mongo {
 namespace repl {
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    void parseReplsetCmdLine(const std::string& cfgString,
-                             string& setname,
-                             vector<HostAndPort>& seeds,
-                             set<HostAndPort>& seedSet ) {
+    void parseReplSetSeedList(const std::string& cfgString,
+                              string& setname,
+                              vector<HostAndPort>& seeds,
+                              set<HostAndPort>& seedSet) {
         const char *p = cfgString.c_str();
         const char *slash = strchr(p, '/');
         if( slash )
