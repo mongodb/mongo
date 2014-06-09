@@ -85,6 +85,10 @@ namespace mongo {
      */
     void getPlanInfo(const QuerySolution& soln, PlanInfo** infoOut);
 
+    void statsToBSON(const PlanStageStats& stats,
+                     BSONObjBuilder* bob,
+                     BSONObjBuilder* topLevelBob);
+
     void statsToBSON(const PlanStageStats& stats, BSONObjBuilder* bob);
 
     BSONObj statsToBSON(const PlanStageStats& stats);

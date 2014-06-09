@@ -222,9 +222,19 @@ namespace mongo {
 
                     fieldBuilder.append(
                         static_cast<BSONArray>(intervalBuilder.arr().clientReadable()));
+
+                    // If the bounds object gets too large, truncate it.
+                    static const int kMaxBoundsSize = 1024 * 1024;
+                    if (builder.len() > kMaxBoundsSize) {
+                        intervalBuilder.doneFast();
+                        fieldBuilder.append(BSON("warning" << "bounds obj exceeds 1 MB"));
+                        fieldBuilder.doneFast();
+                        return builder.obj();
+                    }
                 }
             }
         }
+
         return builder.obj();
     }
 
