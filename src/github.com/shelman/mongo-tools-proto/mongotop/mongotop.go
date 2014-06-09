@@ -1,4 +1,5 @@
-// Package mongotop implements the core logic for the mongotop tool.
+// Package mongotop implements the core logic and structures
+// for the mongotop tool.
 package mongotop
 
 import (
