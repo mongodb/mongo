@@ -97,7 +97,7 @@ namespace repl {
     }
 
 
-    void ReplicationCoordinatorImpl::setCurrentReplicaSetConifg(
+    void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(
             const TopologyCoordinatorImpl::ReplicaSetConfig& newConfig) {
         // TODO
     }

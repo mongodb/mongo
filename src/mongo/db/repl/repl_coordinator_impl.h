@@ -80,7 +80,7 @@ namespace repl {
         void setCurrentMemberState(const MemberState& newState);
 
         // Called by the TopologyCoordinator whenever the replica set configuration is updated
-        void setCurrentReplicaSetConifg(const TopologyCoordinatorImpl::ReplicaSetConfig& newConfig);
+        void setCurrentReplicaSetConfig(const TopologyCoordinatorImpl::ReplicaSetConfig& newConfig);
 
     private:
 
