@@ -411,9 +411,9 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	for (parent_refp = pindex->index + SPLIT_CORRECT_1,
 	    i = pindex->entries - SPLIT_CORRECT_1; i > 0; ++parent_refp, --i) {
 		parent_ref = *parent_refp;
+		WT_ASSERT(session, parent_ref->home == parent);
 		if (parent_ref->state != WT_REF_MEM)
 			continue;
-		WT_ASSERT(session, parent_ref->home == parent);
 
 		child = parent_ref->page;
 		if (child->type != WT_PAGE_ROW_INT &&
