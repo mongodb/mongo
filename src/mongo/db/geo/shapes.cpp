@@ -234,7 +234,7 @@ namespace mongo {
 
     bool Polygon::contains(const Point& p) const { return contains(p, 0) > 0; }
 
-    /* 
+    /*
      * Return values:
      * -1 if no intersection
      * 0 if maybe an intersection (using fudge)
@@ -418,20 +418,35 @@ namespace mongo {
         return _outer;
     }
 
-    bool R2Annulus::contains(const Point& point, double maxError) const {
+    bool R2Annulus::contains(const Point& point) const {
 
         // See if we're inside the inner radius
-        if (distanceWithin(point, _center, getInner() - maxError)) {
+        if (distanceCompare(point, _center, _inner) < 0) {
             return false;
         }
 
         // See if we're outside the outer radius
-        if (!distanceWithin(point, _center, getOuter() + maxError)) {
+        if (distanceCompare(point, _center, _outer) > 0) {
             return false;
         }
 
         return true;
     }
+
+    Box R2Annulus::getR2Bounds() const {
+        return Box(_center.x - _outer, _center.y - _outer, 2 * _outer); // Box(_min.x, _min.y, edgeLength)
+    }
+
+    bool R2Annulus::fastContains(const Box& other) const {
+        return circleContainsBox(Circle(_outer, _center), other)
+            && !circleInteriorIntersectsWithBox(Circle(_inner, _center), other);
+    }
+
+    bool R2Annulus::fastDisjoint(const Box& other) const {
+        return !circleIntersectsWithBox(Circle(_outer, _center), other)
+            || circleInteriorContainsBox(Circle(_inner, _center), other);
+    }
+
 
     /////// Other methods
 
@@ -448,6 +463,16 @@ namespace mongo {
      * (radius + center.x, center.y) or vice-versa.
      */
     bool distanceWithin(const Point &p1, const Point &p2, double radius) {
+        return distanceCompare(p1, p2, radius) <= 0.0;
+    }
+
+    // Compare the distance between p1 and p2 with the radius.
+    // Float-number comparison might be inaccurate.
+    //
+    // > 0: distance is greater than radius
+    // = 0: distance equals radius
+    // < 0: distance is less than radius
+    double distanceCompare(const Point &p1, const Point &p2, double radius) {
         double a = p2.x - p1.x;
         double b = p2.y - p1.y;
 
@@ -462,23 +487,23 @@ namespace mongo {
             // for all 32-bit systems, not just affected systems.
             if (sizeof(void*) <= 4){
                 volatile double sum = p2.y > p1.y ? p1.y + radius : p2.y + radius;
-                return p2.y > p1.y ? sum >= p2.y : sum >= p1.y;
+                return p2.y > p1.y ? p2.y - sum : p1.y - sum;
             } else {
                 // Original math, correct for most systems
-                return p2.y > p1.y ? p1.y + radius >= p2.y : p2.y + radius >= p1.y;
+                return p2.y > p1.y ? p2.y - (p1.y + radius) : p1.y - (p2.y + radius);
             }
         }
 
         if (b == 0) {
             if (sizeof(void*) <= 4){
                 volatile double sum = p2.x > p1.x ? p1.x + radius : p2.x + radius;
-                return p2.x > p1.x ? sum >= p2.x : sum >= p1.x;
+                return p2.x > p1.x ? p2.x - sum : p1.x - sum;
             } else {
-                return p2.x > p1.x ? p1.x + radius >= p2.x : p2.x + radius >= p1.x;
+                return p2.x > p1.x ? p2.x - (p1.x + radius) : p1.x - (p2.x + radius);
             }
         }
 
-        return sqrt((a * a) + (b * b)) <= radius;
+        return sqrt((a * a) + (b * b)) - radius;
     }
 
     // Technically lat/long bounds, not really tied to earth radius.
@@ -572,8 +597,37 @@ namespace mongo {
         return dotProdNormalCD_CA * dotProdNormalCD_CB <= 0; // Perhaps A or B is on line CD
     }
 
+    static bool circleContainsBoxInternal(const Circle& circle,
+                                          const Box& box,
+                                          bool includeCircleBoundary) {
+        const Point& a = box._min;
+        const Point& b = box._max;
+        double compareLL = distanceCompare( circle.center, a, circle.radius ); // Lower left
+        double compareUR = distanceCompare( circle.center, b, circle.radius ); // Upper right
+        // Upper Left
+        double compareUL = distanceCompare( circle.center, Point( a.x, b.y ), circle.radius );
+        // Lower right
+        double compareLR = distanceCompare( circle.center, Point( b.x, a.y ), circle.radius );
+        if ( includeCircleBoundary ) {
+            return compareLL <= 0 && compareUR <= 0 && compareUL <= 0 && compareLR <= 0;
+        }
+        else {
+            return compareLL < 0 && compareUR < 0 && compareUL < 0 && compareLR < 0;
+        }
+    }
+
+    bool circleContainsBox(const Circle& circle, const Box& box) {
+        return circleContainsBoxInternal(circle, box, true);
+    }
+
+    bool circleInteriorContainsBox(const Circle& circle, const Box& box) {
+        return circleContainsBoxInternal(circle, box, false);
+    }
+
     // Check the intersection by measuring the distance between circle center and box center.
-    bool circleIntersectsWithBox(const Circle& circle, const Box& box) {
+    static bool circleIntersectsWithBoxInternal(const Circle& circle,
+                                                const Box& box,
+                                                bool includeCircleBoundary) {
         /* Collapses the four quadrants down into one.
          *   ________
          * r|___B___ \  <- a quarter round corner here. Let's name it "D".
@@ -593,10 +647,23 @@ namespace mongo {
 
         // Check if circle.center is in A, B or C.
         // The circle center could be above the box (B) or right to the box (C), but close enough.
-        if ((dx <= w + r && dy <= h) || (dx <= w && dy <= h + r)) return true;
+        if (includeCircleBoundary) {
+            if ((dx <= w + r && dy <= h) || (dx <= w && dy <= h + r)) return true;
+        } else {
+            if ((dx < w + r && dy < h) || (dx < w && dy < h + r)) return true;
+        }
 
         // Now check if circle.center is in the round corner "D".
-        return distanceWithin(Point(dx, dy), Point(w, h), r);
+        double compareResult = distanceCompare(Point(dx, dy), Point(w, h), r);
+        return compareResult < 0 || (compareResult == 0 && includeCircleBoundary);
+    }
+
+    bool circleIntersectsWithBox(const Circle& circle, const Box& box) {
+        return circleIntersectsWithBoxInternal(circle, box, true);
+    }
+
+    bool circleInteriorIntersectsWithBox(const Circle& circle, const Box& box) {
+        return circleIntersectsWithBoxInternal(circle, box, false);
     }
 
     bool lineIntersectsWithBox(const Point& a, const Point& b, const Box& box) {

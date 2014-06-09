@@ -543,4 +543,76 @@ namespace {
         ASSERT_FALSE(polygonContainsBox(concave, box));
     }
 
+    TEST(ShapeIntersection, Annulus) {
+        R2Annulus annulus(Point(0.0, 0.0), 1, 5);
+        Box box;
+
+        // Disjoint, out of outer circle
+        box = Box(4, 4, 1);
+        ASSERT_TRUE(annulus.fastDisjoint(box));
+        ASSERT_FALSE(annulus.fastContains(box));
+
+        // Box contains outer circle
+        box = Box(-6, -5.5, 12);
+        ASSERT_FALSE(annulus.fastDisjoint(box));
+        ASSERT_FALSE(annulus.fastContains(box));
+
+        // Box intersects with the outer circle, but not the inner circle
+        box = Box(3, 3, 4);
+        ASSERT_FALSE(annulus.fastDisjoint(box));
+        ASSERT_FALSE(annulus.fastContains(box));
+
+        // Box is contained by the annulus
+        box = Box(2, 2, 1);
+        ASSERT_FALSE(annulus.fastDisjoint(box));
+        ASSERT_TRUE(annulus.fastContains(box));
+
+        // Box is contained by the outer circle and intersects with the inner circle
+        box = Box(0.4, 0.5, 3);
+        ASSERT_FALSE(annulus.fastDisjoint(box));
+        ASSERT_FALSE(annulus.fastContains(box));
+
+        // Box intersects with both outer and inner circle
+        box = Box(-4, -4, 4.5);
+        ASSERT_FALSE(annulus.fastDisjoint(box));
+        ASSERT_FALSE(annulus.fastContains(box));
+
+        // Box is inside the inner circle
+        box = Box(-0.1, -0.2, 0.5);
+        ASSERT_TRUE(annulus.fastDisjoint(box));
+        ASSERT_FALSE(annulus.fastContains(box));
+
+        // Box contains the inner circle, but intersects with the outer circle
+        box = Box(-2, -2, 7);
+        ASSERT_FALSE(annulus.fastDisjoint(box));
+        ASSERT_FALSE(annulus.fastContains(box));
+
+        //
+        // Annulus contains both inner and outer circles as boundaries.
+        //
+
+        // Box only touches the outer boundary
+        box  = Box(3, 4, 1); // Lower left touches boundary
+        ASSERT_FALSE(annulus.fastDisjoint(box));
+        ASSERT_FALSE(annulus.fastContains(box));
+        box  = Box(-4, -5, 1); // Upper right touches boundary
+        ASSERT_FALSE(annulus.fastDisjoint(box));
+        ASSERT_FALSE(annulus.fastContains(box));
+
+        // Box is contained by the annulus touching the outer boundary
+        box  = Box(-4, -3, 0.1);
+        ASSERT_FALSE(annulus.fastDisjoint(box));
+        ASSERT_TRUE(annulus.fastContains(box));
+
+        // Box is contained by the annulus touching the inner boundary
+        box  = Box(0, 1, 1);
+        ASSERT_FALSE(annulus.fastDisjoint(box));
+        ASSERT_TRUE(annulus.fastContains(box));
+
+        // Box only touches the inner boundary at (-0.6, 0.8)
+        box  = Box(-0.6, 0.3, 0.5);
+        ASSERT_FALSE(annulus.fastDisjoint(box));
+        ASSERT_FALSE(annulus.fastContains(box));
+    }
+
 } // namespace

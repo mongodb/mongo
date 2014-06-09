@@ -48,12 +48,16 @@ namespace mongo {
     class Polygon;
 
     double distance(const Point& p1, const Point &p2);
+    double distanceCompare(const Point &p1, const Point &p2, double radius);
     bool distanceWithin(const Point &p1, const Point &p2, double radius);
     void checkEarthBounds(const Point &p);
     double spheredist_rad(const Point& p1, const Point& p2);
     double spheredist_deg(const Point& p1, const Point& p2);
     bool linesIntersect(const Point& pA, const Point& pB, const Point& pC, const Point& pD);
+    bool circleContainsBox(const Circle& circle, const Box& box);
+    bool circleInteriorContainsBox(const Circle& circle, const Box& box);
     bool circleIntersectsWithBox(const Circle& circle, const Box& box);
+    bool circleInteriorIntersectsWithBox(const Circle& circle, const Box& box);
     bool edgesIntersectsWithBox(const vector<Point>& vertices, const Box& box);
     bool polygonContainsBox(const Polygon& polygon, const Box& box);
     bool polygonIntersectsWithBox(const Polygon& polygon, const Box& box);
@@ -130,7 +134,7 @@ namespace mongo {
 
         bool contains(const Point& p) const;
 
-        /* 
+        /*
          * Return values:
          * -1 if no intersection
          * 0 if maybe an intersection (using fudge)
@@ -180,14 +184,8 @@ namespace mongo {
         virtual bool fastDisjoint(const Box& other) const = 0;
     };
 
-    // Clearly this isn't right but currently it's sufficient.
-    enum CRS {
-        UNSET,
-        FLAT,
-        SPHERE
-    };
-
-    class R2Annulus {
+    // Annulus is used by GeoNear. Both inner and outer circles are inlcuded.
+    class R2Annulus : public R2Region {
     public:
 
         R2Annulus();
@@ -198,13 +196,26 @@ namespace mongo {
         double getInner() const;
         double getOuter() const;
 
-        bool contains(const Point& point, double maxError) const;
+        bool contains(const Point& point) const;
+
+        // R2Region interface
+        Box getR2Bounds() const;
+        bool fastContains(const Box& other) const;
+        bool fastDisjoint(const Box& other) const;
+
 
     private:
 
         Point _center;
         double _inner;
         double _outer;
+    };
+
+    // Clearly this isn't right but currently it's sufficient.
+    enum CRS {
+        UNSET,
+        FLAT,
+        SPHERE
     };
 
     struct PointWithCRS {
