@@ -42,7 +42,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/util/lruishmap.h"
 
 namespace mongo {
 

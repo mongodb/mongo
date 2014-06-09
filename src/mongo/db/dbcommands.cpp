@@ -77,7 +77,6 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/server.h"
 #include "mongo/util/fail_point_service.h"
-#include "mongo/util/lruishmap.h"
 #include "mongo/util/md5.hpp"
 
 namespace mongo {
