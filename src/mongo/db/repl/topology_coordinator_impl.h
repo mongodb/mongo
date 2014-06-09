@@ -81,6 +81,14 @@ namespace repl {
              */
             bool chainingAllowed;
 
+            // Number of nodes needed for w:majority writes
+            int majorityNumber;
+ 
+            BSONObj asBson() const;
+ 
+            // Calculate majority number based on current config and store in majorityNumber;
+            // done as part of reconfig.
+            void calculateMajorityNumber();
         };
 
         TopologyCoordinatorImpl();
