@@ -558,7 +558,25 @@ namespace mongo {
         return mongo::createPasswordDigest(username, clearTextPassword);
     }
 
+    namespace {
+        class RunCommandHookOverrideGuard {
+            MONGO_DISALLOW_COPYING(RunCommandHookOverrideGuard);
+        public:
+            RunCommandHookOverrideGuard(DBClientWithCommands* cli,
+                                        const DBClientWithCommands::RunCommandHookFunc& hookFunc)
+                : _cli(cli), _oldHookFunc(cli->getRunCommandHook()) {
+                cli->setRunCommandHook(hookFunc);
+            }
+            ~RunCommandHookOverrideGuard() {
+                _cli->setRunCommandHook(_oldHookFunc);
+            }
+        private:
+            DBClientWithCommands* const _cli;
+            DBClientWithCommands::RunCommandHookFunc const _oldHookFunc;
+        };
+    }  // namespace
     void DBClientWithCommands::_auth(const BSONObj& params) {
+        RunCommandHookOverrideGuard hookGuard(this, RunCommandHookFunc());
         std::string mechanism;
 
         uassertStatusOK(bsonExtractStringField(params,
