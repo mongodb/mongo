@@ -277,6 +277,8 @@ MongoRunner.arrOptions = function( binaryName , args ){
 
     var fullArgs = [ "" ]
 
+    // isObject returns true even if "args" is an array, so the else branch of this statement is
+    // dead code.  See SERVER-14220.
     if ( isObject( args ) || ( args.length == 1 && isObject( args[0] ) ) ){
 
         var o = isObject( args ) ? args : args[0]

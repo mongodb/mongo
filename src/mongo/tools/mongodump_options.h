@@ -44,6 +44,8 @@ namespace mongo {
         bool repair;
         bool snapShotQuery;
         bool dumpUsersAndRoles;
+        std::vector<std::string> excludedCollections;
+        std::vector<std::string> excludeCollectionPrefixes;
     };
 
     extern MongoDumpGlobalParams mongoDumpGlobalParams;

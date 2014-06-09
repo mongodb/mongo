@@ -214,10 +214,42 @@ public:
                 continue;
             }
 
+            // We use the collection name as the file name
             const string filename = name.substr( db.size() + 1 );
 
             //if a particular collections is specified, and it's not this one, skip it
             if (coll != "" && db + "." + coll != name && coll != name) {
+                continue;
+            }
+
+            // If the user has specified that we should exclude certain collections, skip them
+            std::vector<std::string>::const_iterator it =
+                std::find(mongoDumpGlobalParams.excludedCollections.begin(),
+                          mongoDumpGlobalParams.excludedCollections.end(), filename);
+
+            if (it != mongoDumpGlobalParams.excludedCollections.end()) {
+                if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
+                    toolInfoLog() << "\tskipping explicitly excluded collection: " << name
+                                  << std::endl;
+                }
+                continue;
+            }
+
+            std::string matchedPrefix;
+            for (it = mongoDumpGlobalParams.excludeCollectionPrefixes.begin();
+                 it != mongoDumpGlobalParams.excludeCollectionPrefixes.end(); it++) {
+                if (startsWith(filename.c_str(), *it)) {
+                    matchedPrefix = *it;
+                    break;
+                }
+            }
+
+            if (!matchedPrefix.empty()) {
+                if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
+                    toolInfoLog() << "\tskipping collection: " << name
+                                  << " that matches exclude prefix: " << matchedPrefix
+                                  << std::endl;
+                }
                 continue;
             }
 

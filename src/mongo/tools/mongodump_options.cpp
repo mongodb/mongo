@@ -76,6 +76,15 @@ namespace mongo {
                 "Dump user and role definitions for the given database")
                         .requires("db").incompatibleWith("collection");
 
+        options->addOptionChaining("excludeCollection", "excludeCollection", moe::StringVector,
+                "Collection to exclude from the dump")
+                        .requires("db").incompatibleWith("collection");
+
+        options->addOptionChaining("excludeCollectionsWithPrefix", "excludeCollectionsWithPrefix",
+                moe::StringVector,
+                "Exclude all collections from the dump that have the given prefix")
+                        .requires("db").incompatibleWith("collection");
+
         return Status::OK();
     }
 
@@ -117,7 +126,8 @@ namespace mongo {
         mongoDumpGlobalParams.query = getParam("query");
         mongoDumpGlobalParams.useOplog = hasParam("oplog");
         if (mongoDumpGlobalParams.useOplog) {
-            if (hasParam("query") || hasParam("db") || hasParam("collection")) {
+            if (hasParam("query") || hasParam("db") || hasParam("collection") ||
+                hasParam("excludeCollection") || hasParam("excludeCollectionsWithPrefix")) {
                 return Status(ErrorCodes::BadValue, "oplog mode is only supported on full dumps");
             }
         }
@@ -149,6 +159,15 @@ namespace mongo {
             // write output to standard error to avoid mangling output
             // must happen early to avoid sending junk to stdout
             toolGlobalParams.canUseStdout = false;
+        }
+
+        if (params.count("excludeCollection")) {
+            mongoDumpGlobalParams.excludedCollections =
+                params["excludeCollection"].as< std::vector<std::string> >();
+        }
+        if (params.count("excludeCollectionsWithPrefix")) {
+            mongoDumpGlobalParams.excludeCollectionPrefixes =
+                params["excludeCollectionsWithPrefix"].as< std::vector<std::string> >();
         }
 
         return Status::OK();

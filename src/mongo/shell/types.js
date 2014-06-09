@@ -695,6 +695,7 @@ isNumber = function(x){
     return typeof(x) == "number";
 }
 
+// This function returns true even if the argument is an array.  See SERVER-14220.
 isObject = function(x){
     return typeof(x) == "object";
 }
