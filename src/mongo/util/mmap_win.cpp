@@ -39,6 +39,10 @@
 
 namespace mongo {
 
+    namespace {
+        mongo::AtomicUInt64 mmfNextId(0);
+    }
+
     static size_t fetchMinOSPageSizeBytes() {
         SYSTEM_INFO si;
         GetSystemInfo(&si);
@@ -132,7 +136,7 @@ namespace mongo {
     }
 
     MemoryMappedFile::MemoryMappedFile()
-        : _uniqueId(0) {
+        : _uniqueId(mmfNextId.fetchAndAdd(1)) {
         fd = 0;
         maphandle = 0;
         len = 0;
@@ -486,9 +490,10 @@ namespace mongo {
         WindowsFlushable( MemoryMappedFile* theFile,
                           void * view,
                           HANDLE fd,
+                          const uint64_t id,
                           const std::string& filename,
                           boost::mutex& flushMutex )
-            : _theFile(theFile), _view(view), _fd(fd), _filename(filename),
+            : _theFile(theFile), _view(view), _fd(fd), _id(id), _filename(filename),
               _flushMutex(flushMutex)
         {}
 
@@ -498,7 +503,10 @@ namespace mongo {
 
             {
                 LockMongoFilesShared mmfilesLock;
-                if ( MongoFile::getAllFiles().count(_theFile) == 0 ) {
+
+                std::set<MongoFile*> mmfs = MongoFile::getAllFiles();
+                std::set<MongoFile*>::const_iterator it = mmfs.find(_theFile);
+                if ( it == mmfs.end() || (*it)->getUniqueId() != _id ) {
                     // this was deleted while we were unlocked
                     return;
                 }
@@ -570,6 +578,7 @@ namespace mongo {
         MemoryMappedFile* _theFile; // this may be deleted while we are running
         void * _view;
         HANDLE _fd;
+        const uint64_t _id;
         string _filename;
         boost::mutex& _flushMutex;
     };
@@ -577,13 +586,13 @@ namespace mongo {
     void MemoryMappedFile::flush(bool sync) {
         uassert(13056, "Async flushing not supported on windows", sync);
         if( !views.empty() ) {
-            WindowsFlushable f(this, viewForFlushing(), fd, filename(), _flushMutex);
+            WindowsFlushable f(this, viewForFlushing(), fd, _uniqueId, filename(), _flushMutex);
             f.flush();
         }
     }
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
-        return new WindowsFlushable(this, viewForFlushing(), fd,
+        return new WindowsFlushable(this, viewForFlushing(), fd, _uniqueId,
                                     filename(), _flushMutex);
     }
 
