@@ -35,9 +35,12 @@
 
 namespace mongo {
 
+    class BSONObj;
+    class BSONObjBuilder;
     struct HostAndPort;
     class IndexDescriptor;
     class NamespaceString;
+    class OperationContext;
     class OpTime;
     struct WriteConcernOptions;
 
@@ -145,6 +148,15 @@ namespace repl {
          * coordinator based on incoming heartbeat messages, which is used in elections.
          */
         virtual Status setLastOptime(const HostAndPort& member, const OpTime& ts) = 0;
+
+        /**
+         * Handles an incoming heartbeat command. Adds BSON to 'result'; errmsg is set to a message
+         * and return status is 'false' if there is a problem.
+         */
+        virtual bool processHeartbeat(OperationContext* txn, 
+                                      const BSONObj& cmdObj, 
+                                      std::string* errmsg,
+                                      BSONObjBuilder* result) = 0;
 
     protected:
 

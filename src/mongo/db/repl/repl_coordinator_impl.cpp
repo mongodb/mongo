@@ -96,6 +96,12 @@ namespace repl {
         return Status::OK();
     }
 
+    bool ReplicationCoordinatorImpl::processHeartbeat(OperationContext* txn, 
+                                                        const BSONObj& cmdObj, 
+                                                        std::string* errmsg, 
+                                                        BSONObjBuilder* result) {
+        return false;
+    }
 
     void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(
             const TopologyCoordinatorImpl::ReplicaSetConfig& newConfig) {

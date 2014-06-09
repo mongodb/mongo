@@ -74,6 +74,11 @@ namespace repl {
 
         virtual Status setLastOptime(const HostAndPort& member, const OpTime& ts);
 
+        virtual bool processHeartbeat(OperationContext* txn, 
+                                      const BSONObj& cmdObj, 
+                                      std::string* errmsg, 
+                                      BSONObjBuilder* result);
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions
@@ -81,6 +86,7 @@ namespace repl {
 
         // Called by the TopologyCoordinator whenever the replica set configuration is updated
         void setCurrentReplicaSetConfig(const TopologyCoordinatorImpl::ReplicaSetConfig& newConfig);
+
 
     private:
 

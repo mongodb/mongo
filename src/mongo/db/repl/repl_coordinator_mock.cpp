@@ -93,5 +93,13 @@ namespace repl {
         return Status::OK();
     }
 
+    bool ReplicationCoordinatorMock::processHeartbeat(OperationContext* txn, 
+                                                      const BSONObj& cmdObj, 
+                                                      std::string* errmsg,
+                                                      BSONObjBuilder* result) {
+        return false;
+    }
+
+
 } // namespace repl
 } // namespace mongo

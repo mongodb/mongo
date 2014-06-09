@@ -70,6 +70,11 @@ namespace repl {
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
         virtual Status setLastOptime(const HostAndPort& member, const OpTime& ts);
+
+        virtual bool processHeartbeat(OperationContext* txn, 
+                                      const BSONObj& cmdObj, 
+                                      std::string* errmsg,
+                                      BSONObjBuilder* result);
     };
 
 } // namespace repl
