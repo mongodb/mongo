@@ -455,8 +455,18 @@ namespace mongo {
         }
     }
 
-    void statsToBSON(const PlanStageStats& stats, BSONObjBuilder* bob) {
+    void statsToBSON(const PlanStageStats& stats,
+                     BSONObjBuilder* bob,
+                     BSONObjBuilder* topLevelBob) {
         invariant(bob);
+        invariant(topLevelBob);
+
+        // Stop as soon as the BSON object we're building exceeds 10 MB.
+        static const int kMaxStatsBSONSize = 10 * 1024 * 1024;
+        if (topLevelBob->len() > kMaxStatsBSONSize) {
+            bob->append("warning", "stats tree exceeded 10 MB");
+            return;
+        }
 
         // Common details.
         bob->append("type", stageTypeString(stats.stageType));
@@ -521,8 +531,11 @@ namespace mongo {
             // TODO: how much do we really want here?  we should separate runtime stats vs. tree
             // structure (soln tostring).
             bob->append("keyPattern", spec->keyPattern.toString());
-            bob->append("boundsVerbose", spec->indexBoundsVerbose);
             bob->appendNumber("isMultiKey", spec->isMultiKey);
+
+            // The verbose bounds can get large. Truncate to 1 MB.
+            static const int kMaxVerboseBoundsSize = 1024 * 1024;
+            bob->append("boundsVerbose", spec->indexBoundsVerbose.substr(0, kMaxVerboseBoundsSize));
 
             bob->appendNumber("yieldMovedCursor", spec->yieldMovedCursor);
             bob->appendNumber("dupsTested", spec->dupsTested);
@@ -566,9 +579,13 @@ namespace mongo {
         BSONArrayBuilder childrenBob(bob->subarrayStart("children"));
         for (size_t i = 0; i < stats.children.size(); ++i) {
             BSONObjBuilder childBob(childrenBob.subobjStart());
-            statsToBSON(*stats.children[i], &childBob);
+            statsToBSON(*stats.children[i], &childBob, topLevelBob);
         }
         childrenBob.doneFast();
+    }
+
+    void statsToBSON(const PlanStageStats& stats, BSONObjBuilder* bob) {
+        statsToBSON(stats, bob, bob);
     }
 
     BSONObj statsToBSON(const PlanStageStats& stats) {
