@@ -325,6 +325,19 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		__wt_page_only_modify_set(session, child);
 
 		/*
+		 * Once the split goes live, the newly created children can be
+		 * evicted and their WT_REF structures freed.  If the child
+		 * pages are evicted before threads exit the previous page index
+		 * array, a thread might see a freed WT_REF.  Set the eviction
+		 * transaction requirement for split pages.  (Note, we're about
+		 * to process those pages below, too, without holding hazard
+		 * references; this "pin" based on the current transaction makes
+		 * that safe as well.)
+		 */
+		child->modify->mod_split_txn =
+		    S2C(session)->txn_global.current + 1;
+
+		/*
 		 * The newly allocated child's page index references the same
 		 * structures as the parent.  (We cannot move WT_REF structures,
 		 * threads may be underneath us right now changing the structure
