@@ -33,17 +33,20 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/optime.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/repl/write_concern.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/util/assert_util.h" // TODO: remove along with invariant from getCurrentMemberState
 #include "mongo/util/fail_point_service.h"
-#include "mongo/db/instance.h"
-#include "mongo/db/repl/connections.h"
-#include "mongo/db/repl/bgsync.h"
 
 namespace mongo {
 namespace repl {
@@ -93,11 +96,68 @@ namespace repl {
         return theReplSet->state();
     }
 
-    Status LegacyReplicationCoordinator::awaitReplication(const OpTime& ts,
-                                                          const WriteConcernOptions& writeConcern,
-                                                          Milliseconds timeout) {
-        // TODO
-        return Status::OK();
+    ReplicationCoordinator::StatusAndDuration LegacyReplicationCoordinator::awaitReplication(
+            const OperationContext* txn,
+            const OpTime& ts,
+            const WriteConcernOptions& writeConcern) {
+
+        Timer timeoutTimer;
+
+        if (writeConcern.wNumNodes <= 1 && writeConcern.wMode.empty()) {
+            // no desired replication check
+            return StatusAndDuration(Status::OK(), Milliseconds(timeoutTimer.millis()));
+        }
+
+        const Mode replMode = getReplicationMode();
+        if (replMode == modeNone || serverGlobalParams.configsvr) {
+            // no replication check needed (validated above)
+            return StatusAndDuration(Status::OK(), Milliseconds(timeoutTimer.millis()));
+        }
+
+        if (writeConcern.wMode == "majority" && replMode == modeMasterSlave) {
+            // with master/slave, majority is equivalent to w=1
+            return StatusAndDuration(Status::OK(), Milliseconds(timeoutTimer.millis()));
+        }
+
+        try {
+            while (1) {
+                if (!writeConcern.wMode.empty()) {
+                    if (opReplicatedEnough(ts, writeConcern.wMode)) {
+                        return StatusAndDuration(Status::OK(), Milliseconds(timeoutTimer.millis()));
+                    }
+                }
+                else if (opReplicatedEnough(ts, writeConcern.wNumNodes)) {
+                    return StatusAndDuration(Status::OK(), Milliseconds(timeoutTimer.millis()));
+                }
+
+                if (writeConcern.wTimeout > 0 && timeoutTimer.millis() >= writeConcern.wTimeout) {
+                    return StatusAndDuration(Status(ErrorCodes::ExceededTimeLimit,
+                                                     "waiting for replication timed out"),
+                                              Milliseconds(timeoutTimer.millis()));
+                }
+
+                if (writeConcern.wTimeout == -1) {
+                    return StatusAndDuration(Status(ErrorCodes::ExceededTimeLimit,
+                                                     "replication not finished when checked"),
+                                              Milliseconds(timeoutTimer.millis()));
+                }
+
+                // TODO (dannenberg) is this the best sleep amount?
+                sleepmillis(1);
+                txn->checkForInterrupt();
+            }
+
+        }
+        catch (const DBException& ex) {
+            return StatusAndDuration(ex.toStatus(), Milliseconds(timeoutTimer.millis()));
+        }
+    }
+
+    ReplicationCoordinator::StatusAndDuration 
+            LegacyReplicationCoordinator::awaitReplicationOfLastOp(
+                    const OperationContext* txn,
+                    const WriteConcernOptions& writeConcern) {
+        return awaitReplication(txn, cc().getLastOp(), writeConcern);
     }
 
     Status LegacyReplicationCoordinator::stepDown(bool force,

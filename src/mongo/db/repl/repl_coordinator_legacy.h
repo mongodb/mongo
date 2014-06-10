@@ -56,9 +56,14 @@ namespace repl {
 
         virtual MemberState getCurrentMemberState() const;
 
-        virtual Status awaitReplication(const OpTime& ts,
-                                        const WriteConcernOptions& writeConcern,
-                                        Milliseconds timeout);
+        virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
+                const OperationContext* txn,
+                const OpTime& ts,
+                const WriteConcernOptions& writeConcern);
+
+        virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOp(
+                const OperationContext* txn,
+                const WriteConcernOptions& writeConcern);
 
         virtual Status stepDown(bool force,
                                 const Milliseconds& waitTime,

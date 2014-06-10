@@ -162,72 +162,36 @@ namespace mongo {
 
         // Now wait for replication
 
-        if ( replOpTime.isNull() ) {
+        if (replOpTime.isNull()) {
             // no write happened for this client yet
             return Status::OK();
         }
 
-        if ( writeConcern.wNumNodes <= 1 && writeConcern.wMode.empty() ) {
+        // needed to avoid incrementing gleWtimeStats SERVER-9005
+        if (writeConcern.wNumNodes <= 1 && writeConcern.wMode.empty()) {
             // no desired replication check
             return Status::OK();
         }
 
-        const repl::ReplicationCoordinator::Mode replMode =
-                repl::getGlobalReplicationCoordinator()->getReplicationMode();
-        if (replMode == repl::ReplicationCoordinator::modeNone || serverGlobalParams.configsvr) {
-            // no replication check needed (validated above)
-            return Status::OK();
-        }
-
-        if ( writeConcern.wMode == "majority" &&
-                replMode == repl::ReplicationCoordinator::modeMasterSlave ) {
-            // with master/slave, majority is equivalent to w=1
-            return Status::OK();
-        }
-
-        // We're sure that replication is enabled and that we have more than one node or a wMode
-        TimerHolder gleTimerHolder( &gleWtimeStats );
-
         // Now we wait for replication
         // Note that replica set stepdowns and gle mode changes are thrown as errors
-        // TODO: Make this cleaner
-        Status replStatus = Status::OK();
-        try {
-            while ( 1 ) {
-
-                if ( writeConcern.wNumNodes > 0 ) {
-                    if (repl::opReplicatedEnough(replOpTime, writeConcern.wNumNodes)) {
-                        break;
-                    }
-                }
-                else if (repl::opReplicatedEnough(replOpTime, writeConcern.wMode)) {
-                    break;
-                }
-
-                if ( writeConcern.wTimeout > 0 &&
-                     gleTimerHolder.millis() >= writeConcern.wTimeout ) {
-                    gleWtimeouts.increment();
-                    result->err = "timeout";
-                    result->wTimedOut = true;
-                    replStatus = Status( ErrorCodes::WriteConcernFailed,
-                                         "waiting for replication timed out" );
-                    break;
-                }
-
-                sleepmillis(1);
-                txn->checkForInterrupt();
-            }
+        repl::ReplicationCoordinator::StatusAndDuration replStatus =
+                repl::getGlobalReplicationCoordinator()->awaitReplication(txn,
+                                                                          replOpTime,
+                                                                          writeConcern);
+        if (replStatus.status == ErrorCodes::ExceededTimeLimit) {
+            gleWtimeouts.increment();
+            replStatus.status = Status(ErrorCodes::WriteConcernFailed,
+                                       "waiting for replication timed out");
+            result->err = "timeout";
+            result->wTimedOut = true;
         }
-        catch( const AssertionException& ex ) {
-            // Our replication state changed while enforcing write concern
-            replStatus = ex.toStatus();
-        }
-
         // Add stats
         result->writtenTo = repl::getHostsWrittenTo(replOpTime);
-        result->wTime = gleTimerHolder.recordMillis();
+        gleWtimeStats.recordMillis(replStatus.duration.total_milliseconds());
+        result->wTime = replStatus.duration.total_milliseconds();
 
-        return replStatus;
+        return replStatus.status;
     }
 
 } // namespace mongo

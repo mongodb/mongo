@@ -33,8 +33,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/repl/write_concern.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/d_logic.h"
 
 namespace mongo {
@@ -57,7 +58,6 @@ namespace mongo {
     bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
                                         const RangeDeleteEntry& taskDetails,
                                         long long int* deletedDocs,
-                                        ReplTime* lastOp,
                                         std::string* errMsg) {
         const string ns(taskDetails.ns);
         const BSONObj inclusiveLower(taskDetails.min);
@@ -129,37 +129,8 @@ namespace mongo {
             }
         }
 
-        *lastOp = cc().getLastOp().asDate();
-
         if (!initiallyHaveClient) {
             cc().shutdown();
-        }
-
-        return true;
-    }
-
-    bool RangeDeleterDBEnv::waitForReplication(ReplTime lastOp,
-                                               const BSONObj& writeConcern,
-                                               long long int timeoutSecs,
-                                               string* errMsg) {
-        if (repl::replSet) {
-            Timer elapsedTime;
-
-            while (!repl::opReplicatedEnough(lastOp, writeConcern["w"])) {
-                if (elapsedTime.seconds() >= timeoutSecs) {
-                    *errMsg = str::stream() << "rangeDeleter timed out after "
-                                            << elapsedTime.seconds() << " seconds while waiting"
-                                            << " for deletions to be replicated to majority nodes";
-
-                    return false;
-                }
-
-                sleepsecs(1);
-            }
-
-            LOG(elapsedTime.seconds() < 30 ? 1 : 0)
-                << "rangeDeleter took " << elapsedTime.seconds() << " seconds "
-                << " waiting for deletes to be replicated to majority nodes" << endl;
         }
 
         return true;

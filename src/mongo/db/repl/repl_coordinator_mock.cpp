@@ -67,11 +67,19 @@ namespace repl {
         invariant(false);
     }
 
-    Status ReplicationCoordinatorMock::awaitReplication(const OpTime& ts,
-                                                        const WriteConcernOptions& writeConcern,
-                                                        Milliseconds timeout) {
+    ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorMock::awaitReplication(
+            const OperationContext* txn,
+            const OpTime& ts,
+            const WriteConcernOptions& writeConcern) {
         // TODO
-        return Status::OK();
+        return StatusAndDuration(Status::OK(), Milliseconds(0));
+    }
+
+    ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorMock::awaitReplicationOfLastOp(
+            const OperationContext* txn,
+            const WriteConcernOptions& writeConcern) {
+        // TODO
+        return StatusAndDuration(Status::OK(), Milliseconds(0));
     }
 
     Status ReplicationCoordinatorMock::stepDown(bool force,

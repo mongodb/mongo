@@ -32,6 +32,8 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/range_deleter.h"
 #include "mongo/db/range_deleter_mock_env.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_coordinator_mock.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 
@@ -55,6 +57,7 @@ namespace {
 
     // Should not be able to queue deletes if deleter workers were not started.
     TEST(QueueDelete, CantAfterStop) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
 
@@ -76,6 +79,7 @@ namespace {
     // Should not start delete if the set of cursors that were open when the
     // delete was queued is still open.
     TEST(QueuedDelete, ShouldWaitCursor) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         const string ns("test.user");
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
@@ -110,6 +114,7 @@ namespace {
 
     // Should terminate when stop is requested.
     TEST(QueuedDelete, StopWhileWaitingCursor) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         const string ns("test.user");
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
@@ -142,6 +147,7 @@ namespace {
     // Should not start delete if the set of cursors that were open when the
     // deleteNow method is called is still open.
     TEST(ImmediateDelete, ShouldWaitCursor) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         const string ns("test.user");
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
@@ -189,6 +195,7 @@ namespace {
 
     // Should terminate when stop is requested.
     TEST(ImmediateDelete, StopWhileWaitingCursor) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         const string ns("test.user");
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
@@ -230,6 +237,7 @@ namespace {
     // other one is waiting for an open cursor. The test then makes sure that the
     // deletes are performed in the right order.
     TEST(MixedDeletes, MultipleDeletes) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         const string blockedNS("foo.bar");
         const string ns("test.user");
 
@@ -328,6 +336,7 @@ namespace {
 
     // Should not be able to delete ranges that overlaps with a black listed range.
     TEST(BlackList, CantDeleteBlackListed) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
         deleter.startWorkers();
@@ -356,6 +365,7 @@ namespace {
     // Should not be able to black list a range that overlaps with a range that is
     // already blacklisted.
     TEST(BlackList, CantDoubleBlackList) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
         const string ns("test.user");
@@ -378,6 +388,7 @@ namespace {
     // Should not be able to black list a range that overlaps with a range that is already
     // queued for deletion.
     TEST(BlackList, CantBlackListQueued) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
         const string ns("test.user");
@@ -408,6 +419,7 @@ namespace {
     // Should not be able to black list a range that overlaps the range of an
     // immediate delete that is currently in progress.
     TEST(BlackList, CantBlackListImmediateInProgress) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
         const string ns("test.user");
@@ -447,6 +459,7 @@ namespace {
     // Undo black list should only work if the range given exactly match with an
     // existing black listed range.
     TEST(BlackList, UndoShouldBeExact) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
         const string ns("test.user");
@@ -465,6 +478,7 @@ namespace {
 
     // Should be able to delete the range again once the black list has been undone.
     TEST(BlackList, UndoBlackList) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
         const string ns("test.user");
@@ -490,6 +504,7 @@ namespace {
 
     // Black listing should only affect the specified namespace.
     TEST(BlackList, NSIsolation) {
+        mongo::repl::setGlobalReplicationCoordinator(new mongo::repl::ReplicationCoordinatorMock());
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
 

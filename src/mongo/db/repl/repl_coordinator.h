@@ -62,6 +62,15 @@ namespace repl {
 
         typedef boost::posix_time::milliseconds Milliseconds;
 
+        struct StatusAndDuration {
+        public:
+            Status status;
+            Milliseconds duration;
+
+            StatusAndDuration(const Status& stat, Milliseconds ms) : status(stat),
+                                                                     duration(ms) {}
+        };
+
         virtual ~ReplicationCoordinator();
 
         /**
@@ -113,14 +122,26 @@ namespace repl {
         virtual MemberState getCurrentMemberState() const = 0;
 
         /**
-         * Blocks the calling thread for up to "timeout" millis, or until "ts" has been replicated
-         * to at least a set of nodes that satisfies the writeConcern, whichever comes first. Will
-         * return a Status with ErrorCodes::ExceededTimeLimit if the timeout is reached before the
-         * data has been sufficiently replicated.
+         * Blocks the calling thread for up to writeConcern.wTimeout millis, or until "ts" has been
+         * replicated to at least a set of nodes that satisfies the writeConcern, whichever comes
+         * first. A writeConcern.wTimeout of 0 indicates no timeout (block forever) and a
+         * writeConcern.wTimeout of -1 indicates return immediately after checking. Will return a
+         * Status with ErrorCodes::ExceededTimeLimit if the writeConcern.wTimeout is reached before
+         * the data has been sufficiently replicated, a Status with ErrorCodes::NotMaster if the
+         * node is not Primary/Master, or a Status with ErrorCodes::UnknownReplWriteConcern if
+         * the writeConcern.wMode contains a write concern mode that is not known.
          */
-        virtual Status awaitReplication(const OpTime& ts,
-                                        const WriteConcernOptions& writeConcern,
-                                        Milliseconds timeout) = 0;
+        virtual StatusAndDuration awaitReplication(const OperationContext* txn,
+                                                    const OpTime& ts,
+                                                    const WriteConcernOptions& writeConcern) = 0;
+
+        /**
+         * Like awaitReplication(), above, but waits for the replication of the last operation
+         * performed on the client associated with "txn".
+         */
+        virtual StatusAndDuration awaitReplicationOfLastOp(
+                const OperationContext* txn,
+                const WriteConcernOptions& writeConcern) = 0;
 
         /**
          * Causes this node to relinquish being primary for at least 'stepdownTime'.  If 'force' is

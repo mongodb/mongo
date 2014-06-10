@@ -362,16 +362,7 @@ namespace mongo {
         virtual bool deleteRange(OperationContext* txn,
                                  const RangeDeleteEntry& taskDetails,
                                  long long int* deletedDocs,
-                                 ReplTime* lastOp,
                                  std::string* errMsg) = 0;
-
-        /**
-         * Returns true if was ops till lastOp were replicated.
-         */
-        virtual bool waitForReplication(ReplTime lastOp,
-                                        const BSONObj& writeConcern,
-                                        long long int timeoutSecs,
-                                        std::string* errMsg) = 0;
 
         /**
          * Gets the list of open cursors on a given namespace. The openCursors is an

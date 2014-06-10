@@ -64,8 +64,8 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
-#include "mongo/db/repl/write_concern.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
@@ -1815,9 +1815,20 @@ namespace mongo {
                         clonedBytes += o.objsize();
 
                         if ( secondaryThrottle && thisTime > 0 ) {
-                            if (!repl::waitForReplication(cc().getLastOp(),
-                                                             2, 60 /* seconds to wait */)) {
-                                warning() << "secondaryThrottle on, but doc insert timed out after 60 seconds, continuing" << endl;
+                            WriteConcernOptions writeConcern;
+                            writeConcern.wNumNodes = 2;
+                            writeConcern.wTimeout = 60 * 1000;
+                            repl::ReplicationCoordinator::StatusAndDuration replStatus =
+                                    repl::getGlobalReplicationCoordinator()->awaitReplication(
+                                            txn,
+                                            cc().getLastOp(),
+                                            writeConcern);
+                            if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
+                                    warning() << "secondaryThrottle on, but doc insert timed out "
+                                                 "after 60 seconds, continuing";
+                            }
+                            else {
+                                massertStatusOK(replStatus.status);
                             }
                         }
                     }
@@ -1864,7 +1875,7 @@ namespace mongo {
                             return;
                         }
                         
-                        if (opReplicatedEnough(lastOpApplied))
+                        if (opReplicatedEnough(txn, lastOpApplied))
                             break;
                         
                         if ( i > 100 ) {
@@ -2087,15 +2098,19 @@ namespace mongo {
             return false;
         }
 
-        bool opReplicatedEnough( const ReplTime& lastOpApplied ) {
+        bool opReplicatedEnough(const OperationContext* txn, const ReplTime& lastOpApplied) {
             // if replication is on, try to force enough secondaries to catch up
             // TODO opReplicatedEnough should eventually honor priorities and geo-awareness
             //      for now, we try to replicate to a sensible number of secondaries
-            return repl::opReplicatedEnough(lastOpApplied, replSetMajorityCount);
+            WriteConcernOptions writeConcern;
+            writeConcern.wTimeout = -1;
+            writeConcern.wMode = "majority";
+            return repl::getGlobalReplicationCoordinator()->awaitReplication(txn, lastOpApplied,
+                    writeConcern).status.isOK();
         }
 
         bool flushPendingWrites(OperationContext* txn, const ReplTime& lastOpApplied ) {
-            if ( ! opReplicatedEnough( lastOpApplied ) ) {
+            if (!opReplicatedEnough(txn, lastOpApplied)) {
                 OpTime op( lastOpApplied );
                 OCCASIONALLY warning() << "migrate commit waiting for " << replSetMajorityCount 
                                        << " slaves for '" << ns << "' " << min << " -> " << max 

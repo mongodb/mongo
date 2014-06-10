@@ -108,7 +108,6 @@ namespace mongo {
     bool RangeDeleterMockEnv::deleteRange(OperationContext* txn,
                                           const RangeDeleteEntry& taskDetails,
                                           long long int* deletedDocs,
-                                          ReplTime* lastOp,
                                           string* errMsg) {
 
         {
@@ -139,13 +138,6 @@ namespace mongo {
             _deleteList.push_back(entry);
         }
 
-        return true;
-    }
-
-    bool RangeDeleterMockEnv::waitForReplication(ReplTime lastOp,
-                                                 const BSONObj& writeConcern,
-                                                 long long int timeoutSecs,
-                                                 string* errMsg) {
         return true;
     }
 

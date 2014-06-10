@@ -129,17 +129,7 @@ namespace mongo {
         bool deleteRange(OperationContext* txn,
                          const RangeDeleteEntry& taskDetails,
                          long long int* deletedDocs,
-                         ReplTime* lastOp,
                          std::string* errMsg);
-
-        /**
-         * Basic implementation of delete that matches the signature for
-         * RangeDeleterEnv::waitForReplication. Does nothing.
-         */
-        bool waitForReplication(ReplTime lastOp,
-                                const BSONObj& writeConcern,
-                                long long int timeoutSecs,
-                                std::string* errMsg);
 
         /**
          * Basic implementation of gathering open cursors that matches the signature for

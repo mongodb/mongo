@@ -26,12 +26,16 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/range_deleter.h"
 
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <memory>
 
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/range_arithmetic.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/mongoutils/str.h"
@@ -51,8 +55,6 @@ namespace {
     const unsigned long long LogCursorsThresholdMillis = 60 * 1000;
     const unsigned long long LogCursorsIntervalMillis = 10 * 1000;
     const size_t DeleteJobsHistory = 10; // entries
-    const mongo::BSONObj DelWriteConcern(BSON("w" << "majority"));
-    const unsigned long long WaitForReplTimeoutSecs = 3600;
 
     /**
      * Removes an element from the container that holds a pointer type, and deletes the
@@ -237,6 +239,38 @@ namespace mongo {
         return true;
     }
 
+namespace {
+    bool _waitForReplication(OperationContext* txn, std::string* errMsg) {
+        WriteConcernOptions writeConcern;
+        writeConcern.wMode = "majority";
+        writeConcern.wTimeout = 60 * 60 * 1000;
+        repl::ReplicationCoordinator::StatusAndDuration replStatus =
+                repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOp(txn,
+                                                                                  writeConcern);
+        repl::ReplicationCoordinator::Milliseconds elapsedTime = replStatus.duration;
+        if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
+            *errMsg = str::stream() << "rangeDeleter timed out after "
+                                    << elapsedTime.seconds() << " seconds while waiting"
+                                    << " for deletions to be replicated to majority nodes";
+            log() << *errMsg;
+        }
+        else if (replStatus.status.code() == ErrorCodes::NotMaster) {
+            *errMsg = str::stream() << "rangeDeleter no longer PRIMARY after "
+                                    << elapsedTime.seconds() << " seconds while waiting"
+                                    << " for deletions to be replicated to majority nodes";
+        }
+        else {
+            LOG(elapsedTime.seconds() < 30 ? 1 : 0)
+                << "rangeDeleter took " << elapsedTime.seconds() << " seconds "
+                << " waiting for deletes to be replicated to majority nodes";
+
+            fassert(18512, replStatus.status);
+        }
+
+        return replStatus.status.isOK();
+    }
+}
+
     bool RangeDeleter::deleteNow(OperationContext* txn,
                                  const std::string& ns,
                                  const BSONObj& min,
@@ -326,23 +360,17 @@ namespace mongo {
         }
         taskDetails.stats.queueEndTS = jsTime();
 
-        ReplTime lastOp;
         taskDetails.stats.deleteStartTS = jsTime();
         bool result = _env->deleteRange(txn,
                                         taskDetails,
                                         &taskDetails.stats.deletedDocCount,
-                                        &lastOp,
                                         errMsg);
 
         taskDetails.stats.deleteEndTS = jsTime();
 
         if (result) {
             taskDetails.stats.waitForReplStartTS = jsTime();
-            result = _env->waitForReplication(lastOp,
-                                              DelWriteConcern,
-                                              WaitForReplTimeoutSecs,
-                                              errMsg);
-
+            result = _waitForReplication(txn, errMsg);
             taskDetails.stats.waitForReplEndTS = jsTime();
         }
 
@@ -513,25 +541,21 @@ namespace mongo {
 
             {
                 boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
-                ReplTime lastOp;
 
                 nextTask->stats.deleteStartTS = jsTime();
                 bool delResult = _env->deleteRange(txn.get(),
                                                    *nextTask,
                                                    &nextTask->stats.deletedDocCount,
-                                                   &lastOp,
                                                    &errMsg);
                 nextTask->stats.deleteEndTS = jsTime();
 
                 if (delResult) {
                     nextTask->stats.waitForReplStartTS = jsTime();
-                    if (!_env->waitForReplication(lastOp,
-                                                  DelWriteConcern,
-                                                  WaitForReplTimeoutSecs,
-                                                  &errMsg)) {
-                        warning() << "Error encountered while waiting for replication: "
-                                  << errMsg << endl;
+
+                    if (!_waitForReplication(txn.get(), &errMsg)) {
+                        warning() << "Error encountered while waiting for replication: " << errMsg;
                     }
+
                     nextTask->stats.waitForReplEndTS = jsTime();
                 }
                 else {

@@ -56,18 +56,7 @@ namespace mongo {
         virtual bool deleteRange(OperationContext* txn,
                                  const RangeDeleteEntry& taskDetails,
                                  long long int* deletedDocs,
-                                 ReplTime* lastOp,
                                  std::string* errMsg);
-
-        /**
-         * Waits for replication to reach lastOp while obeying the given writeConcern.
-         * Note that only the "w" parameter of the writeConcern is recognized at the moment.
-         * No-op if replication is not active.
-         */
-        bool waitForReplication(ReplTime lastOp,
-                                const BSONObj& writeConcern,
-                                long long int timeoutSecs,
-                                std::string* errMsg);
 
         /**
          * Gets the list of open cursors on a given namespace.

@@ -50,7 +50,8 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/write_concern.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
@@ -425,13 +426,25 @@ namespace mongo {
                 numDeleted++;
             }
 
+            // TODO remove once the yielding below that references this timer has been removed
             Timer secondaryThrottleTime;
 
             if ( secondaryThrottle && numDeleted > 0 ) {
-                if (!repl::waitForReplication(c.getLastOp(), 2, 60 /* seconds to wait */)) {
-                    warning() << "replication to secondaries for removeRange at least 60 seconds behind" << endl;
+                WriteConcernOptions writeConcern;
+                writeConcern.wNumNodes = 2;
+                writeConcern.wTimeout = 60 * 1000;
+                repl::ReplicationCoordinator::StatusAndDuration replStatus =
+                        repl::getGlobalReplicationCoordinator()->awaitReplication(txn,
+                                                                                  c.getLastOp(),
+                                                                                  writeConcern);
+                if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
+                    warning() << "replication to secondaries for removeRange at "
+                                 "least 60 seconds behind";
                 }
-                millisWaitingForReplication += secondaryThrottleTime.millis();
+                else {
+                    massertStatusOK(replStatus.status);
+                }
+                millisWaitingForReplication += replStatus.duration.total_milliseconds();
             }
             
             if (!txn->lockState()->isLocked()) {

@@ -881,6 +881,7 @@ env.Library('range_deleter',
               'db/range_deleter_mock_env.cpp',
             ],
             LIBDEPS = [
+                '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
                 '$BUILD_DIR/mongo/s/base', # range_arithmetic.cpp
                 'base/base',
                 'bson',
@@ -890,7 +891,11 @@ env.Library('range_deleter',
 
 env.CppUnitTest('range_deleter_test',
                 [ 'db/range_deleter_test.cpp' ],
-                LIBDEPS = [ 'range_deleter', 'db/common' ]);
+                LIBDEPS = [
+                    '$BUILD_DIR/mongo/db/repl/replmocks',
+                    'db/common',
+                    'range_deleter',
+                ])
 
 env.Library("serveronly", serverOnlyFiles,
             LIBDEPS=["coreshard",

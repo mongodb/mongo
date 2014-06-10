@@ -47,8 +47,8 @@ namespace repl {
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
     void ReplicationCoordinatorImpl::startReplication(
-        TopologyCoordinator* topCoord,
-        ReplicationExecutor::NetworkInterface* network) {
+            TopologyCoordinator* topCoord,
+            ReplicationExecutor::NetworkInterface* network) {
         if (!isReplEnabled()) {
             return;
         }
@@ -104,11 +104,18 @@ namespace repl {
         return _currentState;
     }
 
-    Status ReplicationCoordinatorImpl::awaitReplication(const OpTime& ts,
-                                                        const WriteConcernOptions& writeConcern,
-                                                        Milliseconds timeout) {
+    ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitReplication(
+            const OperationContext* txn,
+            const OpTime& ts,
+            const WriteConcernOptions& writeConcern) {
         // TODO
-        return Status::OK();
+        return StatusAndDuration(Status::OK(), Milliseconds(0));
+    }
+
+    ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitReplicationOfLastOp(
+            const OperationContext* txn,
+            const WriteConcernOptions& writeConcern) {
+        return StatusAndDuration(Status::OK(), Milliseconds(0));
     }
 
     Status ReplicationCoordinatorImpl::stepDown(bool force,

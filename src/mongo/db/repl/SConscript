@@ -45,4 +45,7 @@ env.Library('replmocks',
             ['repl_coordinator_mock.cpp',
              'network_interface_mock.cpp',
              'topology_coordinator_mock.cpp'],
-            LIBDEPS=['repl_coordinator_interface'])
+            LIBDEPS=[
+                'repl_coordinator_interface',
+                'replication_executor',
+            ])
