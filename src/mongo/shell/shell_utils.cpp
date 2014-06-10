@@ -47,6 +47,7 @@ namespace mongo {
 
     namespace JSFiles {
         extern const JSFile servers;
+        extern const JSFile mongodtest;
         extern const JSFile shardingtest;
         extern const JSFile servers_misc;
         extern const JSFile replsettest;
@@ -221,6 +222,7 @@ namespace mongo {
             scope.externalSetup();
             mongo::shell_utils::installShellUtils( scope );
             scope.execSetup(JSFiles::servers);
+            scope.execSetup(JSFiles::mongodtest);
             scope.execSetup(JSFiles::shardingtest);
             scope.execSetup(JSFiles::servers_misc);
             scope.execSetup(JSFiles::replsettest);
