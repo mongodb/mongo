@@ -416,9 +416,6 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			continue;
 
 		child = parent_ref->page;
-		if (child->type != WT_PAGE_ROW_INT &&
-		    child->type != WT_PAGE_COL_INT)
-			continue;
 #ifdef HAVE_DIAGNOSTIC
 		__split_verify_intl_key_order(session, child);
 #endif
