@@ -1,4 +1,4 @@
-/*    Copyright 2013 10gen Inc.
+/*    Copyright 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -29,40 +29,43 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/logger/tag_message_log_domain.h"
-#include "mongo/logger/rotatable_file_writer.h"
-#include "mongo/platform/unordered_map.h"
-
 namespace mongo {
 namespace logger {
 
     /**
-     * Container for managing log domains.
-     *
-     * Use this while setting up the logging system, before launching any threads.
+     * Log tags.
+     * Debug messages logged using the LOG() or MONGO_LOG_TAG()
+     * macros may be associated with one or more log tags.
      */
-    class LogManager {
-        MONGO_DISALLOW_COPYING(LogManager);
+    class LogTag {
     public:
-        LogManager();
-        ~LogManager();
+        enum Value {
+            kDefault = 0,
+            kAccessControl,
+            kCommands,
+            kIndexing,
+            kJournalling,
+            kNetworking,
+            kQuery,
+            kReplication,
+            kSharding,
+            kStorage,
+            kWrites,
+            kNumLogTags
+        };
+
+        /* implicit */ LogTag(Value value) : _value(value) {}
+
+        operator Value() const { return _value; }
 
         /**
-         * Gets the global domain for this manager.  It has no name.
+         * Returns short name of log tag.
+         * Used to generate server parameter names in the format "logLevel_<tag short name>".
          */
-        TagMessageLogDomain* getGlobalDomain() { return &_globalDomain; }
-
-        /**
-         * Get the log domain with the given name, creating if needed.
-         */
-        MessageLogDomain* getNamedDomain(const std::string& name);
+        std::string getShortName() const;
 
     private:
-        typedef unordered_map<std::string, MessageLogDomain*> DomainsByNameMap;
-
-        DomainsByNameMap _domains;
-        TagMessageLogDomain _globalDomain;
+        Value _value;
     };
 
 }  // namespace logger

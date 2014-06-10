@@ -1,4 +1,4 @@
-/*    Copyright 2013 10gen Inc.
+/*    Copyright 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -25,45 +25,33 @@
  *    then also delete it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <string>
+#include "mongo/logger/log_tag.h"
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/logger/tag_message_log_domain.h"
-#include "mongo/logger/rotatable_file_writer.h"
-#include "mongo/platform/unordered_map.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace logger {
 
-    /**
-     * Container for managing log domains.
-     *
-     * Use this while setting up the logging system, before launching any threads.
-     */
-    class LogManager {
-        MONGO_DISALLOW_COPYING(LogManager);
-    public:
-        LogManager();
-        ~LogManager();
+    std::string LogTag::getShortName() const {
+        switch (_value) {
+        case kDefault: return "Default";
+        case kAccessControl: return "AccessControl";
+        case kCommands: return "Commands";
+        case kIndexing: return "Indexing";
+        case kJournalling: return "Journalling";
+        case kNetworking: return "Networking";
+        case kQuery: return "Query";
+        case kReplication: return "Replication";
+        case kSharding: return "Sharding";
+        case kStorage: return "Storage";
+        case kWrites: return "Writes";
+        case kNumLogTags: return "Total";
+        // No default. Compiler should complain if there's a tag that's not handled.
+        }
+        invariant(0);
+    }
 
-        /**
-         * Gets the global domain for this manager.  It has no name.
-         */
-        TagMessageLogDomain* getGlobalDomain() { return &_globalDomain; }
-
-        /**
-         * Get the log domain with the given name, creating if needed.
-         */
-        MessageLogDomain* getNamedDomain(const std::string& name);
-
-    private:
-        typedef unordered_map<std::string, MessageLogDomain*> DomainsByNameMap;
-
-        DomainsByNameMap _domains;
-        TagMessageLogDomain _globalDomain;
-    };
-
-}  // namespace logger
-}  // namespace mongo
+}  // logger
+}  // mongo

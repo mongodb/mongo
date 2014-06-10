@@ -43,7 +43,7 @@ namespace logger {
 
     template <typename E>
         LogDomain<E>::LogDomain() 
-        : _minimumLoggedSeverity(LogSeverity::Log()), _abortOnFailure(false) 
+        : _abortOnFailure(false)
     {}
 
     template <typename E>
