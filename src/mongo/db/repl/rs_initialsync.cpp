@@ -323,12 +323,6 @@ namespace repl {
                 lastH = 0;
 
                 log() << "replSet cleaning up [1]" << rsLog;
-                {
-                    OperationContextImpl txn; // XXX?
-                    Client::WriteContext cx(&txn, "local.");
-                    cx.ctx().db()->flushFiles(true);
-                }
-                log() << "replSet cleaning up [2]" << rsLog;
 
                 log() << "replSet initial sync failed will try again" << endl;
 
@@ -473,7 +467,6 @@ namespace repl {
         {
             Client::WriteContext cx(&txn, "local.");
 
-            cx.ctx().db()->flushFiles(true);
             try {
                 log() << "replSet set minValid=" << minValid["ts"]._opTime().toString() << rsLog;
             }
@@ -485,8 +478,6 @@ namespace repl {
 
             // Clear the initial sync flag.
             theReplSet->clearInitialSyncFlag();
-
-            cx.ctx().db()->flushFiles(true);
         }
         {
             boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);

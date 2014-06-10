@@ -81,8 +81,6 @@ namespace mongo {
          */
         bool setProfilingLevel( OperationContext* txn, int newLevel , std::string& errmsg );
 
-        void flushFiles( bool sync );
-
         /**
          * @return true if ns is part of the database
          *         ns=foo.bar, db=foo returns true

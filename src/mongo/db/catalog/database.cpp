@@ -202,8 +202,6 @@ namespace mongo {
         }
     }
 
-    void Database::flushFiles( bool sync ) { return getExtentManager()->flushFiles( sync ); }
-
     bool Database::setProfilingLevel( OperationContext* txn, int newLevel , string& errmsg ) {
         if ( _profile == newLevel )
             return true;
