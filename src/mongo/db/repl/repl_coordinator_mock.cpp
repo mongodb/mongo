@@ -75,12 +75,12 @@ namespace repl {
 
     bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(const StringData& dbName) {
         // TODO
-        return false;
+        return true;
     }
 
     bool ReplicationCoordinatorMock::canServeReadsFor(const NamespaceString& collection) {
         // TODO
-        return false;
+        return true;
     }
 
     bool ReplicationCoordinatorMock::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {
