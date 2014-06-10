@@ -361,6 +361,13 @@ namespace mongo {
             PDFILE_VERSION_MINOR_24_AND_NEWER;
     }
 
+    bool MMAP1DatabaseCatalogEntry::currentFilesCompatible( OperationContext* opCtx ) const {
+        if ( _extentManager.numFiles() == 0 )
+            return true;
+
+        return _extentManager.getOpenFile( 0 )->getHeader()->isCurrentVersion();
+    }
+
     void MMAP1DatabaseCatalogEntry::getCollectionNamespaces( std::list<std::string>* tofill ) const {
         _namespaceIndex.getCollectionNamespaces( tofill );
     }

@@ -41,12 +41,10 @@
 namespace mongo {
 
     class Collection;
-    class DatabaseCatalogEntry;
     class DataFile;
+    class DatabaseCatalogEntry;
     class ExtentManager;
     class IndexCatalog;
-    class MMAP1DatabaseCatalogEntry;
-    class MmapV1ExtentManager;
     class NamespaceDetails;
     class OperationContext;
 
@@ -101,10 +99,6 @@ namespace mongo {
 
         const DatabaseCatalogEntry* getDatabaseCatalogEntry() const;
 
-        // TODO: do not think this method should exist, so should try and encapsulate better
-        MmapV1ExtentManager* getExtentManager();
-        const MmapV1ExtentManager* getExtentManager() const;
-
         Status dropCollection( OperationContext* txn, const StringData& fullns );
 
         Collection* createCollection( OperationContext* txn,
@@ -150,15 +144,10 @@ namespace mongo {
 
         ~Database(); // closes files and other cleanup see below.
 
-        // TODO(ERH) remove XXX
-        void _addNamespaceToCatalog( OperationContext* txn,
-                                     const StringData& ns,
-                                     const BSONObj* options );
-
         const std::string _name; // "alleyinsider"
         const std::string _path; // "/data/db"
 
-        boost::scoped_ptr<MMAP1DatabaseCatalogEntry> _dbEntry;
+        boost::scoped_ptr<DatabaseCatalogEntry> _dbEntry;
 
         const std::string _profileName; // "alleyinsider.system.profile"
         const std::string _namespacesName; // "alleyinsider.system.namespaces"

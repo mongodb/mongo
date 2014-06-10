@@ -38,7 +38,13 @@
 namespace mongo {
 
     class BSONObjBuilder;
+    class CollectionCatalogEntry;
+    class IndexAccessMethod;
+    class IndexCatalogEntry;
     class OperationContext;
+    class RecordStore;
+
+    struct CollectionOptions;
 
     class DatabaseCatalogEntry {
     public:
@@ -50,18 +56,46 @@ namespace mongo {
 
         const std::string& name() const { return _name; }
 
+        virtual bool exists() const = 0;
         virtual bool isEmpty() const = 0;
 
         virtual void appendExtraStats( OperationContext* opCtx,
                                        BSONObjBuilder* out,
                                        double scale ) const = 0;
 
+        // these are hacks :(
         virtual bool isOlderThan24( OperationContext* opCtx ) const = 0;
         virtual void markIndexSafe24AndUp( OperationContext* opCtx ) = 0;
+
+        /**
+         * @return true if current files on disk are compatibile with the current version.
+         *              if we return false, then an upgrade will be required
+         */
+        virtual bool currentFilesCompatible( OperationContext* opCtx ) const = 0;
 
         // ----
 
         virtual void getCollectionNamespaces( std::list<std::string>* out ) const = 0;
+
+        virtual CollectionCatalogEntry* getCollectionCatalogEntry( OperationContext* txn,
+                                                                   const StringData& ns ) = 0;
+
+        virtual RecordStore* getRecordStore( OperationContext* txn,
+                                             const StringData& ns ) = 0;
+
+        virtual IndexAccessMethod* getIndex( OperationContext* txn,
+                                             const CollectionCatalogEntry* collection,
+                                             IndexCatalogEntry* index ) = 0;
+
+        virtual Status createCollection( OperationContext* txn,
+                                         const StringData& ns,
+                                         const CollectionOptions& options,
+                                         bool allocateDefaultSpace ) = 0;
+
+        virtual Status renameCollection( OperationContext* txn,
+                                         const StringData& fromNS,
+                                         const StringData& toNS,
+                                         bool stayTemp ) = 0;
 
         virtual Status dropCollection( OperationContext* opCtx,
                                        const StringData& ns ) = 0;

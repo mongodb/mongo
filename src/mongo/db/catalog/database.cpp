@@ -49,7 +49,6 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h" //XXX
-#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h" //XXX
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
 
@@ -498,37 +497,6 @@ namespace mongo {
         }
 
         return collection;
-    }
-
-
-    void Database::_addNamespaceToCatalog( OperationContext* txn,
-                                           const StringData& ns,
-                                           const BSONObj* options ) {
-        LOG(1) << "Database::_addNamespaceToCatalog ns: " << ns << endl;
-        if ( nsToCollectionSubstring( ns ) == "system.namespaces" ) {
-            // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
-            return;
-        }
-
-        BSONObjBuilder b;
-        b.append("name", ns);
-        if ( options && !options->isEmpty() )
-            b.append("options", *options);
-        BSONObj obj = b.done();
-
-        Collection* collection = getCollection( txn, _namespacesName );
-        if ( !collection )
-            collection = createCollection( txn, _namespacesName );
-        StatusWith<DiskLoc> loc = collection->insertDocument( txn, obj, false );
-        uassertStatusOK( loc.getStatus() );
-    }
-
-    MmapV1ExtentManager* Database::getExtentManager() {
-        return _dbEntry->getExtentManager();
-    }
-
-    const MmapV1ExtentManager* Database::getExtentManager() const {
-        return _dbEntry->getExtentManager();
     }
 
     const DatabaseCatalogEntry* Database::getDatabaseCatalogEntry() const {

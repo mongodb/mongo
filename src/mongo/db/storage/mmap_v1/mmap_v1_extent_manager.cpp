@@ -186,7 +186,6 @@ namespace mongo {
     }
 
     size_t MmapV1ExtentManager::numFiles() const {
-        DEV Lock::assertAtLeastReadLocked( _dbname );
         return _files.size();
     }
 
@@ -558,5 +557,11 @@ namespace mongo {
         const DataFile* df = _getOpenFile( 0 );
         *major = df->getHeader()->version;
         *minor = df->getHeader()->versionMinor;
+
+        if ( *major <= 0 || *major >= 100 ||
+             *minor <= 0 || *minor >= 100 ) {
+            error() << "corrupt pdfile version? major: " << *major << " minor: " << *minor;
+            fassertFailed( 14026 );
+        }
     }
 }

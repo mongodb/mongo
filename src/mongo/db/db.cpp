@@ -298,35 +298,6 @@ namespace mongo {
         server->run();
     }
 
-
-    void doDBUpgrade( const string& dbName, DataFileHeader* h ) {
-        OperationContextImpl txn;
-        DBDirectClient db(&txn);
-
-        if ( h->version == 4 && h->versionMinor == 4 ) {
-            verify( PDFILE_VERSION == 4 );
-            verify( PDFILE_VERSION_MINOR_22_AND_OLDER == 5 );
-
-            list<string> colls = db.getCollectionNames( dbName );
-            for ( list<string>::iterator i=colls.begin(); i!=colls.end(); i++) {
-                string c = *i;
-                log() << "\t upgrading collection:" << c << endl;
-                BSONObj out;
-                bool ok = db.runCommand( dbName , BSON( "reIndex" << c.substr( dbName.size() + 1 ) ) , out );
-                if ( ! ok ) {
-                    log() << "\t\t reindex failed: " << out;
-                    fassertFailed( 17393 );
-                }
-            }
-
-            txn.recoveryUnit()->writingInt(h->versionMinor) = 5;
-            return;
-        }
-
-        // do this in the general case
-        fassert( 17401, repairDatabase( &txn, dbName ) );
-    }
-
     void checkForIdIndexes( OperationContext* txn, Database* db ) {
 
         if ( db->name() == "local") {
@@ -376,8 +347,6 @@ namespace mongo {
             LOG(1) << "\t" << dbName << endl;
 
             Client::Context ctx( dbName );
-            DataFile *p = ctx.db()->getExtentManager()->getFile(&txn, 0);
-            DataFileHeader *h = p->getHeader();
 
             if (repl::replSettings.usingReplSets()) {
                 // we only care about the _id index if we are in a replset
@@ -387,38 +356,21 @@ namespace mongo {
             if (shouldClearNonLocalTmpCollections || dbName == "local")
                 ctx.db()->clearTmpCollections(&txn);
 
-            if (!h->isCurrentVersion() || mongodGlobalParams.repair) {
-
-                if( h->version <= 0 ) {
-                    uasserted(14026,
-                      str::stream() << "db " << dbName << " appears corrupt pdfile version: " << h->version
-                                    << " info: " << h->versionMinor << ' ' << h->fileLength);
-                }
-
-                if ( !h->isCurrentVersion() ) {
-                    log() << "****" << endl;
-                    log() << "****" << endl;
-                    log() << "need to upgrade database " << dbName << " "
-                          << "with pdfile version " << h->version << "." << h->versionMinor << ", "
-                          << "new version: "
-                          << PDFILE_VERSION << "." << PDFILE_VERSION_MINOR_22_AND_OLDER
-                          << endl;
-                }
-
-                if (mongodGlobalParams.upgrade) {
-                    // QUESTION: Repair even if file format is higher version than code?
-                    doDBUpgrade( dbName, h );
-                }
-                else {
-                    log() << "\t Not upgrading, exiting" << endl;
-                    log() << "\t run --upgrade to upgrade dbs, then start again" << endl;
-                    log() << "****" << endl;
-                    dbexit( EXIT_NEED_UPGRADE );
-                    mongodGlobalParams.upgrade = 1;
-                    return;
-                }
+            OperationContextImpl opCtx;
+            if ( mongodGlobalParams.repair ) {
+                fassert( 18506, repairDatabase( &opCtx, dbName ) );
+            }
+            else if ( !ctx.db()->getDatabaseCatalogEntry()->currentFilesCompatible( &opCtx ) ) {
+                log() << "****";
+                log() << "cannot do this upgrade without an upgrade in the middle";
+                log() << "please do a --repair with 2.6 and then start this version";
+                dbexit( EXIT_NEED_UPGRADE );
+                invariant( false );
+                return;
             }
             else {
+                // major versions match, check indexes
+
                 const string systemIndexes = ctx.db()->name() + ".system.indexes";
                 Collection* coll = ctx.db()->getCollection( &txn, systemIndexes );
                 auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes,coll));
@@ -428,7 +380,7 @@ namespace mongo {
                     const BSONObj key = index.getObjectField("key");
                     const string plugin = IndexNames::findPluginName(key);
 
-                    if (h->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER) {
+                    if (ctx.db()->getDatabaseCatalogEntry()->isOlderThan24( &opCtx )) {
                         if (IndexNames::existedBefore24(plugin))
                             continue;
 

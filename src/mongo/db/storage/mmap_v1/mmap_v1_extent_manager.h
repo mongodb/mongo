@@ -145,6 +145,8 @@ namespace mongo {
 
         void getFileFormat( OperationContext* txn, int* major, int* minor ) const;
 
+        const DataFile* getOpenFile( int n ) const { return _getOpenFile( n ); }
+
         virtual int maxSize() const;
 
 

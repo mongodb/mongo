@@ -156,43 +156,27 @@ namespace PdfileTests {
 
     class ExtentSizing {
     public:
-        struct SmallFilesControl {
-            SmallFilesControl() {
-                old = storageGlobalParams.smallfiles;
-                storageGlobalParams.smallfiles = false;
-            }
-            ~SmallFilesControl() {
-                storageGlobalParams.smallfiles = old;
-            }
-            bool old;
-        };
         void run() {
-            SmallFilesControl c;
+            MmapV1ExtentManager em( "x", "x", false );
 
-            OperationContextImpl txn;
-            Client::ReadContext ctx(&txn, "local");
-            Database* db = ctx.ctx().db();
-            ExtentManager* em = db->getExtentManager();
-
-            ASSERT_EQUALS( em->maxSize(),
-                           em->quantizeExtentSize( em->maxSize() ) );
+            ASSERT_EQUALS( em.maxSize(), em.quantizeExtentSize( em.maxSize() ) );
 
             // test that no matter what we start with, we always get to max extent size
             for ( int obj=16; obj<BSONObjMaxUserSize; obj += 111 ) {
 
-                int sz = em->initialSize( obj );
+                int sz = em.initialSize( obj );
 
                 double totalExtentSize = sz;
 
                 int numFiles = 1;
-                int sizeLeftInExtent = em->maxSize() - 1;
+                int sizeLeftInExtent = em.maxSize() - 1;
 
                 for ( int i=0; i<100; i++ ) {
-                    sz = em->followupSize( obj , sz );
+                    sz = em.followupSize( obj , sz );
                     ASSERT( sz >= obj );
-                    ASSERT( sz >= em->minSize() );
-                    ASSERT( sz <= em->maxSize() );
-                    ASSERT( sz <= em->maxSize() );
+                    ASSERT( sz >= em.minSize() );
+                    ASSERT( sz <= em.maxSize() );
+                    ASSERT( sz <= em.maxSize() );
 
                     totalExtentSize += sz;
 
@@ -201,15 +185,16 @@ namespace PdfileTests {
                     }
                     else {
                         numFiles++;
-                        sizeLeftInExtent = em->maxSize() - sz;
+                        sizeLeftInExtent = em.maxSize() - sz;
                     }
                 }
-                ASSERT_EQUALS( em->maxSize() , sz );
+                ASSERT_EQUALS( em.maxSize(), sz );
 
-                double allocatedOnDisk = (double)numFiles * em->maxSize();
+                double allocatedOnDisk = (double)numFiles * em.maxSize();
 
                 ASSERT( ( totalExtentSize / allocatedOnDisk ) > .95 );
 
+                invariant( em.numFiles() == 0 );
             }
         }
     };
