@@ -6,7 +6,7 @@ var replTest = new ReplSetTest({ name: 'unicomplex',
                               });
 var nodes = replTest.nodeList();
 
-var conns = replTest.startSet({verbose: 1});
+var conns = replTest.startSet();
 var r = replTest.initiate({ "_id": "unicomplex",
                           "members": [
                                       { "_id": 0, "host": nodes[0] },
