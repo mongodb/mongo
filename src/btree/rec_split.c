@@ -792,15 +792,11 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	parent_decr += size;
 	WT_TRET(__wt_session_fotxn_add(session, pindex, size));
-	switch (parent->type) {
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		if ((ikey = __wt_ref_key_instantiated(ref)) == NULL)
-			break;
+	if (parent->type == WT_PAGE_ROW_INT &&
+	    (ikey = __wt_ref_key_instantiated(ref)) != NULL) {
 		size = sizeof(WT_IKEY) + ikey->size;
 		parent_decr += size;
 		WT_TRET(__wt_session_fotxn_add(session, ikey, size));
-		break;
 	}
 	WT_TRET(__wt_session_fotxn_add(session, ref, sizeof(WT_REF)));
 	parent_decr += sizeof(WT_REF);
