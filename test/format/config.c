@@ -359,14 +359,7 @@ config_print(int error_display)
 
 	/* Display configuration values. */
 	for (cp = c; cp->name != NULL; ++cp)
-		if ((cp->type_mask != 0 &&
-		    ((g.type == FIX && !(cp->type_mask & C_FIX)) ||
-		    (g.type == ROW && !(cp->type_mask & C_ROW)) ||
-		    (g.type == VAR && !(cp->type_mask & C_VAR)))) ||
-		    (cp->flags & C_STRING && *(cp->vstr) == NULL))
-			fprintf(fp,
-			    "# %s not applicable to this run\n", cp->name);
-		else if (cp->flags & C_STRING)
+		if (cp->flags & C_STRING)
 			fprintf(fp, "%s=%s\n", cp->name, *cp->vstr);
 		else
 			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
