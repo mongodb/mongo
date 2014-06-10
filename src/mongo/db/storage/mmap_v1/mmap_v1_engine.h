@@ -61,7 +61,9 @@ namespace mongo {
         bool exists() const { return _namespaceIndex.pathExists(); }
         bool isEmpty() const { return !_namespaceIndex.allocated(); }
 
-        virtual void appendExtraStats( BSONObjBuilder* out, double scale ) const;
+        virtual void appendExtraStats( OperationContext* opCtx,
+                                       BSONObjBuilder* out,
+                                       double scale ) const;
 
         Status createCollection( OperationContext* txn,
                                  const StringData& ns,

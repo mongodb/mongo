@@ -47,14 +47,10 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/ops/delete.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage/data_file.h"
-#include "mongo/db/storage/extent.h"
-#include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
+#include "mongo/db/storage/data_file.h" //XXX
+#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h" //XXX
+#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h" //XXX
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
 
@@ -256,11 +252,8 @@ namespace mongo {
     }
 
     void Database::getStats( OperationContext* opCtx, BSONObjBuilder* output, double scale ) {
-        bool empty = _dbEntry->isEmpty() || getExtentManager()->numFiles() == 0;
-
         list<string> collections;
-        if ( !empty )
-            _dbEntry->getCollectionNamespaces( &collections );
+        _dbEntry->getCollectionNamespaces( &collections );
 
         long long ncollections = 0;
         long long objects = 0;
@@ -298,16 +291,8 @@ namespace mongo {
         output->appendNumber( "numExtents" , numExtents );
         output->appendNumber( "indexes" , indexes );
         output->appendNumber( "indexSize" , indexSize / scale );
-        _dbEntry->appendExtraStats( output, scale );
 
-        BSONObjBuilder dataFileVersion( output->subobjStart( "dataFileVersion" ) );
-        if ( !empty ) {
-            int major, minor;
-            getFileFormat( opCtx, &major, &minor );
-            dataFileVersion.append( "major", major );
-            dataFileVersion.append( "minor", minor );
-        }
-        dataFileVersion.done();
+        _dbEntry->appendExtraStats( opCtx, output, scale );
     }
 
     Status Database::dropCollection( OperationContext* txn, const StringData& fullns ) {

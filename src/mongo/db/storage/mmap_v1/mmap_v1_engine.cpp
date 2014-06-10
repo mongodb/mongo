@@ -288,7 +288,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    void MMAP1DatabaseCatalogEntry::appendExtraStats( BSONObjBuilder* output, double scale ) const {
+    void MMAP1DatabaseCatalogEntry::appendExtraStats( OperationContext* opCtx,
+                                                      BSONObjBuilder* output,
+                                                      double scale ) const {
         if ( isEmpty() ) {
             output->appendNumber( "fileSize", 0 );
         }
@@ -306,6 +308,18 @@ namespace mongo {
             extentFreeList.appendNumber( "totalSize",
                                          static_cast<long long>( freeListSpace / scale ) );
             extentFreeList.done();
+
+            {
+
+                int major = 0;
+                int minor = 0;
+                _extentManager.getFileFormat( opCtx, &major, &minor );
+
+                BSONObjBuilder dataFileVersion( output->subobjStart( "dataFileVersion" ) );
+                dataFileVersion.append( "major", major );
+                dataFileVersion.append( "minor", minor );
+                dataFileVersion.done();
+            }
         }
 
     }

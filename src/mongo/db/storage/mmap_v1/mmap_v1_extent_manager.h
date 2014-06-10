@@ -143,6 +143,8 @@ namespace mongo {
          */
         Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true ) const;
 
+        void getFileFormat( OperationContext* txn, int* major, int* minor ) const;
+
         virtual int maxSize() const;
 
 

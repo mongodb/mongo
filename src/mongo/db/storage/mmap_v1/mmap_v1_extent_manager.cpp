@@ -552,4 +552,11 @@ namespace mongo {
                                      MAdvise::Sequential );
     }
 
+    void MmapV1ExtentManager::getFileFormat( OperationContext* txn, int* major, int* minor ) const {
+        if ( numFiles() == 0 )
+            return;
+        const DataFile* df = _getOpenFile( 0 );
+        *major = df->getHeader()->version;
+        *minor = df->getHeader()->versionMinor;
+    }
 }
