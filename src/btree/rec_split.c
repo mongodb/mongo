@@ -781,12 +781,8 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * split (if we failed, we'd leak the underlying blocks, but the parent
 	 * page would be unaffected).
 	 */
-	switch (parent->type) {
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
+	if (parent->type == WT_PAGE_ROW_INT)
 		WT_TRET(__split_ovfl_key_cleanup(session, parent, ref));
-		break;
-	}
 
 	/*
 	 * We can't free the previous page index, or the page's original WT_REF
