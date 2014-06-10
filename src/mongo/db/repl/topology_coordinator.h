@@ -41,6 +41,7 @@ namespace mongo {
 
 namespace repl {
 
+    class ReplicationExecutor;
     class HeartbeatInfo;
     class Member;
     struct MemberState;
@@ -142,10 +143,12 @@ namespace repl {
         virtual void prepareElectCmdResponse(const BSONObj& cmdObj, BSONObjBuilder& result) = 0;
 
         // produce a reply to a heartbeat
-        virtual bool prepareHeartbeatResponse(Date_t now,
+        virtual void prepareHeartbeatResponse(ReplicationExecutor* executor,
+                                              const Status& inStatus,
+                                              Date_t now,
                                               const BSONObj& cmdObj, 
-                                              std::string& errmsg, 
-                                              BSONObjBuilder& result) = 0;
+                                              BSONObjBuilder* resultObj,
+                                              Status* result) = 0;
 
         // update internal state with heartbeat response
         virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo) = 0;

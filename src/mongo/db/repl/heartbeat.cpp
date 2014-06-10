@@ -51,6 +51,8 @@
 namespace mongo {
 namespace repl {
 
+    MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
+
     using namespace bson;
 
     /* { replSetHeartbeat : <setname> } */
@@ -66,10 +68,40 @@ namespace repl {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            return getGlobalReplicationCoordinator()->processHeartbeat(txn, 
-                                                                       cmdObj, 
-                                                                       &errmsg, 
-                                                                       &result);
+
+            MONGO_FAIL_POINT_BLOCK(rsDelayHeartbeatResponse, delay) {
+                const BSONObj& data = delay.getData();
+                sleepsecs(data["delay"].numberInt());
+            }
+
+            /* we don't call ReplSetCommand::check() here because heartbeat
+               checks many things that are pre-initialization. */
+            if( !replSet ) {
+                errmsg = "not running with --replSet";
+                return false;
+            }
+
+            if ( replSetBlind ) {
+                errmsg = str::stream() << "node is blind";
+                return false;
+            }
+
+            /* we want to keep heartbeat connections open when relinquishing primary.  
+               tag them here. */
+            {
+                AbstractMessagingPort *mp = cc().port();
+                if( mp )
+                    mp->tag |= ScopedConn::keepOpen;
+            }
+
+            // ugh.
+            if( cmdObj["checkEmpty"].trueValue() ) {
+                result.append("hasData", replHasDatabases(txn));
+            }
+
+            Status status = getGlobalReplicationCoordinator()->processHeartbeat(cmdObj, 
+                                                                                &result);
+            return appendCommandStatus(result, status);
         }
     } cmdReplSetHeartbeat;
 

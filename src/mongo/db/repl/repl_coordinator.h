@@ -154,13 +154,10 @@ namespace repl {
         virtual Status setLastOptime(const HostAndPort& member, const OpTime& ts) = 0;
 
         /**
-         * Handles an incoming heartbeat command. Adds BSON to 'result'; errmsg is set to a message
-         * and return status is 'false' if there is a problem.
+         * Handles an incoming heartbeat command. Adds BSON to 'resultObj'; 
+         * returns a Status with either OK or an error message.
          */
-        virtual bool processHeartbeat(OperationContext* txn, 
-                                      const BSONObj& cmdObj, 
-                                      std::string* errmsg,
-                                      BSONObjBuilder* result) = 0;
+        virtual Status processHeartbeat(const BSONObj& cmdObj, BSONObjBuilder* resultObj) = 0;
 
     protected:
 

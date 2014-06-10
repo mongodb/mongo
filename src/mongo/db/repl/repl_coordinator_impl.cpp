@@ -47,8 +47,8 @@ namespace repl {
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
     void ReplicationCoordinatorImpl::startReplication(
-            TopologyCoordinator* topCoord,
-            ReplicationExecutor::NetworkInterface* network) {
+        TopologyCoordinator* topCoord,
+        ReplicationExecutor::NetworkInterface* network) {
         if (!isReplEnabled()) {
             return;
         }
@@ -129,11 +129,24 @@ namespace repl {
         return Status::OK();
     }
 
-    bool ReplicationCoordinatorImpl::processHeartbeat(OperationContext* txn, 
-                                                        const BSONObj& cmdObj, 
-                                                        std::string* errmsg, 
-                                                        BSONObjBuilder* result) {
-        return false;
+    Status ReplicationCoordinatorImpl::processHeartbeat(const BSONObj& cmdObj, 
+                                                        BSONObjBuilder* resultObj) {
+        Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");
+        StatusWith<ReplicationExecutor::CallbackHandle> cbh = _replExecutor->scheduleWork(
+            stdx::bind(&TopologyCoordinator::prepareHeartbeatResponse,
+                       _topCoord.get(),
+                       stdx::placeholders::_1,
+                       stdx::placeholders::_2,
+                       Date_t(curTimeMillis64()),
+                       cmdObj,
+                       resultObj,
+                       &result));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+        }
+        fassert(18507, cbh.getStatus());
+        _replExecutor->wait(cbh.getValue());
+        return result;
     }
 
     void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(

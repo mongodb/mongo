@@ -64,11 +64,12 @@ namespace repl {
     void TopologyCoordinatorMock::prepareElectCmdResponse(const BSONObj& cmdObj,
                                                           BSONObjBuilder& result) {}
 
-    bool TopologyCoordinatorMock::prepareHeartbeatResponse(Date_t now,
-                                                           const BSONObj& cmdObj,
-                                                           std::string& errmsg,
-                                                           BSONObjBuilder& result) {
-        return true;
+    void TopologyCoordinatorMock::prepareHeartbeatResponse(ReplicationExecutor* executor,
+                                                           const Status& inStatus,
+                                                           Date_t now,
+                                                           const BSONObj& cmdObj, 
+                                                           BSONObjBuilder* resultObj,
+                                                           Status* result) {
     }
 
     void TopologyCoordinatorMock::updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo) {}

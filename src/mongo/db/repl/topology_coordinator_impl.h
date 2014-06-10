@@ -77,10 +77,12 @@ namespace repl {
         virtual void prepareElectCmdResponse(const BSONObj& cmdObj, BSONObjBuilder& result);
 
         // produce a reply to a heartbeat
-        virtual bool prepareHeartbeatResponse(Date_t now,
+        virtual void prepareHeartbeatResponse(ReplicationExecutor* executor,
+                                              const Status& inStatus,
+                                              Date_t now,
                                               const BSONObj& cmdObj, 
-                                              std::string& errmsg, 
-                                              BSONObjBuilder& result);
+                                              BSONObjBuilder* resultObj,
+                                              Status* result);
 
         // update internal state with heartbeat response
         virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);

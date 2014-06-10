@@ -145,95 +145,60 @@ namespace repl {
         // TODO
         return Status::OK();
     }
-
-    MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
     
-    bool LegacyReplicationCoordinator::processHeartbeat(OperationContext* txn, 
-                                                        const BSONObj& cmdObj, 
-                                                        std::string* errmsg, 
-                                                        BSONObjBuilder* result) {
-        if( replSetBlind ) {
-            if (theReplSet) {
-                *errmsg = str::stream() << theReplSet->selfFullName() << " is blind";
-            }
-            return false;
-        }
-
-        MONGO_FAIL_POINT_BLOCK(rsDelayHeartbeatResponse, delay) {
-            const BSONObj& data = delay.getData();
-            sleepsecs(data["delay"].numberInt());
-        }
-
-        /* we don't call ReplSetCommand::check() here because heartbeat
-           checks many things that are pre-initialization. */
-        if( !replSet ) {
-            *errmsg = "not running with --replSet";
-            return false;
-        }
-
-        /* we want to keep heartbeat connections open when relinquishing primary.  tag them here. */
-        {
-            AbstractMessagingPort *mp = cc().port();
-            if( mp )
-                mp->tag |= ScopedConn::keepOpen;
-        }
-
+    Status LegacyReplicationCoordinator::processHeartbeat(const BSONObj& cmdObj, 
+                                                          BSONObjBuilder* resultObj) {
         if( cmdObj["pv"].Int() != 1 ) {
-            *errmsg = "incompatible replset protocol version";
-            return false;
+            return Status(ErrorCodes::BadValue, "incompatible replset protocol version");
         }
+
         {
             string s = string(cmdObj.getStringField("replSetHeartbeat"));
             if (replSettings.ourSetName() != s) {
-                *errmsg = "repl set names do not match";
                 log() << "replSet set names do not match, our cmdline: " << replSettings.replSet
                       << rsLog;
                 log() << "replSet s: " << s << rsLog;
-                result->append("mismatch", true);
-                return false;
+                resultObj->append("mismatch", true);
+                return Status(ErrorCodes::BadValue, "repl set names do not match");
             }
         }
 
-        result->append("rs", true);
-        if( cmdObj["checkEmpty"].trueValue() ) {
-            result->append("hasData", replHasDatabases(txn));
-        }
+        resultObj->append("rs", true);
         if( (theReplSet == 0) || (theReplSet->startupStatus == ReplSetImpl::LOADINGCONFIG) ) {
             string from( cmdObj.getStringField("from") );
             if( !from.empty() ) {
                 scoped_lock lck( replSettings.discoveredSeeds_mx );
                 replSettings.discoveredSeeds.insert(from);
             }
-            result->append("hbmsg", "still initializing");
-            return true;
+            resultObj->append("hbmsg", "still initializing");
+            return Status::OK();
         }
 
         if( theReplSet->name() != cmdObj.getStringField("replSetHeartbeat") ) {
-            *errmsg = "repl set names do not match (2)";
-            result->append("mismatch", true);
-            return false;
+            resultObj->append("mismatch", true);
+            return Status(ErrorCodes::BadValue, "repl set names do not match (2)");
         }
-        result->append("set", theReplSet->name());
+        resultObj->append("set", theReplSet->name());
 
         MemberState currentState = theReplSet->state();
-        result->append("state", currentState.s);
+        resultObj->append("state", currentState.s);
         if (currentState == MemberState::RS_PRIMARY) {
-            result->appendDate("electionTime", theReplSet->getElectionTime().asDate());
+            resultObj->appendDate("electionTime", theReplSet->getElectionTime().asDate());
         }
 
-        result->append("e", theReplSet->iAmElectable());
-        result->append("hbmsg", theReplSet->hbmsg());
-        result->append("time", (long long) time(0));
-        result->appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
+        resultObj->append("e", theReplSet->iAmElectable());
+        resultObj->append("hbmsg", theReplSet->hbmsg());
+        resultObj->append("time", (long long) time(0));
+        resultObj->appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
         const Member *syncTarget = BackgroundSync::get()->getSyncTarget();
         if (syncTarget) {
-            result->append("syncingTo", syncTarget->fullName());
+            resultObj->append("syncingTo", syncTarget->fullName());
         }
 
         int v = theReplSet->config().version;
-        result->append("v", v);
+        resultObj->append("v", v);
         if( v > cmdObj["v"].Int() )
-            *result << "config" << theReplSet->config().asBson();
+            *resultObj << "config" << theReplSet->config().asBson();
 
         Member* from = NULL;
         if (cmdObj.hasField("fromId")) {
@@ -244,13 +209,13 @@ namespace repl {
         if (!from) {
             from = theReplSet->findByName(cmdObj.getStringField("from"));
             if (!from) {
-                return true;
+                return Status::OK();
             }
         }
 
         // if we thought that this node is down, let it know
         if (!from->hbinfo().up()) {
-            result->append("stateDisagreement", true);
+            resultObj->append("stateDisagreement", true);
         }
 
         // note that we got a heartbeat from this node
@@ -258,7 +223,7 @@ namespace repl {
                                          theReplSet, from->hbinfo().id(), time(0)));
 
 
-        return true;
+        return Status::OK();
     }
 } // namespace repl
 } // namespace mongo

@@ -77,10 +77,8 @@ namespace repl {
 
         virtual Status setLastOptime(const HostAndPort& member, const OpTime& ts);
 
-        virtual bool processHeartbeat(OperationContext* txn, 
-                                      const BSONObj& cmdObj, 
-                                      std::string* errmsg, 
-                                      BSONObjBuilder* result);
+        virtual Status processHeartbeat(const BSONObj& cmdObj, 
+                                        BSONObjBuilder* resultObj);
 
         // ================== Members of replication code internal API ===================
 

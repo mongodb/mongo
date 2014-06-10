@@ -247,60 +247,72 @@ namespace repl {
     }
 
     // produce a reply to a heartbeat
-    bool TopologyCoordinatorImpl::prepareHeartbeatResponse(Date_t now,
+    void TopologyCoordinatorImpl::prepareHeartbeatResponse(ReplicationExecutor* executor,
+                                                           const Status& inStatus,
+                                                           Date_t now,
                                                            const BSONObj& cmdObj, 
-                                                           std::string& errmsg, 
-                                                           BSONObjBuilder& result) {
+                                                           BSONObjBuilder* resultObj,
+                                                           Status* result) {
+        if (inStatus == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+
+        if( cmdObj["pv"].Int() != 1 ) {
+            *result = Status(ErrorCodes::BadValue, "incompatible replset protocol version");
+            return;
+        }
+
         // Verify that replica set names match
         std::string rshb = std::string(cmdObj.getStringField("replSetHeartbeat"));
         if (replSettings.ourSetName() != rshb) {
-            errmsg = "repl set names do not match";
+            *result = Status(ErrorCodes::BadValue, "repl set names do not match");
             log() << "replSet set names do not match, our cmdline: " << replSettings.replSet
                   << rsLog;
             log() << "replSet rshb: " << rshb << rsLog;
-            result.append("mismatch", true);
-            return false;
+            resultObj->append("mismatch", true);
+            return;
         }
 
         // This is a replica set
-        result.append("rs", true);
+        resultObj->append("rs", true);
 
 /*
         if( cmdObj["checkEmpty"].trueValue() ) {
             // Eric: XXX takes read lock; only used for initial sync heartbeat
-            result.append("hasData", replHasDatabases());
+            resultObj->append("hasData", replHasDatabases());
         }
 */
 
         // Verify that the config's replset name matches
         if (_currentConfig.replSetName != cmdObj.getStringField("replSetHeartbeat")) {
-            errmsg = "repl set names do not match (2)";
-            result.append("mismatch", true);
-            return false;
+            *result = Status(ErrorCodes::BadValue, "repl set names do not match (2)");
+            resultObj->append("mismatch", true);
+            return; 
         }
-        result.append("set", _currentConfig.replSetName);
+        resultObj->append("set", _currentConfig.replSetName);
 
-        result.append("state", _memberState.s);
+        resultObj->append("state", _memberState.s);
         if (_memberState == MemberState::RS_PRIMARY) {
-            result.appendDate("electionTime", _electionTime.asDate());
+            resultObj->appendDate("electionTime", _electionTime.asDate());
         }
 
         // Are we electable
-        result.append("e", _electableSet.find(_self->id()) != _electableSet.end());
+        resultObj->append("e", _electableSet.find(_self->id()) != _electableSet.end());
         // Heartbeat status message
-        result.append("hbmsg", _getHbmsg());
-        result.append("time", now);
-        result.appendDate("opTime", _lastApplied.asDate());
+        resultObj->append("hbmsg", _getHbmsg());
+        resultObj->append("time", now);
+        resultObj->appendDate("opTime", _lastApplied.asDate());
 
         if (_syncSource) {
-            result.append("syncingTo", _syncSource->fullName());
+            resultObj->append("syncingTo", _syncSource->fullName());
         }
 
         int v = _currentConfig.version;
-        result.append("v", v);
+        resultObj->append("v", v);
         // Deliver new config if caller's version is older than ours
         if( v > cmdObj["v"].Int() )
-            result << "config" << _currentConfig.asBson();
+            *resultObj << "config" << _currentConfig.asBson();
 
         // Resolve the caller's id in our Member list
         Member* from = NULL;
@@ -311,18 +323,18 @@ namespace repl {
         }
         if (!from) {
             // Can't find the member, so we leave out the stateDisagreement field
-            return true;
+            *result = Status::OK();
+            return;
         }
 
         // if we thought that this node is down, let it know
         if (!from->hbinfo().up()) {
-            result.append("stateDisagreement", true);
+            resultObj->append("stateDisagreement", true);
         }
 
         // note that we got a heartbeat from this node
         from->get_hbinfo().lastHeartbeatRecv = now;
-        
-        return true;
+        *result = Status::OK();
     }
 
 
