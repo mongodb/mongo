@@ -56,6 +56,9 @@ namespace mongo {
                                        BSONObjBuilder* out,
                                        double scale ) const = 0;
 
+        virtual bool isOlderThan24( OperationContext* opCtx ) const = 0;
+        virtual void markIndexSafe24AndUp( OperationContext* opCtx ) = 0;
+
         // ----
 
         virtual void getCollectionNamespaces( std::list<std::string>* out ) const = 0;

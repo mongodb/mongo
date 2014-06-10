@@ -169,13 +169,8 @@ namespace mongo {
         string pluginName = IndexNames::findPluginName(keyPattern);
         bool known = IndexNames::isKnownName(pluginName);
 
-        int majorVersion;
-        int minorVersion;
-
-        _collection->_database->getFileFormat( txn, &majorVersion, &minorVersion );
-            
-        if (minorVersion == PDFILE_VERSION_MINOR_24_AND_NEWER) {
-            // RulesFor24
+        if ( !_collection->_database->getDatabaseCatalogEntry()->isOlderThan24( txn ) ) {
+            // RulesFor24+
             // This assert will be triggered when downgrading from a future version that
             // supports an index plugin unsupported by this version.
             uassert(17197, str::stream() << "Invalid index type '" << pluginName << "' "
@@ -223,12 +218,9 @@ namespace mongo {
 
         Database* db = _collection->_database;
 
-        DataFileHeader* dfh = db->getExtentManager()->getFile(txn, 0)->getHeader();
-        if ( dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER ) {
+        if ( !db->getDatabaseCatalogEntry()->isOlderThan24( txn ) ) {
             return Status::OK(); // these checks have already been done
         }
-
-        fassert(16737, dfh->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER);
 
         auto_ptr<Runner> runner(
             InternalPlanner::collectionScan(db->_indexesName,
@@ -255,7 +247,7 @@ namespace mongo {
             warning() << "Internal error while reading system.indexes collection";
         }
 
-        txn->recoveryUnit()->writingInt(dfh->versionMinor) = PDFILE_VERSION_MINOR_24_AND_NEWER;
+        db->_dbEntry->markIndexSafe24AndUp( txn );
 
         return Status::OK();
     }

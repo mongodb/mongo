@@ -74,8 +74,6 @@ namespace mongo {
 
         void clearTmpCollections(OperationContext* txn);
 
-        void getFileFormat( OperationContext* txn, int* major, int* minor );
-
         /**
          * @return true if success.  false if bad level or error creating profile ns
          */

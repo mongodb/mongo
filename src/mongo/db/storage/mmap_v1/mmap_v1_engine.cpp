@@ -39,7 +39,9 @@
 #include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/index/haystack_access_method.h"
 #include "mongo/db/index/s2_access_method.h"
+#include "mongo/db/pdfile_version.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage/data_file.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/catalog/namespace_details_collection_entry.h"
 #include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
@@ -322,6 +324,41 @@ namespace mongo {
             }
         }
 
+    }
+
+    bool MMAP1DatabaseCatalogEntry::isOlderThan24( OperationContext* opCtx ) const {
+        if ( _extentManager.numFiles() == 0 )
+            return false;
+
+        int major = 0;
+        int minor = 0;
+
+        _extentManager.getFileFormat( opCtx, &major, &minor );
+
+        invariant( major == PDFILE_VERSION );
+
+        return minor == PDFILE_VERSION_MINOR_22_AND_OLDER;
+    }
+
+    void MMAP1DatabaseCatalogEntry::markIndexSafe24AndUp( OperationContext* opCtx ) {
+        if ( _extentManager.numFiles() == 0 )
+            return;
+
+        int major = 0;
+        int minor = 0;
+
+        _extentManager.getFileFormat( opCtx, &major, &minor );
+
+        invariant( major == PDFILE_VERSION );
+
+        if ( minor == PDFILE_VERSION_MINOR_24_AND_NEWER )
+            return;
+
+        invariant( minor == PDFILE_VERSION_MINOR_22_AND_OLDER );
+
+        DataFile* df = _extentManager.getFile( opCtx, 0 );
+        opCtx->recoveryUnit()->writingInt(df->getHeader()->versionMinor) =
+            PDFILE_VERSION_MINOR_24_AND_NEWER;
     }
 
     void MMAP1DatabaseCatalogEntry::getCollectionNamespaces( std::list<std::string>* tofill ) const {

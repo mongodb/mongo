@@ -48,7 +48,6 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage/data_file.h" //XXX
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h" //XXX
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h" //XXX
 #include "mongo/db/storage_options.h"
@@ -522,17 +521,6 @@ namespace mongo {
             collection = createCollection( txn, _namespacesName );
         StatusWith<DiskLoc> loc = collection->insertDocument( txn, obj, false );
         uassertStatusOK( loc.getStatus() );
-    }
-
-    void Database::getFileFormat( OperationContext* txn, int* major, int* minor ) {
-        if ( getExtentManager()->numFiles() == 0 ) {
-            *major = 0;
-            *minor = 0;
-            return;
-        }
-        const DataFile* df = getExtentManager()->getFile( txn, 0 );
-        *major = df->getHeader()->version;
-        *minor = df->getHeader()->versionMinor;
     }
 
     MmapV1ExtentManager* Database::getExtentManager() {

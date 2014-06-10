@@ -61,6 +61,9 @@ namespace mongo {
         bool exists() const { return _namespaceIndex.pathExists(); }
         bool isEmpty() const { return !_namespaceIndex.allocated(); }
 
+        virtual bool isOlderThan24( OperationContext* opCtx ) const;
+        virtual void markIndexSafe24AndUp( OperationContext* opCtx );
+
         virtual void appendExtraStats( OperationContext* opCtx,
                                        BSONObjBuilder* out,
                                        double scale ) const;
