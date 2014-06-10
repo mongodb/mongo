@@ -18,6 +18,6 @@ assert.eq( stats.dataFileVersion.minor, 5 );
 statsDB.dropDatabase();
 var statsEmptyDB = statsDB.stats();
 assert.eq( statsEmptyDB.fileSize, 0 );
-assert.eq( {}, statsEmptyDB.dataFileVersion );
+assert.isnull( statsEmptyDB.dataFileVersion );
 
 statsDB.dropDatabase();
