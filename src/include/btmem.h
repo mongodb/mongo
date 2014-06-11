@@ -253,13 +253,15 @@ struct __wt_page_modify {
 	} u1;
 
 	/*
-	 * Internal pages need to be able to chain root-page splits.  Column-
-	 * store leaf pages need update and append lists.
+	 * Internal pages need to be able to chain root-page splits and have a
+	 * special transactional eviction requirement.  Column-store leaf pages
+	 * need update and append lists.
 	 *
 	 * Ugly union/struct layout to conserve memory, a page is either a leaf
 	 * page or an internal page.
 	 */
 	union {
+	struct {
 		/*
 		 * When a root page splits, we create a new page and write it;
 		 * the new page can also split and so on, and we continue this
@@ -268,7 +270,17 @@ struct __wt_page_modify {
 		 * so they can be discarded when no longer needed.
 		 */
 		WT_PAGE *root_split;	/* Linked list of root split pages */
-#define	mod_root_split		u2.root_split
+
+		/*
+		 * When we deepen the tree, newly created internal pages cannot
+		 * be evicted until all threads have exited the original page
+		 * index structure.  We set a transaction value during the split
+		 * that's checked during eviction.
+		 */
+		uint64_t split_txn;	/* Split eviction transaction value */
+	} intl;
+#define	mod_root_split		u2.intl.root_split
+#define	mod_split_txn		u2.intl.split_txn
 	struct {
 		/*
 		 * Appended items to column-stores: there is only a single one
