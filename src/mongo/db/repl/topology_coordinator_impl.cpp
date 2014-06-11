@@ -60,7 +60,7 @@ namespace repl {
     void TopologyCoordinatorImpl::setLastReceived(const OpTime& optime) {
         _lastReceived = optime;
     }
-    
+
     HostAndPort TopologyCoordinatorImpl::getSyncSourceAddress() const {
         return _syncSource->h();
     }
@@ -239,19 +239,94 @@ namespace repl {
         }
     }
 
-    // produce a reply to a RAFT-style RequestVote RPC; this is MongoDB ReplSetFresh command
-    bool TopologyCoordinatorImpl::prepareRequestVoteResponse(const BSONObj& cmdObj, 
-                                                         std::string& errmsg, 
-                                                         BSONObjBuilder& result) {
-        // TODO
+    // Produce a reply to a RAFT-style RequestVote RPC; this is MongoDB ReplSetFresh command
+    // The caller should validate that the message is for the correct set, and has the required data
+    void TopologyCoordinatorImpl::prepareRequestVoteResponse(const Date_t now,
+                                                             const BSONObj& cmdObj,
+                                                             std::string& errmsg,
+                                                             BSONObjBuilder& result) {
+
+        //TODO: after eric's checkin, add executer stuff and error if cancelled
+        string who = cmdObj["who"].String();
+        int cfgver = cmdObj["cfgver"].Int();
+        OpTime opTime(cmdObj["opTime"].Date());
+
+        bool weAreFresher = false;
+        if( _currentConfig.version > cfgver ) {
+            log() << "replSet member " << who << " is not yet aware its cfg version "
+                  << cfgver << " is stale" << rsLog;
+            result.append("info", "config version stale");
+            weAreFresher = true;
+        }
+        // check not only our own optime, but any other member we can reach
+        else if( opTime < _commitOkayThrough ||
+                 opTime < _latestKnownOpTime())  {
+            weAreFresher = true;
+        }
+        result.appendDate("opTime", _lastApplied.asDate());
+        result.append("fresher", weAreFresher);
+
+        bool doVeto = _shouldVeto(cmdObj, errmsg);
+        result.append("veto",doVeto);
+        if (doVeto) {
+            result.append("errmsg", errmsg);
+        }
+    }
+
+    bool TopologyCoordinatorImpl::_shouldVeto(const BSONObj& cmdObj, string& errmsg) const {
+        // don't veto older versions
+        if (cmdObj["id"].eoo()) {
+            // they won't be looking for the veto field
+            return false;
+        }
+
+        unsigned id = cmdObj["id"].Int();
+        const Member* primary = _currentPrimary;
+        const Member* hopeful = _getConstMember(id);
+        const Member* highestPriority = _getHighestPriorityElectable();
+
+        if (!hopeful) {
+            errmsg = str::stream() << "replSet couldn't find member with id " << id;
+            return true;
+        }
+
+        if (_currentPrimary && (_commitOkayThrough >= hopeful->hbinfo().opTime)) {
+            // hbinfo is not updated, so we have to check the primary's last optime separately
+            errmsg = str::stream() << "I am already primary, " << hopeful->fullName() <<
+                " can try again once I've stepped down";
+            return true;
+        }
+
+        if (_currentPrimary &&
+                (hopeful->hbinfo().id() != primary->hbinfo().id()) &&
+                (primary->hbinfo().opTime >= hopeful->hbinfo().opTime)) {
+            // other members might be aware of more up-to-date nodes
+            errmsg = str::stream() << hopeful->fullName() <<
+                " is trying to elect itself but " << primary->fullName() <<
+                " is already primary and more up-to-date";
+            return true;
+        }
+
+        if (highestPriority &&
+            highestPriority->config().priority > hopeful->config().priority) {
+            errmsg = str::stream() << hopeful->fullName() << " has lower priority than " <<
+                highestPriority->fullName();
+            return true;
+        }
+
+        if (!_electableSet.count(id)) {
+            errmsg = str::stream() << "I don't think " << hopeful->fullName() <<
+                " is electable";
+            return true;
+        }
+
         return false;
     }
 
-    // produce a reply to a recevied electCmd
-    void TopologyCoordinatorImpl::prepareElectCmdResponse(const BSONObj& cmdObj, 
+    // produce a reply to a received electCmd
+    void TopologyCoordinatorImpl::prepareElectCmdResponse(const Date_t now,
+                                                          const BSONObj& cmdObj,
                                                           BSONObjBuilder& result) {
-        // TODO
-        
     }
 
     // produce a reply to a heartbeat
@@ -632,7 +707,6 @@ namespace repl {
         }
         
     }
-
 
 */
         _busyWithElectSelf = false;

@@ -72,12 +72,15 @@ namespace repl {
         virtual void signalDrainComplete();
 
         // produce a reply to a RAFT-style RequestVote RPC; this is MongoDB ReplSetFresh command
-        virtual bool prepareRequestVoteResponse(const BSONObj& cmdObj, 
+        virtual void prepareRequestVoteResponse(const Date_t now,
+                                                const BSONObj& cmdObj,
                                                 std::string& errmsg, 
                                                 BSONObjBuilder& result);
 
         // produce a reply to a received electCmd
-        virtual void prepareElectCmdResponse(const BSONObj& cmdObj, BSONObjBuilder& result);
+        virtual void prepareElectCmdResponse(const Date_t now,
+                                             const BSONObj& cmdObj,
+                                             BSONObjBuilder& result);
 
         // produce a reply to a heartbeat
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
@@ -93,6 +96,10 @@ namespace repl {
         virtual void relinquishPrimary(OperationContext* txn);
 
     private:
+
+        // Determines if we will veto the member in the "fresh" command response
+        // If we veto, the errmsg will be filled in with a reason
+        bool _shouldVeto(const BSONObj& cmdObj, string& errmsg) const;
 
         // Logic to determine if we should step down as primary
         bool _shouldRelinquish() const;
