@@ -167,7 +167,8 @@ __wt_lsm_merge(
 		 */
 		if ((chunk_size += chunk->size) > lsm_tree->chunk_max)
 			if (nchunks < merge_min ||
-			    chunk_size - youngest->size > lsm_tree->chunk_max)
+			    (chunk->generation > youngest->generation &&
+			    chunk_size - youngest->size > lsm_tree->chunk_max))
 				break;
 
 		/*
