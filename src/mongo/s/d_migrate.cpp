@@ -1557,14 +1557,39 @@ namespace mongo {
 
     class MigrateStatus {
     public:
-        
-        MigrateStatus() : m_active("MigrateStatus") { active = false; }
+        enum State {
+            READY,
+            CLONE,
+            CATCHUP,
+            STEADY,
+            COMMIT_START,
+            DONE,
+            FAIL,
+            ABORT
+        };
+
+        MigrateStatus():
+            m_active("MigrateStatus"),
+            active(false),
+            stateMutex("migrateStatusStateMutex"),
+            state(READY) {
+        }
+
+        void setState(State newState) {
+            scoped_lock sl(stateMutex);
+            state = newState;
+        }
+
+        State getState() const {
+            scoped_lock sl(stateMutex);
+            return state;
+        }
 
         void prepare() {
             scoped_lock l(m_active); // reading and writing 'active'
 
             verify( ! active );
-            state = READY;
+            setState(READY);
             errmsg = "";
 
             numCloned = 0;
@@ -1580,17 +1605,17 @@ namespace mongo {
                 _go(txn);
             }
             catch ( std::exception& e ) {
-                state = FAIL;
+                setState(FAIL);
                 errmsg = e.what();
                 error() << "migrate failed: " << e.what() << migrateLog;
             }
             catch ( ... ) {
-                state = FAIL;
+                setState(FAIL);
                 errmsg = "UNKNOWN ERROR";
                 error() << "migrate failed with unknown exception" << migrateLog;
             }
 
-            if ( state != DONE ) {
+            if ( getState() != DONE ) {
                 // Unprotect the range if needed/possible on unsuccessful TO migration
                 Lock::DBWrite lk(txn->lockState(), ns);
                 string errMsg;
@@ -1604,7 +1629,7 @@ namespace mongo {
 
         void _go(OperationContext* txn) {
             verify( getActive() );
-            verify( state == READY );
+            verify( getState() == READY );
             verify( ! min.isEmpty() );
             verify( ! max.isEmpty() );
             
@@ -1668,7 +1693,7 @@ namespace mongo {
                     if ( !collection ) {
                         errmsg = str::stream() << "collection dropped during migration: " << ns;
                         warning() << errmsg;
-                        state = FAIL;
+                        setState(FAIL);
                         return;
                     }
 
@@ -1678,7 +1703,7 @@ namespace mongo {
                                                << " idx: " << idx
                                                << " error: " << status.toString();
                         warning() << errmsg;
-                        state = FAIL;
+                        setState(FAIL);
                         return;
                     }
 
@@ -1706,7 +1731,7 @@ namespace mongo {
                 if (num < 0) {
                     errmsg = "collection or index dropped during migrate";
                     warning() << errmsg << endl;
-                    state = FAIL;
+                    setState(FAIL);
                     return;
                 }
 
@@ -1715,7 +1740,7 @@ namespace mongo {
                     Lock::DBWrite lk(txn->lockState(), ns);
                     if ( !shardingState.notePending( ns, min, max, epoch, &errmsg ) ) {
                         warning() << errmsg << endl;
-                        state = FAIL;
+                        setState(FAIL);
                         return;
                     }
                 }
@@ -1727,7 +1752,8 @@ namespace mongo {
                 MONGO_FP_PAUSE_WHILE(migrateThreadHangAtStep2);
             }
 
-            if (state == FAIL || state == ABORT) {
+            State currentState = getState();
+            if (currentState == FAIL || currentState == ABORT) {
                 string errMsg;
                 if (!getDeleter()->queueDelete(ns, min, max, shardKeyPattern, secondaryThrottle,
                                                NULL /* notifier */, &errMsg)) {
@@ -1737,12 +1763,12 @@ namespace mongo {
 
             {
                 // 3. initial bulk clone
-                state = CLONE;
+                setState(CLONE);
 
                 while ( true ) {
                     BSONObj res;
                     if ( ! conn->runCommand( "admin" , BSON( "_migrateClone" << 1 ) , res ) ) {  // gets array of objects to copy, in disk order
-                        state = FAIL;
+                        setState(FAIL);
                         errmsg = "_migrateClone failed: ";
                         errmsg += res.toString();
                         error() << errmsg << migrateLog;
@@ -1755,6 +1781,15 @@ namespace mongo {
 
                     BSONObjIterator i( arr );
                     while( i.more() ) {
+                        txn->checkForInterrupt();
+
+                        if ( getState() == ABORT ) {
+                            errmsg = str::stream() << "Migration abort requested while "
+                                                   << "copying documents";
+                            error() << errmsg << migrateLog;
+                            return;
+                        }
+
                         BSONObj o = i.next().Obj();
                         {
                             Client::WriteContext cx(txn, ns );
@@ -1800,11 +1835,11 @@ namespace mongo {
 
             {
                 // 4. do bulk of mods
-                state = CATCHUP;
+                setState(CATCHUP);
                 while ( true ) {
                     BSONObj res;
                     if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ) {
-                        state = FAIL;
+                        setState(FAIL);
                         errmsg = "_transferMods failed: ";
                         errmsg += res.toString();
                         error() << "_transferMods failed: " << res << migrateLog;
@@ -1819,7 +1854,13 @@ namespace mongo {
                     const int maxIterations = 3600*50;
                     int i;
                     for ( i=0;i<maxIterations; i++) {
-                        if ( state == ABORT ) {
+                        txn->checkForInterrupt();
+
+                        if ( getState() == ABORT ) {
+                            errmsg = str::stream() << "Migration abort requested while waiting "
+                                                   << "for replication at catch up stage";
+                            error() << errmsg << migrateLog;
+
                             return;
                         }
                         
@@ -1837,7 +1878,7 @@ namespace mongo {
                         errmsg = "secondary can't keep up with migrate";
                         error() << errmsg << migrateLog;
                         conn.done();
-                        state = FAIL;
+                        setState(FAIL);
                         return;
                     } 
                 }
@@ -1851,32 +1892,48 @@ namespace mongo {
                 // this will prevent us from going into critical section until we're ready
                 Timer t;
                 while ( t.minutes() < 600 ) {
+                    txn->checkForInterrupt();
+
+                    if (getState() == ABORT) {
+                        errmsg = "Migration abort requested while waiting for replication";
+                        error() << errmsg << migrateLog;
+                        return;
+                    }
+
                     log() << "Waiting for replication to catch up before entering critical section"
                           << endl;
                     if ( flushPendingWrites(txn, lastOpApplied ) )
                         break;
                     sleepsecs(1);
                 }
+
+                if (t.minutes() >= 600) {
+                  setState(FAIL);
+                  errmsg = "Cannot go to critical section because secondaries cannot keep up";
+                  error() << errmsg << migrateLog;
+                  return;
+                }
             }
 
             {
                 // 5. wait for commit
 
-                state = STEADY;
+                setState(STEADY);
                 bool transferAfterCommit = false;
-                while ( state == STEADY || state == COMMIT_START ) {
+                while ( getState() == STEADY || getState() == COMMIT_START ) {
+                    txn->checkForInterrupt();
 
                     // Make sure we do at least one transfer after recv'ing the commit message
                     // If we aren't sure that at least one transfer happens *after* our state
                     // changes to COMMIT_START, there could be mods still on the FROM shard that
                     // got logged *after* our _transferMods but *before* the critical section.
-                    if ( state == COMMIT_START ) transferAfterCommit = true;
+                    if ( getState() == COMMIT_START ) transferAfterCommit = true;
 
                     BSONObj res;
                     if ( ! conn->runCommand( "admin" , BSON( "_transferMods" << 1 ) , res ) ) {
                         log() << "_transferMods failed in STEADY state: " << res << migrateLog;
                         errmsg = res.toString();
-                        state = FAIL;
+                        setState(FAIL);
                         conn.done();
                         return;
                     }
@@ -1884,23 +1941,23 @@ namespace mongo {
                     if ( res["size"].number() > 0 && apply( txn, res , &lastOpApplied ) )
                         continue;
 
-                    if ( state == ABORT ) {
+                    if ( getState() == ABORT ) {
                         return;
                     }
                     
                     // We know we're finished when:
                     // 1) The from side has told us that it has locked writes (COMMIT_START)
                     // 2) We've checked at least one more time for un-transmitted mods
-                    if ( state == COMMIT_START && transferAfterCommit == true ) {
+                    if ( getState() == COMMIT_START && transferAfterCommit == true ) {
                         if ( flushPendingWrites(txn, lastOpApplied ) )
                             break;
                     }
                     
                     // Only sleep if we aren't committing
-                    if ( state == STEADY ) sleepmillis( 10 );
+                    if ( getState() == STEADY ) sleepmillis( 10 );
                 }
 
-                if ( state == FAIL ) {
+                if ( getState() == FAIL ) {
                     errmsg = "timed out waiting for commit";
                     return;
                 }
@@ -1909,7 +1966,7 @@ namespace mongo {
                 MONGO_FP_PAUSE_WHILE(migrateThreadHangAtStep5);
             }
 
-            state = DONE;
+            setState(DONE);
             conn.done();
         }
 
@@ -1923,7 +1980,7 @@ namespace mongo {
             b.append( "shardKeyPattern" , shardKeyPattern );
 
             b.append( "state" , stateString() );
-            if ( state == FAIL )
+            if ( getState() == FAIL )
                 b.append( "errmsg" , errmsg );
             {
                 BSONObjBuilder bb( b.subobjStart( "counts" ) );
@@ -2062,7 +2119,7 @@ namespace mongo {
         }
 
         string stateString() {
-            switch ( state ) {
+            switch ( getState() ) {
             case READY: return "ready";
             case CLONE: return "clone";
             case CATCHUP: return "catchup";
@@ -2078,9 +2135,9 @@ namespace mongo {
 
         bool startCommit() {
 
-            if ( state != STEADY )
+            if ( getState() != STEADY )
                 return false;
-            state = COMMIT_START;
+            setState(COMMIT_START);
             
             boost::xtime xt;
             boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
@@ -2090,13 +2147,13 @@ namespace mongo {
             while ( active ) {
                 if ( ! isActiveCV.timed_wait( lock.boost(), xt ) ){
                     // TIMEOUT
-                    state = FAIL;
+                    setState(FAIL);
                     log() << "startCommit never finished!" << migrateLog;
                     return false;
                 }
             }
 
-            if ( state == DONE ) {
+            if ( getState() == DONE ) {
                 return true;
             }
 
@@ -2105,7 +2162,7 @@ namespace mongo {
         }
 
         void abort() {
-            state = ABORT;
+            setState(ABORT);
             errmsg = "aborted";
         }
 
@@ -2136,7 +2193,9 @@ namespace mongo {
 
         int replSetMajorityCount;
 
-        enum State { READY , CLONE , CATCHUP , STEADY , COMMIT_START , DONE , FAIL , ABORT } state;
+        // protects state
+        mutable mutex stateMutex;
+        State state;
         string errmsg;
 
     } migrateStatus;
@@ -2148,6 +2207,10 @@ namespace mongo {
             ShardedConnectionInfo::addHook();
             cc().getAuthorizationSession()->grantInternalAuthorization();
         }
+
+        // Make curop active so this will show up in currOp.
+        cc().curop()->reset();
+
         migrateStatus.go(&txn);
         cc().shutdown();
     }
