@@ -504,6 +504,18 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		}
 		WT_ERR(ret);
 
+		/*
+		 * Setup all cursors that haven't had a checkpoint complete or
+		 * aren't the primary chunk to only do conflict checks on
+		 * insert operations. This allows us to execute insert cursor
+		 * operations on non-primary chunks as a way of checking
+		 * for conflicts with open snapshot transactions.
+		 */
+		if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
+		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && i != nchunks - 1)
+			F_SET(((WT_CURSOR_BTREE *)*cp),
+			    WT_CBT_CONFLICT_CHECK);
+
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
 		    !F_ISSET(clsm, WT_CLSM_MERGE))
 			WT_ERR(__wt_bloom_open(session, chunk->bloom_uri,

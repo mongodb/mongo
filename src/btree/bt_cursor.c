@@ -404,6 +404,12 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		    cbt->compare == 0 && !__cursor_invalid(cbt))
 			WT_ERR(WT_DUPLICATE_KEY);
 
+		if (F_ISSET(cbt, WT_CBT_CONFLICT_CHECK)) {
+			if (cbt->compare != 0)
+				return (0);
+			return (__wt_txn_update_check(session, cbt->ins->upd));
+		}
+
 		ret = __cursor_row_modify(session, cbt, 0);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
