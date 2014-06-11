@@ -360,7 +360,8 @@ config_print(int error_display)
 	/* Display configuration values. */
 	for (cp = c; cp->name != NULL; ++cp)
 		if (cp->flags & C_STRING)
-			fprintf(fp, "%s=%s\n", cp->name, *cp->vstr);
+			fprintf(fp, "%s=%s\n", cp->name,
+			    *cp->vstr == NULL ? "" : *cp->vstr);
 		else
 			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
 
