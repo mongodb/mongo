@@ -269,6 +269,7 @@ extern int __wt_btcur_reset(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp);
 extern int __wt_btcur_insert(WT_CURSOR_BTREE *cbt);
+extern int __wt_btcur_update_check(WT_CURSOR *cursor);
 extern int __wt_btcur_remove(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_update(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_compare(WT_CURSOR_BTREE *a_arg,
