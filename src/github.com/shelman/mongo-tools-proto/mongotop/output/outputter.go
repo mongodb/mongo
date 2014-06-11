@@ -5,7 +5,7 @@ package output
 import (
 	"fmt"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
-	"github.com/shelman/mongo-tools-proto/mongotop/result"
+	"github.com/shelman/mongo-tools-proto/mongotop/command"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,7 +20,7 @@ const (
 
 // Interface to output the results of the top command.
 type Outputter interface {
-	Output(*result.TopResults, *commonopts.ToolOptions) error
+	Output(*command.Top, *commonopts.ToolOptions) error
 }
 
 // Outputter that formats the results and prints them to the terminal.
@@ -29,7 +29,7 @@ type TerminalOutputter struct {
 
 // Implementation of Output.  Formats the results and prints them to stdout
 // as a table.
-func (self *TerminalOutputter) Output(results *result.TopResults,
+func (self *TerminalOutputter) Output(results *command.Top,
 	opts *commonopts.ToolOptions) error {
 
 	// bookkeep the longest member of each column, for spacing

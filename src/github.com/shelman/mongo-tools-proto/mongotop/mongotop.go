@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
+	"github.com/shelman/mongo-tools-proto/mongotop/command"
 	"github.com/shelman/mongo-tools-proto/mongotop/output"
 	"github.com/shelman/mongo-tools-proto/mongotop/result"
 	"time"
@@ -31,9 +32,10 @@ type MongoTop struct {
 func (self *MongoTop) Run() error {
 
 	// the top results from the previous run, used for diffing
-	previousResults, err := self.runTopCommand()
+	previousResults := &command.Top{}
+	err := self.SessionProvider.RunCommand("admin", previousResults)
 	if err != nil {
-		return fmt.Errorf("error running initial top command: %v", err)
+		return fmt.Errorf("error running top command: %v", err)
 	}
 
 	for {
@@ -42,13 +44,16 @@ func (self *MongoTop) Run() error {
 		time.Sleep(self.Sleeptime)
 
 		// run the top command against the database
-		topResults, err := self.runTopCommand()
+		//topResults, err := self.runTopCommand()
+
+		topResults := &command.Top{}
+		err = self.SessionProvider.RunCommand("admin", topResults)
 		if err != nil {
 			return fmt.Errorf("error running top command: %v", err)
 		}
 
 		// diff the results
-		diff := result.Diff(previousResults, topResults)
+		diff := command.Diff(previousResults, topResults)
 
 		// output the results
 		if err := self.Outputter.Output(diff, self.Options); err != nil {

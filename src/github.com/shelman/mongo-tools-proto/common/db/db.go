@@ -4,16 +4,11 @@ package db
 
 import (
 	"fmt"
+	"github.com/shelman/mongo-tools-proto/common/db/command"
 	"github.com/shelman/mongo-tools-proto/common/db/ssl"
 	"github.com/shelman/mongo-tools-proto/common/options"
 	"labix.org/v2/mgo"
 	"sync"
-)
-
-const (
-	// authentication types to be passed to the driver
-	AUTH_STANDARD = "MONGODB-CR"
-	AUTH_SSL      = "MONGODB-X509"
 )
 
 // Used to manage database sessions
@@ -27,6 +22,17 @@ type SessionProvider struct {
 
 	// the master session to use for connection pooling
 	masterSession *mgo.Session
+}
+
+func (self *SessionProvider) RunCommand(dbToUse string,
+	cmd command.Command) error {
+	session, err := self.GetSession()
+	if err != nil {
+		return fmt.Errorf("error connecting to database server: %v", err)
+	}
+	defer session.Close()
+
+	return session.DB(dbToUse).Run(cmd.AsRunnable(), cmd)
 }
 
 // Returns a session connected to the database server for which the
