@@ -495,8 +495,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 * was written.  If so, try to open the ordinary handle on that
 		 * chunk instead.
 		 */
-		if (ret == WT_NOTFOUND &&
-		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
+		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 			ret = __wt_open_cursor(
 			    session, chunk->uri, c, NULL, cp);
 			if (ret == 0)
@@ -515,8 +514,8 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && i != nchunks - 1)
 			F_SET(*cp, WT_CURSTD_CONFLICT_CHK);
 
-		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
-		    !F_ISSET(clsm, WT_CLSM_MERGE))
+		if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
+		    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
 			WT_ERR(__wt_bloom_open(session, chunk->bloom_uri,
 			    lsm_tree->bloom_bit_count,
 			    lsm_tree->bloom_hash_count,
