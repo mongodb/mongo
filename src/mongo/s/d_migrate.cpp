@@ -2110,7 +2110,7 @@ namespace mongo {
                 Lock::GlobalRead lk(txn->lockState());
 
                 // if durability is on, force a write to journal
-                if ( getDur().commitNow() ) {
+                if (getDur().commitNow(txn)) {
                     log() << "migrate commit flushed to journal for '" << ns << "' " << min << " -> " << max << migrateLog;
                 }
             }

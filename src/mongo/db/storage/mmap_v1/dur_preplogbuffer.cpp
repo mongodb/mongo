@@ -176,7 +176,6 @@ namespace mongo {
         */
         static void _PREPLOGBUFFER(JSectHeader& h, AlignedBuilder& bb) {
             verify(storageGlobalParams.dur);
-            assertLockedForCommitting();
 
             resetLogBuffer(h, bb); // adds JSectHeader
 
@@ -192,7 +191,6 @@ namespace mongo {
             return;
         }
         void PREPLOGBUFFER(/*out*/ JSectHeader& h, AlignedBuilder& ab) {
-            assertLockedForCommitting();
             Timer t;
             j.assureLogFileOpen(); // so fileId is set
             _PREPLOGBUFFER(h, ab);

@@ -69,7 +69,7 @@
    @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/thread/thread.hpp>
 
@@ -103,7 +103,7 @@ namespace mongo {
         /** declared later in this file
             only used in this file -- use DurableInterface::commitNow() outside
         */
-        static void groupCommit(Lock::GlobalWrite *lgw = 0);
+        static void groupCommit(OperationContext* txn, Lock::GlobalWrite *lgw);
 
         CommitJob& commitJob = *(new CommitJob()); // don't destroy
 
@@ -190,18 +190,17 @@ namespace mongo {
         void NonDurableImpl::declareWriteIntent(void *, unsigned) { 
         }
 
-        bool NonDurableImpl::commitNow() {
+        bool NonDurableImpl::commitNow(OperationContext* txn) {
             cc().checkpointHappened();   // XXX: remove when all dur goes through DurRecoveryUnit
             return false;
         }
 
-        bool NonDurableImpl::commitIfNeeded(bool) {
+        bool NonDurableImpl::commitIfNeeded(OperationContext* txn, bool force) {
             cc().checkpointHappened();   // XXX: remove when all dur goes through DurRecoveryUnit
             return false;
         }
 
 
-        void assertLockedForCommitting();
 
         static DurableImpl* durableImpl = new DurableImpl();
         static NonDurableImpl* nonDurableImpl = new NonDurableImpl();
@@ -218,9 +217,9 @@ namespace mongo {
             _impl = nonDurableImpl;
         }
 
-        bool DurableImpl::commitNow() {
+        bool DurableImpl::commitNow(OperationContext* txn) {
             stats.curr->_earlyCommits++;
-            groupCommit(0);
+            groupCommit(txn, NULL);
             cc().checkpointHappened();
             return true;
         }
@@ -270,20 +269,12 @@ namespace mongo {
             return commitJob.bytes() > UncommittedBytesLimit;
         }
 
-        void assertLockedForCommitting() { 
-            char t = Lock::isLocked();
-            if(  t == 'R' || t == 'W' )
-                return;
-            // 'w' case we upgrade to exclusive (X).
-            fassertFailed( 16110 );
-        }
-
-        bool NOINLINE_DECL DurableImpl::_aCommitIsNeeded() {
-            switch (Lock::isLocked()) {
+        bool NOINLINE_DECL DurableImpl::_aCommitIsNeeded(OperationContext* txn) {
+            switch (txn->lockState()->threadState()) {
                 case '\0': {
                     // lock_w() can call in this state at times if a commit is needed before attempting 
                     // its lock.
-                    Lock::GlobalRead r(&cc().lockState());
+                    Lock::GlobalRead r(txn->lockState());
                     if( commitJob.bytes() < UncommittedBytesLimit ) {
                         // someone else beat us to it
                         //
@@ -293,31 +284,31 @@ namespace mongo {
                         // groupCommitMutex should be on top.
                         return false;
                     }
-                    commitNow();
+                    commitNow(txn);
                     return true;
                 }
                 case 'w': {
-                    if( Lock::atLeastReadLocked("local") ) {
+                    if (txn->lockState()->isAtLeastReadLocked("local")) {
                         LOG(2) << "can't commitNow from commitIfNeeded, as we are in local db lock";
                         return false;
                     }
-                    if( Lock::atLeastReadLocked("admin") ) {
+                    if (txn->lockState()->isAtLeastReadLocked("admin")) {
                         LOG(2) << "can't commitNow from commitIfNeeded, as we are in admin db lock";
                         return false;
                     }
 
                     LOG(1) << "commitIfNeeded upgrading from shared write to exclusive write state"
                            << endl;
-                    Lock::UpgradeGlobalLockToExclusive ex(&cc().lockState());
+                    Lock::UpgradeGlobalLockToExclusive ex(txn->lockState());
                     if (ex.gotUpgrade()) {
-                        commitNow();
+                        commitNow(txn);
                     }
                     return true;
                 }
 
                 case 'W':
                 case 'R':
-                    commitNow();
+                    commitNow(txn);
                     return true;
 
                 case 'r':
@@ -339,7 +330,7 @@ namespace mongo {
 
             perf note: this function is called a lot, on every lock_w() ... and usually returns right away
         */
-        bool DurableImpl::commitIfNeeded(bool force) {
+        bool DurableImpl::commitIfNeeded(OperationContext* txn, bool force) {
             // this is safe since since conceptually if you call commitIfNeeded, we're at a valid
             // spot in an operation to be terminated.
             cc().checkpointHappened();
@@ -347,7 +338,7 @@ namespace mongo {
             if( likely( commitJob.bytes() < UncommittedBytesLimit && !force ) ) {
                 return false;
             }
-            return _aCommitIsNeeded();
+            return _aCommitIsNeeded(txn);
         }
 
         /** Used in _DEBUG builds to check that we didn't overwrite the last intent
@@ -473,7 +464,7 @@ namespace mongo {
 
         extern size_t privateMapBytes;
 
-        static void _REMAPPRIVATEVIEW() {
+        static void _REMAPPRIVATEVIEW(OperationContext* txn) {
             // todo: Consider using ProcessInfo herein and watching for getResidentSize to drop.  that could be a way 
             //       to assure very good behavior here.
 
@@ -482,7 +473,7 @@ namespace mongo {
 
             LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
-            verify( Lock::isW() );
+            invariant(txn->lockState()->isW());
             verify( !commitJob.hasWritten() );
 
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so
@@ -556,9 +547,9 @@ namespace mongo {
         /** We need to remap the private views periodically. otherwise they would become very large.
             Call within write lock.  See top of file for more commentary.
         */
-        void REMAPPRIVATEVIEW() {
+        static void REMAPPRIVATEVIEW(OperationContext* txn) {
             Timer t;
-            _REMAPPRIVATEVIEW();
+            _REMAPPRIVATEVIEW(txn);
             stats.curr->_remapPrivateViewMicros += t.micros();
         }
 
@@ -567,16 +558,16 @@ namespace mongo {
         // reallocate, and more importantly regrow it, on every single commit.
         static AlignedBuilder __theBuilder(4 * 1024 * 1024);
 
-        static bool _groupCommitWithLimitedLocks() {
+        static bool _groupCommitWithLimitedLocks(OperationContext* txn) {
             AlignedBuilder &ab = __theBuilder;
 
-            verify( ! Lock::isLocked() );
+            invariant(!txn->lockState()->isLocked());
 
             // do we need this to be greedy, so that it can start working fairly soon?
             // probably: as this is a read lock, it wouldn't change anything if only reads anyway.
             // also needs to stop greed. our time to work before clearing lk1 is not too bad, so 
             // not super critical, but likely 'correct'.  todo.
-            scoped_ptr<Lock::GlobalRead> lk1(new Lock::GlobalRead(&cc().lockState()));
+            scoped_ptr<Lock::GlobalRead> lk1(new Lock::GlobalRead(txn->lockState()));
 
             SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
 
@@ -628,9 +619,9 @@ namespace mongo {
         }
 
         /** @return true if committed; false if lock acquisition timed out (we only try for a read lock herein and only wait for a certain duration). */
-        bool groupCommitWithLimitedLocks() {
+        static bool groupCommitWithLimitedLocks(OperationContext* txn) {
             try {
-                return _groupCommitWithLimitedLocks();
+                return _groupCommitWithLimitedLocks(txn);
             }
             catch(DBException& e ) {
                 log() << "dbexception in groupCommitLL causing immediate shutdown: " << e.toString() << endl;
@@ -651,11 +642,12 @@ namespace mongo {
             return false;
         }
 
-        static void _groupCommit(Lock::GlobalWrite *lgw) {
+        static void _groupCommit(OperationContext* txn, Lock::GlobalWrite *lgw) {
             LOG(4) << "_groupCommit " << endl;
 
             // We are 'R' or 'W'
-            assertLockedForCommitting();
+            invariant(txn->lockState()->isLockedForCommitting());
+
             {
                 AlignedBuilder &ab = __theBuilder;
 
@@ -697,7 +689,7 @@ namespace mongo {
             // we wouldn't see newly written data on reads.
             //
             DEV verify( !commitJob.hasWritten() );
-            if( !Lock::isW() ) {
+            if (!txn->lockState()->isW()) {
                 // todo: note we end up here i believe if our lock state is X -- and that might not be what we want.
 
                 // REMAPPRIVATEVIEW needs done in a write lock (as there is a short window during remapping when each view 
@@ -713,7 +705,7 @@ namespace mongo {
                 if( lgw ) { 
                     LOG(4) << "_groupCommit upgrade" << endl;
                     lgw->upgrade();
-                    REMAPPRIVATEVIEW();
+                    REMAPPRIVATEVIEW(txn);
                 }
             }
             else {
@@ -722,7 +714,7 @@ namespace mongo {
                 // may do a write without a new lock acquisition.  this can happen when DurableMappedFile::close() calls
                 // this method when a file (and its views) is about to go away.
                 //
-                REMAPPRIVATEVIEW();
+                REMAPPRIVATEVIEW(txn);
             }
         }
 
@@ -733,9 +725,9 @@ namespace mongo {
                    lgw != 0 as more than one thread upgrading would deadlock
             @see DurableMappedFile::close()
         */
-        static void groupCommit(Lock::GlobalWrite *lgw) {
+        static void groupCommit(OperationContext* txn, Lock::GlobalWrite *lgw) {
             try {
-                _groupCommit(lgw);
+                _groupCommit(txn, lgw);
             }
             catch(DBException& e ) { 
                 log() << "dbexception in groupCommit causing immediate shutdown: " << e.toString() << endl;
@@ -757,6 +749,7 @@ namespace mongo {
         }
 
         static void durThreadGroupCommit() {
+            OperationContextImpl txn;
             SimpleMutex::scoped_lock flk(filesLockedFsync);
 
             const int N = 10;
@@ -767,7 +760,7 @@ namespace mongo {
                 // limited locks version doesn't do any remapprivateview at all, so only try this if privateMapBytes
                 // is in an acceptable range.  also every Nth commit, we do everything so we can do some remapping;
                 // remapping a lot all at once could cause jitter from a large amount of copy-on-writes all at once.
-                if( groupCommitWithLimitedLocks() )
+                if( groupCommitWithLimitedLocks(&txn) )
                     return;
             }
 
@@ -775,9 +768,9 @@ namespace mongo {
             // getting a write lock is helpful also as we need to be greedy and not be starved here
             // note our "stopgreed" parm -- to stop greed by others while we are working. you can't write 
             // anytime soon anyway if we are journaling for a while, that was the idea.
-            Lock::GlobalWrite w(&cc().lockState());
+            Lock::GlobalWrite w(txn.lockState());
             w.downgrade();
-            groupCommit(&w);
+            groupCommit(&txn, &w);
         }
 
         /** called when a DurableMappedFile is closing -- we need to go ahead and group commit in that case before its
@@ -896,8 +889,8 @@ namespace mongo {
             boost::thread t(durThread);
         }
 
-        void DurableImpl::syncDataAndTruncateJournal() {
-            verify( Lock::isW() );
+        void DurableImpl::syncDataAndTruncateJournal(OperationContext* txn) {
+            invariant(txn->lockState()->isW());
 
             // a commit from the commit thread won't begin while we are in the write lock,
             // but it may already be in progress and the end of that work is done outside 
@@ -906,7 +899,7 @@ namespace mongo {
                 SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
             }
 
-            commitNow();
+            commitNow(txn);
             MongoFile::flushAll(true);
             journalCleanup();
 

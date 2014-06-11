@@ -178,9 +178,7 @@ namespace mongo {
     bool Lock::isWriteLocked(const StringData& ns) { 
         return lockStateTempOnly().isWriteLocked(ns);
     }
-    bool Lock::atLeastReadLocked(const StringData& ns) { 
-        return lockStateTempOnly().isAtLeastReadLocked(ns);
-    }
+
     void Lock::assertAtLeastReadLocked(const StringData& ns) { 
         if( !atLeastReadLocked(ns) ) { 
             LockState &ls = lockStateTempOnly();

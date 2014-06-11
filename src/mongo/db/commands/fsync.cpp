@@ -133,7 +133,7 @@ namespace mongo {
                 if (sync) {
                     // can this be GlobalRead? and if it can, it should be nongreedy.
                     Lock::GlobalWrite w(txn->lockState());
-                    getDur().commitNow();
+                    getDur().commitNow(txn);
                 }
                 // question : is it ok this is not in the dblock? i think so but this is a change from past behavior, 
                 // please advise.
@@ -155,7 +155,7 @@ namespace mongo {
         
         verify( ! fsyncCmd.locked ); // impossible to get here if locked is true
         try { 
-            getDur().syncDataAndTruncateJournal();
+            getDur().syncDataAndTruncateJournal(&txn);
         } 
         catch( std::exception& e ) { 
             error() << "error doing syncDataAndTruncateJournal: " << e.what() << endl;

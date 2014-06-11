@@ -41,7 +41,7 @@
 namespace mongo {
 
     OperationContextImpl::OperationContextImpl() {
-        _recovery.reset(new DurRecoveryUnit());
+        _recovery.reset(new DurRecoveryUnit(this));
     }
 
     RecoveryUnit* OperationContextImpl::recoveryUnit() const {

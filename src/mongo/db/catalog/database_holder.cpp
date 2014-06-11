@@ -100,7 +100,7 @@ namespace mongo {
         log() << "DatabaseHolder::closeAll path:" << path << endl;
         invariant(txn->lockState()->isW());
 
-        getDur().commitNow(); // bad things happen if we close a DB with outstanding writes
+        getDur().commitNow(txn); // bad things happen if we close a DB with outstanding writes
 
         map<string,Database*>& m = _paths[path];
         _size -= m.size();

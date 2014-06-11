@@ -36,12 +36,14 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     /**
      * Just pass through to getDur().
      */
     class DurRecoveryUnit : public RecoveryUnit {
     public:
-        DurRecoveryUnit();
+        DurRecoveryUnit(OperationContext* txn);
 
         virtual ~DurRecoveryUnit() { }
 
@@ -65,6 +67,10 @@ namespace mongo {
         void rollbackChanges();
         void reset();
         bool haveUncommitedChanges() { return !_changes.empty(); }
+
+        // The parent operation context. This pointer is not owned and it's lifetime must extend
+        // past that of the DurRecoveryUnit
+        OperationContext* _txn;
 
         // State is only used for invariant checking today. It should be deleted once we get rid of
         // nesting.

@@ -64,6 +64,7 @@ namespace mongo {
         bool isWriteLocked() const;
         bool isWriteLocked(const StringData& ns) const;
         bool isAtLeastReadLocked(const StringData& ns) const;
+        bool isLockedForCommitting() const;
         bool isNested() const;
 
         /** pending means we are currently trying to get a lock */

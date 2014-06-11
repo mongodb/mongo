@@ -35,7 +35,9 @@
 
 namespace mongo {
 
-    DurRecoveryUnit::DurRecoveryUnit() {
+    DurRecoveryUnit::DurRecoveryUnit(OperationContext* txn)
+        : _txn(txn) {
+
         _hasWrittenSinceCheckpoint = false;
     }
 
@@ -62,7 +64,7 @@ namespace mongo {
 #endif
 
         // global journal flush
-        getDur().commitIfNeeded();
+        getDur().commitIfNeeded(_txn);
     }
 
     void DurRecoveryUnit::endUnitOfWork() {
@@ -136,7 +138,7 @@ namespace mongo {
         publishChanges();
 #endif
         _hasWrittenSinceCheckpoint = false;
-        return getDur().commitIfNeeded(force);
+        return getDur().commitIfNeeded(_txn, force);
     }
 
     bool DurRecoveryUnit::isCommitNeeded() const {
@@ -161,7 +163,7 @@ namespace mongo {
         invariant(_state != MUST_ROLLBACK);
         publishChanges();
 #endif
-        return getDur().syncDataAndTruncateJournal();
+        return getDur().syncDataAndTruncateJournal(_txn);
     }
 
 }  // namespace mongo

@@ -975,7 +975,7 @@ namespace repl {
                     }
                     op = oplogReader.next();
 
-                    getDur().commitIfNeeded();
+                    getDur().commitIfNeeded(txn);
                 }
             }
         }

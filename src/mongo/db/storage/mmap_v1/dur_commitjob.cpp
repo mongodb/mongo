@@ -63,7 +63,6 @@ namespace mongo {
         }
 
         void IntentsAndDurOps::clear() {
-            assertLockedForCommitting();
             commitJob.groupCommitMutex.dassertLocked();
             _alreadyNoted.clear();
             _intents.clear();
@@ -96,8 +95,7 @@ namespace mongo {
 
         size_t privateMapBytes = 0; // used by _REMAPPRIVATEVIEW to track how much / how fast to remap
 
-        void CommitJob::commitingBegin() { 
-            assertLockedForCommitting();
+        void CommitJob::commitingBegin() {
             _commitNumber = _notify.now();
             stats.curr->_commits++;
         }

@@ -108,6 +108,10 @@ namespace mongo {
         return isLocked(ns);
     }
 
+    bool LockState::isLockedForCommitting() const {
+        return threadState() == 'R' || threadState() == 'W';
+    }
+
     bool LockState::isNested() const {
         return recursiveCount() > 1;
     }

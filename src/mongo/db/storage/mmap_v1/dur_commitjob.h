@@ -40,8 +40,6 @@
 namespace mongo {
     namespace dur {
 
-        void assertLockedForCommitting();
-
         /** Declaration of an intent to write to a region of a memory mapped view
          *  We store the end rather than the start pointer to make operator< faster
          *    since that is heavily used in set lookup.

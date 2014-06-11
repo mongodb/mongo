@@ -1073,10 +1073,11 @@ namespace {
                 while( 1 ) {
                     // we may already be in a read lock from earlier in the call stack, so do read lock here 
                     // to be consistent with that.
-                    readlocktry w(&cc().lockState(), 20000);
-                    if( w.got() ) { 
+                    OperationContextImpl txn;
+                    readlocktry w(txn.lockState(), 20000);
+                    if( w.got() ) {
                         log() << "shutdown: final commit..." << endl;
-                        getDur().commitNow();
+                        getDur().commitNow(&txn);
                         break;
                     }
                     if( --n <= 0 ) {

@@ -55,7 +55,6 @@ namespace mongo {
         static bool isRW();         // R or W. i.e., we are write-exclusive          
         static bool nested();
         static bool isWriteLocked(const StringData& ns);
-        static bool atLeastReadLocked(const StringData& ns); // true if this db is locked
         static void assertAtLeastReadLocked(const StringData& ns);
         static void assertWriteLocked(const StringData& ns);
         
