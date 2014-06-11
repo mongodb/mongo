@@ -509,6 +509,16 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		}
 		WT_ERR(ret);
 
+		/*
+		 * Set update check only on all cursors that haven't had a
+		 * checkpoint complete, or aren't the primary chunk. This
+		 * allows us to execute update calls on non-primary chunks
+		 * to ensure there are no snapshot transaction conflicts.
+		 */
+		if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
+		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && i != nchunks - 1)
+			F_SET(*cp, WT_CURSTD_UPDATE_CHECK_ONLY);
+
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
 		    !F_ISSET(clsm, WT_CLSM_MERGE))
 			WT_ERR(__wt_bloom_open(session, chunk->bloom_uri,
@@ -1209,9 +1219,13 @@ __clsm_put(WT_SESSION_IMPL *session,
 			    !__wt_txn_visible_all(
 			    session, current_chunk->txnid_max));
 			if (i != 0 &&
-			    TXNID_LT(current_chunk->txnid_max, session->txn.id))
+			    TXNID_LT(current_chunk->txnid_max,
+			    session->txn.id) &&
+			    TXNID_LT(current_chunk->update_txn_max,
+			    session->txn.id)) {
 					current_chunk->update_txn_max =
 					    session->txn.id;
+			}
 		}
 	}
 

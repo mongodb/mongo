@@ -281,8 +281,12 @@ __wt_lsm_checkpoint_worker(void *arg)
 			/* Stop if a running transaction needs the chunk. */
 			__wt_txn_update_oldest(session);
 			if (!__wt_txn_visible_all(session,
+#if 0
 			    chunk->update_txn_max != WT_TXN_NONE ?
 			    chunk->update_txn_max : chunk->txnid_max))
+#else
+			    chunk->txnid_max))
+#endif
 				break;
 
 			/*
@@ -350,9 +354,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 				    session, &S2C(session)->checkpoint_lock);
 				locked = 0;
 			}
-			fprintf(stderr,
-			    "Setting chunk %s read only txnid_max: %d\n",
-			    chunk->uri, (int)chunk->txnid_max);
 			S2BT(session)->readonly = 1;
 			WT_TRET(__wt_session_release_btree(session));
 			WT_ERR(ret);

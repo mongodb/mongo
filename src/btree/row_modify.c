@@ -61,6 +61,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			WT_ERR(__wt_txn_update_check(
 			    session, old_upd = *upd_entry));
 
+			if (F_ISSET(&cbt->iface, WT_CURSTD_UPDATE_CHECK_ONLY))
+				return (0);
+
 			/* Allocate a WT_UPDATE structure and transaction ID. */
 			WT_ERR(
 			    __wt_update_alloc(session, value, &upd, &upd_size));
@@ -92,6 +95,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		WT_ERR(__wt_update_serial(
 		    session, page, upd_entry, &upd, upd_size));
 	} else {
+		/* The update check succeeded if an exact match wasn't found */
+		if (F_ISSET(&cbt->iface, WT_CURSTD_UPDATE_CHECK_ONLY))
+			return (0);
 		/*
 		 * Allocate the insert array as necessary.
 		 *
