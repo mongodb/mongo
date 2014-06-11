@@ -428,7 +428,13 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		if (parent_ref->state != WT_REF_MEM)
 			continue;
 
+		/*
+		 * Under some conditions, we pull leaf pages up to the top
+		 * level.  Don't try to descend into those pages.
+		 */
 		child = parent_ref->page;
+		if (!WT_PAGE_IS_INTERNAL(child))
+			continue;
 #ifdef HAVE_DIAGNOSTIC
 		__split_verify_intl_key_order(session, child);
 #endif
