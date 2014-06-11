@@ -528,7 +528,7 @@ namespace mongo {
         if (params->min >= params->max) {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "region for hash must be valid and have positive area, "
-                                        << "but [" << params->min << ", " << params->max << "]"
+                                        << "but [" << params->min << ", " << params->max << "] "
                                         << "was specified");
         }
 
