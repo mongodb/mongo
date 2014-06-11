@@ -404,6 +404,10 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		    cbt->compare == 0 && !__cursor_invalid(cbt))
 			WT_ERR(WT_DUPLICATE_KEY);
 
+		/*
+		 * If we are only interested in conflict checking do it now.
+		 * A conflict can only exist if there was an exact match.
+		 */
 		if (F_ISSET(cbt, WT_CBT_CONFLICT_CHECK)) {
 			if (cbt->compare != 0)
 				return (0);
