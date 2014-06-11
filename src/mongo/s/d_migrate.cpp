@@ -1216,7 +1216,7 @@ namespace mongo {
                     // bump the metadata's version up and "forget" about the chunk being moved
                     // this is not the commit point but in practice the state in this shard won't
                     // until the commit it done
-                    shardingState.donateChunk( ns , min , max , myVersion );
+                    shardingState.donateChunk(txn, ns, min, max, myVersion);
                 }
 
                 log() << "moveChunk setting version to: " << myVersion << migrateLog;
@@ -1252,7 +1252,7 @@ namespace mongo {
 
                         // revert the chunk manager back to the state before "forgetting" about the
                         // chunk
-                        shardingState.undoDonateChunk( ns, origCollMetadata );
+                        shardingState.undoDonateChunk(txn, ns, origCollMetadata);
                     }
                     log() << "Shard version successfully reset to clean up failed migration"
                           << endl;
@@ -1415,7 +1415,7 @@ namespace mongo {
 
                         // Revert the metadata back to the state before "forgetting"
                         // about the chunk.
-                        shardingState.undoDonateChunk( ns, origCollMetadata );
+                        shardingState.undoDonateChunk(txn, ns, origCollMetadata);
                     }
 
                     log() << "Shard version successfully reset to clean up failed migration" << endl;
@@ -1619,7 +1619,7 @@ namespace mongo {
                 // Unprotect the range if needed/possible on unsuccessful TO migration
                 Lock::DBWrite lk(txn->lockState(), ns);
                 string errMsg;
-                if ( !shardingState.forgetPending( ns, min, max, epoch, &errMsg ) ) {
+                if (!shardingState.forgetPending(txn, ns, min, max, epoch, &errMsg)) {
                     warning() << errMsg << endl;
                 }
             }
@@ -1738,7 +1738,7 @@ namespace mongo {
                 {
                     // Protect the range by noting that we're now starting a migration to it
                     Lock::DBWrite lk(txn->lockState(), ns);
-                    if ( !shardingState.notePending( ns, min, max, epoch, &errmsg ) ) {
+                    if (!shardingState.notePending(txn, ns, min, max, epoch, &errmsg)) {
                         warning() << errmsg << endl;
                         setState(FAIL);
                         return;

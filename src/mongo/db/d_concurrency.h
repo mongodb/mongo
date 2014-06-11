@@ -48,15 +48,6 @@ namespace mongo {
     class Lock : boost::noncopyable { 
     public:
         enum Nestable { notnestable=0, local, admin };
-        static int isLocked();      // true if *anything* is locked (by us)
-        static int somethingWriteLocked(); // w or W
-        static bool isW();          // W
-        static bool isR();          
-        static bool isRW();         // R or W. i.e., we are write-exclusive          
-        static bool nested();
-        static bool isWriteLocked(const StringData& ns);
-        static void assertAtLeastReadLocked(const StringData& ns);
-        static void assertWriteLocked(const StringData& ns);
         
         static LockStat* globalLockStat();
         static LockStat* nestableLockStat( Nestable db );
@@ -83,7 +74,7 @@ namespace mongo {
             RWLockRecursive::Exclusive _lk;
         public:
             ParallelBatchWriterMode() : _lk(_batchLock) {}
-            static void iAmABatchParticipant();
+            static void iAmABatchParticipant(LockState* lockState);
             static RWLockRecursive &_batchLock;
         };
 

@@ -31,6 +31,9 @@
 #include "mongo/db/repl/topology_coordinator.h"
 
 namespace mongo {
+
+    class OperationContext;
+
 namespace repl {
 
     class TopologyCoordinatorMock : public TopologyCoordinator {
@@ -69,7 +72,7 @@ namespace repl {
 
         virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
 
-        virtual void relinquishPrimary();
+        virtual void relinquishPrimary(OperationContext* txn);
 
     };
 

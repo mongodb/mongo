@@ -42,6 +42,7 @@
 #include "mongo/util/concurrency/qlock.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/concurrency/threadlocal.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
 
 // oplog locking
@@ -50,11 +51,7 @@
 // oplog now
 // yielding
 
-namespace mongo { 
-
-    inline LockState& lockStateTempOnly() {
-        return cc().lockState();
-    }
+namespace mongo {
 
     class DBTryLockTimeoutException : public std::exception {
     public:
@@ -152,51 +149,11 @@ namespace mongo {
     LockStat* Lock::globalLockStat() {
         return &qlk.stats;
     }
-    
-    int Lock::isLocked() {
-        return lockStateTempOnly().threadState();
-    }
-    int Lock::somethingWriteLocked() {
-        return lockStateTempOnly().threadState() == 'W' || lockStateTempOnly().threadState() == 'w';
-    }
-    bool Lock::isRW() {
-        return lockStateTempOnly().threadState() == 'W' || lockStateTempOnly().threadState() == 'R';
-    }
-    bool Lock::isW() { 
-        return lockStateTempOnly().threadState() == 'W';
-    }
-    bool Lock::isR() { 
-        return lockStateTempOnly().threadState() == 'R';
-    }
-    bool Lock::nested() { 
-        // note this doesn't tell us much actually, it tells us if we are nesting locks but 
-        // they could be the a global lock twice or a global and a specific or two specifics 
-        // (such as including local) 
-        return lockStateTempOnly().recursiveCount() > 1;
-    }
 
-    bool Lock::isWriteLocked(const StringData& ns) { 
-        return lockStateTempOnly().isWriteLocked(ns);
-    }
-
-    void Lock::assertAtLeastReadLocked(const StringData& ns) { 
-        if( !atLeastReadLocked(ns) ) { 
-            LockState &ls = lockStateTempOnly();
-            log() << "error expected " << ns << " to be locked " << endl;
-            ls.dump();
-            msgasserted(16104, str::stream() << "expected to be read locked for " << ns);
-        }
-    }
-    void Lock::assertWriteLocked(const StringData& ns) { 
-        if( !Lock::isWriteLocked(ns) ) { 
-            lockStateTempOnly().dump();
-            msgasserted(16105, str::stream() << "expected to be write locked for " << ns);
-        }
-    }
 
     RWLockRecursive &Lock::ParallelBatchWriterMode::_batchLock = *(new RWLockRecursive("special"));
-    void Lock::ParallelBatchWriterMode::iAmABatchParticipant() {
-        lockStateTempOnly()._batchWriter = true;
+    void Lock::ParallelBatchWriterMode::iAmABatchParticipant(LockState* lockState) {
+        lockState->_batchWriter = true;
     }
 
     Lock::ScopedLock::ParallelBatchWriterSupport::ParallelBatchWriterSupport(LockState* lockState)
@@ -267,7 +224,7 @@ namespace mongo {
     }
 
     Lock::TempRelease::TempRelease(LockState* lockState)
-        : cant(lockState->isNested()), _lockState(lockState) {
+        : cant(lockState->isRecursive()), _lockState(lockState) {
 
         if( cant )
             return;

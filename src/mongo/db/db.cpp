@@ -358,11 +358,10 @@ namespace mongo {
             if (shouldClearNonLocalTmpCollections || dbName == "local")
                 ctx.db()->clearTmpCollections(&txn);
 
-            OperationContextImpl opCtx;
             if ( mongodGlobalParams.repair ) {
-                fassert( 18506, repairDatabase( &opCtx, dbName ) );
+                fassert(18506, repairDatabase(&txn, dbName));
             }
-            else if ( !ctx.db()->getDatabaseCatalogEntry()->currentFilesCompatible( &opCtx ) ) {
+            else if (!ctx.db()->getDatabaseCatalogEntry()->currentFilesCompatible(&txn)) {
                 log() << "****";
                 log() << "cannot do this upgrade without an upgrade in the middle";
                 log() << "please do a --repair with 2.6 and then start this version";
@@ -382,7 +381,7 @@ namespace mongo {
                     const BSONObj key = index.getObjectField("key");
                     const string plugin = IndexNames::findPluginName(key);
 
-                    if (ctx.db()->getDatabaseCatalogEntry()->isOlderThan24( &opCtx )) {
+                    if (ctx.db()->getDatabaseCatalogEntry()->isOlderThan24(&txn)) {
                         if (IndexNames::existedBefore24(plugin))
                             continue;
 

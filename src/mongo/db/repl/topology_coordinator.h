@@ -37,6 +37,7 @@
 
 namespace mongo {
 
+    class OperationContext;
     class OpTime;
 
 namespace repl {
@@ -154,7 +155,7 @@ namespace repl {
         virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo) = 0;
 
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
-        virtual void relinquishPrimary() = 0;
+        virtual void relinquishPrimary(OperationContext* txn) = 0;
     protected:
         TopologyCoordinator() {}
     };

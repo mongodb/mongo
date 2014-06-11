@@ -43,13 +43,31 @@
 
 namespace mongo {
 
+    Database* DatabaseHolder::get(OperationContext* txn,
+                                  const std::string& ns,
+                                  const std::string& path) const {
+
+        txn->lockState()->assertAtLeastReadLocked(ns);
+
+        SimpleMutex::scoped_lock lk(_m);
+        Paths::const_iterator x = _paths.find( path );
+        if ( x == _paths.end() )
+            return 0;
+        const DBs& m = x->second;
+        const std::string db = _todb( ns );
+        DBs::const_iterator it = m.find(db);
+        if ( it != m.end() )
+            return it->second;
+        return NULL;
+    }
+
     Database* DatabaseHolder::getOrCreate(
                 OperationContext* txn, const string& ns, const string& path, bool& justCreated) {
 
         const string dbname = _todb( ns );
         invariant(txn->lockState()->isAtLeastReadLocked(dbname));
 
-        if (txn->lockState()->hasAnyWriteLock() && FileAllocator::get()->hasFailed()) {
+        if (txn->lockState()->isWriteLocked() && FileAllocator::get()->hasFailed()) {
             uassert(17507, "Can't take a write lock while out of disk space", false);
         }
 
@@ -93,6 +111,16 @@ namespace mongo {
         }
 
         return db;
+    }
+
+    void DatabaseHolder::erase(OperationContext* txn,
+                               const std::string& ns,
+                               const std::string& path) {
+        invariant(txn->lockState()->isW());
+
+        SimpleMutex::scoped_lock lk(_m);
+        DBs& m = _paths[path];
+        _size -= (int)m.erase(_todb(ns));
     }
 
     bool DatabaseHolder::closeAll(

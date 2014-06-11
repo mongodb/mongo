@@ -100,8 +100,6 @@ namespace mongo {
         _pinValue = 0;
         _pos = 0;
 
-        Lock::assertAtLeastReadLocked(_ns);
-
         if (_queryOptions & QueryOption_NoCursorTimeout) {
             // cursors normally timeout after an inactivity period to prevent excess memory use
             // setting this prevents timeout of the cursor in question.

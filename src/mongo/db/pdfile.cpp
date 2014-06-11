@@ -158,7 +158,7 @@ namespace mongo {
         string name = db->name(); // just to have safe
         LOG(1) << "dropDatabase " << name << endl;
 
-        Lock::assertWriteLocked( name );
+        txn->lockState()->assertWriteLocked( name );
 
         BackgroundOperation::assertNoBgOpInProgForDb(name.c_str());
 

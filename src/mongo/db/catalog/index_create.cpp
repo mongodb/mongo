@@ -219,7 +219,7 @@ namespace mongo {
             backgroundOperation.reset( new BackgroundOperation(ns) );
             uassert( 13130,
                      "can't start bg index b/c in recursive lock (db.eval?)",
-                     !Lock::nested() );
+                     !txn->lockState()->isRecursive() );
             log() << "\t building index in background";
         }
 

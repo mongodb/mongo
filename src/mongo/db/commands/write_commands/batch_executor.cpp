@@ -405,12 +405,13 @@ namespace mongo {
         error->setErrMessage( errMsg );
     }
 
-    static bool checkShardVersion(ShardingState* shardingState,
+    static bool checkShardVersion(OperationContext* txn,
+                                  ShardingState* shardingState,
                                   const BatchedCommandRequest& request,
                                   WriteOpResult* result) {
 
         const NamespaceString nss( request.getTargetingNS() );
-        Lock::assertWriteLocked( nss.ns() );
+        txn->lockState()->assertWriteLocked( nss.ns() );
 
         ChunkVersion requestShardVersion =
             request.isMetadataSet() && request.getMetadata()->isShardVersionSet() ?
@@ -457,12 +458,13 @@ namespace mongo {
         error->setErrMessage( errMsg );
     }
 
-    static bool checkIndexConstraints(ShardingState* shardingState,
+    static bool checkIndexConstraints(OperationContext* txn,
+                                      ShardingState* shardingState,
                                       const BatchedCommandRequest& request,
                                       WriteOpResult* result) {
 
         const NamespaceString nss( request.getTargetingNS() );
-        Lock::assertWriteLocked( nss.ns() );
+        txn->lockState()->assertWriteLocked( nss.ns() );
 
         if ( !request.isUniqueIndexRequest() )
             return true;
@@ -910,10 +912,10 @@ namespace mongo {
         if (!checkIsMasterForDatabase(request->getNS(), result)) {
             return false;
         }
-        if (!checkShardVersion(&shardingState, *request, result)) {
+        if (!checkShardVersion(txn, &shardingState, *request, result)) {
             return false;
         }
-        if (!checkIndexConstraints(&shardingState, *request, result)) {
+        if (!checkIndexConstraints(txn, &shardingState, *request, result)) {
             return false;
         }
         _context.reset(new Client::Context(request->getNS(),
@@ -1026,7 +1028,7 @@ namespace mongo {
 
         const string& insertNS = collection->ns().ns();
 
-        Lock::assertWriteLocked( insertNS );
+        txn->lockState()->assertWriteLocked( insertNS );
 
         StatusWith<DiskLoc> status = collection->insertDocument( txn, docToInsert, true );
 
@@ -1053,7 +1055,7 @@ namespace mongo {
 
         const string indexNS = collection->ns().getSystemIndexesCollection();
 
-        Lock::assertWriteLocked( indexNS );
+        txn->lockState()->assertWriteLocked( indexNS );
 
         Status status = collection->getIndexCatalog()->createIndex(txn, indexDesc, true);
 
@@ -1094,7 +1096,7 @@ namespace mongo {
         Lock::DBWrite writeLock(txn->lockState(), nsString.ns());
         ///////////////////////////////////////////
 
-        if ( !checkShardVersion( &shardingState, *updateItem.getRequest(), result ) )
+        if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
             return;
 
         Client::Context ctx( nsString.ns(),
@@ -1153,7 +1155,7 @@ namespace mongo {
 
         // Check version once we're locked
 
-        if ( !checkShardVersion( &shardingState, *removeItem.getRequest(), result ) ) {
+        if (!checkShardVersion(txn, &shardingState, *removeItem.getRequest(), result)) {
             // Version error
             return;
         }

@@ -288,8 +288,6 @@ namespace repl {
         while( 1 ) {
             OpQueue ops;
 
-            verify( !Lock::isLocked() );
-
             Timer batchTimer;
             int lastTimeChecked = 0;
 
@@ -533,14 +531,14 @@ namespace repl {
 
     static AtomicUInt32 replWriterWorkerId;
 
-    void initializeWriterThread() {
+    static void initializeWriterThread() {
         // Only do this once per thread
         if (!ClientBasic::getCurrent()) {
             string threadName = str::stream() << "repl writer worker "
                                               << replWriterWorkerId.addAndFetch(1);
             Client::initThread( threadName.c_str() );
             // allow us to get through the magic barrier
-            Lock::ParallelBatchWriterMode::iAmABatchParticipant();
+            Lock::ParallelBatchWriterMode::iAmABatchParticipant(&cc().lockState());
             replLocalAuth();
         }
     }

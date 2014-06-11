@@ -28,6 +28,7 @@
 
 #include "mongo/db/repl/topology_coordinator_impl.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_executor.h"
@@ -187,9 +188,9 @@ namespace repl {
         
     }
 
-    void TopologyCoordinatorImpl::relinquishPrimary() {
+    void TopologyCoordinatorImpl::relinquishPrimary(OperationContext* txn) {
         LOG(2) << "replSet attempting to relinquish" << endl;
-        invariant(Lock::somethingWriteLocked());
+        invariant(txn->lockState()->isWriteLocked());
         if (_memberState != MemberState::RS_PRIMARY) {
             // Already relinquished?
             log() << "replSet warning attempted to relinquish but not primary";

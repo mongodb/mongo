@@ -49,50 +49,16 @@ namespace mongo {
     public:
         DatabaseHolder() : _m("dbholder"),_size(0) { }
 
-        bool __isLoaded( const std::string& ns , const std::string& path ) const {
-            SimpleMutex::scoped_lock lk(_m);
-            Paths::const_iterator x = _paths.find( path );
-            if ( x == _paths.end() )
-                return false;
-            const DBs& m = x->second;
-
-            std::string db = _todb( ns );
-
-            DBs::const_iterator it = m.find(db);
-            return it != m.end();
-        }
-        // must be write locked as otherwise isLoaded could go false->true on you 
-        // in the background and you might not expect that.
-        bool _isLoaded( const std::string& ns , const std::string& path ) const {
-            Lock::assertWriteLocked(ns);
-            return __isLoaded(ns,path);
-        }
-
-        Database * get( const std::string& ns , const std::string& path ) const {
-            SimpleMutex::scoped_lock lk(_m);
-            Lock::assertAtLeastReadLocked(ns);
-            Paths::const_iterator x = _paths.find( path );
-            if ( x == _paths.end() )
-                return 0;
-            const DBs& m = x->second;
-            std::string db = _todb( ns );
-            DBs::const_iterator it = m.find(db);
-            if ( it != m.end() )
-                return it->second;
-            return 0;
-        }
+        Database* get(OperationContext* txn,
+                      const std::string& ns,
+                      const std::string& path) const;
 
         Database* getOrCreate(OperationContext* txn,
                               const std::string& ns,
                               const std::string& path,
                               bool& justCreated);
 
-        void erase( const std::string& ns , const std::string& path ) {
-            SimpleMutex::scoped_lock lk(_m);
-            verify( Lock::isW() );
-            DBs& m = _paths[path];
-            _size -= (int)m.erase( _todb( ns ) );
-        }
+        void erase(OperationContext* txn, const std::string& ns, const std::string& path);
 
         /** @param force - force close even if something underway - use at shutdown */
         bool closeAll(OperationContext* txn,

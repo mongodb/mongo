@@ -85,7 +85,7 @@ namespace mongo {
 
         LOG(4) << "index prefetch for op " << *opType << endl;
 
-        DEV Lock::assertAtLeastReadLocked(ns);
+        DEV txn->lockState()->assertAtLeastReadLocked(ns);
 
         // should we prefetch index pages on updates? if the update is in-place and doesn't change 
         // indexed values, it is actually slower - a lot slower if there are a dozen indexes or 

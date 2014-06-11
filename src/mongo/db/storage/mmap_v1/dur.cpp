@@ -474,7 +474,7 @@ namespace mongo {
             LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
             invariant(txn->lockState()->isW());
-            verify( !commitJob.hasWritten() );
+            invariant(!commitJob.hasWritten());
 
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so
             // we do a little each pass; beyond the remap time, more significantly, there will be copy on write
@@ -780,13 +780,13 @@ namespace mongo {
             if (!storageGlobalParams.dur)
                 return;
 
-            if( Lock::isLocked() ) {
-                getDur().commitIfNeeded(true);
-            }
-            else {
-                verify( inShutdown() );
-                if( commitJob.hasWritten() ) {
-                    log() << "journal warning files are closing outside locks with writes pending" << endl;
+            if (commitJob.hasWritten()) {
+                if (inShutdown()) {
+                    log() << "journal warning files are closing outside locks with writes pending"
+                          << endl;
+                }
+                else {
+                    fassert(18507, !"File is closing while there are unwritten changes.");
                 }
             }
         }

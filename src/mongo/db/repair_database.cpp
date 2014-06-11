@@ -315,7 +315,7 @@ namespace mongo {
 
         {
             Database* originalDatabase = 
-                            dbHolder().get(dbName, storageGlobalParams.dbpath);
+                            dbHolder().get(txn, dbName, storageGlobalParams.dbpath);
             if (originalDatabase == NULL) {
                 return Status(ErrorCodes::NamespaceNotFound, "database does not exist to repair");
             }

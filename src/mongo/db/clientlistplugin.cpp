@@ -40,7 +40,7 @@ namespace {
         ClientListPlugin() : WebStatusPlugin( "clients" , 20 ) {}
         virtual void init() {}
 
-        virtual void run( std::stringstream& ss ) {
+        virtual void run(OperationContext* txn, std::stringstream& ss ) {
             using namespace mongoutils::html;
 
             ss << "\n<table border=1 cellpadding=2 cellspacing=0>";

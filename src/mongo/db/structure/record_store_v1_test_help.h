@@ -119,8 +119,6 @@ namespace mongo {
         virtual size_t numFiles() const;
         virtual long long fileSize() const;
 
-        virtual void flushFiles( bool sync );
-
         virtual DiskLoc allocateExtent( OperationContext* txn,
                                         bool capped,
                                         int size,

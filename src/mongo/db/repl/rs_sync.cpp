@@ -260,8 +260,6 @@ namespace repl {
                 return;
             }
 
-            fassert(16113, !Lock::isLocked());
-
             try {
                 _syncThread();
             }

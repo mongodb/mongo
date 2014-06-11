@@ -144,7 +144,7 @@ namespace repl {
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
         }
-        fassert(18507, cbh.getStatus());
+        fassert(18508, cbh.getStatus());
         _replExecutor->wait(cbh.getValue());
         return result;
     }

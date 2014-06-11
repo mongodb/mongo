@@ -825,7 +825,7 @@ namespace mongo {
             
             {
                 Lock::DBWrite writeLk(txn->lockState(), ns);
-                shardingState.splitChunk( ns , min , max , splitKeys , maxVersion );
+                shardingState.splitChunk(txn, ns, min, max, splitKeys, maxVersion);
             }
 
             //

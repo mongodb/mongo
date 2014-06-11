@@ -229,7 +229,6 @@ namespace repl {
                     // the inference here is basically if the batch is really small, we are 
                     // "caught up".
                     //
-                    dassert( !Lock::isLocked() );
                     sleepmillis(SleepToAllowBatchingMillis);
                 }
   

@@ -30,6 +30,7 @@
 
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/dbwebserver.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/stats/snapshots.h"
 #include "mongo/util/mongoutils/html.h"
 
@@ -44,13 +45,13 @@ namespace {
         WriteLockStatus() : WebStatusPlugin( "write lock" , 51 , "% time in write lock, by 4 sec periods" ) {}
         virtual void init() {}
 
-        virtual void run( stringstream& ss ) {
+        virtual void run(OperationContext* txn, stringstream& ss) {
             statsSnapshots.outputLockInfoHTML( ss );
 
             ss << "<a "
                "href=\"http://dochub.mongodb.org/core/concurrency\" "
                "title=\"snapshot: was the db in the write lock when this page was generated?\">";
-            ss << "write locked now:</a> " << (Lock::isW() ? "true" : "false") << "\n";
+            ss << "write locked now:</a> " << (txn->lockState()->isW() ? "true" : "false") << "\n";
         }
 
     } writeLockStatus;
@@ -91,7 +92,7 @@ namespace {
             ss << "</tr>\n";
         }
 
-        void run( stringstream& ss ) {
+        void run(OperationContext* txn, stringstream& ss) {
             auto_ptr<SnapshotDelta> delta = statsSnapshots.computeDelta();
             if ( ! delta.get() )
                 return;

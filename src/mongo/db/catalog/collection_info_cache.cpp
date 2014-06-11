@@ -46,7 +46,6 @@ namespace mongo {
           _querySettings(new QuerySettings()) { }
 
     void CollectionInfoCache::reset() {
-        Lock::assertWriteLocked( _collection->ns().ns() );
         LOG(1) << _collection->ns().ns() << ": clearing plan cache - collection info cache reset";
         clearQueryCache();
         _keysComputed = false;
@@ -55,8 +54,6 @@ namespace mongo {
     }
 
     void CollectionInfoCache::computeIndexKeys() {
-        DEV Lock::assertWriteLocked( _collection->ns().ns() );
-
         _indexedPaths.clear();
 
         IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator( true );

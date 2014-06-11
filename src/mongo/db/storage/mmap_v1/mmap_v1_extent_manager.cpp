@@ -87,6 +87,10 @@ namespace mongo {
             auto_ptr<DataFile> df( new DataFile(n) );
 
             Status s = df->openExisting( txn, fullNameString.c_str() );
+
+            // openExisting may upgrade the files, so make sure to commit its changes
+            txn->recoveryUnit()->commitIfNeeded(true);
+
             if ( !s.isOK() ) {
                 return s;
             }
@@ -103,11 +107,9 @@ namespace mongo {
     }
 
     const DataFile* MmapV1ExtentManager::_getOpenFile( int n ) const {
-        verify(this);
-        DEV Lock::assertAtLeastReadLocked( _dbname );
         if ( n < 0 || n >= static_cast<int>(_files.size()) )
             log() << "uh oh: " << n;
-        verify( n >= 0 && n < static_cast<int>(_files.size()) );
+        invariant(n >= 0 && n < static_cast<int>(_files.size()));
         return _files[n];
     }
 
@@ -118,7 +120,7 @@ namespace mongo {
                                       int sizeNeeded ,
                                       bool preallocateOnly) {
         verify(this);
-        DEV Lock::assertAtLeastReadLocked( _dbname );
+        DEV txn->lockState()->assertAtLeastReadLocked( _dbname );
 
         if ( n < 0 || n >= DiskLoc::MaxFiles ) {
             log() << "getFile(): n=" << n << endl;
@@ -145,7 +147,7 @@ namespace mongo {
         }
         if ( p == 0 ) {
             if ( n == 0 ) audit::logCreateDatabase( currentClient.get(), _dbname );
-            DEV Lock::assertWriteLocked( _dbname );
+            DEV txn->lockState()->assertWriteLocked( _dbname );
             boost::filesystem::path fullName = fileName( n );
             string fullNameString = fullName.string();
             p = new DataFile(n);
@@ -177,7 +179,7 @@ namespace mongo {
     DataFile* MmapV1ExtentManager::_addAFile( OperationContext* txn,
                                         int sizeNeeded,
                                         bool preallocateNextFile ) {
-        DEV Lock::assertWriteLocked( _dbname );
+        DEV txn->lockState()->assertWriteLocked(_dbname);
         int n = (int) _files.size();
         DataFile *ret = getFile( txn, n, sizeNeeded );
         if ( preallocateNextFile )
@@ -194,14 +196,6 @@ namespace mongo {
         for ( int n = 0; boost::filesystem::exists( fileName(n) ); n++)
             size += boost::filesystem::file_size( fileName(n) );
         return size;
-    }
-
-    void MmapV1ExtentManager::flushFiles( bool sync ) {
-        DEV Lock::assertAtLeastReadLocked( _dbname );
-        for( vector<DataFile*>::iterator i = _files.begin(); i != _files.end(); i++ ) {
-            DataFile *f = *i;
-            f->flush(sync);
-        }
     }
 
     Record* MmapV1ExtentManager::recordForV1( const DiskLoc& loc ) const {

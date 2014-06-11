@@ -152,7 +152,11 @@ namespace mongo {
          * @param min max the chunk to eliminate from the current metadata
          * @param version at which the new metadata should be at
          */
-        void donateChunk( const std::string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version );
+        void donateChunk(OperationContext* txn,
+                         const std::string& ns,
+                         const BSONObj& min,
+                         const BSONObj& max,
+                         ChunkVersion version);
 
         /**
          * Creates and installs new chunk metadata for a given collection by reclaiming a previously
@@ -168,7 +172,9 @@ namespace mongo {
          * @param ns the collection
          * @param prevMetadata the previous metadata before we donated a chunk
          */
-        void undoDonateChunk( const std::string& ns, CollectionMetadataPtr prevMetadata );
+        void undoDonateChunk(OperationContext* txn,
+                             const std::string& ns,
+                             CollectionMetadataPtr prevMetadata);
 
         /**
          * Remembers a chunk range between 'min' and 'max' as a range which will have data migrated
@@ -179,7 +185,8 @@ namespace mongo {
          *
          * @return false with errMsg if the range is owned by this shard
          */
-        bool notePending( const std::string& ns,
+        bool notePending(OperationContext* txn,
+                          const std::string& ns,
                           const BSONObj& min,
                           const BSONObj& max,
                           const OID& epoch,
@@ -197,7 +204,8 @@ namespace mongo {
          * @return false with errMsg if the range is owned by the shard or the epoch of the metadata
          * has changed
          */
-        bool forgetPending( const std::string& ns,
+        bool forgetPending(OperationContext* txn,
+                            const std::string& ns,
                             const BSONObj& min,
                             const BSONObj& max,
                             const OID& epoch,
@@ -216,8 +224,12 @@ namespace mongo {
          * @param splitKeys point in which to split
          * @param version at which the new metadata should be at
          */
-        void splitChunk( const std::string& ns , const BSONObj& min , const BSONObj& max , const std::vector<BSONObj>& splitKeys ,
-                         ChunkVersion version );
+        void splitChunk(OperationContext* txn, 
+                        const std::string& ns,
+                        const BSONObj& min,
+                        const BSONObj& max,
+                        const std::vector<BSONObj>& splitKeys,
+                        ChunkVersion version );
 
         /**
          * Creates and installs a new chunk metadata for a given collection by merging a range of
@@ -232,7 +244,8 @@ namespace mongo {
          * @param minKey maxKey the range which should be merged
          * @param newShardVersion the shard version the newly merged chunk should have
          */
-        void mergeChunks( const std::string& ns,
+        void mergeChunks(OperationContext* txn,
+                          const std::string& ns,
                           const BSONObj& minKey,
                           const BSONObj& maxKey,
                           ChunkVersion mergedVersion );

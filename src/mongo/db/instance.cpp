@@ -546,10 +546,10 @@ namespace mongo {
         // XXX? - Do we need to close database under global lock or just DB-lock is sufficient ?
         invariant(txn->lockState()->isW());
 
-        Database* database = dbHolder().get(db, path);
+        Database* database = dbHolder().get(txn, db, path);
         invariant(database != NULL);
 
-        repl::oplogCheckCloseDatabase(database); // oplog caches some things, dirty its caches
+        repl::oplogCheckCloseDatabase(txn, database); // oplog caches some things, dirty its caches
 
         if( BackgroundOperation::inProgForDb(db) ) {
             log() << "warning: bg op in prog during close db? " << db << endl;
@@ -559,7 +559,12 @@ namespace mongo {
         string prefix(db);
         prefix += '.';
 
-        dbHolder().erase(db, path);
+        // Before the files are closed, flush any potentially outstanding changes, which might
+        // reference this database. Otherwise we will assert when subsequent commit if needed
+        // is called and it happens to have write intents for the removed files.
+        txn->recoveryUnit()->commitIfNeeded(true);
+
+        dbHolder().erase(txn, db, path);
         delete database; // closes files
     }
 

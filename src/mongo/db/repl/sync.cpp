@@ -106,7 +106,7 @@ namespace repl {
     }
 
     bool Sync::shouldRetry(OperationContext* txn, const BSONObj& o) {
-        invariant(txn->lockState()->hasAnyWriteLock());
+        invariant(txn->lockState()->isWriteLocked());
 
         // should already have write lock
         const char *ns = o.getStringField("ns");

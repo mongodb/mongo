@@ -62,10 +62,6 @@ namespace mongo {
         return _threadState == 'r' || _threadState == 'R';
     }
 
-    bool LockState::hasAnyWriteLock() const { 
-        return _threadState == 'w' || _threadState == 'W';
-    }
-
     bool LockState::isLocked( const StringData& ns ) const {
         char db[MaxDatabaseNameLen];
         nsToDatabase(ns, db);
@@ -112,8 +108,25 @@ namespace mongo {
         return threadState() == 'R' || threadState() == 'W';
     }
 
-    bool LockState::isNested() const {
+    bool LockState::isRecursive() const {
         return recursiveCount() > 1;
+    }
+
+    void LockState::assertWriteLocked(const StringData& ns) const {
+        if (!isWriteLocked(ns)) {
+            dump();
+            msgasserted(
+                16105, mongoutils::str::stream() << "expected to be write locked for " << ns);
+        }
+    }
+
+    void LockState::assertAtLeastReadLocked(const StringData& ns) const {
+        if (!isAtLeastReadLocked(ns)) {
+            log() << "error expected " << ns << " to be locked " << endl;
+            dump();
+            msgasserted(
+                16104, mongoutils::str::stream() << "expected to be read locked for " << ns);
+        }
     }
 
     void LockState::lockedStart( char newState ) {
@@ -176,7 +189,7 @@ namespace mongo {
         res.append( "waitingForLock" , _lockPending );
     }
 
-    void LockState::dump() {
+    void LockState::dump() const {
         char s = _threadState;
         stringstream ss;
         ss << "lock status: ";

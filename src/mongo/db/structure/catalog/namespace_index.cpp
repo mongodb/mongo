@@ -65,14 +65,14 @@ namespace mongo {
     void NamespaceIndex::add_ns( OperationContext* txn,
                                  const Namespace& ns, const NamespaceDetails* details ) {
         string nsString = ns.toString();
-        Lock::assertWriteLocked( nsString );
+        txn->lockState()->assertWriteLocked( nsString );
         massert( 17315, "no . in ns", nsString.find( '.' ) != string::npos );
         init( txn );
         uassert( 10081, "too many namespaces/collections", _ht->put(txn, ns, *details));
     }
 
     void NamespaceIndex::kill_ns( OperationContext* txn, const StringData& ns) {
-        Lock::assertWriteLocked(ns);
+        txn->lockState()->assertWriteLocked(ns);
         if ( !_ht.get() )
             return;
         Namespace n(ns);
@@ -132,7 +132,7 @@ namespace mongo {
     NOINLINE_DECL void NamespaceIndex::_init( OperationContext* txn ) {
         verify( !_ht.get() );
 
-        Lock::assertWriteLocked(_database);
+        txn->lockState()->assertWriteLocked(_database);
 
         /* if someone manually deleted the datafiles for a database,
            we need to be sure to clear any cached info for the database in

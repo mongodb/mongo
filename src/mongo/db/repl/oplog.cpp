@@ -83,8 +83,9 @@ namespace repl {
         newOptimeNotifier.notify_all();
     }
 
-    void oplogCheckCloseDatabase( Database* db ) {
-        verify( Lock::isW() );
+    void oplogCheckCloseDatabase(OperationContext* txn, Database* db) {
+        invariant(txn->lockState()->isW());
+
         localDB = NULL;
         localOplogMainCollection = NULL;
         localOplogRSCollection = NULL;
@@ -542,7 +543,7 @@ namespace repl {
 
         bool valueB = fieldB.booleanSafe();
 
-        Lock::assertWriteLocked(ns);
+        txn->lockState()->assertWriteLocked(ns);
 
         Collection* collection = db->getCollection( txn, ns );
         IndexCatalog* indexCatalog = collection == NULL ? NULL : collection->getIndexCatalog();

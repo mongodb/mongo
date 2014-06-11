@@ -53,7 +53,7 @@ namespace repl {
 
     void TopologyCoordinatorMock::signalDrainComplete()  {}
 
-    void TopologyCoordinatorMock::relinquishPrimary() {}
+    void TopologyCoordinatorMock::relinquishPrimary(OperationContext* txn) {}
 
     bool TopologyCoordinatorMock::prepareRequestVoteResponse(const BSONObj& cmdObj,
                                                              std::string& errmsg,

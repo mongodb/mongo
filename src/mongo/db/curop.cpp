@@ -162,7 +162,7 @@ namespace mongo {
         if ( _client ) {
             const LockState& ls = _client->lockState();
             verify( ls.threadState() );
-            Top::global.record( _ns , _op , ls.hasAnyWriteLock() ? 1 : -1 , micros , _isCommand );
+            Top::global.record( _ns , _op , ls.isWriteLocked() ? 1 : -1 , micros , _isCommand );
         }
     }
 

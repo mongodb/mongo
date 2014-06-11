@@ -195,9 +195,9 @@ namespace ThreadedTests {
                             char what = 'r';
                             Lock::DBRead r(&lockState, "foo");
                             ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("foo"));
-                            ASSERT( !lockState.isNested() );
+                            ASSERT(!lockState.isRecursive());
                             Lock::DBRead r2(&lockState, "foo");
-                            ASSERT(lockState.isNested());
+                            ASSERT(lockState.isRecursive());
                             ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("foo"));
                             Lock::DBRead r3(&lockState, "local");
                             if( sometimes ) {

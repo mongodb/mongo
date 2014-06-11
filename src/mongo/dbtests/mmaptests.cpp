@@ -58,7 +58,8 @@ namespace MMapTests {
             try { boost::filesystem::remove(fn); }
             catch(...) { }
 
-            Lock::GlobalWrite lk(&cc().lockState());
+            LockState lockState;
+            Lock::GlobalWrite lk(&lockState);
 
             {
                 DurableMappedFile f;

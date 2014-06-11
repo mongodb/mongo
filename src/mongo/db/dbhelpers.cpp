@@ -130,7 +130,7 @@ namespace mongo {
                            BSONObj& result,
                            bool* nsFound,
                            bool* indexFound) {
-        Lock::assertAtLeastReadLocked(ns);
+        txn->lockState()->assertAtLeastReadLocked(ns);
         invariant( database );
 
         Collection* collection = database->getCollection( txn, ns );
@@ -434,7 +434,7 @@ namespace mongo {
                 millisWaitingForReplication += secondaryThrottleTime.millis();
             }
             
-            if ( ! Lock::isLocked() ) {
+            if (!txn->lockState()->isLocked()) {
                 int micros = ( 2 * Client::recommendedYieldMicros() ) - secondaryThrottleTime.micros();
                 if ( micros > 0 ) {
                     LOG(1) << "Helpers::removeRangeUnlocked going to sleep for " << micros << " micros" << endl;

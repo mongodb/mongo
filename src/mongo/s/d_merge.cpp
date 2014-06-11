@@ -293,7 +293,7 @@ namespace mongo {
         {
             OperationContextImpl txn; // XXX?
             Lock::DBWrite writeLk(txn.lockState(), nss.ns());
-            shardingState.mergeChunks( nss.ns(), minKey, maxKey, mergeVersion );
+            shardingState.mergeChunks(&txn, nss.ns(), minKey, maxKey, mergeVersion);
         }
 
         //

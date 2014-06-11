@@ -232,7 +232,6 @@ namespace mongo {
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
 #if defined(__sunos__) // SERVER-8795
-        verify( Lock::isW() );
         LockMongoFilesExclusive lockMongoFiles;
 #endif
 

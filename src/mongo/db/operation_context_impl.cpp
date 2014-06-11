@@ -116,7 +116,7 @@ namespace mongo {
     void OperationContextImpl::checkForInterrupt(bool heedMutex) const {
         Client& c = cc();
 
-        if (heedMutex && Lock::somethingWriteLocked() && c.hasWrittenSinceCheckpoint()) {
+        if (heedMutex && lockState()->isWriteLocked() && c.hasWrittenSinceCheckpoint()) {
             return;
         }
 

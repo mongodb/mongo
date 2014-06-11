@@ -47,7 +47,6 @@ namespace mongo {
     public:
         DurableMappedFile();
         virtual ~DurableMappedFile();
-        virtual void close();
 
         /** @return true if opened ok. */
         bool open(const std::string& fname, bool sequentialHint /*typically we open with this false*/);

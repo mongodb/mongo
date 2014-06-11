@@ -146,7 +146,8 @@ namespace mongo {
         friend class CollectionCursorCache;
 
         /**
-         * Initialization common between both constructors for the ClientCursor.
+         * Initialization common between both constructors for the ClientCursor. The database must
+         * be stable when this is called, because cursors hang off the collection.
          */
         void init();
 

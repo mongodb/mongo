@@ -421,8 +421,8 @@ namespace repl {
 
         bool warn = false;
 
-        verify(!fixUpInfo.commonPointOurDiskloc.isNull());
-        verify(Lock::isW());
+        invariant(!fixUpInfo.commonPointOurDiskloc.isNull());
+        invariant(txn->lockState()->isW());
 
         // we have items we are writing that aren't from a point-in-time.  thus best not to come
         // online until we get to that point in freshness.

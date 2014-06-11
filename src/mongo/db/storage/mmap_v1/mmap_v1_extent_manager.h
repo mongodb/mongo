@@ -94,8 +94,6 @@ namespace mongo {
                            int sizeNeeded = 0,
                            bool preallocateOnly = false );
 
-        void flushFiles( bool sync );
-
         // must call Extent::reuse on the returned extent
         DiskLoc allocateExtent( OperationContext* txn,
                                 bool capped,

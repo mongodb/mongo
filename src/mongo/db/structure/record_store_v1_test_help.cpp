@@ -214,9 +214,6 @@ namespace mongo {
         return -1;
     }
 
-    void DummyExtentManager::flushFiles( bool sync ) {
-    }
-
     DiskLoc DummyExtentManager::allocateExtent( OperationContext* txn,
                                                 bool capped,
                                                 int size,

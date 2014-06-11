@@ -62,9 +62,7 @@ namespace mongo {
     }
 
     Database::~Database() {
-        verify( Lock::isW() );
-
-        for ( CollectionMap::const_iterator i = _collections.begin(); i != _collections.end(); ++i )
+        for (CollectionMap::const_iterator i = _collections.begin(); i != _collections.end(); ++i)
             delete i->second;
     }
 
@@ -104,8 +102,8 @@ namespace mongo {
     }
 
     Database::Database(OperationContext* txn, const char *nm, bool& newDb, const string& path )
-        : _name(nm), _path(path),
-          _dbEntry(new MMAP1DatabaseCatalogEntry( txn, _name, _path, storageGlobalParams.directoryperdb) ),
+        : _name(nm),
+          _path(path),
           _profileName(_name + ".system.profile"),
           _namespacesName(_name + ".system.namespaces"),
           _indexesName(_name + ".system.indexes"),
@@ -116,6 +114,9 @@ namespace mongo {
             warning() << "tried to open invalid db: " << _name << endl;
             uasserted( 10028, status.toString() );
         }
+
+        _dbEntry.reset(new MMAP1DatabaseCatalogEntry(
+                                txn, _name, _path, storageGlobalParams.directoryperdb));
 
         _profile = serverGlobalParams.defaultProfile;
         newDb = !_dbEntry->exists();
@@ -158,7 +159,7 @@ namespace mongo {
 
     void Database::clearTmpCollections(OperationContext* txn) {
 
-        Lock::assertWriteLocked( _name );
+        txn->lockState()->assertWriteLocked( _name );
 
         // Note: we build up a toDelete vector rather than dropping the collection inside the loop
         // to avoid modifying the system.namespaces collection while iterating over it since that

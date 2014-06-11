@@ -293,7 +293,7 @@ namespace mongo {
 
             doUnlockedStuff(ss);
 
-            WebStatusPlugin::runAll( ss );
+            WebStatusPlugin::runAll(txn.get(), ss);
 
             ss << "</body></html>\n";
             responseMsg = ss.str();
@@ -334,7 +334,7 @@ namespace mongo {
             (*_plugins)[i]->init();
     }
 
-    void WebStatusPlugin::runAll( stringstream& ss ) {
+    void WebStatusPlugin::runAll(OperationContext* txn, stringstream& ss) {
         if ( ! _plugins )
             return;
 
@@ -347,7 +347,7 @@ namespace mongo {
 
             ss << "<br>\n";
 
-            p->run(ss);
+            p->run(txn, ss);
         }
 
     }
@@ -364,7 +364,7 @@ namespace mongo {
 
         virtual void init() {}
 
-        virtual void run( stringstream& ss ) {
+        virtual void run(OperationContext* txn, stringstream& ss ) {
             _log->toHTML( ss );
         }
         RamLog * _log;

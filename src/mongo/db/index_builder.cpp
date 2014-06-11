@@ -58,7 +58,7 @@ namespace mongo {
         OperationContextImpl txn;
 
         Client::initThread(name().c_str());
-        Lock::ParallelBatchWriterMode::iAmABatchParticipant();
+        Lock::ParallelBatchWriterMode::iAmABatchParticipant(txn.lockState());
 
         repl::replLocalAuth();
 
@@ -66,7 +66,7 @@ namespace mongo {
         NamespaceString ns(_index["ns"].String());
         Client::WriteContext ctx(&txn, ns.getSystemIndexesCollection());
 
-        Database* db = dbHolder().get(ns.db().toString(), storageGlobalParams.dbpath);
+        Database* db = dbHolder().get(&txn, ns.db().toString(), storageGlobalParams.dbpath);
 
         Status status = build(&txn, db);
         if ( !status.isOK() ) {

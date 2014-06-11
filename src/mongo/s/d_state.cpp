@@ -185,9 +185,13 @@ namespace mongo {
         }
     }
 
-    void ShardingState::donateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version ) {
+    void ShardingState::donateChunk(OperationContext* txn,
+                                    const string& ns,
+                                    const BSONObj& min,
+                                    const BSONObj& max,
+                                    ChunkVersion version) {
         
-        Lock::assertWriteLocked( ns );
+        txn->lockState()->assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -213,9 +217,11 @@ namespace mongo {
         _collMetadata[ns] = cloned;
     }
 
-    void ShardingState::undoDonateChunk( const string& ns, CollectionMetadataPtr prevMetadata ) {
+    void ShardingState::undoDonateChunk(OperationContext* txn,
+                                        const string& ns,
+                                        CollectionMetadataPtr prevMetadata) {
         
-        Lock::assertWriteLocked( ns );        
+        txn->lockState()->assertWriteLocked( ns );        
         scoped_lock lk( _mutex );
         
         log() << "ShardingState::undoDonateChunk acquired _mutex" << endl;
@@ -225,13 +231,14 @@ namespace mongo {
         it->second = prevMetadata;
     }
 
-    bool ShardingState::notePending( const string& ns,
+    bool ShardingState::notePending(OperationContext* txn,
+                                     const string& ns,
                                      const BSONObj& min,
                                      const BSONObj& max,
                                      const OID& epoch,
                                      string* errMsg ) {
         
-        Lock::assertWriteLocked( ns );
+        txn->lockState()->assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -269,13 +276,14 @@ namespace mongo {
         return true;
     }
 
-    bool ShardingState::forgetPending( const string& ns,
+    bool ShardingState::forgetPending(OperationContext* txn,
+                                       const string& ns,
                                        const BSONObj& min,
                                        const BSONObj& max,
                                        const OID& epoch,
                                        string* errMsg ) {
         
-        Lock::assertWriteLocked( ns );
+        txn->lockState()->assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -313,13 +321,14 @@ namespace mongo {
         return true;
     }
 
-    void ShardingState::splitChunk( const string& ns,
+    void ShardingState::splitChunk(OperationContext* txn,
+                                    const string& ns,
                                     const BSONObj& min,
                                     const BSONObj& max,
                                     const vector<BSONObj>& splitKeys,
                                     ChunkVersion version ) {
         
-        Lock::assertWriteLocked( ns );
+        txn->lockState()->assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -337,12 +346,13 @@ namespace mongo {
         _collMetadata[ns] = cloned;
     }
 
-    void ShardingState::mergeChunks( const string& ns,
+    void ShardingState::mergeChunks(OperationContext* txn,
+                                     const string& ns,
                                      const BSONObj& minKey,
                                      const BSONObj& maxKey,
                                      ChunkVersion mergedVersion ) {
 
-        Lock::assertWriteLocked( ns );
+        txn->lockState()->assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );

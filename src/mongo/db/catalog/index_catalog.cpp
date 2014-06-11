@@ -276,7 +276,7 @@ namespace mongo {
                                       BSONObj spec,
                                       bool mayInterrupt,
                                       ShutdownBehavior shutdownBehavior ) {
-        Lock::assertWriteLocked( _collection->_database->name() );
+        txn->lockState()->assertWriteLocked( _collection->_database->name() );
 
         _checkMagic();
         Status status = _checkUnfinished();
@@ -640,7 +640,7 @@ namespace mongo {
     Status IndexCatalog::dropAllIndexes(OperationContext* txn,
                                         bool includingIdIndex) {
 
-        Lock::assertWriteLocked( _collection->_database->name() );
+        txn->lockState()->assertWriteLocked( _collection->_database->name() );
 
         BackgroundOperation::assertNoBgOpInProgForNs( _collection->ns().ns() );
 
@@ -724,7 +724,7 @@ namespace mongo {
     Status IndexCatalog::dropIndex(OperationContext* txn,
                                    IndexDescriptor* desc ) {
 
-        Lock::assertWriteLocked( _collection->_database->name() );
+        txn->lockState()->assertWriteLocked( _collection->_database->name() );
         IndexCatalogEntry* entry = _entries.find( desc );
 
         if ( !entry )
@@ -1170,7 +1170,6 @@ namespace mongo {
 
     std::vector<BSONObj> 
     IndexCatalog::killMatchingIndexBuilds(const IndexCatalog::IndexKillCriteria& criteria) {
-        verify(Lock::somethingWriteLocked());
         std::vector<BSONObj> indexes;
         for (InProgressIndexesMap::iterator it = _inProgressIndexes.begin();
              it != _inProgressIndexes.end();

@@ -128,7 +128,7 @@ namespace mongo {
                 // a DBWrite on the namespace creates a nested lock, and yields are disallowed for
                 // operations that hold a nested lock.
                 Lock::DBWrite lk(txn->lockState(), ns);
-                invariant(Lock::nested());
+                invariant(txn->lockState()->isRecursive());
 
                 Client::Context ctx(ns);
                 bool failed = repl::applyOperation_inlock(txn,

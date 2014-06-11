@@ -28,6 +28,7 @@
 
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 
 // Remove once we are ready to enable
@@ -153,6 +154,8 @@ namespace mongo {
         _hasWrittenSinceCheckpoint = true;
         return data;
 #else
+        invariant(_txn->lockState()->isWriteLocked());
+
         _hasWrittenSinceCheckpoint = true;
         return getDur().writingPtr(data, len);
 #endif

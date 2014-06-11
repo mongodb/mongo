@@ -73,8 +73,6 @@ namespace mongo {
         virtual size_t numFiles() const = 0;
         virtual long long fileSize() const = 0;
 
-        virtual void flushFiles( bool sync ) = 0;
-
         // must call Extent::reuse on the returned extent
         virtual DiskLoc allocateExtent( OperationContext* txn,
                                         bool capped,

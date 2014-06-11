@@ -453,8 +453,6 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-        verify( Lock::isW() );
-
         LockMongoFilesExclusive lockMongoFiles;
 
         clearWritableBits(oldPrivateAddr);

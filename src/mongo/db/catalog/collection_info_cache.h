@@ -50,7 +50,7 @@ namespace mongo {
         CollectionInfoCache( Collection* collection );
 
         /*
-         * resets entire cache state
+         * Resets entire cache state. Must be called under exclusive DB lock.
          */
         void reset();
 
@@ -106,6 +106,9 @@ namespace mongo {
         // Includes index filters.
         boost::scoped_ptr<QuerySettings> _querySettings;
 
+        /**
+         * Must be called under exclusive DB lock.
+         */
         void computeIndexKeys();
     };
 

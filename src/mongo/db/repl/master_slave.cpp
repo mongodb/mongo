@@ -440,7 +440,7 @@ namespace repl {
                                             const char* ns,
                                             const char* db ) {
         // We are already locked at this point
-        if (dbHolder()._isLoaded(ns, storageGlobalParams.dbpath)) {
+        if (dbHolder().get(txn, ns, storageGlobalParams.dbpath) != NULL) {
             // Database is already present.
             return true;   
         }
@@ -1256,8 +1256,6 @@ namespace repl {
     int _dummy_z;
 
     void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
-        DEV verify( ! Lock::isW() );
-
         Client *c = currentClient.get();
         if( c == 0 ) {
             Client::initThread("pretouchN");

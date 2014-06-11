@@ -88,7 +88,7 @@ namespace repl {
 
     // Flush out the cached pointers to the local database and oplog.
     // Used by the closeDatabase command to ensure we don't cache closed things.
-    void oplogCheckCloseDatabase( Database * db );
+    void oplogCheckCloseDatabase(OperationContext* txn, Database * db);
 
     /**
      * take an op and apply locally

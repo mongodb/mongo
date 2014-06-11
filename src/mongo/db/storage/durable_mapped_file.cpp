@@ -175,40 +175,24 @@ namespace mongo {
         _view_write = _view_private = 0;
     }
 
-    DurableMappedFile::~DurableMappedFile() {
-        try { 
-            close();
-        }
-        catch(...) { error() << "exception in ~DurableMappedFile" << endl; }
-    }
-
     namespace dur {
         void closingFileNotification();
     }
 
-    /*virtual*/ void DurableMappedFile::close() {
-        LOG(3) << "mmf close " << filename() << endl;
+    DurableMappedFile::~DurableMappedFile() {
+        try { 
+            LOG(3) << "mmf close " << filename() << endl;
 
-        if( view_write() /*actually was opened*/ ) {
-            if (storageGlobalParams.dur) {
+            // Only notifiy the durability system if the file was actually opened
+            if (view_write()) {
                 dur::closingFileNotification();
             }
-            /* todo: is it ok to close files if we are not globally locked exclusively?
-                     probably, but need to review. also note the lock assert below is
-                     rather vague and not checking if the right database is locked 
-            */
-            if( !Lock::somethingWriteLocked() ) { 
-                verify( inShutdown() );
-                DEV { 
-                    log() << "is it really ok to close a mongommf outside a write lock? file:" << filename() << endl;
-                }
-            }
+
+            LockMongoFilesExclusive lk;
+            privateViews.remove(_view_private);
+            _view_write = _view_private = 0;
+            MemoryMappedFile::close();
         }
-
-        LockMongoFilesExclusive lk;
-        privateViews.remove(_view_private);
-        _view_write = _view_private = 0;
-        MemoryMappedFile::close();
+        catch(...) { error() << "exception in ~DurableMappedFile" << endl; }
     }
-
 }

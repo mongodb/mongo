@@ -295,7 +295,7 @@ namespace mongo {
             ss << "</pre>\n";
         }
 
-        virtual void run( stringstream& ss ) {
+        virtual void run(OperationContext* txn, stringstream& ss ) {
             Timer t;
             LockState lockState;
             readlocktry lk(&lockState, 300);

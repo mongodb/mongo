@@ -38,6 +38,9 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+    class OperationContext;
+
 namespace repl {
 
     class TopologyCoordinatorImpl : public TopologyCoordinator {
@@ -88,7 +91,7 @@ namespace repl {
         virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
 
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
-        virtual void relinquishPrimary();
+        virtual void relinquishPrimary(OperationContext* txn);
 
     private:
 

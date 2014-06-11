@@ -89,7 +89,7 @@ namespace mongo {
                                                            const StringData& ns,
                                                            NamespaceIndex& ni,
                                                            int nindexessofar) {
-        Lock::assertWriteLocked(ns);
+        txn->lockState()->assertWriteLocked(ns);
 
         int i = (nindexessofar - NIndexesBase) / NIndexesExtra;
         verify( i >= 0 && i <= 1 );

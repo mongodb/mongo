@@ -151,7 +151,7 @@ namespace mongo {
             ASSERT_LESS_THAN( estSizeBytes, maxSizeBytes );
 
             Database* db = dbHolder().get(
-                                    nsToDatabase(range.ns), storageGlobalParams.dbpath);
+                                    &txn, nsToDatabase(range.ns), storageGlobalParams.dbpath);
             const Collection* collection = db->getCollection(&txn, ns);
 
             // Make sure all the disklocs actually correspond to the right info

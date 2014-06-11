@@ -192,7 +192,7 @@ namespace mongo {
                 OperationContext* txn, const string& ns, bool doVersion) {
         {
             _lk.reset(new Lock::DBRead(txn->lockState(), ns));
-            Database *db = dbHolder().get(ns, storageGlobalParams.dbpath);
+            Database *db = dbHolder().get(txn, ns, storageGlobalParams.dbpath);
             if( db ) {
                 _c.reset(new Context(storageGlobalParams.dbpath, ns, db, doVersion));
                 return;
@@ -202,12 +202,12 @@ namespace mongo {
         // we usually don't get here, so doesn't matter how fast this part is
         {
             DEV log() << "_DEBUG ReadContext db wasn't open, will try to open " << ns << endl;
-            if( Lock::isW() ) { 
+            if (txn->lockState()->isW()) {
                 // write locked already
                 DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
                 _c.reset(new Context(ns, storageGlobalParams.dbpath, doVersion));
             }
-            else if( !Lock::nested() ) { 
+            else if (!txn->lockState()->isRecursive()) {
                 _lk.reset(0);
                 {
                     Lock::GlobalWrite w(txn->lockState());
@@ -376,7 +376,7 @@ namespace mongo {
                 Client* c = *i;
                 if ( c->lockState().hasLockPending() ) {
                     num++;
-                    if ( c->lockState().hasAnyWriteLock() )
+                    if ( c->lockState().isWriteLocked() )
                         w++;
                     else
                         r++;
@@ -409,7 +409,7 @@ namespace mongo {
             if ( ! c->curop()->active() )
                 continue;
 
-            if ( c->lockState().hasAnyWriteLock() )
+            if ( c->lockState().isWriteLocked() )
                 writers++;
             if ( c->lockState().hasAnyReadLock() )
                 readers++;
