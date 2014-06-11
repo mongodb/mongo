@@ -36,7 +36,7 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/util/background.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -194,8 +194,11 @@ namespace repl {
         }
 
         bool replicatedToNum(OpTime& op, int w) {
-            massert( ErrorCodes::NotMaster,
-                     "replicatedToNum called but not master anymore", _isMaster() );
+            massert(ErrorCodes::NotMaster,
+                    "replicatedToNum called but not master anymore",
+                    getGlobalReplicationCoordinator()->getReplicationMode() !=
+                            ReplicationCoordinator::modeReplSet ||
+                            getGlobalReplicationCoordinator()->getCurrentMemberState().primary());
 
             if ( w <= 1 )
                 return true;
@@ -208,7 +211,10 @@ namespace repl {
         bool waitForReplication(OpTime& op, int w, int maxSecondsToWait) {
             static const int noLongerMasterAssertCode = ErrorCodes::NotMaster;
             massert(noLongerMasterAssertCode, 
-                    "waitForReplication called but not master anymore", _isMaster() );
+                    "waitForReplication called but not master anymore",
+                    getGlobalReplicationCoordinator()->getReplicationMode() != 
+                            ReplicationCoordinator::modeReplSet ||
+                            getGlobalReplicationCoordinator()->getCurrentMemberState().primary());
 
             if ( w <= 1 )
                 return true;
@@ -219,15 +225,20 @@ namespace repl {
             boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
             xt.sec += maxSecondsToWait;
             
+            ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
             scoped_lock mylk(_mutex);
             while ( ! _replicatedToNum_slaves_locked( op, w ) ) {
                 if ( ! _threadsWaitingForReplication.timed_wait( mylk.boost() , xt ) ) {
                     massert(noLongerMasterAssertCode,
-                            "waitForReplication called but not master anymore", _isMaster());
+                            "waitForReplication called but not master anymore",
+                            replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet
+                                    || replCoord->getCurrentMemberState().primary());
                     return false;
                 }
                 massert(noLongerMasterAssertCode, 
-                        "waitForReplication called but not master anymore", _isMaster());
+                        "waitForReplication called but not master anymore",
+                        replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet
+                                || replCoord->getCurrentMemberState().primary());
             }
             return true;
         }

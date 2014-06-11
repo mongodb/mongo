@@ -75,7 +75,6 @@
 #include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/new_find.h"
-#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/stats/counters.h"

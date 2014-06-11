@@ -39,7 +39,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"

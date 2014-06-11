@@ -77,6 +77,8 @@ namespace repl {
                                                    const Milliseconds& stepdownTime,
                                                    const Milliseconds& postStepdownWaitTime);
 
+        virtual bool isMasterForReportingPurposes();
+
         virtual bool canAcceptWritesForDatabase(const StringData& database);
 
         virtual bool canServeReadsFor(const NamespaceString& collection);

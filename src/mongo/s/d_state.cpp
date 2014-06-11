@@ -50,7 +50,6 @@
 #include "mongo/db/db.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/client/connpool.h"
 #include "mongo/s/chunk_version.h"
@@ -1004,21 +1003,22 @@ namespace mongo {
                 return true;
             }
 
-            // we can run on a slave up to here
-            if (!repl::_isMaster()) {
-                result.append( "errmsg" , "not master" );
-                result.append( "note" , "from post init in setShardVersion" );
-                return false;
-            }
-
-            // step 2
-            
             string ns = cmdObj["setShardVersion"].valuestrsafe();
             if ( ns.size() == 0 ) {
                 errmsg = "need to specify namespace";
                 return false;
             }
 
+
+            // we can run on a slave up to here
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                        NamespaceString(ns).db())) {
+                result.append( "errmsg" , "not master" );
+                result.append( "note" , "from post init in setShardVersion" );
+                return false;
+            }
+
+            // step 2
             if( ! ChunkVersion::canParseBSON( cmdObj, "version" ) ){
                 errmsg = "need to specify version";
                 return false;

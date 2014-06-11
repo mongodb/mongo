@@ -67,7 +67,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"

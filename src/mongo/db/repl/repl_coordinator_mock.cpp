@@ -87,6 +87,11 @@ namespace repl {
         return Status::OK();
     }
 
+    bool ReplicationCoordinatorMock::isMasterForReportingPurposes() {
+        // TODO
+        return true;
+    }
+
     bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(const StringData& dbName) {
         // TODO
         return true;

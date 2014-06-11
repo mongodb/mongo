@@ -33,7 +33,6 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
 #include "mongo/db/repl/repl_set_seed_list.h"
@@ -191,12 +190,64 @@ namespace {
         return Status::OK();
     }
 
-    bool LegacyReplicationCoordinator::canAcceptWritesForDatabase(const StringData& dbName) {
-        if (_isMaster())
+    bool LegacyReplicationCoordinator::isMasterForReportingPurposes() {
+        // we must check replSet since because getReplicationMode() isn't aware of modeReplSet
+        // until theReplSet is initialized
+        if (replSet) {
+            if (theReplSet && getCurrentMemberState().primary()) {
+                return true;
+            }
+            return false;
+        }
+
+        if (!replSettings.slave)
             return true;
-        if (dbName == "local")
+
+        if (replAllDead) {
+            return false;
+        }
+
+        if (replSettings.master) {
+            // if running with --master --slave, allow.
             return true;
+        }
+
+        //TODO: Investigate if this is needed/used, see SERVER-9188
+        if (cc().isGod()) {
+            return true;
+        }
+
         return false;
+    }
+
+    bool LegacyReplicationCoordinator::canAcceptWritesForDatabase(const StringData& dbName) {
+        // we must check replSet since because getReplicationMode() isn't aware of modeReplSet
+        // until theReplSet is initialized
+        if (replSet) {
+            if (theReplSet && getCurrentMemberState().primary()) {
+                return true;
+            }
+            return dbName == "local";
+        }
+
+        if (!replSettings.slave)
+            return true;
+
+        if (replAllDead) {
+            return dbName == "local";
+        }
+
+        if (replSettings.master) {
+            // if running with --master --slave, allow.
+            return true;
+        }
+
+        //TODO: Investigate if this is needed/used, see SERVER-9188
+        if (cc().isGod()) {
+            return true;
+        }
+
+        return dbName == "local";
     }
 
     bool LegacyReplicationCoordinator::canServeReadsFor(const NamespaceString& collection) {

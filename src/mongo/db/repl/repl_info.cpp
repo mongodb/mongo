@@ -34,10 +34,10 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
@@ -67,7 +67,8 @@ namespace repl {
             result.append("info", s);
         }
         else {
-            result.appendBool("ismaster", _isMaster() );
+            result.appendBool("ismaster",
+                              getGlobalReplicationCoordinator()->isMasterForReportingPurposes());
         }
         
         if ( level && replSet ) {

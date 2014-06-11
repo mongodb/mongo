@@ -95,6 +95,8 @@ namespace repl {
 
         /**
          * Returns a value indicating whether this node is a standalone, master/slave, or replicaset
+         * note: nodes are determined to be replicaset members by the presence of a replset config.
+         *       This means that nodes will appear to be standalone until a config is received.
          */
         virtual Mode getReplicationMode() const = 0;
 
@@ -152,9 +154,19 @@ namespace repl {
         // handle_t onReplication(OpTime ts, writeConcern, callbackFunction); // TODO
 
         /**
+         * Returns true if the node can be considered master for the purpose of introspective
+         * commands such as isMaster() and rs.status().
+         */
+        virtual bool isMasterForReportingPurposes() = 0;
+
+        /**
          * Returns true if it is valid for this node to accept writes on the given database.
          * Currently this is true only if this node is Primary, master in master/slave,
          * a standalone, or is writing to the local database.
+         *
+         * If a node was started with the replSet argument, but has not yet received a config, it
+         * will not be able to receive writes to a database other than local (it will not be treated
+         * as standalone node).
          */
         virtual bool canAcceptWritesForDatabase(const StringData& dbName) = 0;
 

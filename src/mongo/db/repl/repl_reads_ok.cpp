@@ -30,7 +30,6 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"

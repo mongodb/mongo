@@ -44,7 +44,6 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/range_preserver.h"

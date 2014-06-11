@@ -126,6 +126,11 @@ namespace repl {
         return Status::OK();
     }
 
+    bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
+        // TODO
+        return false;
+    }
+
     bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(const StringData& collection) {
         // TODO
         return false;

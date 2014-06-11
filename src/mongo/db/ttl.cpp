@@ -41,7 +41,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/operation_context_impl.h"
