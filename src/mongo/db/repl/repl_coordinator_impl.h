@@ -92,7 +92,7 @@ namespace repl {
     private:
 
         // Protects all member data of this ReplicationCoordinator
-        boost::mutex _lock;
+        mutable boost::mutex _mutex;
 
         // Condition variable that is signaled by setLastOptime to wake up any threads waiting
         // in awaitReplication for their write concern to be satisfied.
@@ -110,7 +110,7 @@ namespace repl {
         // Maps nodes in this replication group to the last oplog operation they have committed
         std::map<HostAndPort, OpTime> _hostOptimeMap;
 
-        // Current ReplicaSet state // TODO(spencer): what about master/slave?
+        // Current ReplicaSet state
         MemberState _currentState;
 
         // The current ReplicaSet configuration object, including the information about tag groups

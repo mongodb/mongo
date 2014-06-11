@@ -85,6 +85,7 @@ namespace repl {
         };
 
         struct ReplicaSetConfig {
+            // TODO(spencer): make sure it is safe to copy this
             std::vector<MemberConfig> members;
             std::string replSetName;
             int version;

@@ -37,7 +37,7 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/util/assert_util.h" // TODO: remove along with invariant from getCurrentMemberState
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace repl {
@@ -93,12 +93,15 @@ namespace repl {
     }
 
     void ReplicationCoordinatorImpl::setCurrentMemberState(const MemberState& newState) {
-        // TODO
+        invariant(getReplicationMode() == modeReplSet);
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        _currentState = newState;
     }
 
     MemberState ReplicationCoordinatorImpl::getCurrentMemberState() const {
-        // TODO
-        invariant(false);
+        invariant(getReplicationMode() == modeReplSet);
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        return _currentState;
     }
 
     Status ReplicationCoordinatorImpl::awaitReplication(const OpTime& ts,
@@ -119,8 +122,32 @@ namespace repl {
     }
 
     bool ReplicationCoordinatorImpl::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {
-        // TODO
-        return false;
+        if (!idx->unique()) {
+            return false;
+        }
+        // Never ignore _id index
+        if (idx->isIdIndex()) {
+            return false;
+        }
+        if (getReplicationMode() != modeReplSet) {
+            return false;
+        }
+        // see SERVER-6671
+        MemberState ms = getCurrentMemberState();
+        if (! ((ms == MemberState::RS_STARTUP2) ||
+               (ms == MemberState::RS_RECOVERING) ||
+               (ms == MemberState::RS_ROLLBACK))) {
+            return false;
+        }
+        // TODO(spencer): SERVER-14233 Remove support for old oplog versions, or move oplogVersion
+        // into the repl coordinator
+        /* // 2 is the oldest oplog version where operations
+        // are fully idempotent.
+        if (theReplSet->oplogVersion < 2) {
+            return false;
+        }*/
+
+        return true;
     }
 
     Status ReplicationCoordinatorImpl::setLastOptime(const HostAndPort& member,
@@ -150,7 +177,9 @@ namespace repl {
 
     void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(
             const TopologyCoordinator::ReplicaSetConfig& newConfig) {
-        // TODO
+        invariant(getReplicationMode() == modeReplSet);
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        _rsConfig = newConfig;
     }
 
 } // namespace repl
