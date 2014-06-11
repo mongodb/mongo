@@ -513,8 +513,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 */
 		if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
 		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && i != nchunks - 1)
-			F_SET(((WT_CURSOR_BTREE *)*cp),
-			    WT_CBT_CONFLICT_CHECK);
+			F_SET(*cp, WT_CURSTD_CONFLICT_CHK);
 
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
 		    !F_ISSET(clsm, WT_CLSM_MERGE))

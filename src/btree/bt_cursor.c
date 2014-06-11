@@ -408,8 +408,8 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		 * If we are only interested in conflict checking do it now.
 		 * A conflict can only exist if there was an exact match.
 		 */
-		if (F_ISSET(cbt, WT_CBT_CONFLICT_CHECK)) {
-			if (cbt->compare != 0)
+		if (F_ISSET(cursor, WT_CURSTD_CONFLICT_CHK)) {
+			if (cbt->compare != 0 || cbt->ins == NULL)
 				return (0);
 			return (__wt_txn_update_check(session, cbt->ins->upd));
 		}
