@@ -67,6 +67,9 @@ namespace mongo {
     PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         if (!_noResultToMerge.empty()) {
@@ -244,6 +247,10 @@ namespace mongo {
         // to satisfy irreflexivity we must return 'false' for elements that we consider
         // equivalent under the pattern.
         return false;
+    }
+
+    vector<PlanStage*> MergeSortStage::getChildren() const {
+        return _children;
     }
 
     PlanStageStats* MergeSortStage::getStats() {

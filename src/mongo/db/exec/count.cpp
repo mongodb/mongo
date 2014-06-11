@@ -44,7 +44,10 @@ namespace mongo {
           _params(params),
           _hitEnd(false),
           _shouldDedup(params.descriptor->isMultikey()),
-          _commonStats(kStageType) { }
+          _commonStats(kStageType) {
+        _specificStats.keyPattern = _params.descriptor->keyPattern();
+        _specificStats.isMultiKey = _params.descriptor->isMultikey();
+    }
 
     void Count::initIndexCursor() {
         CursorOptions cursorOptions;
@@ -62,6 +65,8 @@ namespace mongo {
         // that points at the end.
         _btreeCursor->seek(_params.startKey, !_params.startKeyInclusive);
 
+        ++_specificStats.keysExamined;
+
         // Create the cursor that points at our end position.
         IndexCursor* endCursor;
         verify(_iam->newCursor(cursorOptions, &endCursor).isOK());
@@ -72,6 +77,8 @@ namespace mongo {
 
         // If the end key is inclusive we want to point *past* it since that's the end.
         _endCursor->seek(_params.endKey, _params.endKeyInclusive);
+
+        ++_specificStats.keysExamined;
 
         // See if we've hit the end already.
         checkEnd();
@@ -91,10 +98,16 @@ namespace mongo {
     }
 
     PlanStage::StageState Count::work(WorkingSetID* out) {
+        ++_commonStats.works;
+
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (NULL == _btreeCursor.get()) {
             // First call to work().  Perform cursor init.
             initIndexCursor();
             checkEnd();
+            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
 
@@ -104,8 +117,11 @@ namespace mongo {
         _btreeCursor->next();
         checkEnd();
 
+        ++_specificStats.keysExamined;
+
         if (_shouldDedup) {
             if (_returned.end() != _returned.find(loc)) {
+                ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
             else {
@@ -114,6 +130,7 @@ namespace mongo {
         }
 
         *out = WorkingSet::INVALID_ID;
+        ++_commonStats.advanced;
         return PlanStage::ADVANCED;
     }
 
@@ -127,6 +144,7 @@ namespace mongo {
     }
 
     void Count::prepareToYield() {
+        ++_commonStats.yields;
         if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
 
         _btreeCursor->savePosition();
@@ -134,6 +152,7 @@ namespace mongo {
     }
 
     void Count::recoverFromYield() {
+        ++_commonStats.unyields;
         if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
 
         if (!_btreeCursor->restorePosition().isOK()) {
@@ -178,6 +197,8 @@ namespace mongo {
     }
 
     void Count::invalidate(const DiskLoc& dl, InvalidationType type) {
+        ++_commonStats.invalidates;
+
         // The only state we're responsible for holding is what DiskLocs to drop.  If a document
         // mutates the underlying index cursor will deal with it.
         if (INVALIDATION_MUTATION == type) {
@@ -192,11 +213,20 @@ namespace mongo {
         }
     }
 
+    vector<PlanStage*> Count::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
+    }
+
     PlanStageStats* Count::getStats() {
-        // We don't collect stats since this stage is only used by the count command.
-        // If count ever collects stats we must implement this.
-        invariant(0);
-        return NULL;
+        _commonStats.isEOF = isEOF();
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COUNT));
+
+        CountStats* countStats = new CountStats(_specificStats);
+        countStats->keyPattern = _specificStats.keyPattern.getOwned();
+        ret->specific.reset(countStats);
+
+        return ret.release();
     }
 
 }  // namespace mongo

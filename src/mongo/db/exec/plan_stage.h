@@ -41,11 +41,11 @@ namespace mongo {
      * A PlanStage ("stage") is the basic building block of a "Query Execution Plan."  A stage is
      * the smallest piece of machinery used in executing a compiled query.  Stages either access
      * data (from a collection or an index) to create a stream of results, or transform a stream of
-     * results (e.g. AND, OR, SORT) to create a stream of results.  
+     * results (e.g. AND, OR, SORT) to create a stream of results.
      *
      * Stages have zero or more input streams but only one output stream.  Data-accessing stages are
      * leaves and data-transforming stages have children.  Stages can be connected together to form
-     * a tree which is then executed (see plan_runner.h) to solve a query.  
+     * a tree which is then executed (see plan_runner.h) to solve a query.
      *
      * A stage's input and output are each typed.  Only stages with compatible types can be
      * connected.
@@ -195,6 +195,17 @@ namespace mongo {
          * Can only be called after a prepareToYield but before a recoverFromYield.
          */
         virtual void invalidate(const DiskLoc& dl, InvalidationType type) = 0;
+
+        /**
+         * Retrieve a list of this stage's children. This stage keeps ownership of
+         * its children.
+         */
+        virtual std::vector<PlanStage*> getChildren() const = 0;
+
+        /**
+         * What type of stage is this?
+         */
+        virtual StageType stageType() const = 0;
 
         /**
          * Returns a tree of stats.  See plan_stats.h for the details of this structure.  If the

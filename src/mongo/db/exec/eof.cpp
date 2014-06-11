@@ -26,51 +26,50 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/diskloc.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/eof.h"
 
 namespace mongo {
 
-    /**
-     * This stage implements limit functionality.  It only returns 'limit' results before EOF.
-     *
-     * Sort has a baked-in limit, as it can optimize the sort if it has a limit.
-     *
-     * Preconditions: None.
-     */
-    class LimitStage : public PlanStage {
-    public:
-        LimitStage(int limit, WorkingSet* ws, PlanStage* child);
-        virtual ~LimitStage();
+    // static
+    const char* EOFStage::kStageType = "EOF";
 
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
+    EOFStage::EOFStage() : _commonStats(kStageType) { }
 
-        virtual void prepareToYield();
-        virtual void recoverFromYield();
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+    EOFStage::~EOFStage() { }
 
-        virtual std::vector<PlanStage*> getChildren() const;
+    bool EOFStage::isEOF() {
+        return true;
+    }
 
-        virtual StageType stageType() const { return STAGE_LIMIT; }
+    PlanStage::StageState EOFStage::work(WorkingSetID* out) {
+        ++_commonStats.works;
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+        return PlanStage::IS_EOF;
+    }
 
-        virtual PlanStageStats* getStats();
+    void EOFStage::prepareToYield() {
+        ++_commonStats.yields;
+    }
 
-        static const char* kStageType;
+    void EOFStage::recoverFromYield() {
+        ++_commonStats.unyields;
+    }
 
-    private:
-        WorkingSet* _ws;
-        scoped_ptr<PlanStage> _child;
+    void EOFStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+        ++_commonStats.invalidates;
+    }
 
-        // We only return this many results.
-        int _numToReturn;
+    vector<PlanStage*> EOFStage::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
+    }
 
-        // Stats
-        CommonStats _commonStats;
-        LimitStats _specificStats;
-    };
+    PlanStageStats* EOFStage::getStats() {
+        _commonStats.isEOF = isEOF();
+        return new PlanStageStats(_commonStats, STAGE_EOF);
+    }
 
 }  // namespace mongo

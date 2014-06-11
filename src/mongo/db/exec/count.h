@@ -76,6 +76,10 @@ namespace mongo {
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_COUNT; }
+
         virtual PlanStageStats* getStats();
 
         static const char* kStageType;
@@ -114,6 +118,7 @@ namespace mongo {
         bool _shouldDedup;
 
         CommonStats _commonStats;
+        CountStats _specificStats;
     };
 
 }  // namespace mongo

@@ -1,7 +1,5 @@
-// count.h
-
 /**
- *    Copyright (C) 2013 MongoDB Inc.
+ *    Copyright (C) 2013 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,24 +26,39 @@
  *    it in the license file.
  */
 
-#include "mongo/db/jsobj.h"
+#pragma once
+
+#include "mongo/db/diskloc.h"
+#include "mongo/db/exec/plan_stage.h"
 
 namespace mongo {
 
-    class OperationContext;
-
     /**
-     * 'ns' is the namespace we're counting on.
-     *
-     * { count: "collectionname"[, query: <query>] }
-     *
-     * @return -1 on ns does not exist error and other errors, 0 on other errors, otherwise the
-     * match count.
+     * This stage just returns EOF immediately.
      */
-    long long runCount(OperationContext* txn,
-                       const std::string& ns,
-                       const BSONObj& cmd,
-                       std::string& err,
-                       int& errCode);
+    class EOFStage : public PlanStage {
+    public:
+        EOFStage();
 
-} // namespace mongo
+        virtual ~EOFStage();
+
+        virtual bool isEOF();
+        virtual StageState work(WorkingSetID* out);
+
+        virtual void prepareToYield();
+        virtual void recoverFromYield();
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_EOF; }
+
+        PlanStageStats* getStats();
+
+        static const char* kStageType;
+
+    private:
+        CommonStats _commonStats;
+    };
+
+}  // namespace mongo

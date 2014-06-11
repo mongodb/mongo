@@ -45,6 +45,9 @@ namespace mongo {
     PlanStage::StageState LimitStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (0 == _numToReturn) {
             // We've returned as many results as we're limited to.
             return PlanStage::IS_EOF;
@@ -93,6 +96,12 @@ namespace mongo {
     void LimitStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
         _child->invalidate(dl, type);
+    }
+
+    vector<PlanStage*> LimitStage::getChildren() const {
+        vector<PlanStage*> children;
+        children.push_back(_child.get());
+        return children;
     }
 
     PlanStageStats* LimitStage::getStats() {

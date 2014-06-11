@@ -60,6 +60,10 @@ namespace mongo {
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_CACHED_PLAN; }
+
         virtual PlanStageStats* getStats();
 
         static const char* kStageType;
@@ -72,7 +76,7 @@ namespace mongo {
         const Collection* _collection;
 
         // not owned
-	CanonicalQuery* _canonicalQuery;
+        CanonicalQuery* _canonicalQuery;
 
         // owned by us
         boost::scoped_ptr<PlanStage> _mainChildPlan;

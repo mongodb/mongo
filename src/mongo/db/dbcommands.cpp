@@ -60,7 +60,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/count.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"
@@ -467,72 +466,6 @@ namespace mongo {
             return false;
         }
     } cmdDrop;
-
-    /* select count(*) */
-    class CmdCount : public Command {
-    public:
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        CmdCount() : Command("count") { }
-        virtual bool slaveOk() const {
-            // ok on --slave setups
-            return repl::replSettings.slave == repl::SimpleSlave;
-        }
-        virtual bool slaveOverrideOk() const { return true; }
-        virtual bool maintenanceOk() const { return false; }
-        virtual bool adminOnly() const { return false; }
-        virtual void help( stringstream& help ) const { help << "count objects in collection"; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::find);
-            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-        }
-
-        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            long long skip = 0;
-            if ( cmdObj["skip"].isNumber() ) {
-                skip = cmdObj["skip"].numberLong();
-                if ( skip < 0 ) {
-                    errmsg = "skip value is negative in count query";
-                    return false;
-                }
-            }
-            else if ( cmdObj["skip"].ok() ) {
-                errmsg = "skip value is not a valid number";
-                return false;
-            }
-
-            const string ns = parseNs(dbname, cmdObj);
-
-            // This acquires the DB read lock
-            //
-            Client::ReadContext ctx(txn, ns);
-
-            string err;
-            int errCode;
-            long long n = runCount(txn, ns, cmdObj, err, errCode);
-
-            long long retVal = n;
-            bool ok = true;
-            if ( n == -1 ) {
-                retVal = 0;
-                result.appendBool( "missing" , true );
-            }
-            else if ( n < 0 ) {
-                retVal = 0;
-                ok = false;
-                if ( !err.empty() ) {
-                    errmsg = err;
-                    result.append("code", errCode);
-                    return false;
-                }
-            }
-
-            result.append("n", static_cast<double>(retVal));
-            return ok;
-        }
-    } cmdCount;
 
     /* create collection */
     class CmdCreate : public Command {

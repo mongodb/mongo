@@ -26,9 +26,7 @@
  *    it in the license file.
  */
 
-// THIS FILE IS DEPRECATED -- replaced by get_executor.cpp
-
-#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/get_executor.h"
 
 #include <limits>
 
@@ -38,25 +36,23 @@
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/projection.h"
+#include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/eof_runner.h"
 #include "mongo/db/query/explain_plan.h"
-#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_settings.h"
-#include "mongo/db/query/idhack_runner.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/query/stage_builder.h"
-#include "mongo/db/query/subplan_runner.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -64,37 +60,31 @@
 
 namespace mongo {
 
-    Status getRunner(Collection* collection,
-                     const std::string& ns,
-                     const BSONObj& unparsedQuery,
-                     Runner** outRunner,
-                     CanonicalQuery** outCanonicalQuery,
-                     size_t plannerOptions) {
+    // static
+    void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
+                                   std::vector<IndexEntry>* indexEntries) {
+        invariant(indexEntries);
 
-        if (!collection) {
-            LOG(2) << "Collection " << ns << " does not exist."
-                   << " Using EOF runner: " << unparsedQuery.toString();
-            *outCanonicalQuery = NULL;
-            *outRunner = new EOFRunner(NULL, ns);
-            return Status::OK();
+        // Filter index entries
+        // Check BSON objects in AllowedIndices::_indexKeyPatterns against IndexEntry::keyPattern.
+        // Removes IndexEntrys that do not match _indexKeyPatterns.
+        std::vector<IndexEntry> temp;
+        for (std::vector<IndexEntry>::const_iterator i = indexEntries->begin();
+             i != indexEntries->end(); ++i) {
+            const IndexEntry& indexEntry = *i;
+            for (std::vector<BSONObj>::const_iterator j = allowedIndices.indexKeyPatterns.begin();
+                 j != allowedIndices.indexKeyPatterns.end(); ++j) {
+                const BSONObj& index = *j;
+                // Copy index entry to temp vector if found in query settings.
+                if (0 == indexEntry.keyPattern.woCompare(index)) {
+                    temp.push_back(indexEntry);
+                    break;
+                }
+            }
         }
 
-        if (!CanonicalQuery::isSimpleIdQuery(unparsedQuery) ||
-            !collection->getIndexCatalog()->findIdIndex()) {
-
-            const WhereCallbackReal whereCallback(collection->ns().db());
-            Status status = CanonicalQuery::canonicalize(
-                        collection->ns(), unparsedQuery, outCanonicalQuery, whereCallback);
-            if (!status.isOK())
-                return status;
-            return getRunner(collection, *outCanonicalQuery, outRunner, plannerOptions);
-        }
-
-        LOG(2) << "Using idhack: " << unparsedQuery.toString();
-
-        *outCanonicalQuery = NULL;
-        *outRunner = new IDHackRunner(collection, unparsedQuery["_id"].wrap());
-        return Status::OK();
+        // Update results.
+        temp.swap(*indexEntries);
     }
 
     namespace {
@@ -103,32 +93,135 @@ namespace mongo {
     }  // namespace
 
 
-    /**
-     * For a given query, get a runner.
-     */
-    Status getRunner(Collection* collection,
-                     CanonicalQuery* rawCanonicalQuery,
-                     Runner** out,
-                     size_t plannerOptions) {
+    void fillOutPlannerParams(Collection* collection,
+                              CanonicalQuery* canonicalQuery,
+                              QueryPlannerParams* plannerParams) {
+        // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
+        IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(false);
+        while (ii.more()) {
+            const IndexDescriptor* desc = ii.next();
+            plannerParams->indices.push_back(IndexEntry(desc->keyPattern(),
+                                                        desc->getAccessMethodName(),
+                                                        desc->isMultikey(),
+                                                        desc->isSparse(),
+                                                        desc->indexName(),
+                                                        desc->infoObj()));
+        }
 
-        verify(rawCanonicalQuery);
-        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
+        // If query supports index filters, filter params.indices by indices in query settings.
+        QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
+        AllowedIndices* allowedIndicesRaw;
+
+        // Filter index catalog if index filters are specified for query.
+        // Also, signal to planner that application hint should be ignored.
+        if (querySettings->getAllowedIndices(*canonicalQuery, &allowedIndicesRaw)) {
+            boost::scoped_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
+            filterAllowedIndexEntries(*allowedIndices, &plannerParams->indices);
+            plannerParams->indexFiltersApplied = true;
+        }
+
+        // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
+        // overrides this behavior by not outputting a collscan even if there are no indexed
+        // solutions.
+        if (storageGlobalParams.noTableScan) {
+            const string& ns = canonicalQuery->ns();
+            // There are certain cases where we ignore this restriction:
+            bool ignore = canonicalQuery->getQueryObj().isEmpty()
+                          || (string::npos != ns.find(".system."))
+                          || (0 == ns.find("local."));
+            if (!ignore) {
+                plannerParams->options |= QueryPlannerParams::NO_TABLE_SCAN;
+            }
+        }
+
+        // If the caller wants a shard filter, make sure we're actually sharded.
+        if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+            CollectionMetadataPtr collMetadata =
+                shardingState.getCollectionMetadata(canonicalQuery->ns());
+
+            if (collMetadata) {
+                plannerParams->shardKey = collMetadata->getKeyPattern();
+            }
+            else {
+                // If there's no metadata don't bother w/the shard filter since we won't know what
+                // the key pattern is anyway...
+                plannerParams->options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
+            }
+        }
+
+        if (internalQueryPlannerEnableIndexIntersection) {
+            plannerParams->options |= QueryPlannerParams::INDEX_INTERSECTION;
+        }
+
+        plannerParams->options |= QueryPlannerParams::KEEP_MUTATIONS;
+        plannerParams->options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
+    }
+
+    Status getExecutorIDHack(Collection* collection,
+                             CanonicalQuery* query,
+                             const QueryPlannerParams& plannerParams,
+                             PlanExecutor** out) {
+        invariant(collection);
+
+        LOG(2) << "Using idhack: " << query->toStringShort();
+        WorkingSet* ws = new WorkingSet();
+        PlanStage* root = new IDHackStage(collection, query, ws);
+
+        // Might have to filter out orphaned docs.
+        if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+            root = new ShardFilterStage(shardingState.getCollectionMetadata(collection->ns()),
+                                        ws, root);
+        }
+
+        // There might be a projection. The idhack stage will always fetch the full document,
+        // so we don't support covered projections. However, we might use the simple inclusion
+        // fast path.
+        if (NULL != query && NULL != query->getProj()) {
+            ProjectionStageParams params(WhereCallbackReal(collection->ns().db()));
+            params.projObj = query->getProj()->getProjObj();
+
+            // Stuff the right data into the params depending on what proj impl we use.
+            if (query->getProj()->requiresDocument() || query->getProj()->wantIndexKey()) {
+                params.fullExpression = query->root();
+                params.projImpl = ProjectionStageParams::NO_FAST_PATH;
+            }
+            else {
+                params.projImpl = ProjectionStageParams::SIMPLE_DOC;
+            }
+
+            root = new ProjectionStage(params, ws, root);
+        }
+
+        *out = new PlanExecutor(ws, root, collection);
+        return Status::OK();
+    }
+
+    Status getExecutor(Collection* collection,
+                      CanonicalQuery* canonicalQuery,
+                      PlanExecutor** out,
+                      size_t plannerOptions) {
+        invariant(canonicalQuery);
 
         // This can happen as we're called by internal clients as well.
         if (NULL == collection) {
             const string& ns = canonicalQuery->ns();
             LOG(2) << "Collection " << ns << " does not exist."
                    << " Using EOF runner: " << canonicalQuery->toStringShort();
-            *out = new EOFRunner(canonicalQuery.release(), ns);
+            EOFStage* eofStage = new EOFStage();
+            WorkingSet* ws = new WorkingSet();
+            *out = new PlanExecutor(ws, eofStage, collection);
             return Status::OK();
         }
+
+        // Fill out the planning params.  We use these for both cached solutions and non-cached.
+        QueryPlannerParams plannerParams;
+        plannerParams.options = plannerOptions;
+        fillOutPlannerParams(collection, canonicalQuery, &plannerParams);
 
         // If we have an _id index we can use the idhack runner.
         if (IDHackStage::supportsQuery(*canonicalQuery) &&
             collection->getIndexCatalog()->findIdIndex()) {
-            LOG(2) << "Using idhack: " << canonicalQuery->toStringShort();
-            *out = new IDHackRunner(collection, canonicalQuery.release());
-            return Status::OK();
+            return getExecutorIDHack(collection, canonicalQuery, plannerParams, out);
         }
 
         // Tailable: If the query requests tailable the collection must be capped.
@@ -149,11 +242,6 @@ namespace mongo {
                               + actualSort.toString());
             }
         }
-
-        // Fill out the planning params.  We use these for both cached solutions and non-cached.
-        QueryPlannerParams plannerParams;
-        plannerParams.options = plannerOptions;
-        fillOutPlannerParams(collection, rawCanonicalQuery, &plannerParams);
 
         // Try to look up a cached solution for the query.
 
@@ -189,42 +277,43 @@ namespace mongo {
                 }
 
                 // add a CachedPlanStage on top of the previous root
-                root = new CachedPlanStage(collection, rawCanonicalQuery, root, backupRoot);
+                root = new CachedPlanStage(collection, canonicalQuery, root, backupRoot);
 
-                *out = new SingleSolutionRunner(collection,
-                                                canonicalQuery.release(),
-                                                chosenSolution, root, sharedWs);
+                *out = new PlanExecutor(sharedWs, root, chosenSolution, collection);
                 return Status::OK();
             }
         }
 
         if (internalQueryPlanOrChildrenIndependently
-            && SubplanRunner::canUseSubplanRunner(*canonicalQuery)) {
+            && SubplanStage::canUseSubplanning(*canonicalQuery)) {
 
             QLOG() << "Running query as sub-queries: " << canonicalQuery->toStringShort();
             LOG(2) << "Running query as sub-queries: " << canonicalQuery->toStringShort();
 
-            SubplanRunner* runner;
-            Status runnerStatus = SubplanRunner::make(collection, plannerParams,
-                                                      canonicalQuery.release(), &runner);
+            auto_ptr<WorkingSet> ws(new WorkingSet());
+
+            SubplanStage* subplan;
+            Status runnerStatus = SubplanStage::make(collection, ws.get(), plannerParams,
+                                                     canonicalQuery, &subplan);
             if (!runnerStatus.isOK()) {
                 return runnerStatus;
             }
 
-            *out = runner;
+            *out = new PlanExecutor(ws.release(), subplan, collection);
             return Status::OK();
         }
 
-        return getRunnerAlwaysPlan(collection, canonicalQuery.release(), plannerParams, out);
+        return getExecutorAlwaysPlan(collection, canonicalQuery, plannerParams, out);
     }
 
-    Status getRunnerAlwaysPlan(Collection* collection,
-                               CanonicalQuery* rawCanonicalQuery,
-                               const QueryPlannerParams& plannerParams,
-                               Runner** out) {
+    Status getExecutorAlwaysPlan(Collection* collection,
+                                 CanonicalQuery* canonicalQuery,
+                                 const QueryPlannerParams& plannerParams,
+                                 PlanExecutor** execOut) {
         invariant(collection);
-        invariant(rawCanonicalQuery);
-        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
+        invariant(canonicalQuery);
+
+        *execOut = NULL;
 
         vector<QuerySolution*> solutions;
         Status status = QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);
@@ -262,11 +351,8 @@ namespace mongo {
                     WorkingSet* ws = new WorkingSet();
                     PlanStage* root;
                     verify(StageBuilder::build(collection, *solutions[i], ws, &root));
-                    *out = new SingleSolutionRunner(collection,
-                                                    canonicalQuery.release(),
-                                                    solutions[i],
-                                                    root,
-                                                    ws);
+
+                    *execOut = new PlanExecutor(ws, root, solutions[i], collection);
                     return Status::OK();
                 }
             }
@@ -282,12 +368,7 @@ namespace mongo {
             PlanStage* root;
             verify(StageBuilder::build(collection, *solutions[0], ws, &root));
 
-            // And, run the plan.
-            *out = new SingleSolutionRunner(collection,
-                                            canonicalQuery.release(),
-                                            solutions[0],
-                                            root,
-                                            ws);
+            *execOut = new PlanExecutor(ws, root, solutions[0], collection);
             return Status::OK();
         }
         else {
@@ -296,7 +377,7 @@ namespace mongo {
             // The working set will be shared by all candidate plans and owned by the containing runner
             WorkingSet* sharedWorkingSet = new WorkingSet();
 
-            MultiPlanStage* multiPlanStage = new MultiPlanStage(collection, rawCanonicalQuery);
+            MultiPlanStage* multiPlanStage = new MultiPlanStage(collection, canonicalQuery);
 
             for (size_t ix = 0; ix < solutions.size(); ++ix) {
                 if (solutions[ix]->cacheData.get()) {
@@ -312,15 +393,9 @@ namespace mongo {
                 multiPlanStage->addPlan(solutions[ix], nextPlanRoot, sharedWorkingSet);
             }
 
-            multiPlanStage->pickBestPlan();
-            multiPlanStage->generateCandidateStats();
+            PlanExecutor* exec = new PlanExecutor(sharedWorkingSet, multiPlanStage, collection);
 
-            *out = new SingleSolutionRunner(collection,
-                                            canonicalQuery.release(),
-                                            multiPlanStage->bestSolution(),
-                                            multiPlanStage,
-                                            sharedWorkingSet);
-
+            *execOut = exec;
             return Status::OK();
         }
     }
@@ -501,11 +576,11 @@ namespace mongo {
 
     }  // namespace
 
-    Status getRunnerCount(Collection* collection,
-                          const BSONObj& query,
-                          const BSONObj& hintObj,
-                          Runner** out) {
-        verify(collection);
+    Status getExecutorCount(Collection* collection,
+                            const BSONObj& query,
+                            const BSONObj& hintObj,
+                            PlanExecutor** execOut) {
+        invariant(collection);
 
         const WhereCallbackReal whereCallback(collection->ns().db());
 
@@ -513,26 +588,77 @@ namespace mongo {
         uassertStatusOK(CanonicalQuery::canonicalize(collection->ns().ns(),
                                                      query,
                                                      BSONObj(),
-                                                     BSONObj(), 
+                                                     BSONObj(),
                                                      0,
                                                      0,
                                                      hintObj,
                                                      &cq,
                                                      whereCallback));
 
-        return getRunner(collection, cq, out, QueryPlannerParams::PRIVATE_IS_COUNT);
+        scoped_ptr<CanonicalQuery> cleanupCq(cq);
+
+        return getExecutor(collection, cq, execOut, QueryPlannerParams::PRIVATE_IS_COUNT);
     }
 
     //
     // Distinct hack
     //
 
-    Status getRunnerDistinct(Collection* collection,
-                             const BSONObj& query,
-                             const string& field,
-                             Runner** out) {
+    bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
+        QuerySolutionNode* root = soln->root.get();
+
+        // We're looking for a project on top of an ixscan.
+        if (STAGE_PROJECTION == root->getType() && (STAGE_IXSCAN == root->children[0]->getType())) {
+            IndexScanNode* isn = static_cast<IndexScanNode*>(root->children[0]);
+
+            // An additional filter must be applied to the data in the key, so we can't just skip
+            // all the keys with a given value; we must examine every one to find the one that (may)
+            // pass the filter.
+            if (NULL != isn->filter.get()) {
+                return false;
+            }
+
+            // We only set this when we have special query modifiers (.max() or .min()) or other
+            // special cases.  Don't want to handle the interactions between those and distinct.
+            // Don't think this will ever really be true but if it somehow is, just ignore this
+            // soln.
+            if (isn->bounds.isSimpleRange) {
+                return false;
+            }
+
+            // Make a new DistinctNode.  We swap this for the ixscan in the provided solution.
+            DistinctNode* dn = new DistinctNode();
+            dn->indexKeyPattern = isn->indexKeyPattern;
+            dn->direction = isn->direction;
+            dn->bounds = isn->bounds;
+
+            // Figure out which field we're skipping to the next value of.  TODO: We currently only
+            // try to distinct-hack when there is an index prefixed by the field we're distinct-ing
+            // over.  Consider removing this code if we stick with that policy.
+            dn->fieldNo = 0;
+            BSONObjIterator it(isn->indexKeyPattern);
+            while (it.more()) {
+                if (field == it.next().fieldName()) {
+                    break;
+                }
+                dn->fieldNo++;
+            }
+
+            // Delete the old index scan, set the child of project to the fast distinct scan.
+            delete root->children[0];
+            root->children[0] = dn;
+            return true;
+        }
+
+        return false;
+    }
+
+    Status getExecutorDistinct(Collection* collection,
+                               const BSONObj& query,
+                               const std::string& field,
+                               PlanExecutor** out) {
         // This should'a been checked by the distinct command.
-        verify(collection);
+        invariant(collection);
 
         // TODO: check for idhack here?
 
@@ -575,8 +701,10 @@ namespace mongo {
                 return status;
             }
 
-            // Takes ownership of cq.
-            return getRunner(collection, cq, out);
+            scoped_ptr<CanonicalQuery> cleanupCq(cq);
+
+            // Does not take ownership of its args.
+            return getExecutor(collection, cq, out);
         }
 
         //
@@ -600,6 +728,8 @@ namespace mongo {
             return status;
         }
 
+        scoped_ptr<CanonicalQuery> cleanupCq(cq);
+
         // If there's no query, we can just distinct-scan one of the indices.
         // Not every index in plannerParams.indices may be suitable. Refer to
         // getDistinctNodeIndex().
@@ -616,7 +746,7 @@ namespace mongo {
 
             // Takes ownership of 'dn'.
             QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(*cq, params, dn);
-            verify(soln);
+            invariant(soln);
 
             LOG(2) << "Using fast distinct: " << cq->toStringShort()
                    << ", planSummary: " << getPlanSummary(*soln);
@@ -624,7 +754,8 @@ namespace mongo {
             WorkingSet* ws = new WorkingSet();
             PlanStage* root;
             verify(StageBuilder::build(collection, *soln, ws, &root));
-            *out = new SingleSolutionRunner(collection, cq, soln, root, ws);
+            // Takes ownership of 'ws', 'root', and 'soln'.
+            *out = new PlanExecutor(ws, root, soln, collection);
             return Status::OK();
         }
 
@@ -632,7 +763,7 @@ namespace mongo {
         vector<QuerySolution*> solutions;
         status = QueryPlanner::plan(*cq, plannerParams, &solutions);
         if (!status.isOK()) {
-            return getRunner(collection, cq, out);
+            return getExecutor(collection, cq, out);
         }
 
         // We look for a solution that has an ixscan we can turn into a distinctixscan
@@ -652,7 +783,8 @@ namespace mongo {
                 WorkingSet* ws = new WorkingSet();
                 PlanStage* root;
                 verify(StageBuilder::build(collection, *solutions[i], ws, &root));
-                *out = new SingleSolutionRunner(collection, cq, solutions[i], root, ws);
+                // Takes ownership of 'ws', 'root', and 'solutions[i]'.
+                *out = new PlanExecutor(ws, root, solutions[i], collection);
                 return Status::OK();
             }
         }
@@ -665,26 +797,15 @@ namespace mongo {
         }
 
         // We drop the projection from the 'cq'.  Unfortunately this is not trivial.
-        delete cq;
         status = CanonicalQuery::canonicalize(collection->ns().ns(), query, &cq, whereCallback);
         if (!status.isOK()) {
             return status;
         }
 
-        // Takes ownership of cq.
-        return getRunner(collection, cq, out);
-    }
+        cleanupCq.reset(cq);
 
-    ScopedRunnerRegistration::ScopedRunnerRegistration(Runner* runner)
-        : _runner(runner) {
-        // Collection can be null for EOFRunner, or other places where registration is not needed
-        if ( _runner->collection() )
-            _runner->collection()->cursorCache()->registerRunner( runner );
-    }
-
-    ScopedRunnerRegistration::~ScopedRunnerRegistration() {
-        if ( _runner->collection() )
-            _runner->collection()->cursorCache()->deregisterRunner( _runner );
+        // Does not take ownership.
+        return getExecutor(collection, cq, out);
     }
 
 }  // namespace mongo

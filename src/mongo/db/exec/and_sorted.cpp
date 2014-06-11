@@ -61,6 +61,9 @@ namespace mongo {
     PlanStage::StageState AndSortedStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         if (0 == _specificStats.failedAnd.size()) {
@@ -295,6 +298,10 @@ namespace mongo {
             _targetLoc = DiskLoc();
             _workingTowardRep = queue<size_t>();
         }
+    }
+
+    vector<PlanStage*> AndSortedStage::getChildren() const {
+        return _children;
     }
 
     PlanStageStats* AndSortedStage::getStats() {

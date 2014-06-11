@@ -28,8 +28,10 @@
 
 #pragma once
 
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 
@@ -76,8 +78,15 @@ namespace mongo {
          */
         static void generatePlannerInfo(CanonicalQuery* query,
                                         PlanStageStats* winnerStats,
-                                        vector<PlanStageStats*>& rejectedStats,
+                                        const vector<PlanStageStats*>& rejectedStats,
                                         BSONObjBuilder* out);
+
+        /**
+         * Generates the execution stats section for the stats tree 'stats',
+         * adding the resulting BSON to 'out'.
+         */
+        static void generateExecStats(PlanStageStats* stats,
+                                      BSONObjBuilder* out);
 
         /**
          * Adds the 'serverInfo' explain section to the BSON object being build
@@ -92,64 +101,37 @@ namespace mongo {
          * Explain info is added to 'bob' according to the verbosity level passed in
          * 'verbosity'.
          */
-        static void explainTree(const PlanStageStats& stats,
-                                Explain::Verbosity verbosity,
-                                BSONObjBuilder* bob);
+        static void explainStatsTree(const PlanStageStats& stats,
+                                     Explain::Verbosity verbosity,
+                                     BSONObjBuilder* bob);
 
         /**
-         * Add explain info to 'out' at verbosity 'verbosity' in the case that there is
-         * only one query solution available.
+         * Generate explain info for the execution plan 'exec', adding the results
+         * to the BSONObj being built by 'out'.
          *
-         * The query 'rawCanonicalQuery' has one viable query solution 'solution' in the
-         * collection 'collection'.
+         * The query part of the operation is contained in 'canonicalQuery', but
+         * 'exec' can contain any tree of execution stages. We can explain any
+         * operation that executes as stages by calling into this function.
          *
-         * May use a PlanExecutor to run the solution in order to produce exec stats.
+         * The explain information is generated according with a level of detail
+         * specified by 'verbosity'.
          */
-        static Status explainSinglePlan(Collection* collection,
-                                        CanonicalQuery* rawCanonicalQuery,
-                                        QuerySolution* solution,
-                                        Explain::Verbosity verbosity,
-                                        BSONObjBuilder* out);
+        static Status explainStages(PlanExecutor* exec,
+                                    CanonicalQuery* canonicalQuery,
+                                    Explain::Verbosity verbosity,
+                                    BSONObjBuilder* out);
+
+        //
+        // Helpers for special-case explains.
+        //
 
         /**
-         * Add explain info to 'out' at verbosity 'verbosity' in the case that there are
-         * multiple query solutions available.
-         *
-         * The query 'rawCanonicalQuery' has the corresponding query solutions in 'solutions'.
-         *
-         * Uses a MultiPlan stage to choose the best plan, and to run the winning plan or the
-         * rejected plans as required by the verbosity level.
+         * If you have an empty query with a count, then there are no execution stages.
+         * We just get the number of records and then apply skip/limit. Since there
+         * are no stages, this requires a special explain format.
          */
-        static Status explainMultiPlan(Collection* collection,
-                                       CanonicalQuery* rawCanonicalQuery,
-                                       vector<QuerySolution*>& solutions,
-                                       Explain::Verbosity verbosity,
-                                       BSONObjBuilder* out);
+        static void explainCountEmptyQuery(BSONObjBuilder* out);
 
-        /**
-         * The format of the explain output is special if the collection is empty.
-         *
-         * Assuming that the collection is empty, adds the explain info for query
-         * 'rawCanonicalQuery' to 'out'.
-         */
-        static void explainEmptyColl(CanonicalQuery* rawCanonicalQuery,
-                                     BSONObjBuilder* out);
-
-        /**
-         * Top-level explain entry point for a query. Plans 'rawCanonicalQuery' in collection
-         * 'collection' using the planner parameters in 'plannerOptions'.
-         *
-         * The resulting explain BSON is added to 'out'. The level of detail in the output is
-         * controlled by 'verbosity'.
-         *
-         * If necessary, run the query in order to generate execution stats (but throw out
-         * the results of the query).
-         */
-        static Status explain(Collection* collection,
-                              CanonicalQuery* rawCanonicalQuery,
-                              size_t plannerOptions,
-                              Explain::Verbosity verbosity,
-                              BSONObjBuilder* out);
     };
 
 } // namespace

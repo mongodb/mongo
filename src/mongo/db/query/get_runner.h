@@ -26,31 +26,17 @@
  *    it in the license file.
  */
 
+// THIS FILE IS DEPRECATED -- replaced by get_executor.h
+
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_settings.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/runner.h"
 
 namespace mongo {
 
     class Collection;
-
-    /**
-     * Filter indexes retrieved from index catalog by
-     * allowed indices in query settings.
-     * Used by getRunner().
-     * This function is public to facilitate testing.
-     */
-    void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
-                                   std::vector<IndexEntry>* indexEntries);
-
-    /**
-     * Fill out the provided 'plannerParams' for the 'canonicalQuery' operating on the collection
-     * 'collection'.  Exposed for testing.
-     */
-    void fillOutPlannerParams(Collection* collection,
-                              CanonicalQuery* canonicalQuery,
-                              QueryPlannerParams* plannerParams);
 
     /**
      * Get a runner for a query.  Takes ownership of rawCanonicalQuery.
@@ -83,7 +69,6 @@ namespace mongo {
                      Runner** outRunner,
                      CanonicalQuery** outCanonicalQuery,
                      size_t plannerOptions = 0);
-
     /*
      * Get a runner for a query executing as part of a distinct command.
      *
@@ -95,6 +80,7 @@ namespace mongo {
                              const BSONObj& query,
                              const std::string& field,
                              Runner** out);
+
     /*
      * Get a runner for a query executing as part of a count command.
      *

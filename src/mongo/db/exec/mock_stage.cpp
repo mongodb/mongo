@@ -64,4 +64,9 @@ namespace mongo {
         _members.push(id);
     }
 
+    vector<PlanStage*> MockStage::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
+    }
+
 }  // namespace mongo

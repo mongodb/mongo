@@ -175,6 +175,11 @@ namespace mongo {
         }
     }
 
+    vector<PlanStage*> OplogStart::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
+    }
+
     int OplogStart::_backwardsScanTime = 5;
 
 }  // namespace mongo

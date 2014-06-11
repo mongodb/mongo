@@ -53,6 +53,10 @@ namespace mongo {
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
         ++_commonStats.works;
+
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (_nsDropped) { return PlanStage::DEAD; }
 
         // Do some init if we haven't already.
@@ -152,6 +156,11 @@ namespace mongo {
                 _nsDropped = true;
             }
         }
+    }
+
+    vector<PlanStage*> CollectionScan::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
     }
 
     PlanStageStats* CollectionScan::getStats() {

@@ -30,6 +30,7 @@
  * This file contains tests for mongo/db/query/get_runner.h
  */
 
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/get_runner.h"
 
 #include "mongo/db/json.h"

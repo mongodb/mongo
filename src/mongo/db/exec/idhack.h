@@ -29,22 +29,24 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/query/canonical_query.h"
 
 namespace mongo {
 
     /**
-     * This stage implements limit functionality.  It only returns 'limit' results before EOF.
-     *
-     * Sort has a baked-in limit, as it can optimize the sort if it has a limit.
-     *
-     * Preconditions: None.
+     * A standalone stage implementing the fast path for key-value retrievals
+     * via the _id index.
      */
-    class LimitStage : public PlanStage {
+    class IDHackStage : public PlanStage {
     public:
-        LimitStage(int limit, WorkingSet* ws, PlanStage* child);
-        virtual ~LimitStage();
+        /** Takes ownership of all the arguments -collection. */
+        IDHackStage(const Collection* collection, CanonicalQuery* query, WorkingSet* ws);
+
+        IDHackStage(Collection* collection, const BSONObj& key, WorkingSet* ws);
+
+        virtual ~IDHackStage();
 
         virtual bool isEOF();
         virtual StageState work(WorkingSetID* out);
@@ -53,24 +55,40 @@ namespace mongo {
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
+        /**
+         * ID Hack has a very strict criteria for the queries it supports.
+         */
+        static bool supportsQuery(const CanonicalQuery& query);
+
         virtual std::vector<PlanStage*> getChildren() const;
 
-        virtual StageType stageType() const { return STAGE_LIMIT; }
+        virtual StageType stageType() const { return STAGE_IDHACK; }
 
-        virtual PlanStageStats* getStats();
+        PlanStageStats* getStats();
 
         static const char* kStageType;
 
     private:
-        WorkingSet* _ws;
-        scoped_ptr<PlanStage> _child;
+        // Not owned here.
+        const Collection* _collection;
 
-        // We only return this many results.
-        int _numToReturn;
+        // The WorkingSet we annotate with results.  Not owned by us.
+        WorkingSet* _workingSet;
 
-        // Stats
+        // The value to match against the _id field.
+        BSONObj _key;
+
+        // Not owned by us.
+        CanonicalQuery* _query;
+
+        // Did someone call kill() on us?
+        bool _killed;
+
+        // Have we returned our one document?
+        bool _done;
+
         CommonStats _commonStats;
-        LimitStats _specificStats;
+        IDHackStats _specificStats;
     };
 
 }  // namespace mongo

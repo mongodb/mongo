@@ -106,6 +106,9 @@ namespace mongo {
     }
 
     PlanStage::StageState MultiPlanStage::work(WorkingSetID* out) {
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (_failure) {
             *out = _statusMemberId;
             return PlanStage::FAILURE;
@@ -253,7 +256,7 @@ namespace mongo {
         }
     }
 
-    vector<PlanStageStats*>* MultiPlanStage::generateCandidateStats() {
+    vector<PlanStageStats*> MultiPlanStage::generateCandidateStats() {
         for (size_t ix = 0; ix < _candidates.size(); ix++) {
             if (ix == (size_t)_bestPlanIdx) { continue; }
             if (ix == (size_t)_backupPlanIdx) { continue; }
@@ -267,7 +270,7 @@ namespace mongo {
             }
         }
 
-        return &_candidateStats;
+        return _candidateStats;
     }
 
     void MultiPlanStage::clearCandidates() {
@@ -328,31 +331,6 @@ namespace mongo {
         }
 
         return !doneWorking;
-    }
-
-    Status MultiPlanStage::executeWinningPlan() {
-        invariant(_bestPlanIdx != kNoSuchPlan);
-        PlanStage* winner = _candidates[_bestPlanIdx].root;
-        WorkingSet* ws = _candidates[_bestPlanIdx].ws;
-
-        bool doneWorking = false;
-
-        while (!doneWorking) {
-            WorkingSetID id = WorkingSet::INVALID_ID;
-            PlanStage::StageState state = winner->work(&id);
-
-            if (PlanStage::IS_EOF == state || PlanStage::DEAD == state) {
-                doneWorking = true;
-            }
-            else if (PlanStage::FAILURE == state) {
-                // Propogate error.
-                BSONObj errObj;
-                WorkingSetCommon::getStatusMemberObject(*ws, id, &errObj);
-                return Status(ErrorCodes::BadValue, WorkingSetCommon::toStatusString(errObj));
-            }
-        }
-
-        return Status::OK();
     }
 
     Status MultiPlanStage::executeAllPlans() {
@@ -497,6 +475,21 @@ namespace mongo {
         for (size_t i = 0; i < _candidates.size(); ++i) {
             _candidates[i].root->recoverFromYield();
         }
+    }
+
+    vector<PlanStage*> MultiPlanStage::getChildren() const {
+        vector<PlanStage*> children;
+
+        if (bestPlanChosen()) {
+            children.push_back(_candidates[_bestPlanIdx].root);
+        }
+        else {
+            for (size_t i = 0; i < _candidates.size(); i++) {
+                children.push_back(_candidates[i].root);
+            }
+        }
+
+        return children;
     }
 
     PlanStageStats* MultiPlanStage::getStats() {

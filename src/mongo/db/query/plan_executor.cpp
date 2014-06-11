@@ -36,7 +36,19 @@
 namespace mongo {
 
     PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, const Collection* collection)
-        : _collection(collection), _workingSet(ws), _root(rt), _killed(false) {}
+        : _collection(collection),
+          _workingSet(ws),
+          _root(rt),
+          _qs(NULL),
+          _killed(false) { }
+
+    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, QuerySolution* qs,
+                               const Collection* collection)
+        : _collection(collection),
+          _workingSet(ws),
+          _root(rt),
+          _qs(qs),
+          _killed(false) { }
 
     PlanExecutor::~PlanExecutor() { }
 
@@ -141,6 +153,31 @@ namespace mongo {
 
     void PlanExecutor::kill() {
         _killed = true;
+    }
+
+    PlanStage* PlanExecutor::releaseStages() {
+        return _root.release();
+    }
+
+    PlanStage* PlanExecutor::getStages() {
+        return _root.get();
+    }
+
+    Status PlanExecutor::executePlan() {
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState code = PlanStage::NEED_TIME;
+        while (PlanStage::NEED_TIME == code || PlanStage::ADVANCED == code) {
+            code = _root->work(&id);
+        }
+
+        if (PlanStage::FAILURE == code) {
+            BSONObj obj;
+            WorkingSetCommon::getStatusMemberObject(*_workingSet, id, &obj);
+            return Status(ErrorCodes::BadValue,
+                          "Exec error: " + WorkingSetCommon::toStatusString(obj));
+        }
+
+        return Status::OK();
     }
 
 } // namespace mongo

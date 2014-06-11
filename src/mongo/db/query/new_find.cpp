@@ -37,6 +37,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_constants.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/qlog.h"
@@ -489,6 +490,8 @@ namespace mongo {
         //
         // TODO temporary until find() becomes a real command.
         if (isExplain && enableNewExplain) {
+            scoped_ptr<CanonicalQuery> safeCq(cq);
+
             size_t options = QueryPlannerParams::DEFAULT;
             if (shardingState.needCollectionMetadata(pq.ns())) {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -497,11 +500,18 @@ namespace mongo {
             BufBuilder bb;
             bb.skip(sizeof(QueryResult));
 
+            PlanExecutor* rawExec;
+            Status execStatus = getExecutor(collection, cq, &rawExec, options);
+            if (!execStatus.isOK()) {
+                uasserted(17510, "Explain error: " + execStatus.reason());
+            }
+
+            scoped_ptr<PlanExecutor> exec(rawExec);
             BSONObjBuilder explainBob;
-            Status explainStatus = Explain::explain(collection, cq, options,
-                                                    Explain::QUERY_PLANNER, &explainBob);
+            Status explainStatus = Explain::explainStages(exec.get(), cq, Explain::EXEC_ALL_PLANS,
+                                                          &explainBob);
             if (!explainStatus.isOK()) {
-                uasserted(17510, "Explain error: " + explainStatus.reason());
+                uasserted(18521, "Explain error: " + explainStatus.reason());
             }
 
             // Add the resulting object to the return buffer.

@@ -53,6 +53,9 @@ namespace mongo {
     PlanStage::StageState KeepMutationsStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         // If we've returned as many results as we're limited to, isEOF will be true.
         if (isEOF()) { return PlanStage::IS_EOF; }
 
@@ -113,6 +116,12 @@ namespace mongo {
     void KeepMutationsStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
         _child->invalidate(dl, type);
+    }
+
+    vector<PlanStage*> KeepMutationsStage::getChildren() const {
+        vector<PlanStage*> children;
+        children.push_back(_child.get());
+        return children;
     }
 
     PlanStageStats* KeepMutationsStage::getStats() {

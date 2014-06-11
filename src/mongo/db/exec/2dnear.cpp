@@ -55,6 +55,10 @@ namespace mongo {
 
     PlanStage::StageState TwoDNear::work(WorkingSetID* out) {
         ++_commonStats.works;
+
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (!_initted) {
             _initted = true;
 
@@ -149,6 +153,11 @@ namespace mongo {
             verify(!member->hasLoc());
         }
         _invalidationMap.erase(range.first, range.second);
+    }
+
+    vector<PlanStage*> TwoDNear::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
     }
 
     PlanStageStats* TwoDNear::getStats() {

@@ -91,6 +91,9 @@ namespace mongo {
     PlanStage::StageState DistinctScan::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (NULL == _btreeCursor.get()) {
             // First call to work().  Perform cursor init.
             initIndexCursor();
@@ -211,6 +214,11 @@ namespace mongo {
                 break;
             }
         }
+    }
+
+    vector<PlanStage*> DistinctScan::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
     }
 
     PlanStageStats* DistinctScan::getStats() {

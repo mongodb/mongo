@@ -304,6 +304,9 @@ namespace mongo {
     PlanStage::StageState SortStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (NULL == _sortKeyGen) {
             // This is heavy and should be done as part of work().
             _sortKeyGen.reset(new SortStageKeyGenerator(_collection, _pattern, _query));
@@ -447,6 +450,12 @@ namespace mongo {
             _wsidByDiskLoc.erase(it);
             ++_specificStats.forcedFetches;
         }
+    }
+
+    vector<PlanStage*> SortStage::getChildren() const {
+        vector<PlanStage*> children;
+        children.push_back(_child.get());
+        return children;
     }
 
     PlanStageStats* SortStage::getStats() {
