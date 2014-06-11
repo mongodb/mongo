@@ -516,6 +516,10 @@ function IndexDataGenerator(options) {
             else {
             }
         }
+        // The region specified in a 2d index must be positive
+        if (attributes["min"] >= attributes["max"]) {
+            attributes["max"] = attributes["min"] + attributes["max"];
+        }
         return attributes;
     }
 
