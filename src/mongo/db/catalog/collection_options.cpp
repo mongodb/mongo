@@ -80,8 +80,6 @@ namespace mongo {
                 cappedSize = e.numberLong();
                 if ( cappedSize < 0 )
                     return Status( ErrorCodes::BadValue, "size has to be >= 0" );
-                cappedSize += 0xff;
-                cappedSize &= 0xffffffffffffff00LL;
             }
             else if ( fieldName == "max" ) {
                 if ( !options["capped"].trueValue() || !e.isNumber() ) {
@@ -127,11 +125,11 @@ namespace mongo {
         BSONObjBuilder b;
         if ( capped ) {
             b.appendBool( "capped", true );
-            if ( cappedSize )
-                b.appendNumber( "size", cappedSize );
             if ( cappedMaxDocs )
                 b.appendNumber( "max", cappedMaxDocs );
         }
+        if ( cappedSize )
+            b.appendNumber( "size", cappedSize );
 
         if ( initialNumExtents )
             b.appendNumber( "$nExtents", initialNumExtents );
