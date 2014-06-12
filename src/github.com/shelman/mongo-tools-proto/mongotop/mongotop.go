@@ -8,7 +8,6 @@ import (
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/mongotop/command"
 	"github.com/shelman/mongo-tools-proto/mongotop/output"
-	"github.com/shelman/mongo-tools-proto/mongotop/result"
 	"time"
 )
 
@@ -44,8 +43,6 @@ func (self *MongoTop) Run() error {
 		time.Sleep(self.Sleeptime)
 
 		// run the top command against the database
-		//topResults, err := self.runTopCommand()
-
 		topResults := &command.Top{}
 		err = self.SessionProvider.RunCommand("admin", topResults)
 		if err != nil {
@@ -53,10 +50,13 @@ func (self *MongoTop) Run() error {
 		}
 
 		// diff the results
-		diff := command.Diff(previousResults, topResults)
+		diff, err := topResults.Diff(previousResults)
+		if err != nil {
+			return fmt.Errorf("error computing diff: %v", err)
+		}
 
 		// output the results
-		if err := self.Outputter.Output(diff, self.Options); err != nil {
+		if err := self.Outputter.Output(diff); err != nil {
 			return fmt.Errorf("error outputting results: %v", err)
 		}
 
@@ -64,29 +64,5 @@ func (self *MongoTop) Run() error {
 		previousResults = topResults
 
 	}
-
-}
-
-// Run the top command against the database, and return the results.
-func (self *MongoTop) runTopCommand() (*result.TopResults, error) {
-
-	// get a database session
-	session, err := self.SessionProvider.GetSession()
-	if err != nil {
-		return nil, fmt.Errorf("error connecting to database server: %v", err)
-	}
-	defer session.Close()
-
-	// get the admin database
-	adminDB := session.DB("admin")
-	res := &result.TopResults{}
-
-	// run the command
-	if err := adminDB.Run("top", res); err != nil {
-		return nil, fmt.Errorf("error running top command: %v", err)
-	}
-
-	// success
-	return res, nil
 
 }
