@@ -126,6 +126,8 @@ DEF_OPT_AS_UINT32(sample_rate, 50,
     "how often the latency of operations is measured. One for every operation,"
     "two for every second operation, three for every third operation etc.")
 DEF_OPT_AS_CONFIG_STRING(sess_config, "", "session configuration string")
+DEF_OPT_AS_UINT32(stress_checkpoint_rate, 0,
+    "checkpoint every rate operations during the populate phase, 0 to disable")
 DEF_OPT_AS_CONFIG_STRING(table_config,
     "key_format=S,value_format=S,type=lsm,exclusive=true,"
     "leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,",
