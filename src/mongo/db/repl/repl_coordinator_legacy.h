@@ -81,7 +81,7 @@ namespace repl {
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptime(const HostAndPort& member, const OpTime& ts);
+        virtual Status setLastOptime(const OID& rid, const OpTime& ts, const BSONObj& config);
 
         virtual Status processHeartbeat(const BSONObj& cmdObj, BSONObjBuilder* resultObj);
 

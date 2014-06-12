@@ -52,8 +52,6 @@ namespace repl {
     public:
         string name() const { return "SlaveTracking"; }
 
-        static const char * NS;
-
         struct Ident {
 
             Ident(const BSONObj& r, const BSONObj& config, const string& n) {
@@ -113,7 +111,7 @@ namespace repl {
                 
                 _currentlyUpdatingCache = true;
                 for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ) {
-                    db.update( NS , i->first , i->second , true );
+                    db.update("local.slaves", i->first, i->second, true);
                 }
                 _currentlyUpdatingCache = false;
 
@@ -289,64 +287,11 @@ namespace repl {
 
     } slaveTracking;
 
-    const char * SlaveTracking::NS = "local.slaves";
-
-    // parse optimes from replUpdatePositionCommand and pass them to SyncSourceFeedback
-    bool updateSlaveLocations(BSONArray optimes) {
-        BSONForEach(elem, optimes) {
-            BSONObj entry = elem.Obj();
-            BSONObj id = BSON("_id" << entry["_id"].OID());
-            OpTime ot = entry["optime"]._opTime();
-            BSONObj config = entry["config"].Obj();
-
-            // update locally
-            // This updates the slave tracking map, as well as updates
-            // the GhostSlave cache, and updates the tag groups
-            if (!slaveTracking.update(id, config, "local.oplog.rs", ot)) {
-                return false;
-            }
-
-            if (theReplSet && !theReplSet->isPrimary()) {
-                // pass along if we are not primary
-                LOG(2) << "received notification that " << entry << " has reached optime: "
-                       << ot.toStringPretty();
-                theReplSet->syncSourceFeedback.updateMap(entry["_id"].OID(), ot);
-            }
-        }
-        return true;
-    }
-
-    void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp ) {
-        if ( lastOp.isNull() )
-            return;
-
-        verify( str::startsWith(ns, "local.oplog.") );
-
-        Client * c = curop.getClient();
-        verify(c);
-        BSONObj rid = c->getRemoteID();
-        if ( rid.isEmpty() )
-            return;
-
-        BSONObj handshake = c->getHandshake();
-        if (handshake.hasField("config")) {
-            slaveTracking.update(rid, handshake["config"].Obj(), ns, lastOp);
-        }
-        else {
-            BSONObjBuilder bob;
-            bob.append("host", curop.getRemoteString());
-            bob.append("upgradeNeeded", true);
-            slaveTracking.update(rid, bob.done(), ns, lastOp);
-        }
-
-        if (theReplSet && !theReplSet->isPrimary()) {
-            // we don't know the slave's port, so we make the replica set keep
-            // a map of rids to slaves
-            // pass along if we are not primary
-            LOG(2) << "received notification via getmore that " << rid << " has reached optime: "
-                   << lastOp.toStringPretty();
-            theReplSet->syncSourceFeedback.updateMap(rid["_id"].OID(), lastOp);
-        }
+    bool updateSlaveTracking(const BSONObj& rid,
+                             const BSONObj config,
+                             const string& ns,
+                             OpTime last) {
+        return slaveTracking.update(rid, config, ns, last);
     }
 
     bool opReplicatedEnough( OpTime op , BSONElement w ) {

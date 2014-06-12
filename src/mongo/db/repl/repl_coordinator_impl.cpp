@@ -177,8 +177,9 @@ namespace repl {
         return true;
     }
 
-    Status ReplicationCoordinatorImpl::setLastOptime(const HostAndPort& member,
-                                                     const OpTime& ts) {
+    Status ReplicationCoordinatorImpl::setLastOptime(const OID& rid,
+                                                     const OpTime& ts,
+                                                     const BSONObj& config) {
         // TODO
         return Status::OK();
     }

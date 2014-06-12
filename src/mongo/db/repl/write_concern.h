@@ -42,9 +42,16 @@ namespace mongo {
 
 namespace repl {
 
-    bool updateSlaveLocations(BSONArray optimes);
-
-    void updateSlaveLocation( CurOp& curop, const char * oplog_ns , OpTime lastOp );
+    /**
+     * This updates the slave tracking map, as well as updates the GhostSlave cache (used for
+     * maintaining the local.slaves collection), and updates the tag groups.
+     *
+     * @returns false when the member cannot be found
+     */
+    bool updateSlaveTracking(const BSONObj& rid,
+                             const BSONObj config,
+                             const string& ns,
+                             OpTime last);
 
     /** @return true if op has made it to w servers */
     bool opReplicatedEnough( OpTime op , int w );

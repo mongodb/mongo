@@ -36,7 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/write_concern.h"
@@ -421,10 +421,19 @@ namespace repl {
 
             uassert(16888, "optimes field should be an array with an object for each secondary",
                     cmdObj["optimes"].type() == Array);
-            BSONArray newTimes = BSONArray(cmdObj["optimes"].Obj());
-            if (!updateSlaveLocations(newTimes)) {
-                errmsg = "could not update position upstream; will retry";
-                return false;
+            BSONArray optimes = BSONArray(cmdObj["optimes"].Obj());
+            BSONForEach(elem, optimes) {
+                BSONObj entry = elem.Obj();
+                OID id = entry["_id"].OID();
+                OpTime ot = entry["optime"]._opTime();
+                BSONObj config = entry["config"].Obj();
+                Status status = getGlobalReplicationCoordinator()->setLastOptime(id, ot, config);
+                if (!status.isOK()) {
+                    errmsg = str::stream() << "could not update position upstream; will retry"
+                                           << causedBy(status);
+                    result.append("code", status.code());
+                    return false;
+                }
             }
             return true;
         }

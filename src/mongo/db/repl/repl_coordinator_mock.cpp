@@ -115,8 +115,9 @@ namespace repl {
         return false;
     }
 
-    Status ReplicationCoordinatorMock::setLastOptime(const HostAndPort& member,
-                                                     const OpTime& ts) {
+    Status ReplicationCoordinatorMock::setLastOptime(const OID& rid,
+                                                     const OpTime& ts,
+                                                     const BSONObj& config) {
         // TODO
         return Status::OK();
     }

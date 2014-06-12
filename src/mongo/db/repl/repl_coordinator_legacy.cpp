@@ -342,9 +342,24 @@ namespace {
         return true;
     }
 
-    Status LegacyReplicationCoordinator::setLastOptime(const HostAndPort& member,
-                                                       const OpTime& ts) {
-        // TODO
+    Status LegacyReplicationCoordinator::setLastOptime(const OID& rid,
+                                                       const OpTime& ts,
+                                                       const BSONObj& config) {
+        std::string oplogNs = getReplicationMode() == modeReplSet?
+                "local.oplog.rs" : "local.oplog.$main";
+        if (!updateSlaveTracking(BSON("_id" << rid), config, oplogNs, ts)) {
+            return Status(ErrorCodes::NodeNotFound,
+                          str::stream() << "could not update node with _id: " 
+                                        << config["_id"].Int()
+                                        << " beacuse it cannot be found in current ReplSetConfig");
+        }
+
+        if (getReplicationMode() == modeReplSet && !getCurrentMemberState().primary()) {
+            // pass along if we are not primary
+            LOG(2) << "received notification that " << config << " has reached optime: "
+                   << ts.toStringPretty();
+            theReplSet->syncSourceFeedback.updateMap(rid, ts);
+        }
         return Status::OK();
     }
     

@@ -45,6 +45,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
 
@@ -160,9 +161,32 @@ namespace mongo {
     }
 
     void ClientCursor::updateSlaveLocation( CurOp& curop ) {
-        if ( _slaveReadTill.isNull() )
+        if (_slaveReadTill.isNull())
             return;
-        mongo::repl::updateSlaveLocation(curop, _ns.c_str(), _slaveReadTill);
+
+        verify(str::startsWith(_ns.c_str(), "local.oplog."));
+
+        Client* c = curop.getClient();
+        verify(c);
+        BSONObj rid = c->getRemoteID();
+        if (rid.isEmpty())
+            return;
+
+        BSONObj handshake = c->getHandshake();
+        if (handshake.hasField("config")) {
+            repl::getGlobalReplicationCoordinator()->setLastOptime(rid["_id"].OID(),
+                                                                   _slaveReadTill,
+                                                                   handshake["config"].Obj());
+        }
+        else {
+            BSONObjBuilder bob;
+            bob.append("host", curop.getRemoteString());
+            bob.append("upgradeNeeded", true);
+            repl::getGlobalReplicationCoordinator()->setLastOptime(rid["_id"].OID(),
+                                                                   _slaveReadTill,
+                                                                   bob.done());
+        }
+
     }
 
     //

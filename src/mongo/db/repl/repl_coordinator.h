@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_executor.h"
 
@@ -203,15 +204,19 @@ namespace repl {
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx) = 0;
 
         /**
-         * Updates our internal tracking of the last OpTime applied for the given member of the
-         * set identified by "member".  Also updates all bookkeeping related to tracking what the
-         * last OpTime applied by all tag groups that "member" is a part of.  This is called when
+         * Updates our internal tracking of the last OpTime applied for the given member of the set
+         * identified by "rid".  Also updates all bookkeeping related to tracking what the last
+         * OpTime applied by all tag groups that "rid" is a part of.  The config BSONObj is passed
+         * into SlaveTracking, which needs it to update local.slaves.  This is called when
          * secondaries notify the member they are syncing from of their progress in replication.
-         * This information is used by awaitReplication to satisfy write concerns.  It is *not*
-         * used in elections, we maintain a separate view of member optimes in the topology
-         * coordinator based on incoming heartbeat messages, which is used in elections.
+         * This information is used by awaitReplication to satisfy write concerns.  It is *not* used
+         * in elections, we maintain a separate view of member optimes in the topology coordinator
+         * based on incoming heartbeat messages, which is used in elections.
+         *
+         * @returns ErrorCodes::NodeNotFound if the member cannot be found in sync progress tracking
+         * @returns Status::OK() otherwise
          */
-        virtual Status setLastOptime(const HostAndPort& member, const OpTime& ts) = 0;
+        virtual Status setLastOptime(const OID& rid, const OpTime& ts, const BSONObj& config) = 0;
 
         /**
          * Handles an incoming heartbeat command. Adds BSON to 'resultObj'; 
