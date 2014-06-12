@@ -452,6 +452,8 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		if (cbt->compare == 0 && cbt->ins != NULL)
 			ret = __wt_txn_update_check(session, cbt->ins->upd);
 		break;
+	case BTREE_COL_FIX:
+	case BTREE_COL_VAR:
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
