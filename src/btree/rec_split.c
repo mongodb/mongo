@@ -421,16 +421,17 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * up.
 	 */
 	pindex = WT_INTL_INDEX_COPY(parent);
-	for (parent_refp = pindex->index + SPLIT_CORRECT_1,
-	    i = pindex->entries - SPLIT_CORRECT_1; i > 0; ++parent_refp, --i) {
+	for (parent_refp = pindex->index,
+	    i = pindex->entries; i > 0; ++parent_refp, --i) {
 		parent_ref = *parent_refp;
 		WT_ASSERT(session, parent_ref->home == parent);
 		if (parent_ref->state != WT_REF_MEM)
 			continue;
 
 		/*
-		 * Under some conditions, we pull leaf pages up to the top
-		 * level.  Don't try to descend into those pages.
+		 * We left the first/last children of the parent at the current
+		 * level to avoid bad split patterns, they might be leaf pages;
+		 * check the page type before we continue.
 		 */
 		child = parent_ref->page;
 		if (!WT_PAGE_IS_INTERNAL(child))
