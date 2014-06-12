@@ -91,7 +91,8 @@ public:
         ProgressMeter* _m;
     };
 
-    void doCollection( const string coll , Query q, FILE* out , ProgressMeter *m ) {
+    void doCollection( const string coll , Query q, FILE* out , ProgressMeter *m,
+                       bool usingMongos ) {
         int queryOptions = QueryOption_SlaveOk | QueryOption_NoCursorTimeout;
         if (startsWith(coll.c_str(), "local.oplog.") && q.obj.hasField("ts"))
             queryOptions |= QueryOption_OplogReplay;
@@ -103,7 +104,7 @@ public:
         Writer writer(out, m);
 
         // use low-latency "exhaust" mode if going over the network
-        if (!_usingMongos && typeid(connBase) == typeid(DBClientConnection&)) {
+        if (!usingMongos && typeid(connBase) == typeid(DBClientConnection&)) {
             DBClientConnection& conn = static_cast<DBClientConnection&>(connBase);
             stdx::function<void(const BSONObj&)> castedWriter(writer); // needed for overload resolution
             conn.query( castedWriter, coll.c_str() , q , NULL, queryOptions | QueryOption_Exhaust);
@@ -117,7 +118,8 @@ public:
         }
     }
 
-    void writeCollectionFile( const string coll , Query q, boost::filesystem::path outputFile ) {
+    void writeCollectionFile( const string coll , Query q, boost::filesystem::path outputFile,
+                              bool usingMongos ) {
         toolInfoLog() << "\t" << coll << " to " << outputFile.string() << std::endl;
 
         FilePtr f (fopen(outputFile.string().c_str(), "wb"));
@@ -127,7 +129,7 @@ public:
         m.setName("Collection File Writing Progress");
         m.setUnits("documents");
 
-        doCollection(coll, q, f, &m);
+        doCollection(coll, q, f, &m, usingMongos);
 
         toolInfoLog() << "\t\t " << m.done()
                       << ((m.done() == 1) ? " document" : " documents")
@@ -168,15 +170,16 @@ public:
 
 
 
-    void writeCollectionStdout( const string coll ) {
-        doCollection(coll, _query, stdout, NULL);
+    void writeCollectionStdout( const string coll, const BSONObj& dumpQuery, bool usingMongos ) {
+        doCollection(coll, dumpQuery, stdout, NULL, usingMongos);
     }
 
     void go(const string& db,
             const string& coll,
             const Query& query,
             const boost::filesystem::path& outdir,
-            const string& outFilename) {
+            const string& outFilename,
+            bool usingMongos) {
         // Can only provide outFilename if db and coll are provided
         fassert(17368, outFilename.empty() || (!coll.empty() && !db.empty()));
         boost::filesystem::create_directories( outdir );
@@ -229,7 +232,8 @@ public:
             if (nsToCollectionSubstring(name) == "system.indexes") {
               // Create system.indexes.bson for compatibility with pre 2.2 mongorestore
               const string filename = name.substr( db.size() + 1 );
-              writeCollectionFile( name.c_str() , query, outdir / ( filename + ".bson" ) );
+              writeCollectionFile( name.c_str(), query, outdir / ( filename + ".bson" ),
+                                   usingMongos );
               // Don't dump indexes as *.metadata.json
               continue;
             }
@@ -245,7 +249,7 @@ public:
         for (vector<string>::iterator it = collections.begin(); it != collections.end(); ++it) {
             string name = *it;
             const string filename = outFilename != "" ? outFilename : name.substr( db.size() + 1 );
-            writeCollectionFile( name , query, outdir / ( filename + ".bson" ) );
+            writeCollectionFile( name , query, outdir / ( filename + ".bson" ), usingMongos );
             writeMetadataFile( name, outdir / (filename + ".metadata.json"), collectionOptions, indexes);
         }
 
@@ -377,25 +381,29 @@ public:
     }
 
     int run() {
+        bool usingMongos = false;
+        int serverAuthzVersion = 0;
+        BSONObj dumpQuery;
+
         if (mongoDumpGlobalParams.repair){
             return repair();
         }
 
         {
             if (mongoDumpGlobalParams.query.size()) {
-                _query = fromjson(mongoDumpGlobalParams.query);
+                dumpQuery = fromjson(mongoDumpGlobalParams.query);
             }
         }
 
         if (mongoDumpGlobalParams.dumpUsersAndRoles) {
             uassertStatusOK(auth::getRemoteStoredAuthorizationVersion(&conn(true),
-                                                                      &_serverAuthzVersion));
+                                                                      &serverAuthzVersion));
             uassert(17369,
                     mongoutils::str::stream() << "Backing up users and roles is only supported for "
                             "clusters with auth schema versions 1 or 3, found: " <<
-                            _serverAuthzVersion,
-                    _serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
-                    _serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
+                            serverAuthzVersion,
+                    serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
+                    serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
         }
 
         string opLogName = "";
@@ -431,7 +439,8 @@ public:
         // check if we're outputting to stdout
         if (mongoDumpGlobalParams.outputDirectory == "-") {
             if (toolGlobalParams.db != "" && toolGlobalParams.coll != "") {
-                writeCollectionStdout(toolGlobalParams.db + "." + toolGlobalParams.coll);
+                writeCollectionStdout(toolGlobalParams.db + "." + toolGlobalParams.coll, dumpQuery,
+                                      usingMongos);
                 return 0;
             }
             else {
@@ -441,7 +450,7 @@ public:
             }
         }
 
-        _usingMongos = isMongos();
+        usingMongos = isMongos();
 
         boost::filesystem::path root(mongoDumpGlobalParams.outputDirectory);
 
@@ -480,22 +489,22 @@ public:
                 boost::filesystem::path outdir = root / dbName;
                 toolInfoLog() << "DATABASE: " << dbName << "\t to \t" << outdir.string()
                         << std::endl;
-                go ( dbName , "", _query, outdir, "" );
+                go ( dbName , "", dumpQuery, outdir, "", usingMongos );
             }
         }
         else {
             boost::filesystem::path outdir = root / toolGlobalParams.db;
             toolInfoLog() << "DATABASE: " << toolGlobalParams.db << "\t to \t" << outdir.string()
                     << std::endl;
-            go(toolGlobalParams.db, toolGlobalParams.coll, _query, outdir, "");
+            go(toolGlobalParams.db, toolGlobalParams.coll, dumpQuery, outdir, "", usingMongos);
             if (mongoDumpGlobalParams.dumpUsersAndRoles &&
-                    _serverAuthzVersion == AuthorizationManager::schemaVersion26Final &&
+                    serverAuthzVersion == AuthorizationManager::schemaVersion26Final &&
                     toolGlobalParams.db != "admin") {
                 toolInfoLog() << "Backing up user and role data for the " << toolGlobalParams.db <<
                         " database";
                 Query query = Query(BSON("db" << toolGlobalParams.db));
-                go("admin", "system.users", query, outdir, "$admin.system.users");
-                go("admin", "system.roles", query, outdir, "$admin.system.roles");
+                go("admin", "system.users", query, outdir, "$admin.system.users", usingMongos);
+                go("admin", "system.roles", query, outdir, "$admin.system.roles", usingMongos);
             }
         }
 
@@ -503,17 +512,13 @@ public:
             BSONObjBuilder b;
             b.appendTimestamp("$gt", opLogStart);
 
-            _query = BSON("ts" << b.obj());
+            dumpQuery = BSON("ts" << b.obj());
 
-            writeCollectionFile( opLogName , _query, root / "oplog.bson" );
+            writeCollectionFile( opLogName , dumpQuery, root / "oplog.bson", usingMongos );
         }
 
         return 0;
     }
-
-    bool _usingMongos;
-    int _serverAuthzVersion;
-    BSONObj _query;
 };
 
 REGISTER_MONGO_TOOL(Dump);
