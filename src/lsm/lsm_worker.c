@@ -253,7 +253,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 	int locked;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
-	j = 0;
 	lsm_tree = arg;
 	session = lsm_tree->ckpt_session;
 
@@ -401,7 +400,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 			     "LSM worker checkpointed %u", i));
 		}
-keep_going:
 		__lsm_unpin_chunks(session, &cookie);
 		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
@@ -409,15 +407,7 @@ keep_going:
 			    session, lsm_tree->work_cond, 100000));
 	}
 
-err:	/*
-	 * XXX an EBUSY is being returned from somewhere.  Until we can track
-	 * it down, don't have the worker thread give up (and panic).  Just
-	 * keep going.
-	 */
-	if (ret == EBUSY)
-		goto keep_going;
-
-	__lsm_unpin_chunks(session, &cookie);
+err:	__lsm_unpin_chunks(session, &cookie);
 	__wt_free(session, cookie.chunk_array);
 	/*
 	 * The thread will only exit with failure if we run out of memory or
