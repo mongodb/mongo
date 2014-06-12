@@ -135,6 +135,8 @@ typedef struct {
 	size_t	  append_cnt;			/* Current unresolved records */
 	pthread_rwlock_t append_lock;		/* Single-thread resolution */
 
+	char *session_config;			/* Session configuration */
+
 	char *uri;				/* Object name */
 
 	char *config_open;			/* Command-line configuration */
@@ -164,10 +166,12 @@ typedef struct {
 	uint32_t c_insert_pct;
 	uint32_t c_internal_key_truncation;
 	uint32_t c_intl_page_max;
+	char	*c_isolation;
 	uint32_t c_key_gap;
 	uint32_t c_key_max;
 	uint32_t c_key_min;
 	uint32_t c_leaf_page_max;
+	uint32_t c_leak_memory;
 	uint32_t c_logging;
 	uint32_t c_merge_max;
 	uint32_t c_merge_threads;

@@ -132,6 +132,7 @@ generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 static void
 randomize_value(CONFIG *cfg, char *value_buf)
 {
+	uint8_t *vb;
 	uint32_t i;
 
 	/*
@@ -143,10 +144,10 @@ randomize_value(CONFIG *cfg, char *value_buf)
 	while (value_buf[i] == '\0' && i > 0)
 		--i;
 	if (i > 0) {
-		value_buf[0] = (__wt_random() % 255) + 1;
-		value_buf[i] = (__wt_random() % 255) + 1;
+		vb = (uint8_t *)value_buf;
+		vb[0] = (__wt_random() % 255) + 1;
+		vb[i] = (__wt_random() % 255) + 1;
 	}
-	return;
 }
 
 static int
@@ -999,7 +1000,7 @@ monitor(void *arg)
 	path = NULL;
 
 	min_thr = (uint64_t)cfg->min_throughput;
-	latency_max = (uint32_t)ms_to_ns(cfg->max_latency);
+	latency_max = (uint32_t)ms_to_us(cfg->max_latency);
 
 	/* Open the logging file. */
 	len = strlen(cfg->monitor_dir) + 100;
@@ -1205,6 +1206,8 @@ execute_populate(CONFIG *cfg)
 	    " populate thread(s) for %" PRIu32 " items",
 	    cfg->populate_threads, cfg->icount);
 
+	cfg->insert_key = 0;
+
 	if ((cfg->popthreads =
 	    calloc(cfg->populate_threads, sizeof(CONFIG_THREAD))) == NULL)
 		return (enomem(cfg));
@@ -1217,8 +1220,6 @@ execute_populate(CONFIG *cfg)
 	if ((ret = start_threads(cfg, NULL,
 	    cfg->popthreads, cfg->populate_threads, pfunc)) != 0)
 		return (ret);
-
-	cfg->insert_key = 0;
 
 	if ((ret = __wt_epoch(NULL, &start)) != 0) {
 		lprintf(cfg, ret, 0, "Get time failed in populate.");

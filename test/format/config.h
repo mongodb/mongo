@@ -33,11 +33,6 @@ typedef struct {
 	const char	*name;			/* Configuration item */
 	const char	*desc;			/* Configuration description */
 
-#define	C_FIX		0x01			/* File types */
-#define	C_VAR		0x02
-#define	C_ROW		0x04
-	uint8_t	 	type_mask;		/* File type mask */
-
 	/* Value is a boolean, yes if roll of 1-to-100 is <= CONFIG->min. */
 #define	C_BOOL		0x001
 
@@ -73,187 +68,195 @@ typedef struct {
 static CONFIG c[] = {
 	{ "auto_throttle",
 	  "if LSM inserts are throttled",			/* 90% */
-	  0x0, C_BOOL, 90, 0, 0, &g.c_auto_throttle, NULL },
+	  C_BOOL, 90, 0, 0, &g.c_auto_throttle, NULL },
 
 	{ "firstfit",
 	  "if allocation is firstfit",				/* 10% */
-	  0x0, C_BOOL, 10, 0, 0, &g.c_firstfit, NULL },
+	  C_BOOL, 10, 0, 0, &g.c_firstfit, NULL },
 
 	{ "bitcnt",
 	  "number of bits for fixed-length column-store files",
-	  C_FIX, 0x0, 1, 8, 8, &g.c_bitcnt, NULL },
+	  0x0, 1, 8, 8, &g.c_bitcnt, NULL },
 
 	{ "bloom",
 	  "if bloom filters are configured",			/* 95% */
-	  0x0, C_BOOL, 95, 0, 0, &g.c_bloom, NULL },
+	  C_BOOL, 95, 0, 0, &g.c_bloom, NULL },
 
 	{ "bloom_bit_count",
 	  "number of bits per item for LSM bloom filters",
-	  0x0, 0x0, 4, 64, 1000, &g.c_bloom_bit_count, NULL },
+	  0x0, 4, 64, 1000, &g.c_bloom_bit_count, NULL },
 
 	{ "bloom_hash_count",
 	  "number of hash values per item for LSM bloom filters",
-	  0x0, 0x0, 4, 32, 100, &g.c_bloom_hash_count, NULL },
+	  0x0, 4, 32, 100, &g.c_bloom_hash_count, NULL },
 
 	{ "bloom_oldest",
 	  "if bloom_oldest=true",				/* 10% */
-	  0x0, C_BOOL, 10, 0, 0, &g.c_bloom_oldest, NULL },
+	  C_BOOL, 10, 0, 0, &g.c_bloom_oldest, NULL },
 
 	{ "cache",
 	  "size of the cache in MB",
-	  0x0, 0x0, 1, 100, 1024, &g.c_cache, NULL },
+	  0x0, 1, 100, 1024, &g.c_cache, NULL },
 
 	{ "checkpoints",
 	  "if periodic checkpoints are done",			/* 95% */
-	  0x0, C_BOOL, 95, 0, 0, &g.c_checkpoints, NULL },
+	  C_BOOL, 95, 0, 0, &g.c_checkpoints, NULL },
 
 	{ "checksum",
 	  "type of checksums (on | off | uncompressed)",
-	  0x0, C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_checksum },
+	  C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_checksum },
 
 	{ "chunk_size",
 	  "LSM chunk size in MB",
-	  0x0, 0x0, 1, 10, 100, &g.c_chunk_size, NULL },
+	  0x0, 1, 10, 100, &g.c_chunk_size, NULL },
 
 	{ "compaction",
 	  "if compaction is running",				/* 10% */
-	  0x0, C_BOOL, 10, 0, 0, &g.c_compact, NULL },
+	  C_BOOL, 10, 0, 0, &g.c_compact, NULL },
 
 	{ "compression",
 	  "type of compression (none | bzip | bzip-raw | lzo | snappy | zlib)",
-	  0x0, C_IGNORE|C_STRING, 1, 5, 5, NULL, &g.c_compression },
+	  C_IGNORE|C_STRING, 1, 5, 5, NULL, &g.c_compression },
 
 	{ "data_extend",
 	  "if data files are extended",				/* 5% */
-	  0x0, C_BOOL, 5, 0, 0, &g.c_data_extend, NULL },
+	  C_BOOL, 5, 0, 0, &g.c_data_extend, NULL },
 
 	{ "data_source",
 	  "data source (file | helium | kvsbdb | lsm | table)",
-	  0x0, C_IGNORE | C_STRING, 0, 0, 0, NULL, &g.c_data_source },
+	  C_IGNORE | C_STRING, 0, 0, 0, NULL, &g.c_data_source },
 
 	{ "delete_pct",
 	  "percent operations that are deletes",
-	  0x0, C_OPS, 0, 45, 90, &g.c_delete_pct, NULL },
+	  C_OPS, 0, 45, 90, &g.c_delete_pct, NULL },
 
 	{ "dictionary",
 	  "if values are dictionary compressed",		/* 20% */
-	  C_ROW | C_VAR, C_BOOL, 20, 0, 0, &g.c_dictionary, NULL },
+	  C_BOOL, 20, 0, 0, &g.c_dictionary, NULL },
 
 	{ "file_type",
 	  "type of store to create (fix | var | row)",
-	  0x0, C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_file_type },
+	  C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_file_type },
 
 	{ "hot_backups",
 	  "if hot backups are enabled",				/* 5% */
-	  0x0, C_BOOL, 5, 0, 0, &g.c_hot_backups, NULL },
+	  C_BOOL, 5, 0, 0, &g.c_hot_backups, NULL },
 
 	{ "huffman_key",
 	  "if keys are huffman encoded",			/* 20% */
-	  C_ROW, C_BOOL, 20, 0, 0, &g.c_huffman_key, NULL },
+	  C_BOOL, 20, 0, 0, &g.c_huffman_key, NULL },
 
 	{ "huffman_value",
-	 "if values are huffman encoded",			/* 20% */
-	 C_ROW|C_VAR, C_BOOL, 20, 0, 0, &g.c_huffman_value, NULL },
+	  "if values are huffman encoded",			/* 20% */
+	  C_BOOL, 20, 0, 0, &g.c_huffman_value, NULL },
 
 	{ "insert_pct",
 	  "percent operations that are inserts",
-	  0x0, C_OPS, 0, 45, 90, &g.c_insert_pct, NULL },
+	  C_OPS, 0, 45, 90, &g.c_insert_pct, NULL },
 
 	{ "internal_key_truncation",
-	 "if internal keys are truncated",			/* 95% */
-	 0x0, C_BOOL, 95, 0, 0, &g.c_internal_key_truncation, NULL },
+	  "if internal keys are truncated",			/* 95% */
+	  C_BOOL, 95, 0, 0, &g.c_internal_key_truncation, NULL },
 
 	{ "internal_page_max",
 	  "maximum size of Btree internal nodes",
-	  0x0, 0x0, 9, 17, 27, &g.c_intl_page_max, NULL },
+	  0x0, 9, 17, 27, &g.c_intl_page_max, NULL },
+
+	{ "isolation",
+	  "isolation level (read-uncommitted | read-committed | snapshot)",
+	  C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_isolation },
 
 	{ "key_gap",
 	  "gap between instantiated keys on a Btree page",
-	  0x0, 0x0, 0, 20, 20, &g.c_key_gap, NULL },
+	  0x0, 0, 20, 20, &g.c_key_gap, NULL },
 
 	{ "key_max",
 	  "maximum size of keys",
-	  C_ROW, 0x0, 20, 128, MEGABYTE(10), &g.c_key_max, NULL },
+	  0x0, 20, 128, MEGABYTE(10), &g.c_key_max, NULL },
 
 	{ "key_min",
 	  "minimum size of keys",
-	  C_ROW, 0x0, 10, 32, 256, &g.c_key_min, NULL },
+	  0x0, 10, 32, 256, &g.c_key_min, NULL },
+
+	{ "leak_memory",
+	  "if memory should be leaked on close",
+	  C_BOOL, 0, 0, 0, &g.c_leak_memory, NULL },
 
 	{ "leaf_page_max",
 	  "maximum size of Btree leaf nodes",
-	  0x0, 0x0, 9, 17, 27, &g.c_leaf_page_max, NULL },
+	  0x0, 9, 17, 27, &g.c_leaf_page_max, NULL },
 
 	{ "logging",
 	  "if logging configured",				/* 30% */
-	  0x0, C_BOOL, 30, 0, 0, &g.c_logging, NULL },
+	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
 
 	{ "merge_max",
 	  "the maximum number of chunks to include in a merge operation",
-	  0x0, 0x0, 4, 20, 100, &g.c_merge_max, NULL },
+	  0x0, 4, 20, 100, &g.c_merge_max, NULL },
 
 	{ "merge_threads",
 	  "the number of threads to perform merge operations",
-	  0x0, 0x0, 1, 4, 10, &g.c_merge_threads, NULL },
+	  0x0, 1, 4, 10, &g.c_merge_threads, NULL },
 
 	{ "mmap",
 	  "configure for mmap operations",			/* 90% */
-	 0x0, C_BOOL, 90, 0, 0, &g.c_mmap, NULL },
+	  C_BOOL, 90, 0, 0, &g.c_mmap, NULL },
 
 	{ "ops",
 	  "the number of modification operations done per run",
-	  0x0, 0x0, 0, M(2), M(100), &g.c_ops, NULL },
+	  0x0, 0, M(2), M(100), &g.c_ops, NULL },
 
 	{ "prefix_compression",
 	  "if keys are prefix compressed",			/* 80% */
-	  C_ROW, C_BOOL, 80, 0, 0, &g.c_prefix_compression, NULL },
+	  C_BOOL, 80, 0, 0, &g.c_prefix_compression, NULL },
 
 	{ "prefix_compression_min",
 	  "minimum gain before prefix compression is used",
-	  C_ROW, 0x0, 0, 8, 256, &g.c_prefix_compression_min, NULL },
+	  0x0, 0, 8, 256, &g.c_prefix_compression_min, NULL },
 
 	{ "repeat_data_pct",
 	  "percent duplicate values in row- or var-length column-stores",
-	  C_ROW|C_VAR, 0x0, 0, 90, 90, &g.c_repeat_data_pct, NULL },
+	  0x0, 0, 90, 90, &g.c_repeat_data_pct, NULL },
 
 	{ "reverse",
 	  "collate in reverse order",				/* 10% */
-	  0x0, C_BOOL, 10, 0, 0, &g.c_reverse, NULL },
+	  C_BOOL, 10, 0, 0, &g.c_reverse, NULL },
 
 	{ "rows",
 	  "the number of rows to create",
-	  0x0, 0x0, 10, M(1), M(100), &g.c_rows, NULL },
+	  0x0, 10, M(1), M(100), &g.c_rows, NULL },
 
 	{ "runs",
 	  "the number of runs",
-	  0x0, C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_runs, NULL },
+	  C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_runs, NULL },
 
 	{ "split_pct",
 	  "page split size as a percentage of the maximum page size",
-	  0x0, 0x0, 40, 85, 85, &g.c_split_pct, NULL },
+	  0x0, 40, 85, 85, &g.c_split_pct, NULL },
 
 	{ "statistics",
 	  "maintain statistics",				/* 20% */
-	  0x0, C_BOOL, 20, 0, 0, &g.c_statistics, NULL },
+	  C_BOOL, 20, 0, 0, &g.c_statistics, NULL },
 
 	{ "threads",
 	  "the number of threads",
-	  0x0, C_IGNORE, 1, 32, 128, &g.c_threads, NULL },
+	  C_IGNORE, 1, 32, 128, &g.c_threads, NULL },
 
 	{ "value_max",
 	  "maximum size of values",
-	  C_ROW|C_VAR, 0x0, 32, 4096, MEGABYTE(10), &g.c_value_max, NULL },
+	  0x0, 32, 4096, MEGABYTE(10), &g.c_value_max, NULL },
 
 	{ "value_min",
 	  "minimum size of values",
-	  C_ROW|C_VAR, 0x0, 0, 20, 4096, &g.c_value_min, NULL },
+	  0x0, 0, 20, 4096, &g.c_value_min, NULL },
 
 	{ "wiredtiger_config",
 	  "configuration string used to wiredtiger_open",
-	  0x0, C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_config_open },
+	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_config_open },
 
 	{ "write_pct",
 	  "percent operations that are writes",
-	  0x0, C_OPS, 0, 90, 90, &g.c_write_pct, NULL },
+	  C_OPS, 0, 90, 90, &g.c_write_pct, NULL },
 
-	{ NULL, NULL, 0x0, 0x0, 0, 0, 0, NULL, NULL }
+	{ NULL, NULL, 0x0, 0, 0, 0, NULL, NULL }
 };

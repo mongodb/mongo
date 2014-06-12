@@ -16,6 +16,7 @@ DbMultiple
 EAGAIN
 EB
 EBUSY
+ECMA
 EINVAL
 EmpId
 FreeBSD
@@ -183,6 +184,7 @@ ip
 je
 jemalloc
 jni
+jrx
 json
 keyexist
 keyfmt
@@ -300,7 +302,6 @@ rf
 ro
 rpc
 rwlock
-rx
 sHQ
 sHq
 scalable

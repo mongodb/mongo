@@ -74,8 +74,8 @@ The \c os_cache_dirty_max configuration may not be used in combination
 with direct I/O.
 
 The \c os_cache_dirty_max configuration is based on the non-standard
-Linux \c sync_file_range system call and may not available on all
-platforms.
+Linux \c sync_file_range system call and will be ignored if set
+and that call is not available.
 
 @section tuning_system_buffer_cache_os_cache_max os_cache_max
 

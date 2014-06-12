@@ -68,7 +68,8 @@ wts_ops(void)
 
 	/* Open a session. */
 	if (g.logging != 0) {
-		if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		if ((ret = conn->open_session(
+		    conn, NULL, g.session_config, &session)) != 0)
 			die(ret, "connection.open_session");
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== thread ops start ===============");
@@ -218,7 +219,7 @@ ops(void *arg)
 				die(ret, "session.close");
 
 			if ((ret = conn->open_session(
-			    conn, NULL, NULL, &session)) != 0)
+			    conn, NULL, g.session_config, &session)) != 0)
 				die(ret, "connection.open_session");
 
 			/*
@@ -464,7 +465,8 @@ wts_read_scan(void)
 	key_gen_setup(&keybuf);
 
 	/* Open a session and cursor pair. */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+	if ((ret = conn->open_session(
+	    conn, NULL, g.session_config, &session)) != 0)
 		die(ret, "connection.open_session");
 	if ((ret = session->open_cursor(
 	    session, g.uri, NULL, NULL, &cursor)) != 0)

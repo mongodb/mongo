@@ -500,9 +500,11 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	}
 
 	pindex = WT_INTL_INDEX_COPY(next);
-	for (i = 0; i < mod->mod_multi_entries; ++i)
+	for (i = 0; i < mod->mod_multi_entries; ++i) {
 		WT_ERR(__wt_multi_to_ref(session,
 		    next, &mod->mod_multi[i], &pindex->index[i], NULL));
+		pindex->index[i]->home = next;
+	}
 
 	/*
 	 * We maintain a list of pages written for the root in order to free the

@@ -100,7 +100,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection util_dump_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] dump [-rx] [-c checkpoint] [-f output] uri</code>
+<code>wt [-Vv] [-C config] [-h directory] dump [-jrx] [-c checkpoint] [-f output] uri</code>
 
 @subsection util_dump_options Options
 The following are command-specific options for the \c dump command:
@@ -113,6 +113,10 @@ checkpoint.
 @par <code>-f</code>
 By default, the \c dump command output is written to the standard output;
 the \c -f option re-directs the output to the specified file.
+
+@par <code>-j</code>
+Dump in JSON (<a href="http://www.json.org">JavaScript Object Notation</a>)
+format.
 
 @par <code>-r</code>
 Dump in reverse order, from largest key to smallest.

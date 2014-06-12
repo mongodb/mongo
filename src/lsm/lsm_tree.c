@@ -415,23 +415,16 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, lsm_tree->merge_threads <= WT_LSM_MAX_WORKERS);
 
 	/*
-	 * Set up the config for each chunk.  If possible, avoid high latencies
-	 * from fsync by flushing the cache every 8MB (will be overridden by
-	 * any application setting).
+	 * Set up the config for each chunk.
 	 *
-	 * Also make the memory_page_max double the chunk size, so application
+	 * Make the memory_page_max double the chunk size, so application
 	 * threads don't immediately try to force evict the chunk when the
 	 * worker thread clears the NO_EVICTION flag.
 	 */
-	tmpconfig = "";
-#ifdef HAVE_SYNC_FILE_RANGE
-	if (!S2C(session)->direct_io)
-		tmpconfig = "os_cache_dirty_max=8MB,";
-#endif
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
-	    "%s%s,key_format=u,value_format=u,memory_page_max=%" PRIu64,
-	    tmpconfig, config, 2 * lsm_tree->chunk_max));
+	    "%s,key_format=u,value_format=u,memory_page_max=%" PRIu64,
+	    config, 2 * lsm_tree->chunk_max));
 	WT_ERR(__wt_strndup(
 	    session, buf->data, buf->size, &lsm_tree->file_config));
 
@@ -606,9 +599,9 @@ void
 __wt_lsm_tree_throttle(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int decrease_only)
 {
-	WT_LSM_CHUNK *chunk, **cp, *ondisk, *prev_chunk;
+	WT_LSM_CHUNK *last_chunk, **cp, *ondisk, *prev_chunk;
 	uint64_t cache_sz, cache_used, oldtime, record_count, timediff;
-	uint32_t i, in_memory, gen0_chunks;
+	uint32_t in_memory, gen0_chunks;
 
 	/* Never throttle in small trees. */
 	if (lsm_tree->nchunks < 3) {
@@ -634,34 +627,36 @@ __wt_lsm_tree_throttle(
 	record_count = 1;
 	gen0_chunks = in_memory = 0;
 	ondisk = NULL;
-	for (i = 0, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
-	    i < lsm_tree->nchunks;
-	    ++i, --cp)
+	for (cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
+	    cp >= lsm_tree->chunk;
+	    --cp)
 		if (!F_ISSET(*cp, WT_LSM_CHUNK_ONDISK)) {
 			record_count += (*cp)->count;
 			++in_memory;
 		} else {
+			/*
+			 * Assign ondisk to the last chunk that has been
+			 * flushed since the tree was last opened (i.e it's on
+			 * disk and stable is not set).
+			 */
 			if (ondisk == NULL &&
-			    ((*cp)->generation == 0 ||
-			    F_ISSET(*cp, WT_LSM_CHUNK_STABLE)))
+			    ((*cp)->generation == 0 &&
+			    !F_ISSET(*cp, WT_LSM_CHUNK_STABLE)))
 				ondisk = *cp;
 
 			if ((*cp)->generation == 0 &&
 			    !F_ISSET(*cp, WT_LSM_CHUNK_MERGING))
 				++gen0_chunks;
-			else if (ondisk != NULL)
-				break;
 		}
 
-	chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
+	last_chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
 
 	/* Checkpoint throttling, based on the number of in-memory chunks. */
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 3)
 		lsm_tree->ckpt_throttle = 0;
 	else if (decrease_only)
 		; /* Nothing to do */
-	else if (i == lsm_tree->nchunks ||
-	    F_ISSET(ondisk, WT_LSM_CHUNK_STABLE)) {
+	else if (ondisk == NULL) {
 		/*
 		 * No checkpoint has completed this run.  Keep slowing down
 		 * inserts until one does.
@@ -670,8 +665,9 @@ __wt_lsm_tree_throttle(
 		    WT_MAX(WT_LSM_THROTTLE_START, 2 * lsm_tree->ckpt_throttle);
 	} else {
 		WT_ASSERT(session,
-		    WT_TIMECMP(chunk->create_ts, ondisk->create_ts) >= 0);
-		timediff = WT_TIMEDIFF(chunk->create_ts, ondisk->create_ts);
+		    WT_TIMECMP(last_chunk->create_ts, ondisk->create_ts) >= 0);
+		timediff =
+		    WT_TIMEDIFF(last_chunk->create_ts, ondisk->create_ts);
 		lsm_tree->ckpt_throttle =
 		    (long)((in_memory - 2) * timediff / (20 * record_count));
 
@@ -715,14 +711,13 @@ __wt_lsm_tree_throttle(
 	 * check that the new value is sane: otherwise, after a long idle
 	 * period, we can calculate a crazy value.
 	 */
-	if (in_memory > 1 &&
-	    i != lsm_tree->nchunks &&
-	    !F_ISSET(ondisk, WT_LSM_CHUNK_STABLE)) {
+	if (in_memory > 1 && ondisk != NULL) {
 		prev_chunk = lsm_tree->chunk[lsm_tree->nchunks - 2];
 		WT_ASSERT(session, prev_chunk->generation == 0);
-		WT_ASSERT(session,
-		    WT_TIMECMP(chunk->create_ts, prev_chunk->create_ts) >= 0);
-		timediff = WT_TIMEDIFF(chunk->create_ts, prev_chunk->create_ts);
+		WT_ASSERT(session, WT_TIMECMP(
+		    last_chunk->create_ts, prev_chunk->create_ts) >= 0);
+		timediff =
+		    WT_TIMEDIFF(last_chunk->create_ts, prev_chunk->create_ts);
 		WT_ASSERT(session,
 		    WT_TIMECMP(prev_chunk->create_ts, ondisk->create_ts) >= 0);
 		oldtime = WT_TIMEDIFF(prev_chunk->create_ts, ondisk->create_ts);
