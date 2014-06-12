@@ -1298,6 +1298,21 @@ execute_populate(CONFIG *cfg)
 	 * then any in-progress compact/merge is aborted.
 	 */
 	if (cfg->compact) {
+		/*
+		 * Reopen the connection.  We do this so that all data is
+		 * on disk before the compact starts.
+		 */
+		if ((ret = cfg->conn->close(cfg->conn, NULL)) != 0) {
+			lprintf(cfg, ret, 0, "Closing the connection failed");
+			return (ret);
+		}
+		if ((ret = wiredtiger_open(
+		    cfg->home, NULL, cfg->conn_config, &cfg->conn)) != 0) {
+			lprintf(
+			    cfg, ret, 0, "Re-opening the connection failed");
+			return (ret);
+		}
+
 		assert(cfg->async_threads > 0);
 		lprintf(cfg, 0, 1, "Compact after populate");
 		if ((ret = __wt_epoch(NULL, &start)) != 0) {
