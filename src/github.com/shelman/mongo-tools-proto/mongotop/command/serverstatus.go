@@ -87,5 +87,5 @@ func (self *ServerStatus) Diff(other Command) (Diff, error) {
 		}
 	}
 
-	return nil, nil
+	return diff, nil
 }

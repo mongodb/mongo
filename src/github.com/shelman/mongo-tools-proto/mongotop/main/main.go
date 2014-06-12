@@ -59,6 +59,7 @@ func main() {
 	// instantiate a mongotop instance
 	top := &mongotop.MongoTop{
 		Options:         opts,
+		OutputOptions:   outputOpts,
 		Outputter:       &output.TerminalOutputter{},
 		SessionProvider: sessionProvider,
 		Sleeptime:       time.Duration(sleeptime) * time.Second,

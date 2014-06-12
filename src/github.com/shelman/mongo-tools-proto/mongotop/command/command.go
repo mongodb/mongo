@@ -1,6 +1,7 @@
 package command
 
 type Command interface {
+	AsRunnable() interface{}
 	Diff(Command) (Diff, error)
 }
 

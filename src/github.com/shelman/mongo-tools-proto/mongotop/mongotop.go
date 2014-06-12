@@ -7,6 +7,7 @@ import (
 	"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/mongotop/command"
+	"github.com/shelman/mongo-tools-proto/mongotop/options"
 	"github.com/shelman/mongo-tools-proto/mongotop/output"
 	"time"
 )
@@ -15,6 +16,9 @@ import (
 type MongoTop struct {
 	// generic mongo tool options
 	Options *commonopts.ToolOptions
+
+	// mongotop-specific output options
+	OutputOptions *options.Output
 
 	// for connecting to the db
 	SessionProvider *db.SessionProvider
@@ -30,8 +34,18 @@ type MongoTop struct {
 // the results appropriately.
 func (self *MongoTop) Run() error {
 
-	// the results from the previous run, used for diffing
-	previousResults := &command.Top{}
+	// the results used to be compared to each other
+	var previousResults command.Command
+	var topResults command.Command
+	if self.OutputOptions.Locks {
+		previousResults = &command.ServerStatus{}
+		topResults = &command.ServerStatus{}
+	} else {
+		previousResults = &command.Top{}
+		topResults = &command.Top{}
+	}
+
+	// populate the first run of the previous results
 	err := self.SessionProvider.RunCommand("admin", previousResults)
 	if err != nil {
 		return fmt.Errorf("error running top command: %v", err)
@@ -43,7 +57,6 @@ func (self *MongoTop) Run() error {
 		time.Sleep(self.Sleeptime)
 
 		// run the top command against the database
-		topResults := &command.Top{}
 		err = self.SessionProvider.RunCommand("admin", topResults)
 		if err != nil {
 			return fmt.Errorf("error running top command: %v", err)
