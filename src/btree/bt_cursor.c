@@ -76,63 +76,66 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_COL *cip;
-	WT_INSERT *ins;
 	WT_PAGE *page;
+	WT_ROW *rip;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 
 	btree = cbt->btree;
-	ins = cbt->ins;
 	page = cbt->ref->page;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	/* If we found an insert list entry with a visible update, use it. */
-	if (ins != NULL) {
-		if ((upd = __wt_txn_read(session, ins->upd)) != NULL)
-			return (WT_UPDATE_DELETED_ISSET(upd) ? 1 : 0);
-
-		/* Do we have a position on the page? */
-		switch (btree->type) {
-		case BTREE_COL_FIX:
-			if (cbt->recno >=
-			    page->pg_fix_recno + page->pg_fix_entries)
-				return (1);
-			break;
-		case BTREE_COL_VAR:
-			if (cbt->slot > page->pg_var_entries)
-				return (1);
-			break;
-		case BTREE_ROW:
-			if (cbt->slot > page->pg_row_entries)
-				return (1);
-			break;
-		}
-	}
+	/* Check for an insert list entry with a visible update. */
+	if (cbt->ins != NULL &&
+	    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL)
+		return (WT_UPDATE_DELETED_ISSET(upd) ? 1 : 0);
 
 	/*
-	 * Check for empty pages (the page may be empty, the search routine
-	 * doesn't check), otherwise, check for an update in the page's slots.
+	 * Check for a valid page entry: avoid empty pages (the page may be
+	 * empty, the search routines don't check).  If we find a valid page
+	 * entry, check for a delete update.
 	 */
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		if (page->pg_fix_entries == 0)
+		/* Check for a valid page entry. */
+		if (page->pg_fix_entries == 0 ||
+		    cbt->recno >= page->pg_fix_recno + page->pg_fix_entries)
 			return (1);
+
+		/*
+		 * Updates aren't stored on the page, an update would have
+		 * appeared as an "insert" object; no further checks to do.
+		 */
 		break;
 	case BTREE_COL_VAR:
-		if (page->pg_var_entries == 0)
+		/* Check for a valid page entry. */
+		if (page->pg_var_entries == 0 ||
+		    cbt->slot > page->pg_var_entries)
 			return (1);
+
+		/*
+		 * Updates aren't stored on the page, an update would have
+		 * appeared as an "insert" object.  However, variable-length
+		 * column store deletes are written to the backing store,
+		 * check the cell for a record that was deleted when it was
+		 * read.
+		 */
 		cip = &page->pg_var_d[cbt->slot];
 		if ((cell = WT_COL_PTR(page, cip)) == NULL ||
 		    __wt_cell_type(cell) == WT_CELL_DEL)
 			return (1);
 		break;
 	case BTREE_ROW:
-		if (page->pg_row_entries == 0)
+		/* Check for a valid page entry. */
+		if (page->pg_row_entries == 0 ||
+		    cbt->slot > page->pg_row_entries)
 			return (1);
-		if (page->pg_row_upd != NULL && (upd = __wt_txn_read(session,
-		    page->pg_row_upd[cbt->slot])) != NULL &&
-		    WT_UPDATE_DELETED_ISSET(upd))
-			return (1);
+
+		/* Updates are stored on the page, check for a delete. */
+		rip = &page->pg_row_d[cbt->slot];
+		if ((upd =
+		    __wt_txn_read(session, WT_ROW_UPDATE(page, rip))) != NULL)
+			return (WT_UPDATE_DELETED_ISSET(upd) ? 1 : 0);
 		break;
 	}
 	return (0);
