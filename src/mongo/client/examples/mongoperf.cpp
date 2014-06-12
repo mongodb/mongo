@@ -121,7 +121,7 @@ void workerThread() {
             }
             if( w ) {
                 for( unsigned p = P; p <= recSizeKB; p += P ) {
-                    if( rofs < len ) 
+                    if( wofs < len )
                         mmf[wofs] = 3;
                     wofs += PG;
                 }
