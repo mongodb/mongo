@@ -55,11 +55,13 @@ namespace mongo {
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual PlanStageStats* getStats();
+
     private:
+        void init();
+
         scoped_ptr<mongo::twod_exec::GeoBrowse> _browse;
         TwoDParams _params;
         WorkingSet* _workingSet;
-        bool _initted;
         IndexDescriptor* _descriptor;
         TwoDAccessMethod* _am;
         CommonStats _commonStats;

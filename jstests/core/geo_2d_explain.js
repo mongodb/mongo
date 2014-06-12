@@ -27,3 +27,11 @@ print('explain = ' + tojson(explain));
 assert.eq({}, explain.indexBounds);
 assert.eq(explain.n, explain.nscannedObjects);
 assert.lte(explain.n, explain.nscanned);
+
+
+// SERVER-13701
+// Explain shouldn't crash mongod
+t.drop();
+t.ensureIndex({"detection.position": "2d", "creationDate": 1});
+t.ensureIndex({"creationDate": 1});
+t.find({"detection.position": { $geoWithin: { $box: [ [ 0.1, 0.1 ], [ 0.2, 0.2 ] ] } } }).sort({ creationDate: 1 }).explain();

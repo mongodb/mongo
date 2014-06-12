@@ -35,56 +35,51 @@
 namespace mongo {
 
     TwoD::TwoD(const TwoDParams& params, WorkingSet* ws)
-        : _params(params), _workingSet(ws), _initted(false),
-          _descriptor(NULL), _am(NULL) { }
+        : _params(params), _workingSet(ws), _descriptor(NULL), _am(NULL) {
+
+        init();
+    }
 
     TwoD::~TwoD() { }
 
     bool TwoD::isEOF() {
-        return _initted && (NULL == _browse.get());
+        return NULL == _browse.get();
+    }
+
+    void TwoD::init() {
+        Database* database = cc().database();
+        if ( !database ) return;
+
+        Collection* collection = database->getCollection( _params.ns );
+        if ( !collection ) return;
+
+        _descriptor = collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern);
+        if ( _descriptor == NULL ) return;
+
+        _am = static_cast<TwoDAccessMethod*>( collection->getIndexCatalog()->getIndex( _descriptor ) );
+        verify( _am );
+
+        if (NULL != _params.gq.getGeometry()._cap.get()) {
+            _browse.reset(new twod_exec::GeoCircleBrowse(_params, _am));
+        }
+        else if (NULL != _params.gq.getGeometry()._polygon.get()) {
+            _browse.reset(new twod_exec::GeoPolygonBrowse(_params, _am));
+        }
+        else {
+            verify(NULL != _params.gq.getGeometry()._box.get());
+            _browse.reset(new twod_exec::GeoBoxBrowse(_params, _am));
+        }
+
+        // Fill out static portion of plan stats.
+        // We will retrieve the geo hashes used by the geo browser
+        // when the search is complete.
+        _specificStats.type = _browse->_type;
+        _specificStats.field = _params.gq.getField();
+        _specificStats.converterParams = _browse->_converter->getParams();
     }
 
     PlanStage::StageState TwoD::work(WorkingSetID* out) {
         if (isEOF()) { return PlanStage::IS_EOF; }
-
-        if (!_initted) {
-            _initted = true;
-
-            Database* database = cc().database();
-            if ( !database )
-                return PlanStage::IS_EOF;
-
-            Collection* collection = database->getCollection( _params.ns );
-            if ( !collection )
-                return PlanStage::IS_EOF;
-
-            _descriptor = collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern);
-            if ( _descriptor == NULL )
-                return PlanStage::IS_EOF;
-
-            _am = static_cast<TwoDAccessMethod*>( collection->getIndexCatalog()->getIndex( _descriptor ) );
-            verify( _am );
-
-            if (NULL != _params.gq.getGeometry()._cap.get()) {
-                _browse.reset(new twod_exec::GeoCircleBrowse(_params, _am));
-            }
-            else if (NULL != _params.gq.getGeometry()._polygon.get()) {
-                _browse.reset(new twod_exec::GeoPolygonBrowse(_params, _am));
-            }
-            else {
-                verify(NULL != _params.gq.getGeometry()._box.get());
-                _browse.reset(new twod_exec::GeoBoxBrowse(_params, _am));
-            }
-
-            // Fill out static portion of plan stats.
-            // We will retrieve the geo hashes used by the geo browser
-            // when the search is complete.
-            _specificStats.type = _browse->_type;
-            _specificStats.field = _params.gq.getField();
-            _specificStats.converterParams = _browse->_converter->getParams();
-
-            return PlanStage::NEED_TIME;
-        }
 
         verify(NULL != _browse.get());
 
