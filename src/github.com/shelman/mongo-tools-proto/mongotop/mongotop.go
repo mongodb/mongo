@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
+	"github.com/shelman/mongo-tools-proto/common/util"
 	"github.com/shelman/mongo-tools-proto/mongotop/command"
 	"github.com/shelman/mongo-tools-proto/mongotop/options"
 	"github.com/shelman/mongo-tools-proto/mongotop/output"
@@ -34,6 +35,18 @@ type MongoTop struct {
 // the results appropriately.
 func (self *MongoTop) Run() error {
 
+	// test the connection
+	session, err := self.SessionProvider.GetSession()
+	if err != nil {
+		util.Printlnf("Connection error: %v", err)
+	}
+	session.Close()
+	connUrl := self.Options.Host
+	if self.Options.Port != "" {
+		connUrl = connUrl + ":" + self.Options.Port
+	}
+	util.Printlnf("connected to: %v", connUrl)
+
 	// the results used to be compared to each other
 	var previousResults command.Command
 	if self.OutputOptions.Locks {
@@ -43,7 +56,7 @@ func (self *MongoTop) Run() error {
 	}
 
 	// populate the first run of the previous results
-	err := self.SessionProvider.RunCommand("admin", previousResults)
+	err = self.SessionProvider.RunCommand("admin", previousResults)
 	if err != nil {
 		return fmt.Errorf("error running top command: %v", err)
 	}

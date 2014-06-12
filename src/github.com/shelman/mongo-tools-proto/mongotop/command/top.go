@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Top struct {
@@ -37,7 +38,8 @@ func (self *TopDiff) ToRows() [][]string {
 	rows := [][]string{}
 
 	// the header row
-	headerRow := []string{"ns", "total", "read", "write"}
+	headerRow := []string{"ns", "total", "read", "write",
+		time.Now().Format("2006-01-02T15:04:05")}
 	rows = append(rows, headerRow)
 
 	// sort the namespaces
