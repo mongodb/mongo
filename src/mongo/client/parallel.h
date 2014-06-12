@@ -200,11 +200,34 @@ namespace mongo {
 
         bool isCommand(){ return NamespaceString( _qSpec.ns() ).isCommand(); }
         bool isExplain(){ return _qSpec.isExplain(); }
-        bool isVersioned(){ return _qShards.size() == 0; }
 
+        /**
+         * Returns whether the collection was sharded when the cursors were established.
+         */
         bool isSharded();
+
+        /**
+         * Returns the number of shards with open cursors.
+         */
+        int getNumQueryShards();
+
+        /**
+         * Returns the set of shards with open cursors.
+         */
+        void getQueryShards(std::set<Shard>& shards);
+
+        /**
+         * Returns the single shard with an open cursor.
+         * It is an error to call this if getNumQueryShards() > 1
+         */
+        ShardPtr getQueryShard();
+
+        /**
+         * Returns primary shard with an open cursor.
+         * It is an error to call this if the collection is sharded.
+         */
         ShardPtr getPrimary();
-        void getQueryShards( std::set<Shard>& shards );
+
         ChunkManagerPtr getChunkManager( const Shard& shard );
         DBClientCursorPtr getShardCursor( const Shard& shard );
 
@@ -224,7 +247,6 @@ namespace mongo {
         bool _didInit;
         bool _done;
 
-        std::set<Shard> _qShards;
         QuerySpec _qSpec;
         CommandInfo _cInfo;
 
