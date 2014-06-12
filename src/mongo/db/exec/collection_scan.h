@@ -58,6 +58,9 @@ namespace mongo {
         virtual void recoverFromYield();
 
         virtual PlanStageStats* getStats();
+
+        static const char* kStageType;
+
     private:
         /**
          * Returns true if the record 'loc' references is in memory, false otherwise.

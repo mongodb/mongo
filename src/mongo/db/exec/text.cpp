@@ -38,6 +38,9 @@
 
 namespace mongo {
 
+    // static
+    const char* TextStage::kStageType = "TEXT";
+
     TextStage::TextStage(const TextStageParams& params,
                          WorkingSet* ws,
                          const MatchExpression* filter)
@@ -45,9 +48,9 @@ namespace mongo {
           _ftsMatcher(params.query, params.spec),
           _ws(ws),
           _filter(filter),
+          _commonStats(kStageType),
           _internalState(INIT_SCANS),
           _currentIndexScanner(0) {
-
         _scoreIterator = _scores.end();
     }
 
@@ -133,6 +136,16 @@ namespace mongo {
 
     PlanStageStats* TextStage::getStats() {
         _commonStats.isEOF = isEOF();
+
+        // Add a BSON representation of the filter to the stats tree, if there is one.
+        if (NULL != _filter) {
+            BSONObjBuilder bob;
+            _filter->toBSON(&bob);
+            _commonStats.filter = bob.obj();
+        }
+
+        _specificStats.indexPrefix = _params.indexPrefix;
+
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_TEXT));
         ret->specific.reset(new TextStats(_specificStats));
         return ret.release();

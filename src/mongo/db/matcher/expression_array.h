@@ -86,6 +86,8 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level ) const;
 
+        virtual void toBSON(BSONObjBuilder* out) const;
+
         virtual size_t numChildren() const { return 1; }
 
         virtual MatchExpression* getChild( size_t i ) const { return _sub.get(); }
@@ -119,6 +121,8 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level ) const;
 
+        virtual void toBSON(BSONObjBuilder* out) const;
+
         virtual size_t numChildren() const { return _subs.size(); }
 
         virtual MatchExpression* getChild( size_t i ) const { return _subs[i]; }
@@ -146,6 +150,8 @@ namespace mongo {
         virtual bool matchesArray( const BSONObj& anArray, MatchDetails* details ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
 
@@ -187,6 +193,8 @@ namespace mongo {
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
 

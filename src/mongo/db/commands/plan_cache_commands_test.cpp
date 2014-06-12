@@ -104,7 +104,8 @@ namespace {
     PlanRankingDecision* createDecision(size_t numPlans) {
         auto_ptr<PlanRankingDecision> why(new PlanRankingDecision());
         for (size_t i = 0; i < numPlans; ++i) {
-            auto_ptr<PlanStageStats> stats(new PlanStageStats(CommonStats(), STAGE_COLLSCAN));
+            CommonStats common("COLLSCAN");
+            auto_ptr<PlanStageStats> stats(new PlanStageStats(common, STAGE_COLLSCAN));
             stats->specific.reset(new CollectionScanStats());
             why->stats.mutableVector().push_back(stats.release());
             why->scores.push_back(0U);

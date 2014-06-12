@@ -78,6 +78,8 @@ namespace mongo {
 
         virtual PlanStageStats* getStats();
 
+        static const char* kStageType;
+
     private:
         /**
          * Initialize the underlying IndexCursor
@@ -110,6 +112,8 @@ namespace mongo {
         bool _hitEnd;
 
         bool _shouldDedup;
+
+        CommonStats _commonStats;
     };
 
 }  // namespace mongo

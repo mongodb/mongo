@@ -71,6 +71,8 @@ namespace mongo {
 
         PlanStageStats* getStats();
 
+        static const char* kStageType;
+
     private:
         // Not owned by us.
         const Collection* _collection;

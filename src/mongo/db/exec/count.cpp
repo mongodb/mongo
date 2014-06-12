@@ -33,6 +33,9 @@
 
 namespace mongo {
 
+    // static
+    const char* Count::kStageType = "COUNT";
+
     Count::Count(const CountParams& params, WorkingSet* workingSet)
         : _workingSet(workingSet),
           _descriptor(params.descriptor),
@@ -40,7 +43,8 @@ namespace mongo {
           _btreeCursor(NULL),
           _params(params),
           _hitEnd(false),
-          _shouldDedup(params.descriptor->isMultikey()) { }
+          _shouldDedup(params.descriptor->isMultikey()),
+          _commonStats(kStageType) { }
 
     void Count::initIndexCursor() {
         CursorOptions cursorOptions;

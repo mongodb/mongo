@@ -48,6 +48,8 @@ namespace mongo {
 
 namespace repl {
 
+    class TopologyCoordinator;
+
     /**
      * The ReplicationCoordinator is responsible for coordinating the interaction of replication
      * with the rest of the system.  The public methods on ReplicationCoordinator are the public
@@ -66,8 +68,10 @@ namespace repl {
          * Does any initial bookkeeping needed to start replication, and instructs the other
          * components of the replication system to start up whatever threads and do whatever
          * initialization they need.
+         * Takes ownership of the passed-in TopologyCoordinator and NetworkInterface.
          */
-        virtual void startReplication(ReplicationExecutor::NetworkInterface* network) = 0;
+        virtual void startReplication(TopologyCoordinator* topCoord,
+                                      ReplicationExecutor::NetworkInterface* network) = 0;
 
         /**
          * Does whatever cleanup is required to stop replication, including instructing the other

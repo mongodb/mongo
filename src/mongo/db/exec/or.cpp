@@ -33,8 +33,11 @@
 
 namespace mongo {
 
+    // static
+    const char* OrStage::kStageType = "OR";
+
     OrStage::OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter)
-        : _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup) { }
+        : _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup), _commonStats(kStageType) { }
 
     OrStage::~OrStage() {
         for (size_t i = 0; i < _children.size(); ++i) {
@@ -167,6 +170,13 @@ namespace mongo {
 
     PlanStageStats* OrStage::getStats() {
         _commonStats.isEOF = isEOF();
+
+        // Add a BSON representation of the filter to the stats tree, if there is one.
+        if (NULL != _filter) {
+            BSONObjBuilder bob;
+            _filter->toBSON(&bob);
+            _commonStats.filter = bob.obj();
+        }
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_OR));
         ret->specific.reset(new OrStats(_specificStats));

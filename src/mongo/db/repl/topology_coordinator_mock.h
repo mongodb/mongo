@@ -28,54 +28,47 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/db/repl/repl_coordinator.h"
+#include "mongo/db/repl/topology_coordinator.h"
 
 namespace mongo {
 namespace repl {
 
-    /**
-     * A mock ReplicationCoordinator.  Currently it is extremely simple and exists solely to link
-     * into dbtests.
-     */
-    class ReplicationCoordinatorMock : public ReplicationCoordinator {
-        MONGO_DISALLOW_COPYING(ReplicationCoordinatorMock);
-
+    class TopologyCoordinatorMock : public TopologyCoordinator {
     public:
 
-        ReplicationCoordinatorMock();
-        virtual ~ReplicationCoordinatorMock();
+        TopologyCoordinatorMock();
+        virtual ~TopologyCoordinatorMock() {};
+        
+        virtual void setLastApplied(const OpTime& optime);
+        virtual void setCommitOkayThrough(const OpTime& optime);
+        virtual void setLastReceived(const OpTime& optime);
 
-        virtual void startReplication(TopologyCoordinator* topCoord,
-                                      ReplicationExecutor::NetworkInterface* network);
+        virtual HostAndPort getSyncSourceAddress() const;
 
-        virtual void shutdown();
+        virtual void chooseNewSyncSource(Date_t now); // this is basically getMemberToSyncTo()
 
-        virtual bool isShutdownOkay() const;
+        virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
 
-        virtual bool isReplEnabled() const;
+        virtual void registerConfigChangeCallback(const ConfigChangeCallbackFn& fn);
+        virtual void registerStateChangeCallback(const StateChangeCallbackFn& fn);
 
-        virtual Mode getReplicationMode() const;
+        virtual void signalDrainComplete();
 
-        virtual MemberState getCurrentMemberState() const;
+        virtual bool prepareRequestVoteResponse(const BSONObj& cmdObj, 
+                                                std::string& errmsg, 
+                                                BSONObjBuilder& result);
 
-        virtual Status awaitReplication(const OpTime& ts,
-                                        const WriteConcernOptions& writeConcern,
-                                        Milliseconds timeout);
+        virtual void prepareElectCmdResponse(const BSONObj& cmdObj, BSONObjBuilder& result);
 
+        virtual bool prepareHeartbeatResponse(Date_t now,
+                                              const BSONObj& cmdObj, 
+                                              std::string& errmsg, 
+                                              BSONObjBuilder& result);
 
-        virtual bool canAcceptWritesForDatabase(const StringData& dbName);
+        virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
 
-        virtual bool canServeReadsFor(const NamespaceString& collection);
+        virtual void relinquishPrimary();
 
-        virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
-
-        virtual Status setLastOptime(const HostAndPort& member, const OpTime& ts);
-
-        virtual bool processHeartbeat(OperationContext* txn, 
-                                      const BSONObj& cmdObj, 
-                                      std::string* errmsg,
-                                      BSONObjBuilder* result);
     };
 
 } // namespace repl

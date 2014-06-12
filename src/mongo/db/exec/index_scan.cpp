@@ -33,6 +33,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/query/explain.h"
 
 namespace {
 
@@ -47,6 +48,9 @@ namespace {
 
 namespace mongo {
 
+    // static
+    const char* IndexScan::kStageType = "IXSCAN";
+
     IndexScan::IndexScan(const IndexScanParams& params, WorkingSet* workingSet,
                          const MatchExpression* filter)
         : _workingSet(workingSet),
@@ -55,13 +59,14 @@ namespace mongo {
           _shouldDedup(true),
           _yieldMovedCursor(false),
           _params(params),
-          _btreeCursor(NULL) { }
+          _btreeCursor(NULL),
+          _commonStats(kStageType) {
+        _iam = _params.descriptor->getIndexCatalog()->getIndex(_params.descriptor);
+        _keyPattern = _params.descriptor->keyPattern().getOwned();
+    }
 
     void IndexScan::initIndexScan() {
         // Perform the possibly heavy-duty initialization of the underlying index cursor.
-        _iam = _params.descriptor->getIndexCatalog()->getIndex(_params.descriptor);
-        _keyPattern = _params.descriptor->keyPattern().getOwned();
-
         if (_params.doNotDedup) {
             _shouldDedup = false;
         }
@@ -338,10 +343,26 @@ namespace mongo {
         // catalog information here.
         _commonStats.isEOF = isEOF();
 
+        // Add a BSON representation of the filter to the stats tree, if there is one.
+        if (NULL != _filter) {
+            BSONObjBuilder bob;
+            _filter->toBSON(&bob);
+            _commonStats.filter = bob.obj();
+        }
+
         // These specific stats fields never change.
         if (_specificStats.indexType.empty()) {
             _specificStats.indexType = "BtreeCursor"; // TODO amName;
-            _specificStats.indexBounds = _params.bounds.toBSON();
+
+            // TODO this can be simplified once the new explain format is
+            // the default. Probably won't need to include explain.h here either.
+            if (enableNewExplain) {
+                _specificStats.indexBounds = _params.bounds.toBSON();
+            }
+            else {
+                _specificStats.indexBounds = _params.bounds.toLegacyBSON();
+            }
+
             _specificStats.indexBoundsVerbose = _params.bounds.toString();
             _specificStats.direction = _params.direction;
             _specificStats.keyPattern = _keyPattern;

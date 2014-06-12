@@ -61,6 +61,8 @@ namespace mongo {
 
         PlanStageStats* getStats();
 
+        static const char* kStageType;
+
     private:
 
         /**

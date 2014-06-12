@@ -48,6 +48,9 @@ namespace mongo {
 
     const size_t AndHashStage::kLookAheadWorks = 10;
 
+    // static
+    const char* AndHashStage::kStageType = "AND_HASH";
+
     AndHashStage::AndHashStage(WorkingSet* ws, 
                                const MatchExpression* filter,
                                const Collection* collection)
@@ -56,6 +59,7 @@ namespace mongo {
           _filter(filter),
           _hashingChildren(true),
           _currentChild(0),
+          _commonStats(kStageType),
           _memUsage(0),
           _maxMemUsage(kDefaultMaxMemUsageBytes) {}
 
@@ -68,6 +72,7 @@ namespace mongo {
           _filter(filter),
           _hashingChildren(true),
           _currentChild(0),
+          _commonStats(kStageType),
           _memUsage(0),
           _maxMemUsage(maxMemUsage) {}
 
@@ -500,6 +505,13 @@ namespace mongo {
 
         _specificStats.memLimit = _maxMemUsage;
         _specificStats.memUsage = _memUsage;
+
+        // Add a BSON representation of the filter to the stats tree, if there is one.
+        if (NULL != _filter) {
+            BSONObjBuilder bob;
+            _filter->toBSON(&bob);
+            _commonStats.filter = bob.obj();
+        }
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_HASH));
         ret->specific.reset(new AndHashStats(_specificStats));

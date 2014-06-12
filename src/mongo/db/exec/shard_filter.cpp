@@ -32,10 +32,13 @@
 
 namespace mongo {
 
+    // static
+    const char* ShardFilterStage::kStageType = "SHARDING_FILTER";
+
     ShardFilterStage::ShardFilterStage(const CollectionMetadataPtr& metadata,
                                        WorkingSet* ws,
                                        PlanStage* child)
-        : _ws(ws), _child(child), _metadata(metadata) { }
+        : _ws(ws), _child(child), _commonStats(kStageType), _metadata(metadata) { }
 
     ShardFilterStage::~ShardFilterStage() { }
 

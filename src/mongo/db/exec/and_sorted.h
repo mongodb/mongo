@@ -67,6 +67,8 @@ namespace mongo {
 
         virtual PlanStageStats* getStats();
 
+        static const char* kStageType;
+
     private:
         // Find a node to AND against.
         PlanStage::StageState getTargetLoc(WorkingSetID* out);

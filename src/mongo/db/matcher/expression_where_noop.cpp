@@ -67,6 +67,8 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
 
+        virtual void toBSON(BSONObjBuilder* out) const;
+
         virtual bool equivalent( const MatchExpression* other ) const ;
 
         virtual void resetTag() { setTag(NULL); }
@@ -90,6 +92,10 @@ namespace mongo {
 
         _debugAddSpace( debug, level + 1 );
         debug << "code: " << _code << "\n";
+    }
+
+    void WhereNoOpMatchExpression::toBSON(BSONObjBuilder* out) const {
+        out->append("$where", _code);
     }
 
     bool WhereNoOpMatchExpression::equivalent( const MatchExpression* other ) const {

@@ -39,7 +39,11 @@ function runTest(shutdownServer) {
     db.createUser({user: 'user', pwd: 'pass', roles: jsTest.basicUserRoles});
     db.createRole({role: 'role', roles: [], privileges:[]});
     var backupActions = ['find'];
+<<<<<<< HEAD
     db.createRole({role: 'backupFooChester',
+=======
+    db.createRole({role: 'backupFooChester', 
+>>>>>>> dfbf53178e31ebb8e0efea79f58eecfd11a96e0d
        privileges: [{resource: {db: 'foo', collection: 'chester'}, actions: backupActions}],
        roles: []});
     db.createUser({user: 'backupFooChester', pwd: 'pass', roles: ['backupFooChester']});
@@ -73,7 +77,11 @@ function runTest(shutdownServer) {
     mongod = runTool("mongorestore", mongod, shutdownServer, {dir: dumpDir + "foo/",
                                                               db: 'foo',
                                                               restoreDbUsersAndRoles: ""});
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> dfbf53178e31ebb8e0efea79f58eecfd11a96e0d
     db = mongod.getDB('foo');
 
     assert.soon(function() { return db.bar.findOne(); }, "no data after restore");

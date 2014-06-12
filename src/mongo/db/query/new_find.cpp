@@ -35,6 +35,7 @@
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"
@@ -479,6 +480,52 @@ namespace mongo {
         // We use this a lot below.
         const LiteParsedQuery& pq = cq->getParsed();
 
+        // set this outside loop. we will need to use this both within loop and when deciding
+        // to fill in explain information
+        const bool isExplain = pq.isExplain();
+
+        // New-style explains get diverted through a separate path which calls back into the
+        // query planner and query execution mechanisms.
+        //
+        // TODO temporary until find() becomes a real command.
+        if (isExplain && enableNewExplain) {
+            size_t options = QueryPlannerParams::DEFAULT;
+            if (shardingState.needCollectionMetadata(pq.ns())) {
+                options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+            }
+
+            BufBuilder bb;
+            bb.skip(sizeof(QueryResult));
+
+            BSONObjBuilder explainBob;
+            Status explainStatus = Explain::explain(collection, cq, options,
+                                                    Explain::QUERY_PLANNER, &explainBob);
+            if (!explainStatus.isOK()) {
+                uasserted(17510, "Explain error: " + explainStatus.reason());
+            }
+
+            // Add the resulting object to the return buffer.
+            BSONObj explainObj = explainBob.obj();
+            bb.appendBuf((void*)explainObj.objdata(), explainObj.objsize());
+
+            curop.debug().iscommand = true;
+            // TODO: Does this get overwritten/do we really need to set this twice?
+            curop.debug().query = q.query;
+
+            // Set query result fields.
+            QueryResult* qr = reinterpret_cast<QueryResult*>(bb.buf());
+            bb.decouple();
+            qr->setResultFlagsToOk();
+            qr->len = bb.len();
+            curop.debug().responseLength = bb.len();
+            qr->setOperation(opReply);
+            qr->cursorId = 0;
+            qr->startingFrom = 0;
+            qr->nReturned = 1;
+            result.setData(qr, true);
+            return "";
+        }
+
         // We'll now try to get the query runner that will execute this query for us. There
         // are a few cases in which we know upfront which runner we should get and, therefore,
         // we shortcut the selection process here.
@@ -561,10 +608,6 @@ namespace mongo {
         BSONObj obj;
         Runner::RunnerState state;
         // uint64_t numMisplacedDocs = 0;
-
-        // set this outside loop. we will need to use this both within loop and when deciding
-        // to fill in explain information
-        const bool isExplain = pq.isExplain();
 
         // Have we retrieved info about which plan the runner will
         // use to execute the query yet?

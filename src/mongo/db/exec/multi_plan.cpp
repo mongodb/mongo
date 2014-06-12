@@ -42,6 +42,10 @@
 #include "mongo/db/query/qlog.h"
 
 namespace mongo {
+
+    // static
+    const char* MultiPlanStage::kStageType = "MULTI_PLAN";
+
     MultiPlanStage::MultiPlanStage(const Collection* collection, CanonicalQuery* cq)
         : _collection(collection),
           _query(cq),
@@ -49,7 +53,8 @@ namespace mongo {
           _backupPlanIdx(kNoSuchPlan),
           _failure(false),
           _failureCount(0),
-          _statusMemberId(WorkingSet::INVALID_ID) { }
+          _statusMemberId(WorkingSet::INVALID_ID),
+          _commonStats(kStageType) { }
 
     MultiPlanStage::~MultiPlanStage() {
         if (bestPlanChosen()) {
@@ -65,6 +70,9 @@ namespace mongo {
                 delete _candidates[_backupPlanIdx].solution;
                 delete _candidates[_backupPlanIdx].root;
             }
+
+            // Clean up the losing candidates.
+            clearCandidates();
         }
         else {
             for (size_t ix = 0; ix < _candidates.size(); ++ix) {
@@ -243,18 +251,12 @@ namespace mongo {
                 _collection->infoCache()->getPlanCache()->add(*_query, solutions, ranking.release());
             }
         }
+    }
 
-        // Clear out the candidate plans, leaving only stats as we're all done w/them.
-        // Traverse candidate plans in order or score
-        for (size_t orderingIndex = 0;
-             orderingIndex < candidateOrder.size(); ++orderingIndex) {
-            // index into candidates/ranking
-            int ix = candidateOrder[orderingIndex];
-
-            if (ix == _bestPlanIdx) { continue; }
-            if (ix == _backupPlanIdx) { continue; }
-
-            delete _candidates[ix].solution;
+    vector<PlanStageStats*>* MultiPlanStage::generateCandidateStats() {
+        for (size_t ix = 0; ix < _candidates.size(); ix++) {
+            if (ix == (size_t)_bestPlanIdx) { continue; }
+            if (ix == (size_t)_backupPlanIdx) { continue; }
 
             // Remember the stats for the candidate plan because we always show it on an
             // explain. (The {verbose:false} in explain() is client-side trick; we always
@@ -263,7 +265,20 @@ namespace mongo {
             if (stats) {
                 _candidateStats.push_back(stats);
             }
+        }
+
+        return &_candidateStats;
+    }
+
+    void MultiPlanStage::clearCandidates() {
+        // Clear out the candidate plans, leaving only stats as we're all done w/them.
+        // Traverse candidate plans in order or score
+        for (size_t ix = 0; ix < _candidates.size(); ix++) {
+            if (ix == (size_t)_bestPlanIdx) { continue; }
+            if (ix == (size_t)_backupPlanIdx) { continue; }
+
             delete _candidates[ix].root;
+            delete _candidates[ix].solution;
         }
     }
 
@@ -313,6 +328,63 @@ namespace mongo {
         }
 
         return !doneWorking;
+    }
+
+    Status MultiPlanStage::executeWinningPlan() {
+        invariant(_bestPlanIdx != kNoSuchPlan);
+        PlanStage* winner = _candidates[_bestPlanIdx].root;
+        WorkingSet* ws = _candidates[_bestPlanIdx].ws;
+
+        bool doneWorking = false;
+
+        while (!doneWorking) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState state = winner->work(&id);
+
+            if (PlanStage::IS_EOF == state || PlanStage::DEAD == state) {
+                doneWorking = true;
+            }
+            else if (PlanStage::FAILURE == state) {
+                // Propogate error.
+                BSONObj errObj;
+                WorkingSetCommon::getStatusMemberObject(*ws, id, &errObj);
+                return Status(ErrorCodes::BadValue, WorkingSetCommon::toStatusString(errObj));
+            }
+        }
+
+        return Status::OK();
+    }
+
+    Status MultiPlanStage::executeAllPlans() {
+        // Boolean vector keeping track of which plans are done.
+        vector<bool> planDone(_candidates.size(), false);
+
+        // Number of plans that are done.
+        size_t doneCount = 0;
+
+        while (doneCount < _candidates.size()) {
+            for (size_t i = 0; i < _candidates.size(); i++) {
+                if (planDone[i]) {
+                    continue;
+                }
+
+                WorkingSetID id = WorkingSet::INVALID_ID;
+                PlanStage::StageState state = _candidates[i].root->work(&id);
+
+                if (PlanStage::IS_EOF == state || PlanStage::DEAD == state) {
+                    doneCount++;
+                    planDone[i] = true;
+                }
+                else if (PlanStage::FAILURE == state) {
+                    // Propogate error.
+                    BSONObj errObj;
+                    WorkingSetCommon::getStatusMemberObject(*_candidates[i].ws, id, &errObj);
+                    return Status(ErrorCodes::BadValue, WorkingSetCommon::toStatusString(errObj));
+                }
+            }
+        }
+
+        return Status::OK();
     }
 
     void MultiPlanStage::prepareToYield() {

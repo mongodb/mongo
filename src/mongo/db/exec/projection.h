@@ -109,6 +109,8 @@ namespace mongo {
                                              const FieldSet& includedFields,
                                              BSONObjBuilder& bob);
 
+        static const char* kStageType;
+
     private:
         Status transform(WorkingSetMember* member);
 
@@ -120,6 +122,7 @@ namespace mongo {
 
         // Stats
         CommonStats _commonStats;
+        ProjectionStats _specificStats;
 
         // Fast paths:
         ProjectionStageParams::ProjectionImplementation _projImpl;

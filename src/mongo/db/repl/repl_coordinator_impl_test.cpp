@@ -1,7 +1,5 @@
-// expression.cpp
-
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,53 +26,25 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/expression.h"
+#include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsonobjiterator.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/util/log.h"
+#include "mongo/db/repl/network_interface_mock.h"
+#include "mongo/db/repl/repl_coordinator_impl.h"
+#include "mongo/db/repl/topology_coordinator_mock.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace repl {
 
-    MatchExpression::MatchExpression( MatchType type )
-        : _matchType( type ) { }
+namespace {
 
-    string MatchExpression::toString() const {
-        StringBuilder buf;
-        debugString( buf, 0 );
-        return buf.str();
+    TEST(ReplicationCoordinator, StartupShutdown) {
+        ReplicationCoordinatorImpl coordinator;
+        coordinator.startReplication(new TopologyCoordinatorMock, new NetworkInterfaceMock);
+        coordinator.shutdown();
     }
 
-    void MatchExpression::_debugAddSpace( StringBuilder& debug, int level ) const {
-        for ( int i = 0; i < level; i++ )
-            debug << "    ";
-    }
-
-    bool MatchExpression::matchesBSON( const BSONObj& doc, MatchDetails* details ) const {
-        BSONMatchableDocument mydoc( doc );
-        return matches( &mydoc, details );
-    }
-
-
-    void AtomicMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace( debug, level );
-        debug << "$atomic\n";
-    }
-
-    void AtomicMatchExpression::toBSON(BSONObjBuilder* out) const {
-        out->append("$isolated", 1);
-    }
-
-    void FalseMatchExpression::debugString( StringBuilder& debug, int level ) const {
-        _debugAddSpace( debug, level );
-        debug << "$false\n";
-    }
-
-    void FalseMatchExpression::toBSON(BSONObjBuilder* out) const {
-        out->append("$false", 1);
-    }
-
-}
-
-
+}  // namespace
+}  // namespace repl
+}  // namespace mongo

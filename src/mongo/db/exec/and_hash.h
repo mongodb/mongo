@@ -81,6 +81,8 @@ namespace mongo {
 
         virtual PlanStageStats* getStats();
 
+        static const char* kStageType;
+
     private:
         static const size_t kLookAheadWorks;
 

@@ -76,6 +76,8 @@ namespace mongo {
 
         PlanStageStats* getStats();
 
+        static const char* kStageType;
+
     private:
         void init();
         StageState addResultToQueue(WorkingSetID* out);

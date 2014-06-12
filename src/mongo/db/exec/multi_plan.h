@@ -53,6 +53,11 @@ namespace mongo {
 
         virtual ~MultiPlanStage();
 
+        /**
+         * Helper used by the destructor to delete losing candidate plans.
+         */
+        void clearCandidates();
+
         virtual bool isEOF();
 
         virtual StageState work(WorkingSetID* out);
@@ -69,7 +74,7 @@ namespace mongo {
         void addPlan(QuerySolution* solution, PlanStage* root, WorkingSet* sharedWs);
 
         /**
-         * Runs all plans added by addPlan, ranks them, and picks a best.  Deletes all loser plans.
+         * Runs all plans added by addPlan, ranks them, and picks a best.
          * All further calls to getNext(...) will return results from the best plan.
          */
         void pickBestPlan();
@@ -89,6 +94,35 @@ namespace mongo {
          * Exposed for testing.
          */
         bool hasBackupPlan() const;
+
+        /**
+         * Gathers execution stats for all losing plans.
+         */
+        vector<PlanStageStats*>* generateCandidateStats();
+
+        //
+        // Used by explain.
+        //
+
+        /**
+         * Runs the winning plan into it hits EOF or returns DEAD, throwing out the results.
+         * Execution stats are gathered in the process.
+         *
+         * You can call this after calling pickBestPlan(...). It expects that a winning plan
+         * has already been selected.
+         */
+        Status executeWinningPlan();
+
+        /**
+         * Runs the candidate plans until each has either hit EOF or returned DEAD. Results
+         * from the plans are thrown out, but execution stats are gathered.
+         *
+         * You can call this after calling pickBestPlan(...). It expects that a winning plan
+         * has already been selected.
+         */
+        Status executeAllPlans();
+
+        static const char* kStageType;
 
     private:
         //

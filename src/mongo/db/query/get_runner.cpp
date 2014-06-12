@@ -397,7 +397,10 @@ namespace mongo {
                 // Owns none of the arguments
                 multiPlanStage->addPlan(solutions[ix], nextPlanRoot, sharedWorkingSet);
             }
+
             multiPlanStage->pickBestPlan();
+            multiPlanStage->generateCandidateStats();
+
             *out = new SingleSolutionRunner(collection,
                                             canonicalQuery.release(),
                                             multiPlanStage->bestSolution(),

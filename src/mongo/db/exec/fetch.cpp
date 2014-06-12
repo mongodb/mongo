@@ -37,14 +37,18 @@
 
 namespace mongo {
 
-    FetchStage::FetchStage(WorkingSet* ws, 
-                           PlanStage* child, 
-                           const MatchExpression* filter, 
+    // static
+    const char* FetchStage::kStageType = "FETCH";
+
+    FetchStage::FetchStage(WorkingSet* ws,
+                           PlanStage* child,
+                           const MatchExpression* filter,
                            const Collection* collection)
         : _collection(collection),
-          _ws(ws), 
-          _child(child), 
-          _filter(filter) { }
+          _ws(ws),
+          _child(child),
+          _filter(filter),
+          _commonStats(kStageType) { }
 
     FetchStage::~FetchStage() { }
 
@@ -142,6 +146,13 @@ namespace mongo {
 
     PlanStageStats* FetchStage::getStats() {
         _commonStats.isEOF = isEOF();
+
+        // Add a BSON representation of the filter to the stats tree, if there is one.
+        if (NULL != _filter) {
+            BSONObjBuilder bob;
+            _filter->toBSON(&bob);
+            _commonStats.filter = bob.obj();
+        }
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_FETCH));
         ret->specific.reset(new FetchStats(_specificStats));

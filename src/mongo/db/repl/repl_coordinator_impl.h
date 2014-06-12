@@ -54,7 +54,8 @@ namespace repl {
 
         // ================== Members of public ReplicationCoordinator API ===================
 
-        virtual void startReplication(ReplicationExecutor::NetworkInterface* network);
+        virtual void startReplication(TopologyCoordinator* topCoord,
+                                      ReplicationExecutor::NetworkInterface* network);
 
         virtual void shutdown();
 

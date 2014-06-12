@@ -36,13 +36,17 @@
 
 namespace mongo {
 
+    // static
+    const char* DistinctScan::kStageType = "DISTINCT";
+
     DistinctScan::DistinctScan(const DistinctParams& params, WorkingSet* workingSet)
         : _workingSet(workingSet),
           _descriptor(params.descriptor),
           _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
           _btreeCursor(NULL),
           _hitEnd(false),
-          _params(params) { }
+          _params(params),
+          _commonStats(kStageType) { }
 
     void DistinctScan::initIndexCursor() {
         // Create an IndexCursor over the btree we're distinct-ing over.

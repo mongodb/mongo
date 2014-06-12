@@ -15,6 +15,7 @@ adminDB.createUser({user: 'restore', pwd: 'password', roles: ['restore']});
 // Add user defined roles & users with those roles
 var testUserAdmin = c.getDB().getSiblingDB(dbName);
 var backupActions = ["find"];
+<<<<<<< HEAD
 testUserAdmin.createRole({role: "backupFoo",
        privileges: [{resource: {db: dbName, collection: "foo"}, actions:backupActions},
                     {resource: {db: dbName, collection: "system.indexes"},
@@ -22,6 +23,15 @@ testUserAdmin.createRole({role: "backupFoo",
                     {resource: {db: dbName, collection: "system.namespaces"},
                      actions: backupActions}],
        roles: []});
+=======
+testUserAdmin.createRole({role: "backupFoo", 
+	   privileges: [{resource: {db: dbName, collection: "foo"}, actions:backupActions},
+	                {resource: {db: dbName, collection: "system.indexes"},
+	                 actions: backupActions},
+	                {resource: {db: dbName, collection: "system.namespaces"},
+	                 actions: backupActions}],
+	   roles: []});
+>>>>>>> dfbf53178e31ebb8e0efea79f58eecfd11a96e0d
 testUserAdmin.createUser({user: 'backupFoo', pwd: 'password', roles: ['backupFoo']});
 
 var restoreActions = ["collMod", "createCollection","createIndex","dropCollection","insert"];
@@ -29,6 +39,7 @@ var restoreActionsFind = restoreActions;
 restoreActionsFind.push("find");
 testUserAdmin.createRole({role: "restoreChester",
        privileges: [{resource: {db: dbName, collection: "chester"}, actions: restoreActions},
+<<<<<<< HEAD
                     {resource: {db: dbName, collection: "system.indexes"},
                      actions: restoreActions},
                     {resource: {db: dbName, collection: "system.namespaces"},
@@ -40,6 +51,19 @@ testUserAdmin.createRole({role: "restoreFoo",
                      actions: restoreActions},
                     {resource: {db: dbName, collection: "system.namespaces"},
                      actions: restoreActionsFind}],
+=======
+	                {resource: {db: dbName, collection: "system.indexes"},
+	                 actions: restoreActions},
+	                {resource: {db: dbName, collection: "system.namespaces"},
+	                 actions: restoreActionsFind}],
+       roles: []});
+testUserAdmin.createRole({role: "restoreFoo",
+       privileges: [{resource: {db: dbName, collection: "foo"}, actions:restoreActions},
+	                {resource: {db: dbName, collection: "system.indexes"},
+	                 actions: restoreActions},
+	                {resource: {db: dbName, collection: "system.namespaces"},
+	                 actions: restoreActionsFind}],
+>>>>>>> dfbf53178e31ebb8e0efea79f58eecfd11a96e0d
        roles: []});
 testUserAdmin.createUser({user: 'restoreChester', pwd: 'password', roles: ['restoreChester']});
 testUserAdmin.createUser({user: 'restoreFoo', pwd: 'password', roles: ['restoreFoo']});
@@ -51,7 +75,11 @@ assert.eq(1 , c.count() , "setup2");
 
 assert.commandWorked(c.runCommand("collMod", {usePowerOf2Sizes: false}));
 assert.eq(0, c.getDB().system.namespaces.findOne(
+<<<<<<< HEAD
     {name: c.getFullName()}).options.flags, "find namespaces 1");
+=======
+	{name: c.getFullName()}).options.flags, "find namespaces 1");
+>>>>>>> dfbf53178e31ebb8e0efea79f58eecfd11a96e0d
 
 t.runTool("dump" , "--out" , t.ext, "--username", "backup", "--password", "password");
 
@@ -68,7 +96,11 @@ assert.soon("c.findOne()" , "no data after sleep");
 assert.eq(1 , c.count() , "after restore 2");
 assert.eq(22 , c.findOne().a , "after restore 2");
 assert.eq(0, c.getDB().system.namespaces.findOne(
+<<<<<<< HEAD
     {name: c.getFullName()}).options.flags, "find namespaces 2");
+=======
+	{name: c.getFullName()}).options.flags, "find namespaces 2");
+>>>>>>> dfbf53178e31ebb8e0efea79f58eecfd11a96e0d
 assert.eq(sysUsers, adminDB.system.users.count());
 
 // Dump & restore DB/colection with user defined roles
@@ -89,7 +121,11 @@ assert.soon("c.findOne()" , "no data after sleep");
 assert.eq(1 , c.count() , "after restore 3");
 assert.eq(22 , c.findOne().a , "after restore 3");
 assert.eq(0, c.getDB().system.namespaces.findOne(
+<<<<<<< HEAD
     {name: c.getFullName()}).options.flags, "find namespaces 3");
+=======
+	{name: c.getFullName()}).options.flags, "find namespaces 3");
+>>>>>>> dfbf53178e31ebb8e0efea79f58eecfd11a96e0d
 assert.eq(sysUsers, adminDB.system.users.count());
 
 t.stop();

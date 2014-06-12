@@ -43,6 +43,9 @@ namespace mongo {
      */
     class QueryPlanner {
     public:
+        // Identifies the version of the query planner module. Reported in explain.
+        static const int kPlannerVersion;
+
         /**
          * Outputs a series of possible solutions for the provided 'query' into 'out'.  Uses the
          * indices and other data in 'params' to plan with.

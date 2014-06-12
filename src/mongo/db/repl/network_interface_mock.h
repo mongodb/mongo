@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,62 +28,31 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/platform/unordered_set.h"
+#include <map>
+
+#include "mongo/db/repl/replication_executor.h"
 
 namespace mongo {
+namespace repl {
 
-    /**
-     * This stage outputs the union of its children.  It optionally deduplicates on DiskLoc.
-     *
-     * Preconditions: Valid DiskLoc.
-     *
-     * If we're deduping, we may fail to dedup any invalidated DiskLoc properly.
-     */
-    class OrStage : public PlanStage {
+    class NetworkInterfaceMock : public ReplicationExecutor::NetworkInterface {
     public:
-        OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter);
-        virtual ~OrStage();
+        NetworkInterfaceMock() {}
+        virtual ~NetworkInterfaceMock() {}
+        virtual Date_t now();
+        virtual StatusWith<BSONObj> runCommand(
+                const ReplicationExecutor::RemoteCommandRequest& request);
+        virtual void runCallbackWithGlobalExclusiveLock(
+                const stdx::function<void ()>& callback);
 
-        void addChild(PlanStage* child);
-
-        virtual bool isEOF();
-
-        virtual StageState work(WorkingSetID* out);
-
-        virtual void prepareToYield();
-        virtual void recoverFromYield();
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
-
-        virtual PlanStageStats* getStats();
-
-        static const char* kStageType;
+        bool addResponse(const ReplicationExecutor::RemoteCommandRequest& request,
+                         const StatusWith<BSONObj>& response);
 
     private:
-        // Not owned by us.
-        WorkingSet* _ws;
-
-        // The filter is not owned by us.
-        const MatchExpression* _filter;
-
-        // Owned by us.
-        std::vector<PlanStage*> _children;
-
-        // Which of _children are we calling work(...) on now?
-        size_t _currentChild;
-
-        // True if we dedup on DiskLoc, false otherwise.
-        bool _dedup;
-
-        // Which DiskLocs have we returned?
-        unordered_set<DiskLoc, DiskLoc::Hasher> _seen;
-
-        // Stats
-        CommonStats _commonStats;
-        OrStats _specificStats;
+        typedef std::map<ReplicationExecutor::RemoteCommandRequest,
+                         StatusWith<BSONObj> > RequestResponseMap;
+        RequestResponseMap _responses;
     };
 
+}  // namespace repl
 }  // namespace mongo

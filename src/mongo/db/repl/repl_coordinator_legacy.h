@@ -45,7 +45,8 @@ namespace repl {
         LegacyReplicationCoordinator();
         virtual ~LegacyReplicationCoordinator();
 
-        virtual void startReplication(ReplicationExecutor::NetworkInterface*);
+        virtual void startReplication(TopologyCoordinator*,
+                                      ReplicationExecutor::NetworkInterface*);
 
         virtual void shutdown();
 

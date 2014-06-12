@@ -10,13 +10,29 @@ env.Library(
         '$BUILD_DIR/mongo/clientdriver'
         ])
 
+env.Library('repl_settings',
+            'repl_settings.cpp',
+            LIBDEPS=['$BUILD_DIR/mongo/foundation'])
+
 env.Library('replication_executor',
             'replication_executor.cpp',
             LIBDEPS=['$BUILD_DIR/mongo/foundation'])
 
 env.CppUnitTest('replication_executor_test',
                 'replication_executor_test.cpp',
-                LIBDEPS=['replication_executor'])
+                LIBDEPS=['replication_executor',
+                         'replmocks'])
+
+env.Library('repl_coordinator_impl',
+            'repl_coordinator_impl.cpp',
+            LIBDEPS=['$BUILD_DIR/mongo/foundation',
+                     'replication_executor',
+                     'repl_settings'])
+
+env.CppUnitTest('repl_coordinator_impl_test',
+                'repl_coordinator_impl_test.cpp',
+                LIBDEPS=['repl_coordinator_impl',
+                         'replmocks'])
 
 env.Library('repl_coordinator_interface',
             'repl_coordinator.cpp')
@@ -26,5 +42,7 @@ env.Library('repl_coordinator_global',
             LIBDEPS=['repl_coordinator_interface'])
 
 env.Library('replmocks',
-            'repl_coordinator_mock.cpp',
+            ['repl_coordinator_mock.cpp',
+             'network_interface_mock.cpp',
+             'topology_coordinator_mock.cpp'],
             LIBDEPS=['repl_coordinator_interface'])

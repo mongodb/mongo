@@ -31,6 +31,7 @@
 #include <map>
 #include <boost/thread/thread.hpp>
 
+#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
@@ -39,18 +40,6 @@
 
 namespace mongo {
 namespace repl {
-    bool operator<(const ReplicationExecutor::RemoteCommandRequest& lhs,
-                   const ReplicationExecutor::RemoteCommandRequest& rhs) {
-        if (lhs.target < rhs.target)
-            return true;
-        if (rhs.target < lhs.target)
-            return false;
-        if (lhs.dbname < rhs.dbname)
-            return true;
-        if (rhs.dbname < lhs.dbname)
-            return false;
-        return lhs.cmdObj < rhs.cmdObj;
-    }
 
 namespace {
 
@@ -70,58 +59,6 @@ namespace {
     bool operator!=(const ReplicationExecutor::RemoteCommandRequest lhs,
                     const ReplicationExecutor::RemoteCommandRequest rhs) {
         return !(lhs == rhs);
-    }
-
-    std::string writeRequest(const ReplicationExecutor::RemoteCommandRequest& request) {
-        return mongoutils::str::stream() << "Request(" << request.target.toString() << ", " <<
-            request.dbname << ", " << request.cmdObj << ')';
-    }
-
-    class MockNetworkInterface : public ReplicationExecutor::NetworkInterface {
-    public:
-        MockNetworkInterface() {}
-        virtual ~MockNetworkInterface() {}
-        virtual Date_t now();
-        virtual StatusWith<BSONObj> runCommand(
-                const ReplicationExecutor::RemoteCommandRequest& request);
-        virtual void runCallbackWithGlobalExclusiveLock(
-                const stdx::function<void ()>& callback);
-
-        void addResponse(const ReplicationExecutor::RemoteCommandRequest& request,
-                         const StatusWith<BSONObj>& response);
-
-    private:
-        typedef std::map<ReplicationExecutor::RemoteCommandRequest,
-                         StatusWith<BSONObj> > RequestResponseMap;
-        RequestResponseMap _responses;
-    };
-
-    Date_t MockNetworkInterface::now() {
-        return curTimeMillis64();
-    }
-
-    StatusWith<BSONObj> MockNetworkInterface::runCommand(
-            const ReplicationExecutor::RemoteCommandRequest& request) {
-        return mapFindWithDefault(
-                _responses,
-                request,
-                StatusWith<BSONObj>(
-                        ErrorCodes::NoSuchKey,
-                        mongoutils::str::stream() << "Could not find response for " <<
-                        writeRequest(request)));
-    }
-
-    void MockNetworkInterface::runCallbackWithGlobalExclusiveLock(
-            const stdx::function<void ()>& callback) {
-
-        callback();
-    }
-
-    void MockNetworkInterface::addResponse(
-            const ReplicationExecutor::RemoteCommandRequest& request,
-            const StatusWith<BSONObj>& response) {
-
-        ASSERT(_responses.insert(std::make_pair(request, response)).second);
     }
 
     void setStatus(ReplicationExecutor* executor, const Status& source, Status* target) {
@@ -161,7 +98,7 @@ namespace {
     }
 
     TEST(ReplicationExecutor, RunOne) {
-        ReplicationExecutor executor(new MockNetworkInterface);
+        ReplicationExecutor executor(new NetworkInterfaceMock);
         Status status(ErrorCodes::InternalError, "Not mutated");
         ASSERT_OK(executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                                    stdx::placeholders::_1,
@@ -172,7 +109,7 @@ namespace {
     }
 
     TEST(ReplicationExecutor, Schedule1ButShutdown) {
-        ReplicationExecutor executor(new MockNetworkInterface);
+        ReplicationExecutor executor(new NetworkInterfaceMock);
         Status status(ErrorCodes::InternalError, "Not mutated");
         ASSERT_OK(executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                                    stdx::placeholders::_1,
@@ -184,7 +121,7 @@ namespace {
     }
 
     TEST(ReplicationExecutor, Schedule2Cancel1) {
-        ReplicationExecutor executor(new MockNetworkInterface);
+        ReplicationExecutor executor(new NetworkInterfaceMock);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         Status status2(ErrorCodes::InternalError, "Not mutated");
         ReplicationExecutor::CallbackHandle cb = ASSERT_GET(
@@ -203,7 +140,7 @@ namespace {
     }
 
     TEST(ReplicationExecutor, OneSchedulesAnother) {
-        ReplicationExecutor executor(new MockNetworkInterface);
+        ReplicationExecutor executor(new NetworkInterfaceMock);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         Status status2(ErrorCodes::InternalError, "Not mutated");
         ASSERT_OK(executor.scheduleWork(stdx::bind(scheduleSetStatusAndShutdown,
@@ -246,7 +183,7 @@ namespace {
     }
 
     EventChainAndWaitingTest::EventChainAndWaitingTest() :
-        executor(new MockNetworkInterface),
+        executor(new NetworkInterfaceMock),
         executorThread(stdx::bind(&ReplicationExecutor::run, &executor)),
         goEvent(ASSERT_GET(executor.makeEvent())),
         event2(ASSERT_GET(executor.makeEvent())),
@@ -350,7 +287,7 @@ namespace {
     }
 
     TEST(ReplicationExecutor, ScheduleWorkAt) {
-        MockNetworkInterface* net = new MockNetworkInterface;
+        NetworkInterfaceMock* net = new NetworkInterfaceMock;
         ReplicationExecutor executor(net);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         Status status2(ErrorCodes::InternalError, "Not mutated");
@@ -377,6 +314,11 @@ namespace {
         ASSERT_EQUALS(status3, ErrorCodes::CallbackCanceled);
     }
 
+    std::string getRequestDescription(const ReplicationExecutor::RemoteCommandRequest& request) {
+        return mongoutils::str::stream() << "Request(" << request.target.toString() << ", " <<
+            request.dbname << ", " << request.cmdObj << ')';
+    }
+
     static void setStatusOnRemoteCommandCompletion(
             ReplicationExecutor* executor,
             const ReplicationExecutor::RemoteCommandRequest& actualRequest,
@@ -388,15 +330,15 @@ namespace {
             *outStatus = Status(
                     ErrorCodes::BadValue,
                     mongoutils::str::stream() << "Actual request: " <<
-                    writeRequest(actualRequest) << "; expected: " <<
-                    writeRequest(expectedRequest));
+                    getRequestDescription(actualRequest) << "; expected: " <<
+                    getRequestDescription(expectedRequest));
             return;
         }
         *outStatus = actualResponse.getStatus();
     }
 
     TEST(ReplicationExecutor, ScheduleRemoteCommand) {
-        MockNetworkInterface* net = new MockNetworkInterface;
+        NetworkInterfaceMock* net = new NetworkInterfaceMock;
         ReplicationExecutor executor(net);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         const ReplicationExecutor::RemoteCommandRequest request(
@@ -420,7 +362,7 @@ namespace {
     }
 
     TEST(ReplicationExecutor, ScheduleAndCancelRemoteCommand) {
-        MockNetworkInterface* net = new MockNetworkInterface;
+        NetworkInterfaceMock* net = new NetworkInterfaceMock;
         ReplicationExecutor executor(net);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         const ReplicationExecutor::RemoteCommandRequest request(
@@ -445,7 +387,7 @@ namespace {
     }
 
     TEST(ReplicationExecutor, ScheduleExclusiveLockOperation) {
-        ReplicationExecutor executor(new MockNetworkInterface);
+        ReplicationExecutor executor(new NetworkInterfaceMock);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         ASSERT_OK(executor.scheduleWorkWithGlobalExclusiveLock(
                           stdx::bind(setStatusAndShutdown,
