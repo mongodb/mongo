@@ -6,7 +6,7 @@
      writes it back out you will use the comments and semi-neat formatting below.
 -->
 
-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -35,7 +35,7 @@
     <ProjectConfiguration Include="Win2008PlusRelease|Win32">
       <Configuration>Win2008PlusRelease</Configuration>
       <Platform>Win32</Platform>
-    </ProjectConfiguration>
+  </ProjectConfiguration>
     <ProjectConfiguration Include="Win2008PlusRelease|x64">
       <Configuration>Win2008PlusRelease</Configuration>
       <Platform>x64</Platform>
@@ -43,10 +43,12 @@
   </ItemGroup>
 
   <PropertyGroup Label="Globals">
-    <ProjectName>_TARGET_</ProjectName>
+    <ProjectName>%_TARGET_%</ProjectName>
+    <RootNamespace>mongod</RootNamespace>
+    <PlatformToolset>v120</PlatformToolset>
     <!-- <ProjectGuid>{215B2D68-0A70-4D10-8E75-B31010C62A91}</ProjectGuid> -->
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>_TARGET_</RootNamespace>
+    <RootNamespace>%_TARGET_%</RootNamespace>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -97,7 +99,7 @@
   <!-- GLOBAL SETTINGS ALL BUILD STYLES -->
   <ItemDefinitionGroup>
     <ClCompile>
-      <ObjectFileName>%(RelativeDir)/</ObjectFileName>
+      <ObjectFileName>Build/%(RelativeDir)/</ObjectFileName>
       <AdditionalIncludeDirectories>src;src\mongo;src\third_party\v8\include;src\third_party\pcre-8.30;src\third_party\boost;src\third_party\snappy;src\third_party\s2;src\third_party\yaml-cpp-0.5.1\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NTDDI_VERSION=0x06010000;_WIN32_WINNT=0x0601;WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
       <!-- above is temp - NTDDI etc. should be configurable, not finished yet, this gets us compiling some for now. 
@@ -198,19 +200,52 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">
   </ItemDefinitionGroup>
 
-<!--
-  <ItemDefinitionGroup>
-    <PreBuildEvent>
-      <Command>cscript //Nologo "src\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
-cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
-cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\v8" /input:"tools\js2c.py,src\proxy.js,src\collection.js,src\macros.py" /output:"src\experimental-libraries.cc" /command:"python tools\js2c.py src/experimental-libraries.cc EXPERIMENTAL off src/proxy.js src/collection.js src/macros.py"
-cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\v8" /input:"tools\js2c.py,src/runtime.js,src/v8natives.js,src/array.js,src/string.js,src/uri.js,src/math.js,src/messages.js,src/apinatives.js,src/date.js,src/regexp.js,src/json.js,src/liveedit-debugger.js,src/mirror-debugger.js,src/debug-debugger.js,src\macros.py" /output:"src\libraries.cc" /command:"python tools\js2c.py src/libraries.cc CORE off src/runtime.js src/v8natives.js src/array.js src/string.js src/uri.js src/math.js src/messages.js src/apinatives.js src/date.js src/regexp.js src/json.js src/liveedit-debugger.js src/mirror-debugger.js src/debug-debugger.js src\macros.py"
-cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\fts" /input:"generate_stop_words.py,stop_words_danish.txt,stop_words_dutch.txt,stop_words_english.txt,stop_words_finnish.txt,stop_words_french.txt,stop_words_german.txt,stop_words_hungarian.txt,stop_words_italian.txt,stop_words_norwegian.txt,stop_words_portuguese.txt,stop_words_romanian.txt,stop_words_russian.txt,stop_words_spanish.txt,stop_words_swedish.txt,stop_words_turkish.txt" /output:"stop_words_list.h,stop_words_list.cpp" /command:"python generate_stop_words.py stop_words_danish.txt stop_words_dutch.txt stop_words_english.txt stop_words_finnish.txt stop_words_french.txt stop_words_german.txt stop_words_hungarian.txt stop_words_italian.txt stop_words_norwegian.txt stop_words_portuguese.txt stop_words_romanian.txt stop_words_russian.txt stop_words_spanish.txt stop_words_swedish.txt stop_words_turkish.txt stop_words_list.h stop_words_list.cpp"
-cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
-        </Command>
-      <Message>Run pre-build commands</Message>
-    </PreBuildEvent>
-  </ItemDefinitionGroup>
--->
+  <PropertyGroup>
+      <MongoBase>src\mongo\base</MongoBase>
+      <MongoAuth>src\mongo\db\auth</MongoAuth>
+      <MongoFts>src\mongo\db\fts</MongoFts>
+      <MongoShell>src\mongo\shell</MongoShell>
+      <MongoV8>src\third_party\v8</MongoV8>
+  </PropertyGroup>
+  <Target Name="ErrorCodes"
+      BeforeTargets="ClCompile"
+      Outputs="$(MongoBase)\error_codes.h;$(MongoBase)\error_codes.cpp"
+      Inputs="src\mongo\base\generate_error_codes.py;$(MongoBase)\error_codes.err">
 
+      <Exec Command="python src\mongo\base\generate_error_codes.py  $(MongoBase)\error_codes.err $(MongoBase)\error_codes.h $(MongoBase)\error_codes.cpp" />
+  </Target>
+  <Target Name="ActionTypes"
+      BeforeTargets="ClCompile"
+      Outputs="$(MongoAuth)\action_type.h;$(MongoAuth)\action_type.cpp"
+      Inputs="$(MongoAuth)\generate_action_types.py;$(MongoAuth)\action_types.txt">
 
+      <Exec Command="python $(MongoAuth)\generate_action_types.py  $(MongoAuth)\action_types.txt $(MongoAuth)\action_type.h $(MongoAuth)\action_type.cpp" />
+  </Target>
+  <Target Name="StopWords"
+      BeforeTargets="ClCompile"
+      Outputs="$(MongoFts)\stop_words_list.h;$(MongoFts)\stop_words_list.cpp"
+      Inputs="$(MongoFts)\generate_stop_words.py;$(MongoFts)\stop_words_danish.txt;$(MongoFts)\stop_words_dutch.txt;$(MongoFts)\stop_words_english.txt;$(MongoFts)\stop_words_finnish.txt;$(MongoFts)\stop_words_french.txt;$(MongoFts)\stop_words_german.txt;$(MongoFts)\stop_words_hungarian.txt;$(MongoFts)\stop_words_italian.txt;$(MongoFts)\stop_words_norwegian.txt;$(MongoFts)\stop_words_portuguese.txt;$(MongoFts)\stop_words_romanian.txt;$(MongoFts)\stop_words_russian.txt;$(MongoFts)\stop_words_spanish.txt;$(MongoFts)\stop_words_swedish.txt;$(MongoFts)\stop_words_turkish.txt" >
+
+      <Exec Command="python $(MongoFts)\generate_stop_words.py $(MongoFts)\stop_words_danish.txt $(MongoFts)\stop_words_dutch.txt $(MongoFts)\stop_words_english.txt $(MongoFts)\stop_words_finnish.txt $(MongoFts)\stop_words_french.txt $(MongoFts)\stop_words_german.txt $(MongoFts)\stop_words_hungarian.txt $(MongoFts)\stop_words_italian.txt $(MongoFts)\stop_words_norwegian.txt $(MongoFts)\stop_words_portuguese.txt $(MongoFts)\stop_words_romanian.txt $(MongoFts)\stop_words_russian.txt $(MongoFts)\stop_words_spanish.txt $(MongoFts)\stop_words_swedish.txt $(MongoFts)\stop_words_turkish.txt $(MongoFts)\stop_words_list.h $(MongoFts)\stop_words_list.cpp"/>
+  </Target>
+  <Target Name="V8ExperimentalLibraries"
+      BeforeTargets="ClCompile"
+      Outputs="$(MongoV8)\src\experimental-libraries.cc"
+      Inputs="$(MongoV8)\tools\js2c.py;$(MongoV8)\src\proxy.js;$(MongoV8)\src\collection.js;$(MongoV8)\src\macros.py" >
+
+      <Exec Command="python $(MongoV8)\tools\js2c.py $(MongoV8)\src\experimental-libraries.cc EXPERIMENTAL off $(MongoV8)\src\proxy.js $(MongoV8)\src\collection.js $(MongoV8)\src\macros.py" />
+  </Target>
+  <Target Name="V8Libraries"
+      BeforeTargets="ClCompile"
+      Outputs="$(MongoV8)\src\libraries.cc"
+      Inputs="$(MongoV8)\tools\js2c.py;$(MongoV8)\src\runtime.js;$(MongoV8)\src\v8natives.js;$(MongoV8)\src\array.js;$(MongoV8)\src\string.js;$(MongoV8)\src\uri.js;$(MongoV8)\src\math.js;$(MongoV8)\src\messages.js;$(MongoV8)\src\apinatives.js;$(MongoV8)\src\date.js;$(MongoV8)\src\regexp.js;$(MongoV8)\src\json.js;$(MongoV8)\src\liveedit-debugger.js;$(MongoV8)\src\mirror-debugger.js;$(MongoV8)\src\debug-debugger.js;$(MongoV8)\src\macros.py" >
+
+      <Exec Command="python $(MongoV8)\tools\js2c.py $(MongoV8)\src\libraries.cc CORE off $(MongoV8)\src\runtime.js $(MongoV8)\src\v8natives.js $(MongoV8)\src\array.js $(MongoV8)\src\string.js $(MongoV8)\src\uri.js $(MongoV8)\src\math.js $(MongoV8)\src\messages.js $(MongoV8)\src\apinatives.js $(MongoV8)\src\date.js $(MongoV8)\src\regexp.js $(MongoV8)\src\json.js $(MongoV8)\src\liveedit-debugger.js $(MongoV8)\src\mirror-debugger.js $(MongoV8)\src\debug-debugger.js $(MongoV8)\src\macros.py" />
+  </Target>
+  <Target Name="MongoShell"
+      BeforeTargets="ClCompile"
+      Outputs="$(MongoShell)\mongo.cpp"
+      Inputs="$(MongoShell)\assert.js;$(MongoShell)\bulk_api.js;$(MongoShell)\collection.js;$(MongoShell)\db.js;$(MongoShell)\mongo.js;$(MongoShell)\mr.js;$(MongoShell)\query.js;$(MongoShell)\types.js;$(MongoShell)\upgrade_check.js;$(MongoShell)\utils.js;$(MongoShell)\utils_sh.js;$(MongoShell)\utils_auth.js" >
+
+      <Exec Command="python site_scons\site_tools\jstoh.py $(MongoShell)\mongo.cpp $(MongoShell)\assert.js $(MongoShell)\bulk_api.js $(MongoShell)\collection.js $(MongoShell)\db.js $(MongoShell)\mongo.js $(MongoShell)\mr.js $(MongoShell)\query.js $(MongoShell)\types.js $(MongoShell)\upgrade_check.js $(MongoShell)\utils.js $(MongoShell)\utils_sh.js $(MongoShell)\utils_auth.js" />
+  </Target>
