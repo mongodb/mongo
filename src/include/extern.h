@@ -269,7 +269,7 @@ extern int __wt_btcur_reset(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp);
 extern int __wt_btcur_insert(WT_CURSOR_BTREE *cbt);
-extern int __wt_btcur_update_check(WT_CURSOR *cursor);
+extern int __wt_btcur_update_check(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_remove(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_update(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_compare(WT_CURSOR_BTREE *a_arg,
@@ -667,6 +667,7 @@ extern int __wt_curds_create( WT_SESSION_IMPL *session,
 extern int __wt_curdump_create(WT_CURSOR *child,
     WT_CURSOR *owner,
     WT_CURSOR **cursorp);
+extern int __wt_curfile_update_check(WT_CURSOR *cursor);
 extern int __wt_curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],

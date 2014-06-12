@@ -510,7 +510,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 * write conflicts with concurrent updates.
 		 */
 		if (i != nchunks - 1)
-			(*cp)->insert = __wt_btcur_update_check;
+			(*cp)->insert = __wt_curfile_update_check;
 
 		if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
 		    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))

@@ -429,14 +429,14 @@ err:	if (ret == WT_RESTART)
  *	in an LSM tree.
  */
 int
-__wt_btcur_update_check(WT_CURSOR *cursor)
+__wt_btcur_update_check(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
-	WT_CURSOR_BTREE *cbt;
+	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	cbt = (WT_CURSOR_BTREE *)cursor;
+	cursor = &cbt->iface;
 	btree = cbt->btree;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
