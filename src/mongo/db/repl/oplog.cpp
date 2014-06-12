@@ -369,18 +369,32 @@ namespace mongo {
                bool* b,
                bool fromMigrate,
                const BSONObj* fullObj) {
-        if ( replSettings.master ) {
-            _logOp(opstr, ns, 0, obj, patt, b, fromMigrate);
+
+        try {
+            if ( replSettings.master ) {
+                _logOp(opstr, ns, 0, obj, patt, b, fromMigrate);
+            }
+
+            logOpForSharding(opstr, ns, obj, patt, fullObj, fromMigrate);
+            logOpForDbHash(opstr, ns, obj, patt, fullObj, fromMigrate);
+            getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b);
+
+            if ( strstr( ns, ".system.js" ) ) {
+                Scope::storedFuncMod(); // this is terrible
+            }
         }
-
-        logOpForSharding(opstr, ns, obj, patt, fullObj, fromMigrate);
-        logOpForDbHash(opstr, ns, obj, patt, fullObj, fromMigrate);
-        getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b);
-
-        if ( strstr( ns, ".system.js" ) ) {
-            Scope::storedFuncMod(); // this is terrible
+        catch (const DBException& ex) {
+            severe() << "Fatal DBException in logOp(): " << ex.toString();
+            std::terminate();
         }
-
+        catch (const std::exception& ex) {
+            severe() << "Fatal std::exception in logOp(): " << ex.what();
+            std::terminate();
+        }
+        catch (...) {
+            severe() << "Fatal error in logOp()";
+            std::terminate();
+        }
     }
 
     void createOplog() {
