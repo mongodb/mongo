@@ -544,16 +544,10 @@ namespace mongo {
         std::vector<Value> _array;
     };
 
-}
-
-namespace std {
-    template<>
     inline void swap(mongo::Document& lhs, mongo::Document& rhs) { lhs.swap(rhs); }
-}
 
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 
-namespace mongo {
     inline FieldIterator Document::fieldIterator() const {
         return FieldIterator(*this);
     }
