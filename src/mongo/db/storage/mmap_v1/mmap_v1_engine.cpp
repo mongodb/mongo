@@ -448,12 +448,20 @@ namespace mongo {
                     // extents, which is invalid.
                     int sz = _massageExtentSize( &_extentManager,
                                                  options.cappedSize - rs->storageSize() );
+                    sz += 0xff;
                     sz &= 0xffffff00;
                     rs->increaseStorageSize( txn, sz, -1 );
                 } while( rs->storageSize() < options.cappedSize );
             }
             else {
-                rs->increaseStorageSize( txn, _extentManager.initialSize( 128 ), -1 );
+                int sz;
+                if ( options.cappedSize > 0 ) {
+                    sz = _extentManager.quantizeExtentSize( options.cappedSize );
+                }
+                else {
+                    sz = _extentManager.initialSize( 128 );
+                }
+                rs->increaseStorageSize( txn, sz, -1 );
             }
         }
 
