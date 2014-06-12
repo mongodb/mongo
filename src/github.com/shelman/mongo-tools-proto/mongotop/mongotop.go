@@ -36,13 +36,10 @@ func (self *MongoTop) Run() error {
 
 	// the results used to be compared to each other
 	var previousResults command.Command
-	var topResults command.Command
 	if self.OutputOptions.Locks {
 		previousResults = &command.ServerStatus{}
-		topResults = &command.ServerStatus{}
 	} else {
 		previousResults = &command.Top{}
-		topResults = &command.Top{}
 	}
 
 	// populate the first run of the previous results
@@ -55,6 +52,13 @@ func (self *MongoTop) Run() error {
 
 		// sleep
 		time.Sleep(self.Sleeptime)
+
+		var topResults command.Command
+		if self.OutputOptions.Locks {
+			topResults = &command.ServerStatus{}
+		} else {
+			topResults = &command.Top{}
+		}
 
 		// run the top command against the database
 		err = self.SessionProvider.RunCommand("admin", topResults)

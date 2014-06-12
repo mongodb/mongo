@@ -63,7 +63,7 @@ func (self *ServerStatus) Diff(other Command) (Diff, error) {
 	}
 
 	firstLocks := otherAsServerStatus.Locks
-	secondLocks := otherAsServerStatus.Locks
+	secondLocks := self.Locks
 	for ns, firstNSInfo := range firstLocks {
 		if secondNSInfo, ok := secondLocks[ns]; ok {
 
@@ -80,6 +80,7 @@ func (self *ServerStatus) Diff(other Command) (Diff, error) {
 						(firstTimeLocked["w"]+firstTimeLocked["W"]),
 				),
 			}
+
 			diff.Totals[ns] = append(
 				[]int{diff.Totals[ns][0] + diff.Totals[ns][1]},
 				diff.Totals[ns]...,
