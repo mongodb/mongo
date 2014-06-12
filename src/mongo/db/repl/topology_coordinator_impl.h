@@ -214,6 +214,13 @@ namespace repl {
             }
         } _heartbeatOptions;
 
+        // Last vote info from the election
+        struct LastVote {
+            LastVote() : when(0), who(0xffffffff) { }
+            Date_t when;
+            unsigned who;
+        } _lastVote;
+
 
     };
 

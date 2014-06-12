@@ -323,10 +323,86 @@ namespace repl {
         return false;
     }
 
+    namespace {
+        const size_t LeaseTime = 3;
+    } // namespace
+
     // produce a reply to a received electCmd
     void TopologyCoordinatorImpl::prepareElectCmdResponse(const Date_t now,
                                                           const BSONObj& cmdObj,
                                                           BSONObjBuilder& result) {
+
+        //TODO: after eric's checkin, add executer stuff and error if cancelled
+        DEV log() << "replSet received elect msg " << cmdObj.toString() << rsLog;
+        else LOG(2) << "replSet received elect msg " << cmdObj.toString() << rsLog;
+
+        string setName = cmdObj["setName"].String();
+        unsigned whoid = cmdObj["whoid"].Int();
+        int cfgver = cmdObj["cfgver"].Int();
+        OID round = cmdObj["round"].OID();
+        int myver = _currentConfig.version;
+
+        const Member* primary = _currentPrimary;
+        const Member* hopeful = _getConstMember(whoid);
+        const Member* highestPriority = _getHighestPriorityElectable();
+
+        int vote = 0;
+        if( setName != _currentConfig.replSetName ) {
+            log() << "replSet error received an elect request for '" << setName
+                  << "' but our setName name is '" << _currentConfig.replSetName << "'" << rsLog;
+        }
+        else if( myver < cfgver ) {
+            // we are stale.  don't vote
+        }
+        else if( myver > cfgver ) {
+            // they are stale!
+            log() << "replSet electCmdReceived info got stale version # during election" << rsLog;
+            vote = -10000;
+        }
+        else if( !hopeful ) {
+            log() << "replSet electCmdReceived couldn't find member with id " << whoid << rsLog;
+            vote = -10000;
+        }
+        else if( primary && _memberState == MemberState::RS_PRIMARY ) {
+            log() << "I am already primary, " << hopeful->fullName()
+                  << " can try again once I've stepped down" << rsLog;
+            vote = -10000;
+        }
+        else if (primary) {
+            log() << hopeful->fullName() << " is trying to elect itself but " <<
+                  primary->fullName() << " is already primary" << rsLog;
+            vote = -10000;
+        }
+        else if( highestPriority &&
+                 highestPriority->config().priority > hopeful->config().priority) {
+            log() << hopeful->fullName() << " has lower priority than "
+                  << highestPriority->fullName();
+            vote = -10000;
+        }
+        else {
+            try {
+                if( _lastVote.when + LeaseTime >= now && _lastVote.who != whoid ) {
+                    LOG(1) << "replSet not voting yea for " << whoid
+                           << " voted for " << _lastVote.who << ' ' << now-_lastVote.when
+                           << " secs ago" << rsLog;
+                    //TODO: remove exception, and change control flow?
+                    throw VoteException();
+                }
+                _lastVote.when = now;
+                _lastVote.who = whoid;
+                vote = _currentConfig.self->votes;
+                dassert( hopeful->id() == whoid );
+                log() << "replSet info voting yea for " <<  hopeful->fullName()
+                      << " (" << whoid << ')' << rsLog;
+            }
+            catch(VoteException&) {
+                log() << "replSet voting no for " << hopeful->fullName()
+                      << " already voted for another" << rsLog;
+            }
+        }
+
+        result.append("vote", vote);
+        result.append("round", round);
     }
 
     // produce a reply to a heartbeat
