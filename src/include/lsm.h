@@ -105,6 +105,8 @@ struct __wt_lsm_tree {
 	u_int merge_min, merge_max;
 	u_int merge_threads;
 
+	u_int merge_idle;		/* Count of idle merge threads */
+
 #define	WT_LSM_BLOOM_MERGED				0x00000001
 #define	WT_LSM_BLOOM_OFF				0x00000002
 #define	WT_LSM_BLOOM_OLDEST				0x00000004

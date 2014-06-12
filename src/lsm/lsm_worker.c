@@ -146,9 +146,17 @@ __wt_lsm_merge_worker(void *vargs)
 			stallms = 0;
 		else if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+			if (WT_ATOMIC_ADD(lsm_tree->merge_idle, 1) ==
+			    lsm_tree->merge_threads &&
+			    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
+				F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
+
 			/* Poll 10 times per second. */
 			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
+
+			(void)WT_ATOMIC_SUB(lsm_tree->merge_idle, 1);
+
 			/*
 			 * Randomize the tracking of stall time so that with
 			 * multiple LSM trees open, they don't all get

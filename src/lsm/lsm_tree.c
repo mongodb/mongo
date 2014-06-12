@@ -1010,7 +1010,6 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 {
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
-	uint64_t last_merge_progressing;
 	time_t begin, end;
 
 	/*
@@ -1049,21 +1048,17 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	/* Wake up the merge threads. */
 	WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));
 
-	/* Allow some time for merges to get started. */
-	__wt_sleep(10, 0);
-
-	/* Now wait for merge activity to stop. */
+	/* Wait for merge activity to stop. */
 	do {
-		last_merge_progressing = lsm_tree->merge_progressing;
 		__wt_sleep(1, 0);
 		WT_RET(__wt_seconds(session, &end));
 		if (session->compact->max_time > 0 &&
-		    session->compact->max_time < (uint64_t)(end - begin))
-			WT_ERR(ETIMEDOUT);
-	} while (lsm_tree->merge_progressing != last_merge_progressing &&
-	    lsm_tree->nchunks > 1);
-
-err:	F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
+		    session->compact->max_time < (uint64_t)(end - begin)) {
+			ret = ETIMEDOUT;
+			F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
+		}
+	} while (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING) &&
+	    F_ISSET(lsm_tree, WT_LSM_TREE_WORKING));
 
 	return (ret);
 }
