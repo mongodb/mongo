@@ -78,8 +78,7 @@ struct __wt_cursor_btree {
 	 * to page modification: we have a page, a WT_COL/WT_ROW slot on the
 	 * page, an insert head, insert list and a skiplist stack (the stack of
 	 * skiplist entries leading to the insert point).  The search functions
-	 * also return the relationship of the search key to the found key and
-	 * a write-generation for the leaf page.
+	 * also return the relationship of the search key to the found key.
 	 */
 	WT_REF	  *ref;			/* Current page */
 	uint32_t   slot;		/* WT_COL/WT_ROW 0-based slot */
@@ -154,8 +153,7 @@ struct __wt_cursor_btree {
 	WT_ROW *rip_saved;		/* Last-returned key reference */
 
 	/*
-	 * A temporary buffer with two uses: caching RLE values for column-store
-	 * files, and caching the last-returned keys for row-store files.
+	 * A temporary buffer for caching RLE values for column-store files.
 	 */
 	WT_ITEM tmp;
 
