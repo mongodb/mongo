@@ -172,7 +172,6 @@ struct __wt_cursor_btree {
 #define	WT_CBT_ITERATE_PREV	0x08	/* Prev iteration configuration */
 #define	WT_CBT_MAX_RECORD	0x10	/* Col-store: past end-of-table */
 #define	WT_CBT_SEARCH_SMALLEST	0x20	/* Row-store: small-key insert list */
-#define	WT_CBT_CONFLICT_CHECK	0x40	/* Only check for conflicts */
 	uint8_t flags;
 };
 
