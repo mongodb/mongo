@@ -743,7 +743,7 @@ populate_thread(void *arg)
 	size_t i;
 	uint64_t op, usecs;
 	uint32_t opcount;
-	int intxn, measure_latency, ret;
+	int intxn, measure_latency, ret, stress_checkpoint_due;
 	char *value_buf, *key_buf;
 	const char *cursor_config;
 
@@ -752,7 +752,7 @@ populate_thread(void *arg)
 	conn = cfg->conn;
 	session = NULL;
 	cursors = NULL;
-	ret = 0;
+	ret = stress_checkpoint_due = 0;
 	trk = &thread->insert;
 
 	key_buf = thread->key_buf;
@@ -829,8 +829,7 @@ populate_thread(void *arg)
 		 */
 		if (measure_latency) {
 			if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-				lprintf(cfg, ret, 0,
-				    "Get time call failed");
+				lprintf(cfg, ret, 0, "Get time call failed");
 				goto err;
 			}
 			++trk->latency_ops;
@@ -838,6 +837,10 @@ populate_thread(void *arg)
 			track_operation(trk, usecs);
 		}
 		++thread->insert.ops;	/* Same as trk->ops */
+
+		if (cfg->stress_checkpoint_rate != 0 &&
+		    (op % cfg->stress_checkpoint_rate) == 0)
+			stress_checkpoint_due = 1;
 
 		if (cfg->populate_ops_per_txn != 0) {
 			if (++opcount < cfg->populate_ops_per_txn)
@@ -849,6 +852,14 @@ populate_thread(void *arg)
 				lprintf(cfg, ret, 0,
 				    "Fail committing, transaction was aborted");
 			intxn = 0;
+		}
+
+		if (stress_checkpoint_due && intxn == 0) {
+			stress_checkpoint_due = 0;
+			if ((ret = session->checkpoint(session, NULL)) != 0) {
+				lprintf(cfg, ret, 0, "Checkpoint failed");
+				goto err;
+			}
 		}
 	}
 	if (intxn &&
