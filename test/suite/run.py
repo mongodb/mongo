@@ -40,18 +40,15 @@ wt_3rdpartydir = os.path.join(wt_disttop, 'test', '3rdparty')
 # current working directory, then in build_posix and finally in the disttop
 # directory. This isn't ideal - if a user has multiple builds in a tree we
 # could pick the wrong one.
-if os.path.isfile(os.path.join(wt_disttop, 'wt')):
+if os.path.isfile(os.path.join(os.getcwd(), 'wt')):
+    wt_builddir = os.getcwd()
+elif os.path.isfile(os.path.join(wt_disttop, 'wt')):
     wt_builddir = wt_disttop
 elif os.path.isfile(os.path.join(wt_disttop, 'build_posix', 'wt')):
     wt_builddir = os.path.join(wt_disttop, 'build_posix')
-elif os.path.isfile(os.path.join(os.getcwd(), 'wt')):
-    wt_builddir = os.getcwd()
 else:
     print 'Unable to find useable WiredTiger build'
     sys.exit(False)
-
-print 'builddir: ' + wt_builddir
-
 
 # Cannot import wiredtiger and supporting utils until we set up paths
 sys.path.append(os.path.join(wt_builddir, 'lang', 'python'))
