@@ -1206,6 +1206,8 @@ execute_populate(CONFIG *cfg)
 	    " populate thread(s) for %" PRIu32 " items",
 	    cfg->populate_threads, cfg->icount);
 
+	cfg->insert_key = 0;
+
 	if ((cfg->popthreads =
 	    calloc(cfg->populate_threads, sizeof(CONFIG_THREAD))) == NULL)
 		return (enomem(cfg));
@@ -1218,8 +1220,6 @@ execute_populate(CONFIG *cfg)
 	if ((ret = start_threads(cfg, NULL,
 	    cfg->popthreads, cfg->populate_threads, pfunc)) != 0)
 		return (ret);
-
-	cfg->insert_key = 0;
 
 	if ((ret = __wt_epoch(NULL, &start)) != 0) {
 		lprintf(cfg, ret, 0, "Get time failed in populate.");
