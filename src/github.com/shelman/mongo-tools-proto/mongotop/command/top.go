@@ -27,6 +27,7 @@ type TopField struct {
 }
 
 type TopDiff struct {
+	// namespace -> totals
 	Totals map[string][]int
 }
 

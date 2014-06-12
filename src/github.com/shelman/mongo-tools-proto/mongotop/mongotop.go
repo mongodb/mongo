@@ -30,7 +30,7 @@ type MongoTop struct {
 // the results appropriately.
 func (self *MongoTop) Run() error {
 
-	// the top results from the previous run, used for diffing
+	// the results from the previous run, used for diffing
 	previousResults := &command.Top{}
 	err := self.SessionProvider.RunCommand("admin", previousResults)
 	if err != nil {
