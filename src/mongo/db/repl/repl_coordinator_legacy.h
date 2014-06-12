@@ -60,6 +60,13 @@ namespace repl {
                                         const WriteConcernOptions& writeConcern,
                                         Milliseconds timeout);
 
+        virtual Status stepDown(bool force,
+                                const Milliseconds& waitTime,
+                                const Milliseconds& stepdownTime);
+
+        virtual Status stepDownAndWaitForSecondary(const Milliseconds& initialWaitTime,
+                                                   const Milliseconds& stepdownTime,
+                                                   const Milliseconds& postStepdownWaitTime);
 
         virtual bool canAcceptWritesForDatabase(const StringData& dbName);
 
@@ -70,6 +77,12 @@ namespace repl {
         virtual Status setLastOptime(const HostAndPort& member, const OpTime& ts);
 
         virtual Status processHeartbeat(const BSONObj& cmdObj, BSONObjBuilder* resultObj);
+
+    private:
+        Status _stepDownHelper(bool force,
+                               const Milliseconds& initialWaitTime,
+                               const Milliseconds& stepdownTime,
+                               const Milliseconds& postStepdownWaitTime);
     };
 
 } // namespace repl

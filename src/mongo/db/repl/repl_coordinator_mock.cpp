@@ -74,6 +74,19 @@ namespace repl {
         return Status::OK();
     }
 
+    Status ReplicationCoordinatorMock::stepDown(bool force,
+                                                const Milliseconds& waitTime,
+                                                const Milliseconds& stepdownTime) {
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorMock::stepDownAndWaitForSecondary(
+            const Milliseconds& initialWaitTime,
+            const Milliseconds& stepdownTime,
+            const Milliseconds& postStepdownWaitTime) {
+        return Status::OK();
+    }
+
     bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(const StringData& dbName) {
         // TODO
         return true;

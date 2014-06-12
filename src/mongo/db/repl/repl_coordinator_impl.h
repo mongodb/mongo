@@ -69,6 +69,14 @@ namespace repl {
                                         const WriteConcernOptions& writeConcern,
                                         Milliseconds timeout);
 
+        virtual Status stepDown(bool force,
+                                const Milliseconds& waitTime,
+                                const Milliseconds& stepdownTime);
+
+        virtual Status stepDownAndWaitForSecondary(const Milliseconds& initialWaitTime,
+                                                   const Milliseconds& stepdownTime,
+                                                   const Milliseconds& postStepdownWaitTime);
+
         virtual bool canAcceptWritesForDatabase(const StringData& database);
 
         virtual bool canServeReadsFor(const NamespaceString& collection);

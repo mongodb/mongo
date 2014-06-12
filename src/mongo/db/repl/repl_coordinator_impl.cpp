@@ -111,6 +111,21 @@ namespace repl {
         return Status::OK();
     }
 
+    Status ReplicationCoordinatorImpl::stepDown(bool force,
+                                                const Milliseconds& waitTime,
+                                                const Milliseconds& stepdownTime) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorImpl::stepDownAndWaitForSecondary(
+            const Milliseconds& initialWaitTime,
+            const Milliseconds& stepdownTime,
+            const Milliseconds& postStepdownWaitTime) {
+        // TODO
+        return Status::OK();
+    }
+
     bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(const StringData& collection) {
         // TODO
         return false;

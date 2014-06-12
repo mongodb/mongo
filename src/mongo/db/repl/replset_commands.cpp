@@ -35,7 +35,8 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_settings.h"  // replSettings
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/write_concern.h"
@@ -311,41 +312,17 @@ namespace repl {
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
-            if( !theReplSet->box.getState().primary() ) {
-                errmsg = "not primary so can't step down";
-                return false;
-            }
 
             bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
-
-            // only step down if there is another node synced to within 10
-            // seconds of this node which can potentially become primary
-            if (!force) {
-                long long int lastOp = static_cast<long long int>(
-                                        theReplSet->lastOpTimeWritten.getSecs());
-                long long int closest = static_cast<long long int>(
-                                        theReplSet->lastOtherElectableOpTime().getSecs());
-
-                long long int diff = lastOp - closest;
-                result.append("closest", closest);
-                result.append("difference", diff);
-
-                if (diff < 0) {
-                    // not our problem, but we'll wait until thing settle down
-                    errmsg = "someone is ahead of the primary?";
-                    return false;
-                }
-
-                if (diff > 10) {
-                    errmsg = "no secondaries within 10 seconds of my optime";
-                    return false;
-                }
-            }
-
             int secs = (int) cmdObj.firstElement().numberInt();
             if( secs == 0 )
                 secs = 60;
-            return theReplSet->stepDown(secs);
+
+            Status status = getGlobalReplicationCoordinator()->stepDown(
+                    force,
+                    ReplicationCoordinator::Milliseconds(0),
+                    ReplicationCoordinator::Milliseconds(secs * 1000));
+            return appendCommandStatus(result, status);
         }
     } cmdReplSetStepDown;
 

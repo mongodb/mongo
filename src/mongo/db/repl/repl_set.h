@@ -40,6 +40,7 @@ namespace repl {
         virtual ~ReplSet() {}
 
         // for the replSetStepDown command
+        // Returns false if this node isn't currently primary
         bool stepDown(int secs) { return _stepDown(secs); }
 
         // for the replSetFreeze command

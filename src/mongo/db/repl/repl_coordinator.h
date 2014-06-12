@@ -121,6 +121,32 @@ namespace repl {
                                         Milliseconds timeout) = 0;
 
         /**
+         * Causes this node to relinquish being primary for at least 'stepdownTime'.  If 'force' is
+         * false, before doing so it will wait for 'waitTime' for one other node to be within 10
+         * seconds of this node's optime before stepping down. Returns a Status with the code
+         * ErrorCodes::ExceededTimeLimit if no secondary catches up within waitTime,
+         * ErrorCodes::NotMaster if you are no longer primary when trying to step down,
+         * ErrorCodes::SecondaryAheadOfPrimary if we are primary but there is another node that
+         * seems to be ahead of us in replication, and Status::OK otherwise.
+         * TODO(spencer): SERVER-14251 This should block writes while waiting for other nodes to
+         * catch up, and then should wait till a secondary is completely caught up rather than
+         * within 10 seconds.
+         */
+        virtual Status stepDown(bool force,
+                                const Milliseconds& waitTime,
+                                const Milliseconds& stepdownTime) = 0;
+
+        /**
+         * Behaves similarly to stepDown except that after stepping down as primary it waits for
+         * up to 'postStepdownWaitTime' for one other node to match this node's optime exactly.
+         * TODO(spencer): This method should be removed and all callers should use shutDown, after
+         * shutdown has been fixed to block new writes while waiting for secondaries to catch up.
+         */
+        virtual Status stepDownAndWaitForSecondary(const Milliseconds& initialWaitTime,
+                                                   const Milliseconds& stepdownTime,
+                                                   const Milliseconds& postStepdownWaitTime) = 0;
+
+        /**
          * TODO a way to trigger an action on replication of a given operation
          */
         // handle_t onReplication(OpTime ts, writeConcern, callbackFunction); // TODO

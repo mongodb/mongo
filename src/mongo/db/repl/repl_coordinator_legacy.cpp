@@ -40,7 +40,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/util/assert_util.h" // TODO: remove along with invariant from getCurrentMemberState
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/connections.h"
@@ -90,6 +90,7 @@ namespace repl {
     }
 
     MemberState LegacyReplicationCoordinator::getCurrentMemberState() const {
+        invariant(getReplicationMode() == modeReplSet);
         return theReplSet->state();
     }
 
@@ -97,6 +98,96 @@ namespace repl {
                                                           const WriteConcernOptions& writeConcern,
                                                           Milliseconds timeout) {
         // TODO
+        return Status::OK();
+    }
+
+    Status LegacyReplicationCoordinator::stepDown(bool force,
+                                                  const Milliseconds& waitTime,
+                                                  const Milliseconds& stepdownTime) {
+        return _stepDownHelper(force, waitTime, stepdownTime, Milliseconds(0));
+    }
+
+    Status LegacyReplicationCoordinator::stepDownAndWaitForSecondary(
+            const Milliseconds& initialWaitTime,
+            const Milliseconds& stepdownTime,
+            const Milliseconds& postStepdownWaitTime) {
+        return _stepDownHelper(false, initialWaitTime, stepdownTime, postStepdownWaitTime);
+    }
+
+namespace {
+    /**
+     * Waits up to timeout milliseconds for one secondary to get within threshold milliseconds
+     * of us.
+     */
+    Status _waitForSecondary(const ReplicationCoordinator::Milliseconds& timeout,
+                             const ReplicationCoordinator::Milliseconds& threshold) {
+        if (theReplSet->getConfig().members.size() <= 1) {
+            return Status(ErrorCodes::ExceededTimeLimit,
+                          mongoutils::str::stream() << "no secondaries within " <<
+                                  threshold.total_seconds() << " seconds of my optime");
+        }
+
+        long long timeoutTime, now, start;
+        timeoutTime = now = start = curTimeMillis64()/1000;
+        timeoutTime += timeout.total_seconds();
+
+        OpTime lastOp = repl::theReplSet->lastOpTimeWritten;
+        OpTime closest = repl::theReplSet->lastOtherElectableOpTime();
+        long long int diff = lastOp.getSecs() - closest.getSecs();
+        while (now <= timeoutTime && (diff < 0 || diff > threshold.total_seconds())) {
+            sleepsecs(1);
+            now = curTimeMillis64() / 1000;
+
+            lastOp = repl::theReplSet->lastOpTimeWritten;
+            closest = repl::theReplSet->lastOtherElectableOpTime();
+            diff = lastOp.getSecs() - closest.getSecs();
+        }
+
+        if (diff < 0) {
+            // not our problem but we'll wait until things settle down
+            return Status(ErrorCodes::SecondaryAheadOfPrimary,
+                          "someone is ahead of the primary?");
+        }
+        if (diff > threshold.total_seconds()) {
+            return Status(ErrorCodes::ExceededTimeLimit,
+                          mongoutils::str::stream() << "no secondaries within " <<
+                                  threshold.total_seconds() << " seconds of my optime");
+        }
+        return Status::OK();
+    }
+} // namespace
+
+    Status LegacyReplicationCoordinator::_stepDownHelper(bool force,
+                                                         const Milliseconds& initialWaitTime,
+                                                         const Milliseconds& stepdownTime,
+                                                         const Milliseconds& postStepdownWaitTime) {
+        invariant(getReplicationMode() == modeReplSet);
+        if (!getCurrentMemberState().primary()) {
+            return Status(ErrorCodes::NotMaster, "not primary so can't step down");
+        }
+
+        if (!force) {
+            Status status = _waitForSecondary(initialWaitTime, Milliseconds(10 * 1000));
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+
+        // step down
+        bool worked = repl::theReplSet->stepDown(stepdownTime.total_seconds());
+        if (!worked) {
+            return Status(ErrorCodes::NotMaster, "not primary so can't step down");
+        }
+
+        if (postStepdownWaitTime.total_milliseconds() > 0) {
+            log() << "waiting for secondaries to catch up" << endl;
+
+            // The only caller of this with a non-zero postStepdownWaitTime is
+            // stepDownAndWaitForSecondary, and the only caller of that is the shutdown command
+            // which doesn't actually care if secondaries failed to catch up here, so we ignore the
+            // return status of _waitForSecondary
+            _waitForSecondary(postStepdownWaitTime, Milliseconds(0));
+        }
         return Status::OK();
     }
 

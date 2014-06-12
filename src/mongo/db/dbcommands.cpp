@@ -95,50 +95,22 @@ namespace mongo {
     bool CmdShutdown::run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
+        repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
         if (!force &&
-                repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
-                        repl::ReplicationCoordinator::modeReplSet &&
-                repl::theReplSet->getConfig().members.size() > 1 &&
-                repl::getGlobalReplicationCoordinator()->getCurrentMemberState().primary()) {
-            long long timeout, now, start;
-            timeout = now = start = curTimeMicros64()/1000000;
+                replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
+                replCoord->getCurrentMemberState().primary()) {
+            long long timeoutSecs = 0;
             if (cmdObj.hasField("timeoutSecs")) {
-                timeout += cmdObj["timeoutSecs"].numberLong();
+                timeoutSecs = cmdObj["timeoutSecs"].numberLong();
             }
 
-            OpTime lastOp = repl::theReplSet->lastOpTimeWritten;
-            OpTime closest = repl::theReplSet->lastOtherOpTime();
-            long long int diff = lastOp.getSecs() - closest.getSecs();
-            while (now <= timeout && (diff < 0 || diff > 10)) {
-                sleepsecs(1);
-                now++;
-
-                lastOp = repl::theReplSet->lastOpTimeWritten;
-                closest = repl::theReplSet->lastOtherOpTime();
-                diff = lastOp.getSecs() - closest.getSecs();
+            Status status = repl::getGlobalReplicationCoordinator()->stepDownAndWaitForSecondary(
+                    repl::ReplicationCoordinator::Milliseconds(timeoutSecs * 1000),
+                    repl::ReplicationCoordinator::Milliseconds(120 * 1000),
+                    repl::ReplicationCoordinator::Milliseconds(60 * 1000));
+            if (!status.isOK() && status.code() != ErrorCodes::NotMaster) { // ignore not master
+                return appendCommandStatus(result, status);
             }
-
-            if (diff < 0 || diff > 10) {
-                errmsg = "no secondaries within 10 seconds of my optime";
-                result.append("closest", closest.getSecs());
-                result.append("difference", diff);
-                return false;
-            }
-
-            // step down
-            repl::theReplSet->stepDown(120);
-
-            log() << "waiting for secondaries to catch up" << endl;
-
-            lastOp = repl::theReplSet->lastOpTimeWritten;
-            while (lastOp != closest && now - start < 60) {
-                closest = repl::theReplSet->lastOtherOpTime();
-
-                now++;
-                sleepsecs(1);
-            }
-
-            // regardless of whether they caught up, we'll shut down
         }
 
         writelocktry wlt(txn->lockState(), 2 * 60 * 1000);
