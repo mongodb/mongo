@@ -420,6 +420,50 @@ err:	if (ret == WT_RESTART)
 }
 
 /*
+ * __wt_btcur_update_check --
+ *	Check whether an update would conflict.
+ *
+ *	This can be used to replace WT_CURSOR::insert or WT_CURSOR::update, so
+ *	they only check for conflicts without updating the tree.  It is used to
+ *	maintain snapshot isolation for transactions that span multiple chunks
+ *	in an LSM tree.
+ */
+int
+__wt_btcur_update_check(WT_CURSOR_BTREE *cbt)
+{
+	WT_BTREE *btree;
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	cursor = &cbt->iface;
+	btree = cbt->btree;
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+retry:	WT_RET(__cursor_func_init(cbt, 1));
+
+	switch (btree->type) {
+	case BTREE_ROW:
+		WT_ERR(__cursor_row_search(session, cbt, 1));
+
+		/*
+		 * We are only interested in checking for conflicts.
+		 */
+		if (cbt->compare == 0 && cbt->ins != NULL)
+			ret = __wt_txn_update_check(session, cbt->ins->upd);
+		break;
+	WT_ILLEGAL_VALUE_ERR(session);
+	}
+
+err:	if (ret == WT_RESTART)
+		goto retry;
+	WT_TRET(__curfile_leave(cbt));
+	if (ret != 0)
+		WT_TRET(__cursor_error_resolve(cbt));
+	return (ret);
+}
+
+/*
  * __wt_btcur_remove --
  *	Remove a record from the tree.
  */
