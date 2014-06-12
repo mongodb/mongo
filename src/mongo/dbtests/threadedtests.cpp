@@ -37,6 +37,7 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/bits.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/mvar.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -81,8 +82,13 @@ namespace ThreadedTests {
         }
     };
 
+
+#ifdef MONGO_PLATFORM_32
+    // Avoid OOM on Linux-32 by using fewer threads
+    const int nthr=45;
+#else
     const int nthr=135;
-    //const int nthr=7;
+#endif
     class MongoMutexTest : public ThreadedTest<nthr> {
 #if defined(_DEBUG)
         enum { N = 2000 };
