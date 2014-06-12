@@ -381,7 +381,7 @@ public:
     }
 
     int run() {
-        bool usingMongos = false;
+        bool usingMongos = isMongos();
         int serverAuthzVersion = 0;
         BSONObj dumpQuery;
 
@@ -449,8 +449,6 @@ public:
                 return -1;
             }
         }
-
-        usingMongos = isMongos();
 
         boost::filesystem::path root(mongoDumpGlobalParams.outputDirectory);
 
