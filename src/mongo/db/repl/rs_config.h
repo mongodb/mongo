@@ -174,9 +174,13 @@ namespace repl {
         /** check if modification makes sense */
         static bool legalChange(const ReplSetConfig& old, const ReplSetConfig& n, std::string& errmsg);
 
-        //static void receivedNewConfig(BSONObj);
+        /**
+         * 1. Checks the validity of member variables. (may uassert)
+         * 2. Saves a BSON copy of the config to local.system.replset
+         * 3. If 'comment' isn't empty and we're a primary or not yet initiated, log an 'n' op
+         *    to the oplog.  This is important because it establishes our lastOpWritten time.
+         */
         void saveConfigLocally(BSONObj comment); // to local db
-        std::string saveConfigEverywhere(); // returns textual info on what happened
 
         /**
          * Update members' groups when the config changes but members stay the same.
@@ -224,16 +228,24 @@ namespace repl {
         int _majority;
         bool _ok;
 
+        /**
+         * This function takes a config BSON and converts it into actual Member objects
+         * with the proper config filled in.  It then pushes all the new Members onto
+         * the member variable "members".  It also does some config checks and might uassert.
+         */
         void from(BSONObj);
-        void clear();
 
-        struct TagClause;
+        /**
+         * Just sets "version" to -5 and "_ok" to false.
+         */
+        void clear();
 
         /**
          * The timeout to use for heartbeats
          */
         int _heartbeatTimeout;
 
+        struct TagClause;
         /**
          * This is a logical grouping of servers.  It is pointed to by a set of
          * servers with a certain tag.

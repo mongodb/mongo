@@ -49,8 +49,8 @@ namespace repl {
     mongo::mutex ReplSetConfig::groupMx("RS tag group");
     const int ReplSetConfig::DEFAULT_HB_TIMEOUT = 10;
 
-    static AtomicUInt _warnedAboutVotes = 0;
-    void logOpInitiate(OperationContext* txn, const bo&);
+namespace {
+    AtomicUInt _warnedAboutVotes = 0;
 
     void assertOnlyHas(BSONObj o, const set<string>& fields) {
         BSONObj::iterator i(o);
@@ -61,6 +61,7 @@ namespace repl {
             }
         }
     }
+} // namespace
 
     list<HostAndPort> ReplSetConfig::otherMemberHostnames() const {
         list<HostAndPort> L;
@@ -188,37 +189,6 @@ namespace repl {
         uassert(13477, "priority must be 0 when buildIndexes=false", buildIndexes || priority == 0);
         uassert(17492, "arbiter must vote (cannot have 0 votes)", !arbiterOnly || votes > 0);
     }
-/*
-    string ReplSetConfig::TagSubgroup::toString() const {
-        bool first = true;
-        string result = "\""+name+"\": [";
-        for (set<const MemberCfg*>::const_iterator i = m.begin(); i != m.end(); i++) {
-            if (!first) {
-                result += ", ";
-            }
-            first = false;
-            result += (*i)->h.toString();
-        }
-        return result+"]";
-    }
-    */
-    string ReplSetConfig::TagClause::toString() const {
-        string result = name+": {";
-        for (map<string,TagSubgroup*>::const_iterator i = subgroups.begin(); i != subgroups.end(); i++) {
-//TEMP?            result += (*i).second->toString()+", ";
-        }
-        result += "TagClause toString TEMPORARILY DISABLED";
-        return result + "}";
-    }
-
-    string ReplSetConfig::TagRule::toString() const {
-        string result = "{";
-        for (vector<TagClause*>::const_iterator it = clauses.begin(); it < clauses.end(); it++) {
-            result += ((TagClause*)(*it))->toString()+",";
-        }
-        return result+"}";
-    }
-
     void ReplSetConfig::TagSubgroup::updateLast(const OpTime& op) {
         RACECHECK
         if (last < op) {
@@ -490,7 +460,6 @@ namespace repl {
             }
 
             // if we got here, this is a valid rule
-            LOG(1) << "replSet new rule " << rule.fieldName() << ": " << r->toString() << rsLog;
             rules[rule.fieldName()] = r;
         }
     }
@@ -635,10 +604,6 @@ namespace repl {
         return _heartbeatTimeout;
     }
 
-    static inline void configAssert(bool expr) {
-        uassert(13122, "bad repl set config?", expr);
-    }
-
     ReplSetConfig::ReplSetConfig() :
         version(EMPTYCONFIG),
         _chainingAllowed(true),
@@ -659,7 +624,7 @@ namespace repl {
         if( force ) {
             version += rand() % 100000 + 10000;
         }
-        configAssert( version < 0 /*unspecified*/ || (version >= 1) );
+        uassert(13122, "bad repl set config?", version < 0 /*unspecified*/ || (version >= 1) );
         if( version < 1 )
             version = 1;
         _ok = true;

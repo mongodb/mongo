@@ -85,6 +85,9 @@ namespace repl {
           { msg : "text", ... }
     */
     void logOpComment(OperationContext* txn, const BSONObj& obj);
+    
+    // Same as logOpComment, except only works for replsets
+    void logOpInitiate(OperationContext* txn, const BSONObj& obj);
 
     // Flush out the cached pointers to the local database and oplog.
     // Used by the closeDatabase command to ensure we don't cache closed things.
