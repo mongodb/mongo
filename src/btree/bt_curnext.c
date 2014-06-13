@@ -491,10 +491,15 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	 * Only supports row-store: applications can trivially select a random
 	 * value from a column-store, if there were any reason to do so.
 	 */
-	WT_ERR(btree->type == BTREE_ROW ?
-	    __wt_row_random(session, cbt) : ENOTSUP);
-	ret = cbt->compare == 0 ?
-	    __wt_kv_return(session, cbt) : WT_NOTFOUND;
+	if (btree->type != BTREE_ROW)
+		WT_ERR(ENOTSUP);
+
+	WT_ERR(__wt_row_random(session, cbt));
+
+	if (cbt->compare != 0)
+		WT_ERR(WT_NOTFOUND);
+	WT_ERR(__wt_kv_return(		/* XXX: wrong for an invisible update */
+	    session, cbt, cbt->ins == NULL ? NULL : cbt->ins->upd));
 
 err:	if (ret != 0)
 		WT_TRET(__cursor_error_resolve(cbt));

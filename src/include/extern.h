@@ -385,7 +385,9 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     uint32_t flags,
     WT_PAGE **pagep);
 extern int __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref);
-extern int __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
+extern int __wt_kv_return(WT_SESSION_IMPL *session,
+    WT_CURSOR_BTREE *cbt,
+    WT_UPDATE *upd);
 extern int __wt_bt_salvage(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase,
     const char *cfg[]);

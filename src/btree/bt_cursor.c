@@ -66,34 +66,57 @@ __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 
 /*
  * __cursor_invalid --
- *	Return if the cursor references an invalid K/V pair (either the pair
- *	doesn't exist at all because the tree is empty, or the pair was
- *	deleted).
+ *	Return if the cursor references an invalid key/value pair.
  */
 static inline int
-__cursor_invalid(WT_CURSOR_BTREE *cbt)
+__cursor_invalid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_COL *cip;
 	WT_PAGE *page;
-	WT_ROW *rip;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 
 	btree = cbt->btree;
 	page = cbt->ref->page;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-
-	/* Check for an insert list entry with a visible update. */
-	if (cbt->ins != NULL &&
-	    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL)
-		return (WT_UPDATE_DELETED_ISSET(upd) ? 1 : 0);
+	if (updp != NULL)
+		*updp = NULL;
 
 	/*
-	 * Check for a valid page entry: avoid empty pages (the page may be
-	 * empty, the search routines don't check).  If we find a valid page
-	 * entry, check for a delete update.
+	 * We may be pointing to an insert object, and we may have a page with
+	 * existing entries.  Insert objects always have associated update
+	 * objects (the value), on-page row-store objects may have associated
+	 * update objects.  Any update object may be deleted, or invisible to
+	 * us.  In the case of an on-page entry, there is by definition a value
+	 * that is visible to us, the original page cell (but in the case of a
+	 * variable-length column-store cell, the on-page cell may be deleted).
+	 *
+	 * If we find a visible update structure, return our caller a reference
+	 * to it because we don't want to repeatedly search for the update, it
+	 * might suddenly become invisible (imagine a read-uncommitted session
+	 * with another session's aborted insert), and we don't want to handle
+	 * that potential error every time we look at the value.
+	 *
+	 * First, check for an insert object with a visible update (a visible
+	 * update that's been deleted is not a valid key/value pair).
+	 */
+	if (cbt->ins != NULL &&
+	    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL) {
+		if (WT_UPDATE_DELETED_ISSET(upd))
+			return (1);
+		if (updp != NULL)
+			*updp = upd;
+		return (0);
+	}
+
+	/*
+	 * If we don't have an insert object, or we have an insert object but
+	 * no update was visible to us, use the original page information.
+	 *
+	 * Avoid empty pages (the page might be empty, the search routines don't
+	 * check), or searches past the end of the data on the page.
 	 */
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -132,10 +155,13 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 			return (1);
 
 		/* Updates are stored on the page, check for a delete. */
-		rip = &page->pg_row_d[cbt->slot];
-		if ((upd =
-		    __wt_txn_read(session, WT_ROW_UPDATE(page, rip))) != NULL)
-			return (WT_UPDATE_DELETED_ISSET(upd) ? 1 : 0);
+		if (page->pg_row_upd != NULL && (upd = __wt_txn_read(
+		    session, page->pg_row_upd[cbt->slot])) != NULL) {
+			if (WT_UPDATE_DELETED_ISSET(upd))
+				return (1);
+			if (updp != NULL)
+				*updp = upd;
+		}
 		break;
 	}
 	return (0);
@@ -217,6 +243,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -233,7 +260,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	WT_ERR(btree->type == BTREE_ROW ?
 	    __cursor_row_search(session, cbt, 0) :
 	    __cursor_col_search(session, cbt));
-	if (cbt->compare != 0 || __cursor_invalid(cbt)) {
+	if (cbt->compare != 0 || __cursor_invalid(cbt, &upd)) {
 		/*
 		 * Creating a record past the end of the tree in a fixed-length
 		 * column-store implicitly fills the gap with empty records.
@@ -246,7 +273,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		} else
 			ret = WT_NOTFOUND;
 	} else
-		ret = __wt_kv_return(session, cbt);
+		ret = __wt_kv_return(session, cbt, upd);
 
 err:	if (ret != 0)
 		WT_TRET(__cursor_error_resolve(cbt));
@@ -264,6 +291,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
 	int exact;
 
 	btree = cbt->btree;
@@ -308,18 +336,18 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 		cursor->value.data = &cbt->v;
 		cursor->value.size = 1;
 		exact = 0;
-	} else if (!__cursor_invalid(cbt)) {
+	} else if (!__cursor_invalid(cbt, &upd)) {
 		exact = cbt->compare;
-		ret = __wt_kv_return(session, cbt);
+		ret = __wt_kv_return(session, cbt, upd);
 	} else if ((ret = __wt_btcur_next(cbt, 0)) != WT_NOTFOUND)
 		exact = 1;
 	else {
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, 1) :
 		    __cursor_col_search(session, cbt));
-		if (!__cursor_invalid(cbt)) {
+		if (!__cursor_invalid(cbt, &upd)) {
 			exact = cbt->compare;
-			ret = __wt_kv_return(session, cbt);
+			ret = __wt_kv_return(session, cbt, upd);
 		} else if ((ret = __wt_btcur_prev(cbt, 0)) != WT_NOTFOUND)
 			exact = -1;
 	}
@@ -389,7 +417,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		 * Fail in that case, the record exists.
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-		    ((cbt->compare == 0 && !__cursor_invalid(cbt)) ||
+		    ((cbt->compare == 0 && !__cursor_invalid(cbt, NULL)) ||
 		    (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt))))
 			WT_ERR(WT_DUPLICATE_KEY);
 
@@ -404,7 +432,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		 * key/value pair.
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-		    cbt->compare == 0 && !__cursor_invalid(cbt))
+		    cbt->compare == 0 && !__cursor_invalid(cbt, NULL))
 			WT_ERR(WT_DUPLICATE_KEY);
 
 		ret = __cursor_row_modify(session, cbt, 0);
@@ -499,7 +527,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		WT_ERR(__cursor_col_search(session, cbt));
 
 		/* Remove the record if it exists. */
-		if (cbt->compare != 0 || __cursor_invalid(cbt)) {
+		if (cbt->compare != 0 || __cursor_invalid(cbt, NULL)) {
 			if (!__cursor_fix_implicit(btree, cbt))
 				WT_ERR(WT_NOTFOUND);
 			/*
@@ -519,7 +547,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	case BTREE_ROW:
 		/* Remove the record if it exists. */
 		WT_ERR(__cursor_row_search(session, cbt, 0));
-		if (cbt->compare != 0 || __cursor_invalid(cbt))
+		if (cbt->compare != 0 || __cursor_invalid(cbt, NULL))
 			WT_ERR(WT_NOTFOUND);
 
 		ret = __cursor_row_modify(session, cbt, 1);
@@ -588,7 +616,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		 * record exists.
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-		    (cbt->compare != 0 || __cursor_invalid(cbt)) &&
+		    (cbt->compare != 0 || __cursor_invalid(cbt, NULL)) &&
 		    !__cursor_fix_implicit(btree, cbt))
 			WT_ERR(WT_NOTFOUND);
 		ret = __cursor_col_modify(session, cbt, 0);
@@ -599,7 +627,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		 * If not overwriting, fail if the key does not exist.
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-		    (cbt->compare != 0 || __cursor_invalid(cbt)))
+		    (cbt->compare != 0 || __cursor_invalid(cbt, NULL)))
 			WT_ERR(WT_NOTFOUND);
 		ret = __cursor_row_modify(session, cbt, 0);
 		break;
@@ -610,7 +638,8 @@ err:	if (ret == WT_RESTART)
 		goto retry;
 	/* If successful, point the cursor at internal copies of the data. */
 	if (ret == 0)
-		ret = __wt_kv_return(session, cbt);
+		ret = __wt_kv_return(
+		    session, cbt, cbt->ins == NULL ? NULL : cbt->ins->upd);
 	if (ret != 0)
 		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
