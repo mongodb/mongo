@@ -27,13 +27,39 @@ class ReplayIterator;
 }
 #endif
 
-#define  WT_URI  "table:data"
-#define  WT_CONN_CONFIG  "log=(enabled),checkpoint_sync=false,transaction_sync=none,session_max=256,"
-#define  WT_TABLE_CONFIG  "type=lsm,leaf_page_max=4KB,leaf_item_max=1KB,"
+#define WT_URI          "table:data"
+#define WT_CONN_CONFIG  "log=(enabled),checkpoint_sync=false," \
+                         "transaction_sync=none,session_max=256,"
+#define WT_TABLE_CONFIG  "type=lsm,leaf_page_max=4KB,leaf_item_max=1KB,"
 
 /* Destructors required for interfaces. */
 leveldb::DB::~DB() {}
 Snapshot::~Snapshot() {}
+
+Status WiredTigerErrorToStatus(int wiredTigerError, const char *msg) {
+  if (wiredTigerError == 0)
+    return Status::OK();
+
+  if (msg == NULL)
+    msg = wiredtiger_strerror(wiredTigerError);
+
+  if (wiredTigerError == WT_NOTFOUND)
+    return Status::NotFound(Slice(msg));
+  else if (wiredTigerError == WT_ERROR || wiredTigerError == WT_PANIC)
+    return Status::Corruption(Slice(msg));
+  else if (wiredTigerError == WT_DEADLOCK)
+    return Status::IOError("DEADLOCK"); // TODO: Is this the best translation?
+  else if (wiredTigerError == ENOTSUP)
+    return Status::NotSupported(Slice(msg));
+  else if (wiredTigerError == EINVAL)
+    return Status::InvalidArgument(Slice(msg));
+  else if (wiredTigerError == EPERM || wiredTigerError == ENOENT ||
+      wiredTigerError == EIO || wiredTigerError == EBADF ||
+      wiredTigerError == EEXIST || wiredTigerError == ENOSPC)
+    return Status::IOError(Slice(msg));
+  else
+    return Status::Corruption(Slice(msg));
+}
 
 /* Iterators, from leveldb/table/iterator.cc */
 Iterator::Iterator() {
@@ -138,19 +164,22 @@ Cache *NewLRUCache(size_t capacity) {
 
 Status DestroyDB(const std::string& name, const Options& options) {
   WT_CONNECTION *conn;
+  int ret, t_ret;
   /* If the database doesn't exist, there is nothing to destroy. */
   if (access((name + "/WiredTiger").c_str(), F_OK) != 0)
     return Status::OK();
-  int ret = ::wiredtiger_open(name.c_str(), NULL, NULL, &conn);
-  assert(ret == 0);
+  if ((ret = ::wiredtiger_open(name.c_str(), NULL, NULL, &conn)) != 0)
+    return WiredTigerErrorToStatus(ret, NULL);
   WT_SESSION *session;
-  ret = conn->open_session(conn, NULL, NULL, &session);
-  assert(ret == 0);
-  ret = session->drop(session, WT_URI, "force");
-  assert(ret == 0);
-  ret = conn->close(conn, NULL);
-  assert(ret == 0);
-  return Status::OK();
+  if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+    goto cleanup;
+  if ((ret = session->drop(session, WT_URI, "force")) != 0)
+    goto cleanup;
+
+cleanup:
+  if ((t_ret = conn->close(conn, NULL)) != 0 && ret == 0)
+    ret = t_ret;
+  return WiredTigerErrorToStatus(ret, NULL);
 }
 
 Status RepairDB(const std::string& dbname, const Options& options) {
@@ -220,7 +249,8 @@ private:
 
 class IteratorImpl : public Iterator {
 public:
-  IteratorImpl(WT_CURSOR *cursor, DbImpl *db, const ReadOptions &options) : cursor_(cursor), status_(Status::OK()), valid_(false) {}
+  IteratorImpl(WT_CURSOR *cursor, DbImpl *db, const ReadOptions &options) :
+    cursor_(cursor), status_(Status::OK()), valid_(false) {}
   virtual ~IteratorImpl() {}
 
   // An iterator is either positioned at a key/value pair, or
@@ -268,7 +298,8 @@ public:
 
 class DbImpl : public leveldb::DB {
 public:
-  DbImpl(WT_CONNECTION *conn) : DB(), conn_(conn), context_(new ThreadLocal<OperationContext>) {}
+  DbImpl(WT_CONNECTION *conn) :
+    DB(), conn_(conn), context_(new ThreadLocal<OperationContext>) {}
   virtual ~DbImpl() {
     delete context_;
     int ret = conn_->close(conn_, NULL);
@@ -287,7 +318,9 @@ public:
          const Slice& key, std::string* value);
 
 #ifdef HAVE_HYPERLEVELDB
-  virtual Status LiveBackup(const Slice& name) { return Status::NotSupported("sorry!"); }
+  virtual Status LiveBackup(const Slice& name) {
+    return Status::NotSupported("sorry!");
+  }
   virtual void GetReplayTimestamp(std::string* timestamp) {}
   virtual void AllowGarbageCollectBeforeTimestamp(const std::string& timestamp) {}
   virtual bool ValidateTimestamp(const std::string& timestamp) {}
@@ -358,9 +391,10 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
   int ret = ::wiredtiger_open(name.c_str(), NULL, conn_config.c_str(), &conn);
   if (ret == ENOENT)
     return Status::NotFound(Slice("Database does not exist."));
-  if (ret == EEXIST)
+  else if (ret == EEXIST)
     return Status::NotFound(Slice("Database already exists."));
-  assert(ret == 0);
+  else if (ret != 0)
+    return WiredTigerErrorToStatus(ret, NULL);
 
   if (options.create_if_missing) {
     std::stringstream s_table;
@@ -380,14 +414,19 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
     s_table << "),";
     WT_SESSION *session;
     std::string table_config = s_table.str();
-    ret = conn->open_session(conn, NULL, NULL, &session);
-    assert(ret == 0);
-    ret = session->create(session, WT_URI, table_config.c_str());
-    assert(ret == 0);
-    ret = session->close(session, NULL);
-    assert(ret == 0);
+    if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+      goto err;
+    if ((ret = session->create(session, WT_URI, table_config.c_str())) != 0)
+      goto err;
+    if ((ret = session->close(session, NULL)) != 0)
+      goto err;
   }
 
+  if (ret != 0) {
+err:
+    conn->close(conn, NULL);
+    return WiredTigerErrorToStatus(ret, NULL);
+  }
   *dbptr = new DbImpl(conn);
   return Status::OK();
 }
@@ -409,8 +448,7 @@ DbImpl::Put(const WriteOptions& options,
   item.size = value.size();
   cursor->set_value(cursor, &item);
   int ret = cursor->insert(cursor);
-  assert(ret == 0);
-  return Status::OK();
+  return WiredTigerErrorToStatus(ret, NULL);
 }
 
 // Remove the database entry (if any) for "key".  Returns OK on
@@ -427,10 +465,12 @@ DbImpl::Delete(const WriteOptions& options, const Slice& key)
   item.size = key.size();
   cursor->set_key(cursor, &item);
   int ret = cursor->remove(cursor);
-  assert(ret == 0);
-  ret = cursor->reset(cursor);
-  assert(ret == 0);
-  return Status::OK();
+  // Reset the WiredTiger cursor so it doesn't keep any pages pinned. Track
+  // failures in debug builds since we don't expect failure, but don't pass
+  // failures on - it's not necessary for correct operation.
+  int t_ret = cursor->reset(cursor);
+  assert(t_ret == 0);
+  return WiredTigerErrorToStatus(ret, NULL);
 }
 
 // Implement WriteBatch::Handler
@@ -478,9 +518,11 @@ DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
   WT_CURSOR *cursor = getCursor();
   WriteBatchHandler handler(cursor);
   Status status = updates->Iterate(&handler);
-  assert(handler.getStatus() == 0);
-  int ret = cursor->reset(cursor);
-  assert(ret == 0);
+  // Reset the WiredTiger cursor so it doesn't keep any pages pinned. Track
+  // failures in debug builds since we don't expect failure, but don't pass
+  // failures on - it's not necessary for correct operation.
+  int t_ret = cursor->reset(cursor);
+  assert(t_ret == 0);
   return status;
 }
 
@@ -504,9 +546,11 @@ DbImpl::Get(const ReadOptions& options,
   int ret = cursor->search(cursor);
   if (ret == WT_NOTFOUND)
     return Status::NotFound("DB::Get key not found");
-  assert(ret == 0);
+  else if (ret != 0)
+    return WiredTigerErrorToStatus(ret, NULL);
   ret = cursor->get_value(cursor, &item);
-  assert(ret == 0);
+  if (ret != 0)
+    return WiredTigerErrorToStatus(ret, NULL);
   *value = std::string((const char *)item.data, item.size);
   return Status::OK();
 }
