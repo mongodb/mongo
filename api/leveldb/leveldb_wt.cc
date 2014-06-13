@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2008-2014 WiredTiger, Inc.
- * 	All rights reserved.
+ *   All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
@@ -284,6 +284,11 @@ private:
   Slice key_, value_;
   Status status_;
   bool valid_;
+
+  void SetError(int wiredTigerError) {
+    valid_ = false;
+    status_ = WiredTigerErrorToStatus(wiredTigerError, NULL);
+  }
 
   // No copying allowed
   IteratorImpl(const IteratorImpl&);
@@ -663,20 +668,33 @@ DbImpl::ResumeCompactions()
 void
 IteratorImpl::SeekToFirst()
 {
+  int ret;
   WT_ITEM item;
 
-  int ret = cursor_->reset(cursor_);
-  assert(ret == 0);
-  ret = cursor_->next(cursor_);
-  if (ret != 0) {
-    valid_ = false;
+  if (!Status().ok())
+    return;
+
+  if ((ret = cursor_->reset(cursor_)) != 0) {
+    SetError(ret);
     return;
   }
-  ret = cursor_->get_key(cursor_, &item);
-  assert(ret == 0);
+  ret = cursor_->next(cursor_);
+  if (ret == WT_NOTFOUND) {
+    valid_ = false;
+    return;
+  } else if (ret != 0) {
+    SetError(ret);
+    return;
+  }
+  if ((ret = cursor_->get_key(cursor_, &item)) != 0) {
+    SetError(ret);
+    return;
+  }
   key_ = Slice((const char *)item.data, item.size);
-  ret = cursor_->get_value(cursor_, &item);
-  assert(ret == 0);
+  if ((ret = cursor_->get_value(cursor_, &item)) != 0) {
+    SetError(ret);
+    return;
+  }
   value_ = Slice((const char *)item.data, item.size);
   valid_ = true;
 }
@@ -686,20 +704,33 @@ IteratorImpl::SeekToFirst()
 void
 IteratorImpl::SeekToLast()
 {
+  int ret;
   WT_ITEM item;
 
-  int ret = cursor_->reset(cursor_);
-  assert(ret == 0);
-  ret = cursor_->prev(cursor_);
-  if (ret != 0) {
-    valid_ = false;
+  if (!Status().ok())
+    return;
+
+  if ((ret = cursor_->reset(cursor_)) != 0) {
+    SetError(ret);
     return;
   }
-  ret = cursor_->get_key(cursor_, &item);
-  assert(ret == 0);
+  ret = cursor_->prev(cursor_);
+  if (ret == WT_NOTFOUND) {
+    valid_ = false;
+    return;
+  } else if (ret != 0) {
+    SetError(ret);
+    return;
+  }
+  if ((ret = cursor_->get_key(cursor_, &item)) != 0) {
+    SetError(ret);
+    return;
+  }
   key_ = Slice((const char *)item.data, item.size);
-  ret = cursor_->get_value(cursor_, &item);
-  assert(ret == 0);
+  if ((ret = cursor_->get_value(cursor_, &item)) != 0) {
+    SetError(ret);
+    return;
+  }
   value_ = Slice((const char *)item.data, item.size);
   valid_ = true;
 }
@@ -712,6 +743,9 @@ IteratorImpl::Seek(const Slice& target)
 {
   WT_ITEM item;
 
+  if (!Status().ok())
+    return;
+
   item.data = target.data();
   item.size = target.size();
   cursor_->set_key(cursor_, &item);
@@ -720,15 +754,19 @@ IteratorImpl::Seek(const Slice& target)
     ret = cursor_->next(cursor_);
   if (ret != 0) {
     if (ret != WT_NOTFOUND)
-      status_ = Status::IOError(wiredtiger_strerror(ret));
+      SetError(ret);
     valid_ = false;
     return;
   }
-  ret = cursor_->get_key(cursor_, &item);
-  assert(ret == 0);
+  if ((ret = cursor_->get_key(cursor_, &item)) != 0) {
+    SetError(ret);
+    return;
+  }
   key_ = Slice((const char *)item.data, item.size);
-  ret = cursor_->get_value(cursor_, &item);
-  assert(ret == 0);
+  if ((ret = cursor_->get_value(cursor_, &item)) != 0) {
+    SetError(ret);
+    return;
+  }
   value_ = Slice((const char *)item.data, item.size);
   valid_ = true;
 }
@@ -739,22 +777,33 @@ IteratorImpl::Seek(const Slice& target)
 void
 IteratorImpl::Next()
 {
+  int ret;
   WT_ITEM item;
 
-  assert(valid_);
+  if (!Status().ok())
+    return;
 
-  int ret = cursor_->next(cursor_);
+  if (!valid_) {
+    SetError(EINVAL);
+    return;
+  }
+
+  ret = cursor_->next(cursor_);
   if (ret != 0) {
     if (ret != WT_NOTFOUND)
-      status_ = Status::IOError(wiredtiger_strerror(ret));
+      SetError(ret);
     valid_ = false;
     return;
   }
-  ret = cursor_->get_key(cursor_, &item);
-  assert(ret == 0);
+  if ((ret = cursor_->get_key(cursor_, &item)) != 0) {
+    SetError(ret);
+    return;
+  }
   key_ = Slice((const char *)item.data, item.size);
-  ret = cursor_->get_value(cursor_, &item);
-  assert(ret == 0);
+  if ((ret = cursor_->get_value(cursor_, &item)) != 0) {
+    SetError(ret);
+    return;
+  }
   value_ = Slice((const char *)item.data, item.size);
   valid_ = true;
 }
@@ -767,20 +816,30 @@ IteratorImpl::Prev()
 {
   WT_ITEM item;
 
-  assert(valid_);
+  if (!Status().ok())
+    return;
+
+  if (!valid_) {
+    SetError(EINVAL);
+    return;
+  }
 
   int ret = cursor_->prev(cursor_);
   if (ret != 0) {
     if (ret != WT_NOTFOUND)
-      status_ = Status::IOError(wiredtiger_strerror(ret));
+      SetError(ret);
     valid_ = false;
     return;
   }
-  ret = cursor_->get_key(cursor_, &item);
-  assert(ret == 0);
+  if ((ret = cursor_->get_key(cursor_, &item)) != 0) {
+    SetError(ret);
+    return;
+  }
   key_ = Slice((const char *)item.data, item.size);
-  ret = cursor_->get_value(cursor_, &item);
-  assert(ret == 0);
+  if ((ret = cursor_->get_value(cursor_, &item)) != 0) {
+    SetError(ret);
+    return;
+  }
   value_ = Slice((const char *)item.data, item.size);
   valid_ = true;
 }
