@@ -200,7 +200,7 @@ void go() {
 
     cout << "testing..."<< endl;
 
-    cout << "optoins:" << o.toString() << endl;
+    cout << "options:" << o.toString() << endl;
     unsigned wthr = 1;
     if( !o["nThreads"].eoo() ) {
         wthr = (unsigned) o["nThreads"].Int();
