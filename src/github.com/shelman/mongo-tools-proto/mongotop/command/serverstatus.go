@@ -71,14 +71,10 @@ func (self *ServerStatus) Diff(other Command) (Diff, error) {
 			secondTimeLocked := secondNSInfo.TimeLockedMicros
 
 			diff.Totals[ns] = []int{
-				util.MaxInt(
-					0, (secondTimeLocked["r"]+secondTimeLocked["R"])-
-						(firstTimeLocked["r"]+firstTimeLocked["R"]),
-				),
-				util.MaxInt(
-					0, (secondTimeLocked["w"]+secondTimeLocked["W"])-
-						(firstTimeLocked["w"]+firstTimeLocked["W"]),
-				),
+				(secondTimeLocked["r"] + secondTimeLocked["R"]) -
+					(firstTimeLocked["r"] + firstTimeLocked["R"]),
+				(secondTimeLocked["w"] + secondTimeLocked["W"]) -
+					(firstTimeLocked["w"] + firstTimeLocked["W"]),
 			}
 
 			diff.Totals[ns] = append(

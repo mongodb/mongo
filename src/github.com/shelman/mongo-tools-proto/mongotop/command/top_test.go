@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestTopCommandDiff(t *testing.T) {
+func TestTopDiff(t *testing.T) {
 
 	testutil.VerifyTestType(t, "unit")
 
