@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	// the default sleep time, in seconds
 	DEFAULT_SLEEP_TIME = 1
 )
 

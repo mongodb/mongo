@@ -9,7 +9,7 @@ import (
 
 // Interface type for connecting to the database.
 type DBConnector interface {
-	// configure, based on the opts passed in
+	// configure, based on the options passed in
 	Configure(*options.ToolOptions) error
 
 	// dial the database and get a fresh new session
@@ -20,7 +20,7 @@ var (
 	DefaultDialTimeout = time.Second * 3
 )
 
-// Basic connector for dialing the database, with no auth.
+// Basic connector for dialing the database, with no authentication.
 type VanillaDBConnector struct {
 	dialInfo *mgo.DialInfo
 }
