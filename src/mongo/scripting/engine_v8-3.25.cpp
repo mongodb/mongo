@@ -652,8 +652,7 @@ namespace mongo {
             return;
         }
 
-        v8::Local<v8::External> f =
-            v8::Local<v8::External>::Cast(args.Callee()->Get(scope->strLitToV8("_v8_function")));
+        v8::Local<v8::External> f = v8::Local<v8::External>::Cast(args.Data());
         v8Function function = (v8Function)(f->Value());
         v8::Local<v8::Value> ret;
         string exceptionText;
@@ -1249,9 +1248,12 @@ namespace mongo {
     }
 
     v8::Local<v8::FunctionTemplate> V8Scope::createV8Function(v8Function func) {
-        v8::Local<v8::FunctionTemplate> ft = v8::FunctionTemplate::New(_isolate, v8Callback);
+        v8::Local<v8::Value> funcHandle = v8::External::New(_isolate,
+                                                            reinterpret_cast<void*>(func));
+        v8::Local<v8::FunctionTemplate> ft = v8::FunctionTemplate::New(_isolate, v8Callback,
+                                                                       funcHandle);
         ft->Set(strLitToV8("_v8_function"),
-                v8::External::New(_isolate, reinterpret_cast<void*>(func)),
+                v8::Boolean::New(_isolate, true),
                 static_cast<v8::PropertyAttribute>(v8::DontEnum | v8::ReadOnly));
         return ft;
     }
