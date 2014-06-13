@@ -51,16 +51,17 @@ namespace {
     ReplicationExecutor::~ReplicationExecutor() {}
 
     void ReplicationExecutor::run() {
-        WorkItem work;
-        while ((work = getWork()).callback) {
+        std::pair<WorkItem, CallbackHandle> work;
+        while ((work = getWork()).first.callback) {
             {
                 boost::lock_guard<boost::mutex> lk(_terribleExLockSyncMutex);
-                const Status inStatus = work.isCanceled ?
+                const Status inStatus = work.first.isCanceled ?
                     Status(ErrorCodes::CallbackCanceled, "Callback canceled") :
                     Status::OK();
-                makeNoExcept(stdx::bind(work.callback, this, inStatus))();
+                makeNoExcept(stdx::bind(work.first.callback,
+                                        CallbackData(this, work.second, inStatus)))();
             }
-            signalEvent(work.finishedEvent);
+            signalEvent(work.first.finishedEvent);
         }
         finishShutdown();
     }
@@ -184,28 +185,35 @@ namespace {
     }
 
     static void remoteCommandFinished(
-            ReplicationExecutor* executor,
+            const ReplicationExecutor::CallbackData& cbData,
             const ReplicationExecutor::RemoteCommandCallbackFn& cb,
             const ReplicationExecutor::RemoteCommandRequest& request,
-            const StatusWith<BSONObj>& response,
-            const Status& status) {
+            const StatusWith<BSONObj>& response) {
 
-        if (status.isOK()) {
-            cb(executor, request, response);
+        if (cbData.status.isOK()) {
+            cb(ReplicationExecutor::RemoteCommandCallbackData(
+                       cbData.executor, cbData.myHandle, request, response));
         }
         else {
-            cb(executor, request, StatusWith<BSONObj>(status));
+            cb(ReplicationExecutor::RemoteCommandCallbackData(
+                       cbData.executor,
+                       cbData.myHandle,
+                       request,
+                       StatusWith<BSONObj>(cbData.status)));
         }
     }
 
     static void remoteCommandFailedEarly(
-            ReplicationExecutor* executor,
+            const ReplicationExecutor::CallbackData& cbData,
             const ReplicationExecutor::RemoteCommandCallbackFn& cb,
-            const ReplicationExecutor::RemoteCommandRequest& request,
-            const Status& status) {
+            const ReplicationExecutor::RemoteCommandRequest& request) {
 
-        invariant(!status.isOK());
-        cb(executor, request, StatusWith<BSONObj>(status));
+        invariant(!cbData.status.isOK());
+        cb(ReplicationExecutor::RemoteCommandCallbackData(
+                   cbData.executor,
+                   cbData.myHandle,
+                   request,
+                   StatusWith<BSONObj>(cbData.status)));
     }
 
     void ReplicationExecutor::doRemoteCommand(
@@ -245,8 +253,7 @@ namespace {
                                     stdx::placeholders::_1,
                                     cb,
                                     request,
-                                    cmdResult,
-                                    stdx::placeholders::_2);
+                                    cmdResult);
         _readyQueue.splice(_readyQueue.end(), _networkInProgressQueue, iter);
         _workAvailable.notify_all();
     }
@@ -261,8 +268,7 @@ namespace {
                 stdx::bind(remoteCommandFailedEarly,
                            stdx::placeholders::_1,
                            cb,
-                           request,
-                           stdx::placeholders::_2));
+                           request));
         if (handle.isOK()) {
             _networkWorkers.schedule(makeNoExcept(stdx::bind(&ReplicationExecutor::doRemoteCommand,
                                                              this,
@@ -310,11 +316,11 @@ namespace {
         lk.unlock();
         {
             boost::lock_guard<boost::mutex> terribleLock(_terribleExLockSyncMutex);
-            work.callback(
-                    this,
-                    (work.isCanceled ?
-                     Status(ErrorCodes::CallbackCanceled, "Callback canceled") :
-                     Status::OK()));
+            work.callback(CallbackData(this,
+                                       cbHandle,
+                                       (work.isCanceled ?
+                                        Status(ErrorCodes::CallbackCanceled, "Callback canceled") :
+                                        Status::OK())));
         }
         lk.lock();
         signalEvent_inlock(work.finishedEvent);
@@ -352,7 +358,8 @@ namespace {
         waitForEvent(cbHandle._finishedEvent);
     }
 
-    ReplicationExecutor::WorkItem ReplicationExecutor::getWork() {
+    std::pair<ReplicationExecutor::WorkItem, ReplicationExecutor::CallbackHandle>
+    ReplicationExecutor::getWork() {
         boost::unique_lock<boost::mutex> lk(_mutex);
         while (true) {
             Milliseconds waitFor = scheduleReadySleepers_inlock();
@@ -360,14 +367,15 @@ namespace {
                 break;
             }
             else if (_inShutdown) {
-                return WorkItem();
+                return std::make_pair(WorkItem(), CallbackHandle());
             }
             _workAvailable.timed_wait(lk, waitFor);
         }
-        const WorkItem result = _readyQueue.front();
+        const CallbackHandle cbHandle(_readyQueue.begin());
+        const WorkItem work = *cbHandle._iter;
         _readyQueue.begin()->callback = CallbackFn();
         _freeQueue.splice(_freeQueue.begin(), _readyQueue, _readyQueue.begin());
-        return result;
+        return std::make_pair(work, cbHandle);
     }
 
     ReplicationExecutor::Milliseconds ReplicationExecutor::scheduleReadySleepers_inlock() {
@@ -416,6 +424,14 @@ namespace {
         _finishedEvent(iter->finishedEvent) {
     }
 
+    ReplicationExecutor::CallbackData::CallbackData(ReplicationExecutor* theExecutor,
+                                                    const CallbackHandle& theHandle,
+                                                    const Status& theStatus) :
+        executor(theExecutor),
+        myHandle(theHandle),
+        status(theStatus) {
+    }
+
     ReplicationExecutor::RemoteCommandRequest::RemoteCommandRequest() {}
     ReplicationExecutor::RemoteCommandRequest::RemoteCommandRequest(
             const HostAndPort& theTarget,
@@ -424,6 +440,17 @@ namespace {
         target(theTarget),
         dbname(theDbName),
         cmdObj(theCmdObj) {
+    }
+
+    ReplicationExecutor::RemoteCommandCallbackData::RemoteCommandCallbackData(
+            ReplicationExecutor* theExecutor,
+            const CallbackHandle& theHandle,
+            const RemoteCommandRequest& theRequest,
+            const StatusWith<BSONObj>& theResponse) :
+        executor(theExecutor),
+        myHandle(theHandle),
+        request(theRequest),
+        response(theResponse) {
     }
 
     ReplicationExecutor::WorkItem::WorkItem() : generation(0U), isCanceled(false) {}

@@ -248,13 +248,13 @@ namespace repl {
     }
 
     // produce a reply to a heartbeat
-    void TopologyCoordinatorImpl::prepareHeartbeatResponse(ReplicationExecutor* executor,
-                                                           const Status& inStatus,
-                                                           Date_t now,
-                                                           const BSONObj& cmdObj, 
-                                                           BSONObjBuilder* resultObj,
-                                                           Status* result) {
-        if (inStatus == ErrorCodes::CallbackCanceled) {
+    void TopologyCoordinatorImpl::prepareHeartbeatResponse(
+            const ReplicationExecutor::CallbackData& data,
+            Date_t now,
+            const BSONObj& cmdObj,
+            BSONObjBuilder* resultObj,
+            Status* result) {
+        if (data.status == ErrorCodes::CallbackCanceled) {
             *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
             return;
         }

@@ -136,7 +136,6 @@ namespace repl {
             stdx::bind(&TopologyCoordinator::prepareHeartbeatResponse,
                        _topCoord.get(),
                        stdx::placeholders::_1,
-                       stdx::placeholders::_2,
                        Date_t(curTimeMillis64()),
                        cmdObj,
                        resultObj,

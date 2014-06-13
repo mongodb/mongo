@@ -61,40 +61,36 @@ namespace {
         return !(lhs == rhs);
     }
 
-    void setStatus(ReplicationExecutor* executor, const Status& source, Status* target) {
-        *target = source;
+    void setStatus(const ReplicationExecutor::CallbackData& cbData, Status* target) {
+        *target = cbData.status;
     }
 
-    void setStatusAndShutdown(ReplicationExecutor* executor,
-                              const Status& source,
+    void setStatusAndShutdown(const ReplicationExecutor::CallbackData& cbData,
                               Status* target) {
-        setStatus(executor, source, target);
-        if (source != ErrorCodes::CallbackCanceled)
-            executor->shutdown();
+        setStatus(cbData, target);
+        if (cbData.status != ErrorCodes::CallbackCanceled)
+            cbData.executor->shutdown();
     }
 
-    void setStatusAndTriggerEvent(ReplicationExecutor* executor,
-                                  const Status& inStatus,
+    void setStatusAndTriggerEvent(const ReplicationExecutor::CallbackData& cbData,
                                   Status* outStatus,
                                   ReplicationExecutor::EventHandle event) {
-        *outStatus = inStatus;
-        if (!inStatus.isOK())
+        *outStatus = cbData.status;
+        if (!cbData.status.isOK())
             return;
-        executor->signalEvent(event);
+        cbData.executor->signalEvent(event);
     }
 
-    void scheduleSetStatusAndShutdown(ReplicationExecutor* executor,
-                                      const Status& inStatus,
+    void scheduleSetStatusAndShutdown(const ReplicationExecutor::CallbackData& cbData,
                                       Status* outStatus1,
                                       Status* outStatus2) {
-        if (!inStatus.isOK()) {
-            *outStatus1 = inStatus;
+        if (!cbData.status.isOK()) {
+            *outStatus1 = cbData.status;
             return;
         }
-        *outStatus1= executor->scheduleWork(stdx::bind(setStatusAndShutdown,
-                                                       stdx::placeholders::_1,
-                                                       stdx::placeholders::_2,
-                                                       outStatus2)).getStatus();
+        *outStatus1= cbData.executor->scheduleWork(stdx::bind(setStatusAndShutdown,
+                                                            stdx::placeholders::_1,
+                                                            outStatus2)).getStatus();
     }
 
     TEST(ReplicationExecutor, RunOne) {
@@ -102,7 +98,6 @@ namespace {
         Status status(ErrorCodes::InternalError, "Not mutated");
         ASSERT_OK(executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                                    stdx::placeholders::_1,
-                                                   stdx::placeholders::_2,
                                                    &status)).getStatus());
         executor.run();
         ASSERT_OK(status);
@@ -113,7 +108,6 @@ namespace {
         Status status(ErrorCodes::InternalError, "Not mutated");
         ASSERT_OK(executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                                    stdx::placeholders::_1,
-                                                   stdx::placeholders::_2,
                                                    &status)).getStatus());
         executor.shutdown();
         executor.run();
@@ -127,12 +121,10 @@ namespace {
         ReplicationExecutor::CallbackHandle cb = ASSERT_GET(
             executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                              stdx::placeholders::_1,
-                                             stdx::placeholders::_2,
                                              &status1)));
         executor.cancel(cb);
         ASSERT_OK(executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                                    stdx::placeholders::_1,
-                                                   stdx::placeholders::_2,
                                                    &status2)).getStatus());
         executor.run();
         ASSERT_EQUALS(status1, ErrorCodes::CallbackCanceled);
@@ -145,7 +137,6 @@ namespace {
         Status status2(ErrorCodes::InternalError, "Not mutated");
         ASSERT_OK(executor.scheduleWork(stdx::bind(scheduleSetStatusAndShutdown,
                                                    stdx::placeholders::_1,
-                                                   stdx::placeholders::_2,
                                                    &status1,
                                                    &status2)).getStatus());
         executor.run();
@@ -159,9 +150,8 @@ namespace {
         EventChainAndWaitingTest();
         void run();
     private:
-        void onGo(ReplicationExecutor* executor, const Status& status);
-        void onGoAfterTriggered(ReplicationExecutor* executor,
-                                const Status& status);
+        void onGo(const ReplicationExecutor::CallbackData& cbData);
+        void onGoAfterTriggered(const ReplicationExecutor::CallbackData& cbData);
 
         ReplicationExecutor executor;
         boost::thread executorThread;
@@ -196,12 +186,10 @@ namespace {
 
         triggered2 = stdx::bind(setStatusAndTriggerEvent,
                                 stdx::placeholders::_1,
-                                stdx::placeholders::_2,
                                 &status2,
                                 event2);
         triggered3 = stdx::bind(setStatusAndTriggerEvent,
                                 stdx::placeholders::_1,
-                                stdx::placeholders::_2,
                                 &status3,
                                 event3);
     }
@@ -210,8 +198,7 @@ namespace {
         executor.onEvent(goEvent,
                          stdx::bind(&EventChainAndWaitingTest::onGo,
                                     this,
-                                    stdx::placeholders::_1,
-                                    stdx::placeholders::_2));
+                                    stdx::placeholders::_1));
         executor.signalEvent(goEvent);
         executor.waitForEvent(goEvent);
         executor.waitForEvent(event2);
@@ -224,7 +211,6 @@ namespace {
         ReplicationExecutor::CallbackHandle shutdownCallback = ASSERT_GET(
                 executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                                  stdx::placeholders::_1,
-                                                 stdx::placeholders::_2,
                                                  &status5)));
         executor.wait(shutdownCallback);
         neverSignaledWaiter.join();
@@ -236,12 +222,12 @@ namespace {
         ASSERT_OK(status5);
     }
 
-    void EventChainAndWaitingTest::onGo(ReplicationExecutor* executor,
-                                        const Status& status) {
-        if (!status.isOK()) {
-            status1 = status;
+    void EventChainAndWaitingTest::onGo(const ReplicationExecutor::CallbackData& cbData) {
+        if (!cbData.status.isOK()) {
+            status1 = cbData.status;
             return;
         }
+        ReplicationExecutor* executor = cbData.executor;
         StatusWith<ReplicationExecutor::EventHandle> errorOrTriggerEvent = executor->makeEvent();
         if (!errorOrTriggerEvent.isOK()) {
             status1 = errorOrTriggerEvent.getStatus();
@@ -267,8 +253,7 @@ namespace {
                 goEvent,
                 stdx::bind(&EventChainAndWaitingTest::onGoAfterTriggered,
                            this,
-                           stdx::placeholders::_1,
-                           stdx::placeholders::_2));
+                           stdx::placeholders::_1));
         if (!cbHandle.isOK()) {
             status1 = cbHandle.getStatus();
             executor->shutdown();
@@ -277,13 +262,13 @@ namespace {
         status1 = Status::OK();
     }
 
-    void EventChainAndWaitingTest::onGoAfterTriggered(ReplicationExecutor* executor,
-                                                      const Status& status) {
-        status4 = status;
-        if (!status.isOK()) {
+    void EventChainAndWaitingTest::onGoAfterTriggered(
+            const ReplicationExecutor::CallbackData& cbData) {
+        status4 = cbData.status;
+        if (!cbData.status.isOK()) {
             return;
         }
-        executor->signalEvent(triggerEvent);
+        cbData.executor->signalEvent(triggerEvent);
     }
 
     TEST(ReplicationExecutor, ScheduleWorkAt) {
@@ -296,17 +281,14 @@ namespace {
         ASSERT_GET(executor.scheduleWorkAt(Date_t(now.millis + 100),
                                            stdx::bind(setStatus,
                                                       stdx::placeholders::_1,
-                                                      stdx::placeholders::_2,
                                                       &status1)));
         ASSERT_GET(executor.scheduleWorkAt(Date_t(now.millis + 5000),
                                            stdx::bind(setStatus,
                                                       stdx::placeholders::_1,
-                                                      stdx::placeholders::_2,
                                                       &status3)));
         ASSERT_GET(executor.scheduleWorkAt(Date_t(now.millis + 200),
                                            stdx::bind(setStatusAndShutdown,
                                                       stdx::placeholders::_1,
-                                                      stdx::placeholders::_2,
                                                       &status2)));
         executor.run();
         ASSERT_OK(status1);
@@ -320,21 +302,19 @@ namespace {
     }
 
     static void setStatusOnRemoteCommandCompletion(
-            ReplicationExecutor* executor,
-            const ReplicationExecutor::RemoteCommandRequest& actualRequest,
-            const StatusWith<BSONObj>& actualResponse,
+            const ReplicationExecutor::RemoteCommandCallbackData& cbData,
             const ReplicationExecutor::RemoteCommandRequest& expectedRequest,
             Status* outStatus) {
 
-        if (actualRequest != expectedRequest) {
+        if (cbData.request != expectedRequest) {
             *outStatus = Status(
                     ErrorCodes::BadValue,
                     mongoutils::str::stream() << "Actual request: " <<
-                    getRequestDescription(actualRequest) << "; expected: " <<
+                    getRequestDescription(cbData.request) << "; expected: " <<
                     getRequestDescription(expectedRequest));
             return;
         }
-        *outStatus = actualResponse.getStatus();
+        *outStatus = cbData.response.getStatus();
     }
 
     TEST(ReplicationExecutor, ScheduleRemoteCommand) {
@@ -350,8 +330,6 @@ namespace {
                         request,
                         stdx::bind(setStatusOnRemoteCommandCompletion,
                                    stdx::placeholders::_1,
-                                   stdx::placeholders::_2,
-                                   stdx::placeholders::_3,
                                    request,
                                    &status1)));
         boost::thread executorThread(stdx::bind(&ReplicationExecutor::run, &executor));
@@ -374,8 +352,6 @@ namespace {
                         request,
                         stdx::bind(setStatusOnRemoteCommandCompletion,
                                    stdx::placeholders::_1,
-                                   stdx::placeholders::_2,
-                                   stdx::placeholders::_3,
                                    request,
                                    &status1)));
         executor.cancel(cbHandle);
@@ -392,7 +368,6 @@ namespace {
         ASSERT_OK(executor.scheduleWorkWithGlobalExclusiveLock(
                           stdx::bind(setStatusAndShutdown,
                                      stdx::placeholders::_1,
-                                     stdx::placeholders::_2,
                                      &status1)).getStatus());
         executor.run();
         ASSERT_OK(status1);

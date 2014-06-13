@@ -63,8 +63,7 @@ namespace repl {
 
         virtual void prepareElectCmdResponse(const BSONObj& cmdObj, BSONObjBuilder& result);
 
-        virtual void prepareHeartbeatResponse(ReplicationExecutor* executor,
-                                              const Status& inStatus,
+        virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
                                               Date_t now,
                                               const BSONObj& cmdObj, 
                                               BSONObjBuilder* resultObj,

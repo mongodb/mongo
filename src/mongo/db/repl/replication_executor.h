@@ -104,9 +104,11 @@ namespace repl {
         MONGO_DISALLOW_COPYING(ReplicationExecutor);
     public:
         typedef boost::posix_time::milliseconds Milliseconds;
+        struct CallbackData;
         class CallbackHandle;
         class EventHandle;
         class NetworkInterface;
+        struct RemoteCommandCallbackData;
         struct RemoteCommandRequest;
 
         /**
@@ -116,8 +118,7 @@ namespace repl {
          * the callback was canceled for any reason (including shutdown).  Otherwise, it should have
          * Status::OK().
          */
-        typedef stdx::function<
-            void (ReplicationExecutor*, const Status&)> CallbackFn;
+        typedef stdx::function<void (const CallbackData&)> CallbackFn;
 
         /**
          * Type of a callback from a request to run a command on a remote MongoDB node.
@@ -128,10 +129,7 @@ namespace repl {
          * the BSONObj returned by the command, with the "ok" field indicating the success of the
          * command in the usual way.
          */
-        typedef stdx::function<
-            void (ReplicationExecutor*,
-                  const RemoteCommandRequest&,
-                  const StatusWith<BSONObj>&)> RemoteCommandCallbackFn;
+        typedef stdx::function<void (const RemoteCommandCallbackData&)> RemoteCommandCallbackFn;
 
         /**
          * Constructs a new executor.
@@ -294,7 +292,7 @@ namespace repl {
          * If the "callback" member of the returned WorkItem is falsey, that is a signal
          * to the run loop to wait for shutdown.
          */
-        WorkItem getWork();
+        std::pair<WorkItem, CallbackHandle> getWork();
 
         /**
          * Marks as runnable any sleepers whose ready date has passed and returns 0ms; or if there
@@ -395,6 +393,16 @@ namespace repl {
         EventHandle _finishedEvent;
     };
 
+    struct ReplicationExecutor::CallbackData {
+        CallbackData(ReplicationExecutor* theExecutor,
+                     const CallbackHandle& theHandle,
+                     const Status& theStatus);
+
+        ReplicationExecutor* executor;
+        CallbackHandle myHandle;
+        Status status;
+    };
+
     /**
      * Type of object describing a command to execute against a remote MongoDB node.
      */
@@ -407,6 +415,18 @@ namespace repl {
         HostAndPort target;
         std::string dbname;
         BSONObj cmdObj;
+    };
+
+    struct ReplicationExecutor::RemoteCommandCallbackData {
+        RemoteCommandCallbackData(ReplicationExecutor* theExecutor,
+                                  const CallbackHandle& theHandle,
+                                  const RemoteCommandRequest& theRequest,
+                                  const StatusWith<BSONObj>& theResponse);
+
+        ReplicationExecutor* executor;
+        CallbackHandle myHandle;
+        RemoteCommandRequest request;
+        StatusWith<BSONObj> response;
     };
 
     /**

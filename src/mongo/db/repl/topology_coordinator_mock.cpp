@@ -64,8 +64,7 @@ namespace repl {
     void TopologyCoordinatorMock::prepareElectCmdResponse(const BSONObj& cmdObj,
                                                           BSONObjBuilder& result) {}
 
-    void TopologyCoordinatorMock::prepareHeartbeatResponse(ReplicationExecutor* executor,
-                                                           const Status& inStatus,
+    void TopologyCoordinatorMock::prepareHeartbeatResponse(const ReplicationExecutor::CallbackData&,
                                                            Date_t now,
                                                            const BSONObj& cmdObj, 
                                                            BSONObjBuilder* resultObj,

@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -42,7 +43,6 @@ namespace mongo {
 
 namespace repl {
 
-    class ReplicationExecutor;
     class HeartbeatInfo;
     class Member;
     struct MemberState;
@@ -144,8 +144,7 @@ namespace repl {
         virtual void prepareElectCmdResponse(const BSONObj& cmdObj, BSONObjBuilder& result) = 0;
 
         // produce a reply to a heartbeat
-        virtual void prepareHeartbeatResponse(ReplicationExecutor* executor,
-                                              const Status& inStatus,
+        virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
                                               Date_t now,
                                               const BSONObj& cmdObj, 
                                               BSONObjBuilder* resultObj,
