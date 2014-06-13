@@ -75,11 +75,6 @@ if test "$wt_cv_enable_hyperleveldb" = "yes"; then
 	    [AC_MSG_ERROR([--enable-leveldb=hyper requires hyperleveldb/db.h])])
 	AC_LANG_POP([C++])
 	AC_DEFINE(HAVE_HYPERLEVELDB)
-elif test "$wt_cv_enable_leveldb" = "yes"; then
-	AC_LANG_PUSH([C++])
-	AC_CHECK_HEADER(leveldb/db.h,,
-	    [AC_MSG_ERROR([--enable-leveldb requires leveldb/db.h])])
-	AC_LANG_POP([C++])
 fi
 AM_CONDITIONAL([LEVELDB], [test "$wt_cv_enable_leveldb" = "yes"])
 
