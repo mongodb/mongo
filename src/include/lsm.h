@@ -131,10 +131,11 @@ struct __wt_lsm_tree {
 	u_int nold_chunks;		/* Number of old chunks */
 
 #define	WT_LSM_TREE_COMPACTING	0x01
-#define	WT_LSM_TREE_NEED_SWITCH	0x02
-#define	WT_LSM_TREE_OPEN	0x04
-#define	WT_LSM_TREE_THROTTLE	0x08
-#define	WT_LSM_TREE_WORKING	0x10
+#define	WT_LSM_TREE_FLUSH_ALL	0x02
+#define	WT_LSM_TREE_NEED_SWITCH	0x04
+#define	WT_LSM_TREE_OPEN	0x08
+#define	WT_LSM_TREE_THROTTLE	0x10
+#define	WT_LSM_TREE_WORKING	0x20
 	uint32_t flags;
 };
 

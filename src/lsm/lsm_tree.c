@@ -1008,7 +1008,6 @@ __wt_lsm_tree_unlock(
 int
 __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 {
-	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 	time_t begin, end;
 
@@ -1032,10 +1031,28 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	/*
 	 * If another thread started compacting this tree, we're done.
 	 */
-	if (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
+	if (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL | WT_LSM_TREE_COMPACTING))
 		return (0);
 
 	WT_RET(__wt_seconds(session, &begin));
+
+	/*
+	 * Set the flush all flag so that the checkpoint worker tries to write
+	 * all in-memory chunks to disk.
+	 */
+	F_SET(lsm_tree, WT_LSM_TREE_FLUSH_ALL);
+
+	/* Wait for flushing to stop. */
+	while (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL) &&
+	    F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+		__wt_sleep(1, 0);
+		WT_RET(__wt_seconds(session, &end));
+		if (session->compact->max_time > 0 &&
+		    session->compact->max_time < (uint64_t)(end - begin)) {
+			F_CLR(lsm_tree, WT_LSM_TREE_FLUSH_ALL);
+			return (ETIMEDOUT);
+		}
+	}
 
 	/*
 	 * Set the compacting flag and clear the current merge throttle
@@ -1049,18 +1066,18 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));
 
 	/* Wait for merge activity to stop. */
-	do {
+	while (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING) &&
+	    F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		__wt_sleep(1, 0);
 		WT_RET(__wt_seconds(session, &end));
 		if (session->compact->max_time > 0 &&
 		    session->compact->max_time < (uint64_t)(end - begin)) {
-			ret = ETIMEDOUT;
 			F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
+			return (ETIMEDOUT);
 		}
-	} while (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING) &&
-	    F_ISSET(lsm_tree, WT_LSM_TREE_WORKING));
+	}
 
-	return (ret);
+	return (0);
 }
 
 /*
