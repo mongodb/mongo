@@ -44,7 +44,7 @@ func (self *TopDiff) ToRows() [][]string {
 
 	// sort the namespaces
 	nsSorted := []string{}
-	for ns, _ := range self.Totals {
+	for ns := range self.Totals {
 		nsSorted = append(nsSorted, ns)
 	}
 	sort.Strings(nsSorted)
