@@ -81,10 +81,11 @@ namespace ShardingTests {
     class ChunkManagerTest : public ConnectionString::ConnectionHook {
     public:
 
+        OperationContextImpl _txn;
         CustomDirectClient _client;
         Shard _shard;
 
-        ChunkManagerTest() {
+        ChunkManagerTest() : _client(&_txn) {
 
             DBException::traceExceptions = true;
 
@@ -131,7 +132,7 @@ namespace ShardingTests {
                                        double socketTimeout )
         {
             // Note - must be new, since it gets owned elsewhere
-            return new CustomDirectClient();
+            return new CustomDirectClient(&_txn);
         }
     };
 

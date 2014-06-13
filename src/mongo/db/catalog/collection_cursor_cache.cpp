@@ -191,7 +191,7 @@ namespace mongo {
         Database* db = dbHolder().get(txn, ns);
         if ( !db )
             return false;
-        Client::Context context( ns, db );
+        Client::Context context(txn, ns, db );
         Collection* collection = db->getCollection( txn, ns );
         if ( !collection ) {
             if ( checkAuth )
@@ -221,7 +221,7 @@ namespace mongo {
             Database* db = dbHolder().get(txn, ns);
             if ( !db )
                 continue;
-            Client::Context context( ns, db );
+            Client::Context context(txn,  ns, db );
             Collection* collection = db->getCollection( txn, ns );
             if ( collection == NULL ) {
                 continue;

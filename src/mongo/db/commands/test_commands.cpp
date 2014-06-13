@@ -62,7 +62,7 @@ namespace mongo {
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
 
             Lock::DBWrite lk(txn->lockState(), ns);
-            Client::Context ctx( ns );
+            Client::Context ctx(txn,  ns );
             Database* db = ctx.db();
             Collection* collection = db->getCollection( txn, ns );
             if ( !collection ) {

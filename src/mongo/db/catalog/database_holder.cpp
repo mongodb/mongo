@@ -141,8 +141,10 @@ namespace mongo {
         int nNotClosed = 0;
         for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
             string name = *i;
+
             LOG(2) << "DatabaseHolder::closeAll name:" << name;
-            Client::Context ctx( name );
+            Client::Context ctx(txn, name);
+
             if( !force && BackgroundOperation::inProgForDb(name) ) {
                 log() << "WARNING: can't close database "
                       << name

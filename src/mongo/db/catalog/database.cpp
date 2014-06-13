@@ -513,7 +513,7 @@ namespace mongo {
         log() << "dropAllDatabasesExceptLocal " << n.size() << endl;
         for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
             if( *i != "local" ) {
-                Client::Context ctx(*i);
+                Client::Context ctx(txn, *i);
                 dropDatabase(txn, ctx.db());
             }
         }

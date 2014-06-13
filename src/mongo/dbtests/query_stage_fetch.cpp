@@ -48,7 +48,9 @@ namespace QueryStageFetch {
 
     class QueryStageFetchBase {
     public:
-        QueryStageFetchBase() { }
+        QueryStageFetchBase() : _client(&_txn) {
+        
+        }
 
         virtual ~QueryStageFetchBase() {
             _client.dropCollection(ns());
@@ -75,6 +77,7 @@ namespace QueryStageFetch {
         static const char* ns() { return "unittests.QueryStageFetch"; }
 
     private:
+        OperationContextImpl _txn;
         DBDirectClient _client;
     };
 

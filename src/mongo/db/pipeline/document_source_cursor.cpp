@@ -80,7 +80,7 @@ namespace mongo {
         // We have already validated the sharding version when we constructed the Runner
         // so we shouldn't check it again.
         Lock::DBRead lk(pExpCtx->opCtx->lockState(), _ns);
-        Client::Context ctx(_ns, /*doVersion=*/false);
+        Client::Context ctx(pExpCtx->opCtx, _ns, /*doVersion=*/false);
 
         _runner->restoreState(pExpCtx->opCtx);
 
@@ -200,7 +200,8 @@ namespace {
         scoped_ptr<TypeExplain> plan;
         {
             Lock::DBRead lk(pExpCtx->opCtx->lockState(), _ns);
-            Client::Context ctx(_ns, /*doVersion=*/false);
+            Client::Context ctx(pExpCtx->opCtx, _ns, /*doVersion=*/ false);
+
             massert(17392, "No _runner. Were we disposed before explained?",
                     _runner);
 

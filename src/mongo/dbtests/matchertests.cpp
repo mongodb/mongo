@@ -41,18 +41,19 @@ namespace MatcherTests {
 
     class CollectionBase {
     public:
-        CollectionBase() :
-        _ns( "unittests.matchertests" ) {
+        CollectionBase() : _ns( "unittests.matchertests" ) {
+
         }
+
         virtual ~CollectionBase() {
-            client().dropCollection( ns() );
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
+            client.dropCollection(_ns);
         }
+
     protected:
-        const char* ns() const { return _ns; }
-        DBDirectClient &client() { return _client; }
-    private:
         const char * const _ns;
-        DBDirectClient _client;
     };
 
     template <typename M>

@@ -45,7 +45,9 @@ namespace QuerySingleSolutionRunner {
 
     class SingleSolutionRunnerBase {
     public:
-        SingleSolutionRunnerBase() { }
+        SingleSolutionRunnerBase() : _client(&_txn) {
+        
+        }
 
         virtual ~SingleSolutionRunnerBase() {
             _client.dropCollection(ns());
