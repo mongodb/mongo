@@ -12,16 +12,16 @@
 #include <hyperleveldb/table_builder.h>
 #include <hyperleveldb/write_batch.h>
 #else
-#include <leveldb/cache.h>
-#include <leveldb/comparator.h>
-#include <leveldb/db.h>
-#include <leveldb/env.h>
-#include <leveldb/filter_policy.h>
-#include <leveldb/slice.h>
-#include <leveldb/slice.h>
-#include <leveldb/status.h>
-#include <leveldb/table_builder.h>
-#include <leveldb/write_batch.h>
+#include "cache.h"
+#include "comparator.h"
+#include "db.h"
+#include "env.h"
+#include "filter_policy.h"
+#include "slice.h"
+#include "slice.h"
+#include "status.h"
+#include "table_builder.h"
+#include "write_batch.h"
 #endif
 
 #include "wiredtiger.h"
