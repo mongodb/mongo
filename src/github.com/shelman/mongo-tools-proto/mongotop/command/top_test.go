@@ -10,10 +10,142 @@ func TestTopCommandDiff(t *testing.T) {
 
 	testutil.VerifyTestType(t, "unit")
 
-	Convey("When diffing two TopCommands", t, func() {
+	Convey("When diffing two Top commands", t, func() {
 
 		var firstTop *Top
 		var secondTop *Top
+
+		Convey("any namespaces only existing in the first Top should be"+
+			" ignored", func() {
+
+			firstTop = &Top{
+				Totals: map[string]NSTopInfo{
+					"a": NSTopInfo{},
+					"b": NSTopInfo{},
+					"c": NSTopInfo{},
+				},
+			}
+
+			secondTop = &Top{
+				Totals: map[string]NSTopInfo{
+					"a": NSTopInfo{},
+				},
+			}
+
+			diff, err := secondTop.Diff(firstTop)
+			So(err, ShouldBeNil)
+
+			asTopDiff, ok := diff.(*TopDiff)
+			So(ok, ShouldBeTrue)
+
+			_, hasA := asTopDiff.Totals["a"]
+			So(hasA, ShouldBeTrue)
+			_, hasB := asTopDiff.Totals["b"]
+			So(hasB, ShouldBeFalse)
+			_, hasC := asTopDiff.Totals["c"]
+			So(hasC, ShouldBeFalse)
+
+		})
+
+		Convey("any namespaces only existing in the second Top should be"+
+			" ignored", func() {
+
+			firstTop = &Top{
+				Totals: map[string]NSTopInfo{
+					"a": NSTopInfo{},
+				},
+			}
+
+			secondTop = &Top{
+				Totals: map[string]NSTopInfo{
+					"a": NSTopInfo{},
+					"b": NSTopInfo{},
+					"c": NSTopInfo{},
+				},
+			}
+
+			diff, err := secondTop.Diff(firstTop)
+			So(err, ShouldBeNil)
+
+			asTopDiff, ok := diff.(*TopDiff)
+			So(ok, ShouldBeTrue)
+
+			_, hasA := asTopDiff.Totals["a"]
+			So(hasA, ShouldBeTrue)
+			_, hasB := asTopDiff.Totals["b"]
+			So(hasB, ShouldBeFalse)
+			_, hasC := asTopDiff.Totals["c"]
+			So(hasC, ShouldBeFalse)
+
+		})
+
+		Convey("the differences for the times for any shared namespaces should"+
+			"be included in the output", func() {
+
+			firstTop = &Top{
+				Totals: map[string]NSTopInfo{
+					"a": NSTopInfo{
+						Total: TopField{
+							Time: 2,
+						},
+						Read: TopField{
+							Time: 2,
+						},
+						Write: TopField{
+							Time: 2,
+						},
+					},
+					"b": NSTopInfo{
+						Total: TopField{
+							Time: 2,
+						},
+						Read: TopField{
+							Time: 2,
+						},
+						Write: TopField{
+							Time: 2,
+						},
+					},
+				},
+			}
+
+			secondTop = &Top{
+				Totals: map[string]NSTopInfo{
+					"a": NSTopInfo{
+						Total: TopField{
+							Time: 3,
+						},
+						Read: TopField{
+							Time: 3,
+						},
+						Write: TopField{
+							Time: 3,
+						},
+					},
+					"b": NSTopInfo{
+						Total: TopField{
+							Time: 4,
+						},
+						Read: TopField{
+							Time: 4,
+						},
+						Write: TopField{
+							Time: 4,
+						},
+					},
+				},
+			}
+
+			diff, err := secondTop.Diff(firstTop)
+			So(err, ShouldBeNil)
+
+			asTopDiff, ok := diff.(*TopDiff)
+			So(ok, ShouldBeTrue)
+
+			So(asTopDiff.Totals["a"], ShouldResemble, []int{1, 1, 1})
+			So(asTopDiff.Totals["b"], ShouldResemble, []int{2, 2, 2})
+
+		})
 
 	})
 

@@ -107,15 +107,9 @@ func (self *Top) Diff(other Command) (Diff, error) {
 	for ns, firstNSInfo := range firstTotals {
 		if secondNSInfo, ok := secondTotals[ns]; ok {
 			diff.Totals[ns] = []int{
-				util.MaxInt(
-					0, secondNSInfo.Total.Time-firstNSInfo.Total.Time,
-				),
-				util.MaxInt(
-					0, secondNSInfo.Read.Time-firstNSInfo.Total.Time,
-				),
-				util.MaxInt(
-					0, secondNSInfo.Write.Time-firstNSInfo.Total.Time,
-				),
+				secondNSInfo.Total.Time - firstNSInfo.Total.Time,
+				secondNSInfo.Read.Time - firstNSInfo.Total.Time,
+				secondNSInfo.Write.Time - firstNSInfo.Total.Time,
 			}
 		}
 	}
