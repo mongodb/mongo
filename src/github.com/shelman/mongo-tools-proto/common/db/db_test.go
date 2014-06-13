@@ -138,3 +138,39 @@ func TestInitSessionProvider(t *testing.T) {
 	})
 
 }
+
+type listDatabasesCommand struct {
+	Databases []map[string]interface{} `json:"databases"`
+	Ok        bool                     `json:"ok"`
+}
+
+func (self *listDatabasesCommand) AsRunnable() interface{} {
+	return "listDatabases"
+}
+
+func TestRunCommand(t *testing.T) {
+
+	testutil.VerifyTestType(t, "db")
+
+	Convey("When running a db command against a live mongod", t, func() {
+
+		Convey("the specified command should be run and unmarshalled into the"+
+			" provided struct", func() {
+
+			opts := &options.ToolOptions{
+				Connection: &options.Connection{},
+				SSL:        &options.SSL{},
+			}
+			provider, err := InitSessionProvider(opts)
+			So(err, ShouldBeNil)
+
+			cmd := &listDatabasesCommand{}
+			So(provider.RunCommand("admin", cmd), ShouldBeNil)
+			So(cmd.Databases, ShouldNotBeNil)
+			So(cmd.Ok, ShouldBeTrue)
+
+		})
+
+	})
+
+}

@@ -6,6 +6,19 @@ import (
 	"testing"
 )
 
+func TestTopCommandDiff(t *testing.T) {
+
+	testutil.VerifyTestType(t, "unit")
+
+	Convey("When diffing two TopCommands", t, func() {
+
+		var firstTop *Top
+		var secondTop *Top
+
+	})
+
+}
+
 func TestTopDiffToRows(t *testing.T) {
 
 	testutil.VerifyTestType(t, "unit")
