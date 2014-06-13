@@ -147,12 +147,12 @@ namespace mongo {
         for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
             if( *i != "local" ) {
                 Client::Context ctx(*i);
-                dropDatabase(txn, ctx.db());
+                dropDatabase(txn, ctx.db(), storageGlobalParams.dbpath);
             }
         }
     }
 
-    void dropDatabase(OperationContext* txn, Database* db ) {
+    void dropDatabase(OperationContext* txn, Database* db, const std::string& path ) {
         invariant( db );
 
         string name = db->name(); // just to have safe
@@ -173,7 +173,7 @@ namespace mongo {
 
         txn->recoveryUnit()->syncDataAndTruncateJournal();
 
-        Database::closeDatabase(txn, name, db->path());
+        Database::closeDatabase(txn, name, path );
         db = 0; // d is now deleted
 
         _deleteDataFiles( name );

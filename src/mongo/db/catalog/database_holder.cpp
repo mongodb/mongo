@@ -34,11 +34,14 @@
 #include "mongo/db/background.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/util/file_allocator.h"
+
+#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h" //XXX
 
 
 namespace mongo {
@@ -100,7 +103,13 @@ namespace mongo {
         cc().writeHappened();
 
         // this locks _m for defensive checks, so we don't want to be locked right here :
-        Database *db = new Database(txn, dbname.c_str(), justCreated, path);
+        Database *db = new Database(txn,
+                                    dbname,
+                                    justCreated,
+                                    new MMAP1DatabaseCatalogEntry(txn,
+                                                                  dbname,
+                                                                  path,
+                                                                  storageGlobalParams.directoryperdb));
 
         {
             SimpleMutex::scoped_lock lk(_m);
@@ -135,7 +144,6 @@ namespace mongo {
 
         set< string > dbs;
         for ( map<string,Database*>::iterator i = m.begin(); i != m.end(); i++ ) {
-            wassert( i->second->path() == path );
             dbs.insert( i->first );
         }
 

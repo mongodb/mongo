@@ -57,9 +57,9 @@ namespace mongo {
     public:
         // you probably need to be in dbHolderMutex when constructing this
         Database(OperationContext* txn,
-                 const char *nm,
-                 /*out*/ bool& newDb,
-                 const std::string& path = storageGlobalParams.dbpath);
+                 const std::string& name,
+                 bool& newDb, /* out */
+                 DatabaseCatalogEntry* dbEntry );
 
         /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
            thus the destructor is private.  this could be cleaned up one day...
@@ -68,7 +68,6 @@ namespace mongo {
                         OperationContext* txn, const std::string& db, const std::string& path);
 
         const std::string& name() const { return _name; }
-        const std::string& path() const { return _path; }
 
         void clearTmpCollections(OperationContext* txn);
 
@@ -145,7 +144,6 @@ namespace mongo {
         ~Database(); // closes files and other cleanup see below.
 
         const std::string _name; // "alleyinsider"
-        const std::string _path; // "/data/db"
 
         boost::scoped_ptr<DatabaseCatalogEntry> _dbEntry;
 

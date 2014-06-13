@@ -365,7 +365,7 @@ namespace repl {
     void ReplSource::resyncDrop( OperationContext* txn, const string& db ) {
         log() << "resync: dropping database " << db;
         Client::Context ctx(db);
-        dropDatabase(txn, ctx.db());
+        dropDatabase(txn, ctx.db(), storageGlobalParams.dbpath);
     }
 
     /* grab initial copy of a database from the master */
@@ -514,7 +514,7 @@ namespace repl {
             incompleteCloneDbs.erase(*i);
             addDbNextPass.erase(*i);
             Client::Context ctx(*i);
-            dropDatabase(txn, ctx.db());
+            dropDatabase(txn, ctx.db(), storageGlobalParams.dbpath );
         }
         
         massert(14034, "Duplicate database names present after attempting to delete duplicates",

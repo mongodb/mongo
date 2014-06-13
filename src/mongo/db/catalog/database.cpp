@@ -41,6 +41,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/structure/catalog/index_details.h"
@@ -48,7 +49,6 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h" //XXX
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
 
@@ -101,9 +101,12 @@ namespace mongo {
         return Status::OK();
     }
 
-    Database::Database(OperationContext* txn, const char *nm, bool& newDb, const string& path )
-        : _name(nm),
-          _path(path),
+    Database::Database(OperationContext* txn,
+                       const std::string& name,
+                       bool& newDb,
+                       DatabaseCatalogEntry* dbEntry )
+        : _name(name),
+          _dbEntry( dbEntry ),
           _profileName(_name + ".system.profile"),
           _namespacesName(_name + ".system.namespaces"),
           _indexesName(_name + ".system.indexes"),
@@ -114,9 +117,6 @@ namespace mongo {
             warning() << "tried to open invalid db: " << _name << endl;
             uasserted( 10028, status.toString() );
         }
-
-        _dbEntry.reset(new MMAP1DatabaseCatalogEntry(
-                                txn, _name, _path, storageGlobalParams.directoryperdb));
 
         _profile = serverGlobalParams.defaultProfile;
         newDb = !_dbEntry->exists();

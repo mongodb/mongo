@@ -43,6 +43,8 @@
 #include "mongo/util/text.h"
 #include "mongo/util/time_support.h"
 
+#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h" //XXX
+
 namespace BasicTests {
 
     class Rarely {
@@ -383,7 +385,11 @@ namespace BasicTests {
             // this leaks as ~Database is private
             // if that changes, should put this on the stack
             {
-                Database * db = new Database( &txn, "dbtests_basictests_ownsns" , isNew );
+                MMAP1DatabaseCatalogEntry* temp = new MMAP1DatabaseCatalogEntry(&txn,
+                                                                                "dbtests_basictests_ownsns",
+                                                                                storageGlobalParams.dbpath,
+                                                                                storageGlobalParams.directoryperdb);
+                Database * db = new Database( &txn, "dbtests_basictests_ownsns", isNew, temp );
                 verify( isNew );
 
                 ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x" ) );

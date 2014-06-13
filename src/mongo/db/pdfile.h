@@ -47,7 +47,7 @@ namespace mongo {
     class Database;
     class OperationContext;
 
-    void dropDatabase(OperationContext* txn, Database* db);
+    void dropDatabase(OperationContext* txn, Database* db, const std::string& path );
 
     void dropAllDatabasesExceptLocal(OperationContext* txn);
 
