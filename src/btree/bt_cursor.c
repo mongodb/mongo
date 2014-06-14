@@ -636,10 +636,17 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
+
 	/* If successful, point the cursor at internal copies of the data. */
-	if (ret == 0)
-		ret = __wt_kv_return(
-		    session, cbt, cbt->ins == NULL ? NULL : cbt->ins->upd);
+	if (ret == 0) {
+		if (!WT_DATA_IN_ITEM(&cursor->key))
+			WT_TRET(__wt_buf_set(session, &cursor->key,
+			    cursor->key.data, cursor->key.size));
+		if (!WT_DATA_IN_ITEM(&cursor->value))
+			WT_TRET(__wt_buf_set(session, &cursor->value,
+			    cursor->value.data, cursor->value.size));
+	}
+
 	if (ret != 0)
 		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
