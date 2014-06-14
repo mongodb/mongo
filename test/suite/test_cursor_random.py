@@ -136,8 +136,8 @@ class test_cursor_random_column(wttest.WiredTigerTestCase):
         cursor.close()
 
 
-# Check next_random works in the presence a set of updates none of which are
-# visible to the cursor.
+# Check next_random works in the presence a set of updates, some or all of
+# which are invisible to the cursor.
 class test_cursor_random_invisible(wttest.WiredTigerTestCase):
     def test_cursor_random_invisible_all(self):
         uri = 'file:random'
