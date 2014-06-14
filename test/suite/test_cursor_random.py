@@ -86,9 +86,8 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         # Close the connection so everything is forced to disk (otherwise the
         # values are on an insert list and the underlying engine doesn't make
         # random selections, it selects the middle of the list.
-        self.conn.close()
-        self.conn = self.setUpConnectionOpen(".")
-        self.session = self.conn.open_session()
+        self.reopen_conn()
+
         cursor = self.session.open_cursor(uri, None, "next_random=true")
         last = ''
         match = 0
