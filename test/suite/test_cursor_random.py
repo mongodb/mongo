@@ -71,8 +71,27 @@ class test_cursor_random(wttest.WiredTigerTestCase):
             self.assertEquals(cursor.get_key(), 'AAA')
         cursor.close
 
-    # Check that next_random works in the presence of a larger set of values.
-    def test_cursor_random_multiple_records(self):
+    # Check that next_random works in the presence of a larger set of values,
+    # where the values are in an insert list.
+    def test_cursor_random_multiple_insert_records(self):
+        uri = self.type + 'random'
+        if self.type == 'file:':
+            simple_populate(self, uri,
+                'allocation_size=512,leaf_page_max=512,key_format=' +\
+                self.fmt, 10000)
+        else:
+            complex_populate(self, uri,
+                'allocation_size=512,leaf_page_max=512,key_format=' +\
+                self.fmt, 10000)
+
+        # In a insert list, next_random always selects the middle key/value
+        # pair, all we can do is confirm cursor.next works.
+        cursor = self.session.open_cursor(uri, None, "next_random=true")
+        self.assertEqual(cursor.next(), 0)
+
+    # Check that next_random works in the presence of a larger set of values,
+    # where the values are in a disk format page.
+    def test_cursor_random_multiple_page_records(self):
         uri = self.type + 'random'
         if self.type == 'file:':
             simple_populate(self, uri,
