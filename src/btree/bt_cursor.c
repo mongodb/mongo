@@ -87,17 +87,43 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 	/*
 	 * We may be pointing to an insert object, and we may have a page with
 	 * existing entries.  Insert objects always have associated update
-	 * objects (the value), on-page row-store objects may have associated
-	 * update objects.  Any update object may be deleted, or invisible to
-	 * us.  In the case of an on-page entry, there is by definition a value
-	 * that is visible to us, the original page cell (but in the case of a
-	 * variable-length column-store cell, the on-page cell may be deleted).
+	 * objects (the value).  Any update object may be deleted, or invisible
+	 * to us.  In the case of an on-page entry, there is by definition a
+	 * value that is visible to us, the original page cell.
 	 *
 	 * If we find a visible update structure, return our caller a reference
 	 * to it because we don't want to repeatedly search for the update, it
 	 * might suddenly become invisible (imagine a read-uncommitted session
 	 * with another session's aborted insert), and we don't want to handle
 	 * that potential error every time we look at the value.
+	 *
+	 * Unfortunately, the objects we might have and their relationships are
+	 * different for the underlying page types.
+	 *
+	 * In the case of row-store, an insert object implies ignoring any page
+	 * objects, no insert object can have the same key as an on-page object.
+	 * For row-store:
+	 *	if there's an insert object:
+	 *		if there's a visible update:
+	 *			exact match
+	 *		else
+	 *			no exact match
+	 *	else
+	 *		use the on-page object (which may have an associated
+	 *		update object that may or may not be visible to us).
+	 *
+	 * Column-store is more complicated because an insert object can have
+	 * the same key as an on-page object: updates to column-store rows
+	 * are insert/object pairs, and an invisible update isn't the end as
+	 * there may be an on-page object that is visible.  This changes the
+	 * logic to:
+	 *	if there's an insert object:
+	 *		if there's a visible update:
+	 *			exact match
+	 *		else if the on-page object's key matches the insert key
+	 *			use the on-page object
+	 *	else
+	 *		use the on-page object
 	 *
 	 * First, check for an insert object with a visible update (a visible
 	 * update that's been deleted is not a valid key/value pair).
@@ -112,17 +138,21 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 	}
 
 	/*
-	 * If we don't have an insert object, or we have an insert object but
-	 * no update was visible to us, use the original page information.
-	 *
-	 * Avoid empty pages (the page might be empty, the search routines don't
-	 * check), or searches past the end of the data on the page.
+	 * If we don't have an insert object, or in the case of column-store,
+	 * there's an insert object but no update was visible to us and the key
+	 * on the page is the same as the insert object's key, and the slot as
+	 * set by the search function is valid, we can use the original page
+	 * information.
 	 */
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		/* Check for a valid page entry. */
-		if (page->pg_fix_entries == 0 ||
-		    cbt->recno >= page->pg_fix_recno + page->pg_fix_entries)
+		/*
+		 * If search returned an insert object, there may or may not be
+		 * a matching on-page object, we have to check.  Fixed-length
+		 * column-store pages don't have slots, but map one-to-one to
+		 * keys, check for retrieval past the end of the page.
+		 */
+		if (cbt->recno >= page->pg_fix_recno + page->pg_fix_entries)
 			return (1);
 
 		/*
@@ -131,17 +161,20 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 */
 		break;
 	case BTREE_COL_VAR:
-		/* Check for a valid page entry. */
-		if (page->pg_var_entries == 0 ||
-		    cbt->slot > page->pg_var_entries)
+		/*
+		 * If search returned an insert object, there may or may not be
+		 * a matching on-page object, we have to check.  Variable-length
+		 * column-store pages don't map one-to-one to keys, but have
+		 * "slots", check if search returned a valid slot.
+		 */
+		if (cbt->slot >= page->pg_var_entries)
 			return (1);
 
 		/*
 		 * Updates aren't stored on the page, an update would have
-		 * appeared as an "insert" object.  However, variable-length
-		 * column store deletes are written to the backing store,
-		 * check the cell for a record that was deleted when it was
-		 * read.
+		 * appeared as an "insert" object; however, variable-length
+		 * column store deletes are written into the backing store,
+		 * check the cell for a record already deleted when read.
 		 */
 		cip = &page->pg_var_d[cbt->slot];
 		if ((cell = WT_COL_PTR(page, cip)) == NULL ||
@@ -149,9 +182,18 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 			return (1);
 		break;
 	case BTREE_ROW:
-		/* Check for a valid page entry. */
-		if (page->pg_row_entries == 0 ||
-		    cbt->slot > page->pg_row_entries)
+		/*
+		 * See above: for row-store, no insert object can have the same
+		 * key as an on-page object, we're done.
+		 */
+		if (cbt->ins != NULL)
+			return (1);
+
+		/*
+		 * Check if searched returned a valid slot (the likely failure
+		 * here is an empty page, the search function doesn't check).
+		 */
+		if (cbt->slot >= page->pg_row_entries)
 			return (1);
 
 		/* Updates are stored on the page, check for a delete. */
@@ -317,28 +359,31 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	    __cursor_col_search(session, cbt));
 
 	/*
-	 * Creating a record past the end of the tree in a fixed-length column-
-	 * store implicitly fills the gap with empty records.  In this case, we
-	 * instantiate the empty record, it's an exact match.
+	 * If we find an valid key, return it.
 	 *
-	 * Else, if we find a valid key (one that wasn't deleted), return it.
+	 * Else, creating a record past the end of the tree in a fixed-length
+	 * column-store implicitly fills the gap with empty records.  In this
+	 * case, we instantiate the empty record, it's an exact match.
 	 *
-	 * Else, if we found a deleted key, try to move to the next key in the
-	 * tree (bias for prefix searches).  Cursor next skips deleted records,
-	 * so we don't have to test for them again.
+	 * Else, move to the next key in the tree (bias for prefix searches).
+	 * Cursor next skips invalid rows, so we don't have to test for them
+	 * again.
 	 *
-	 * Else if there's no larger tree key, redo the search and try and find
-	 * an earlier record.  If that fails, quit, there's no record to return.
+	 * Else, redo the search and move to the previous key in the tree.
+	 * Cursor previous skips invalid rows, so we don't have to test for
+	 * them again.
+	 *
+	 * If that fails, quit, there's no record to return.
 	 */
-	if (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt)) {
+	if (!__cursor_invalid(cbt, &upd)) {
+		exact = cbt->compare;
+		ret = __wt_kv_return(session, cbt, upd);
+	} else if (__cursor_fix_implicit(btree, cbt)) {
 		cbt->recno = cursor->recno;
 		cbt->v = 0;
 		cursor->value.data = &cbt->v;
 		cursor->value.size = 1;
 		exact = 0;
-	} else if (!__cursor_invalid(cbt, &upd)) {
-		exact = cbt->compare;
-		ret = __wt_kv_return(session, cbt, upd);
 	} else if ((ret = __wt_btcur_next(cbt, 0)) != WT_NOTFOUND)
 		exact = 1;
 	else {

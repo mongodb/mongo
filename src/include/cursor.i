@@ -25,7 +25,12 @@ __cursor_search_clear(WT_CURSOR_BTREE *cbt)
 {
 	/* Our caller should have released any page held by this cursor. */
 	cbt->ref = NULL;
-	cbt->slot = UINT32_MAX;			/* Fail big */
+
+	/*
+	 * Set the on-page slot to an impossible value larger than any possible
+	 * slot (it's used to validate the search function's return).
+	 */
+	cbt->slot = UINT32_MAX;
 
 	cbt->ins_head = NULL;
 	cbt->ins = NULL;
