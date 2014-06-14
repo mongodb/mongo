@@ -653,6 +653,46 @@ err:	if (ret == WT_RESTART)
 }
 
 /*
+ * __wt_btcur_next_random --
+ *	Move to a random record in the tree.
+ */
+int
+__wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	btree = cbt->btree;
+
+	/*
+	 * Only supports row-store: applications can trivially select a random
+	 * value from a column-store, if there were any reason to do so.
+	 */
+	if (btree->type != BTREE_ROW)
+		WT_RET(ENOTSUP);
+
+	WT_STAT_FAST_CONN_INCR(session, cursor_next);
+	WT_STAT_FAST_DATA_INCR(session, cursor_next);
+
+	WT_RET(__cursor_func_init(cbt, 1));
+
+	WT_ERR(__wt_row_random(session, cbt));
+	if (cbt->compare != 0)
+		WT_ERR(WT_NOTFOUND);
+	if (__cursor_invalid(cbt, &upd))
+		WT_ERR(__wt_btcur_search_near(cbt, 0));
+	else
+		WT_ERR(__wt_kv_return(session, cbt, upd));
+
+err:	if (ret != 0)
+		WT_TRET(__cursor_error_resolve(cbt));
+	return (ret);
+}
+
+/*
  * __wt_btcur_compare --
  *	Return a comparison between two cursors.
  */

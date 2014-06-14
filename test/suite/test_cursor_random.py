@@ -27,6 +27,7 @@
 
 import wiredtiger, wttest
 from helper import complex_populate, simple_populate
+from helper import key_populate, value_populate
 
 # test_cursor_random.py
 #    Cursor next_random operations
@@ -78,11 +79,11 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         if self.type == 'file:':
             simple_populate(self, uri,
                 'allocation_size=512,leaf_page_max=512,key_format=' +\
-                self.fmt, 10000)
+                self.fmt, 100)
         else:
             complex_populate(self, uri,
                 'allocation_size=512,leaf_page_max=512,key_format=' +\
-                self.fmt, 10000)
+                self.fmt, 100)
 
         # In a insert list, next_random always selects the middle key/value
         # pair, all we can do is confirm cursor.next works.
@@ -133,6 +134,76 @@ class test_cursor_random_column(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None, "next_random=true")
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.next())
         cursor.close()
+
+
+# Check next_random works in the presence a set of updates none of which are
+# visible to the cursor.
+class test_cursor_random_invisible(wttest.WiredTigerTestCase):
+    def test_cursor_random_invisible_all(self):
+        uri = 'file:random'
+        self.session.create(uri, 'key_format=S,value_format=S')
+        cursor = self.session.open_cursor(uri, None)
+
+        # Start a transaction.
+        self.session.begin_transaction()
+        for i in range(1, 100):
+            cursor.set_key(key_populate(cursor, i))
+            cursor.set_value(value_populate(cursor, i))
+            cursor.insert()
+
+        # Open another session, the updates won't yet be visible, we shouldn't
+        # find anything at all.
+        s = self.conn.open_session()
+        cursor = s.open_cursor(uri, None, "next_random=true")
+        self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+
+    def test_cursor_random_invisible_after(self):
+        uri = 'file:random'
+        self.session.create(uri, 'key_format=S,value_format=S')
+        cursor = self.session.open_cursor(uri, None)
+
+        # Insert a single leading record.
+        cursor.set_key(key_populate(cursor, 1))
+        cursor.set_value(value_populate(cursor, 1))
+        cursor.insert()
+
+        # Start a transaction.
+        self.session.begin_transaction()
+        for i in range(2, 100):
+            cursor.set_key(key_populate(cursor, i))
+            cursor.set_value(value_populate(cursor, i))
+            cursor.insert()
+
+        # Open another session, the updates won't yet be visible, we should
+        # return the only possible record.
+        s = self.conn.open_session()
+        cursor = s.open_cursor(uri, None, "next_random=true")
+        cursor.next()
+        self.assertEqual(cursor.get_key(), key_populate(cursor, 1))
+
+    def test_cursor_random_invisible_before(self):
+        uri = 'file:random'
+        self.session.create(uri, 'key_format=S,value_format=S')
+        cursor = self.session.open_cursor(uri, None)
+
+        # Insert a single leading record.
+        cursor.set_key(key_populate(cursor, 99))
+        cursor.set_value(value_populate(cursor, 99))
+        cursor.insert()
+
+        # Start a transaction.
+        self.session.begin_transaction()
+        for i in range(2, 100):
+            cursor.set_key(key_populate(cursor, i))
+            cursor.set_value(value_populate(cursor, i))
+            cursor.insert()
+
+        # Open another session, the updates won't yet be visible, we should
+        # return the only possible record.
+        s = self.conn.open_session()
+        cursor = s.open_cursor(uri, None, "next_random=true")
+        cursor.next()
+        self.assertEqual(cursor.get_key(), key_populate(cursor, 99))
 
 
 if __name__ == '__main__':
