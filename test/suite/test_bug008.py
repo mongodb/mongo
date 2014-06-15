@@ -95,7 +95,11 @@ class test_bug008(wttest.WiredTigerTestCase):
 
     # Verify cursor search and search-near operations on a file with a set of
     # on-page visible records, a set of insert-list visible records, and a set
-    # of insert-list invisible records.
+    # of insert-list invisible records.  (The reason I'm adding this slightly
+    # different test is because I want to confirm that if search positions the
+    # the cursor in the insert list with a set of invisible updates, the right
+    # fallback happens, whether the correct position is in the page slots or
+    # the insert list.)
     def test_search_invisible_two(self):
         uri = 'file:test_bug008'                # This is a btree layer test.
 
