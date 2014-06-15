@@ -39,7 +39,9 @@ class test_bug008(wttest.WiredTigerTestCase):
         ('var', dict(fmt='key_format=r', empty=0))
     ]
 
-    def test_search_invisible(self):
+    # Verify cursor search and search-near operations on a file with a set of
+    # on-page visible records, and a set of insert-list invisible records.
+    def test_search_invisible_one(self):
         uri = 'file:test_bug008'                # This is a btree layer test.
 
         # Populate the tree and reopen the connection, forcing it to disk
@@ -50,7 +52,7 @@ class test_bug008(wttest.WiredTigerTestCase):
         # Begin a transaction, and add some additional records.
         self.session.begin_transaction()
         cursor = self.session.open_cursor(uri, None)
-        for i in range(100, 120):
+        for i in range(100, 140):
             cursor.set_key(key_populate(cursor, i))
             cursor.set_value(value_populate(cursor, i))
             cursor.insert()
@@ -60,14 +62,14 @@ class test_bug008(wttest.WiredTigerTestCase):
         cursor = s.open_cursor(uri, None)
 
         # Search for an invisible record.
-        cursor.set_key(key_populate(cursor, 110))
+        cursor.set_key(key_populate(cursor, 130))
         if self.empty:
             # Invisible updates to fixed-length column-store objects are
             # invisible to the reader, but the fact that they exist past
             # the end of the initial records causes the instantiation of
             # empty records: confirm successful return of an empty row.
             cursor.search()
-            self.assertEqual(cursor.get_key(), 110)
+            self.assertEqual(cursor.get_key(), 130)
             self.assertEqual(cursor.get_value(), 0)
         else:
             # Otherwise, we should not find any matching records.
@@ -75,7 +77,7 @@ class test_bug008(wttest.WiredTigerTestCase):
 
         # Search-near for an invisible record, which should succeed, returning
         # the last visible record.
-        cursor.set_key(key_populate(cursor, 110))
+        cursor.set_key(key_populate(cursor, 130))
         cursor.search_near()
         if self.empty:
             # Invisible updates to fixed-length column-store objects are
@@ -83,13 +85,76 @@ class test_bug008(wttest.WiredTigerTestCase):
             # the end of the initial records causes the instantiation of
             # empty records: confirm successful return of an empty row.
             cursor.search()
-            self.assertEqual(cursor.get_key(), 110)
+            self.assertEqual(cursor.get_key(), 130)
             self.assertEqual(cursor.get_value(), 0)
         else:
             # Otherwise, we should find the closest record for which we can see
             # the value.
             self.assertEqual(cursor.get_key(), key_populate(cursor, 100))
             self.assertEqual(cursor.get_value(), value_populate(cursor, 100))
+
+    # Verify cursor search and search-near operations on a file with a set of
+    # on-page visible records, a set of insert-list visible records, and a set
+    # of insert-list invisible records.
+    def test_search_invisible_two(self):
+        uri = 'file:test_bug008'                # This is a btree layer test.
+
+        # Populate the tree and reopen the connection, forcing it to disk
+        # and moving the records to an on-page format.
+        simple_populate(self, uri, self.fmt, 100) 
+        self.reopen_conn()
+
+        # Add some additional visible records.
+        cursor = self.session.open_cursor(uri, None)
+        for i in range(100, 120):
+            cursor.set_key(key_populate(cursor, i))
+            cursor.set_value(value_populate(cursor, i))
+            cursor.insert()
+	cursor.close()
+
+        # Begin a transaction, and add some additional records.
+        self.session.begin_transaction()
+        cursor = self.session.open_cursor(uri, None)
+        for i in range(120, 140):
+            cursor.set_key(key_populate(cursor, i))
+            cursor.set_value(value_populate(cursor, i))
+            cursor.insert()
+
+        # Open a separate session and cursor.
+        s = self.conn.open_session()
+        cursor = s.open_cursor(uri, None)
+
+        # Search for an invisible record.
+        cursor.set_key(key_populate(cursor, 130))
+        if self.empty:
+            # Invisible updates to fixed-length column-store objects are
+            # invisible to the reader, but the fact that they exist past
+            # the end of the initial records causes the instantiation of
+            # empty records: confirm successful return of an empty row.
+            cursor.search()
+            self.assertEqual(cursor.get_key(), 130)
+            self.assertEqual(cursor.get_value(), 0)
+        else:
+            # Otherwise, we should not find any matching records.
+            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+
+        # Search-near for an invisible record, which should succeed, returning
+        # the last visible record.
+        cursor.set_key(key_populate(cursor, 130))
+        cursor.search_near()
+        if self.empty:
+            # Invisible updates to fixed-length column-store objects are
+            # invisible to the reader, but the fact that they exist past
+            # the end of the initial records causes the instantiation of
+            # empty records: confirm successful return of an empty row.
+            cursor.search()
+            self.assertEqual(cursor.get_key(), 130)
+            self.assertEqual(cursor.get_value(), 0)
+        else:
+            # Otherwise, we should find the closest record for which we can see
+            # the value.
+            self.assertEqual(cursor.get_key(), key_populate(cursor, 119))
+            self.assertEqual(cursor.get_value(), value_populate(cursor, 119))
 
 
 if __name__ == '__main__':
