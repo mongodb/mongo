@@ -85,6 +85,10 @@ namespace mongo {
     }
 
     void ShardingState::initialize(const string& server) {
+        uassert(18509,
+                "Unable to obtain host name during sharding initialization.",
+                !getHostName().empty());
+
         ShardedConnectionInfo::addHook();
         shardingState.enable(server);
         configServer.init(server);

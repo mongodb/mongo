@@ -223,6 +223,10 @@ static bool runMongosServer( bool doUpgrade ) {
     ReplicaSetMonitor::setConfigChangeHook(
         stdx::bind(&ConfigServer::replicaSetChange, &configServer, stdx::placeholders::_1 , stdx::placeholders::_2));
 
+    if (getHostName().empty()) {
+        dbexit(EXIT_BADOPTIONS);
+    }
+
     if (!configServer.init(mongosGlobalParams.configdbs)) {
         log() << "couldn't resolve config db address" << endl;
         return false;

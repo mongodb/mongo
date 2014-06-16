@@ -782,14 +782,7 @@ namespace mongo {
     }
 
     bool ConfigServer::init( vector<string> configHosts ) {
-
         uassert( 10187 ,  "need configdbs" , configHosts.size() );
-
-        string hn = getHostName();
-        if ( hn.empty() ) {
-            sleepsecs(5);
-            dbexit( EXIT_BADOPTIONS );
-        }
 
         set<string> hosts;
         for ( size_t i=0; i<configHosts.size(); i++ ) {
