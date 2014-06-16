@@ -34,17 +34,27 @@
  *	WiredTiger reverse collation.
  */
 static int
-collate_reverse(WT_COLLATOR *collator, WT_SESSION *session,
-    const WT_ITEM *k1, const WT_ITEM *k2, int *cmp)
+collate_reverse(WT_COLLATOR *collator,
+    WT_SESSION *session, const WT_ITEM *k1, const WT_ITEM *k2, int *ret)
 {
 	size_t len;
+	int cmp;
 
 	(void)collator;					/* Unused */
 	(void)session;
 
 	len = (k1->size < k2->size) ? k1->size : k2->size;
-	if ((*cmp = memcmp(k2->data, k1->data, len)) == 0)
-		*cmp = ((int)k1->size - (int)k2->size);
+	cmp = memcmp(k1->data, k2->data, len);
+	if (cmp < 0)
+		*ret = 1;
+	else if (cmp > 0)
+		*ret = -1;
+	else if (k1->size < k2->size)
+		*ret = 1;
+	else if (k1->size > k2->size)
+		*ret = -1;
+	else
+		*ret = 0;
 	return (0);
 }
 

@@ -263,14 +263,15 @@ extern int __wt_compact_page_skip(WT_SESSION_IMPL *session,
     int *skipp);
 extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next);
 extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating);
-extern int __wt_btcur_next_random(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating);
 extern int __wt_btcur_reset(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp);
 extern int __wt_btcur_insert(WT_CURSOR_BTREE *cbt);
+extern int __wt_btcur_update_check(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_remove(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_update(WT_CURSOR_BTREE *cbt);
+extern int __wt_btcur_next_random(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_compare(WT_CURSOR_BTREE *a_arg,
     WT_CURSOR_BTREE *b_arg,
     int *cmpp);
@@ -384,7 +385,9 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     uint32_t flags,
     WT_PAGE **pagep);
 extern int __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref);
-extern int __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
+extern int __wt_kv_return(WT_SESSION_IMPL *session,
+    WT_CURSOR_BTREE *cbt,
+    WT_UPDATE *upd);
 extern int __wt_bt_salvage(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase,
     const char *cfg[]);
@@ -666,6 +669,7 @@ extern int __wt_curds_create( WT_SESSION_IMPL *session,
 extern int __wt_curdump_create(WT_CURSOR *child,
     WT_CURSOR *owner,
     WT_CURSOR **cursorp);
+extern int __wt_curfile_update_check(WT_CURSOR *cursor);
 extern int __wt_curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],

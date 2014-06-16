@@ -333,7 +333,7 @@ wts_close(void)
 
 	conn = g.wts_conn;
 
-	config = MMRAND(0, 1) ? "leak_memory" : NULL;
+	config = g.c_leak_memory ? "leak_memory" : NULL;
 
 	if ((ret = conn->close(conn, config)) != 0)
 		die(ret, "connection.close");

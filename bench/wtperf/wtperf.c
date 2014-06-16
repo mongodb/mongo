@@ -132,6 +132,7 @@ generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 static void
 randomize_value(CONFIG *cfg, char *value_buf)
 {
+	uint8_t *vb;
 	uint32_t i;
 
 	/*
@@ -143,10 +144,10 @@ randomize_value(CONFIG *cfg, char *value_buf)
 	while (value_buf[i] == '\0' && i > 0)
 		--i;
 	if (i > 0) {
-		value_buf[0] = (__wt_random() % 255) + 1;
-		value_buf[i] = (__wt_random() % 255) + 1;
+		vb = (uint8_t *)value_buf;
+		vb[0] = (__wt_random() % 255) + 1;
+		vb[i] = (__wt_random() % 255) + 1;
 	}
-	return;
 }
 
 static int
@@ -742,7 +743,7 @@ populate_thread(void *arg)
 	size_t i;
 	uint64_t op, usecs;
 	uint32_t opcount;
-	int intxn, measure_latency, ret;
+	int intxn, measure_latency, ret, stress_checkpoint_due;
 	char *value_buf, *key_buf;
 	const char *cursor_config;
 
@@ -751,7 +752,7 @@ populate_thread(void *arg)
 	conn = cfg->conn;
 	session = NULL;
 	cursors = NULL;
-	ret = 0;
+	ret = stress_checkpoint_due = 0;
 	trk = &thread->insert;
 
 	key_buf = thread->key_buf;
@@ -832,8 +833,7 @@ populate_thread(void *arg)
 		 */
 		if (measure_latency) {
 			if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-				lprintf(cfg, ret, 0,
-				    "Get time call failed");
+				lprintf(cfg, ret, 0, "Get time call failed");
 				goto err;
 			}
 			++trk->latency_ops;
@@ -841,6 +841,10 @@ populate_thread(void *arg)
 			track_operation(trk, usecs);
 		}
 		++thread->insert.ops;	/* Same as trk->ops */
+
+		if (cfg->stress_checkpoint_rate != 0 &&
+		    (op % cfg->stress_checkpoint_rate) == 0)
+			stress_checkpoint_due = 1;
 
 		if (cfg->populate_ops_per_txn != 0) {
 			if (++opcount < cfg->populate_ops_per_txn)
@@ -859,6 +863,14 @@ populate_thread(void *arg)
 			if (thread->thread_index == 2 ||
 			    thread->thread_index == 0)
 			    session->checkpoint(session, NULL);
+		}
+
+		if (stress_checkpoint_due && intxn == 0) {
+			stress_checkpoint_due = 0;
+			if ((ret = session->checkpoint(session, NULL)) != 0) {
+				lprintf(cfg, ret, 0, "Checkpoint failed");
+				goto err;
+			}
 		}
 	}
 	if (intxn &&
@@ -1216,6 +1228,8 @@ execute_populate(CONFIG *cfg)
 	    " populate thread(s) for %" PRIu32 " items",
 	    cfg->populate_threads, cfg->icount);
 
+	cfg->insert_key = 0;
+
 	if ((cfg->popthreads =
 	    calloc(cfg->populate_threads, sizeof(CONFIG_THREAD))) == NULL)
 		return (enomem(cfg));
@@ -1230,8 +1244,6 @@ execute_populate(CONFIG *cfg)
 	if ((ret = start_threads(cfg, NULL,
 	    cfg->popthreads, cfg->populate_threads, pfunc)) != 0)
 		return (ret);
-
-	cfg->insert_key = 0;
 
 	if ((ret = __wt_epoch(NULL, &start)) != 0) {
 		lprintf(cfg, ret, 0, "Get time failed in populate.");

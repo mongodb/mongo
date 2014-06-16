@@ -288,6 +288,13 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	__wt_logrec_free(session, &txn->logrec);
 
 	/*
+	 * Discard any memory from the session's free-on-transaction generation
+	 * list that we can.
+	 */
+	if (session->fotxn_cnt > 0)
+		__wt_session_fotxn_discard(session, session, 0);
+
+	/*
 	 * Reset the transaction state to not running.
 	 *
 	 * Auto-commit transactions (identified by having active cursors)

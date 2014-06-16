@@ -89,19 +89,18 @@ __wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			    btree->collator, srch_key, &key, cmp, &match));
 		}
 
-		if (cmp > 0) {		/* Keep going at this level */
+		if (cmp > 0) {			/* Keep going at this level */
 			insp = &ret_ins->next[i];
 			skiplow = match;
-		} else if (cmp == 0)
+		} else if (cmp < 0) {		/* Drop down a level */
+			cbt->next_stack[i] = ret_ins;
+			cbt->ins_stack[i--] = insp--;
+			skiphigh = match;
+		} else
 			for (; i >= 0; i--) {
 				cbt->next_stack[i] = ret_ins->next[i];
 				cbt->ins_stack[i] = &ret_ins->next[i];
 			}
-		else {			/* Drop down a level */
-			cbt->next_stack[i] = ret_ins;
-			cbt->ins_stack[i--] = insp--;
-			skiphigh = match;
-		}
 	}
 
 	/*
@@ -167,18 +166,19 @@ restart:	page = parent->page;
 			break;
 
 		pindex = WT_INTL_INDEX_COPY(page);
-		base = pindex->entries;
-		child = pindex->index[base - 1];
 
 		/*
 		 * Fast-path internal pages with one child, a common case for
 		 * the root page in new trees.
 		 */
-		if (base == 1)
+		if (pindex->entries == 1) {
+			child = pindex->index[0];
 			goto descend;
+		}
 
 		/* Fast-path appends. */
 		if (insert && btree->appending) {
+			child = pindex->index[pindex->entries - 1];
 			__wt_ref_key(page, child, &item->data, &item->size);
 			WT_ERR(WT_LEX_CMP(
 			    session, btree->collator, srch_key, item, cmp));
@@ -191,88 +191,79 @@ restart:	page = parent->page;
 		/*
 		 * Two versions of the binary search of internal pages: with and
 		 * without application-specified collation.
+		 *
+		 * The 0th key on an internal page is a problem for a couple of
+		 * reasons.  First, we have to force the 0th key to sort less
+		 * than any application key, so internal pages don't have to be
+		 * updated if the application stores a new, "smallest" key in
+		 * the tree.  Second, reconciliation is aware of this and will
+		 * store a byte of garbage in the 0th key, so the comparison of
+		 * an application key and a 0th key is meaningless (but doing
+		 * the comparison could still incorrectly modify our tracking
+		 * of the leading bytes in each key that we can skip during the
+		 * comparison).
+		 *
+		 * The only way to possibly compare against the 0th key in the
+		 * binary search loop is if base is 0 and limit is 0 or 1; in
+		 * that case, we must exit the loop after doing the 0th key
+		 * comparison, that is, if we are doing the comparison, we're
+		 * descending down the left-hand side of the tree.
 		 */
 		base = 0;
+		indx = 0;		/* -Werror=maybe-uninitialized */
 		limit = pindex->entries;
-		if (btree->collator == NULL) {
+		if (btree->collator == NULL)
 			for (; limit != 0; limit >>= 1) {
-				indx = base + (limit >> 1);
-				child = pindex->index[indx];
+				/* If index is 0, skip the comparison. */
+				if ((indx = base + (limit >> 1)) == 0)
+					break;
 
-				/*
-				 * If about to compare an application key with
-				 * the 0th index on an internal page, pretend
-				 * the 0th index sorts less than any application
-				 * key.  This test is so we don't have to update
-				 * internal pages if the application stores a
-				 * new, "smallest" key in the tree.
-				 */
-				if (indx != 0) {
-					__wt_ref_key(page,
-					    child, &item->data, &item->size);
-					match = WT_MIN(skiplow, skiphigh);
-					cmp = __wt_lex_compare_skip(
-					    srch_key, item, &match);
-					if (cmp == 0)
-						goto descend;
-					if (cmp < 0) {
-						skiphigh = match;
-						continue;
-					}
-					skiplow = match;
-				}
-				base = indx + 1;
-				--limit;
-			}
-			/*
-			 * Reference the slot used for next step down the tree.
-			 *
-			 * Base is the smallest index greater than key and may
-			 * be the (last + 1) index.  (Base cannot be the 0th
-			 * index as the 0th index always sorts less than any
-			 * application key).  The slot for descent is the one
-			 * before base.
-			 */
-			if (cmp != 0)
-				child = pindex->index[base - 1];
-		} else {
-			for (; limit != 0; limit >>= 1) {
-				indx = base + (limit >> 1);
 				child = pindex->index[indx];
-				/*
-				 * If about to compare an application key with
-				 * the 0th index on an internal page, pretend
-				 * the 0th index sorts less than any application
-				 * key.  This test is so we don't have to update
-				 * internal pages if the application stores a
-				 * new, "smallest" key in the tree.
-				 */
-				if (indx != 0) {
-					__wt_ref_key(page,
-					    child, &item->data, &item->size);
-					WT_ERR(WT_LEX_CMP_SKIP(
-					    session, btree->collator,
-					    srch_key, item, cmp, &match));
-					if (cmp == 0)
-						goto descend;
-					if (cmp < 0)
-						continue;
-				}
-				base = indx + 1;
-				--limit;
+				__wt_ref_key(
+				    page, child, &item->data, &item->size);
+
+				match = WT_MIN(skiplow, skiphigh);
+				cmp = __wt_lex_compare_skip(
+				    srch_key, item, &match);
+				if (cmp > 0) {
+					skiplow = match;
+					base = indx + 1;
+					--limit;
+				} else if (cmp < 0)
+					skiphigh = match;
+				else
+					break;
 			}
-			/*
-			 * Reference the slot used for next step down the tree.
-			 *
-			 * Base is the smallest index greater than key and may
-			 * be the (last + 1) index.  (Base cannot be the 0th
-			 * index as the 0th index always sorts less than any
-			 * application key).  The slot for descent is the one
-			 * before base.
-			 */
-			if (cmp != 0)
-				child = pindex->index[base - 1];
-		}
+		else
+			for (; limit != 0; limit >>= 1) {
+				/* If index is 0, skip the comparison. */
+				if ((indx = base + (limit >> 1)) == 0)
+					break;
+
+				child = pindex->index[indx];
+				__wt_ref_key(
+				    page, child, &item->data, &item->size);
+
+				WT_ERR(WT_LEX_CMP(session,
+				    btree->collator, srch_key, item, cmp));
+				if (cmp > 0) {
+					base = indx + 1;
+					--limit;
+				} else if (cmp == 0)
+					break;
+			}
+
+		/*
+		 * Find the slot used to descend the tree.  If index is 0, it's
+		 * a left-side descent.  Otherwise, if we found an exact match,
+		 * child is already set, if we didn't find an exact match, base
+		 * is the smallest index greater than key, possibly (last + 1).
+		 */
+		if (indx == 0)
+			child = pindex->index[0];
+		else if (cmp != 0)
+			child = pindex->index[base - 1];
+
 descend:	WT_ASSERT(session, child != NULL);
 
 		/*
@@ -314,36 +305,32 @@ leaf_only:
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			rip = page->pg_row_d + indx;
-
 			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
+
 			match = WT_MIN(skiplow, skiphigh);
 			cmp = __wt_lex_compare_skip(srch_key, item, &match);
-			if (cmp == 0)
-				break;
-			if (cmp < 0) {
+			if (cmp > 0) {
+				skiplow = match;
+				base = indx + 1;
+				--limit;
+			} else if (cmp < 0)
 				skiphigh = match;
-				continue;
-			}
-			skiplow = match;
-
-			base = indx + 1;
-			--limit;
+			else
+				break;
 		}
 	else
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			rip = page->pg_row_d + indx;
-
 			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
-			WT_ERR(WT_LEX_CMP_SKIP(session,
-			    btree->collator, srch_key, item, cmp, &match));
-			if (cmp == 0)
-				break;
-			if (cmp < 0)
-				continue;
 
-			base = indx + 1;
-			--limit;
+			WT_ERR(WT_LEX_CMP(
+			    session, btree->collator, srch_key, item, cmp));
+			if (cmp > 0) {
+				base = indx + 1;
+				--limit;
+			} else if (cmp == 0)
+				break;
 		}
 
 	/*
@@ -353,9 +340,13 @@ leaf_only:
 	 * an existing entry.  Check that case and get out fast.
 	 */
 	if (cmp == 0) {
-		WT_ASSERT(session, rip != NULL);
 		cbt->compare = 0;
 		cbt->ref = child;
+
+		/*
+		 * Safe: if the page had entries, rip will be set in the loop
+		 * above, if the page has no entries, then cmp will not be 0.
+		 */
 		cbt->slot = WT_ROW_SLOT(page, rip);
 		return (0);
 	}

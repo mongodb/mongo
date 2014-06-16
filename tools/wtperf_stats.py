@@ -43,11 +43,19 @@ except ImportError:
             the same directory as %s" % sys.argv[0]
     sys.exit(-1)
 
+def timesort(s):
+    # Sort the timestr via its parsetime() value so that the year gets
+    # added and it properly sorts.  Times are only %b %d %H:%M:%S and
+    # may improperly sort if the data crosses a month boundary.
+    t = operator.itemgetter('#time')
+    timestr = t(s)
+    return parsetime(timestr)
+
 # Fixup the names and values in a dictionary read in from a csv file. One
 # field must be "#time" - which is used to calculate the interval.
 # Input is a dictionary, output is a list of dictionaries with a single entry.
 def munge_dict(values_dict, abstime):
-    sorted_values = sorted(values_dict, key=operator.itemgetter('#time'))
+    sorted_values = sorted(values_dict, key=timesort)
     start_time = parsetime(sorted_values[0]['#time'])
 
     ret = []
