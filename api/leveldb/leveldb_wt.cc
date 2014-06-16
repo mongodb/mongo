@@ -365,6 +365,7 @@ private:
     return (ctx);
   }
 
+  WT_SESSION *getSession() { return getContext()->getSession(); }
   WT_CURSOR *getCursor() { return getContext()->getCursor(); }
 
   // No copying allowed
@@ -483,7 +484,7 @@ class WriteBatchHandler : public WriteBatch::Handler {
 public:
   WriteBatchHandler(WT_CURSOR *cursor) : cursor_(cursor), status_(0) {}
   virtual ~WriteBatchHandler() {}
-  int getStatus() { return status_; }
+  int getWiredTigerStatus() { return status_; }
 
   virtual void Put(const Slice& key, const Slice& value) {
     WT_ITEM item;
@@ -498,6 +499,7 @@ public:
     if (ret != 0 && status_ == 0)
       status_ = ret;
   }
+
   virtual void Delete(const Slice& key) {
     WT_ITEM item;
 
@@ -520,14 +522,33 @@ private:
 Status
 DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
 {
+  Status status = Status::OK();
   WT_CURSOR *cursor = getCursor();
-  WriteBatchHandler handler(cursor);
-  Status status = updates->Iterate(&handler);
-  // Reset the WiredTiger cursor so it doesn't keep any pages pinned. Track
-  // failures in debug builds since we don't expect failure, but don't pass
-  // failures on - it's not necessary for correct operation.
-  int t_ret = cursor->reset(cursor);
-  assert(t_ret == 0);
+  WT_SESSION *session = getSession();
+  int ret, t_ret;
+
+  for (;;) {
+    if ((ret = session->begin_transaction(session, NULL)) != 0)
+      return WiredTigerErrorToStatus(
+          ret, "Begin transaction failed in Write batch");
+
+    WriteBatchHandler handler(cursor);
+    status = updates->Iterate(&handler);
+    // Retry the batch if we got a deadlock return and could roll back
+    // the transaction.
+    if (handler.getWiredTigerStatus() != WT_DEADLOCK ||
+      (ret = session->rollback_transaction(session, NULL)) != 0)
+      break;
+  }
+
+  if (status.ok() && ret == 0)
+    ret = session->commit_transaction(session, NULL);
+  else if ((t_ret = session->rollback_transaction(session, NULL)) != 0 &&
+    ret == 0)
+    ret = t_ret;
+
+  if (status.ok() && ret != 0)
+    status = WiredTigerErrorToStatus(ret, NULL);
   return status;
 }
 
