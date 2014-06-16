@@ -31,19 +31,12 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
-    const int scramHashSize = 20;
-    
     /* 
-     * Compute the SCRAM secrets storedKey and serverKey
-     * as defined in RFC5802 
+     * Generate the user salt and the SCRAM secrets 
+     * storedKey and serverKey as defined in RFC5802 
      */
-    void computeSCRAMProperties(const std::string& password,
-                                       const unsigned char salt[],
-                                       size_t saltLen,
-                                       size_t iterationCount,
-                                       unsigned char storedKey[scramHashSize],
-                                       unsigned char serverKey[scramHashSize]);
-
+    BSONObj generateSCRAMCredentials(const std::string& hashedPassword);
 } // namespace mongo

@@ -54,10 +54,8 @@
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/random.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/util/base64.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/sequence_util.h"
@@ -419,46 +417,20 @@ namespace mongo {
                 // Must be an external user
                 userObjBuilder.append("credentials", BSON("external" << true));
             }
-            else if (args.mechanism == "SCRAM-SHA-1") { 
-                // TODO: configure the default iteration count via setParameter
-                const int iterationCount = 10000;
-                const int saltLenQWords = 2;
-
-                // Generate salt
-                uint64_t userSalt[saltLenQWords];
-                scoped_ptr<SecureRandom> sr(SecureRandom::create());
-
-                userSalt[0] = sr->nextInt64();
-                userSalt[1] = sr->nextInt64();
-                std::string encodedUserSalt = 
-                    base64::encode(reinterpret_cast<char*>(&userSalt[0]), sizeof(userSalt));
-
-                // Compute SCRAM secrets serverKey and storedKey
-                unsigned char storedKey[scramHashSize];
-                unsigned char serverKey[scramHashSize];
-
-                computeSCRAMProperties(args.hashedPassword,
-                                                reinterpret_cast<unsigned char*>(userSalt),
-                                                saltLenQWords*sizeof(uint64_t),
-                                                iterationCount,
-                                                storedKey,
-                                                serverKey);
-
-                std::string encodedStoredKey = 
-                    base64::encode(reinterpret_cast<char*>(&storedKey[0]), scramHashSize);
-                std::string encodedServerKey = 
-                    base64::encode(reinterpret_cast<char*>(&serverKey[0]), scramHashSize);
-
-                userObjBuilder.append("credentials", BSON("SCRAM-SHA-1" << 
-                                                     BSON("iterationCount" << iterationCount <<
-                                                          "salt" << encodedUserSalt << 
-                                                          "storedKey" << encodedStoredKey <<
-                                                          "serverKey" << encodedServerKey)));
-            }
-            else if(args.mechanism == "MONGODB-CR" || 
-                    args.mechanism == "CRAM-MD5" || 
-                    args.mechanism.empty()) {
-                userObjBuilder.append("credentials", BSON("MONGODB-CR" << args.hashedPassword));
+            else if (args.mechanism == "SCRAM-SHA-1" || 
+                     args.mechanism == "MONGODB-CR" || 
+                     args.mechanism == "CRAM-MD5" || 
+                     args.mechanism.empty()) {
+                
+                // At the moment we are ignoring the mechanism parameter and create
+                // both SCRAM-SHA-1 and MONGODB-CR credentials for all new users
+                BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
+                BSONObj scramCred =  generateSCRAMCredentials(args.hashedPassword);
+                if(!scramCred.isEmpty()) {
+                    credentialsBuilder.append("SCRAM-SHA-1",scramCred);
+                }
+                credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+                credentialsBuilder.done();
             }
             else {
                 return appendCommandStatus(
@@ -614,7 +586,14 @@ namespace mongo {
 
             BSONObjBuilder updateSetBuilder;
             if (args.hasHashedPassword) {
-                updateSetBuilder.append("credentials.MONGODB-CR", args.hashedPassword);
+                // Create both SCRAM-SHA-1 and MONGODB-CR credentials for all new users
+                BSONObjBuilder credentialsBuilder(updateSetBuilder.subobjStart("credentials"));
+                BSONObj scramCred =  generateSCRAMCredentials(args.hashedPassword);
+                if(!scramCred.isEmpty()) {
+                    credentialsBuilder.append("SCRAM-SHA-1",scramCred);
+                }
+                credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+                credentialsBuilder.done();
             }
             if (args.hasCustomData) {
                 updateSetBuilder.append("customData", args.customData);

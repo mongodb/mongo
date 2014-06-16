@@ -38,9 +38,12 @@
 #include <openssl/hmac.h>
 #endif
 
-#include "mongo/util/assert_util.h"
+#include "mongo/platform/random.h"
+#include "mongo/util/base64.h"
 
 namespace mongo {
+
+const int scramHashSize = 20;
 
 // Need to #ifdef this until our SCRAM implementation
 // is independent of libcrypto
@@ -90,19 +93,15 @@ namespace mongo {
             }
         }
     }
-#endif
 
     /* Compute the SCRAM secrets storedKey and serverKey
      * as defined in RFC5802 */
-    void computeSCRAMProperties(const std::string& password,
+    static void computeSCRAMProperties(const std::string& password,
                                 const unsigned char salt[],
                                 size_t saltLen,
                                 size_t iterationCount,
                                 unsigned char storedKey[scramHashSize],
                                 unsigned char serverKey[scramHashSize]) {
-#ifndef MONGO_SSL
-        fassertFailed(17496);
-#else
 
         unsigned char saltedPassword[scramHashSize];
         unsigned char clientKey[scramHashSize];
@@ -138,6 +137,49 @@ namespace mongo {
                  serverKeyConst.size(),
                  serverKey,
                  &hashLen));
+    }
+    
 #endif //MONGO_SSL
+
+    BSONObj generateSCRAMCredentials(const std::string& hashedPassword) {
+#ifndef MONGO_SSL
+        return BSONObj();
+#else
+
+        // TODO: configure the default iteration count via setParameter
+        const int iterationCount = 10000;
+        const int saltLenQWords = 2;
+
+        // Generate salt
+        uint64_t userSalt[saltLenQWords];
+        
+        scoped_ptr<SecureRandom> sr(SecureRandom::create());
+
+        userSalt[0] = sr->nextInt64();
+        userSalt[1] = sr->nextInt64();
+        std::string encodedUserSalt = 
+            base64::encode(reinterpret_cast<char*>(&userSalt[0]), sizeof(userSalt));
+
+        // Compute SCRAM secrets serverKey and storedKey
+        unsigned char storedKey[scramHashSize];
+        unsigned char serverKey[scramHashSize];
+
+        computeSCRAMProperties(hashedPassword,
+                               reinterpret_cast<unsigned char*>(userSalt),
+                               saltLenQWords*sizeof(uint64_t),
+                               iterationCount,
+                               storedKey,
+                               serverKey);
+
+        std::string encodedStoredKey = 
+            base64::encode(reinterpret_cast<char*>(&storedKey[0]), scramHashSize);
+        std::string encodedServerKey = 
+            base64::encode(reinterpret_cast<char*>(&serverKey[0]), scramHashSize);
+     
+        return BSON("iterationCount" << iterationCount <<
+                                          "salt" << encodedUserSalt << 
+                                          "storedKey" << encodedStoredKey <<
+                                          "serverKey" << encodedServerKey);
+#endif
     }
 } // namespace mongo
