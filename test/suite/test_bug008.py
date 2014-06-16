@@ -114,7 +114,7 @@ class test_bug008(wttest.WiredTigerTestCase):
             cursor.set_key(key_populate(cursor, i))
             cursor.set_value(value_populate(cursor, i))
             cursor.insert()
-	cursor.close()
+        cursor.close()
 
         # Begin a transaction, and add some additional records.
         self.session.begin_transaction()
