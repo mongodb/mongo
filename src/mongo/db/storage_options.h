@@ -52,8 +52,7 @@ namespace mongo {
             preallocj(true),
             journalCommitInterval(0), // 0 means use default
             quota(false), quotaFiles(8),
-            syncdelay(60),
-            useHints(true)
+            syncdelay(60)
         {
             repairpath = dbpath;
             dur = false;
@@ -100,8 +99,6 @@ namespace mongo {
         int quotaFiles;        // --quotaFiles
 
         double syncdelay;      // seconds between fsyncs
-
-        bool useHints;         // only off if --nohints
     };
 
     extern StorageGlobalParams storageGlobalParams;

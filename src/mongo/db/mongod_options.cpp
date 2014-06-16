@@ -422,11 +422,6 @@ namespace mongo {
                                   .hidden()
                                   .setSources(moe::SourceAllLegacy);
 
-        // things we don't want people to use
-        options->addOptionChaining("nohints", "nohints", moe::Switch, "ignore query hints")
-                                  .hidden()
-                                  .setSources(moe::SourceAllLegacy);
-
         // deprecated pairing command line options
         options->addOptionChaining("pairwith", "pairwith", moe::Switch, "DEPRECATED")
                                   .hidden()
@@ -951,9 +946,6 @@ namespace mongo {
         }
         if (params.count("storage.journal.debugFlags")) {
             storageGlobalParams.durOptions = params["storage.journal.debugFlags"].as<int>();
-        }
-        if (params.count("nohints")) {
-            storageGlobalParams.useHints = !params["nohints"].as<bool>();
         }
         if (params.count("nopreallocj")) {
             storageGlobalParams.preallocj = !params["nopreallocj"].as<bool>();

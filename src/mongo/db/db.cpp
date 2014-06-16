@@ -114,9 +114,6 @@ namespace mongo {
 
     void (*snmpInit)() = NULL;
 
-    /* only off if --nohints */
-    extern bool useHints;
-
     extern int diagLogging;
     extern int lockFile;
 
