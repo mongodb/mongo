@@ -534,18 +534,18 @@ DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
 
     WriteBatchHandler handler(cursor);
     status = updates->Iterate(&handler);
-    // Retry the batch if we got a deadlock return and could roll back
-    // the transaction.
-    if (handler.getWiredTigerStatus() != WT_DEADLOCK ||
-      (ret = session->rollback_transaction(session, NULL)) != 0)
+    if ((ret = handler.getWiredTigerStatus()) != WT_DEADLOCK)
       break;
+    // Roll back the transaction on deadlock so we can try again
+    if ((ret = session->rollback_transaction(session, NULL)) != 0)
+      return WiredTigerErrorToStatus(
+          ret, "Rollback transaction failed in Write batch");
   }
 
   if (status.ok() && ret == 0)
     ret = session->commit_transaction(session, NULL);
-  else if ((t_ret = session->rollback_transaction(session, NULL)) != 0 &&
-    ret == 0)
-    ret = t_ret;
+  else if (ret == 0)
+    ret = session->rollback_transaction(session, NULL);
 
   if (status.ok() && ret != 0)
     status = WiredTigerErrorToStatus(ret, NULL);
