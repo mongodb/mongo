@@ -99,7 +99,7 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
     };
 
     // Test command that can be sent to secondary
-    cmdTest({ distinct: 'user', key: { x: 1 }, query: { x: 1 }}, true,
+    cmdTest({ distinct: 'user', key: 'x', query: { x: 1 }}, true,
         formatProfileQuery({ distinct: 'user' }, !isMongos));
 
     // Test command that can't be sent to secondary
@@ -186,13 +186,13 @@ var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
     // Test that a command that could be routed to a secondary fails with bad mode / tags.
     if (isMongos) {
         // Command result should have ok: 0.
-        cmdResult = testDB.runCommand({ distinct: 'user', key: { x: 1 } });
+        cmdResult = testDB.runCommand({ distinct: 'user', key: 'x' });
         jsTest.log('cmd result: ' + tojson(cmdResult));
         assert(!cmdResult.ok);
     } else {
         try {
             // conn should throw error
-            testDB.runCommand({ distinct: 'user', key: { x: 1 } });
+            testDB.runCommand({ distinct: 'user', key: 'x' });
             failureMsg = "Unexpected success running distinct!";
         }
         catch (e) {
