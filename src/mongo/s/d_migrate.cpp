@@ -1792,7 +1792,7 @@ namespace mongo {
                                     e.touch();
                                 }
                             }
-                        }
+                        } // end PageFaultRetryableSection
                         thisTime++;
                         numCloned++;
                         clonedBytes += o.objsize();

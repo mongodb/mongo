@@ -95,20 +95,20 @@ namespace mongo {
                 return false;
             }
             
-            PageFaultRetryableSection s;
-            while ( 1 ) {
-                try {
-                    return runNoDirectClient( ns , 
-                                              query , fields , update , 
-                                              upsert , returnNew , remove , 
-                                              result , errmsg );
+            {
+                PageFaultRetryableSection s;
+                while ( 1 ) {
+                    try {
+                        return runNoDirectClient( ns , 
+                                                  query , fields , update , 
+                                                  upsert , returnNew , remove , 
+                                                  result , errmsg );
+                    }
+                    catch ( PageFaultException& e ) {
+                        e.touch();
+                    }
                 }
-                catch ( PageFaultException& e ) {
-                    e.touch();
-                }
-            }
-
-                    
+            } // end PageFaultRetryableSection
         }
 
         void _appendHelper( BSONObjBuilder& result , const BSONObj& doc , bool found , const BSONObj& fields ) {

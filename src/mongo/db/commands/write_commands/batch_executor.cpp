@@ -880,18 +880,20 @@ namespace mongo {
         WriteOpResult result;
 
         // NOTE: Deletes will not fault outside the lock once any data has been written
-        PageFaultRetryableSection pageFaultSection;
-        while ( true ) {
-            try {
-                multiRemove( removeItem, &result );
-                break;
+        {
+            PageFaultRetryableSection pageFaultSection;
+            while ( true ) {
+                try {
+                    multiRemove( removeItem, &result );
+                    break;
+                }
+                catch (PageFaultException& pfe) {
+                    pfe.touch();
+                    invariant(!result.getError());
+                    continue;
+                }
+                fassertFailed(17429);
             }
-            catch (PageFaultException& pfe) {
-                pfe.touch();
-                invariant(!result.getError());
-                continue;
-            }
-            fassertFailed(17429);
         }
 
         // END CURRENT OP
@@ -978,38 +980,40 @@ namespace mongo {
             normalizedInsert.getValue();
 
         cc().clearHasWrittenThisOperation();
-        PageFaultRetryableSection pageFaultSection;
-        while (true) {
-            try {
-                if (!state->lockAndCheck(result)) {
+        {
+            PageFaultRetryableSection pageFaultSection;
+            while (true) {
+                try {
+                    if (!state->lockAndCheck(result)) {
+                        break;
+                    }
+
+                    if (!state->request->isInsertIndexRequest()) {
+                        const PregeneratedKeys* pregen = NULL;
+                        if ( state->pregeneratedKeys.size() > state->currIndex )
+                            pregen = &state->pregeneratedKeys[state->currIndex];
+                        singleInsert(insertDoc, state->getCollection(), pregen, result);
+                    }
+                    else {
+                        singleCreateIndex(insertDoc, state->getCollection(), result);
+                    }
                     break;
                 }
-
-                if (!state->request->isInsertIndexRequest()) {
-                    const PregeneratedKeys* pregen = NULL;
-                    if ( state->pregeneratedKeys.size() > state->currIndex )
-                        pregen = &state->pregeneratedKeys[state->currIndex];
-                    singleInsert(insertDoc, state->getCollection(), pregen, result);
+                catch (const DBException& ex) {
+                    Status status(ex.toStatus());
+                    if (ErrorCodes::isInterruption(status.code()))
+                        throw;
+                    result->setError(toWriteError(status));
+                    break;
                 }
-                else {
-                    singleCreateIndex(insertDoc, state->getCollection(), result);
+                catch (PageFaultException& pfe) {
+                    state->unlock();
+                    pfe.touch();
+                    continue;  // Try the operation again.
                 }
-                break;
+                fassertFailed(17430);
             }
-            catch (const DBException& ex) {
-                Status status(ex.toStatus());
-                if (ErrorCodes::isInterruption(status.code()))
-                    throw;
-                result->setError(toWriteError(status));
-                break;
-            }
-            catch (PageFaultException& pfe) {
-                state->unlock();
-                pfe.touch();
-                continue;  // Try the operation again.
-            }
-            fassertFailed(17430);
-        }
+        } // end PageFaultRetryableSection
 
         // Errors release the write lock, as a matter of policy.
         if (result->getError())

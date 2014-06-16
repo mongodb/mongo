@@ -647,33 +647,36 @@ namespace mongo {
         op.debug().query = pattern;
         op.setQuery(pattern);
 
-        PageFaultRetryableSection s;
-        while ( 1 ) {
-            try {
-                DeleteRequest request(ns);
-                request.setQuery(pattern);
-                request.setMulti(!justOne);
-                request.setUpdateOpLog(true);
-                DeleteExecutor executor(&request);
-                uassertStatusOK(executor.prepare());
-                Lock::DBWrite lk(ns.ns());
+        {
+            PageFaultRetryableSection s;
+            while ( 1 ) {
+                try {
+                    DeleteRequest request(ns);
+                    request.setQuery(pattern);
+                    request.setMulti(!justOne);
+                    request.setUpdateOpLog(true);
+                    DeleteExecutor executor(&request);
+                    uassertStatusOK(executor.prepare());
+                    Lock::DBWrite lk(ns.ns());
 
-                // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
-                if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-                    return;
+                    // if this ever moves to outside of lock, need to adjust check
+                    // Client::Context::_finishInit
+                    if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
+                        return;
 
-                Client::Context ctx(ns);
+                    Client::Context ctx(ns);
 
-                long long n = executor.execute();
-                lastError.getSafe()->recordDelete( n );
-                op.debug().ndeleted = n;
-                break;
+                    long long n = executor.execute();
+                    lastError.getSafe()->recordDelete( n );
+                    op.debug().ndeleted = n;
+                    break;
+                }
+                catch ( PageFaultException& e ) {
+                    LOG(2) << "recordDelete got a PageFaultException" << endl;
+                    e.touch();
+                }
             }
-            catch ( PageFaultException& e ) {
-                LOG(2) << "recordDelete got a PageFaultException" << endl;
-                e.touch();
-            }
-        }
+        } // end PageFaultRetryableSection
     }
 
     QueryResult* emptyMoreResult(long long);
@@ -902,35 +905,37 @@ namespace mongo {
             GeneratorHolder::getInstance()->prepare( ns, multi[0], &tempHack );
         }
 
-        PageFaultRetryableSection s;
-        while ( true ) {
-            try {
-                Lock::DBWrite lk(ns);
+        {
+            PageFaultRetryableSection s;
+            while ( true ) {
+                try {
+                    Lock::DBWrite lk(ns);
 
-                // CONCURRENCY TODO: is being read locked in big log sufficient here?
-                // writelock is used to synchronize stepdowns w/ writes
-                uassert( 10058 , "not master", isMasterNs(ns) );
+                    // CONCURRENCY TODO: is being read locked in big log sufficient here?
+                    // writelock is used to synchronize stepdowns w/ writes
+                    uassert( 10058 , "not master", isMasterNs(ns) );
 
-                if ( handlePossibleShardedMessage( m , 0 ) )
+                    if ( handlePossibleShardedMessage( m , 0 ) )
+                        return;
+
+                    Client::Context ctx(ns);
+
+                    if (multi.size() > 1) {
+                        const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
+                        insertMulti(ctx, keepGoing, ns, multi, op);
+                    }
+                    else {
+                        checkAndInsert(ctx, ns, multi[0], &tempHack);
+                        globalOpCounters.incInsertInWriteLock(1);
+                        op.debug().ninserted = 1;
+                    }
                     return;
-
-                Client::Context ctx(ns);
-
-                if (multi.size() > 1) {
-                    const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-                    insertMulti(ctx, keepGoing, ns, multi, op);
                 }
-                else {
-                    checkAndInsert(ctx, ns, multi[0], &tempHack);
-                    globalOpCounters.incInsertInWriteLock(1);
-                    op.debug().ninserted = 1;
+                catch ( PageFaultException& e ) {
+                    e.touch();
                 }
-                return;
             }
-            catch ( PageFaultException& e ) {
-                e.touch();
-            }
-        }
+        } // end PageFaultRetryableSection
     }
 
     void getDatabaseNames( vector< string > &names , const string& usePath ) {
