@@ -41,7 +41,7 @@
 #include <fstream>
 
 #include "mongo/db/db.h"
-#include "mongo/db/storage/durable_mapped_file.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"

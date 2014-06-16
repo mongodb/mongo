@@ -30,7 +30,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/storage/durable_mapped_file.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/processinfo.h"

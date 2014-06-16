@@ -30,7 +30,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/storage/data_file.h"
+#include "mongo/db/storage/mmap_v1/data_file.h"
 
 #include <boost/filesystem/operations.hpp>
 

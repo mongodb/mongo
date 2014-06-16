@@ -77,6 +77,7 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
@@ -900,7 +901,7 @@ namespace mongo {
             }
 
             commitNow(txn);
-            MongoFile::flushAll(true);
+            globalStorageEngine->flushAllFiles(true);
             journalCleanup();
 
             verify(!haveJournalFiles()); // Double check post-conditions

@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mmap.h"
@@ -246,7 +247,7 @@ namespace mongo {
 
             try {
                 _txn->recoveryUnit()->syncDataAndTruncateJournal();
-                MongoFile::flushAll(true); // need both in case journaling is disabled
+                globalStorageEngine->flushAllFiles(true); // need both in case journaling is disabled
                 {
                     Client::Context tempContext( _dbName, _pathString );
                     Database::closeDatabase(_txn, _dbName, _pathString);
@@ -428,7 +429,7 @@ namespace mongo {
             }
 
             txn->recoveryUnit()->syncDataAndTruncateJournal();
-            MongoFile::flushAll(true); // need both in case journaling is disabled
+            globalStorageEngine->flushAllFiles(true); // need both in case journaling is disabled
 
             txn->checkForInterrupt(false);
 

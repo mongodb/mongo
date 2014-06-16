@@ -52,9 +52,11 @@
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/global_optime.h"
 #include "mongo/db/global_environment_experiment.h"
@@ -112,6 +114,8 @@ namespace mongo {
 #ifdef _WIN32
     HANDLE lockFileHandle;
 #endif
+
+    StorageEngine* globalStorageEngine = new MMAPV1Engine(); // TODO: put this somewhere else
 
     MONGO_FP_DECLARE(rsStopGetMore);
 
@@ -1092,7 +1096,7 @@ namespace {
                     log() << "shutdown: waiting for write lock..." << endl;
                 }
             }
-            MemoryMappedFile::flushAll(true);
+            globalStorageEngine->flushAllFiles(true);
         }
 
         log() << "shutdown: closing all files..." << endl;

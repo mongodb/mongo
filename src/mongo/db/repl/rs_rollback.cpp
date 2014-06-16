@@ -407,8 +407,6 @@ namespace repl {
             throw e;
         }
 
-        MemoryMappedFile::flushAll(true);
-
         sethbmsg("rollback 3.5");
         if (fixUpInfo.rbid != getRBID(oplogreader.conn())) {
             // our source rolled back itself.  so the data we received isn't necessarily consistent.
@@ -655,8 +653,6 @@ namespace repl {
 
         removeSavers.clear(); // this effectively closes all of them
 
-        sethbmsg(str::stream() << "rollback 5 d:" << deletes << " u:" << updates);
-        MemoryMappedFile::flushAll(true);
         sethbmsg("rollback 6");
 
         // clean up oplog
@@ -673,9 +669,6 @@ namespace repl {
 
         // reset cached lastoptimewritten and h value
         loadLastOpTimeWritten();
-
-        sethbmsg("rollback 7");
-        MemoryMappedFile::flushAll(true);
 
         // done
         if (warn)

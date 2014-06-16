@@ -30,8 +30,13 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
+#include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
 
+    class MMAPV1Engine : public StorageEngine {
+    public:
+        virtual ~MMAPV1Engine();
+        int flushAllFiles( bool sync );
+    };
 }

@@ -80,8 +80,8 @@
 #include "mongo/db/startup_warnings.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
-#include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
 #include "mongo/platform/process_id.h"
@@ -488,7 +488,7 @@ namespace mongo {
                 }
 
                 Date_t start = jsTime();
-                int numFiles = MemoryMappedFile::flushAll( true );
+                int numFiles = globalStorageEngine->flushAllFiles( true );
                 time_flushing = (int) (jsTime() - start);
 
                 _flushed(time_flushing);

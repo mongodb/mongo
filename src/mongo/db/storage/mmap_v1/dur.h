@@ -31,7 +31,7 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/storage/durable_mapped_file.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/record.h"
 
 namespace mongo {

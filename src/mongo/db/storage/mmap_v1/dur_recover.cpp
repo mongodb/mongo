@@ -39,13 +39,14 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/db.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage/mmap_v1/durop.h"
-#include "mongo/db/storage/durable_mapped_file.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/bufreader.h"
@@ -224,7 +225,7 @@ namespace mongo {
         }
 
         void RecoveryJob::_close() {
-            MongoFile::flushAll(true);
+            globalStorageEngine->flushAllFiles(true);
             _mmfs.clear();
         }
 

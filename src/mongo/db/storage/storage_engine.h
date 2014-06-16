@@ -1,4 +1,4 @@
-// mmap_v1_engine.cpp
+// storage_engine.h
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -28,17 +28,23 @@
 *    it in the license file.
 */
 
-#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
+#pragma once
 
-#include "mongo/util/mmap.h"
+#include "mongo/base/status.h"
 
 namespace mongo {
 
-    MMAPV1Engine::~MMAPV1Engine() {
-    }
+    class StorageEngine {
+    public:
+        virtual ~StorageEngine() {}
 
-    int MMAPV1Engine::flushAllFiles( bool sync ) {
-        return MongoFile::flushAll( sync );
-    }
+        /**
+         * @return number of files flushed
+         */
+        virtual int flushAllFiles( bool sync ) = 0;
 
+    };
+
+    // TODO: this is temporary
+    extern StorageEngine* globalStorageEngine;
 }

@@ -41,7 +41,7 @@
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/pdfile_version.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage/data_file.h"
+#include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/catalog/namespace_details_collection_entry.h"
 #include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"

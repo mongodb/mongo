@@ -57,6 +57,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/scripting/engine.h"
@@ -516,7 +517,7 @@ namespace repl {
             logOp( &txn, "n", "", BSONObj() );
 
         /* sync here so we don't get any surprising lag later when we try to sync */
-        MemoryMappedFile::flushAll(true);
+        globalStorageEngine->flushAllFiles(true);
         log() << "******" << endl;
     }
 

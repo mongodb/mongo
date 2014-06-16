@@ -42,6 +42,7 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
@@ -137,7 +138,7 @@ namespace mongo {
                 }
                 // question : is it ok this is not in the dblock? i think so but this is a change from past behavior, 
                 // please advise.
-                result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );
+                result.append( "numFiles" , globalStorageEngine->flushAllFiles( sync ) );
             }
             return 1;
         }
@@ -168,7 +169,7 @@ namespace mongo {
         global.downgrade();
         
         try {
-            MemoryMappedFile::flushAll(true);
+            globalStorageEngine->flushAllFiles(true);
         }
         catch( std::exception& e ) { 
             error() << "error doing flushAll: " << e.what() << endl;

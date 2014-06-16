@@ -34,6 +34,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern.h"
 
 namespace mongo {
@@ -144,7 +145,7 @@ namespace mongo {
             break;
         case WriteConcernOptions::FSYNC:
             if ( !getDur().isDurable() ) {
-                result->fsyncFiles = MemoryMappedFile::flushAll( true );
+                result->fsyncFiles = globalStorageEngine->flushAllFiles( true );
             }
             else {
                 // We only need to commit the journal if we're durable
