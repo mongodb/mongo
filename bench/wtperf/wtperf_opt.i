@@ -130,7 +130,8 @@ DEF_OPT_AS_UINT32(stress_checkpoint_rate, 0,
     "checkpoint every rate operations during the populate phase, 0 to disable")
 DEF_OPT_AS_CONFIG_STRING(table_config,
     "key_format=S,value_format=S,type=lsm,exclusive=true,"
-    "leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,",
+    "allocation_size=4kb,internal_page_max=64kb,leaf_page_max=4kb,"
+    "split_pct=100",
     "table configuration string")
 DEF_OPT_AS_UINT32(table_count, 1,
     "number of tables to run operations over. Keys are divided evenly "

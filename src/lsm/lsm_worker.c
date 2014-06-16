@@ -146,9 +146,17 @@ __wt_lsm_merge_worker(void *vargs)
 			stallms = 0;
 		else if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+			if (WT_ATOMIC_ADD(lsm_tree->merge_idle, 1) ==
+			    lsm_tree->merge_threads &&
+			    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
+				F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
+
 			/* Poll 10 times per second. */
 			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
+
+			(void)WT_ATOMIC_SUB(lsm_tree->merge_idle, 1);
+
 			/*
 			 * Randomize the tracking of stall time so that with
 			 * multiple LSM trees open, they don't all get
@@ -260,19 +268,28 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-			WT_WITH_SCHEMA_LOCK(session, ret =
-			    __wt_lsm_tree_switch(session, lsm_tree));
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret = __wt_lsm_tree_switch(session, lsm_tree));
 			WT_ERR(ret);
 		}
 
 		WT_ERR(__lsm_copy_chunks(session, lsm_tree, &cookie, 0));
 
 		/* Write checkpoints in all completed files. */
-		for (i = 0, j = 0; i < cookie.nchunks - 1; i++) {
+		for (i = 0, j = 0; i < cookie.nchunks; i++) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 				goto err;
 
 			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
+				break;
+
+			/*
+			 * Normally, we ignore the latest chunk in the tree
+			 * unless we are flushing all chunks before a compact
+			 * operation.
+			 */
+			if (i == cookie.nchunks - 1 &&
+			    !F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL))
 				break;
 
 			chunk = cookie.chunk_array[i];
@@ -402,9 +419,12 @@ __wt_lsm_checkpoint_worker(void *arg)
 		}
 		__lsm_unpin_chunks(session, &cookie);
 		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
-		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
+		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+			if (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL))
+				F_CLR(lsm_tree, WT_LSM_TREE_FLUSH_ALL);
 			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
+		}
 	}
 
 err:	__lsm_unpin_chunks(session, &cookie);
