@@ -43,7 +43,7 @@
 #include "mongo/util/text.h"
 #include "mongo/util/time_support.h"
 
-#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h" //XXX
+#include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h" //XXX
 
 namespace BasicTests {
 

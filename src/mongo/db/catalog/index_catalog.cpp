@@ -36,6 +36,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
@@ -58,10 +59,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-
-#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h" // XXX
-#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h" // XXX
-#include "mongo/db/storage/extent_manager.h" // XXX
 
 namespace mongo {
 

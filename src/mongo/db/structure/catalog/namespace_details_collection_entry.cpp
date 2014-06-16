@@ -31,7 +31,7 @@
 #include "mongo/db/structure/catalog/namespace_details_collection_entry.h"
 
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/record_store.h"
 #include "mongo/util/startup_test.h"

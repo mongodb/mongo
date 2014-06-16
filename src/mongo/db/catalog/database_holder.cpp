@@ -41,7 +41,7 @@
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/util/file_allocator.h"
 
-#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h" //XXX
+#include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h" //XXX
 
 
 namespace mongo {
