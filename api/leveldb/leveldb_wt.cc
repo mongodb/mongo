@@ -225,7 +225,7 @@ class DbImpl;
 class OperationContext {
 public:
   OperationContext(WT_CONNECTION *conn) {
-    int ret = conn->open_session(conn, NULL, NULL, &session_);
+    int ret = conn->open_session(conn, NULL, "isolation=snapshot", &session_);
     assert(ret == 0);
     ret = session_->open_cursor(
         session_, WT_URI, NULL, NULL, &cursor_);
@@ -296,12 +296,19 @@ private:
 };
 
 class SnapshotImpl : public Snapshot {
+friend class DbImpl;
 public:
-  SnapshotImpl(DbImpl *db) : Snapshot() {}
+  SnapshotImpl(DbImpl *db) : Snapshot(), db_(db) {}
   virtual ~SnapshotImpl() {}
+protected:
+  Status setupTransaction();
+  Status releaseTransaction();
+private:
+  DbImpl *db_;
 };
 
 class DbImpl : public leveldb::DB {
+friend class SnapshotImpl;
 public:
   DbImpl(WT_CONNECTION *conn) :
     DB(), conn_(conn), context_(new ThreadLocal<OperationContext>) {}
@@ -365,12 +372,13 @@ private:
     return (ctx);
   }
 
-  WT_SESSION *getSession() { return getContext()->getSession(); }
-  WT_CURSOR *getCursor() { return getContext()->getCursor(); }
-
   // No copying allowed
   DbImpl(const DbImpl&);
   void operator=(const DbImpl&);
+
+protected:
+  WT_SESSION *getSession() { return getContext()->getSession(); }
+  WT_CURSOR *getCursor() { return getContext()->getCursor(); }
 };
 
 Status
@@ -600,7 +608,14 @@ DbImpl::NewIterator(const ReadOptions& options)
 const Snapshot *
 DbImpl::GetSnapshot()
 {
-  return new SnapshotImpl(this);
+  SnapshotImpl *snapshot = new SnapshotImpl(this);
+  Status status = snapshot->setupTransaction();
+  if (!status.ok()) {
+    delete snapshot;
+    // TODO: Flag an error here?
+    return NULL;
+  }
+  return snapshot;
 }
 
 // Release a previously acquired snapshot.  The caller must not
@@ -608,7 +623,12 @@ DbImpl::GetSnapshot()
 void
 DbImpl::ReleaseSnapshot(const Snapshot* snapshot)
 {
-  delete (SnapshotImpl *)snapshot;
+  SnapshotImpl *si =
+    static_cast<SnapshotImpl *>(const_cast<Snapshot *>(snapshot));
+  if (si != NULL) {
+    si->releaseTransaction();
+    delete si;
+  }
 }
 
 // DB implementations can export properties about their state
@@ -863,4 +883,21 @@ IteratorImpl::Prev()
   }
   value_ = Slice((const char *)item.data, item.size);
   valid_ = true;
+}
+
+// Implementation for WiredTiger specific read snapshot
+Status SnapshotImpl::setupTransaction()
+{
+  WT_SESSION * session = db_->getSession();
+  session->begin_transaction(session, NULL);
+  return Status::OK();
+}
+
+Status SnapshotImpl::releaseTransaction()
+{
+  WT_SESSION * session = db_->getSession();
+  // In LevelDB Snapshots are read only objects - roll back the transaction,
+  // it has a slightly lower cost.
+  session->rollback_transaction(session, NULL);
+  return Status::OK();
 }
