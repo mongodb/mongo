@@ -889,8 +889,8 @@ IteratorImpl::Prev()
 Status SnapshotImpl::setupTransaction()
 {
   WT_SESSION * session = db_->getSession();
-  session->begin_transaction(session, NULL);
-  return Status::OK();
+  int ret = session->begin_transaction(session, NULL);
+  return WiredTigerErrorToStatus(ret, NULL);
 }
 
 Status SnapshotImpl::releaseTransaction()
@@ -898,6 +898,7 @@ Status SnapshotImpl::releaseTransaction()
   WT_SESSION * session = db_->getSession();
   // In LevelDB Snapshots are read only objects - roll back the transaction,
   // it has a slightly lower cost.
-  session->rollback_transaction(session, NULL);
-  return Status::OK();
+  int ret = session->rollback_transaction(session, NULL);
+
+  return WiredTigerErrorToStatus(ret, NULL);
 }
