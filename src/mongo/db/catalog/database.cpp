@@ -548,7 +548,9 @@ namespace mongo {
             if ( !s.isOK() )
                 return s;
 
-            deleteObjects( _indexesName, oldIndexSpec, true, false, true );
+            const BSONObj oldIndexSpecQueryObj = BSON("ns" << fromNS <<
+                                                      "name" << oldIndexSpec["name"]);
+            deleteObjects( _indexesName, oldIndexSpecQueryObj, true, false, true );
         }
 
         Top::global.collectionDropped( fromNS.toString() );
