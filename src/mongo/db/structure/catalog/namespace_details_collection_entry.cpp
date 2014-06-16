@@ -40,7 +40,7 @@ namespace mongo {
     NamespaceDetailsCollectionCatalogEntry::NamespaceDetailsCollectionCatalogEntry( const StringData& ns,
                                                                                     NamespaceDetails* details,
                                                                                     RecordStore* indexRecordStore,
-                                                                                    MMAP1DatabaseCatalogEntry* db )
+                                                                                    MMAPV1DatabaseCatalogEntry* db )
         : CollectionCatalogEntry( ns ),
           _details( details ),
           _indexRecordStore( indexRecordStore ),

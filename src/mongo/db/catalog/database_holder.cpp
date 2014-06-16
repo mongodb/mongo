@@ -106,7 +106,7 @@ namespace mongo {
         Database *db = new Database(txn,
                                     dbname,
                                     justCreated,
-                                    new MMAP1DatabaseCatalogEntry(txn,
+                                    new MMAPV1DatabaseCatalogEntry(txn,
                                                                   dbname,
                                                                   path,
                                                                   storageGlobalParams.directoryperdb));

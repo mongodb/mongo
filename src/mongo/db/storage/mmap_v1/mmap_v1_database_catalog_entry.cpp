@@ -52,7 +52,7 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(newCollectionsUsePowerOf2Sizes, bool, true);
 
-    MMAP1DatabaseCatalogEntry::MMAP1DatabaseCatalogEntry( OperationContext* txn,
+    MMAPV1DatabaseCatalogEntry::MMAPV1DatabaseCatalogEntry( OperationContext* txn,
                                                           const StringData& name,
                                                           const StringData& path,
                                                           bool directoryPerDB )
@@ -104,10 +104,10 @@ namespace mongo {
 
     }
 
-    MMAP1DatabaseCatalogEntry::~MMAP1DatabaseCatalogEntry() {
+    MMAPV1DatabaseCatalogEntry::~MMAPV1DatabaseCatalogEntry() {
     }
 
-    Status MMAP1DatabaseCatalogEntry::dropCollection( OperationContext* txn, const StringData& ns ) {
+    Status MMAPV1DatabaseCatalogEntry::dropCollection( OperationContext* txn, const StringData& ns ) {
         invariant( txn->lockState()->isWriteLocked( ns ) );
 
         NamespaceDetails* details = _namespaceIndex.details( ns );
@@ -135,7 +135,7 @@ namespace mongo {
     }
 
 
-    Status MMAP1DatabaseCatalogEntry::renameCollection( OperationContext* txn,
+    Status MMAPV1DatabaseCatalogEntry::renameCollection( OperationContext* txn,
                                                         const StringData& fromNS,
                                                         const StringData& toNS,
                                                         bool stayTemp ) {
@@ -206,7 +206,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status MMAP1DatabaseCatalogEntry::_renameSingleNamespace( OperationContext* txn,
+    Status MMAPV1DatabaseCatalogEntry::_renameSingleNamespace( OperationContext* txn,
                                                               const StringData& fromNS,
                                                               const StringData& toNS,
                                                               bool stayTemp ) {
@@ -290,7 +290,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void MMAP1DatabaseCatalogEntry::appendExtraStats( OperationContext* opCtx,
+    void MMAPV1DatabaseCatalogEntry::appendExtraStats( OperationContext* opCtx,
                                                       BSONObjBuilder* output,
                                                       double scale ) const {
         if ( isEmpty() ) {
@@ -326,7 +326,7 @@ namespace mongo {
 
     }
 
-    bool MMAP1DatabaseCatalogEntry::isOlderThan24( OperationContext* opCtx ) const {
+    bool MMAPV1DatabaseCatalogEntry::isOlderThan24( OperationContext* opCtx ) const {
         if ( _extentManager.numFiles() == 0 )
             return false;
 
@@ -340,7 +340,7 @@ namespace mongo {
         return minor == PDFILE_VERSION_MINOR_22_AND_OLDER;
     }
 
-    void MMAP1DatabaseCatalogEntry::markIndexSafe24AndUp( OperationContext* opCtx ) {
+    void MMAPV1DatabaseCatalogEntry::markIndexSafe24AndUp( OperationContext* opCtx ) {
         if ( _extentManager.numFiles() == 0 )
             return;
 
@@ -361,18 +361,18 @@ namespace mongo {
             PDFILE_VERSION_MINOR_24_AND_NEWER;
     }
 
-    bool MMAP1DatabaseCatalogEntry::currentFilesCompatible( OperationContext* opCtx ) const {
+    bool MMAPV1DatabaseCatalogEntry::currentFilesCompatible( OperationContext* opCtx ) const {
         if ( _extentManager.numFiles() == 0 )
             return true;
 
         return _extentManager.getOpenFile( 0 )->getHeader()->isCurrentVersion();
     }
 
-    void MMAP1DatabaseCatalogEntry::getCollectionNamespaces( std::list<std::string>* tofill ) const {
+    void MMAPV1DatabaseCatalogEntry::getCollectionNamespaces( std::list<std::string>* tofill ) const {
         _namespaceIndex.getCollectionNamespaces( tofill );
     }
 
-    void MMAP1DatabaseCatalogEntry::_checkDuplicateUncasedNames() const {
+    void MMAPV1DatabaseCatalogEntry::_checkDuplicateUncasedNames() const {
         string duplicate = Database::duplicateUncasedName(name(), _path);
         if ( !duplicate.empty() ) {
             stringstream ss;
@@ -392,7 +392,7 @@ namespace mongo {
         }
     }
 
-    Status MMAP1DatabaseCatalogEntry::createCollection( OperationContext* txn,
+    Status MMAPV1DatabaseCatalogEntry::createCollection( OperationContext* txn,
                                                         const StringData& ns,
                                                         const CollectionOptions& options,
                                                         bool allocateDefaultSpace ) {
@@ -460,7 +460,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    CollectionCatalogEntry* MMAP1DatabaseCatalogEntry::getCollectionCatalogEntry( OperationContext* txn,
+    CollectionCatalogEntry* MMAPV1DatabaseCatalogEntry::getCollectionCatalogEntry( OperationContext* txn,
                                                                                   const StringData& ns ) {
         NamespaceDetails* details = _namespaceIndex.details( ns );
         if ( !details ) {
@@ -473,12 +473,12 @@ namespace mongo {
                                                            this );
     }
 
-    RecordStore* MMAP1DatabaseCatalogEntry::getRecordStore( OperationContext* txn,
+    RecordStore* MMAPV1DatabaseCatalogEntry::getRecordStore( OperationContext* txn,
                                                             const StringData& ns ) {
         return _getRecordStore( txn, ns );
     }
 
-    RecordStoreV1Base* MMAP1DatabaseCatalogEntry::_getRecordStore( OperationContext* txn,
+    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getRecordStore( OperationContext* txn,
                                                                    const StringData& ns ) {
 
         // XXX TODO - CACHE
@@ -509,7 +509,7 @@ namespace mongo {
                                         nss.coll() == "system.indexes" );
     }
 
-    IndexAccessMethod* MMAP1DatabaseCatalogEntry::getIndex( OperationContext* txn,
+    IndexAccessMethod* MMAPV1DatabaseCatalogEntry::getIndex( OperationContext* txn,
                                                             const CollectionCatalogEntry* collection,
                                                             IndexCatalogEntry* entry ) {
         const string& type = entry->descriptor()->getAccessMethodName();
@@ -549,7 +549,7 @@ namespace mongo {
         fassertFailed(17489);
     }
 
-    RecordStoreV1Base* MMAP1DatabaseCatalogEntry::_getIndexRecordStore( OperationContext* txn ) {
+    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getIndexRecordStore( OperationContext* txn ) {
         NamespaceString nss( name(), "system.indexes" );
         RecordStoreV1Base* rs = _getRecordStore( txn, nss.ns() );
         if ( rs != NULL )
@@ -562,7 +562,7 @@ namespace mongo {
         return rs;
     }
 
-    RecordStoreV1Base* MMAP1DatabaseCatalogEntry::_getNamespaceRecordStore( OperationContext* txn,
+    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getNamespaceRecordStore( OperationContext* txn,
                                                                             const StringData& whosAsking) {
         NamespaceString nss( name(), "system.namespaces" );
         if ( nss == whosAsking )
@@ -579,7 +579,7 @@ namespace mongo {
 
     }
 
-    void MMAP1DatabaseCatalogEntry::_addNamespaceToNamespaceCollection( OperationContext* txn,
+    void MMAPV1DatabaseCatalogEntry::_addNamespaceToNamespaceCollection( OperationContext* txn,
                                                                         const StringData& ns,
                                                                         const BSONObj* options ) {
         if ( nsToCollectionSubstring( ns ) == "system.namespaces" ) {
@@ -599,7 +599,7 @@ namespace mongo {
         massertStatusOK( loc.getStatus() );
     }
 
-    void MMAP1DatabaseCatalogEntry::_removeNamespaceFromNamespaceCollection( OperationContext* txn,
+    void MMAPV1DatabaseCatalogEntry::_removeNamespaceFromNamespaceCollection( OperationContext* txn,
                                                                              const StringData& ns ) {
         if ( nsToCollectionSubstring( ns ) == "system.namespaces" ) {
             // system.namespaces holds all the others, so it is not explicitly listed in the catalog.

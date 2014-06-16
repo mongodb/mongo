@@ -39,7 +39,7 @@ namespace mongo {
 
     class NamespaceDetails;
 
-    class MMAP1DatabaseCatalogEntry;;
+    class MMAPV1DatabaseCatalogEntry;;
     class RecordStore;
     class OperationContext;
 
@@ -48,7 +48,7 @@ namespace mongo {
         NamespaceDetailsCollectionCatalogEntry( const StringData& ns,
                                                 NamespaceDetails* details,
                                                 RecordStore* indexRecordStore,
-                                                MMAP1DatabaseCatalogEntry* db );
+                                                MMAPV1DatabaseCatalogEntry* db );
 
         virtual ~NamespaceDetailsCollectionCatalogEntry(){}
 
@@ -100,8 +100,8 @@ namespace mongo {
     private:
         NamespaceDetails* _details;
         RecordStore* _indexRecordStore;
-        MMAP1DatabaseCatalogEntry* _db;
+        MMAPV1DatabaseCatalogEntry* _db;
 
-        friend class MMAP1DatabaseCatalogEntry;
+        friend class MMAPV1DatabaseCatalogEntry;
     };
 }

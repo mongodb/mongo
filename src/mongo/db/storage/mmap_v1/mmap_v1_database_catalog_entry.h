@@ -47,14 +47,14 @@ namespace mongo {
     class RecordStoreV1Base;
     class OperationContext;
 
-    class MMAP1DatabaseCatalogEntry : public DatabaseCatalogEntry {
+    class MMAPV1DatabaseCatalogEntry : public DatabaseCatalogEntry {
     public:
-        MMAP1DatabaseCatalogEntry( OperationContext* txn,
+        MMAPV1DatabaseCatalogEntry( OperationContext* txn,
                                    const StringData& name,
                                    const StringData& path,
                                    bool directoryperdb );
 
-        virtual ~MMAP1DatabaseCatalogEntry();
+        virtual ~MMAPV1DatabaseCatalogEntry();
 
         // these two seem the same and yet different
         // TODO(ERH): consolidate into one ideally

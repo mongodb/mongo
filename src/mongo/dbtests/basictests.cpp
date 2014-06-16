@@ -385,7 +385,7 @@ namespace BasicTests {
             // this leaks as ~Database is private
             // if that changes, should put this on the stack
             {
-                MMAP1DatabaseCatalogEntry* temp = new MMAP1DatabaseCatalogEntry(&txn,
+                MMAPV1DatabaseCatalogEntry* temp = new MMAPV1DatabaseCatalogEntry(&txn,
                                                                                 "dbtests_basictests_ownsns",
                                                                                 storageGlobalParams.dbpath,
                                                                                 storageGlobalParams.directoryperdb);
