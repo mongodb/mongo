@@ -94,7 +94,6 @@ namespace mongo {
         static BSONObj coverAsBSON(const std::vector<S2CellId> &cover, const std::string& field,
                                    const int coarsestIndexedLevel);
         static void setCoverLimitsBasedOnArea(double area, S2RegionCoverer *coverer, int coarsestIndexedLevel);
-        static bool distanceBetween(const S2Point& us, const BSONObj& them, double *out);
     };
 
 }  // namespace mongo

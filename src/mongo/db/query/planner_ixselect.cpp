@@ -30,7 +30,6 @@
 
 #include <vector>
 
-#include "mongo/db/geo/core.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_array.h"

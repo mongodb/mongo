@@ -60,11 +60,11 @@ namespace mongo {
     TEST(ExpressionGeoTest, GeoNear1) {
         BSONObj query = fromjson("{loc:{$near:{$maxDistance:100, "
                                  "$geometry:{type:\"Point\", coordinates:[0,0]}}}}");
-        NearQuery nq;
-        ASSERT_OK(nq.parseFrom(query["loc"].Obj()));
+        auto_ptr<NearQuery> nq(new NearQuery);
+        ASSERT_OK(nq->parseFrom(query["loc"].Obj()));
 
         GeoNearMatchExpression gne;
-        ASSERT(gne.init("a", nq, query).isOK());
+        ASSERT(gne.init("a", nq.release(), query).isOK());
 
         // We can't match the data but we can make sure it was parsed OK.
         ASSERT_EQUALS(gne.getData().centroid.crs, SPHERE);

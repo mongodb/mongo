@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "third_party/s2/s2regioncoverer.h"
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/geoquery.h"
@@ -48,6 +50,24 @@ namespace mongo {
             BSONObjBuilder bob;
             bob.append("", BSONElementHasher::hash64(value, BSONElementHasher::DEFAULT_HASH_SEED));
             return bob.obj();
+        }
+
+        // For debugging only
+        static std::string toCoveringString(const GeoHashConverter& hashConverter,
+                                            const set<GeoHash>& covering) {
+            string result = "[";
+            for (set<GeoHash>::const_iterator it = covering.begin(); it != covering.end();
+                ++it) {
+
+                if (it != covering.begin()) result += ", ";
+
+                const GeoHash& geoHash = *it;
+
+                result += hashConverter.unhashToBox(geoHash).toString();
+                result += " (" + geoHash.toStringHex1() + ")";
+            }
+
+            return result + "]";
         }
 
         static void cover2d(const R2Region& region,

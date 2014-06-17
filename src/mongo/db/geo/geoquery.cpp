@@ -29,6 +29,7 @@
 #include "mongo/db/geo/geoquery.h"
 
 #include "mongo/db/geo/geoconstants.h"
+#include "mongo/db/geo/s2common.h"
 
 namespace mongo {
 
@@ -40,6 +41,7 @@ namespace mongo {
         // First, try legacy near, e.g.:
         // t.find({ loc : { $nearSphere: [0,0], $minDistance: 1, $maxDistance: 3 }})
         // t.find({ loc : { $nearSphere: [0,0] }})
+        // t.find({ loc : { $near : [0, 0, 1] } });
         // t.find({ loc : { $near: { someGeoJSONPoint}})
         // t.find({ loc : { $geoNear: { someGeoJSONPoint}})
         BSONObjIterator it(obj);
@@ -342,13 +344,11 @@ namespace mongo {
     bool GeometryContainer::R2BoxRegion::fastContains(const Box& other) const {
 
         // TODO: Add more cases here to make coverings better
-
         if (_geometry->_box && FLAT == _geometry->_box->crs) {
             const Box& box = _geometry->_box->box;
-            return box.contains(other);
-        }
-
-        if ( _geometry->_cap && FLAT == _geometry->_cap->crs ) {
+            if (box.contains(other))
+                return true;
+        } else if (_geometry->_cap && FLAT == _geometry->_cap->crs) {
             const Circle& circle = _geometry->_cap->circle;
             // Exact test
             return circleContainsBox(circle, other);
@@ -368,18 +368,6 @@ namespace mongo {
 
         if (!_bounds.intersects(other))
             return true;
-
-        if (_geometry->_cap && FLAT == _geometry->_cap->crs) {
-            const Circle& circle = _geometry->_cap->circle;
-            // Exact test
-            return !circleIntersectsWithBox(circle, other);
-        }
-
-        if (_geometry->_polygon && FLAT == _geometry->_polygon->crs) {
-            const Polygon& polygon = _geometry->_polygon->oldPolygon;
-            // Exact test
-            return !polygonIntersectsWithBox(polygon, other);
-        }
 
         // Not sure
         return false;
@@ -1025,7 +1013,7 @@ namespace mongo {
             // We can't really pass these things around willy-nilly except by ptr.
             _polygon.reset(new PolygonWithCRS());
             if (!GeoParser::parsePolygon(obj, _polygon.get())) { return false; }
-        } else if (GeoParser::isPoint(obj)) {
+        } else if (GeoParser::isIndexablePoint(obj)) {
             _point.reset(new PointWithCRS());
             if (!GeoParser::parsePoint(obj, _point.get())) { return false; }
         } else if (GeoParser::isLine(obj)) {
@@ -1135,6 +1123,211 @@ namespace mongo {
         else {
             invariant(false);
             return FLAT;
+        }
+    }
+
+    bool GeometryContainer::supportsProject(CRS otherCRS) const {
+
+        // TODO: Fix geometry collection reporting when/if we support more CRSes
+
+        if (NULL != _point) {
+            if (_point->crs == otherCRS) return true;
+            // SPHERE can always go FLAT, but FLAT may not always go back to SPHERE
+            return _point->crs == SPHERE || _point->flatUpgradedToSphere;
+        }
+        else if (NULL != _line) { return _line->crs == otherCRS; }
+        else if (NULL != _box) { return _box->crs == otherCRS; }
+        else if (NULL != _polygon) { return _polygon->crs == otherCRS; }
+        else if (NULL != _cap ) { return _cap->crs == otherCRS; }
+        else if (NULL != _multiPoint) { return _multiPoint->crs == otherCRS; }
+        else if (NULL != _multiLine) { return _multiLine->crs == otherCRS; }
+        else if (NULL != _multiPolygon) { return _multiPolygon->crs == otherCRS; }
+        else if (NULL != _geometryCollection) { return SPHERE == otherCRS; }
+        else {
+            invariant(false);
+            return false;
+        }
+    }
+
+    void GeometryContainer::projectInto(CRS otherCRS) {
+
+        if (otherCRS == getNativeCRS())
+            return;
+
+        invariant(NULL != _point);
+
+        if (FLAT == _point->crs) {
+            invariant(_point->flatUpgradedToSphere);
+            _point->crs = SPHERE;
+        }
+        else {
+            invariant(FLAT == otherCRS);
+            S2LatLng latLng(_point->point);
+            _point->oldPoint = Point(latLng.lng().degrees(), latLng.lat().degrees());
+            _point->flatUpgradedToSphere = true;
+            _point->crs = FLAT;
+        }
+    }
+
+    static double s2MinDistanceRad(const S2Point& s2Point, const MultiPointWithCRS& s2MultiPoint) {
+
+        double minDistance = -1;
+        for (vector<S2Point>::const_iterator it = s2MultiPoint.points.begin();
+            it != s2MultiPoint.points.end(); ++it) {
+
+            double nextDistance = S2Distance::distanceRad(s2Point, *it);
+            if (minDistance < 0 || nextDistance < minDistance) {
+                minDistance = nextDistance;
+            }
+        }
+
+        return minDistance;
+    }
+
+    static double s2MinDistanceRad(const S2Point& s2Point, const MultiLineWithCRS& s2MultiLine) {
+
+        double minDistance = -1;
+        for (vector<S2Polyline*>::const_iterator it = s2MultiLine.lines.vector().begin();
+            it != s2MultiLine.lines.vector().end(); ++it) {
+
+            double nextDistance = S2Distance::minDistanceRad(s2Point, **it);
+            if (minDistance < 0 || nextDistance < minDistance) {
+                minDistance = nextDistance;
+            }
+        }
+
+        return minDistance;
+    }
+
+    static double s2MinDistanceRad(const S2Point& s2Point, const MultiPolygonWithCRS& s2MultiPolygon) {
+
+        double minDistance = -1;
+        for (vector<S2Polygon*>::const_iterator it = s2MultiPolygon.polygons.vector().begin();
+            it != s2MultiPolygon.polygons.vector().end(); ++it) {
+
+            double nextDistance = S2Distance::minDistanceRad(s2Point, **it);
+            if (minDistance < 0 || nextDistance < minDistance) {
+                minDistance = nextDistance;
+            }
+        }
+
+        return minDistance;
+    }
+
+    static double s2MinDistanceRad(const S2Point& s2Point,
+                                   const GeometryCollection& geometryCollection) {
+
+        double minDistance = -1;
+        for (vector<PointWithCRS>::const_iterator it = geometryCollection.points.begin();
+            it != geometryCollection.points.end(); ++it) {
+
+            invariant(SPHERE == it->crs);
+            double nextDistance = S2Distance::distanceRad(s2Point, it->point);
+            if (minDistance < 0 || nextDistance < minDistance) {
+                minDistance = nextDistance;
+            }
+        }
+
+        for (vector<LineWithCRS*>::const_iterator it = geometryCollection.lines.vector().begin();
+            it != geometryCollection.lines.vector().end(); ++it) {
+
+            invariant(SPHERE == (*it)->crs);
+            double nextDistance = S2Distance::minDistanceRad(s2Point, (*it)->line);
+            if (minDistance < 0 || nextDistance < minDistance) {
+                minDistance = nextDistance;
+            }
+        }
+
+        for (vector<PolygonWithCRS*>::const_iterator it = geometryCollection.polygons.vector().begin();
+            it != geometryCollection.polygons.vector().end(); ++it) {
+
+            invariant(SPHERE == (*it)->crs);
+            double nextDistance = S2Distance::minDistanceRad(s2Point, (*it)->polygon);
+            if (minDistance < 0 || nextDistance < minDistance) {
+                minDistance = nextDistance;
+            }
+        }
+
+        for (vector<MultiPointWithCRS*>::const_iterator it = geometryCollection.multiPoints.vector()
+            .begin(); it != geometryCollection.multiPoints.vector().end(); ++it) {
+
+            double nextDistance = s2MinDistanceRad(s2Point, **it);
+            if (minDistance < 0 || nextDistance < minDistance) {
+                minDistance = nextDistance;
+            }
+        }
+
+        for (vector<MultiLineWithCRS*>::const_iterator it = geometryCollection.multiLines.vector()
+            .begin(); it != geometryCollection.multiLines.vector().end(); ++it) {
+
+            double nextDistance = s2MinDistanceRad(s2Point, **it);
+            if (minDistance < 0 || nextDistance < minDistance) {
+                minDistance = nextDistance;
+            }
+        }
+
+        for (vector<MultiPolygonWithCRS*>::const_iterator it = geometryCollection.multiPolygons
+            .vector().begin(); it != geometryCollection.multiPolygons.vector().end(); ++it) {
+
+            double nextDistance = s2MinDistanceRad(s2Point, **it);
+            if (minDistance < 0 || nextDistance < minDistance) {
+                minDistance = nextDistance;
+            }
+        }
+
+        return minDistance;
+    }
+
+    double GeometryContainer::minDistance(const PointWithCRS& otherPoint) const {
+
+        const CRS crs = getNativeCRS();
+
+        if (FLAT == crs) {
+
+            invariant(NULL != _point);
+
+            if (FLAT == otherPoint.crs) {
+                return distance(_point->oldPoint, otherPoint.oldPoint);
+            }
+            else {
+                S2LatLng latLng(otherPoint.point);
+                return distance(_point->oldPoint,
+                                Point(latLng.lng().degrees(), latLng.lat().degrees()));
+            }
+        }
+        else {
+            invariant(SPHERE == crs);
+            invariant(FLAT != otherPoint.crs || otherPoint.flatUpgradedToSphere);
+
+            double minDistance = -1;
+
+            if (NULL != _point) {
+                minDistance = S2Distance::distanceRad(otherPoint.point, _point->point);
+            }
+            else if (NULL != _line) {
+                minDistance = S2Distance::minDistanceRad(otherPoint.point, _line->line);
+            }
+            else if (NULL != _polygon) {
+                minDistance = S2Distance::minDistanceRad(otherPoint.point, _polygon->polygon);
+            }
+            else if (NULL != _cap) {
+                minDistance = S2Distance::minDistanceRad(otherPoint.point, _cap->cap);
+            }
+            else if (NULL != _multiPoint) {
+                minDistance = s2MinDistanceRad(otherPoint.point, *_multiPoint);
+            }
+            else if (NULL != _multiLine) {
+                minDistance = s2MinDistanceRad(otherPoint.point, *_multiLine);
+            }
+            else if (NULL != _multiPolygon) {
+                minDistance = s2MinDistanceRad(otherPoint.point, *_multiPolygon);
+            }
+            else if (NULL != _geometryCollection) {
+                minDistance = s2MinDistanceRad(otherPoint.point, *_geometryCollection);
+            }
+
+            invariant(minDistance != -1);
+            return minDistance * kRadiusOfEarthInMeters;
         }
     }
 

@@ -564,7 +564,7 @@ namespace mongo {
 
     // This is a standalone stage.
     struct GeoNear2DNode : public QuerySolutionNode {
-        GeoNear2DNode() : numWanted(100), addPointMeta(false), addDistMeta(false) { }
+        GeoNear2DNode() : numToReturn(0), addPointMeta(false), addDistMeta(false) { }
         virtual ~GeoNear2DNode() { }
 
         virtual StageType getType() const { return STAGE_GEO_NEAR_2D; }
@@ -580,7 +580,15 @@ namespace mongo {
         BSONObjSet _sorts;
 
         NearQuery nq;
-        int numWanted;
+        IndexBounds baseBounds;
+
+        // TODO: Remove both of these
+        int numToReturn;
+        // A full match expression for the query with geoNear removed is currently needed -
+        // since 2D geoNear has a default limit not set in the query, we must limit ourselves and
+        // so generate only valid results.
+        scoped_ptr<MatchExpression> fullFilterExcludingNear;
+
         BSONObj indexKeyPattern;
         bool addPointMeta;
         bool addDistMeta;

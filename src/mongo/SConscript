@@ -643,7 +643,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/structure/catalog/index_details.cpp",
                     "db/index_builder.cpp",
                     "db/index_rebuilder.cpp",
-                    "db/commands/geonear.cpp",
+                    "db/commands/geo_near_cmd.cpp",
                     "db/geo/haystack.cpp",
                     "db/geo/s2common.cpp",
                     "db/ops/delete.cpp",
@@ -846,7 +846,9 @@ if has_option( 'use-cpu-profiler' ):
 env.Library("defaultversion", "s/default_version.cpp")
 
 # Geo
-env.Library("geometry", [ "db/geo/hash.cpp", "db/geo/shapes.cpp", ], LIBDEPS = [ "bson" ])
+env.Library("geometry", [ "db/geo/hash.cpp", "db/geo/shapes.cpp", ], 
+            LIBDEPS = [ "bson",
+                        "$BUILD_DIR/third_party/s2/s2" ])
 env.Library("geoparser", [ "db/geo/geoparser.cpp", ],
             LIBDEPS = [ "bson",
                         "geometry",

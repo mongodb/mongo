@@ -102,10 +102,6 @@ namespace {
             const IndexScanStats* spec = static_cast<const IndexScanStats*>(specific);
             return spec->keysExamined;
         }
-        else if (STAGE_GEO_NEAR_2D == type) {
-            const TwoDNearStats* spec = static_cast<const TwoDNearStats*>(specific);
-            return spec->nscanned;
-        }
         else if (STAGE_IDHACK == type) {
             const IDHackStats* spec = static_cast<const IDHackStats*>(specific);
             return spec->keysExamined;
@@ -132,11 +128,7 @@ namespace {
      * (in which case this gets called from Explain::getSummaryStats()).
      */
     size_t getDocsExamined(StageType type, const SpecificStats* specific) {
-        if (STAGE_GEO_NEAR_2D == type) {
-            const TwoDNearStats* spec = static_cast<const TwoDNearStats*>(specific);
-            return spec->objectsLoaded;
-        }
-        else if (STAGE_IDHACK == type) {
+        if (STAGE_IDHACK == type) {
             const IDHackStats* spec = static_cast<const IDHackStats*>(specific);
             return spec->docsExamined;
         }
@@ -175,11 +167,11 @@ namespace {
             ss << " " << spec->keyPattern;
         }
         else if (STAGE_GEO_NEAR_2D == stage->stageType()) {
-            const TwoDNearStats* spec = static_cast<const TwoDNearStats*>(specific);
+            const NearStats* spec = static_cast<const NearStats*>(specific);
             ss << " " << spec->keyPattern;
         }
         else if (STAGE_GEO_NEAR_2DSPHERE == stage->stageType()) {
-            const S2NearStats* spec = static_cast<const S2NearStats*>(specific);
+            const NearStats* spec = static_cast<const NearStats*>(specific);
             ss << " " << spec->keyPattern;
         }
         else if (STAGE_IXSCAN == stage->stageType()) {
@@ -253,16 +245,6 @@ namespace mongo {
             if (verbosity >= Explain::EXEC_STATS) {
                 bob->appendNumber("docsExamined", spec->docsExamined);
             }
-        }
-        else if (STAGE_GEO_NEAR_2D == stats.stageType) {
-            TwoDNearStats* spec = static_cast<TwoDNearStats*>(stats.specific.get());
-
-            if (verbosity >= Explain::EXEC_STATS) {
-                bob->appendNumber("keysExamined", spec->nscanned);
-                bob->appendNumber("docsExamined", spec->objectsLoaded);
-            }
-
-            bob->append("keyPattern", spec->keyPattern);
         }
         else if (STAGE_IDHACK == stats.stageType) {
             IDHackStats* spec = static_cast<IDHackStats*>(stats.specific.get());
@@ -381,6 +363,7 @@ namespace mongo {
         size_t totalKeysExamined = 0;
         size_t totalDocsExamined = 0;
         for (size_t i = 0; i < statsNodes.size(); ++i) {
+            
             totalKeysExamined += getKeysExamined(statsNodes[i]->stageType,
                                                  statsNodes[i]->specific.get());
             totalDocsExamined += getDocsExamined(statsNodes[i]->stageType,

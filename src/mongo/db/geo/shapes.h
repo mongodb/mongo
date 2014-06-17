@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,10 @@
 #include "third_party/s2/s2polygon.h"
 #include "third_party/s2/s2polyline.h"
 
+#ifndef M_PI
+#  define M_PI 3.14159265358979323846
+#endif
+
 namespace mongo {
 
     struct Point;
@@ -47,12 +52,17 @@ namespace mongo {
     class Box;
     class Polygon;
 
-    double distance(const Point& p1, const Point &p2);
-    double distanceCompare(const Point &p1, const Point &p2, double radius);
-    bool distanceWithin(const Point &p1, const Point &p2, double radius);
+    inline double deg2rad(const double deg) { return deg * (M_PI / 180.0); }
+
+    inline double rad2deg(const double rad) { return rad * (180.0 / M_PI); }
+
+    inline double computeXScanDistance(double y, double maxDistDegrees) {
+        // TODO: this overestimates for large maxDistDegrees far from the equator
+        return maxDistDegrees / std::min(cos(deg2rad(std::min(+89.0, y + maxDistDegrees))),
+                                         cos(deg2rad(std::max(-89.0, y - maxDistDegrees))));
+    }
+
     void checkEarthBounds(const Point &p);
-    double spheredist_rad(const Point& p1, const Point& p2);
-    double spheredist_deg(const Point& p1, const Point& p2);
     bool linesIntersect(const Point& pA, const Point& pB, const Point& pC, const Point& pD);
     bool circleContainsBox(const Circle& circle, const Box& box);
     bool circleInteriorContainsBox(const Circle& circle, const Box& box);
@@ -61,6 +71,30 @@ namespace mongo {
     bool edgesIntersectsWithBox(const vector<Point>& vertices, const Box& box);
     bool polygonContainsBox(const Polygon& polygon, const Box& box);
     bool polygonIntersectsWithBox(const Polygon& polygon, const Box& box);
+
+    /**
+     * Distance utilities for R2 geometries
+     */
+    double distance(const Point& p1, const Point &p2);
+    bool distanceWithin(const Point &p1, const Point &p2, double radius);
+    double distanceCompare(const Point &p1, const Point &p2, double radius);
+    // Still needed for non-wrapping $nearSphere
+    double spheredist_rad(const Point& p1, const Point& p2);
+    double spheredist_deg(const Point& p1, const Point& p2);
+
+
+
+    /**
+     * Distance utilities for S2 geometries
+     */
+    struct S2Distance {
+
+        static double distanceRad(const S2Point& pointA, const S2Point& pointB);
+        static double minDistanceRad(const S2Point& point, const S2Polyline& line);
+        static double minDistanceRad(const S2Point& point, const S2Polygon& polygon);
+        static double minDistanceRad(const S2Point& point, const S2Cap& cap);
+
+    };
 
     struct Point {
         Point();
@@ -203,6 +237,8 @@ namespace mongo {
         bool fastContains(const Box& other) const;
         bool fastDisjoint(const Box& other) const;
 
+        // For debugging
+        std::string toString() const;
 
     private:
 

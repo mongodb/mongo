@@ -28,7 +28,6 @@
 
 #include "mongo/db/query/explain_plan.h"
 
-#include "mongo/db/exec/2dcommon.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/type_explain.h"
 #include "mongo/util/mongoutils/str.h"
@@ -41,6 +40,10 @@ namespace mongo {
 
         bool isOrStage(StageType stageType) {
             return stageType == STAGE_OR || stageType == STAGE_SORT_MERGE;
+        }
+
+        bool isNearStage(StageType stageType) {
+            return stageType == STAGE_GEO_NEAR_2D || stageType == STAGE_GEO_NEAR_2DSPHERE;
         }
 
         bool isIntersectPlan(const PlanStageStats& stats) {
@@ -149,6 +152,9 @@ namespace mongo {
             bool sortPresent = false;
             size_t chunkSkips = 0;
 
+
+            // XXX: TEMPORARY HACK - GEONEAR explains like OR queries (both have children) until the
+            // new explain framework makes this file go away.
             const PlanStageStats* orStage = NULL;
             const PlanStageStats* root = &stats;
             const PlanStageStats* leaf = root;
@@ -156,10 +162,10 @@ namespace mongo {
             while (leaf->children.size() > 0) {
                 // We shouldn't be here if there are any ANDs
                 if (leaf->children.size() > 1) {
-                    verify(isOrStage(leaf->stageType));
+                    verify(isOrStage(leaf->stageType) || isNearStage(leaf->stageType));
                 }
 
-                if (isOrStage(leaf->stageType)) {
+                if (isOrStage(leaf->stageType) || isNearStage(leaf->stageType)) {
                     orStage = leaf;
                     break;
                 }
@@ -223,7 +229,18 @@ namespace mongo {
                     }
                 }
                 // We set the cursor name for backwards compatibility with 2.4.
-                res->setCursor("QueryOptimizerCursor");
+                if (isOrStage(leaf->stageType)) {
+                    res->setCursor("QueryOptimizerCursor");
+                }
+                else {
+                    if (leaf->stageType == STAGE_GEO_NEAR_2D)
+                        res->setCursor("GeoSearchCursor");
+                    else
+                        res->setCursor("S2NearCursor");
+
+                    res->setIndexOnly(false);
+                    res->setIsMultiKey(false);
+                }
                 res->setNScanned(nScanned);
                 res->setNScannedObjects(nScannedObjects);
             }
@@ -234,30 +251,6 @@ namespace mongo {
                 res->setNScannedObjects(csStats->docsTested);
                 res->setIndexOnly(false);
                 res->setIsMultiKey(false);
-            }
-            else if (leaf->stageType == STAGE_GEO_NEAR_2DSPHERE) {
-                // TODO: This is kind of a lie for STAGE_GEO_NEAR_2DSPHERE.
-                res->setCursor("S2NearCursor");
-                // The first work() is an init.  Every subsequent work examines a document.
-                res->setNScanned(leaf->common.works);
-                res->setNScannedObjects(leaf->common.works);
-                // TODO: only adding empty index bounds for backwards compatibility.
-                res->setIndexBounds(BSONObj());
-                // TODO: Could be multikey.
-                res->setIsMultiKey(false);
-                res->setIndexOnly(false);
-            }
-            else if (leaf->stageType == STAGE_GEO_NEAR_2D) {
-                TwoDNearStats* nStats = static_cast<TwoDNearStats*>(leaf->specific.get());
-                res->setCursor("GeoSearchCursor");
-                // The first work() is an init.  Every subsequent work examines a document.
-                res->setNScanned(nStats->nscanned);
-                res->setNScannedObjects(nStats->objectsLoaded);
-                // TODO: only adding empty index bounds for backwards compatibility.
-                res->setIndexBounds(BSONObj());
-                // TODO: Could be multikey.
-                res->setIsMultiKey(false);
-                res->setIndexOnly(false);
             }
             else if (leaf->stageType == STAGE_TEXT) {
                 TextStats* tStats = static_cast<TextStats*>(leaf->specific.get());
@@ -480,11 +473,6 @@ namespace mongo {
             bob->appendNumber("alreadyHasObj", spec->alreadyHasObj);
             bob->appendNumber("forcedFetches", spec->forcedFetches);
             bob->appendNumber("matchTested", spec->matchTested);
-        }
-        else if (STAGE_GEO_NEAR_2D == stats.stageType) {
-            TwoDNearStats* spec = static_cast<TwoDNearStats*>(stats.specific.get());
-            bob->appendNumber("objectsLoaded", spec->objectsLoaded);
-            bob->appendNumber("nscanned", spec->nscanned);
         }
         else if (STAGE_IXSCAN == stats.stageType) {
             IndexScanStats* spec = static_cast<IndexScanStats*>(stats.specific.get());

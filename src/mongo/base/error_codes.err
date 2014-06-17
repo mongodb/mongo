@@ -96,7 +96,7 @@ error_code("InvalidReplicaSetConfig", 93)
 error_code("NotYetInitialized", 94)
 error_code("NotSecondary", 95)
 error_code("OperationFailed", 96)
-
+error_code("NoProjectionFound", 97)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h

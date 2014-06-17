@@ -29,20 +29,19 @@
 #include "mongo/db/query/stage_builder.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/exec/2dnear.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/count.h"
 #include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/fetch.h"
+#include "mongo/db/exec/geo_near.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/keep_mutations.h"
 #include "mongo/db/exec/limit.h"
 #include "mongo/db/exec/merge_sort.h"
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/projection.h"
-#include "mongo/db/exec/s2near.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/skip.h"
@@ -191,27 +190,51 @@ namespace mongo {
         }
         else if (STAGE_GEO_NEAR_2D == root->getType()) {
             const GeoNear2DNode* node = static_cast<const GeoNear2DNode*>(root);
-            TwoDNearParams params;
-            params.nearQuery = node->nq;
-            params.collection = collection;
-            params.indexKeyPattern = node->indexKeyPattern;
-            params.filter = node->filter.get();
-            params.numWanted = node->numWanted;
-            params.addPointMeta = node->addPointMeta;
-            params.addDistMeta = node->addDistMeta;
-            return new TwoDNear(txn, params, ws);
-        }
-        else if (STAGE_GEO_NEAR_2DSPHERE == root->getType()) {
-            const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(root);
-            S2NearParams params;
-            params.collection = collection;
-            params.indexKeyPattern = node->indexKeyPattern;
+
+            GeoNearParams params;
             params.nearQuery = node->nq;
             params.baseBounds = node->baseBounds;
             params.filter = node->filter.get();
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
-            return new S2NearStage(txn, params, ws);
+
+            IndexDescriptor* twoDIndex = collection->getIndexCatalog()->findIndexByKeyPattern(node
+                ->indexKeyPattern);
+
+            if (twoDIndex == NULL) {
+                warning() << "Can't find 2D index " << node->indexKeyPattern.toString()
+                          << "in namespace " << collection->ns() << endl;
+                return NULL;
+            }
+
+            int numToReturn = node->numToReturn;
+            params.fullFilter = node->fullFilterExcludingNear.get();
+
+            GeoNear2DStage* nearStage = new GeoNear2DStage(params, txn, ws, collection, twoDIndex);
+            nearStage->setLimit(numToReturn);
+
+            return nearStage;
+        }
+        else if (STAGE_GEO_NEAR_2DSPHERE == root->getType()) {
+            const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(root);
+
+            GeoNearParams params;
+            params.nearQuery = node->nq;
+            params.baseBounds = node->baseBounds;
+            params.filter = node->filter.get();
+            params.addPointMeta = node->addPointMeta;
+            params.addDistMeta = node->addDistMeta;
+
+            IndexDescriptor* s2Index = collection->getIndexCatalog()->findIndexByKeyPattern(node
+                ->indexKeyPattern);
+
+            if (s2Index == NULL) {
+                warning() << "Can't find 2DSphere index " << node->indexKeyPattern.toString()
+                          << "in namespace " << collection->ns() << endl;
+                return NULL;
+            }
+
+            return new GeoNear2DSphereStage(params, txn, ws, collection, s2Index);
         }
         else if (STAGE_TEXT == root->getType()) {
             const TextNode* node = static_cast<const TextNode*>(root);
