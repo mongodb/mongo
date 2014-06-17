@@ -5,6 +5,9 @@ be shared between threads.  Applications typically open a single
 connection to each database, per process.  Multi-threaded programs
 must wait for all other threads to exit before closing the WT_CONNECTION
 handle because that will implicitly close all other handles.
+Alternatively, a thread can set an event handler using
+WT_CONNECTION::open_session to be notified when a WT_CONNECTION close is
+in progress.
 
 WT_SESSION and WT_CURSOR methods are not thread safe and WT_SESSION and
 WT_CURSOR handles cannot be accessed concurrently by multiple threads.
