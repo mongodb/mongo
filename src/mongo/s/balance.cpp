@@ -33,6 +33,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
@@ -61,7 +62,7 @@ namespace mongo {
     }
 
     int Balancer::_moveChunks(const vector<CandidateChunkPtr>* candidateChunks,
-                              bool secondaryThrottle,
+                              const WriteConcernOptions* writeConcern,
                               bool waitForDelete)
     {
         int movedCount = 0;
@@ -98,7 +99,7 @@ namespace mongo {
                 BSONObj res;
                 if (c->moveAndCommit(Shard::make(chunkInfo.to),
                                      Chunk::MaxChunkSize,
-                                     secondaryThrottle,
+                                     writeConcern,
                                      waitForDelete,
                                      0, /* maxTimeMS */
                                      res)) {
@@ -456,9 +457,16 @@ namespace mongo {
                 // refresh chunk size (even though another balancer might be active)
                 Chunk::refreshChunkSize();
 
-                BSONObj balancerConfig;
+                SettingsType balancerConfig;
+                string errMsg;
+
+                if (!grid.getBalancerSettings(&balancerConfig, &errMsg)) {
+                    warning() << errMsg;
+                    return ;
+                }
+
                 // now make sure we should even be running
-                if ( ! grid.shouldBalance( "", &balancerConfig ) ) {
+                if (!grid.shouldBalance(balancerConfig)) {
                     LOG(1) << "skipping balancing round because balancing is disabled" << endl;
 
                     // Ping again so scripts can determine if we're active without waiting
@@ -494,20 +502,22 @@ namespace mongo {
                         continue;
                     }
 
-                    LOG(1) << "*** start balancing round" << endl;
+                    const bool waitForDelete = (balancerConfig.isWaitForDeleteSet() ?
+                            balancerConfig.getWaitForDelete() : false);
 
-                    bool waitForDelete = false;
-                    if (balancerConfig["_waitForDelete"].trueValue()) {
-                        waitForDelete = balancerConfig["_waitForDelete"].trueValue();
+                    StatusWith<WriteConcernOptions*> extractStatus =
+                            balancerConfig.extractWriteConcern();
+                    if (!extractStatus.isOK()) {
+                        warning() << extractStatus.toString();
                     }
 
-                    bool secondaryThrottle = true; // default to on
-                    if ( balancerConfig[SettingsType::secondaryThrottle()].type() ) {
-                        secondaryThrottle = balancerConfig[SettingsType::secondaryThrottle()].trueValue();
-                    }
+                    scoped_ptr<WriteConcernOptions> writeConcern(extractStatus.getValue());
 
-                    LOG(1) << "waitForDelete: " << waitForDelete << endl;
-                    LOG(1) << "secondaryThrottle: " << secondaryThrottle << endl;
+                    LOG(1) << "*** start balancing round. "
+                           << "waitForDelete: " << waitForDelete
+                           << ", secondaryThrottle: "
+                           << (writeConcern.get() ? writeConcern->toBSON().toString() : "default")
+                           << endl;
 
                     vector<CandidateChunkPtr> candidateChunks;
                     _doBalanceRound( conn.conn() , &candidateChunks );
@@ -517,7 +527,7 @@ namespace mongo {
                     }
                     else {
                         _balancedLastTime = _moveChunks(&candidateChunks,
-                                                        secondaryThrottle,
+                                                        writeConcern.get(),
                                                         waitForDelete );
                     }
 
