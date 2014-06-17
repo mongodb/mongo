@@ -259,7 +259,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_TXN_ISOLATION saved_isolation;
 	uint64_t txnid_max;
 	u_int i, j;
-	int locked;
+	int last_chunk, locked;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	lsm_tree = arg;
@@ -289,9 +289,13 @@ __wt_lsm_checkpoint_worker(void *arg)
 			 * unless we are flushing all chunks before a compact
 			 * operation.
 			 */
-			if (i == cookie.nchunks - 1 &&
-			    !F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL))
-				break;
+			last_chunk = 0;
+			if (i == cookie.nchunks - 1) {
+				if (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL))
+					last_chunk = 1;
+				else
+					break;
+			}
 
 			chunk = cookie.chunk_array[i];
 
@@ -395,26 +399,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 			if (chunk->txnid_max != txnid_max)
 				break;
 
-			WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
-			/*
-			 * Clear the "cache resident" flag so the primary can
-			 * be evicted and eventually closed.  Only do this once
-			 * the checkpoint has succeeded: otherwise, accessing
-			 * the leaf page during the checkpoint can trigger
-			 * forced eviction.
-			 */
-			WT_ERR(__wt_session_get_btree(
-			    session, chunk->uri, NULL, NULL, 0));
-			__wt_btree_evictable(session, 1);
-			if (i < lsm_tree->nchunks - 1) {
-#if 0
-				WT_ASSERT(session,
-				    S2BT(session)->modified == 0);
-#endif
-				S2BT(session)->readonly = 1;
-			}
-			WT_ERR(__wt_session_release_btree(session));
-
 			++j;
 			WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
 			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
@@ -424,6 +408,29 @@ __wt_lsm_checkpoint_worker(void *arg)
 			/* Update the throttle time. */
 			__wt_lsm_tree_throttle(session, lsm_tree, 1);
 			WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+
+			WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
+
+			/*
+			 * Clear the "cache resident" flag so the primary can
+			 * be evicted and eventually closed.  Only do this once
+			 * the checkpoint has succeeded: otherwise, accessing
+			 * the leaf page during the checkpoint can trigger
+			 * forced eviction.
+			 */
+			WT_TRET(__wt_session_get_btree(
+			    session, chunk->uri, NULL, NULL, 0));
+			if (ret == 0) {
+				__wt_btree_evictable(session, 1);
+				if (!last_chunk) {
+#if 0
+					WT_ASSERT(session,
+					    S2BT(session)->modified == 0);
+#endif
+					S2BT(session)->readonly = 1;
+				}
+				WT_TRET(__wt_session_release_btree(session));
+			}
 
 			/* Make sure we aren't pinning a transaction ID. */
 			__wt_txn_release_snapshot(session);
