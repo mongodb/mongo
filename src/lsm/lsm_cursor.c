@@ -40,6 +40,86 @@ static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_reset_cursors(WT_CURSOR_LSM *, WT_CURSOR *);
 
 /*
+ * __clsm_enter_update --
+ *	Make sure an LSM cursor is ready to perform an update.
+ */
+static int
+__clsm_enter_update(WT_CURSOR_LSM *clsm)
+{
+	WT_CURSOR *primary;
+	WT_LSM_TREE *lsm_tree;
+	WT_SESSION_IMPL *session;
+	int need_signal, ovfl;
+
+	lsm_tree = clsm->lsm_tree;
+	primary = clsm->cursors[clsm->nchunks - 1];
+	session = (WT_SESSION_IMPL *)primary->session;
+
+	/*
+	 * In LSM there are multiple btrees active at one time. The tree
+	 * switch code needs to use btree API methods, and it wants to
+	 * operate on the btree for the primary chunk. Set that up now.
+	 *
+	 * If the primary chunk has grown too large, set a flag so the worker
+	 * thread will switch when it gets a chance to avoid introducing high
+	 * latency into application threads.  Don't do this indefinitely: if a
+	 * chunk grows twice as large as the configured size, block until it
+	 * can be switched.
+	 */
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+		if (F_ISSET(clsm->primary_chunk, WT_LSM_CHUNK_ONDISK))
+			ovfl = 1;
+		else
+			WT_WITH_BTREE(session,
+			    ((WT_CURSOR_BTREE *)primary)->btree,
+			    ovfl = __wt_btree_size_overflow(
+			    session, lsm_tree->chunk_size));
+
+		if (ovfl) {
+			/*
+			 * Check that we are up-to-date: don't set the switch
+			 * if the tree has changed since we last opened
+			 * cursors: that can lead to switching multiple times
+			 * when only one switch is required, creating very
+			 * small chunks.
+			 */
+			need_signal = 0;
+			WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
+			if (clsm->dsk_gen == lsm_tree->dsk_gen &&
+			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+				F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
+				need_signal = 1;
+			}
+			WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
+			if (need_signal)
+				WT_RET(__wt_cond_signal(
+				    session, lsm_tree->work_cond));
+			ovfl = 0;
+		}
+	} else if (F_ISSET(clsm->primary_chunk, WT_LSM_CHUNK_ONDISK))
+		ovfl = 1;
+	else
+		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
+		    ovfl = __wt_btree_size_overflow(
+		    session, 2 * lsm_tree->chunk_size));
+
+	/*
+	 * If the primary chunk has really overflowed, which either means a
+	 * worker thread has fallen behind or there has just been a user-level
+	 * checkpoint, wait until the tree changes.
+	 *
+	 * We used to switch chunks in the application thread if we got to
+	 * here, but that is problematic because there is a transaction in
+	 * progress and it could roll back, leaving the metadata inconsistent.
+	 */
+	if (ovfl)
+		while (clsm->dsk_gen == lsm_tree->dsk_gen)
+			__wt_sleep(0, 10);
+
+	return (0);
+}
+
+/*
  * __clsm_enter --
  *	Start an operation on an LSM cursor, update if the tree has changed.
  */
@@ -48,7 +128,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 {
 	WT_CURSOR *c;
 	WT_DECL_RET;
-	WT_LSM_CHUNK *chunk;
+	WT_LSM_CHUNK *primary;
 	WT_SESSION_IMPL *session;
 	uint64_t *txnid_maxp;
 	uint64_t id, myid, snap_min;
@@ -88,43 +168,49 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 			goto open;
 
 		/* Update the maximum transaction ID in the primary chunk. */
-		if (update && (chunk = clsm->primary_chunk) != NULL) {
+		primary = clsm->primary_chunk;
+		if (update && primary != NULL) {
+			WT_RET(__clsm_enter_update(clsm));
+			if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
+				goto open;
+
 			/*
 			 * Ensure that there is a transaction with an ID
 			 * allocated before using that ID in the LSM tree.
 			 */
 			WT_RET(__wt_txn_autocommit_check(session));
 			WT_RET(__wt_txn_id_check(session));
-			for (id = chunk->txnid_max, myid = session->txn.id;
+			for (id = primary->txnid_max, myid = session->txn.id;
 			    !TXNID_LE(myid, id);
-			    id = chunk->txnid_max) {
-				WT_ASSERT(session, myid != WT_TXN_NONE);
+			    id = primary->txnid_max)
 				(void)WT_ATOMIC_CAS(
-				    chunk->txnid_max, id, myid);
-			}
-		}
+				    primary->txnid_max, id, myid);
 
-		/*
-		 * Figure out how many updates are required for snapshot
-		 * isolation.
-		 *
-		 * This is not a normal visibility check on the maximum
-		 * transaction ID in each chunk: any transaction ID that
-		 * overlaps with our snapshot is a potential conflict.
-		 */
-		clsm->nupdates = 1;
-		if (session->txn.isolation == TXN_ISO_SNAPSHOT &&
-		    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
-			WT_ASSERT(session,
-			    F_ISSET(&session->txn, TXN_HAS_SNAPSHOT));
-			snap_min = session->txn.snap_min;
-			for (txnid_maxp = &clsm->txnid_max[clsm->nchunks - 2];
-			    clsm->nupdates < clsm->nchunks;
-			    clsm->nupdates++, txnid_maxp--) {
-				if (TXNID_LT(*txnid_maxp, snap_min))
-					break;
-				WT_ASSERT(session, !__wt_txn_visible_all(
-				    session, *txnid_maxp));
+			/*
+			 * Figure out how many updates are required for
+			 * snapshot isolation.
+			 *
+			 * This is not a normal visibility check on the maximum
+			 * transaction ID in each chunk: any transaction ID
+			 * that overlaps with our snapshot is a potential
+			 * conflict.
+			 */
+			clsm->nupdates = 1;
+			if (session->txn.isolation == TXN_ISO_SNAPSHOT &&
+			    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
+				WT_ASSERT(session,
+				    F_ISSET(&session->txn, TXN_HAS_SNAPSHOT));
+				snap_min = session->txn.snap_min;
+				for (txnid_maxp =
+				    &clsm->txnid_max[clsm->nchunks - 2];
+				    clsm->nupdates < clsm->nchunks;
+				    clsm->nupdates++, txnid_maxp--) {
+					if (TXNID_LT(*txnid_maxp, snap_min))
+						break;
+					WT_ASSERT(session,
+					    !__wt_txn_visible_all(
+					    session, *txnid_maxp));
+				}
 			}
 		}
 
@@ -138,7 +224,8 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 		if ((!update ||
 		    session->txn.isolation != TXN_ISO_SNAPSHOT ||
 		    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) &&
-		    ((update && clsm->primary_chunk != NULL) ||
+		    ((update && primary != NULL &&
+		    !F_ISSET(primary, WT_LSM_CHUNK_ONDISK)) ||
 		    (!update && F_ISSET(clsm, WT_CLSM_OPEN_READ))))
 			break;
 
@@ -1176,13 +1263,11 @@ __clsm_put(WT_SESSION_IMPL *session,
 	WT_CURSOR *c, *primary;
 	WT_LSM_TREE *lsm_tree;
 	u_int i;
-	int need_signal, ovfl;
 
 	lsm_tree = clsm->lsm_tree;
 
 	WT_ASSERT(session,
 	    clsm->primary_chunk != NULL &&
-	    !F_ISSET(clsm->primary_chunk, WT_LSM_CHUNK_ONDISK) &&
 	    TXNID_LE(session->txn.id, clsm->primary_chunk->txnid_max));
 
 	/*
@@ -1258,61 +1343,6 @@ __clsm_put(WT_SESSION_IMPL *session,
 		__wt_sleep(0,
 		    lsm_tree->ckpt_throttle + lsm_tree->merge_throttle);
 	}
-
-	/*
-	 * In LSM there are multiple btrees active at one time. The tree
-	 * switch code needs to use btree API methods, and it wants to
-	 * operate on the btree for the primary chunk. Set that up now.
-	 *
-	 * If the primary chunk has grown too large, set a flag so the worker
-	 * thread will switch when it gets a chance to avoid introducing high
-	 * latency into application threads.  Don't do this indefinitely: if a
-	 * chunk grows twice as large as the configured size, block until it
-	 * can be switched.
-	 */
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
-		    ovfl = __wt_btree_size_overflow(
-		    session, lsm_tree->chunk_size));
-
-		if (ovfl) {
-			/*
-			 * Check that we are up-to-date: don't set the switch
-			 * if the tree has changed since we last opened
-			 * cursors: that can lead to switching multiple times
-			 * when only one switch is required, creating very
-			 * small chunks.
-			 */
-			need_signal = 0;
-			WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
-			if (clsm->dsk_gen == lsm_tree->dsk_gen &&
-			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-				F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
-				need_signal = 1;
-			}
-			WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
-			if (need_signal)
-				WT_RET(__wt_cond_signal(
-				    session, lsm_tree->work_cond));
-			ovfl = 0;
-		}
-	} else
-		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
-		    ovfl = __wt_btree_size_overflow(
-		    session, 2 * lsm_tree->chunk_size));
-
-	/*
-	 * If the primary chunk has really overflowed, which either means a
-	 * worker thread has fallen behind or there has just been a user-level
-	 * checkpoint, wait until the tree changes.
-	 *
-	 * We used to switch chunks in the application thread if we got to
-	 * here, but that is problematic because there is a transaction in
-	 * progress and it could roll back, leaving the metadata inconsistent.
-	 */
-	if (ovfl)
-		while (clsm->dsk_gen == lsm_tree->dsk_gen)
-			__wt_sleep(0, 10);
 
 	return (0);
 }

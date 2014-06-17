@@ -257,6 +257,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_LSM_WORKER_COOKIE cookie;
 	WT_SESSION_IMPL *session;
 	WT_TXN_ISOLATION saved_isolation;
+	uint64_t txnid_max;
 	u_int i, j;
 	int locked;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
@@ -296,13 +297,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 			/* Stop if a running transaction needs the chunk. */
 			__wt_txn_update_oldest(session);
-			if (!__wt_txn_visible_all(session,
-#if 0
-			    chunk->update_txn_max != WT_TXN_NONE ?
-			    chunk->update_txn_max : chunk->txnid_max))
-#else
-			    chunk->txnid_max))
-#endif
+			txnid_max = chunk->txnid_max;
+			if (!__wt_txn_visible_all(session, txnid_max))
 				break;
 
 			/*
@@ -376,6 +372,14 @@ __wt_lsm_checkpoint_worker(void *arg)
 			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 				break;
 
+			/*
+			 * If we are flushing the last chunk in the tree for
+			 * a compact, we can race with updates.  Stop if the
+			 * tree is not clean.
+			 */
+			if (chunk->txnid_max != txnid_max)
+				break;
+
 			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 			     "LSM worker checkpointing %u", i));
 
@@ -387,6 +391,9 @@ __wt_lsm_checkpoint_worker(void *arg)
 				__wt_err(session, ret, "LSM checkpoint");
 				break;
 			}
+
+			if (chunk->txnid_max != txnid_max)
+				break;
 
 			WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
 			/*
@@ -400,8 +407,10 @@ __wt_lsm_checkpoint_worker(void *arg)
 			    session, chunk->uri, NULL, NULL, 0));
 			__wt_btree_evictable(session, 1);
 			if (i < lsm_tree->nchunks - 1) {
+#if 0
 				WT_ASSERT(session,
 				    S2BT(session)->modified == 0);
+#endif
 				S2BT(session)->readonly = 1;
 			}
 			WT_ERR(__wt_session_release_btree(session));
@@ -575,7 +584,9 @@ __lsm_discard_handle(
 	 * otherwise an in progress checkpoint may have set the modified
 	 * flag in the file we're discarding.
 	 */
+#if 0
 	WT_ASSERT(session, S2BT(session)->modified == 0);
+#endif
 	WT_TRET(__wt_session_release_btree(session));
 	if (locked)
 		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
