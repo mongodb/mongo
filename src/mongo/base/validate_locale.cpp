@@ -1,4 +1,4 @@
-/*    Copyright 2013 10gen Inc.
+/*    Copyright 2014 MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -25,42 +25,30 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/logger/logger.h"
+#include <stdexcept>
+
+#include <boost/filesystem/operations.hpp>
 
 #include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/inline_decls.h"  // For MONGO_unlikely, which should really be in
-                                      // mongo/platform/compiler.h
 
 namespace mongo {
-namespace logger {
 
-    static LogManager* theGlobalLogManager;  // NULL at program start, before even static
-                                             // initialization.
-
-    static RotatableFileManager theGlobalRotatableFileManager;
-
-    LogManager* globalLogManager() {
-        if (MONGO_unlikely(!theGlobalLogManager)) {
-            theGlobalLogManager = new LogManager;
+MONGO_INITIALIZER_GENERAL(ValidateLocale,
+        MONGO_NO_PREREQUISITES,
+        MONGO_DEFAULT_PREREQUISITES)
+        (InitializerContext*) {
+        try {
+            // Validate that boost can correctly load the user's locale
+            boost::filesystem::path("/").has_root_directory();
         }
-        return theGlobalLogManager;
-    }
-
-    RotatableFileManager* globalRotatableFileManager() {
-        return &theGlobalRotatableFileManager;
-    }
-
-    /**
-     * Just in case no static initializer called globalLogManager, make sure that the global log
-     * manager is instantiated while we're still in a single-threaded context.
-     */
-    MONGO_INITIALIZER_GENERAL(GlobalLogManager, ("ValidateLocale"), ("default"))(
-            InitializerContext*) {
-
-        globalLogManager();
+        catch (const std::runtime_error&) {
+           return Status(ErrorCodes::BadValue, "Invalid or no user locale set."
+#ifndef _WIN32
+                " Please ensure LANG and/or LC_* environment variables are set correctly."
+#endif
+                );
+        }
         return Status::OK();
     }
 
-}  // namespace logger
 }  // namespace mongo

@@ -34,7 +34,7 @@
 
 /* Groups for all of option handling */
 MONGO_INITIALIZER_GROUP(BeginStartupOptionHandling,
-                        ("GlobalLogManager"), ("EndStartupOptionHandling"))
+                        ("GlobalLogManager", "ValidateLocale"), ("EndStartupOptionHandling"))
 
 /* Groups for option registration */
 MONGO_INITIALIZER_GROUP(BeginStartupOptionRegistration,
