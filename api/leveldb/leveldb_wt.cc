@@ -224,7 +224,7 @@ class DbImpl;
 /* Context for operations (including snapshots, write batches, transactions) */
 class OperationContext {
 public:
-  OperationContext(WT_CONNECTION *conn) {
+  OperationContext(WT_CONNECTION *conn) : conn_(conn), in_use_(false) {
     int ret = conn->open_session(conn, NULL, "isolation=snapshot", &session_);
     assert(ret == 0);
     ret = session_->open_cursor(
@@ -239,19 +239,20 @@ public:
 #endif
   }
 
-  WT_CURSOR *getCursor() { return cursor_; }
-  WT_SESSION *getSession() { return session_; }
+  WT_CURSOR *getCursor();
+  void releaseCursor(WT_CURSOR *cursor);
 
 private:
+  WT_CONNECTION *conn_;
   WT_SESSION *session_;
   WT_CURSOR *cursor_;
+  bool in_use_;
 };
 
 class IteratorImpl : public Iterator {
 public:
-  IteratorImpl(WT_CURSOR *cursor, DbImpl *db, const ReadOptions &options) :
-    cursor_(cursor), status_(Status::OK()), valid_(false) {}
-  virtual ~IteratorImpl() {}
+  IteratorImpl(DbImpl *db, const ReadOptions &options);
+  virtual ~IteratorImpl();
 
   // An iterator is either positioned at a key/value pair, or
   // not valid.  This method returns true iff the iterator is valid.
@@ -280,10 +281,12 @@ public:
   }
 
 private:
+  DbImpl *db_;
   WT_CURSOR *cursor_;
   Slice key_, value_;
   Status status_;
   bool valid_;
+  bool snapshot_iterator_;
 
   void SetError(int wiredTigerError) {
     valid_ = false;
@@ -297,17 +300,24 @@ private:
 
 class SnapshotImpl : public Snapshot {
 friend class DbImpl;
+friend class IteratorImpl;
 public:
-  SnapshotImpl(DbImpl *db) : Snapshot(), db_(db) {}
+  SnapshotImpl(DbImpl *db) :
+    Snapshot(), db_(db), cursor_(NULL), status_(Status::OK()) {}
   virtual ~SnapshotImpl() {}
 protected:
+  WT_CURSOR *getCursor() const { return cursor_; }
+  Status getStatus() const { return status_; }
   Status setupTransaction();
   Status releaseTransaction();
 private:
   DbImpl *db_;
+  WT_CURSOR *cursor_;
+  Status status_;
 };
 
 class DbImpl : public leveldb::DB {
+friend class IteratorImpl;
 friend class SnapshotImpl;
 public:
   DbImpl(WT_CONNECTION *conn) :
@@ -377,9 +387,44 @@ private:
   void operator=(const DbImpl&);
 
 protected:
-  WT_SESSION *getSession() { return getContext()->getSession(); }
   WT_CURSOR *getCursor() { return getContext()->getCursor(); }
+  void releaseCursor(WT_CURSOR *cursor) { getContext()->releaseCursor(cursor); }
 };
+
+// Return a cursor for the current operation to use. In the "normal" case
+// we will return the cursor opened when the OperationContext was created.
+// If the thread this OperationContext belongs to requires more than one
+// cursor (for example they start a read snapshot while doing updates), we
+// open a new session/cursor for each parallel operation.
+WT_CURSOR *OperationContext::getCursor()
+{
+  int ret;
+  if (!in_use_) {
+    in_use_ = true;
+    return cursor_;
+  } else {
+    WT_SESSION *session;
+    WT_CURSOR *cursor;
+    if ((ret = conn_->open_session(
+            conn_, NULL, "isolation=snapshot", &session)) != 0)
+      return NULL;
+    if ((ret = session->open_cursor(
+        session, WT_URI, NULL, NULL, &cursor)) != 0)
+      return NULL;
+    return cursor;
+  }
+}
+
+void OperationContext::releaseCursor(WT_CURSOR *cursor)
+{
+  if (cursor == cursor_)
+    in_use_ = false;
+  else {
+    WT_SESSION *session = cursor->session;
+    int ret = session->close(session, NULL);
+    assert(ret == 0);
+  }
+}
 
 Status
 leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB **dbptr)
@@ -462,6 +507,7 @@ DbImpl::Put(const WriteOptions& options,
   item.size = value.size();
   cursor->set_value(cursor, &item);
   int ret = cursor->insert(cursor);
+  releaseCursor(cursor);
   return WiredTigerErrorToStatus(ret, NULL);
 }
 
@@ -484,6 +530,7 @@ DbImpl::Delete(const WriteOptions& options, const Slice& key)
   // failures on - it's not necessary for correct operation.
   int t_ret = cursor->reset(cursor);
   assert(t_ret == 0);
+  releaseCursor(cursor);
   return WiredTigerErrorToStatus(ret, NULL);
 }
 
@@ -532,22 +579,25 @@ DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
 {
   Status status = Status::OK();
   WT_CURSOR *cursor = getCursor();
-  WT_SESSION *session = getSession();
+  WT_SESSION *session = cursor->session;
+  const char *errmsg = NULL;
   int ret, t_ret;
 
   for (;;) {
-    if ((ret = session->begin_transaction(session, NULL)) != 0)
-      return WiredTigerErrorToStatus(
-          ret, "Begin transaction failed in Write batch");
+    if ((ret = session->begin_transaction(session, NULL)) != 0) {
+      errmsg = "Begin transaction failed in Write batch";
+      goto err;
+    }
 
     WriteBatchHandler handler(cursor);
     status = updates->Iterate(&handler);
     if ((ret = handler.getWiredTigerStatus()) != WT_DEADLOCK)
       break;
     // Roll back the transaction on deadlock so we can try again
-    if ((ret = session->rollback_transaction(session, NULL)) != 0)
-      return WiredTigerErrorToStatus(
-          ret, "Rollback transaction failed in Write batch");
+    if ((ret = session->rollback_transaction(session, NULL)) != 0) {
+      errmsg = "Rollback transaction failed in Write batch";
+      goto err;
+    }
   }
 
   if (status.ok() && ret == 0)
@@ -555,6 +605,8 @@ DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
   else if (ret == 0)
     ret = session->rollback_transaction(session, NULL);
 
+err:
+  releaseCursor(cursor);
   if (status.ok() && ret != 0)
     status = WiredTigerErrorToStatus(ret, NULL);
   return status;
@@ -571,22 +623,36 @@ Status
 DbImpl::Get(const ReadOptions& options,
        const Slice& key, std::string* value)
 {
-  WT_CURSOR *cursor = getCursor();
+  WT_CURSOR *cursor;
   WT_ITEM item;
+  const SnapshotImpl *si = NULL;
+  const char *errmsg = NULL;
+
+  // Read options can contain a snapshot for us to use
+  if (options.snapshot == NULL) {
+    cursor = getCursor();
+  } else {
+    si = static_cast<const SnapshotImpl *>(options.snapshot);
+    if (!si->getStatus().ok())
+      return si->getStatus();
+    cursor = si->getCursor();
+  }
 
   item.data = key.data();
   item.size = key.size();
   cursor->set_key(cursor, &item);
   int ret = cursor->search(cursor);
-  if (ret == WT_NOTFOUND)
-    return Status::NotFound("DB::Get key not found");
-  else if (ret != 0)
-    return WiredTigerErrorToStatus(ret, NULL);
-  ret = cursor->get_value(cursor, &item);
-  if (ret != 0)
-    return WiredTigerErrorToStatus(ret, NULL);
-  *value = std::string((const char *)item.data, item.size);
-  return Status::OK();
+  if (ret == 0) {
+    ret = cursor->get_value(cursor, &item);
+    if (ret == 0)
+      *value = std::string((const char *)item.data, item.size);
+  } else if (ret == WT_NOTFOUND)
+    errmsg = "DB::Get key not found";
+err:
+  // There is no need to release the cursor if we are in a snapshot
+  if (si != NULL)
+    releaseCursor(cursor);
+  return WiredTigerErrorToStatus(ret, errmsg);
 }
 
 // Return a heap-allocated iterator over the contents of the database.
@@ -598,7 +664,7 @@ DbImpl::Get(const ReadOptions& options,
 Iterator *
 DbImpl::NewIterator(const ReadOptions& options)
 {
-  return new IteratorImpl(getCursor(), this, options);
+  return new IteratorImpl(this, options);
 }
 
 // Return a handle to the current DB state.  Iterators created with
@@ -684,9 +750,13 @@ DbImpl::GetApproximateSizes(const Range* range, int n,
 void
 DbImpl::CompactRange(const Slice* begin, const Slice* end)
 {
-  WT_SESSION *session = getContext()->getSession();
+  // The compact doesn't need a cursor, but the context always opens a
+  // cursor when opening the session - so grab that, and use the session.
+  WT_CURSOR *cursor = getCursor();
+  WT_SESSION *session = cursor->session;
   int ret = session->compact(session, WT_URI, NULL);
   assert(ret == 0);
+  releaseCursor(cursor);
 }
 
 // Suspends the background compaction thread.  This methods
@@ -702,6 +772,26 @@ void
 DbImpl::ResumeCompactions()
 {
   /* Not supported */
+}
+
+IteratorImpl::IteratorImpl(DbImpl *db, const ReadOptions &options) :
+    cursor_(NULL), db_(db), status_(Status::OK()), valid_(false)
+{
+  if (options.snapshot == NULL) {
+    cursor_ = db_->getCursor();
+    snapshot_iterator_ = false;
+  } else {
+    const SnapshotImpl *si =
+      static_cast<const SnapshotImpl *>(options.snapshot);
+    cursor_ = si->getCursor();
+    snapshot_iterator_ = true;
+  }
+}
+
+IteratorImpl::~IteratorImpl()
+{
+  if (!snapshot_iterator_)
+    db_->releaseCursor(cursor_);
 }
 
 // Position at the first key in the source.  The iterator is Valid()
@@ -888,15 +978,17 @@ IteratorImpl::Prev()
 // Implementation for WiredTiger specific read snapshot
 Status SnapshotImpl::setupTransaction()
 {
-  WT_SESSION * session = db_->getSession();
+  cursor_ = db_->getCursor();
+  WT_SESSION *session = cursor_->session;
   int ret = session->begin_transaction(session, NULL);
   return WiredTigerErrorToStatus(ret, NULL);
 }
 
 Status SnapshotImpl::releaseTransaction()
 {
-  WT_SESSION * session = db_->getSession();
+  WT_SESSION *session = cursor_->session;
   int ret = session->commit_transaction(session, NULL);
+  db_->releaseCursor(cursor_);
 
   return WiredTigerErrorToStatus(ret, NULL);
 }
