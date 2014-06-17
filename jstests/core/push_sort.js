@@ -52,6 +52,13 @@ assert.eq( [{a:{b:2}}, {a:{b:3}}], t.findOne( {_id:7} ).x );
 // Invalid Cases
 //
 
+// $push with $sort should not push a "$sort" field
+var doc8 = {_id: 8, x: [{a:1}, {a:2}]};
+t.save(doc8);
+var res = t.update({_id: 8}, {$push: {x: {$sort: {a: -1}}}});
+assert.writeError(res);
+assert.docEq(t.findOne({_id:8}), doc8); //ensure doc was not changed
+
 t.save({ _id: 100, x: [ {a:1} ] } );
 
 // For now, elements of the $each vector need to be objects. In here, '2' is an invalide $each.
