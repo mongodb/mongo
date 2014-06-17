@@ -163,8 +163,9 @@ static CONFIG c[] = {
 	  0x0, 9, 17, 27, &g.c_intl_page_max, NULL },
 
 	{ "isolation",
-	  "isolation level (read-uncommitted | read-committed | snapshot)",
-	  C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_isolation },
+	  "isolation level "
+	  "(random | read-uncommitted | read-committed | snapshot)",
+	  C_IGNORE|C_STRING, 1, 4, 4, NULL, &g.c_isolation },
 
 	{ "key_gap",
 	  "gap between instantiated keys on a Btree page",

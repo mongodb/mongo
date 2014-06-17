@@ -158,6 +158,12 @@ struct __wt_cursor_btree {
 	WT_ITEM tmp;
 
 	/*
+	 * The update structure allocated by the row- and column-store modify
+	 * functions, used to avoid a data copy in the WT_CURSOR.update call.
+	 */
+	WT_UPDATE *modify_update;
+
+	/*
 	 * Fixed-length column-store items are a single byte, and it's simpler
 	 * and cheaper to allocate the space for it now than keep checking to
 	 * see if we need to grow the buffer.

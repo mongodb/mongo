@@ -681,15 +681,16 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 err:	if (ret == WT_RESTART)
 		goto retry;
 
-	/* If successful, point the cursor at internal copies of the data. */
-	if (ret == 0) {
-		if (!WT_DATA_IN_ITEM(&cursor->key))
-			WT_TRET(__wt_buf_set(session, &cursor->key,
-			    cursor->key.data, cursor->key.size));
-		if (!WT_DATA_IN_ITEM(&cursor->value))
-			WT_TRET(__wt_buf_set(session, &cursor->value,
-			    cursor->value.data, cursor->value.size));
-	}
+	/*
+	 * If successful, point the cursor at internal copies of the data.  We
+	 * could shuffle memory in the cursor so the key/value pair are in local
+	 * buffer memory, but that's a data copy.  We don't want to do another
+	 * search (and we might get a different update structure if we race).
+	 * To make this work, we add a field to the btree cursor to pass back a
+	 * pointer to the modify function's allocated update structure.
+	 */
+	if (ret == 0)
+		WT_TRET(__wt_kv_return(session, cbt, cbt->modify_update));
 
 	if (ret != 0)
 		WT_TRET(__cursor_error_resolve(cbt));
