@@ -896,9 +896,7 @@ Status SnapshotImpl::setupTransaction()
 Status SnapshotImpl::releaseTransaction()
 {
   WT_SESSION * session = db_->getSession();
-  // In LevelDB Snapshots are read only objects - roll back the transaction,
-  // it has a slightly lower cost.
-  int ret = session->rollback_transaction(session, NULL);
+  int ret = session->commit_transaction(session, NULL);
 
   return WiredTigerErrorToStatus(ret, NULL);
 }
