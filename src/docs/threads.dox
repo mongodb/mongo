@@ -2,7 +2,9 @@
 
 All WT_CONNECTION methods are thread safe, and WT_CONNECTION handles can
 be shared between threads.  Applications typically open a single
-connection to each database, per process.
+connection to each database, per process.  Multi-threaded programs
+must wait for all other threads to exit before closing the WT_CONNECTION
+handle because that will implicitly close all other handles.
 
 WT_SESSION and WT_CURSOR methods are not thread safe and WT_SESSION and
 WT_CURSOR handles cannot be accessed concurrently by multiple threads.
