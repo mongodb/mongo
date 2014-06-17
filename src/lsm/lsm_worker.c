@@ -369,7 +369,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 				__wt_spin_unlock(
 				    session, &S2C(session)->checkpoint_lock);
 				locked = 0;
-				S2BT(session)->readonly = 1;
 			}
 			WT_TRET(__wt_session_release_btree(session));
 			WT_ERR(ret);
@@ -400,7 +399,11 @@ __wt_lsm_checkpoint_worker(void *arg)
 			WT_ERR(__wt_session_get_btree(
 			    session, chunk->uri, NULL, NULL, 0));
 			__wt_btree_evictable(session, 1);
-			WT_ASSERT(session, S2BT(session)->modified == 0);
+			if (i < lsm_tree->nchunks - 1) {
+				WT_ASSERT(session,
+				    S2BT(session)->modified == 0);
+				S2BT(session)->readonly = 1;
+			}
 			WT_ERR(__wt_session_release_btree(session));
 
 			++j;

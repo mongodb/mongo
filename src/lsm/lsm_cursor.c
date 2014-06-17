@@ -1213,7 +1213,7 @@ __clsm_put(WT_SESSION_IMPL *session,
 			    !F_ISSET(current_chunk, WT_LSM_CHUNK_ONDISK) &&
 			    strcmp(current_chunk->uri,
 			    clsm->cursors[(clsm->nchunks - i) - 1]->uri) == 0);
-			WT_ASSERT(session, i == 0 || 
+			WT_ASSERT(session, i == 0 ||
 			    !__wt_txn_visible_all(
 			    session, current_chunk->txnid_max));
 			if (i != 0 &&
