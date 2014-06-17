@@ -1097,18 +1097,15 @@ DBCollection.prototype.isCapped = function(){
 
 DBCollection.prototype._distinct = function( keyString , query ){
     return this._dbCommand( { distinct : this._shortName , key : keyString , query : query || {} } );
+    if ( ! res.ok )
+        throw Error( "distinct failed: " + tojson( res ) );
+    return res.values;
 }
 
 DBCollection.prototype.distinct = function( keyString , query ){
-    keyStringType = typeof keyString;
-    if (keyStringType != "string")
-        throw Error("The first argument to the distinct command must be a string but was a " + keyStringType);
-    queryType = typeof query;
-    if (query != null && queryType != "object")
-        throw Error("The query argument to the distinct command must be a document but was a " + queryType);
     var res = this._distinct( keyString , query );
     if ( ! res.ok )
-        throw Error("distinct failed: " + tojson( res ));
+        throw Error( "distinct failed: " + tojson( res ) );
     return res.values;
 }
 
