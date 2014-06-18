@@ -497,13 +497,9 @@ namespace {
                 static const set<string> legals(legal, legal + 10);
                 assertOnlyHas(mobj, legals);
 
-                try {
-                    m._id = (int) mobj["_id"].Number();
-                }
-                catch(...) {
-                    /* TODO: use of string exceptions may be problematic for reconfig case! */
-                    throw "_id must be numeric";
-                }
+                uassert(18519, "_id must be numeric", mobj["_id"].isNumber());
+                m._id = mobj["_id"].numberInt();
+
                 try {
                     string s = mobj["host"].String();
                     boost::trim(s);
@@ -513,8 +509,11 @@ namespace {
                         m.h.setPort(m.h.port());
                     }
                 }
-                catch(...) {
-                    throw string("bad or missing host field? ") + mobj.toString();
+                catch (const DBException& e) {
+                    uasserted(18520,
+                              mongoutils::str::stream() <<
+                                      "bad or missing host field in member config object " <<
+                                      mobj.toString() << causedBy(e));
                 }
                 if( m.h.isLocalHost() )
                     localhosts++;
