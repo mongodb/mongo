@@ -219,6 +219,11 @@ namespace repl {
         virtual Status setLastOptime(const OID& rid, const OpTime& ts, const BSONObj& config) = 0;
 
         /**
+         * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.
+         */
+        virtual void processReplSetGetStatus(BSONObjBuilder* result) = 0;
+
+        /**
          * Handles an incoming heartbeat command. Adds BSON to 'resultObj'; 
          * returns a Status with either OK or an error message.
          */

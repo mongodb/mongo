@@ -83,6 +83,8 @@ namespace repl {
 
         virtual Status setLastOptime(const OID& rid, const OpTime& ts, const BSONObj& config);
 
+        virtual void processReplSetGetStatus(BSONObjBuilder* result);
+
         virtual Status processHeartbeat(const BSONObj& cmdObj, BSONObjBuilder* resultObj);
 
     private:

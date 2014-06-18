@@ -161,9 +161,11 @@ namespace repl {
             if ( cmdObj["forShell"].trueValue() )
                 lastError.disableForCommand();
 
-            if( !check(errmsg, result) )
+            if (!check(errmsg, result))
                 return false;
-            theReplSet->summarizeStatus(result);
+
+            getGlobalReplicationCoordinator()->processReplSetGetStatus(&result);
+
             return true;
         }
     } cmdReplSetGetStatus;

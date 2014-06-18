@@ -363,6 +363,10 @@ namespace {
         return Status::OK();
     }
     
+    void LegacyReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
+        theReplSet->summarizeStatus(*result);
+    }
+
     Status LegacyReplicationCoordinator::processHeartbeat(const BSONObj& cmdObj, 
                                                           BSONObjBuilder* resultObj) {
         if( cmdObj["pv"].Int() != 1 ) {

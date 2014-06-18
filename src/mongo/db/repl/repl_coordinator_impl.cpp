@@ -184,6 +184,10 @@ namespace repl {
         return Status::OK();
     }
 
+    void ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* result) {
+        // TODO
+    }
+
     Status ReplicationCoordinatorImpl::processHeartbeat(const BSONObj& cmdObj, 
                                                         BSONObjBuilder* resultObj) {
         Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");

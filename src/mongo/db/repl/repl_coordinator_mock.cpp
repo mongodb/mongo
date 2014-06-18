@@ -122,6 +122,10 @@ namespace repl {
         return Status::OK();
     }
 
+    void ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
+        //TODO
+    }
+
     Status ReplicationCoordinatorMock::processHeartbeat(const BSONObj& cmdObj, 
                                                       BSONObjBuilder* resultObj) {
         return Status::OK();
