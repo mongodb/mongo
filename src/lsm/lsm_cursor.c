@@ -47,12 +47,19 @@ static int
 __clsm_enter_update(WT_CURSOR_LSM *clsm)
 {
 	WT_CURSOR *primary;
+	WT_LSM_CHUNK *primary_chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	int need_signal, ovfl;
+	int have_primary, need_signal, ovfl;
 
 	lsm_tree = clsm->lsm_tree;
-	primary = clsm->cursors[clsm->nchunks - 1];
+	if (clsm->nchunks == 0 ||
+	    (primary = clsm->cursors[clsm->nchunks - 1]) == NULL)
+		return (0);
+	primary_chunk = clsm->primary_chunk;
+	have_primary = (primary_chunk != NULL &&
+	    primary_chunk->switch_txn == WT_TXN_NONE);
+	ovfl = !have_primary;
 	session = (WT_SESSION_IMPL *)primary->session;
 
 	/*
@@ -67,9 +74,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	 * can be switched.
 	 */
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-		if (clsm->primary_chunk->switch_txn != WT_TXN_NONE)
-			ovfl = 1;
-		else
+		if (have_primary)
 			WT_WITH_BTREE(session,
 			    ((WT_CURSOR_BTREE *)primary)->btree,
 			    ovfl = __wt_btree_size_overflow(
@@ -96,23 +101,21 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 				    session, lsm_tree->work_cond));
 			ovfl = 0;
 		}
-	} else if (clsm->primary_chunk->switch_txn != WT_TXN_NONE)
-		ovfl = 1;
-	else
+	} else if (have_primary)
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
 		    ovfl = __wt_btree_size_overflow(
 		    session, 2 * lsm_tree->chunk_size));
 
 	/*
-	 * If the primary chunk has really overflowed, which either means a
-	 * worker thread has fallen behind or there has just been a user-level
-	 * checkpoint, wait until the tree changes.
+	 * If there is no primary chunk, or it has really overflowed, which
+	 * either means a worker thread has fallen behind or there has just
+	 * been a user-level checkpoint, wait until the tree changes.
 	 *
 	 * We used to switch chunks in the application thread if we got to
 	 * here, but that is problematic because there is a transaction in
 	 * progress and it could roll back, leaving the metadata inconsistent.
 	 */
-	if (ovfl)
+	if (ovfl || !have_primary)
 		while (clsm->dsk_gen == lsm_tree->dsk_gen)
 			__wt_sleep(0, 10);
 
@@ -128,7 +131,6 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 {
 	WT_CURSOR *c;
 	WT_DECL_RET;
-	WT_LSM_CHUNK *primary;
 	WT_SESSION_IMPL *session;
 	uint64_t *switch_txnp;
 	uint64_t snap_min;
@@ -168,8 +170,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 			goto open;
 
 		/* Update the maximum transaction ID in the primary chunk. */
-		primary = clsm->primary_chunk;
-		if (update && primary != NULL) {
+		if (update) {
 			WT_RET(__clsm_enter_update(clsm));
 			if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
 				goto open;
@@ -217,7 +218,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 		if ((!update ||
 		    session->txn.isolation != TXN_ISO_SNAPSHOT ||
 		    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) &&
-		    ((update && primary != NULL) ||
+		    ((update && clsm->primary_chunk != NULL) ||
 		    (!update && F_ISSET(clsm, WT_CLSM_OPEN_READ))))
 			break;
 
@@ -608,7 +609,9 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 	}
 
 	/* The last chunk is our new primary. */
-	if (chunk != NULL && chunk->switch_txn == WT_TXN_NONE) {
+	if (chunk != NULL &&
+	    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+	    chunk->switch_txn == WT_TXN_NONE) {
 		clsm->primary_chunk = chunk;
 		primary = clsm->cursors[clsm->nchunks - 1];
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)(primary))->btree,
