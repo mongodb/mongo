@@ -148,8 +148,10 @@ __wt_lsm_merge_worker(void *vargs)
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
 			if (WT_ATOMIC_ADD(lsm_tree->merge_idle, 1) ==
 			    lsm_tree->merge_threads &&
-			    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
-				F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
+			    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING |
+			    WT_LSM_TREE_MERGING))
+				F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING |
+				    WT_LSM_TREE_MERGING);
 
 			/* Poll 10 times per second. */
 			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(

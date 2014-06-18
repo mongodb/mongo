@@ -137,12 +137,13 @@ struct __wt_lsm_tree {
 	size_t old_alloc;		/* Space allocated for old chunks */
 	u_int nold_chunks;		/* Number of old chunks */
 
-#define	WT_LSM_TREE_COMPACTING	0x01
-#define	WT_LSM_TREE_FLUSH_ALL	0x02
-#define	WT_LSM_TREE_NEED_SWITCH	0x04
-#define	WT_LSM_TREE_OPEN	0x08
-#define	WT_LSM_TREE_THROTTLE	0x10
-#define	WT_LSM_TREE_WORKING	0x20
+#define	WT_LSM_TREE_COMPACTING	0x01	/* Tree is being compacted */
+#define	WT_LSM_TREE_FLUSH_ALL	0x02	/* All chunks should be flushed */
+#define	WT_LSM_TREE_MERGING	0x04	/* Ordinary merging is active */
+#define	WT_LSM_TREE_NEED_SWITCH	0x08	/* A new chunk should be created */
+#define	WT_LSM_TREE_OPEN	0x10	/* The tree is open */
+#define	WT_LSM_TREE_THROTTLE	0x20	/* Throttle updates */
+#define	WT_LSM_TREE_WORKING	0x40	/* Workers are active */
 	uint32_t flags;
 };
 

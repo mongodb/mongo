@@ -1016,6 +1016,12 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	time_t begin, end;
+	uint32_t *modep, modes[] = {
+	    WT_LSM_TREE_FLUSH_ALL,
+	    WT_LSM_TREE_MERGING,
+	    WT_LSM_TREE_COMPACTING,
+	    0
+	};
 
 	/*
 	 * This function is applied to all matching sources: ignore anything
@@ -1039,6 +1045,9 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	/* Lock the tree: single-thread compaction. */
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
+	/* Clear any merge throttle: compact throws out that calculation. */
+	lsm_tree->merge_throttle = 0;
+
 	/* If another thread started compacting this tree, we're done. */
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL | WT_LSM_TREE_COMPACTING)) {
 		WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
@@ -1056,43 +1065,37 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		chunk->switch_txn = __wt_txn_current_id(session);
 
 	/*
-	 * Set the flush all flag so that the checkpoint worker tries
+	 * First set the "flush all" flag so that the checkpoint worker tries
 	 * to write all in-memory chunks to disk.
+	 *
+	 * Then set the merging flag to detect when ordinary merges have
+	 * completed.
+	 *
+	 * Then set the compacting flag so that all merge threads look for
+	 * merges at all levels of the tree.
 	 */
-	F_SET(lsm_tree, WT_LSM_TREE_FLUSH_ALL);
+	modep = modes;
+	F_SET(lsm_tree, *modep);
 	WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
 
+	/* Wake up the merge threads. */
+	WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));
+
 	/* Wait for flushing to stop. */
-	while (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL) &&
-	    F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+		if (!F_ISSET(lsm_tree, *modep)) {
+			/* Zero marks the end of the list. */
+			if (*++modep == 0)
+				break;
+			F_SET(lsm_tree, *modep);
+			WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));
+			continue;
+		}
 		__wt_sleep(1, 0);
 		WT_RET(__wt_seconds(session, &end));
 		if (session->compact->max_time > 0 &&
 		    session->compact->max_time < (uint64_t)(end - begin)) {
 			F_CLR(lsm_tree, WT_LSM_TREE_FLUSH_ALL);
-			return (ETIMEDOUT);
-		}
-	}
-
-	/*
-	 * Set the compacting flag and clear the current merge throttle
-	 * setting, so that all merge threads look for merges at all levels of
-	 * the tree.
-	 */
-	F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
-	lsm_tree->merge_throttle = 0;
-
-	/* Wake up the merge threads. */
-	WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));
-
-	/* Wait for merge activity to stop. */
-	while (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING) &&
-	    F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-		__wt_sleep(1, 0);
-		WT_RET(__wt_seconds(session, &end));
-		if (session->compact->max_time > 0 &&
-		    session->compact->max_time < (uint64_t)(end - begin)) {
-			F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
 			return (ETIMEDOUT);
 		}
 	}
