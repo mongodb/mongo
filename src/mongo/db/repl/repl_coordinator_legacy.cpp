@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/optime.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/master_slave.h"
@@ -43,9 +44,10 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rs_initiate.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/util/assert_util.h" // TODO: remove along with invariant from getCurrentMemberState
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
@@ -446,5 +448,93 @@ namespace {
 
         return Status::OK();
     }
+
+namespace {
+    Status _checkReplEnabledForCommand(BSONObjBuilder* result) {
+        if( !replSet ) {
+            if (serverGlobalParams.configsvr) {
+                result->append("info", "configsvr"); // for shell prompt
+            }
+            return Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet");
+        }
+
+        if( theReplSet == 0 ) {
+            result->append("startupStatus", ReplSet::startupStatus);
+            if( ReplSet::startupStatus == ReplSet::EMPTYCONFIG )
+                result->append("info", "run rs.initiate(...) if not yet done for the set");
+            return Status(ErrorCodes::NotYetInitialized, ReplSet::startupStatusMsg.empty() ?
+                    "replset unknown error 2" : ReplSet::startupStatusMsg.get());
+        }
+
+        return Status::OK();
+    }
+} // namespace
+
+    Status LegacyReplicationCoordinator::processReplSetReconfig(OperationContext* txn,
+                                                                const BSONObj& newConfigObj,
+                                                                bool force,
+                                                                BSONObjBuilder* resultObj) {
+
+        if( force && !theReplSet ) {
+            replSettings.reconfig = newConfigObj.getOwned();
+            resultObj->append("msg",
+                              "will try this config momentarily, try running rs.conf() again in a "
+                                      "few seconds");
+            return Status::OK();
+        }
+
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if( !force && !theReplSet->box.getState().primary() ) {
+            return Status(ErrorCodes::NotMaster,
+                          "replSetReconfig command must be sent to the current replica set "
+                                  "primary.");
+        }
+
+        try {
+            {
+                // just make sure we can get a write lock before doing anything else.  we'll
+                // reacquire one later.  of course it could be stuck then, but this check lowers the
+                // risk if weird things are up - we probably don't want a change to apply 30 minutes
+                // after the initial attempt.
+                time_t t = time(0);
+                Lock::GlobalWrite lk(txn->lockState());
+                if( time(0)-t > 20 ) {
+                    return Status(ErrorCodes::ExceededTimeLimit,
+                                  "took a long time to get write lock, so not initiating.  "
+                                          "Initiate when server less busy?");
+                }
+            }
+
+
+            scoped_ptr<ReplSetConfig> newConfig(ReplSetConfig::make(newConfigObj, force));
+
+            log() << "replSet replSetReconfig config object parses ok, " <<
+                    newConfig->members.size() << " members specified" << rsLog;
+
+            Status status = ReplSetConfig::legalChange(theReplSet->getConfig(), *newConfig);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            checkMembersUpForConfigChange(*newConfig, *resultObj, false);
+
+            log() << "replSet replSetReconfig [2]" << rsLog;
+
+            theReplSet->haveNewConfig(*newConfig, true);
+            ReplSet::startupStatusMsg.set("replSetReconfig'd");
+        }
+        catch(const DBException& e) {
+            log() << "replSet replSetReconfig exception: " << e.what() << rsLog;
+            return e.toStatus();
+        }
+
+        resetSlaveCache();
+        return Status::OK();
+    }
+
 } // namespace repl
 } // namespace mongo

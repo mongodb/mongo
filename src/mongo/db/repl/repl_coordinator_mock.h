@@ -90,6 +90,11 @@ namespace repl {
 
         virtual Status processHeartbeat(const BSONObj& cmdObj, 
                                         BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetReconfig(OperationContext* txn,
+                                              const BSONObj& newConfigObj,
+                                              bool force,
+                                              BSONObjBuilder* resultObj);
     };
 
 } // namespace repl

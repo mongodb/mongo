@@ -97,6 +97,11 @@ namespace repl {
         virtual Status processHeartbeat(const BSONObj& cmdObj, 
                                         BSONObjBuilder* resultObj);
 
+        virtual Status processReplSetReconfig(OperationContext* txn,
+                                              const BSONObj& newConfigObj,
+                                              bool force,
+                                              BSONObjBuilder* resultObj);
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions

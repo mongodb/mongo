@@ -31,6 +31,8 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/repl/rs_initiate.h"
+
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
@@ -55,10 +57,6 @@ using namespace mongoutils;
 namespace mongo {
 namespace repl {
 
-    /* called on a reconfig AND on initiate
-       throws
-       @param initial true when initiating
-    */
     void checkMembersUpForConfigChange(const ReplSetConfig& cfg, BSONObjBuilder& result, bool initial) {
         int failures = 0, allVotes = 0, allowableFailures = 0;
         int me = 0;

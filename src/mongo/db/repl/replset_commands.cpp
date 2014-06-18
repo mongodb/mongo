@@ -46,8 +46,6 @@ using namespace bson;
 namespace mongo {
 namespace repl {
 
-    void checkMembersUpForConfigChange(const ReplSetConfig& cfg, BSONObjBuilder& result, bool initial);
-
     /* commands in other files:
          replSetHeartbeat - health.cpp
          replSetInitiate  - rs_mod.cpp
@@ -202,64 +200,13 @@ namespace repl {
                 return false;
             }
 
+            BSONObj newConfigObj =  cmdObj["replSetReconfig"].Obj();
             bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
-            if( force && !theReplSet ) {
-                replSettings.reconfig = cmdObj["replSetReconfig"].Obj().getOwned();
-                result.append("msg", "will try this config momentarily, try running rs.conf() again in a few seconds");
-                return true;
-            }
-
-            if ( !check(errmsg, result) ) {
-                return false;
-            }
-
-            if( !force && !theReplSet->box.getState().primary() ) {
-                errmsg = "replSetReconfig command must be sent to the current replica set primary.";
-                return false;
-            }
-
-            {
-                // just make sure we can get a write lock before doing anything else.  we'll reacquire one
-                // later.  of course it could be stuck then, but this check lowers the risk if weird things
-                // are up - we probably don't want a change to apply 30 minutes after the initial attempt.
-                time_t t = time(0);
-                Lock::GlobalWrite lk(txn->lockState());
-                if( time(0)-t > 20 ) {
-                    errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
-                    return false;
-                }
-            }
-
-            try {
-                scoped_ptr<ReplSetConfig> newConfig
-                        (ReplSetConfig::make(cmdObj["replSetReconfig"].Obj(), force));
-
-                log() << "replSet replSetReconfig config object parses ok, " <<
-                        newConfig->members.size() << " members specified" << rsLog;
-
-                if( !ReplSetConfig::legalChange(theReplSet->getConfig(), *newConfig, errmsg) ) {
-                    return false;
-                }
-
-                checkMembersUpForConfigChange(*newConfig, result, false);
-
-                log() << "replSet replSetReconfig [2]" << rsLog;
-
-                theReplSet->haveNewConfig(*newConfig, true);
-                ReplSet::startupStatusMsg.set("replSetReconfig'd");
-            }
-            catch( DBException& e ) {
-                log() << "replSet replSetReconfig exception: " << e.what() << rsLog;
-                throw;
-            }
-            catch( string& se ) {
-                log() << "replSet reconfig exception: " << se << rsLog;
-                errmsg = se;
-                return false;
-            }
-
-            resetSlaveCache();
-            return true;
+            Status status = getGlobalReplicationCoordinator()->processReplSetReconfig(txn,
+                                                                                      newConfigObj,
+                                                                                      force,
+                                                                                      &result);
+            return appendCommandStatus(result, status);
         }
     } cmdReplSetReconfig;
 

@@ -229,6 +229,15 @@ namespace repl {
          */
         virtual Status processHeartbeat(const BSONObj& cmdObj, BSONObjBuilder* resultObj) = 0;
 
+        /**
+         * Handles an incoming replSetReconfig command. Adds BSON to 'resultObj';
+         * returns a Status with either OK or an error message.
+         */
+        virtual Status processReplSetReconfig(OperationContext* txn,
+                                              const BSONObj& newConfigObj,
+                                              bool force,
+                                              BSONObjBuilder* resultObj) = 0;
+
     protected:
 
         ReplicationCoordinator();

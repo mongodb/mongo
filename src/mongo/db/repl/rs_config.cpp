@@ -240,21 +240,20 @@ namespace {
         @param n new config
         */
     /*static*/
-    bool ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n, string& errmsg) {
+    Status ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n) {
         verify( theReplSet );
 
         if( o._id != n._id ) {
-            errmsg = "set name may not change";
-            return false;
+            return Status(ErrorCodes::InvalidReplicaSetConfig, "set name may not change");
         }
         /* TODO : wonder if we need to allow o.version < n.version only, which is more lenient.
                   if someone had some intermediate config this node doesnt have, that could be
                   necessary.  but then how did we become primary?  so perhaps we are fine as-is.
                   */
         if( o.version >= n.version ) {
-            errmsg = str::stream() << "version number must increase, old: "
-                                   << o.version << " new: " << n.version;
-            return false;
+            return Status(ErrorCodes::InvalidReplicaSetConfig,
+                          str::stream() << "version number must increase, old: "
+                                   << o.version << " new: " << n.version);
         }
 
         map<HostAndPort,const ReplSetConfig::MemberCfg*> old;
@@ -296,7 +295,7 @@ namespace {
 
         uassert(13433, "can't find self in new replset config", me == 1);
 
-        return true;
+        return Status::OK();
     }
 
     void ReplSetConfig::clear() {

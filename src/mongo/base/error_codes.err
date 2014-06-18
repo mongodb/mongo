@@ -92,6 +92,8 @@ error_code("NetworkTimeout", 89)
 error_code("CallbackCanceled", 90)
 error_code("ShutdownInProgress", 91)
 error_code("SecondaryAheadOfPrimary", 92)
+error_code("InvalidReplicaSetConfig", 93)
+error_code("NotYetInitialized", 94)
 
 
 # Non-sequential error codes (for compatibility only)
