@@ -95,12 +95,10 @@ namespace RunnerRegistry {
         }
 
         static const char* ns() { return "unittests.RunnerRegistryDiskLocInvalidation"; }
-        static DBDirectClient _client;
+        DBDirectClient _client;
         auto_ptr<Client::WriteContext> _ctx;
         OperationContextImpl _opCtx;
     };
-
-    DBDirectClient RunnerRegistryBase::_client;
 
     // Test that a registered runner receives invalidation notifications.
     class RunnerRegistryDiskLocInvalid : public RunnerRegistryBase {

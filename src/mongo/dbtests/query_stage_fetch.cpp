@@ -76,10 +76,8 @@ namespace QueryStageFetch {
         static const char* ns() { return "unittests.QueryStageFetch"; }
 
     private:
-        static DBDirectClient _client;
+        DBDirectClient _client;
     };
-
-    DBDirectClient QueryStageFetchBase::_client;
 
     //
     // Test that a WSM with an obj is passed through verbatim.

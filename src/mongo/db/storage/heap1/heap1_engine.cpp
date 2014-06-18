@@ -1,4 +1,4 @@
-// heap1_recovery_unit.h
+// heap1_engine.cpp
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -28,42 +28,37 @@
 *    it in the license file.
 */
 
-#pragma once
+#include "mongo/db/storage/heap1/heap1_engine.h"
 
-#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/heap1/heap1_database_catalog_entry.h"
+#include "mongo/db/storage/heap1/heap1_recovery_unit.h"
 
 namespace mongo {
 
-    class Heap1RecoveryUnit : public RecoveryUnit {
-    public:
-        Heap1RecoveryUnit() {
-            rollbackPossible = true;
+    RecoveryUnit* Heap1Engine::newRecoveryUnit( OperationContext* opCtx ) {
+        return new Heap1RecoveryUnit();
+    }
+
+    void Heap1Engine::listDatabases( std::vector<std::string>* out ) const {
+        boost::mutex::scoped_lock lk( _dbLock );
+        for ( DBMap::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i ) {
+            out->push_back( *i );
         }
+    }
 
-        virtual void beginUnitOfWork() {}
-        virtual void commitUnitOfWork() {}
+    DatabaseCatalogEntry* Heap1Engine::getDatabaseCatalogEntry( OperationContext* opCtx,
+                                                                const StringData& dbName ) {
+        boost::mutex::scoped_lock lk( _dbLock );
 
-        virtual void endUnitOfWork() {}
-
-        virtual bool commitIfNeeded(bool force = false) {
-            return false;
-        }
-
-        virtual bool awaitCommit() {
-            return true;
-        }
-
-        virtual bool isCommitNeeded() const {
-            return false;
-        }
-
-        virtual void* writingPtr(void* data, size_t len) {
-            return data;
-        }
-
-        virtual void syncDataAndTruncateJournal() {}
-
-        bool rollbackPossible;
-    };
+        // THIS is temporary I think
+        _dbs.insert( dbName.toString() );
+        return new Heap1DatabaseCatalogEntry( dbName );
+        /*
+        Heap1DatabaseCatalogEntry*& db = _dbs[dbName.toString()];
+        if ( !db )
+            db = new Heap1DatabaseCatalogEntry( dbName );
+        return db;
+        */
+    }
 
 }

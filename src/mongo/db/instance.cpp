@@ -56,7 +56,6 @@
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/global_optime.h"
 #include "mongo/db/global_environment_experiment.h"
@@ -114,8 +113,6 @@ namespace mongo {
 #ifdef _WIN32
     HANDLE lockFileHandle;
 #endif
-
-    StorageEngine* globalStorageEngine = new MMAPV1Engine(); // TODO: put this somewhere else
 
     MONGO_FP_DECLARE(rsStopGetMore);
 
@@ -551,7 +548,8 @@ namespace mongo {
         invariant(txn->lockState()->isW());
 
         Database* database = dbHolder().get(txn, db);
-        invariant(database != NULL);
+        if ( !database )
+            return;
 
         repl::oplogCheckCloseDatabase(txn, database); // oplog caches some things, dirty its caches
 
@@ -1020,7 +1018,9 @@ namespace {
         return new DBDirectClient();
     }
 
-    MONGO_INITIALIZER(CreateJSDirectClient)
+    MONGO_INITIALIZER_GENERAL(CreateJSDirectClient,
+                              ("StorageEngineInit"),
+                              MONGO_NO_DEPENDENTS)
         (InitializerContext* context) {
 
         directDBClient = createDirectClient();

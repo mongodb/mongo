@@ -91,10 +91,8 @@ namespace QueryStageKeep {
         }
 
     private:
-        static DBDirectClient _client;
+        DBDirectClient _client;
     };
-
-    DBDirectClient QueryStageKeepBase::_client;
 
     // Test that we actually merge flagged results.
 

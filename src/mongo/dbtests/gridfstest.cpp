@@ -37,12 +37,12 @@ using mongo::GridFS;
 using mongo::MsgAssertionException;
 
 namespace {
-    DBDirectClient _client;
     
     class SetChunkSizeTest {
     public:
         virtual void run() {
-            GridFS grid( _client, "gridtest" );
+            DBDirectClient client;
+            GridFS grid( client, "gridtest" );
             grid.setChunkSize( 5 );
 
             ASSERT_EQUALS( 5U, grid.getChunkSize() );

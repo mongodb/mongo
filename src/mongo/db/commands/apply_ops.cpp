@@ -91,6 +91,7 @@ namespace mongo {
                 while ( i.more() ) {
                     BSONObj f = i.next().Obj();
 
+                    DBDirectClient db( txn );
                     BSONObj realres = db.findOne( f["ns"].String() , f["q"].Obj() );
 
                     // Apply-ops would never have a $where matcher, so use the default callback,
@@ -171,8 +172,6 @@ namespace mongo {
 
             return errors == 0;
         }
-
-        DBDirectClient db;
 
     } applyOpsCmd;
 

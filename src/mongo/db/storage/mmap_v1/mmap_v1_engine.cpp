@@ -35,11 +35,16 @@
 
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
+#include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 #include "mongo/util/mmap.h"
 
 namespace mongo {
 
     MMAPV1Engine::~MMAPV1Engine() {
+    }
+
+    RecoveryUnit* MMAPV1Engine::newRecoveryUnit( OperationContext* opCtx ) {
+        return new DurRecoveryUnit( opCtx );
     }
 
     void MMAPV1Engine::listDatabases( std::vector<std::string>* out ) const {

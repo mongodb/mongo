@@ -35,7 +35,6 @@ using mongo::MsgAssertionException;
  * Test getLastError client handling
  */
 namespace {
-    DBDirectClient _client;
     static const char* const _ns = "unittests.gle";
 
     /**
@@ -44,9 +43,10 @@ namespace {
     class GetLastErrorCommandFailure {
     public:
         void run() {
-            _client.insert(_ns, BSON( "test" << "test"));
+            DBDirectClient client;
+            client.insert(_ns, BSON( "test" << "test"));
             // Cannot mix fsync + j, will make command fail
-            string gleString = _client.getLastError(true, true, 10, 10);
+            string gleString = client.getLastError(true, true, 10, 10);
             ASSERT_NOT_EQUALS(gleString, "");
         }
     };
@@ -57,9 +57,10 @@ namespace {
     class GetLastErrorClean {
     public:
         void run() {
-            _client.insert(_ns, BSON( "test" << "test"));
+            DBDirectClient client;
+            client.insert(_ns, BSON( "test" << "test"));
             // Make sure there was no error
-            string gleString = _client.getLastError();
+            string gleString = client.getLastError();
             ASSERT_EQUALS(gleString, "");
         }
     };
@@ -70,15 +71,16 @@ namespace {
     class GetLastErrorFromDup {
     public:
         void run() {
-            _client.insert(_ns, BSON( "_id" << 1));
+            DBDirectClient client;
+            client.insert(_ns, BSON( "_id" << 1));
             // Make sure there was no error
-            string gleString = _client.getLastError();
+            string gleString = client.getLastError();
             ASSERT_EQUALS(gleString, "");
 
             //insert dup
-            _client.insert(_ns, BSON( "_id" << 1));
+            client.insert(_ns, BSON( "_id" << 1));
             // Make sure there was an error
-            gleString = _client.getLastError();
+            gleString = client.getLastError();
             ASSERT_NOT_EQUALS(gleString, "");
         }
     };

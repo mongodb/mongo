@@ -43,7 +43,6 @@
 namespace IndexUpdateTests {
 
     static const char* const _ns = "unittests.indexupdate";
-    DBDirectClient _client;
 #if 0
     ExternalSortComparison* _aFirstSort = BtreeBasedBulkAccessMethod::getComparison(0, BSON("a" << 1));
 #endif
@@ -94,6 +93,7 @@ namespace IndexUpdateTests {
         }
 #endif
 
+        DBDirectClient _client;
         OperationContextImpl _txn;
         Client::WriteContext _ctx;
     };

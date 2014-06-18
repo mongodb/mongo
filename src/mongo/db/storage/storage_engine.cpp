@@ -1,4 +1,4 @@
-// heap1_recovery_unit.h
+// storage_engine.cpp
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -28,42 +28,33 @@
 *    it in the license file.
 */
 
-#pragma once
+#include "mongo/db/storage/storage_engine.h"
 
-#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/base/init.h"
+#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/heap1/heap1_engine.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
-    class Heap1RecoveryUnit : public RecoveryUnit {
-    public:
-        Heap1RecoveryUnit() {
-            rollbackPossible = true;
+    StorageEngine* globalStorageEngine = 0;
+
+    MONGO_INITIALIZER_GENERAL(StorageEngineInit,
+                              ("EndStartupOptionStorage"),
+                              MONGO_NO_DEPENDENTS )
+        (InitializerContext* context) {
+        if ( storageGlobalParams.engine == "mmapv1" ) {
+            globalStorageEngine = new MMAPV1Engine();
         }
-
-        virtual void beginUnitOfWork() {}
-        virtual void commitUnitOfWork() {}
-
-        virtual void endUnitOfWork() {}
-
-        virtual bool commitIfNeeded(bool force = false) {
-            return false;
+        else if ( storageGlobalParams.engine == "heap1" ) {
+            globalStorageEngine = new Heap1Engine();
         }
-
-        virtual bool awaitCommit() {
-            return true;
+        else {
+            log() << "unknown storage engine: " << storageGlobalParams.engine;
+            return Status( ErrorCodes::BadValue, "unknown storage engine" );
         }
-
-        virtual bool isCommitNeeded() const {
-            return false;
-        }
-
-        virtual void* writingPtr(void* data, size_t len) {
-            return data;
-        }
-
-        virtual void syncDataAndTruncateJournal() {}
-
-        bool rollbackPossible;
-    };
-
+        return Status::OK();
+    }
 }
+

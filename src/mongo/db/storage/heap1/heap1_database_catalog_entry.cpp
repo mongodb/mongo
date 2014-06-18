@@ -101,7 +101,9 @@ namespace mongo {
         entry = new Entry( ns );
 
         if ( options.capped ) {
-            invariant( false );
+            entry->rs.reset( new HeapRecordStore( ns,
+                                                  true,
+                                                  options.cappedSize ) );
         }
         else {
             entry->rs.reset( new HeapRecordStore( ns ) );
@@ -134,6 +136,7 @@ namespace mongo {
         const Entry* entry = dynamic_cast<const Entry*>( collection );
         Entry::Indexes::const_iterator i = entry->indexes.find( index->descriptor()->indexName() );
         invariant( i != entry->indexes.end() );
+        invariant( i->second->access.get() );
         return i->second->access.get();
     }
 

@@ -155,6 +155,11 @@ namespace mongo {
 
         // Storage Options
 
+        general_options.addOptionChaining("storage.engine", "storageEngine", moe::String,
+                                          "what storage engine to use")
+            .setDefault(moe::Value(std::string("mmapv1")));
+
+
 #ifdef _WIN32
         boost::filesystem::path currentPath = boost::filesystem::current_path();
 
@@ -858,6 +863,8 @@ namespace mongo {
                           "security.enableLocalhostAuthBypass is currently not supported in config "
                           "files");
         }
+
+        storageGlobalParams.engine = params["storage.engine"].as<string>();
 
         if (params.count("storage.dbPath")) {
             storageGlobalParams.dbpath = params["storage.dbPath"].as<string>();

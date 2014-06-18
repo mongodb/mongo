@@ -39,10 +39,13 @@ namespace mongo {
 
     class DatabaseCatalogEntry;
     class OperationContext;
+    class RecoveryUnit;
 
     class StorageEngine {
     public:
         virtual ~StorageEngine() {}
+
+        virtual RecoveryUnit* newRecoveryUnit( OperationContext* opCtx ) = 0;
 
         virtual void listDatabases( std::vector<std::string>* out ) const = 0;
 

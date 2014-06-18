@@ -58,7 +58,6 @@ namespace mongo {
         // you probably need to be in dbHolderMutex when constructing this
         Database(OperationContext* txn,
                  const std::string& name,
-                 bool& newDb, /* out */
                  DatabaseCatalogEntry* dbEntry );
 
         /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.

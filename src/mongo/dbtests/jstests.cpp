@@ -904,8 +904,6 @@ namespace JSTests {
         verify(0);
     }
 
-    DBDirectClient client;
-
     class Utf8Check {
     public:
         Utf8Check() { reset(); }
@@ -932,6 +930,7 @@ namespace JSTests {
             client.dropCollection( ns() );
         }
         static const char *ns() { return "unittest.jstests.utf8check"; }
+        DBDirectClient client;
     };
 
     class LongUtf8String {
@@ -948,6 +947,7 @@ namespace JSTests {
             client.dropCollection( ns() );
         }
         static const char *ns() { return "unittest.jstests.longutf8string"; }
+        DBDirectClient client;
     };
 
     class InvalidUTF8Check {
@@ -1077,6 +1077,7 @@ namespace JSTests {
             virtual string jsonOut() const {
                 return json();
             }
+            DBDirectClient client;
         };
 
         class DBRefTest : public TestRoundTrip {
@@ -1981,6 +1982,7 @@ namespace JSTests {
     class InvalidStoredJS {
     public:
         void run() {
+            DBDirectClient client;
             BSONObjBuilder query;
             query.append( "_id" , "invalidstoredjs1" );
             

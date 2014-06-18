@@ -94,10 +94,13 @@ namespace mongo {
         cc().writeHappened();
 
         // this locks _m for defensive checks, so we don't want to be locked right here :
+        invariant( globalStorageEngine );
+        DatabaseCatalogEntry* entry = globalStorageEngine->getDatabaseCatalogEntry( txn, dbname );
+        invariant( entry );
+        justCreated = !entry->exists();
         Database *db = new Database(txn,
                                     dbname,
-                                    justCreated,
-                                    globalStorageEngine->getDatabaseCatalogEntry( txn, dbname ) );
+                                    entry );
 
         {
             SimpleMutex::scoped_lock lk(_m);

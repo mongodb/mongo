@@ -34,14 +34,15 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
     OperationContextImpl::OperationContextImpl() {
-        _recovery.reset(new DurRecoveryUnit(this));
+        invariant( globalStorageEngine );
+        _recovery.reset(globalStorageEngine->newRecoveryUnit(this));
     }
 
     RecoveryUnit* OperationContextImpl::recoveryUnit() const {

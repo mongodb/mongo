@@ -104,7 +104,6 @@ namespace mongo {
 
     Database::Database(OperationContext* txn,
                        const std::string& name,
-                       bool& newDb,
                        DatabaseCatalogEntry* dbEntry )
         : _name(name),
           _dbEntry( dbEntry ),
@@ -120,7 +119,6 @@ namespace mongo {
         }
 
         _profile = serverGlobalParams.defaultProfile;
-        newDb = !_dbEntry->exists();
     }
 
 

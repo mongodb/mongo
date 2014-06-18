@@ -40,7 +40,6 @@ namespace mongo {
      */
 
     static const char * const ns = "unittests.removetests";
-    static DBDirectClient client;
 
     // TODO: Normalize with test framework
     /** Simple test for Helpers::RemoveRange. */
@@ -51,6 +50,7 @@ namespace mongo {
         {
         }
         void run() {
+            DBDirectClient client;
             for ( int i = 0; i < 10; ++i ) {
                 client.insert( ns, BSON( "_id" << i ) );
             }
@@ -83,6 +83,7 @@ namespace mongo {
             return bab.arr();
         }
         BSONArray docs() const {
+            DBDirectClient client;
             auto_ptr<DBClientCursor> cursor = client.query( ns,
                                                             Query().hint( BSON( "_id" << 1 ) ) );
             BSONArrayBuilder bab;

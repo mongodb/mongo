@@ -43,8 +43,6 @@
 #include "mongo/util/text.h"
 #include "mongo/util/time_support.h"
 
-#include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h" //XXX
-
 namespace BasicTests {
 
     class Rarely {
@@ -381,23 +379,12 @@ namespace BasicTests {
             OperationContextImpl txn;
             Lock::GlobalWrite lk(txn.lockState());
 
-            bool isNew = false;
-            // this leaks as ~Database is private
-            // if that changes, should put this on the stack
-            {
-                MMAPV1DatabaseCatalogEntry* temp = new MMAPV1DatabaseCatalogEntry(&txn,
-                                                                                  "dbtests_basictests_ownsns",
-                                                                                  storageGlobalParams.dbpath,
-                                                                                  storageGlobalParams.directoryperdb,
-                                                                                  true);
-                Database * db = new Database( &txn, "dbtests_basictests_ownsns", isNew, temp );
-                ASSERT( isNew );
+            Database db( &txn, "dbtests_basictests_ownsns", NULL );
 
-                ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x" ) );
-                ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x.y" ) );
-                ASSERT( ! db->ownsNS( "dbtests_basictests_ownsn.x.y" ) );
-                ASSERT( ! db->ownsNS( "dbtests_basictests_ownsnsa.x.y" ) );
-            }
+            ASSERT( db.ownsNS( "dbtests_basictests_ownsns.x" ) );
+            ASSERT( db.ownsNS( "dbtests_basictests_ownsns.x.y" ) );
+            ASSERT( !db.ownsNS( "dbtests_basictests_ownsn.x.y" ) );
+            ASSERT( !db.ownsNS( "dbtests_basictests_ownsnsa.x.y" ) );
         }
     };
 

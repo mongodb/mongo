@@ -1,4 +1,4 @@
-// heap1_recovery_unit.h
+// heap1_engine.h
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -30,40 +30,43 @@
 
 #pragma once
 
-#include "mongo/db/storage/recovery_unit.h"
+#include <set>
+#include <string>
+#include <map>
+
+#include <boost/thread/mutex.hpp>
+
+#include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
 
-    class Heap1RecoveryUnit : public RecoveryUnit {
+    class Heap1DatabaseCatalogEntry;
+
+    class Heap1Engine : public StorageEngine {
     public:
-        Heap1RecoveryUnit() {
-            rollbackPossible = true;
-        }
+        virtual ~Heap1Engine() {}
 
-        virtual void beginUnitOfWork() {}
-        virtual void commitUnitOfWork() {}
+        virtual RecoveryUnit* newRecoveryUnit( OperationContext* opCtx );
 
-        virtual void endUnitOfWork() {}
+        virtual void listDatabases( std::vector<std::string>* out ) const;
 
-        virtual bool commitIfNeeded(bool force = false) {
-            return false;
-        }
+        virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
+                                                               const StringData& db );
 
-        virtual bool awaitCommit() {
-            return true;
-        }
+        /**
+         * @return number of files flushed
+         */
+        virtual int flushAllFiles( bool sync ) { return 0; }
 
-        virtual bool isCommitNeeded() const {
-            return false;
-        }
+        virtual Status repairDatabase( OperationContext* tnx,
+                                       const std::string& dbName,
+                                       bool preserveClonedFilesOnFailure = false,
+                                       bool backupOriginalFiles = false ) { return Status::OK(); }
 
-        virtual void* writingPtr(void* data, size_t len) {
-            return data;
-        }
-
-        virtual void syncDataAndTruncateJournal() {}
-
-        bool rollbackPossible;
+    private:
+        mutable boost::mutex _dbLock;
+        typedef std::set<std::string> DBMap;
+        DBMap _dbs;
     };
 
 }

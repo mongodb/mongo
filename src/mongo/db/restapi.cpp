@@ -70,6 +70,8 @@ namespace mongo {
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
 
+            DBDirectClient db( txn );
+
             string::size_type first = url.find( "/" , 1 );
             if ( first == string::npos ) {
                 responseCode = 400;
@@ -106,11 +108,11 @@ namespace mongo {
 
             if ( method == "GET" ) {
                 responseCode = 200;
-                html = handleRESTQuery( fullns , action , params , responseCode , ss  );
+                html = handleRESTQuery( db, fullns, action, params, responseCode, ss  );
             }
             else if ( method == "POST" ) {
                 responseCode = 201;
-                handlePost( fullns , MiniWebServer::body( rq ) , params , responseCode , ss  );
+                handlePost( db, fullns, MiniWebServer::body( rq ), params, responseCode, ss  );
             }
             else {
                 responseCode = 400;
@@ -127,7 +129,8 @@ namespace mongo {
             responseMsg = ss.str();
         }
 
-        bool handleRESTQuery( const std::string& ns,
+        bool handleRESTQuery( DBDirectClient& db,
+                              const std::string& ns,
                               const std::string& action,
                               BSONObj & params,
                               int & responseCode,
@@ -229,7 +232,8 @@ namespace mongo {
         }
 
         // TODO Generate id and revision per couch POST spec
-        void handlePost( const std::string& ns,
+        void handlePost( DBDirectClient& db,
+                         const std::string& ns,
                          const char *body,
                          BSONObj& params,
                          int & responseCode,
@@ -255,8 +259,6 @@ namespace mongo {
                 return atoi( e.valuestr() );
             return def;
         }
-
-        DBDirectClient db;
 
     } restHandler;
 

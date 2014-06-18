@@ -52,20 +52,19 @@ namespace UpdateTests {
             mongo::lastError.release();
         }
     protected:
-        static void insert( const char *ns, BSONObj o ) {
+        void insert( const char *ns, BSONObj o ) {
             client_.insert( ns, o );
         }
-        static void update( const char *ns, BSONObj q, BSONObj o, bool upsert = 0 ) {
+        void update( const char *ns, BSONObj q, BSONObj o, bool upsert = 0 ) {
             client_.update( ns, Query( q ), o, upsert );
         }
-        static bool error() {
+        bool error() {
             return !client_.getPrevError().getField( "err" ).isNull();
         }
-        DBDirectClient &client() const { return client_; }
+        DBDirectClient &client() { return client_; }
     private:
-        static DBDirectClient client_;
+        DBDirectClient client_;
     };
-    DBDirectClient ClientBase::client_;
 
     class Fail : public ClientBase {
     public:

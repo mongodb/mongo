@@ -42,6 +42,7 @@ namespace mongo {
     struct StorageGlobalParams {
 
         StorageGlobalParams() :
+            engine("mmapv1"),
 #ifdef _WIN32
             dbpath("\\data\\db\\"),
 #else
@@ -66,6 +67,7 @@ namespace mongo {
 #endif
         }
 
+        std::string engine;
         std::string dbpath;
         bool directoryperdb;
         std::string repairpath;

@@ -83,10 +83,9 @@ namespace QueryMultiPlanRunner {
         static const char* ns() { return "unittests.QueryStageMultiPlanRunner"; }
 
     private:
-        static DBDirectClient _client;
+        DBDirectClient _client;
     };
 
-    DBDirectClient MultiPlanRunnerBase::_client;
 
     // Basic ranking test: collection scan vs. highly selective index scan.  Make sure we also get
     // all expected results out as well.

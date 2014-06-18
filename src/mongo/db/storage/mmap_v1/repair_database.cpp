@@ -325,13 +325,11 @@ namespace mongo {
                                                     reservedPathString,
                                                     storageGlobalParams.directoryperdb,
                                                     true );
-                bool justCreated = false;
+                invariant( !entry->exists() );
                 tempDatabase.reset( new Database( txn,
                                                   dbName,
-                                                  justCreated,
                                                   entry ) );
 
-                invariant( justCreated );
             }
 
             map<string,CollectionOptions> namespacesToCopy;

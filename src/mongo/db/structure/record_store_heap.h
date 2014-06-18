@@ -123,6 +123,7 @@ namespace mongo {
         typedef std::map<DiskLoc, boost::shared_array<char> > Records;
 
         bool isCapped() const { return _isCapped; }
+        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) { _cappedDeleteCallback = cb; }
         bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
 
@@ -135,7 +136,7 @@ namespace mongo {
         const bool _isCapped;
         const int64_t _cappedMaxSize;
         const int64_t _cappedMaxDocs;
-        CappedDocumentDeleteCallback* const _cappedDeleteCallback;
+        CappedDocumentDeleteCallback* _cappedDeleteCallback;
         int64_t _dataSize;
 
         Records _records;
