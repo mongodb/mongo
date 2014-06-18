@@ -82,7 +82,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	 * with some eviction-dominated workloads.
 	 */
 	if (full < (busy ? 100 : 95) || F_ISSET(session,
-	    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
+	    WT_SESSION_LSM_TREE_LOCK | WT_SESSION_SCHEMA_LOCKED))
 		return (0);
 
 	if ((btree = S2BT_SAFE(session)) != NULL &&
