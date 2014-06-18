@@ -46,6 +46,9 @@ namespace mongo {
                                bool preserveClonedFilesOnFailure,
                                bool backupOriginalFiles );
 
+        DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
+                                                       const StringData& db );
+
     private:
         static void _listDatabases( const std::string& directory,
                                     std::vector<std::string>* out );

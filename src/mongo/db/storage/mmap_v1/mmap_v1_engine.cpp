@@ -34,6 +34,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/storage_options.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/util/mmap.h"
 
 namespace mongo {
@@ -43,6 +44,15 @@ namespace mongo {
 
     void MMAPV1Engine::listDatabases( std::vector<std::string>* out ) const {
         _listDatabases( storageGlobalParams.dbpath, out );
+    }
+
+    DatabaseCatalogEntry* MMAPV1Engine::getDatabaseCatalogEntry( OperationContext* opCtx,
+                                                                 const StringData& db ) {
+        return new MMAPV1DatabaseCatalogEntry( opCtx,
+                                               db,
+                                               storageGlobalParams.dbpath,
+                                               storageGlobalParams.directoryperdb,
+                                               false );
     }
 
     void MMAPV1Engine::_listDatabases( const std::string& directory,

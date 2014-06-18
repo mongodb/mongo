@@ -39,10 +39,8 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/file_allocator.h"
-
-#include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h" //XXX
-
 
 namespace mongo {
 
@@ -99,11 +97,7 @@ namespace mongo {
         Database *db = new Database(txn,
                                     dbname,
                                     justCreated,
-                                    new MMAPV1DatabaseCatalogEntry(txn,
-                                                                   dbname,
-                                                                   storageGlobalParams.dbpath,
-                                                                   storageGlobalParams.directoryperdb,
-                                                                   false));
+                                    globalStorageEngine->getDatabaseCatalogEntry( txn, dbname ) );
 
         {
             SimpleMutex::scoped_lock lk(_m);

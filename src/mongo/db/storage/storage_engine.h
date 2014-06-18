@@ -37,6 +37,7 @@
 
 namespace mongo {
 
+    class DatabaseCatalogEntry;
     class OperationContext;
 
     class StorageEngine {
@@ -44,6 +45,12 @@ namespace mongo {
         virtual ~StorageEngine() {}
 
         virtual void listDatabases( std::vector<std::string>* out ) const = 0;
+
+        /**
+         * TODO: document ownership semantics
+         */
+        virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
+                                                               const StringData& db ) = 0;
 
         /**
          * @return number of files flushed
