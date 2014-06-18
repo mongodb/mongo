@@ -84,7 +84,7 @@ namespace mongo {
                               const UpdateTicket& ticket,
                               int64_t* numUpdated);
 
-        virtual Status newCursor(IndexCursor **out) const;
+        virtual Status newCursor(const CursorOptions& opts, IndexCursor** out) const;
 
         virtual Status initializeAsEmpty(OperationContext* txn);
 

@@ -48,11 +48,6 @@ namespace mongo {
         HashAccessMethod(IndexCatalogEntry* btreeState, RecordStore* rs);
         virtual ~HashAccessMethod() { }
 
-        // This is a NO-OP.
-        virtual Status setOptions(const CursorOptions& options) {
-            return Status::OK();
-        }
-
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 

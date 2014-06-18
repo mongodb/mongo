@@ -90,10 +90,9 @@ namespace mongo {
         }
 
         IndexCursor *cursor;
-        Status s = _iam->newCursor(&cursor);
+        Status s = _iam->newCursor(cursorOptions, &cursor);
         verify(s.isOK());
         _indexCursor.reset(cursor);
-        _indexCursor->setOptions(cursorOptions);
 
         if (_params.bounds.isSimpleRange) {
             // Start at one key, end at another.

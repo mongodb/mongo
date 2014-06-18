@@ -55,11 +55,6 @@ namespace mongo {
         virtual ~IndexCursor() { }
 
         /**
-         * Set options on the cursor (direction).  See CursorOptions below.
-         */
-        virtual Status setOptions(const CursorOptions& options) = 0;
-
-        /**
          * A cursor doesn't point anywhere by default.  You must seek to the start position.
          * The provided position must be a predicate that the index understands.  The
          * predicate must describe one value, though there may be several instances

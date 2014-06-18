@@ -51,13 +51,12 @@ namespace mongo {
         cursorOptions.direction = CursorOptions::INCREASING;
 
         IndexCursor *cursor;
-        Status s = _iam->newCursor(&cursor);
+        Status s = _iam->newCursor(cursorOptions, &cursor);
         verify(s.isOK());
         verify(cursor);
 
         // Is this assumption always valid?  See SERVER-12397
         _btreeCursor.reset(static_cast<BtreeIndexCursor*>(cursor));
-        _btreeCursor->setOptions(cursorOptions);
 
         // _btreeCursor points at our start position.  We move it forward until it hits a cursor
         // that points at the end.
@@ -65,12 +64,11 @@ namespace mongo {
 
         // Create the cursor that points at our end position.
         IndexCursor* endCursor;
-        verify(_iam->newCursor(&endCursor).isOK());
+        verify(_iam->newCursor(cursorOptions, &endCursor).isOK());
         verify(endCursor);
 
         // Is this assumption always valid?  See SERVER-12397
         _endCursor.reset(static_cast<BtreeIndexCursor*>(endCursor));
-        _endCursor->setOptions(cursorOptions);
 
         // If the end key is inclusive we want to point *past* it since that's the end.
         _endCursor->seek(_params.endKey, _params.endKeyInclusive);

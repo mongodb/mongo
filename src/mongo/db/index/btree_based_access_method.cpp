@@ -156,9 +156,8 @@ namespace mongo {
         return ret;
     }
 
-    Status BtreeBasedAccessMethod::newCursor(IndexCursor **out) const {
-        *out = new BtreeIndexCursor(_btreeState->head(),
-                                    _newInterface.get());
+    Status BtreeBasedAccessMethod::newCursor(const CursorOptions& opts, IndexCursor** out) const {
+        *out = new BtreeIndexCursor(_newInterface->newCursor(opts.direction));
         return Status::OK();
     }
 
@@ -215,10 +214,9 @@ namespace mongo {
         BSONObjSet keys;
         getKeys(obj, &keys);
 
-        DiskLoc loc;
-        int keyPos;
+        boost::scoped_ptr<BtreeInterface::Cursor> cursor(_newInterface->newCursor(1));
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            _newInterface->locate(*i, DiskLoc(), 1, &loc, &keyPos);
+            cursor->locate(*i, DiskLoc());
         }
 
         return Status::OK();
@@ -230,24 +228,22 @@ namespace mongo {
     }
 
     DiskLoc BtreeBasedAccessMethod::findSingle(const BSONObj& key) const {
-        DiskLoc bucket;
-        int pos;
-
-        _newInterface->locate(key, minDiskLoc, 1, &bucket, &pos);
+        boost::scoped_ptr<BtreeInterface::Cursor> cursor(_newInterface->newCursor(1));
+        cursor->locate(key, minDiskLoc);
 
         // A null bucket means the key wasn't found (nor was anything found after it).
-        if (bucket.isNull()) {
+        if (cursor->isEOF()) {
             return DiskLoc();
         }
 
         // We found something but it could be a key after 'key'.  Examine what we're pointing at.
-        if (0 != key.woCompare(_newInterface->getKey(bucket, pos), BSONObj(), false)) {
+        if (0 != key.woCompare(cursor->getKey(), BSONObj(), false)) {
             // If the keys don't match, return "not found."
             return DiskLoc();
         }
 
         // Return the DiskLoc found.
-        return _newInterface->getDiskLoc(bucket, pos);
+        return cursor->getDiskLoc();
     }
 
     Status BtreeBasedAccessMethod::validate(int64_t* numKeys) {

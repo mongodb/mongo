@@ -66,8 +66,6 @@ namespace mongo {
     /**
      * This is the interface for interacting with the Btree.  The index access and catalog layers
      * should use this.
-     *
-     * TODO: do we want to hide the fact that (DiskLoc, int) identify an entry?
      */
     class BtreeInterface {
     public:
@@ -128,54 +126,67 @@ namespace mongo {
         // Navigation
         //
 
-        virtual bool locate(const BSONObj& key,
-                            const DiskLoc& loc,
-                            const int direction,
-                            DiskLoc* bucketOut,
-                            int* keyPosOut) = 0;
+        class Cursor {
+        public:
+            virtual ~Cursor() {}
 
-        virtual void advanceTo(DiskLoc* thisLocInOut,
-                               int* keyOfsInOut,
-                               const BSONObj &keyBegin,
-                               int keyBeginLen,
-                               bool afterKey,
-                               const vector<const BSONElement*>& keyEnd,
-                               const vector<bool>& keyEndInclusive,
-                               int direction) const = 0;
+            virtual int getDirection() const = 0;
+
+            virtual bool isEOF() const = 0;
+
+            /**
+             * Will only be called with other from same index as this.
+             * All EOF locs should be considered equal.
+             */
+             virtual bool pointsToSamePlaceAs(const Cursor& other) const = 0;
+
+            /**
+             * If the BtreeInterface impl calls the BucketNotificationCallback, the argument must
+             * be forwarded to all Cursors over that Btree.
+             * TODO something better.
+             */
+            virtual void aboutToDeleteBucket(const DiskLoc& bucket) = 0;
+
+            virtual bool locate(const BSONObj& key, const DiskLoc& loc) = 0;
+
+            virtual void advanceTo(const BSONObj &keyBegin,
+                                   int keyBeginLen,
+                                   bool afterKey,
+                                   const vector<const BSONElement*>& keyEnd,
+                                   const vector<bool>& keyEndInclusive) = 0;
+
+            /**
+             * Locate a key with fields comprised of a combination of keyBegin fields and keyEnd
+             * fields.
+             */
+            virtual void customLocate(const BSONObj& keyBegin,
+                                      int keyBeginLen,
+                                      bool afterVersion,
+                                      const vector<const BSONElement*>& keyEnd,
+                                      const vector<bool>& keyEndInclusive) = 0;
+
+            /**
+             * Return OK if it's not
+             * Otherwise return a status that can be displayed 
+             */
+            virtual BSONObj getKey() const = 0;
+
+            virtual DiskLoc getDiskLoc() const = 0;
+
+            virtual void advance() = 0;
+
+            //
+            // Saving and restoring state
+            //
+            virtual void savePosition(SavedPositionData* savedOut) const = 0;
+
+            virtual void restorePosition(const SavedPositionData& saved) = 0;
+        };
 
         /**
-         * Locate a key with fields comprised of a combination of keyBegin fields and keyEnd fields.
+         * Caller takes ownership. BtreeInterface must outlive all Cursors it produces.
          */
-        virtual void customLocate(DiskLoc* locInOut,
-                                  int* keyOfsInOut,
-                                  const BSONObj& keyBegin,
-                                  int keyBeginLen,
-                                  bool afterVersion,
-                                  const vector<const BSONElement*>& keyEnd,
-                                  const vector<bool>& keyEndInclusive,
-                                  int direction) = 0;
-
-        /**
-         * Return OK if it's not
-         * Otherwise return a status that can be displayed 
-         */
-        virtual BSONObj getKey(const DiskLoc& bucket, const int keyOffset) = 0;
-
-        virtual DiskLoc getDiskLoc(const DiskLoc& bucket, const int keyOffset) = 0;
-
-        virtual void advance(DiskLoc* bucketInOut, int* posInOut, int direction) = 0;
-
-        //
-        // Saving and restoring state
-        //
-        virtual void savePosition(const DiskLoc& bucket,
-                                  const int keyOffset,
-                                  SavedPositionData* savedOut) = 0;
-
-        virtual void restorePosition(const SavedPositionData& saved,
-                                     int direction,
-                                     DiskLoc* bucketOut,
-                                     int* keyOffsetOut) = 0;
+        virtual Cursor* newCursor(int direction) const = 0;
 
         //
         // Index creation

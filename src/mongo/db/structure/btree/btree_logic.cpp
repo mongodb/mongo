@@ -2013,14 +2013,14 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    DiskLoc BtreeLogic<BtreeLayout>::getDiskLoc(const DiskLoc& bucketLoc, const int keyOffset) {
+    DiskLoc BtreeLogic<BtreeLayout>::getDiskLoc(const DiskLoc& bucketLoc, const int keyOffset) const {
         invariant(!bucketLoc.isNull());
         BucketType* bucket = getBucket(bucketLoc);
         return getKeyHeader(bucket, keyOffset).recordLoc;
     }
 
     template <class BtreeLayout>
-    BSONObj BtreeLogic<BtreeLayout>::getKey(const DiskLoc& bucketLoc, const int keyOffset) {
+    BSONObj BtreeLogic<BtreeLayout>::getKey(const DiskLoc& bucketLoc, const int keyOffset) const {
         invariant(!bucketLoc.isNull());
         BucketType* bucket = getBucket(bucketLoc);
         int n = bucket->n;

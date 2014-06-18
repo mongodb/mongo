@@ -109,7 +109,7 @@ namespace mongo {
             return _notAllowed();
         }
 
-        virtual Status newCursor(IndexCursor **out) const {
+        virtual Status newCursor(const CursorOptions& opts, IndexCursor** out) const {
             return _notAllowed();
         }
 

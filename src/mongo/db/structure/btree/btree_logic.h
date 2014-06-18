@@ -174,9 +174,9 @@ namespace mongo {
                                bool dumpBuckets,
                                unsigned depth);
 
-        DiskLoc getDiskLoc(const DiskLoc& bucketLoc, const int keyOffset);
+        DiskLoc getDiskLoc(const DiskLoc& bucketLoc, const int keyOffset) const;
 
-        BSONObj getKey(const DiskLoc& bucketLoc, const int keyOffset);
+        BSONObj getKey(const DiskLoc& bucketLoc, const int keyOffset) const;
 
         //
         // Composite key navigation methods
@@ -205,6 +205,8 @@ namespace mongo {
                              int direction,
                              DiskLoc* bucketInOut,
                              int* keyOffsetInOut) const;
+
+        DiskLoc getHead() const { return _headManager->getHead(); }
 
         //
         // Creation and deletion

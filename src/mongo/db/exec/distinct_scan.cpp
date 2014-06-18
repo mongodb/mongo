@@ -60,12 +60,11 @@ namespace mongo {
         }
 
         IndexCursor *cursor;
-        Status s = _iam->newCursor(&cursor);
+        Status s = _iam->newCursor(cursorOptions, &cursor);
         verify(s.isOK());
         verify(cursor);
         // Is this assumption always valid?  See SERVER-12397
         _btreeCursor.reset(static_cast<BtreeIndexCursor*>(cursor));
-        _btreeCursor->setOptions(cursorOptions);
 
         // Create a new bounds checker.  The bounds checker gets our start key and assists in
         // executing the scan and staying within the required bounds.
