@@ -42,6 +42,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     archive_list = ['true', 'false']
     conn_list = ['reopen', 'stay_open']
     sync_list = ['dsync', 'fsync', 'none']
+    txn_sync_list = ['', 'dsync', 'fsync', 'none']
 
     types = [
         ('row', dict(tabletype='row',
@@ -199,6 +200,11 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             self.scenario_number % len(self.conn_list)]
         ops = (self.op1, self.op2, self.op3, self.op4)
         txns = (self.txn1, self.txn2, self.txn3, self.txn4)
+        txn_sync = self.txn_sync_list[
+            self.scenario_number % len(self.txn_sync_list)]
+        txn_cfg = None
+        if txn_sync != '':
+            txn_cfg = 'transaction_sync="%s"' % txn_sync
         # for ok, txn in zip(ops, txns):
         # print ', '.join('%s(%d)[%s]' % (ok[0], ok[1], txn)
         for i, ot in enumerate(zip(ops, txns)):
@@ -210,7 +216,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
                 self.reopen_conn()
                 c = self.session.open_cursor(self.uri, None, 'overwrite')
 
-            self.session.begin_transaction()
+            self.session.begin_transaction(txn_cfg)
             # Test multiple operations per transaction by always
             # doing the same operation on key k + 1.
             k1 = k + 1

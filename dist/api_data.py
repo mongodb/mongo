@@ -596,6 +596,9 @@ methods = {
 	    priority of the transaction for resolving conflicts.
 	    Transactions with higher values are less likely to abort''',
 	    min='-100', max='100'),
+	Config('transaction_sync', '', r'''
+	    how to sync log records when the transaction commits''',
+	    choices=['dsync', 'fsync', 'none']),
 ]),
 
 'session.commit_transaction' : Method([]),

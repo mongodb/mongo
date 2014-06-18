@@ -14,18 +14,8 @@
 static int
 __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 {
-	static const struct {
-		const char *name;
-		uint32_t flag;
-	} *st, sync_types[] = {
-		{ "dsync",	WT_LOG_DSYNC},
-		{ "fsync",	WT_LOG_FSYNC},
-		{ "none",	0 },
-		{ NULL, 0 }
-	};
-	WT_CONFIG_ITEM cval, sval;
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 
 	conn = S2C(session);
 
@@ -48,18 +38,8 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
 	conn->txn_logsync = WT_LOG_DSYNC;
-	WT_RET(__wt_config_gets(session, cfg, "transaction_sync", &cval));
-	for (st = sync_types; st->name != NULL; st++) {
-		ret = __wt_config_subgets(session, &cval, st->name, &sval);
-		if (ret == 0) {
-			if (sval.val)
-				conn->txn_logsync = st->flag;
-		} else if (ret != WT_NOTFOUND)
-			goto err;
-	}
-	ret = 0;
-err:
-	return (ret);
+	WT_RET(__wt_logmgr_sync_cfg(session, cfg, &conn->txn_logsync));
+	return (0);
 }
 
 /*
@@ -145,6 +125,44 @@ err:		__wt_err(session, ret, "log archive server error");
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 	return (NULL);
+}
+
+/*
+ * __wt_logmgr_sync_cfg --
+ *	Interpret the transaction_sync config.
+ */
+int
+__wt_logmgr_sync_cfg(
+    WT_SESSION_IMPL *session, const char **cfg, uint32_t *syncp)
+{
+	static const struct {
+		const char *name;
+		uint32_t flag;
+	} *st, sync_types[] = {
+		{ "dsync",	WT_LOG_DSYNC},
+		{ "fsync",	WT_LOG_FSYNC},
+		{ "none",	0 },
+		{ NULL, 0 }
+	};
+	WT_CONFIG_ITEM cval, sval;
+	WT_DECL_RET;
+
+	ret = 0;
+	if (syncp == NULL || cfg == NULL)
+		goto out;
+	WT_RET(__wt_config_gets(session, cfg, "transaction_sync", &cval));
+	for (st = sync_types; st->name != NULL; st++) {
+		ret = __wt_config_subgets(session, &cval, st->name, &sval);
+		if (ret == 0) {
+			if (sval.val)
+				*syncp = st->flag;
+		} else if (ret != WT_NOTFOUND)
+			goto out;
+	}
+	/* WT_NOTFOUND is okay.  Return 0. */
+	ret = 0;
+out:
+	return (ret);
 }
 
 /*

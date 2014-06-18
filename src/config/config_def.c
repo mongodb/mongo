@@ -144,6 +144,9 @@ static const WT_CONFIG_CHECK confchk_session_begin_transaction[] = {
 	    NULL},
 	{ "name", "string", NULL, NULL},
 	{ "priority", "int", "min=-100,max=100", NULL},
+	{ "transaction_sync", "string",
+	    "choices=[\"dsync\",\"fsync\",\"none\"]",
+	    NULL},
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -387,7 +390,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_index_meta
 	},
 	{ "session.begin_transaction",
-	  "isolation=,name=,priority=0",
+	  "isolation=,name=,priority=0,transaction_sync=",
 	  confchk_session_begin_transaction
 	},
 	{ "session.checkpoint",

@@ -251,6 +251,8 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		    TXN_ISO_SNAPSHOT :
 		    WT_STRING_MATCH("read-committed", cval.str, cval.len) ?
 		    TXN_ISO_READ_COMMITTED : TXN_ISO_READ_UNCOMMITTED;
+	txn->txn_logsync = S2C(session)->txn_logsync;
+	WT_RET(__wt_logmgr_sync_cfg(session, cfg, &txn->txn_logsync));
 
 	F_SET(txn, TXN_RUNNING);
 	if (txn->isolation == TXN_ISO_SNAPSHOT)
