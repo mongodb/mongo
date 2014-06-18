@@ -736,11 +736,13 @@ private:
         long long fileSize = boost::filesystem::file_size(filePath);
         ifstream file(filePath.c_str(), ios_base::in);
 
-        boost::scoped_array<char> buf(new char[fileSize]);
+        boost::scoped_array<char> buf(new char[fileSize + 1]);
         file.read(buf.get(), fileSize);
+        buf[fileSize] = '\0';
+
         int objSize;
         BSONObj obj;
-        obj = fromjson (buf.get(), &objSize);
+        obj = fromjson(buf.get(), &objSize);
         return obj;
     }
 
