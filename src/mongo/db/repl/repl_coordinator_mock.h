@@ -95,6 +95,10 @@ namespace repl {
                                               const BSONObj& newConfigObj,
                                               bool force,
                                               BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetInitiate(OperationContext* txn,
+                                              const BSONObj& configObj,
+                                              BSONObjBuilder* resultObj);
     };
 
 } // namespace repl

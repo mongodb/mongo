@@ -43,6 +43,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/heartbeat.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_set_seed_list.h"  // parseReplSetSeedList
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/replset_commands.h"
@@ -177,123 +178,22 @@ namespace repl {
             actions.addAction(ActionType::replSetConfigure);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            log() << "replSet replSetInitiate admin command received from client" << rsLog;
-
-            if( !replSet ) {
-                errmsg = "server is not running with --replSet";
-                return false;
-            }
-            if( theReplSet ) {
-                errmsg = "already initialized";
-                result.append("info", "try querying " + rsConfigNs + " to see current configuration");
-                return false;
-            }
-
-            {
-                // just make sure we can get a write lock before doing anything else.  we'll reacquire one
-                // later.  of course it could be stuck then, but this check lowers the risk if weird things
-                // are up.
-                time_t t = time(0);
-                Lock::GlobalWrite lk(txn->lockState());
-                if( time(0)-t > 10 ) {
-                    errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
-                    return false;
-                }
-
-                /* check that we don't already have an oplog.  that could cause issues.
-                   it is ok if the initiating member has *other* data than that.
-                   */
-                BSONObj o;
-                if( Helpers::getFirst(txn, rsoplog, o) ) {
-                    errmsg = rsoplog + string(" is not empty on the initiating member.  cannot initiate.");
-                    return false;
-                }
-            }
-
-            if( ReplSet::startupStatus == ReplSet::BADCONFIG ) {
-                errmsg = "server already in BADCONFIG state (check logs); not initiating";
-                result.append("info", ReplSet::startupStatusMsg.get());
-                return false;
-            }
-            if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
-                result.append("startupStatus", ReplSet::startupStatus);
-                errmsg = "all members and seeds must be reachable to initiate set";
-                result.append("info", replSettings.replSet);
-                return false;
-            }
+        virtual bool run(OperationContext* txn,
+                         const string& ,
+                         BSONObj& cmdObj,
+                         int, string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
 
             BSONObj configObj;
-
-            if( cmdObj["replSetInitiate"].type() != Object ) {
-                result.append("info2", "no configuration explicitly specified -- making one");
-                log() << "replSet info initiate : no configuration specified.  Using a default configuration for the set" << rsLog;
-
-                string name;
-                vector<HostAndPort> seeds;
-                set<HostAndPort> seedSet;
-                parseReplSetSeedList(replSettings.replSet, name, seeds, seedSet); // may throw...
-
-                bob b;
-                b.append("_id", name);
-                bob members;
-                members.append("0", BSON( "_id" << 0 << "host" << HostAndPort::me().toString() ));
-                result.append("me", HostAndPort::me().toString());
-                for( unsigned i = 0; i < seeds.size(); i++ )
-                    members.append(bob::numStr(i+1), BSON( "_id" << i+1 << "host" << seeds[i].toString()));
-                b.appendArray("members", members.obj());
-                configObj = b.obj();
-                log() << "replSet created this configuration for initiation : " << configObj.toString() << rsLog;
-            }
-            else {
+            if( cmdObj["replSetInitiate"].type() == Object ) {
                 configObj = cmdObj["replSetInitiate"].Obj();
             }
 
-            bool parsed = false;
-            try {
-                scoped_ptr<ReplSetConfig> newConfig(ReplSetConfig::make(configObj));
-                parsed = true;
-
-                if( newConfig->version > 1 ) {
-                    errmsg = "can't initiate with a version number greater than 1";
-                    return false;
-                }
-
-                log() << "replSet replSetInitiate config object parses ok, " <<
-                        newConfig->members.size() << " members specified" << rsLog;
-
-                checkMembersUpForConfigChange(*newConfig, result, true);
-
-                log() << "replSet replSetInitiate all members seem up" << rsLog;
-
-                createOplog();
-
-                Lock::GlobalWrite lk(txn->lockState());
-                bo comment = BSON( "msg" << "initiating set");
-                newConfig->saveConfigLocally(comment);
-                log() << "replSet replSetInitiate config now saved locally.  "
-                    "Should come online in about a minute." << rsLog;
-                result.append("info", "Config now saved locally.  Should come online "
-                              "in about a minute.");
-                ReplSet::startupStatus = ReplSet::SOON;
-                ReplSet::startupStatusMsg.set("Received replSetInitiate - "
-                                              "should come online shortly.");
-            }
-            catch( DBException& e ) {
-                log() << "replSet replSetInitiate exception: " << e.what() << rsLog;
-                if( !parsed )
-                    errmsg = string("couldn't parse cfg object ") + e.what();
-                else
-                    errmsg = string("couldn't initiate : ") + e.what();
-                return false;
-            }
-            catch( string& e2 ) {
-                log() << e2 << rsLog;
-                errmsg = e2;
-                return false;
-            }
-
-            return true;
+            Status status = getGlobalReplicationCoordinator()->processReplSetInitiate(txn,
+                                                                                      configObj,
+                                                                                      &result);
+            return appendCommandStatus(result, status);
         }
     } cmdReplSetInitiate;
 

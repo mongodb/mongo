@@ -34,6 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/optime.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/bgsync.h"
@@ -536,5 +537,125 @@ namespace {
         return Status::OK();
     }
 
+    Status LegacyReplicationCoordinator::processReplSetInitiate(OperationContext* txn,
+                                                                const BSONObj& givenConfig,
+                                                                BSONObjBuilder* resultObj) {
+
+        log() << "replSet replSetInitiate admin command received from client" << rsLog;
+
+        if( !replSet ) {
+            return Status(ErrorCodes::NoReplicationEnabled, "server is not running with --replSet");
+        }
+
+        if( theReplSet ) {
+            resultObj->append("info",
+                              "try querying " + rsConfigNs + " to see current configuration");
+            return Status(ErrorCodes::AlreadyInitialized, "already initialized");
+        }
+
+        try {
+            {
+                // just make sure we can get a write lock before doing anything else.  we'll
+                // reacquire one later.  of course it could be stuck then, but this check lowers the
+                // risk if weird things are up.
+                time_t t = time(0);
+                Lock::GlobalWrite lk(txn->lockState());
+                if( time(0)-t > 10 ) {
+                    return Status(ErrorCodes::ExceededTimeLimit,
+                                  "took a long time to get write lock, so not initiating.  "
+                                          "Initiate when server less busy?");
+                }
+
+                /* check that we don't already have an oplog.  that could cause issues.
+                   it is ok if the initiating member has *other* data than that.
+                   */
+                BSONObj o;
+                if( Helpers::getFirst(txn, rsoplog, o) ) {
+                    return Status(ErrorCodes::AlreadyInitialized,
+                                  rsoplog + string(" is not empty on the initiating member.  "
+                                          "cannot initiate."));
+                }
+            }
+
+            if( ReplSet::startupStatus == ReplSet::BADCONFIG ) {
+                resultObj->append("info", ReplSet::startupStatusMsg.get());
+                return Status(ErrorCodes::InvalidReplicaSetConfig,
+                              "server already in BADCONFIG state (check logs); not initiating");
+            }
+            if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
+                resultObj->append("startupStatus", ReplSet::startupStatus);
+                resultObj->append("info", replSettings.replSet);
+                return Status(ErrorCodes::InvalidReplicaSetConfig,
+                              "all members and seeds must be reachable to initiate set");
+            }
+
+            BSONObj configObj;
+            if (!givenConfig.isEmpty()) {
+                configObj = givenConfig;
+            } else {
+                resultObj->append("info2", "no configuration explicitly specified -- making one");
+                log() << "replSet info initiate : no configuration specified.  "
+                        "Using a default configuration for the set" << rsLog;
+
+                string name;
+                vector<HostAndPort> seeds;
+                set<HostAndPort> seedSet;
+                parseReplSetSeedList(replSettings.replSet, name, seeds, seedSet); // may throw...
+
+                BSONObjBuilder b;
+                b.append("_id", name);
+                BSONObjBuilder members;
+                members.append("0", BSON( "_id" << 0 << "host" << HostAndPort::me().toString() ));
+                resultObj->append("me", HostAndPort::me().toString());
+                for( unsigned i = 0; i < seeds.size(); i++ ) {
+                    members.append(BSONObjBuilder::numStr(i+1),
+                                   BSON( "_id" << i+1 << "host" << seeds[i].toString()));
+                }
+                b.appendArray("members", members.obj());
+                configObj = b.obj();
+                log() << "replSet created this configuration for initiation : " <<
+                        configObj.toString() << rsLog;
+            }
+
+            scoped_ptr<ReplSetConfig> newConfig;
+            try {
+                newConfig.reset(ReplSetConfig::make(configObj));
+            } catch (const DBException& e) {
+                log() << "replSet replSetInitiate exception: " << e.what() << rsLog;
+                return Status(ErrorCodes::InvalidReplicaSetConfig,
+                              mongoutils::str::stream() << "couldn't parse cfg object " << e.what());
+            }
+
+            if( newConfig->version > 1 ) {
+                return Status(ErrorCodes::InvalidReplicaSetConfig,
+                              "can't initiate with a version number greater than 1");
+            }
+
+            log() << "replSet replSetInitiate config object parses ok, " <<
+                    newConfig->members.size() << " members specified" << rsLog;
+
+            checkMembersUpForConfigChange(*newConfig, *resultObj, true);
+
+            log() << "replSet replSetInitiate all members seem up" << rsLog;
+
+            createOplog();
+
+            Lock::GlobalWrite lk(txn->lockState());
+            BSONObj comment = BSON( "msg" << "initiating set");
+            newConfig->saveConfigLocally(comment);
+            log() << "replSet replSetInitiate config now saved locally.  "
+                "Should come online in about a minute." << rsLog;
+            resultObj->append("info",
+                              "Config now saved locally.  Should come online in about a minute.");
+            ReplSet::startupStatus = ReplSet::SOON;
+            ReplSet::startupStatusMsg.set("Received replSetInitiate - "
+                                          "should come online shortly.");
+        }
+        catch(const DBException& e ) {
+            return e.toStatus();
+        }
+
+        return Status::OK();
+    }
 } // namespace repl
 } // namespace mongo

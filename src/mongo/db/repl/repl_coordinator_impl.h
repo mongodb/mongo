@@ -102,6 +102,10 @@ namespace repl {
                                               bool force,
                                               BSONObjBuilder* resultObj);
 
+        virtual Status processReplSetInitiate(OperationContext* txn,
+                                              const BSONObj& configObj,
+                                              BSONObjBuilder* resultObj);
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions

@@ -91,6 +91,10 @@ namespace repl {
                                               const BSONObj& newConfigObj,
                                               bool force,
                                               BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetInitiate(OperationContext* txn,
+                                              const BSONObj& configObj,
+                                              BSONObjBuilder* resultObj);
     private:
         Status _stepDownHelper(bool force,
                                const Milliseconds& initialWaitTime,

@@ -138,5 +138,11 @@ namespace repl {
         return Status::OK();
     }
 
+    Status ReplicationCoordinatorMock::processReplSetInitiate(OperationContext* txn,
+                                                              const BSONObj& configObj,
+                                                              BSONObjBuilder* resultObj) {
+        return Status::OK();
+    }
+
 } // namespace repl
 } // namespace mongo

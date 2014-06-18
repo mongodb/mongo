@@ -238,6 +238,15 @@ namespace repl {
                                               bool force,
                                               BSONObjBuilder* resultObj) = 0;
 
+        /*
+         * Handles an incoming replSetInitiate command. If "configObj" is empty, generates a default
+         * configuration to use.
+         * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
+         */
+        virtual Status processReplSetInitiate(OperationContext* txn,
+                                              const BSONObj& configObj,
+                                              BSONObjBuilder* resultObj) = 0;
+
     protected:
 
         ReplicationCoordinator();
