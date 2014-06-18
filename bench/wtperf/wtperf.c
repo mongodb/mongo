@@ -785,10 +785,6 @@ populate_thread(void *arg)
 		}
 	}
 
-	/* Avoid a race on startup that results in WT_DEADLOCK. */
-	if (thread->thread_index != 0)
-		usleep(3000);
-
 	/* Populate the databases. */
 	for (intxn = 0, opcount = 0;;) {
 		op = get_next_incr(cfg);
@@ -849,10 +845,6 @@ populate_thread(void *arg)
 		if (cfg->populate_ops_per_txn != 0) {
 			if (++opcount < cfg->populate_ops_per_txn)
 				continue;
-			if (thread->thread_index == 1) {
-			    if (opcount % (cfg->populate_ops_per_txn * 10) != 0)
-				continue;
-			}
 			opcount = 0;
 
 			if ((ret = session->commit_transaction(
@@ -860,9 +852,6 @@ populate_thread(void *arg)
 				lprintf(cfg, ret, 0,
 				    "Fail committing, transaction was aborted");
 			intxn = 0;
-			if (thread->thread_index == 2 ||
-			    thread->thread_index == 0)
-			    session->checkpoint(session, NULL);
 		}
 
 		if (stress_checkpoint_due && intxn == 0) {
@@ -1239,8 +1228,6 @@ execute_populate(CONFIG *cfg)
 		pfunc = populate_async;
 	} else
 		pfunc = populate_thread;
-	for (i = 0; i < cfg->populate_threads; i++)
-		cfg->popthreads[i].thread_index = i;
 	if ((ret = start_threads(cfg, NULL,
 	    cfg->popthreads, cfg->populate_threads, pfunc)) != 0)
 		return (ret);
@@ -1802,21 +1789,6 @@ start_run(CONFIG *cfg)
 		monitor_created = 1;
 	}
 
-	/* Start the checkpoint thread. */
-	if (cfg->checkpoint_threads != 0) {
-		lprintf(cfg, 0, 1,
-		    "Starting %" PRIu32 " checkpoint thread(s)",
-		    cfg->checkpoint_threads);
-		if ((cfg->ckptthreads =
-		    calloc(cfg->checkpoint_threads,
-		    sizeof(CONFIG_THREAD))) == NULL) {
-			ret = enomem(cfg);
-			goto err;
-		}
-		if (start_threads(cfg, NULL, cfg->ckptthreads,
-		    cfg->checkpoint_threads, checkpoint_worker) != 0)
-			goto err;
-	}
 	/* If creating, populate the table. */
 	if (cfg->create != 0 && execute_populate(cfg) != 0)
 		goto err;
@@ -1828,7 +1800,6 @@ start_run(CONFIG *cfg)
 		if (cfg->create == 0 && find_table_count(cfg) != 0)
 			goto err;
 		/* Start the checkpoint thread. */
-#if 0
 		if (cfg->checkpoint_threads != 0) {
 			lprintf(cfg, 0, 1,
 			    "Starting %" PRIu32 " checkpoint thread(s)",
@@ -1843,7 +1814,6 @@ start_run(CONFIG *cfg)
 			    cfg->checkpoint_threads, checkpoint_worker) != 0)
 				goto err;
 		}
-#endif
 		/* Execute the workload. */
 		if ((ret = execute_workload(cfg)) != 0)
 			goto err;

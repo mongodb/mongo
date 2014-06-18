@@ -320,7 +320,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	btree->write_gen = ckpt->write_gen;		/* Write generation */
 	btree->modified = 0;				/* Clean */
-	btree->readonly = 0;				/* Clean */
 
 	return (0);
 }

@@ -104,7 +104,6 @@ struct __wt_btree {
 
 	WT_REF root;			/* Root page reference */
 	int modified;			/* If the tree ever modified */
-	int readonly;			/* If the tree ever modified */
 	int bulk_load_ok;		/* Bulk-load is a possibility */
 
 	WT_BM	*bm;			/* Block manager reference */

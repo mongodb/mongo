@@ -258,7 +258,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_SESSION_IMPL *session;
 	WT_TXN_ISOLATION saved_isolation;
 	u_int i, j;
-	int last_chunk, locked;
+	int locked;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	lsm_tree = arg;
@@ -282,19 +282,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 				break;
-
-			/*
-			 * Normally, we ignore the latest chunk in the tree
-			 * unless we are flushing all chunks before a compact
-			 * operation.
-			 */
-			last_chunk = 0;
-			if (i == cookie.nchunks - 1) {
-				if (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL))
-					last_chunk = 1;
-				else
-					break;
-			}
 
 			chunk = cookie.chunk_array[i];
 
@@ -387,6 +374,13 @@ __wt_lsm_checkpoint_worker(void *arg)
 				break;
 			}
 
+			/* Now the file is written, get the chunk size. */
+			WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
+
+			/*
+			 * Lock the tree, mark the chunk as on disk and update
+			 * the metadata.
+			 */
 			++j;
 			WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
 			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
@@ -397,7 +391,10 @@ __wt_lsm_checkpoint_worker(void *arg)
 			__wt_lsm_tree_throttle(session, lsm_tree, 1);
 			WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 
-			WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
+			if (ret != 0) {
+				__wt_err(session, ret, "LSM metadata write");
+				break;
+			}
 
 			/*
 			 * Clear the "cache resident" flag so the primary can
@@ -406,28 +403,13 @@ __wt_lsm_checkpoint_worker(void *arg)
 			 * the leaf page during the checkpoint can trigger
 			 * forced eviction.
 			 */
-			WT_TRET(__wt_session_get_btree(
+			WT_ERR(__wt_session_get_btree(
 			    session, chunk->uri, NULL, NULL, 0));
-			if (ret == 0) {
-				__wt_btree_evictable(session, 1);
-				if (!last_chunk) {
-#if 0
-					WT_ASSERT(session,
-					    S2BT(session)->modified == 0);
-#endif
-					S2BT(session)->readonly = 1;
-				}
-				WT_TRET(__wt_session_release_btree(session));
-			}
+			__wt_btree_evictable(session, 1);
+			WT_ERR(__wt_session_release_btree(session));
 
 			/* Make sure we aren't pinning a transaction ID. */
 			__wt_txn_release_snapshot(session);
-
-			if (ret != 0) {
-				__wt_err(session, ret,
-				    "LSM checkpoint metadata write");
-				break;
-			}
 
 			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 			     "LSM worker checkpointed %u", i));
@@ -579,9 +561,6 @@ __lsm_discard_handle(
 	 * otherwise an in progress checkpoint may have set the modified
 	 * flag in the file we're discarding.
 	 */
-#if 0
-	WT_ASSERT(session, S2BT(session)->modified == 0);
-#endif
 	WT_TRET(__wt_session_release_btree(session));
 	if (locked)
 		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);

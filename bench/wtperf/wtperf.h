@@ -210,7 +210,6 @@ struct __config_thread {		/* Per-thread structure */
 	TRACK insert;			/* Insert operations */
 	TRACK read;			/* Read operations */
 	TRACK update;			/* Update operations */
-	int thread_index;
 };
 
 int	 config_assign(CONFIG *, const CONFIG *);

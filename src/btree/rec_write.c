@@ -864,7 +864,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * If some updates are not globally visible, or were skipped, the page
 	 * cannot be marked clean.
 	 */
-	WT_ASSERT(session, S2BT(session)->readonly == 0);
 	r->leave_dirty = 1;
 
 	/* If we're not evicting, we're done, we know what we'll write. */
@@ -4724,7 +4723,6 @@ err:			__wt_scr_free(&tkey);
 	if (r->leave_dirty) {
 		mod->first_dirty_txn = r->skipped_txn;
 
-		WT_ASSERT(session, btree->readonly == 0);
 		btree->modified = 1;
 		WT_FULL_BARRIER();
 	}
