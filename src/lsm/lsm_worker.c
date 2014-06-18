@@ -285,12 +285,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 			chunk = cookie.chunk_array[i];
 
-			/* Stop if a running transaction needs the chunk. */
-			__wt_txn_update_oldest(session);
-			if (chunk->switch_txn == WT_TXN_NONE ||
-			    !__wt_txn_visible_all(session, chunk->switch_txn))
-				break;
-
 			/*
 			 * If the chunk is already checkpointed, make sure it
 			 * is also evicted.  Either way, there is no point
@@ -310,6 +304,12 @@ __wt_lsm_checkpoint_worker(void *arg)
 			}
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 				continue;
+
+			/* Stop if a running transaction needs the chunk. */
+			__wt_txn_update_oldest(session);
+			if (chunk->switch_txn == WT_TXN_NONE ||
+			    !__wt_txn_visible_all(session, chunk->switch_txn))
+				break;
 
 			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 			     "LSM worker flushing %u", i));
