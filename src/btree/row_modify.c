@@ -66,6 +66,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			    __wt_update_alloc(session, value, &upd, &upd_size));
 			WT_ERR(__wt_txn_modify(session, upd));
 			logged = 1;
+
+			/* Avoid WT_CURSOR.update data copy. */
+			cbt->modify_update = upd;
 		} else {
 			upd_size = sizeof(WT_UPDATE) + upd->size;
 			/*
@@ -132,6 +135,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			    __wt_update_alloc(session, value, &upd, &upd_size));
 			WT_ERR(__wt_txn_modify(session, upd));
 			logged = 1;
+
+			/* Avoid WT_CURSOR.update data copy. */
+			cbt->modify_update = upd;
 		} else
 			upd_size = sizeof(WT_UPDATE) + upd->size;
 		ins->upd = upd;

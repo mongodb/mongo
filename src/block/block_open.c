@@ -151,10 +151,15 @@ __wt_block_open(WT_SESSION_IMPL *session,
 		    "os_cache_dirty_max not supported in combination with "
 		    "direct_io");
 #else
-	if (block->os_cache_dirty_max)
-		WT_ERR_MSG(session, EINVAL,
-		    "os_cache_dirty_max not supported if sync_file_range not "
-		    "available");
+	if (block->os_cache_dirty_max) {
+		/*
+		 * Ignore any setting if it is not supported.
+		 */
+		block->os_cache_dirty_max = 0;
+		WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,
+		    "os_cache_dirty_max ignored when sync_file_range not "
+		    "available"));
+	}
 #endif
 
 	/* Open the underlying file handle. */

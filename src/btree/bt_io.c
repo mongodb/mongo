@@ -67,13 +67,12 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 * an example.
 		 */
 		memcpy(buf->mem, tmp->data, WT_BLOCK_COMPRESS_SKIP);
-		WT_ERR(btree->compressor->decompress(
+		ret = btree->compressor->decompress(
 		    btree->compressor, &session->iface,
 		    (uint8_t *)tmp->data + WT_BLOCK_COMPRESS_SKIP,
 		    tmp->size - WT_BLOCK_COMPRESS_SKIP,
 		    (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP,
-		    dsk->mem_size - WT_BLOCK_COMPRESS_SKIP,
-		    &result_len));
+		    dsk->mem_size - WT_BLOCK_COMPRESS_SKIP, &result_len);
 
 		/*
 		 * If checksums were turned off because we're depending on the
@@ -81,7 +80,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 * here after corruption happens.  If we're salvaging the file,
 		 * it's OK, otherwise it's really, really bad.
 		 */
-		if (result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
+		if (ret != 0 ||
+		    result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
 			WT_ERR(
 			    F_ISSET(btree, WT_BTREE_VERIFY) ||
 			    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?

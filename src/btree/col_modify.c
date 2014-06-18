@@ -86,6 +86,9 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		WT_ERR(__wt_txn_modify(session, upd));
 		logged = 1;
 
+		/* Avoid a data copy in WT_CURSOR.update. */
+		cbt->modify_update = upd;
+
 		/*
 		 * Point the new WT_UPDATE item to the next element in the list.
 		 * If we get it right, the serialization function lock acts as
@@ -135,6 +138,9 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			    __wt_update_alloc(session, value, &upd, &upd_size));
 			WT_ERR(__wt_txn_modify(session, upd));
 			logged = 1;
+
+			/* Avoid a data copy in WT_CURSOR.update. */
+			cbt->modify_update = upd;
 		} else
 			upd_size = sizeof(WT_UPDATE) + upd->size;
 		ins->upd = upd;

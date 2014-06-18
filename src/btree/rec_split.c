@@ -325,6 +325,19 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		__wt_page_only_modify_set(session, child);
 
 		/*
+		 * Once the split goes live, the newly created children can be
+		 * evicted and their WT_REF structures freed.  If the child
+		 * pages are evicted before threads exit the previous page index
+		 * array, a thread might see a freed WT_REF.  Set the eviction
+		 * transaction requirement for split pages.  (Note, we're about
+		 * to process those pages below, too, without holding hazard
+		 * references; this "pin" based on the current transaction makes
+		 * that safe as well.)
+		 */
+		child->modify->mod_split_txn =
+		    S2C(session)->txn_global.current + 1;
+
+		/*
 		 * The newly allocated child's page index references the same
 		 * structures as the parent.  (We cannot move WT_REF structures,
 		 * threads may be underneath us right now changing the structure
@@ -408,16 +421,20 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * up.
 	 */
 	pindex = WT_INTL_INDEX_COPY(parent);
-	for (parent_refp = pindex->index + SPLIT_CORRECT_1,
-	    i = pindex->entries - SPLIT_CORRECT_1; i > 0; ++parent_refp, --i) {
+	for (parent_refp = pindex->index,
+	    i = pindex->entries; i > 0; ++parent_refp, --i) {
 		parent_ref = *parent_refp;
+		WT_ASSERT(session, parent_ref->home == parent);
 		if (parent_ref->state != WT_REF_MEM)
 			continue;
-		WT_ASSERT(session, parent_ref->home == parent);
 
+		/*
+		 * We left the first/last children of the parent at the current
+		 * level to avoid bad split patterns, they might be leaf pages;
+		 * check the page type before we continue.
+		 */
 		child = parent_ref->page;
-		if (child->type != WT_PAGE_ROW_INT &&
-		    child->type != WT_PAGE_COL_INT)
+		if (!WT_PAGE_IS_INTERNAL(child))
 			continue;
 #ifdef HAVE_DIAGNOSTIC
 		__split_verify_intl_key_order(session, child);
@@ -784,12 +801,8 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * split (if we failed, we'd leak the underlying blocks, but the parent
 	 * page would be unaffected).
 	 */
-	switch (parent->type) {
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
+	if (parent->type == WT_PAGE_ROW_INT)
 		WT_TRET(__split_ovfl_key_cleanup(session, parent, ref));
-		break;
-	}
 
 	/*
 	 * We can't free the previous page index, or the page's original WT_REF
@@ -799,15 +812,11 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	parent_decr += size;
 	WT_TRET(__wt_session_fotxn_add(session, pindex, size));
-	switch (parent->type) {
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		if ((ikey = __wt_ref_key_instantiated(ref)) == NULL)
-			break;
+	if (parent->type == WT_PAGE_ROW_INT &&
+	    (ikey = __wt_ref_key_instantiated(ref)) != NULL) {
 		size = sizeof(WT_IKEY) + ikey->size;
 		parent_decr += size;
 		WT_TRET(__wt_session_fotxn_add(session, ikey, size));
-		break;
 	}
 	WT_TRET(__wt_session_fotxn_add(session, ref, sizeof(WT_REF)));
 	parent_decr += sizeof(WT_REF);

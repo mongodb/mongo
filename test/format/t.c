@@ -29,7 +29,6 @@
 
 GLOBAL g;
 
-static void onint(int);
 static void startup(void);
 static void usage(void);
 
@@ -157,9 +156,6 @@ main(int argc, char *argv[])
 		die(ret, "pthread_rwlock_init: append lock");
 	if ((ret = pthread_rwlock_init(&g.backup_lock, NULL)) != 0)
 		die(ret, "pthread_rwlock_init: hot-backup lock");
-
-	/* Clean up on signal. */
-	(void)signal(SIGINT, onint);
 
 	/* Seed the random number generator. */
 	srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
@@ -315,25 +311,6 @@ startup(void)
 	if ((g.rand_log = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
 		die(errno, "%s", g.home_rand);
 	(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
-}
-
-/*
- * onint --
- *	Interrupt signal handler.
- */
-static void
-onint(int signo)
-{
-	int ret;
-
-	WT_UNUSED(signo);
-
-	/* Remove the run's files except for rand. */
-	if ((ret = system(g.home_init)) != 0)
-		die(ret, "home directory initialization failed");
-
-	fprintf(stderr, "\n");
-	exit(EXIT_FAILURE);
 }
 
 /*

@@ -135,8 +135,6 @@ typedef struct {
 	size_t	  append_cnt;			/* Current unresolved records */
 	pthread_rwlock_t append_lock;		/* Single-thread resolution */
 
-	char *session_config;			/* Session configuration */
-
 	char *uri;				/* Object name */
 
 	char *config_open;			/* Command-line configuration */
@@ -171,6 +169,7 @@ typedef struct {
 	uint32_t c_key_max;
 	uint32_t c_key_min;
 	uint32_t c_leaf_page_max;
+	uint32_t c_leak_memory;
 	uint32_t c_logging;
 	uint32_t c_merge_max;
 	uint32_t c_merge_threads;
@@ -189,23 +188,29 @@ typedef struct {
 	uint32_t c_value_min;
 	uint32_t c_write_pct;
 
-#define	FIX			1	
-#define	ROW			2
-#define	VAR			3
+#define	FIX				1	
+#define	ROW				2
+#define	VAR				3
 	u_int type;				/* File type's flag value */
 
-#define	CHECKSUM_OFF		1
-#define	CHECKSUM_ON		2
-#define	CHECKSUM_UNCOMPRESSED	3
+#define	CHECKSUM_OFF			1
+#define	CHECKSUM_ON			2
+#define	CHECKSUM_UNCOMPRESSED		3
 	u_int c_checksum_flag;			/* Checksum flag value */
 
-#define	COMPRESS_NONE		1
-#define	COMPRESS_BZIP		2
-#define	COMPRESS_BZIP_RAW	3
-#define	COMPRESS_LZO		4
-#define	COMPRESS_SNAPPY		5
-#define	COMPRESS_ZLIB		6
+#define	COMPRESS_NONE			1
+#define	COMPRESS_BZIP			2
+#define	COMPRESS_BZIP_RAW		3
+#define	COMPRESS_LZO			4
+#define	COMPRESS_SNAPPY			5
+#define	COMPRESS_ZLIB			6
 	u_int c_compression_flag;		/* Compression flag value */
+
+#define	ISOLATION_RANDOM		1
+#define	ISOLATION_READ_UNCOMMITTED	2
+#define	ISOLATION_READ_COMMITTED	3
+#define	ISOLATION_SNAPSHOT		4
+	u_int c_isolation_flag;			/* Isolation flag value */
 
 	uint64_t key_cnt;			/* Keys loaded so far */
 	uint64_t rows;				/* Total rows */

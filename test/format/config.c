@@ -37,6 +37,7 @@ static void	   config_isolation(void);
 static void	   config_map_checksum(const char *, u_int *);
 static void	   config_map_compression(const char *, u_int *);
 static void	   config_map_file_type(const char *, u_int *);
+static void	   config_map_isolation(const char *, u_int *);
 
 /*
  * config_setup --
@@ -302,15 +303,19 @@ config_isolation(void)
 	cp = config_find("isolation", strlen("isolation"));
 	if (!(cp->flags & C_PERM)) {
 		/* Avoid "maybe uninitialized" warnings. */
-		cstr = "isolation=snapshot";
-		switch (MMRAND(1, 3)) {
+		switch (MMRAND(1, 4)) {
 		case 1:
-			cstr = "isolation=read-uncommitted";
+			cstr = "isolation=random";
 			break;
 		case 2:
-			cstr = "isolation=read-committed";
+			cstr = "isolation=read-uncommitted";
 			break;
 		case 3:
+			cstr = "isolation=read-committed";
+			break;
+		case 4:
+		default:
+			cstr = "isolation=snapshot";
 			break;
 		}
 		config_single(cstr, 0);
@@ -359,15 +364,9 @@ config_print(int error_display)
 
 	/* Display configuration values. */
 	for (cp = c; cp->name != NULL; ++cp)
-		if ((cp->type_mask != 0 &&
-		    ((g.type == FIX && !(cp->type_mask & C_FIX)) ||
-		    (g.type == ROW && !(cp->type_mask & C_ROW)) ||
-		    (g.type == VAR && !(cp->type_mask & C_VAR)))) ||
-		    (cp->flags & C_STRING && *(cp->vstr) == NULL))
-			fprintf(fp,
-			    "# %s not applicable to this run\n", cp->name);
-		else if (cp->flags & C_STRING)
-			fprintf(fp, "%s=%s\n", cp->name, *cp->vstr);
+		if (cp->flags & C_STRING)
+			fprintf(fp, "%s=%s\n", cp->name,
+			    *cp->vstr == NULL ? "" : *cp->vstr);
 		else
 			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
 
@@ -419,8 +418,6 @@ config_clear(void)
 	}
 	free(g.uri);
 	g.uri = NULL;
-	free(g.session_config);
-	g.session_config = NULL;
 }
 
 /*
@@ -464,15 +461,16 @@ config_single(const char *s, int perm)
 			config_map_compression(ep, &g.c_compression_flag);
 			*cp->vstr = strdup(ep);
 		} else if (strncmp(s, "isolation", strlen("isolation")) == 0) {
+			config_map_isolation(ep, &g.c_isolation_flag);
 			*cp->vstr = strdup(ep);
-			g.session_config =
-			    malloc(strlen("isolation=") + strlen(ep) + 1);
-			sprintf(g.session_config, "isolation=%s", ep);
 		} else if (strncmp(s, "file_type", strlen("file_type")) == 0) {
 			config_map_file_type(ep, &g.type);
 			*cp->vstr = strdup(config_file_type(g.type));
-		} else
+		} else {
+			if (*cp->vstr != NULL)
+				free(*cp->vstr);
 			*cp->vstr = strdup(ep);
+		}
 		if (*cp->vstr == NULL)
 			die(errno, "malloc");
 
@@ -553,6 +551,25 @@ config_map_compression(const char *s, u_int *vp)
 		*vp = COMPRESS_ZLIB;
 	else
 		die(EINVAL, "illegal compression configuration: %s", s);
+}
+
+/*
+ * config_map_isolation --
+ *	Map an isolation configuration to a flag.
+ */
+static void
+config_map_isolation(const char *s, u_int *vp)
+{
+	if (strcmp(s, "random") == 0)
+		*vp = ISOLATION_RANDOM;
+	else if (strcmp(s, "read-uncommitted") == 0)
+		*vp = ISOLATION_READ_UNCOMMITTED;
+	else if (strcmp(s, "read-committed") == 0)
+		*vp = ISOLATION_READ_COMMITTED;
+	else if (strcmp(s, "snapshot") == 0)
+		*vp = ISOLATION_SNAPSHOT;
+	else
+		die(EINVAL, "illegal isolation configuration: %s", s);
 }
 
 /*

@@ -291,6 +291,19 @@ __rec_review(
 			}
 		} WT_INTL_FOREACH_END;
 
+	mod = page->modify;
+
+	/*
+	 * If the tree was deepened, there's a special requirement that newly
+	 * created internal pages not be evicted until all threads are known
+	 * to have exited the original page index array.  During the split we
+	 * set a transaction value, once that's globally visible, we know we
+	 * can evict the created page.
+	 */
+	if (!exclusive && mod != NULL && WT_PAGE_IS_INTERNAL(page) &&
+	    !__wt_txn_visible_all(session, mod->mod_split_txn))
+		return (EBUSY);
+
 	/*
 	 * If the file is being checkpointed, we can't evict dirty pages:
 	 * if we write a page and free the previous version of the page, that
@@ -311,7 +324,7 @@ __rec_review(
 	 * internal page acquires hazard pointers on child pages it reads, and
 	 * is blocked by the exclusive lock.
 	 */
-	if ((mod = page->modify) != NULL && btree->checkpointing &&
+	if (mod != NULL && btree->checkpointing &&
 	    (__wt_page_is_modified(page) ||
 	    F_ISSET(mod, WT_PM_REC_MULTIBLOCK))) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);

@@ -191,13 +191,33 @@ restart:	page = parent->page;
 		/*
 		 * Two versions of the binary search of internal pages: with and
 		 * without application-specified collation.
+		 *
+		 * The 0th key on an internal page is a problem for a couple of
+		 * reasons.  First, we have to force the 0th key to sort less
+		 * than any application key, so internal pages don't have to be
+		 * updated if the application stores a new, "smallest" key in
+		 * the tree.  Second, reconciliation is aware of this and will
+		 * store a byte of garbage in the 0th key, so the comparison of
+		 * an application key and a 0th key is meaningless (but doing
+		 * the comparison could still incorrectly modify our tracking
+		 * of the leading bytes in each key that we can skip during the
+		 * comparison).
+		 *
+		 * The only way to possibly compare against the 0th key in the
+		 * binary search loop is if base is 0 and limit is 0 or 1; in
+		 * that case, we must exit the loop after doing the 0th key
+		 * comparison, that is, if we are doing the comparison, we're
+		 * descending down the left-hand side of the tree.
 		 */
 		base = 0;
 		indx = 0;		/* -Werror=maybe-uninitialized */
 		limit = pindex->entries;
 		if (btree->collator == NULL)
 			for (; limit != 0; limit >>= 1) {
-				indx = base + (limit >> 1);
+				/* If index is 0, skip the comparison. */
+				if ((indx = base + (limit >> 1)) == 0)
+					break;
+
 				child = pindex->index[indx];
 				__wt_ref_key(
 				    page, child, &item->data, &item->size);
@@ -216,7 +236,10 @@ restart:	page = parent->page;
 			}
 		else
 			for (; limit != 0; limit >>= 1) {
-				indx = base + (limit >> 1);
+				/* If index is 0, skip the comparison. */
+				if ((indx = base + (limit >> 1)) == 0)
+					break;
+
 				child = pindex->index[indx];
 				__wt_ref_key(
 				    page, child, &item->data, &item->size);
@@ -231,40 +254,14 @@ restart:	page = parent->page;
 			}
 
 		/*
-		 * Find the slot used to descend the tree.
-		 *
-		 * The 0th key on an internal page is a problem for a couple of
-		 * reasons.  First, we have to force the 0th key to sort less
-		 * than any application key, so internal pages don't have to be
-		 * updated if the application stores a new, "smallest" key in
-		 * the tree.  Second, reconciliation is aware of this and will
-		 * store a byte of garbage in the 0th key -- the comparison of
-		 * an application key and a 0th key is meaningless.  The binary
-		 * search loop could be written to avoid comparing application
-		 * keys against the 0th key, but that means an additional branch
-		 * in each loop of the binary search (vs. an additional compare
-		 * in the less common case of a search down the left-hand side
-		 * of the tree).  The only way to possibly compare against the
-		 * 0th key in the binary search loop is if base is 0 and limit
-		 * is 0 or 1; in that case, we must exit the loop after doing
-		 * the 0th key comparison, and we must exit the loop with the
-		 * index set to 0.  Test for that before anything else.
-		 *
-		 * Otherwise, if we found an exact match, child is already set;
-		 * if we didn't find an exact match, base is the smallest index
-		 * greater than the key and may be the (last + 1) index.
+		 * Find the slot used to descend the tree.  If index is 0, it's
+		 * a left-side descent.  Otherwise, if we found an exact match,
+		 * child is already set, if we didn't find an exact match, base
+		 * is the smallest index greater than key, possibly (last + 1).
 		 */
-		if (indx == 0) {
-			/*
-			 * The last, meaningless comparison may have incorrectly
-			 * modified the leading bytes of the keys we can skip.
-			 * That's not a good thing, but searching the left-hand
-			 * side of the tree shouldn't be that common.
-			 */
-			skiphigh = skiplow = 0;
-
+		if (indx == 0)
 			child = pindex->index[0];
-		} else if (cmp != 0)
+		else if (cmp != 0)
 			child = pindex->index[base - 1];
 
 descend:	WT_ASSERT(session, child != NULL);
@@ -343,9 +340,13 @@ leaf_only:
 	 * an existing entry.  Check that case and get out fast.
 	 */
 	if (cmp == 0) {
-		WT_ASSERT(session, rip != NULL);
 		cbt->compare = 0;
 		cbt->ref = child;
+
+		/*
+		 * Safe: if the page had entries, rip will be set in the loop
+		 * above, if the page has no entries, then cmp will not be 0.
+		 */
 		cbt->slot = WT_ROW_SLOT(page, rip);
 		return (0);
 	}

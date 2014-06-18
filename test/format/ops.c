@@ -68,8 +68,7 @@ wts_ops(void)
 
 	/* Open a session. */
 	if (g.logging != 0) {
-		if ((ret = conn->open_session(
-		    conn, NULL, g.session_config, &session)) != 0)
+		if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 			die(ret, "connection.open_session");
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== thread ops start ===============");
@@ -150,6 +149,31 @@ wts_ops(void)
 	}
 }
 
+/*
+ * ops_session_config --
+ *	Return the current session configuration.
+ */
+static const char *
+ops_session_config(void)
+{
+	u_int v;
+
+	/*
+	 * The only current session configuration is the isolation level.
+	 */
+	if ((v = g.c_isolation_flag) == ISOLATION_RANDOM)
+		v = MMRAND(2, 4);
+	switch (v) {
+	case ISOLATION_READ_UNCOMMITTED:
+		return ("isolation=read-uncommitted");
+	case ISOLATION_READ_COMMITTED:
+		return ("isolation=read-committed");
+	case ISOLATION_SNAPSHOT:
+	default:
+		return ("isolation=snapshot");
+	}
+}
+
 static void *
 ops(void *arg)
 {
@@ -219,7 +243,7 @@ ops(void *arg)
 				die(ret, "session.close");
 
 			if ((ret = conn->open_session(
-			    conn, NULL, g.session_config, &session)) != 0)
+			    conn, NULL, ops_session_config(), &session)) != 0)
 				die(ret, "connection.open_session");
 
 			/*
@@ -466,7 +490,7 @@ wts_read_scan(void)
 
 	/* Open a session and cursor pair. */
 	if ((ret = conn->open_session(
-	    conn, NULL, g.session_config, &session)) != 0)
+	    conn, NULL, ops_session_config(), &session)) != 0)
 		die(ret, "connection.open_session");
 	if ((ret = session->open_cursor(
 	    session, g.uri, NULL, NULL, &cursor)) != 0)

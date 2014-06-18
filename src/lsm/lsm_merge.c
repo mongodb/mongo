@@ -60,7 +60,7 @@ __wt_lsm_merge(
 	WT_LSM_CHUNK *chunk, *previous, *youngest;
 	uint32_t generation, max_gap, max_gen, max_level, start_id;
 	uint64_t insert_count, record_count, chunk_size;
-	u_int dest_id, end_chunk, i, merge_min, nchunks, start_chunk;
+	u_int dest_id, end_chunk, i, merge_max, merge_min, nchunks, start_chunk;
 	int create_bloom, tret;
 	const char *cfg[3];
 	const char *drop_cfg[] =
@@ -80,6 +80,7 @@ __wt_lsm_merge(
 	if (!lsm_tree->modified ||
 	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
 		aggressive = 10;
+	merge_max = (aggressive > 5) ? 100 : lsm_tree->merge_min;
 	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
 	max_gap = (aggressive + 4) / 5;
 	max_level = (lsm_tree->merge_throttle > 0) ? 0 : id + aggressive;
@@ -167,7 +168,8 @@ __wt_lsm_merge(
 		 */
 		if ((chunk_size += chunk->size) > lsm_tree->chunk_max)
 			if (nchunks < merge_min ||
-			    chunk_size - youngest->size > lsm_tree->chunk_max)
+			    (chunk->generation > youngest->generation &&
+			    chunk_size - youngest->size > lsm_tree->chunk_max))
 				break;
 
 		/*
@@ -190,7 +192,7 @@ __wt_lsm_merge(
 		 * If we have a full window, or the merge would be too big,
 		 * remove the youngest chunk.
 		 */
-		if (nchunks == lsm_tree->merge_max ||
+		if (nchunks == merge_max ||
 		    chunk_size > lsm_tree->chunk_max) {
 			WT_ASSERT(session,
 			    F_ISSET(youngest, WT_LSM_CHUNK_MERGING));
@@ -202,7 +204,7 @@ __wt_lsm_merge(
 	}
 
 	nchunks = (end_chunk + 1) - start_chunk;
-	WT_ASSERT(session, nchunks <= lsm_tree->merge_max);
+	WT_ASSERT(session, nchunks <= merge_max);
 
 	if (nchunks > 0) {
 		WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
@@ -294,6 +296,15 @@ __wt_lsm_merge(
 		if (insert_count % LSM_MERGE_CHECK_INTERVAL == 0) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 				WT_ERR(EINTR);
+			/*
+			 * Help out with switching chunks in case the
+			 * checkpoint worker is busy.
+			 */
+			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+				WT_WITH_SCHEMA_LOCK(session, ret =
+				    __wt_lsm_tree_switch(session, lsm_tree));
+				WT_ERR(ret);
+			}
 			WT_STAT_FAST_CONN_INCRV(session,
 			    lsm_rows_merged, LSM_MERGE_CHECK_INTERVAL);
 			++lsm_tree->merge_progressing;
