@@ -322,14 +322,11 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline void
 __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_TXN_GLOBAL *txn_global;
 	uint64_t last_running;
-
-	txn_global = &S2C(session)->txn_global;
 
 	last_running = 0;
 	if (page->modify->write_gen == 0)
-		last_running = txn_global->last_running;
+		last_running = S2C(session)->txn_global.last_running;
 
 	/*
 	 * We depend on atomic-add being a write barrier, that is, a barrier to

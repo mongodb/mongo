@@ -255,7 +255,6 @@ __wt_lsm_tree_setup_chunk(
 		if (exists)
 			WT_RET(__wt_schema_drop(session, chunk->uri, cfg));
 	}
-	chunk->update_txn_max = WT_TXN_NONE;
 	return (__wt_schema_create(session, chunk->uri, lsm_tree->file_config));
 }
 
@@ -746,11 +745,16 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * Check if a switch is still needed: we may have raced while waiting
 	 * for a lock.
 	 */
+	chunk = NULL;
 	if ((nchunks = lsm_tree->nchunks) != 0 &&
 	    (chunk = lsm_tree->chunk[nchunks - 1]) != NULL &&
 	    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
 	    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 		goto err;
+
+	/* Set the switch transaction in the previous chunk, if necessary. */
+	if (chunk != NULL && chunk->switch_txn == WT_TXN_NONE)
+		chunk->switch_txn = __wt_txn_current_id(session);
 
 	/* Update the throttle time. */
 	__wt_lsm_tree_throttle(session, lsm_tree, 0);
@@ -767,7 +771,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = new_id;
-	chunk->txnid_max = WT_TXN_NONE;
+	chunk->switch_txn = WT_TXN_NONE;
 	lsm_tree->chunk[lsm_tree->nchunks++] = chunk;
 	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 
@@ -951,7 +955,7 @@ __wt_lsm_tree_truncate(
 	WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
 	__wt_lsm_tree_release(session, lsm_tree);
 
-err:	if (locked) 
+err:	if (locked)
 		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 	if (ret != 0) {
 		if (chunk != NULL) {
@@ -1009,6 +1013,7 @@ __wt_lsm_tree_unlock(
 int
 __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 {
+	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	time_t begin, end;
 
@@ -1029,19 +1034,33 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		WT_RET_MSG(session, EINVAL,
 		    "LSM compaction requires active merge threads");
 
-	/*
-	 * If another thread started compacting this tree, we're done.
-	 */
-	if (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL | WT_LSM_TREE_COMPACTING))
-		return (0);
-
 	WT_RET(__wt_seconds(session, &begin));
 
+	/* Lock the tree: single-thread compaction. */
+	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
+
+	/* If another thread started compacting this tree, we're done. */
+	if (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL | WT_LSM_TREE_COMPACTING)) {
+		WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
+		return (0);
+	}
+
 	/*
-	 * Set the flush all flag so that the checkpoint worker tries to write
-	 * all in-memory chunks to disk.
+	 * Set the switch transaction on the current chunk, if it
+	 * hasn't been set before.  This prevents further writes, so it
+	 * can be flushed by the checkpoint worker.
+	 */
+	if (lsm_tree->nchunks > 0 &&
+	    (chunk = lsm_tree->chunk[lsm_tree->nchunks - 1]) != NULL &&
+	    chunk->switch_txn == WT_TXN_NONE)
+		chunk->switch_txn = __wt_txn_current_id(session);
+
+	/*
+	 * Set the flush all flag so that the checkpoint worker tries
+	 * to write all in-memory chunks to disk.
 	 */
 	F_SET(lsm_tree, WT_LSM_TREE_FLUSH_ALL);
+	WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
 
 	/* Wait for flushing to stop. */
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL) &&

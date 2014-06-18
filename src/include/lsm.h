@@ -27,7 +27,7 @@ struct __wt_cursor_lsm {
 	WT_CURSOR *current;     	/* The current cursor for iteration */
 	WT_LSM_CHUNK *primary_chunk;	/* The current primary chunk */
 
-	uint64_t *txnid_max;		/* Maximum txn for each chunk */
+	uint64_t *switch_txn;		/* Switch txn for each chunk */
 	size_t txnid_alloc;
 
 	u_int update_count;		/* Updates performed. */
@@ -54,8 +54,14 @@ struct __wt_lsm_chunk {
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
 	uint64_t count;			/* Approximate count of records */
 	uint64_t size;			/* Final chunk size */
-	uint64_t txnid_max;		/* Newest transactional update */
-	uint64_t update_txn_max;	/* Newest txn to apply an update */
+
+	uint64_t switch_txn;		/*
+					 * Largest transaction that can write
+					 * to this chunk, set by a worker
+					 * thread when the chunk is switched
+					 * out, or by compact to get the most
+					 * recent chunk flushed.
+					 */
 
 	uint32_t id;			/* ID used to generate URIs */
 	uint32_t generation;		/* Merge generation */

@@ -257,7 +257,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_LSM_WORKER_COOKIE cookie;
 	WT_SESSION_IMPL *session;
 	WT_TXN_ISOLATION saved_isolation;
-	uint64_t txnid_max;
 	u_int i, j;
 	int last_chunk, locked;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
@@ -301,8 +300,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 			/* Stop if a running transaction needs the chunk. */
 			__wt_txn_update_oldest(session);
-			txnid_max = chunk->txnid_max;
-			if (!__wt_txn_visible_all(session, txnid_max))
+			if (chunk->switch_txn == WT_TXN_NONE ||
+			    !__wt_txn_visible_all(session, chunk->switch_txn))
 				break;
 
 			/*
@@ -376,14 +375,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 				break;
 
-			/*
-			 * If we are flushing the last chunk in the tree for
-			 * a compact, we can race with updates.  Stop if the
-			 * tree is not clean.
-			 */
-			if (chunk->txnid_max != txnid_max)
-				break;
-
 			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 			     "LSM worker checkpointing %u", i));
 
@@ -395,9 +386,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 				__wt_err(session, ret, "LSM checkpoint");
 				break;
 			}
-
-			if (chunk->txnid_max != txnid_max)
-				break;
 
 			++j;
 			WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));

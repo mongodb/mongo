@@ -32,7 +32,7 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 	for (i = 0, fotxn = session->fotxn;
 	    i < session->fotxn_size / sizeof(session->fotxn[0]);  ++i, ++fotxn)
 		if (fotxn->p == NULL) {
-			fotxn->txnid = S2C(session)->txn_global.current + 1;
+			fotxn->txnid = __wt_txn_new_id(session);
 			WT_ASSERT(session,
 			    !__wt_txn_visible_all(session, fotxn->txnid));
 			fotxn->p = p;
