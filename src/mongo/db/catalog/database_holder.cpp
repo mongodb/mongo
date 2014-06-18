@@ -47,25 +47,21 @@
 namespace mongo {
 
     Database* DatabaseHolder::get(OperationContext* txn,
-                                  const std::string& ns,
-                                  const std::string& path) const {
+                                  const std::string& ns) const {
 
         txn->lockState()->assertAtLeastReadLocked(ns);
 
         SimpleMutex::scoped_lock lk(_m);
-        Paths::const_iterator x = _paths.find( path );
-        if ( x == _paths.end() )
-            return 0;
-        const DBs& m = x->second;
         const std::string db = _todb( ns );
-        DBs::const_iterator it = m.find(db);
-        if ( it != m.end() )
+        DBs::const_iterator it = _dbs.find(db);
+        if ( it != _dbs.end() )
             return it->second;
         return NULL;
     }
 
-    Database* DatabaseHolder::getOrCreate(
-                OperationContext* txn, const string& ns, const string& path, bool& justCreated) {
+    Database* DatabaseHolder::getOrCreate(OperationContext* txn,
+                                          const string& ns,
+                                          bool& justCreated) {
 
         const string dbname = _todb( ns );
         invariant(txn->lockState()->isAtLeastReadLocked(dbname));
@@ -76,10 +72,9 @@ namespace mongo {
 
         {
             SimpleMutex::scoped_lock lk(_m);
-            DBs& m = _paths[path];
             {
-                DBs::iterator i = m.find(dbname);
-                if( i != m.end() ) {
+                DBs::iterator i = _dbs.find(dbname);
+                if( i != _dbs.end() ) {
                     justCreated = false;
                     return i->second;
                 }
@@ -90,10 +85,8 @@ namespace mongo {
             //       perhaps just log it, which is what we do here with the "> 40" :
             bool cant = !txn->lockState()->isWriteLocked(ns);
             if( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) ||
-                m.size() > 40 || cant || DEBUG_BUILD ) {
-                log() << "opening db: "
-                      << (path == storageGlobalParams.dbpath ? "" : path) << ' ' << dbname
-                      << endl;
+                _dbs.size() > 40 || cant || DEBUG_BUILD ) {
+                log() << "opening db: " << dbname;
             }
             massert(15927, "can't open database in a read lock. if db was just closed, consider retrying the query. might otherwise indicate an internal error", !cant);
         }
@@ -107,43 +100,36 @@ namespace mongo {
                                     dbname,
                                     justCreated,
                                     new MMAPV1DatabaseCatalogEntry(txn,
-                                                                  dbname,
-                                                                  path,
-                                                                  storageGlobalParams.directoryperdb));
+                                                                   dbname,
+                                                                   storageGlobalParams.dbpath,
+                                                                   storageGlobalParams.directoryperdb,
+                                                                   false));
 
         {
             SimpleMutex::scoped_lock lk(_m);
-            DBs& m = _paths[path];
-            verify( m[dbname] == 0 );
-            m[dbname] = db;
-            _size++;
+            _dbs[dbname] = db;
         }
 
         return db;
     }
 
     void DatabaseHolder::erase(OperationContext* txn,
-                               const std::string& ns,
-                               const std::string& path) {
+                               const std::string& ns) {
         invariant(txn->lockState()->isW());
 
         SimpleMutex::scoped_lock lk(_m);
-        DBs& m = _paths[path];
-        _size -= (int)m.erase(_todb(ns));
+        _dbs.erase(_todb(ns));
     }
 
-    bool DatabaseHolder::closeAll(
-                OperationContext* txn, const string& path, BSONObjBuilder& result, bool force) {
-        log() << "DatabaseHolder::closeAll path:" << path << endl;
+    bool DatabaseHolder::closeAll(OperationContext* txn,
+                                  BSONObjBuilder& result,
+                                  bool force) {
         invariant(txn->lockState()->isW());
 
         getDur().commitNow(txn); // bad things happen if we close a DB with outstanding writes
 
-        map<string,Database*>& m = _paths[path];
-        _size -= m.size();
-
         set< string > dbs;
-        for ( map<string,Database*>::iterator i = m.begin(); i != m.end(); i++ ) {
+        for ( map<string,Database*>::iterator i = _dbs.begin(); i != _dbs.end(); i++ ) {
             dbs.insert( i->first );
         }
 
@@ -152,8 +138,8 @@ namespace mongo {
         int nNotClosed = 0;
         for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
             string name = *i;
-            LOG(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
-            Client::Context ctx( name , path );
+            LOG(2) << "DatabaseHolder::closeAll name:" << name;
+            Client::Context ctx( name );
             if( !force && BackgroundOperation::inProgForDb(name) ) {
                 log() << "WARNING: can't close database "
                       << name
@@ -162,7 +148,7 @@ namespace mongo {
                 nNotClosed++;
             }
             else {
-                Database::closeDatabase(txn, name.c_str(), path);
+                Database::closeDatabase(txn, name.c_str());
                 bb.append( bb.numStr( n++ ) , name );
             }
         }

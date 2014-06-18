@@ -51,6 +51,7 @@
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
@@ -186,7 +187,7 @@ namespace mongo {
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
                 stopIndexBuilds(txn, context.db(), cmdObj);
-                dropDatabase(txn, context.db(), storageGlobalParams.dbpath);
+                dropDatabase(txn, context.db());
 
                 log() << "dropDatabase " << dbname << " finished";
 
@@ -267,8 +268,10 @@ namespace mongo {
             bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
             e = cmdObj.getField( "backupOriginalFiles" );
             bool backupOriginalFiles = e.isBoolean() && e.boolean();
-            Status status =
-                repairDatabase( txn, dbname, preserveClonedFilesOnFailure, backupOriginalFiles );
+            Status status = globalStorageEngine->repairDatabase( txn,
+                                                                 dbname,
+                                                                 preserveClonedFilesOnFailure,
+                                                                 backupOriginalFiles );
 
             IndexBuilder::restoreIndexes(indexesInProg);
 
@@ -629,7 +632,8 @@ namespace mongo {
         CmdListDatabases() : Command("listDatabases" , true ) {}
         bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             vector< string > dbNames;
-            getDatabaseNames( dbNames );
+            globalStorageEngine->listDatabases( &dbNames );
+
             vector< BSONObj > dbInfos;
 
             set<string> seen;
@@ -714,7 +718,7 @@ namespace mongo {
             Client::Context ctx(dbname);
 
             try {
-                return dbHolder().closeAll(txn, storageGlobalParams.dbpath, result, false);
+                return dbHolder().closeAll(txn, result, false);
             }
             catch(DBException&) { 
                 throw;

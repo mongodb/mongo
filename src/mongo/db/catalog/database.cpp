@@ -50,6 +50,7 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/catalog/collection.h"
 
 namespace mongo {
@@ -124,13 +125,13 @@ namespace mongo {
 
 
     /*static*/
-    string Database::duplicateUncasedName(const string &name, const string &path, set< string > *duplicates) {
+    string Database::duplicateUncasedName(const string &name, set< string > *duplicates) {
         if ( duplicates ) {
             duplicates->clear();
         }
 
         vector<string> others;
-        getDatabaseNames( others , path );
+        globalStorageEngine->listDatabases( &others );
 
         set<string> allShortNames;
         dbHolder().getAllShortNames(allShortNames);

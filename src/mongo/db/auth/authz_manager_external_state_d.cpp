@@ -40,6 +40,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -99,8 +100,7 @@ namespace mongo {
 
     Status AuthzManagerExternalStateMongod::getAllDatabaseNames(
                 OperationContext* txn, std::vector<std::string>* dbnames) {
-        Lock::GlobalRead lk(txn->lockState());
-        getDatabaseNames(*dbnames);
+        globalStorageEngine->listDatabases( dbnames );
         return Status::OK();
     }
 

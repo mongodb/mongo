@@ -338,7 +338,8 @@ namespace mongo {
         Lock::GlobalWrite lk(txn.lockState());
 
         vector< string > dbNames;
-        getDatabaseNames( dbNames );
+        globalStorageEngine->listDatabases( &dbNames );
+
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
             string dbName = *i;
             LOG(1) << "\t" << dbName << endl;
@@ -354,7 +355,7 @@ namespace mongo {
                 ctx.db()->clearTmpCollections(&txn);
 
             if ( mongodGlobalParams.repair ) {
-                fassert(18506, repairDatabase(&txn, dbName));
+                fassert(18506, globalStorageEngine->repairDatabase(&txn, dbName));
             }
             else if (!ctx.db()->getDatabaseCatalogEntry()->currentFilesCompatible(&txn)) {
                 log() << "****";
@@ -401,7 +402,7 @@ namespace mongo {
                     warning() << "Internal error while reading collection " << systemIndexes;
                 }
 
-                Database::closeDatabase(&txn, dbName.c_str(), storageGlobalParams.dbpath);
+                Database::closeDatabase(&txn, dbName.c_str());
             }
         }
 

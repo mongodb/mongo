@@ -73,9 +73,6 @@ namespace mongo {
                            DbResponse& dbresponse,
                            const HostAndPort &client );
 
-    void getDatabaseNames(std::vector<std::string> &names,
-                          const std::string& usePath = storageGlobalParams.dbpath);
-
     /* returns true if there is no data on this server.  useful when starting replication.
        local database does NOT count.
     */

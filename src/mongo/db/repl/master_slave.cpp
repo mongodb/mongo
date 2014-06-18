@@ -365,7 +365,7 @@ namespace repl {
     void ReplSource::resyncDrop( OperationContext* txn, const string& db ) {
         log() << "resync: dropping database " << db;
         Client::Context ctx(db);
-        dropDatabase(txn, ctx.db(), storageGlobalParams.dbpath);
+        dropDatabase(txn, ctx.db());
     }
 
     /* grab initial copy of a database from the master */
@@ -440,7 +440,7 @@ namespace repl {
                                             const char* ns,
                                             const char* db ) {
         // We are already locked at this point
-        if (dbHolder().get(txn, ns, storageGlobalParams.dbpath) != NULL) {
+        if (dbHolder().get(txn, ns) != NULL) {
             // Database is already present.
             return true;   
         }
@@ -450,7 +450,7 @@ namespace repl {
             // missing from master after optime "ts".
             return false;   
         }
-        if (Database::duplicateUncasedName(db, storageGlobalParams.dbpath).empty()) {
+        if (Database::duplicateUncasedName(db).empty()) {
             // No duplicate database names are present.
             return true;
         }
@@ -505,7 +505,7 @@ namespace repl {
         
         // Check for duplicates again, since we released the lock above.
         set< string > duplicates;
-        Database::duplicateUncasedName(db, storageGlobalParams.dbpath, &duplicates);
+        Database::duplicateUncasedName(db, &duplicates);
         
         // The database is present on the master and no conflicting databases
         // are present on the master.  Drop any local conflicts.
@@ -514,11 +514,11 @@ namespace repl {
             incompleteCloneDbs.erase(*i);
             addDbNextPass.erase(*i);
             Client::Context ctx(*i);
-            dropDatabase(txn, ctx.db(), storageGlobalParams.dbpath );
+            dropDatabase(txn, ctx.db() );
         }
         
         massert(14034, "Duplicate database names present after attempting to delete duplicates",
-                Database::duplicateUncasedName(db, storageGlobalParams.dbpath).empty());
+                Database::duplicateUncasedName(db).empty());
         return true;
     }
 
@@ -630,7 +630,7 @@ namespace repl {
         // This code executes on the slaves only, so it doesn't need to be sharding-aware since
         // mongos will not send requests there. That's why the last argument is false (do not do
         // version checking).
-        Client::Context ctx(ns, storageGlobalParams.dbpath, false);
+        Client::Context ctx(ns, false);
         ctx.getClient()->curop()->reset();
 
         bool empty = ctx.db()->getDatabaseCatalogEntry()->isEmpty();

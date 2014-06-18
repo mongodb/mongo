@@ -38,6 +38,7 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -56,7 +57,7 @@ namespace mongo {
         cc().getAuthorizationSession()->grantInternalAuthorization();
 
         std::vector<std::string> dbNames;
-        getDatabaseNames(dbNames);
+        globalStorageEngine->listDatabases( &dbNames );
 
         try {
             std::list<std::string> collNames;

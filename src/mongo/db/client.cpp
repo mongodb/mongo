@@ -164,8 +164,6 @@ namespace mongo {
     BSONObj CachedBSONObjBase::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
     Client::Context::Context(const std::string& ns , Database * db) :
         _client( currentClient.get() ), 
-        _path(storageGlobalParams.dbpath), // is this right? could be a different db?
-                                               // may need a dassert for this
         _justCreated(false),
         _doVersion( true ),
         _ns( ns ), 
@@ -174,9 +172,8 @@ namespace mongo {
 
     }
 
-    Client::Context::Context(const string& ns, const std::string& path, bool doVersion) :
+    Client::Context::Context(const string& ns, bool doVersion) :
         _client( currentClient.get() ), 
-        _path( path ), 
         _justCreated(false), // set for real in finishInit
         _doVersion(doVersion),
         _ns( ns ), 
@@ -192,9 +189,9 @@ namespace mongo {
                 OperationContext* txn, const string& ns, bool doVersion) {
         {
             _lk.reset(new Lock::DBRead(txn->lockState(), ns));
-            Database *db = dbHolder().get(txn, ns, storageGlobalParams.dbpath);
+            Database *db = dbHolder().get(txn, ns);
             if( db ) {
-                _c.reset(new Context(storageGlobalParams.dbpath, ns, db, doVersion));
+                _c.reset(new Context(ns, db, doVersion));
                 return;
             }
         }
@@ -205,18 +202,18 @@ namespace mongo {
             if (txn->lockState()->isW()) {
                 // write locked already
                 DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
-                _c.reset(new Context(ns, storageGlobalParams.dbpath, doVersion));
+                _c.reset(new Context(ns, doVersion));
             }
             else if (!txn->lockState()->isRecursive()) {
                 _lk.reset(0);
                 {
                     Lock::GlobalWrite w(txn->lockState());
-                    Context c(ns, storageGlobalParams.dbpath, doVersion);
+                    Context c(ns, doVersion);
                 }
 
                 // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
                 _lk.reset(new Lock::DBRead(txn->lockState(), ns));
-                _c.reset(new Context(ns, storageGlobalParams.dbpath, doVersion));
+                _c.reset(new Context(ns, doVersion));
             }
             else { 
                 uasserted(15928, str::stream() << "can't open a database from a nested read lock " << ns);
@@ -231,7 +228,7 @@ namespace mongo {
     Client::WriteContext::WriteContext(
                 OperationContext* opCtx, const std::string& ns, bool doVersion)
         : _lk(opCtx->lockState(), ns),
-          _c(ns, storageGlobalParams.dbpath, doVersion) {
+          _c(ns, doVersion) {
     }
 
 
@@ -255,9 +252,8 @@ namespace mongo {
     }
 
     // invoked from ReadContext
-    Client::Context::Context(const string& path, const string& ns, Database *db, bool doVersion) :
+    Client::Context::Context(const string& ns, Database *db, bool doVersion) :
         _client( currentClient.get() ), 
-        _path( path ), 
         _justCreated(false),
         _doVersion( doVersion ),
         _ns( ns ), 
@@ -270,7 +266,7 @@ namespace mongo {
        
     void Client::Context::_finishInit() {
         OperationContextImpl txn; // TODO get rid of this once reads require transactions
-        _db = dbHolder().getOrCreate(&txn, _ns, _path, _justCreated);
+        _db = dbHolder().getOrCreate(&txn, _ns, _justCreated);
         invariant(_db);
 
         if( _doVersion ) checkNotStale();

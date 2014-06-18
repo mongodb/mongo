@@ -106,8 +106,7 @@ namespace mongo {
             
             // Make sure database still exists after we resume from the temp release
             bool unused;
-            Database* db = dbHolder().getOrCreate(
-                                        txn, _dbName, storageGlobalParams.dbpath, unused);
+            Database* db = dbHolder().getOrCreate(txn, _dbName, unused);
 
             bool createdCollection = false;
             Collection* collection = NULL;
@@ -231,7 +230,7 @@ namespace mongo {
         // We are under lock here again, so reload the database in case it may have disappeared
         // during the temp release
         bool unused;
-        Database* db = dbHolder().getOrCreate(txn, toDBName, storageGlobalParams.dbpath, unused);
+        Database* db = dbHolder().getOrCreate(txn, toDBName, unused);
 
         if ( indexesToBuild.size() ) {
             for (list<BSONObj>::const_iterator i = indexesToBuild.begin();
@@ -305,7 +304,7 @@ namespace mongo {
         const string dbName = nss.db().toString();
 
         bool unused;
-        Database* db = dbHolder().getOrCreate(txn, dbName, storageGlobalParams.dbpath, unused);
+        Database* db = dbHolder().getOrCreate(txn, dbName, unused);
 
         // config
         string temp = dbName + ".system.namespaces";
@@ -482,8 +481,7 @@ namespace mongo {
             // throw if the database has changed in between, but for now preserve the existing
             // behaviour.
             bool unused;
-            Database* db = 
-                dbHolder().getOrCreate(txn, toDBName, storageGlobalParams.dbpath, unused);
+            Database* db = dbHolder().getOrCreate(txn, toDBName, unused);
 
             /* we defer building id index for performance - building it in batch is much faster */
             Status createStatus = userCreateNS( txn, db, to_name, options,

@@ -136,8 +136,6 @@ namespace mongo {
                     Lock::GlobalWrite w(txn->lockState());
                     getDur().commitNow(txn);
                 }
-                // question : is it ok this is not in the dblock? i think so but this is a change from past behavior, 
-                // please advise.
                 result.append( "numFiles" , globalStorageEngine->flushAllFiles( sync ) );
             }
             return 1;

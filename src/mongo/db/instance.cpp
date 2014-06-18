@@ -546,11 +546,11 @@ namespace mongo {
     }
 
     /*static*/ 
-    void Database::closeDatabase(OperationContext* txn, const string& db, const string& path) {
+    void Database::closeDatabase(OperationContext* txn, const string& db) {
         // XXX? - Do we need to close database under global lock or just DB-lock is sufficient ?
         invariant(txn->lockState()->isW());
 
-        Database* database = dbHolder().get(txn, db, path);
+        Database* database = dbHolder().get(txn, db);
         invariant(database != NULL);
 
         repl::oplogCheckCloseDatabase(txn, database); // oplog caches some things, dirty its caches
@@ -559,16 +559,12 @@ namespace mongo {
             log() << "warning: bg op in prog during close db? " << db << endl;
         }
 
-        /* important: kill all open cursors on the database */
-        string prefix(db);
-        prefix += '.';
-
         // Before the files are closed, flush any potentially outstanding changes, which might
         // reference this database. Otherwise we will assert when subsequent commit if needed
         // is called and it happens to have write intents for the removed files.
         txn->recoveryUnit()->commitIfNeeded(true);
 
-        dbHolder().erase(txn, db, path);
+        dbHolder().erase(txn, db);
         delete database; // closes files
     }
 
@@ -911,32 +907,14 @@ namespace mongo {
         }
     }
 
-    void getDatabaseNames( vector< string > &names , const string& usePath ) {
-        boost::filesystem::path path( usePath );
-        for ( boost::filesystem::directory_iterator i( path );
-                i != boost::filesystem::directory_iterator(); ++i ) {
-            if (storageGlobalParams.directoryperdb) {
-                boost::filesystem::path p = *i;
-                string dbName = p.leaf().string();
-                p /= ( dbName + ".ns" );
-                if ( exists( p ) )
-                    names.push_back( dbName );
-            }
-            else {
-                string fileName = boost::filesystem::path(*i).leaf().string();
-                if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" )
-                    names.push_back( fileName.substr( 0, fileName.length() - 3 ) );
-            }
-        }
-    }
-
     /* returns true if there is data on this server.  useful when starting replication.
        local database does NOT count except for rsoplog collection.
        used to set the hasData field on replset heartbeat command response
     */
     bool replHasDatabases(OperationContext* txn) {
         vector<string> names;
-        getDatabaseNames(names);
+        globalStorageEngine->listDatabases( &names );
+
         if( names.size() >= 2 ) return true;
         if( names.size() == 1 ) {
             if( names[0] != "local" )
@@ -1265,10 +1243,10 @@ namespace {
                     // even prealloc files, then it means that it is mounted so we can continue.
                     // Previously there was an issue (SERVER-5056) where we would fail to start up
                     // if killed during prealloc.
-                    
+
                     vector<string> dbnames;
-                    getDatabaseNames( dbnames );
-                    
+                    globalStorageEngine->listDatabases( &dbnames );
+
                     if ( dbnames.size() == 0 ) {
                         // this means that mongod crashed
                         // between initial startup and when journaling was initialized

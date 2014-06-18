@@ -159,7 +159,7 @@ namespace mongo {
         class Context : boost::noncopyable {
         public:
             /** this is probably what you want */
-            Context(const std::string& ns, const std::string& path=storageGlobalParams.dbpath,
+            Context(const std::string& ns,
                     bool doVersion = true);
 
             /** note: this does not call finishInit -- i.e., does not call 
@@ -169,15 +169,12 @@ namespace mongo {
             Context(const std::string& ns , Database * db);
 
             // used by ReadContext
-            Context(const std::string& path, const std::string& ns, Database *db, bool doVersion = true);
+            Context(const std::string& ns, Database *db, bool doVersion );
 
             ~Context();
             Client* getClient() const { return _client; }
             Database* db() const { return _db; }
             const char * ns() const { return _ns.c_str(); }
-            bool equals(const std::string& ns, const std::string& path=storageGlobalParams.dbpath) const {
-                return _ns == ns && _path == path;
-            }
 
             /** @return if the db was created by this Context */
             bool justCreated() const { return _justCreated; }
@@ -197,7 +194,6 @@ namespace mongo {
             void checkNsAccess( bool doauth );
             void checkNsAccess( bool doauth, int lockState );
             Client * const _client;
-            const std::string _path;
             bool _justCreated;
             bool _doVersion;
             const std::string _ns;

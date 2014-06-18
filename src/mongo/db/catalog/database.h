@@ -64,8 +64,11 @@ namespace mongo {
         /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
            thus the destructor is private.  this could be cleaned up one day...
         */
-        static void closeDatabase(
-                        OperationContext* txn, const std::string& db, const std::string& path);
+        static void closeDatabase(OperationContext* txn,
+                                  const std::string& db);
+
+        // do not use!
+        ~Database(); // closes files and other cleanup see below.
 
         const std::string& name() const { return _name; }
 
@@ -129,7 +132,6 @@ namespace mongo {
          // TODO move???
          */
         static string duplicateUncasedName( const std::string &name,
-                                            const std::string &path,
                                             std::set< std::string > *duplicates = 0 );
 
         static Status validateDBName( const StringData& dbname );
@@ -140,8 +142,6 @@ namespace mongo {
         void _clearCollectionCache( const StringData& fullns );
 
         void _clearCollectionCache_inlock( const StringData& fullns );
-
-        ~Database(); // closes files and other cleanup see below.
 
         const std::string _name; // "alleyinsider"
 

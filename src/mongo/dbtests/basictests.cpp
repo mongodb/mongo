@@ -386,11 +386,12 @@ namespace BasicTests {
             // if that changes, should put this on the stack
             {
                 MMAPV1DatabaseCatalogEntry* temp = new MMAPV1DatabaseCatalogEntry(&txn,
-                                                                                "dbtests_basictests_ownsns",
-                                                                                storageGlobalParams.dbpath,
-                                                                                storageGlobalParams.directoryperdb);
+                                                                                  "dbtests_basictests_ownsns",
+                                                                                  storageGlobalParams.dbpath,
+                                                                                  storageGlobalParams.directoryperdb,
+                                                                                  true);
                 Database * db = new Database( &txn, "dbtests_basictests_ownsns", isNew, temp );
-                verify( isNew );
+                ASSERT( isNew );
 
                 ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x" ) );
                 ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x.y" ) );

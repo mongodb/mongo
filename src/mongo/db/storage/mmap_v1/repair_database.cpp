@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/db/repair_database.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 
 #include <boost/filesystem/operations.hpp>
 
@@ -39,7 +39,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mmap.h"
@@ -248,10 +248,6 @@ namespace mongo {
             try {
                 _txn->recoveryUnit()->syncDataAndTruncateJournal();
                 globalStorageEngine->flushAllFiles(true); // need both in case journaling is disabled
-                {
-                    Client::Context tempContext( _dbName, _pathString );
-                    Database::closeDatabase(_txn, _dbName, _pathString);
-                }
                 MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( _path ) );
             }
             catch ( DBException& e ) {
@@ -273,16 +269,16 @@ namespace mongo {
         bool _success;
     };
 
-    Status repairDatabase( OperationContext* txn,
-                           string dbName,
-                           bool preserveClonedFilesOnFailure,
-                           bool backupOriginalFiles ) {
+    Status MMAPV1Engine::repairDatabase( OperationContext* txn,
+                                         const std::string& dbName,
+                                         bool preserveClonedFilesOnFailure,
+                                         bool backupOriginalFiles ) {
         // We must hold some form of lock here
         invariant(txn->lockState()->threadState());
+        invariant( dbName.find( '.' ) == string::npos );
 
         scoped_ptr<RepairFileDeleter> repairFileDeleter;
         doingRepair dr;
-        dbName = nsToDatabase( dbName );
 
         log() << "repairDatabase " << dbName << endl;
 
@@ -315,17 +311,26 @@ namespace mongo {
                                                             reservedPath ) );
 
         {
-            Database* originalDatabase = 
-                            dbHolder().get(txn, dbName, storageGlobalParams.dbpath);
+            Database* originalDatabase =
+                            dbHolder().get(txn, dbName);
             if (originalDatabase == NULL) {
                 return Status(ErrorCodes::NamespaceNotFound, "database does not exist to repair");
             }
 
-            Database* tempDatabase = NULL;
+            scoped_ptr<Database> tempDatabase;
             {
+                MMAPV1DatabaseCatalogEntry* entry =
+                    new MMAPV1DatabaseCatalogEntry( txn,
+                                                    dbName,
+                                                    reservedPathString,
+                                                    storageGlobalParams.directoryperdb,
+                                                    true );
                 bool justCreated = false;
-                tempDatabase = 
-                    dbHolder().getOrCreate(txn, dbName, reservedPathString, justCreated);
+                tempDatabase.reset( new Database( txn,
+                                                  dbName,
+                                                  justCreated,
+                                                  entry ) );
+
                 invariant( justCreated );
             }
 
@@ -433,8 +438,6 @@ namespace mongo {
 
             txn->checkForInterrupt(false);
 
-            Client::Context tempContext( dbName, reservedPathString );
-            Database::closeDatabase(txn, dbName, reservedPathString);
         }
 
         // at this point if we abort, we don't want to delete new files
@@ -444,7 +447,7 @@ namespace mongo {
             repairFileDeleter->success();
 
         Client::Context ctx( dbName );
-        Database::closeDatabase(txn, dbName, storageGlobalParams.dbpath);
+        Database::closeDatabase(txn, dbName);
 
         if ( backupOriginalFiles ) {
             _renameForBackup( dbName, reservedPath );

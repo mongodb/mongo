@@ -30,19 +30,30 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "mongo/base/status.h"
 
 namespace mongo {
 
+    class OperationContext;
+
     class StorageEngine {
     public:
         virtual ~StorageEngine() {}
+
+        virtual void listDatabases( std::vector<std::string>* out ) const = 0;
 
         /**
          * @return number of files flushed
          */
         virtual int flushAllFiles( bool sync ) = 0;
 
+        virtual Status repairDatabase( OperationContext* tnx,
+                                       const std::string& dbName,
+                                       bool preserveClonedFilesOnFailure = false,
+                                       bool backupOriginalFiles = false ) = 0;
     };
 
     // TODO: this is temporary

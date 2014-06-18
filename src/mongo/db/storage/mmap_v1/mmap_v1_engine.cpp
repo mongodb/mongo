@@ -30,11 +30,40 @@
 
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 
+#include <boost/filesystem/path.hpp>
+#include <boost/filesystem/operations.hpp>
+
+#include "mongo/db/storage_options.h"
 #include "mongo/util/mmap.h"
 
 namespace mongo {
 
     MMAPV1Engine::~MMAPV1Engine() {
+    }
+
+    void MMAPV1Engine::listDatabases( std::vector<std::string>* out ) const {
+        _listDatabases( storageGlobalParams.dbpath, out );
+    }
+
+    void MMAPV1Engine::_listDatabases( const std::string& directory,
+                                       std::vector<std::string>* out ) {
+        boost::filesystem::path path( directory );
+        for ( boost::filesystem::directory_iterator i( path );
+              i != boost::filesystem::directory_iterator();
+              ++i ) {
+            if (storageGlobalParams.directoryperdb) {
+                boost::filesystem::path p = *i;
+                string dbName = p.leaf().string();
+                p /= ( dbName + ".ns" );
+                if ( exists( p ) )
+                    out->push_back( dbName );
+            }
+            else {
+                string fileName = boost::filesystem::path(*i).leaf().string();
+                if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" )
+                    out->push_back( fileName.substr( 0, fileName.length() - 3 ) );
+            }
+        }
     }
 
     int MMAPV1Engine::flushAllFiles( bool sync ) {

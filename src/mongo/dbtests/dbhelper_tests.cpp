@@ -150,8 +150,7 @@ namespace mongo {
             ASSERT_NOT_EQUALS( estSizeBytes, 0 );
             ASSERT_LESS_THAN( estSizeBytes, maxSizeBytes );
 
-            Database* db = dbHolder().get(
-                                    &txn, nsToDatabase(range.ns), storageGlobalParams.dbpath);
+            Database* db = dbHolder().get( &txn, nsToDatabase(range.ns) );
             const Collection* collection = db->getCollection(&txn, ns);
 
             // Make sure all the disklocs actually correspond to the right info

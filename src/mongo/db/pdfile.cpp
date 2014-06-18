@@ -60,7 +60,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/delete.h"
@@ -68,6 +67,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/file.h"
@@ -141,18 +141,18 @@ namespace mongo {
         Lock::GlobalWrite lk(txn->lockState());
 
         vector<string> n;
-        getDatabaseNames(n);
+        globalStorageEngine->listDatabases( &n );
         if( n.size() == 0 ) return;
         log() << "dropAllDatabasesExceptLocal " << n.size() << endl;
         for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
             if( *i != "local" ) {
                 Client::Context ctx(*i);
-                dropDatabase(txn, ctx.db(), storageGlobalParams.dbpath);
+                dropDatabase(txn, ctx.db());
             }
         }
     }
 
-    void dropDatabase(OperationContext* txn, Database* db, const std::string& path ) {
+    void dropDatabase(OperationContext* txn, Database* db ) {
         invariant( db );
 
         string name = db->name(); // just to have safe
@@ -173,7 +173,7 @@ namespace mongo {
 
         txn->recoveryUnit()->syncDataAndTruncateJournal();
 
-        Database::closeDatabase(txn, name, path );
+        Database::closeDatabase(txn, name );
         db = 0; // d is now deleted
 
         _deleteDataFiles( name );

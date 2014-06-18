@@ -44,11 +44,4 @@ namespace mongo {
     // TODO: move
     void _deleteDataFiles(const std::string& database);
 
-    // must have a global lock
-    Status repairDatabase( OperationContext* txn,
-                           std::string db,
-                           bool preserveClonedFilesOnFailure = false,
-                           bool backupOriginalFiles = false );
-
-
 } // namespace mongo

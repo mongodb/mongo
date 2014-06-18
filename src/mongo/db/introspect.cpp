@@ -138,10 +138,9 @@ namespace {
             // NOTE: It's kind of weird that we lock the op's namespace, but have to for now since
             // we're sometimes inside the lock already
             Lock::DBWrite lk(txn->lockState(), currentOp.getNS() );
-            if (dbHolder().get(
-                    txn, nsToDatabase(currentOp.getNS()), storageGlobalParams.dbpath) != NULL) {
+            if (dbHolder().get(txn, nsToDatabase(currentOp.getNS())) != NULL) {
 
-                Client::Context cx(currentOp.getNS(), storageGlobalParams.dbpath, false);
+                Client::Context cx(currentOp.getNS(), false);
                 _profile(txn, c, cx.db(), currentOp, profileBufBuilder);
             }
             else {

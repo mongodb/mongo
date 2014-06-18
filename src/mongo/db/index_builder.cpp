@@ -66,7 +66,7 @@ namespace mongo {
         NamespaceString ns(_index["ns"].String());
         Client::WriteContext ctx(&txn, ns.getSystemIndexesCollection());
 
-        Database* db = dbHolder().get(&txn, ns.db().toString(), storageGlobalParams.dbpath);
+        Database* db = dbHolder().get(&txn, ns.db().toString());
 
         Status status = build(&txn, db);
         if ( !status.isOK() ) {

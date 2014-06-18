@@ -438,8 +438,7 @@ namespace repl {
                 const NamespaceString nss(ns);
 
                 bool unused;
-                Database* db = dbHolder().getOrCreate(
-                                    txn, nss.db().toString(), storageGlobalParams.dbpath, unused);
+                Database* db = dbHolder().getOrCreate(txn, nss.db().toString(), unused);
                 invariant(db);
 
                 db->dropCollection(txn, ns);
@@ -652,7 +651,7 @@ namespace repl {
         }
 
         removeSavers.clear(); // this effectively closes all of them
-
+        sethbmsg(str::stream() << "rollback 5 d:" << deletes << " u:" << updates);
         sethbmsg("rollback 6");
 
         // clean up oplog

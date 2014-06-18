@@ -32,13 +32,13 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/commands/get_last_error.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
@@ -95,7 +95,8 @@ namespace repl {
 namespace {
     void dropAllTempCollections() {
         vector<string> dbNames;
-        getDatabaseNames(dbNames);
+        globalStorageEngine->listDatabases( &dbNames );
+
         OperationContextImpl txn;
         for (vector<string>::const_iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
             // The local db is special because it isn't replicated. It is cleared at startup even on

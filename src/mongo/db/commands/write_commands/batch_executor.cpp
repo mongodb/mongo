@@ -919,7 +919,6 @@ namespace mongo {
             return false;
         }
         _context.reset(new Client::Context(request->getNS(),
-                                           storageGlobalParams.dbpath,
                                            false /* don't check version */));
         Database* database = _context->db();
         dassert(database);
@@ -1100,7 +1099,6 @@ namespace mongo {
             return;
 
         Client::Context ctx( nsString.ns(),
-                             storageGlobalParams.dbpath,
                              false /* don't check version */ );
 
         try {
@@ -1163,7 +1161,6 @@ namespace mongo {
         // Context once we're locked, to set more details in currentOp()
         // TODO: better constructor?
         Client::Context writeContext( nss.ns(),
-                                      storageGlobalParams.dbpath,
                                       false /* don't check version */);
 
         try {

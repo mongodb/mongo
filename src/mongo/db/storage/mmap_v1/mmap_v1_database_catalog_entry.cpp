@@ -53,16 +53,18 @@ namespace mongo {
     MONGO_EXPORT_SERVER_PARAMETER(newCollectionsUsePowerOf2Sizes, bool, true);
 
     MMAPV1DatabaseCatalogEntry::MMAPV1DatabaseCatalogEntry( OperationContext* txn,
-                                                          const StringData& name,
-                                                          const StringData& path,
-                                                          bool directoryPerDB )
+                                                            const StringData& name,
+                                                            const StringData& path,
+                                                            bool directoryPerDB,
+                                                            bool transient )
         : DatabaseCatalogEntry( name ),
           _path( path.toString() ),
           _extentManager( name, path, directoryPerDB ),
           _namespaceIndex( _path, name.toString() ) {
 
         try {
-            _checkDuplicateUncasedNames();
+            if ( !transient )
+                _checkDuplicateUncasedNames();
 
             Status s = _extentManager.init(txn);
             if ( !s.isOK() ) {
@@ -373,7 +375,7 @@ namespace mongo {
     }
 
     void MMAPV1DatabaseCatalogEntry::_checkDuplicateUncasedNames() const {
-        string duplicate = Database::duplicateUncasedName(name(), _path);
+        string duplicate = Database::duplicateUncasedName(name());
         if ( !duplicate.empty() ) {
             stringstream ss;
             ss << "db already exists with different case already have: [" << duplicate

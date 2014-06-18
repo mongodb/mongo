@@ -123,7 +123,7 @@ namespace repl {
 
         {
             if ( localOplogRSCollection == 0 ) {
-                Client::Context ctx(rsoplog, storageGlobalParams.dbpath);
+                Client::Context ctx(rsoplog);
                 localDB = ctx.db();
                 verify( localDB );
                 localOplogRSCollection = localDB->getCollection( &txn, rsoplog );
@@ -282,7 +282,7 @@ namespace repl {
         DEV verify( logNS == 0 ); // check this was never a master/slave master
 
         if ( localOplogRSCollection == 0 ) {
-            Client::Context ctx(rsoplog, storageGlobalParams.dbpath);
+            Client::Context ctx(rsoplog);
             localDB = ctx.db();
             verify( localDB );
             localOplogRSCollection = localDB->getCollection( txn, rsoplog );
@@ -338,8 +338,6 @@ namespace repl {
         OpTime ts(getNextGlobalOptime());
         newOptimeNotifier.notify_all();
 
-        Client::Context context("", 0);
-
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
         */
@@ -362,7 +360,7 @@ namespace repl {
         }
 
         if ( localOplogMainCollection == 0 ) {
-            Client::Context ctx(logNS, storageGlobalParams.dbpath);
+            Client::Context ctx(logNS);
             localDB = ctx.db();
             verify( localDB );
             localOplogMainCollection = localDB->getCollection(txn, logNS);
@@ -373,7 +371,7 @@ namespace repl {
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( localOplogMainCollection->insertDocument( txn, &writer, false ) );
 
-        context.getClient()->setLastOp( ts );
+        ctx.getClient()->setLastOp( ts );
     }
 
     static void (*_logOp)(OperationContext* txn,

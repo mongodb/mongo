@@ -50,9 +50,10 @@ namespace mongo {
     class MMAPV1DatabaseCatalogEntry : public DatabaseCatalogEntry {
     public:
         MMAPV1DatabaseCatalogEntry( OperationContext* txn,
-                                   const StringData& name,
-                                   const StringData& path,
-                                   bool directoryperdb );
+                                    const StringData& name,
+                                    const StringData& path,
+                                    bool directoryperdb,
+                                    bool transient );
 
         virtual ~MMAPV1DatabaseCatalogEntry();
 

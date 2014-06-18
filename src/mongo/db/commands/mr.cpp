@@ -1290,7 +1290,7 @@ namespace mongo {
 
                         // This context does no version check, safe b/c we checked earlier and have an
                         // open cursor
-                        scoped_ptr<Client::Context> ctx(new Client::Context(config.ns, storageGlobalParams.dbpath, false));
+                        scoped_ptr<Client::Context> ctx(new Client::Context(config.ns, false));
 
                         const NamespaceString nss(config.ns);
                         const WhereCallbackReal whereCallback(nss.db());
@@ -1349,7 +1349,7 @@ namespace mongo {
                                 lock.reset();
                                 state.reduceAndSpillInMemoryStateIfNeeded();
                                 lock.reset(new Lock::DBRead(txn->lockState(), config.ns));
-                                ctx.reset(new Client::Context(config.ns, storageGlobalParams.dbpath, false));
+                                ctx.reset(new Client::Context(config.ns, false));
 
                                 reduceTime += t.micros();
 

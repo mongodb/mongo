@@ -37,6 +37,17 @@ namespace mongo {
     class MMAPV1Engine : public StorageEngine {
     public:
         virtual ~MMAPV1Engine();
+
+        void listDatabases( std::vector<std::string>* out ) const;
         int flushAllFiles( bool sync );
+
+        Status repairDatabase( OperationContext* tnx,
+                               const std::string& dbName,
+                               bool preserveClonedFilesOnFailure,
+                               bool backupOriginalFiles );
+
+    private:
+        static void _listDatabases( const std::string& directory,
+                                    std::vector<std::string>* out );
     };
 }

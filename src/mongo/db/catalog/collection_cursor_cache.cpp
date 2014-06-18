@@ -188,7 +188,7 @@ namespace mongo {
         }
 
         Lock::DBRead lock(txn->lockState(), ns);
-        Database* db = dbHolder().get(txn, ns, storageGlobalParams.dbpath);
+        Database* db = dbHolder().get(txn, ns);
         if ( !db )
             return false;
         Client::Context context( ns, db );
@@ -218,7 +218,7 @@ namespace mongo {
         for ( unsigned i = 0; i < todo.size(); i++ ) {
             const string& ns = todo[i];
             Lock::DBRead lock(txn->lockState(), ns);
-            Database* db = dbHolder().get(txn, ns, storageGlobalParams.dbpath);
+            Database* db = dbHolder().get(txn, ns);
             if ( !db )
                 continue;
             Client::Context context( ns, db );
