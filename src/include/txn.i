@@ -196,6 +196,26 @@ __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_current_id --
+ *	Get the current transaction ID.
+ */
+static inline uint64_t
+__wt_txn_current_id(WT_SESSION_IMPL *session)
+{
+	return (S2C(session)->txn_global.current);
+}
+
+/*
+ * __wt_txn_new_id --
+ *	Allocate a new transaction ID.
+ */
+static inline uint64_t
+__wt_txn_new_id(WT_SESSION_IMPL *session)
+{
+	return WT_ATOMIC_ADD(S2C(session)->txn_global.current, 1);
+}
+
+/*
  * __wt_txn_id_check --
  *	A transaction is going to do an update, start an auto commit
  *      transaction if required and allocate a transaction ID.
