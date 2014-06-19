@@ -41,7 +41,10 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
     archive_list = ['true', 'false']
     sync_list = [
-        '(method=dsync,enabled)', '(method=fsync,enabled)', '(enabled=false)'
+        '(method=dsync,enabled)',
+        '(method=fsync,enabled)',
+        '(method=none,enabled)',
+        '(enabled=false)'
     ]
 
     types = [

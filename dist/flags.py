@@ -27,8 +27,8 @@ flags = {
 	],
 	'log_write' : [
 		'LOG_DSYNC',
-		'LOG_FSYNC',
 		'LOG_FLUSH',
+		'LOG_FSYNC',
 	],
 	'page_read' : [
 		'READ_CACHE',

@@ -42,7 +42,10 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     archive_list = ['true', 'false']
     conn_list = ['reopen', 'stay_open']
     sync_list = [
-        '(method=dsync,enabled)', '(method=fsync,enabled)', '(enabled=false)'
+        '(method=dsync,enabled)',
+        '(method=fsync,enabled)',
+        '(method=none,enabled)',
+        '(enabled=false)'
     ]
 
     types = [

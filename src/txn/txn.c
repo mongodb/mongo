@@ -254,6 +254,10 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
 	txn->txn_logsync = S2C(session)->txn_logsync;
 	WT_RET(__wt_config_gets_def(session, cfg, "sync", 0, &cval));
+	/*
+	 * Don't sync if either sync is false or syncing is disabled
+	 * on the connection.
+	 */
 	if (!cval.val && !FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH))
 		txn->txn_logsync = 0;
 
