@@ -121,6 +121,11 @@ namespace mongo {
         virtual void fullValidate(long long* numKeysOut) = 0;
 
         virtual bool isEmpty() = 0;
+        
+        /**
+         * Attempt to bring whole index into memory. No-op is ok if not supported.
+         */
+        virtual Status touch(OperationContext* txn) const = 0;
 
         //
         // Navigation

@@ -57,7 +57,7 @@ namespace mongo {
     public:
         using BtreeBasedAccessMethod::_descriptor;
 
-        HaystackAccessMethod(IndexCatalogEntry* btreeState, RecordStore* rs);
+        HaystackAccessMethod(IndexCatalogEntry* btreeState, BtreeInterface* btree);
         virtual ~HaystackAccessMethod() { }
 
     protected:

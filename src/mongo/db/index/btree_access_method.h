@@ -52,7 +52,7 @@ namespace mongo {
         using BtreeBasedAccessMethod::_descriptor;
 
         BtreeAccessMethod(IndexCatalogEntry* btreeState,
-                          RecordStore* rs );
+                          BtreeInterface* btree );
         virtual ~BtreeAccessMethod() { }
 
     private:

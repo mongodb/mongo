@@ -178,6 +178,10 @@ namespace mongo {
 
         BSONObj getKey(const DiskLoc& bucketLoc, const int keyOffset) const;
 
+        DiskLoc getHead() const { return _headManager->getHead(); }
+
+        Status touch(OperationContext* txn) const;
+
         //
         // Composite key navigation methods
         //
@@ -205,8 +209,6 @@ namespace mongo {
                              int direction,
                              DiskLoc* bucketInOut,
                              int* keyOffsetInOut) const;
-
-        DiskLoc getHead() const { return _headManager->getHead(); }
 
         //
         // Creation and deletion
