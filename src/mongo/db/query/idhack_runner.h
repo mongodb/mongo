@@ -88,12 +88,10 @@ namespace mongo {
         bool hasCoveredProjection() const;
 
         /**
-         * If '_query' has a projection, then apply it, returning the result in 'objOut'.
-         * The diskloc 'loc' contains the BSONObj to transform.
-         *
-         * Otherwise do nothing and return false.
+         * Apply the projection from '_query' to the given object and return the result.
+         * '_query->getProj()' must be non-NULL.
          */
-         bool applyProjection(const DiskLoc& loc, BSONObj* objOut) const;
+        BSONObj applyProjection(const BSONObj& docObj) const;
 
         // Not owned here.
         const Collection* _collection;

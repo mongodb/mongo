@@ -95,34 +95,48 @@ namespace mongo {
         if (NULL == objOut) {
             // No object requested - nothing to do.
         }
-        else if (hasCoveredProjection()) {
-            // Covered query on _id field only.
-            // Set object to search key.
-            // Search key is retrieved from the canonical query at
-            // construction and always contains the _id field name.
-            // It is possible to construct the ID hack runner with just the collection
-            // and the key object (which could be {"": my_obj_id}) but _query would be null
-            // in that case and the query would never be seen as covered.
-            *objOut = _key.getOwned();
-        }
         else {
-            _nscannedObjects++;
-
-            if (!applyProjection(loc, objOut)) {
-                // No projection. Just return the object inside the diskloc.
-                *objOut = _collection->docFor(loc);
+            // If we're sharded, get the config metadata for this collection.  This will be used
+            // later to see if we own the document to be returned.
+            //
+            // Query execution machinery should generally delegate to ShardFilterStage in order to
+            // accomplish this task.  It is only safe to rely on the state of the config metadata
+            // here because it is not possible for the config metadata to change during the lifetime
+            // of the IDHackRunner (since the IDHackRunner returns only a single document, the
+            // config metadata must be the same as it was when the query started).
+            CollectionMetadataPtr collectionMetadata;
+            if (shardingState.needCollectionMetadata(_collection->ns().ns())) {
+                collectionMetadata = shardingState.getCollectionMetadata(_collection->ns().ns());
             }
 
-            // If we're sharded make sure the key belongs to us.  We need the object to do this.
-            if (shardingState.needCollectionMetadata(_collection->ns().ns())) {
-                CollectionMetadataPtr m = shardingState.getCollectionMetadata(_collection->ns().ns());
-                if (m) {
-                    KeyPattern kp(m->getKeyPattern());
-                    if (!m->keyBelongsToMe( kp.extractSingleKey(*objOut))) {
+            // If we're not sharded, consider a covered projection (we can't if we're sharded, since
+            // we require a fetch in order to apply the sharding filter).
+            if (!collectionMetadata && hasCoveredProjection()) {
+                // Covered query on _id field only.  Set object to search key.  Search key is
+                // retrieved from the canonical query at construction and always contains the _id
+                // field name.  It is possible to construct the ID hack runner with just the
+                // collection and the key object (which could be {"": my_obj_id}) but _query would
+                // be null in that case and the query would never be seen as covered.
+                *objOut = _key.getOwned();
+            }
+            // Otherwise, fetch the document.
+            else {
+                *objOut = _collection->docFor(loc);
+                _nscannedObjects++;
+
+                // If we're sharded, make sure the key belongs to us.
+                if (collectionMetadata) {
+                    KeyPattern kp(collectionMetadata->getKeyPattern());
+                    if (!collectionMetadata->keyBelongsToMe(kp.extractSingleKey(*objOut))) {
                         // We have something with a matching _id but it doesn't belong to me.
                         _done = true;
                         return Runner::RUNNER_EOF;
                     }
+                }
+
+                // Apply the projection if one was requested.
+                if (_query && _query->getProj()) {
+                    *objOut = applyProjection(*objOut);
                 }
             }
         }
@@ -136,13 +150,8 @@ namespace mongo {
         return Runner::RUNNER_ADVANCED;
     }
 
-     bool IDHackRunner::applyProjection(const DiskLoc& loc, BSONObj* objOut) const {
-        if (NULL == _query.get() || NULL == _query->getProj()) {
-            // This idhack query does not have a projection.
-            return false;
-        }
-
-        const BSONObj& docAtLoc = _collection->docFor(loc);
+    BSONObj IDHackRunner::applyProjection(const BSONObj& docObj) const {
+        invariant(_query && _query->getProj());
 
         // We have a non-covered projection (covered projections should be handled earlier,
         // in getNext(..). For simple inclusion projections we use a fast path similar to that
@@ -155,14 +164,16 @@ namespace mongo {
             BSONObjBuilder bob;
             const BSONObj& queryObj = _query->getParsed().getFilter();
             bob.append(queryObj["_id"]);
-            *objOut = bob.obj();
+            return bob.obj();
         }
         else if (_query->getProj()->requiresDocument() || _query->getProj()->wantIndexKey()) {
             // Not a simple projection, so fallback on the regular projection path.
+            BSONObj projectedObj;
             ProjectionExec projExec(projObj,
                                     _query->root(),
                                     WhereCallbackReal(_collection->ns().db()));
-            projExec.transform(docAtLoc, objOut);
+            projExec.transform(docObj, &projectedObj);
+            return projectedObj;
         }
         else {
             // This is a simple inclusion projection. Start by getting the set
@@ -172,13 +183,11 @@ namespace mongo {
 
             // Apply the simple inclusion projection.
             BSONObjBuilder bob;
-            ProjectionStage::transformSimpleInclusion(docAtLoc, includedFields, bob);
+            ProjectionStage::transformSimpleInclusion(docObj, includedFields, bob);
 
-            *objOut = bob.obj();
+            return bob.obj();
         }
-
-        return true;
-     }
+    }
 
     bool IDHackRunner::isEOF() {
         return _killed || _done;
