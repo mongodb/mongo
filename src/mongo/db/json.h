@@ -55,13 +55,55 @@ namespace mongo {
     MONGO_CLIENT_API BSONObj fromjson(const char* str, int* len=NULL);
 
     /**
+     * Tests whether the JSON string is an Array.
+     *
+     * Useful for assigning the result of fromjson to the right object type. Either:
+     *  BSONObj
+     *  BSONArray
+     *
+     * @example Using the method to select the proper type.
+     *  If this method returns true, the user could store the result of fromjson
+     *  inside a BSONArray, rather than a BSONObj, in order to have it print as an
+     *  array when passed to tojson.
+     *
+     * @param obj The JSON string to test.
+     */
+    MONGO_CLIENT_API bool isArray(const StringData& str);
+
+    /**
+     * Convert a BSONArray to a JSON string.
+     *
+     * @param arr The BSON Array.
+     * @param format The JSON format (JS, TenGen, Strict).
+     * @param pretty Enables pretty output.
+     */
+    MONGO_CLIENT_API std::string tojson(
+        const BSONArray& arr,
+        JsonStringFormat format = Strict,
+        bool pretty = false
+    );
+
+    /**
+     * Convert a BSONObj to a JSON string.
+     *
+     * @param obj The BSON Object.
+     * @param format The JSON format (JS, TenGen, Strict).
+     * @param pretty Enables pretty output.
+     */
+    MONGO_CLIENT_API std::string tojson(
+        const BSONObj& obj,
+        JsonStringFormat format = Strict,
+        bool pretty = false
+    );
+
+    /**
      * Parser class.  A BSONObj is constructed incrementally by passing a
      * BSONObjBuilder to the recursive parsing methods.  The grammar for the
      * element parsed is described before each function.
      */
     class JParse {
         public:
-            explicit JParse(const char*);
+            explicit JParse(const StringData& str);
 
             /*
              * Notation: All-uppercase symbols denote non-terminals; all other
@@ -123,6 +165,8 @@ namespace mongo {
              */
         public:
             Status object(const StringData& fieldName, BSONObjBuilder&, bool subObj=true);
+            Status parse(BSONObjBuilder& builder);
+            bool isArray();
 
         private:
             /* The following functions are called with the '{' and the first
@@ -196,7 +240,7 @@ namespace mongo {
              *     VALUE
              *   | VALUE , ELEMENTS
              */
-            Status array(const StringData& fieldName, BSONObjBuilder&);
+            Status array(const StringData& fieldName, BSONObjBuilder&, bool subObj=true);
 
             /*
              * NOTE: Currently only Date can be preceded by the "new" keyword
