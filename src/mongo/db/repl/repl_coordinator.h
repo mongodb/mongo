@@ -224,6 +224,20 @@ namespace repl {
         virtual void processReplSetGetStatus(BSONObjBuilder* result) = 0;
 
         /**
+         * Toggles maintenanceMode to the value expressed by 'activate'
+         * return true, if the change worked and false otherwise
+         */
+        virtual bool setMaintenanceMode(bool activate) = 0;
+
+        /**
+         * Handles an incoming replSetMaintenance command. 'activate' indicates whether to activate
+         * or deactivate maintenanceMode.
+         * returns Status::OK() if maintenanceMode is successfully changed, otherwise returns a
+         * Status containing an error message about the failure
+         */
+        virtual Status processReplSetMaintenance(bool activate, BSONObjBuilder* resultObj) = 0;
+
+        /**
          * Handles an incoming replSetFreeze command. Adds BSON to 'resultObj' 
          * returns Status::OK() if the node is a member of a replica set with a config and an
          * error Status otherwise

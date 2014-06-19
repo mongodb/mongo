@@ -94,6 +94,8 @@ error_code("ShutdownInProgress", 91)
 error_code("SecondaryAheadOfPrimary", 92)
 error_code("InvalidReplicaSetConfig", 93)
 error_code("NotYetInitialized", 94)
+error_code("NotSecondary", 95)
+error_code("OperationFailed", 96)
 
 
 # Non-sequential error codes (for compatibility only)

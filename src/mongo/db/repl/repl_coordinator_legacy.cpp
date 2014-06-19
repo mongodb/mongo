@@ -374,6 +374,10 @@ namespace {
         theReplSet->summarizeStatus(*result);
     }
 
+    bool LegacyReplicationCoordinator::setMaintenanceMode(bool activate) {
+        return theReplSet->setMaintenanceMode(activate);
+    }
+
     Status LegacyReplicationCoordinator::processHeartbeat(const BSONObj& cmdObj, 
                                                           BSONObjBuilder* resultObj) {
         if( cmdObj["pv"].Int() != 1 ) {
@@ -787,6 +791,24 @@ namespace {
         if (secs == 1) {
             resultObj->append("warning", "you really want to freeze for only 1 second?");
         }
+        return Status::OK();
+    }
+
+    Status LegacyReplicationCoordinator::processReplSetMaintenance(bool activate,
+                                                                   BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+        if (!setMaintenanceMode(activate)) {
+            if (theReplSet->isPrimary()) {
+                return Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
+            }
+            else {
+                return Status(ErrorCodes::OperationFailed, "already out of maintenance mode");
+            }
+        }
+
         return Status::OK();
     }
 

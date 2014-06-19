@@ -1291,11 +1291,12 @@ namespace mongo {
        assumption needs to be audited and documented. */
     class MaintenanceModeSetter {
     public:
-        MaintenanceModeSetter() : maintenanceModeSet(repl::theReplSet->setMaintenanceMode(true))
+        MaintenanceModeSetter() :
+            maintenanceModeSet(repl::getGlobalReplicationCoordinator()->setMaintenanceMode(true))
             {}
         ~MaintenanceModeSetter() {
-            if(maintenanceModeSet)
-                repl::theReplSet->setMaintenanceMode(false);
+            if (maintenanceModeSet)
+                repl::getGlobalReplicationCoordinator()->setMaintenanceMode(false);
         } 
     private:
         bool maintenanceModeSet;

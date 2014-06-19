@@ -188,6 +188,17 @@ namespace repl {
         // TODO
     }
 
+    bool ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
+        // TODO
+        return false;
+    }
+
+    Status ReplicationCoordinatorImpl::processReplSetMaintenance(bool activate,
+                                                                 BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
     Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();

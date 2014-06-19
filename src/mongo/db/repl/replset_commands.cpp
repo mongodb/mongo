@@ -271,20 +271,11 @@ namespace repl {
         }
         CmdReplSetMaintenance() : ReplSetCommand("replSetMaintenance") { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( !check(errmsg, result) )
-                return false;
-
-            if (!theReplSet->setMaintenanceMode(cmdObj["replSetMaintenance"].trueValue())) {
-                if (theReplSet->isPrimary()) {
-                    errmsg = "primaries can't modify maintenance mode";
-                }
-                else {
-                    errmsg = "already out of maintenance mode";
-                }
-                return false;
-            }
-
-            return true;
+            return appendCommandStatus(
+                    result,
+                    getGlobalReplicationCoordinator()->processReplSetMaintenance(
+                            cmdObj["replSetMaintenance"].trueValue(),
+                            &result));
         }
     } cmdReplSetMaintenance;
 

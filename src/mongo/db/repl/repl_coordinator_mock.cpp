@@ -127,6 +127,17 @@ namespace repl {
         return Status::OK();
     }
 
+    bool ReplicationCoordinatorMock::setMaintenanceMode(bool activate) {
+        // TODO
+        return false;
+    }
+
+    Status ReplicationCoordinatorMock::processReplSetMaintenance(bool activate,
+                                                                 BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
     Status ReplicationCoordinatorMock::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();
