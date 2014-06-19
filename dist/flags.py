@@ -17,17 +17,18 @@ flags = {
 	'file_types' : [
 		'FILE_TYPE_CHECKPOINT',
 		'FILE_TYPE_DATA',
-		'FILE_TYPE_LOG'
+		'FILE_TYPE_LOG',
 	],
 	'log_scan' : [
 		'LOGSCAN_FIRST',
 		'LOGSCAN_FROM_CKP',
 		'LOGSCAN_ONE',
-		'LOGSCAN_RECOVER'
+		'LOGSCAN_RECOVER',
 	],
 	'log_write' : [
 		'LOG_DSYNC',
-		'LOG_FSYNC'
+		'LOG_FSYNC',
+		'LOG_FLUSH',
 	],
 	'page_read' : [
 		'READ_CACHE',
@@ -43,10 +44,10 @@ flags = {
 	'rec_write' : [
 		'EVICTING',
 		'SKIP_UPDATE_ERR',
-		'SKIP_UPDATE_RESTORE'
+		'SKIP_UPDATE_RESTORE',
 	],
 	'shared_cache' : [
-		'CACHE_POOL_RUN'
+		'CACHE_POOL_RUN',
 	],
 	'txn_log_checkpoint' : [
 		'TXN_LOG_CKPT_FAIL',
@@ -75,7 +76,7 @@ flags = {
 		'VERB_SPLIT',
 		'VERB_VERIFY',
 		'VERB_VERSION',
-		'VERB_WRITE'
+		'VERB_WRITE',
 	],
 
 ###################################################

@@ -596,9 +596,9 @@ methods = {
 	    priority of the transaction for resolving conflicts.
 	    Transactions with higher values are less likely to abort''',
 	    min='-100', max='100'),
-	Config('transaction_sync', '', r'''
-	    how to sync log records when the transaction commits''',
-	    choices=['dsync', 'fsync', 'none']),
+	Config('sync', 'false', r'''
+	    whether to sync log records when the transaction commits''',
+	    type='boolean'),
 ]),
 
 'session.commit_transaction' : Method([]),
@@ -751,9 +751,16 @@ methods = {
 	    maximum expected number of sessions (including server
 	    threads)''',
 	    min='1'),
-	Config('transaction_sync', 'fsync', r'''
+	Config('transaction_sync', '', r'''
 	    how to sync log records when the transaction commits''',
-	    choices=['dsync', 'fsync', 'none']),
+	    type='category', subconfig=[
+	    Config('enabled', 'false', r'''
+	        whether to sync the log on every commit''',
+	        type='boolean'),
+	    Config('method', 'fsync', r'''
+	        the method used to ensure log records are stable on disk''',
+	        choices=['dsync', 'fsync', 'none']),
+	    ]),
 	Config('use_environment_priv', 'false', r'''
 	    use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
 	    variables regardless of whether or not the process is running

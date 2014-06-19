@@ -144,9 +144,7 @@ static const WT_CONFIG_CHECK confchk_session_begin_transaction[] = {
 	    NULL },
 	{ "name", "string", NULL, NULL },
 	{ "priority", "int", "min=-100,max=100", NULL },
-	{ "transaction_sync", "string",
-	    "choices=[\"dsync\",\"fsync\",\"none\"]",
-	    NULL },
+	{ "sync", "boolean", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -276,6 +274,14 @@ static const WT_CONFIG_CHECK confchk_log_subconfigs[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
+static const WT_CONFIG_CHECK confchk_transaction_sync_subconfigs[] = {
+	{ "enabled", "boolean", NULL, NULL },
+	{ "method", "string",
+	    "choices=[\"dsync\",\"fsync\",\"none\"]",
+	    NULL },
+	{ NULL, NULL, NULL, NULL }
+};
+
 static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "async", "category", NULL, confchk_async_subconfigs },
 	{ "buffer_alignment", "int", "min=-1,max=1MB", NULL },
@@ -307,9 +313,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	    NULL },
 	{ "statistics_log", "category", NULL,
 	     confchk_statistics_log_subconfigs },
-	{ "transaction_sync", "string",
-	    "choices=[\"dsync\",\"fsync\",\"none\"]",
-	    NULL },
+	{ "transaction_sync", "category", NULL,
+	     confchk_transaction_sync_subconfigs },
 	{ "use_environment_priv", "boolean", NULL, NULL },
 	{ "verbose", "list",
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
@@ -390,7 +395,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_index_meta
 	},
 	{ "session.begin_transaction",
-	  "isolation=,name=,priority=0,transaction_sync=",
+	  "isolation=,name=,priority=0,sync=0",
 	  confchk_session_begin_transaction
 	},
 	{ "session.checkpoint",
@@ -478,8 +483,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "mmap=,multiprocess=0,session_max=100,shared_cache=(chunk=10MB,"
 	  "name=,reserve=0,size=500MB),statistics=none,"
 	  "statistics_log=(path=\"WiredTigerStat.%d.%H\",sources=,"
-	  "timestamp=\"%b %d %H:%M:%S\",wait=0),transaction_sync=fsync,"
-	  "use_environment_priv=0,verbose=",
+	  "timestamp=\"%b %d %H:%M:%S\",wait=0),transaction_sync=(enabled=0"
+	  ",method=fsync),use_environment_priv=0,verbose=",
 	  confchk_wiredtiger_open
 	},
 	{ NULL, NULL, NULL }

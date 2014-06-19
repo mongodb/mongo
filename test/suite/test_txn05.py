@@ -40,7 +40,9 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_txn05'
     uri = 'table:' + tablename
     archive_list = ['true', 'false']
-    sync_list = ['dsync', 'fsync', 'none']
+    sync_list = [
+        '(method=dsync,enabled)', '(method=fsync,enabled)', '(enabled=false)'
+    ]
 
     types = [
         ('row', dict(tabletype='row',
