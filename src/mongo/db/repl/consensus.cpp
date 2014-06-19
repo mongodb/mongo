@@ -30,6 +30,7 @@
 
 #include "mongo/db/global_optime.h"
 #include "mongo/db/repl/multicmd.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/replset_commands.h"
 
 namespace mongo {
@@ -49,92 +50,21 @@ namespace repl {
             actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-    private:
-
-        bool shouldVeto(const BSONObj& cmdObj, string& errmsg) {
-            // don't veto older versions
-            if (cmdObj["id"].eoo()) {
-                // they won't be looking for the veto field
-                return false;
-            }
-
-            unsigned id = cmdObj["id"].Int();
-            const Member* primary = theReplSet->box.getPrimary();
-            const Member* hopeful = theReplSet->findById(id);
-            const Member *highestPriority = theReplSet->getMostElectable();
-
-            if (!hopeful) {
-                errmsg = str::stream() << "replSet couldn't find member with id " << id;
-                return true;
-            }
-
-            if (theReplSet->isPrimary() &&
-                theReplSet->lastOpTimeWritten >= hopeful->hbinfo().opTime) {
-                // hbinfo is not updated, so we have to check the primary's last optime separately
-                errmsg = str::stream() << "I am already primary, " << hopeful->fullName() <<
-                    " can try again once I've stepped down";
-                return true;
-            }
-
-            if (primary &&
-                    (hopeful->hbinfo().id() != primary->hbinfo().id()) &&
-                    (primary->hbinfo().opTime >= hopeful->hbinfo().opTime)) {
-                // other members might be aware of more up-to-date nodes
-                errmsg = str::stream() << hopeful->fullName() <<
-                    " is trying to elect itself but " << primary->fullName() <<
-                    " is already primary and more up-to-date";
-                return true;
-            }
-
-            if (highestPriority &&
-                highestPriority->config().priority > hopeful->config().priority) {
-                errmsg = str::stream() << hopeful->fullName() << " has lower priority than " <<
-                    highestPriority->fullName();
-                return true;
-            }
-
-            if (!theReplSet->isElectable(id)) {
-                errmsg = str::stream() << "I don't think " << hopeful->fullName() <<
-                    " is electable";
-                return true;
-            }
-
-            return false;
-        }
 
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( !check(errmsg, result) )
-                return false;
-
-            if( cmdObj["set"].String() != theReplSet->name() ) {
-                errmsg = "wrong repl set name";
-                return false;
-            }
-            string who = cmdObj["who"].String();
+            unsigned id = cmdObj["id"].Int();
+            std::string setName = cmdObj["set"].String();
+            std::string who = cmdObj["who"].String();
             int cfgver = cmdObj["cfgver"].Int();
             OpTime opTime(cmdObj["opTime"].Date());
 
-            bool weAreFresher = false;
-            if( theReplSet->config().version > cfgver ) {
-                log() << "replSet member " << who << " is not yet aware its cfg version " << cfgver << " is stale" << rsLog;
-                result.append("info", "config version stale");
-                weAreFresher = true;
-            }
-            // check not only our own optime, but any other member we can reach
-            else if( opTime < theReplSet->lastOpTimeWritten ||
-                     opTime < theReplSet->lastOtherOpTime())  {
-                weAreFresher = true;
-            }
-            result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
-            result.append("fresher", weAreFresher);
-
-            bool veto = shouldVeto(cmdObj, errmsg);
-            result.append("veto", veto);
-            if (veto) {
-                result.append("errmsg", errmsg);
-            }
-
-            return true;
+            Status status = getGlobalReplicationCoordinator()->processReplSetFresh(setName,
+                                                                                   who,
+                                                                                   id,
+                                                                                   cfgver,
+                                                                                   opTime,
+                                                                                   &result);
+            return appendCommandStatus(result, status);
         }
     } cmdReplSetFresh;
 

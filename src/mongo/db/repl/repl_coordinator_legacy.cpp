@@ -671,6 +671,92 @@ namespace {
         return Status::OK();
     }
 
+namespace {
+    bool _shouldVeto(unsigned id, std::string* errmsg) {
+        const Member* primary = theReplSet->box.getPrimary();
+        const Member* hopeful = theReplSet->findById(id);
+        const Member *highestPriority = theReplSet->getMostElectable();
+
+        if (!hopeful) {
+            *errmsg = str::stream() << "replSet couldn't find member with id " << id;
+            return true;
+        }
+
+        if (theReplSet->isPrimary() &&
+            theReplSet->lastOpTimeWritten >= hopeful->hbinfo().opTime) {
+            // hbinfo is not updated, so we have to check the primary's last optime separately
+            *errmsg = str::stream() << "I am already primary, " << hopeful->fullName() <<
+                " can try again once I've stepped down";
+            return true;
+        }
+
+        if (primary &&
+                (hopeful->hbinfo().id() != primary->hbinfo().id()) &&
+                (primary->hbinfo().opTime >= hopeful->hbinfo().opTime)) {
+            // other members might be aware of more up-to-date nodes
+            *errmsg = str::stream() << hopeful->fullName() <<
+                " is trying to elect itself but " << primary->fullName() <<
+                " is already primary and more up-to-date";
+            return true;
+        }
+
+        if (highestPriority &&
+            highestPriority->config().priority > hopeful->config().priority) {
+            *errmsg = str::stream() << hopeful->fullName() << " has lower priority than " <<
+                highestPriority->fullName();
+            return true;
+        }
+
+        if (!theReplSet->isElectable(id)) {
+            *errmsg = str::stream() << "I don't think " << hopeful->fullName() <<
+                " is electable";
+            return true;
+        }
+
+        return false;
+    }
+} // namespace
+
+    Status LegacyReplicationCoordinator::processReplSetFresh(const StringData& setName,
+                                                             const StringData& who,
+                                                             unsigned id,
+                                                             int cfgver,
+                                                             const OpTime& opTime,
+                                                             BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if( setName != theReplSet->name() ) {
+            return Status(ErrorCodes::ReplicaSetNotFound, "wrong repl set name");
+        }
+
+        bool weAreFresher = false;
+        if( theReplSet->config().version > cfgver ) {
+            log() << "replSet member " << who << " is not yet aware its cfg version " << cfgver <<
+                    " is stale" << rsLog;
+            resultObj->append("info", "config version stale");
+            weAreFresher = true;
+        }
+        // check not only our own optime, but any other member we can reach
+        else if( opTime < theReplSet->lastOpTimeWritten ||
+                 opTime < theReplSet->lastOtherOpTime())  {
+            weAreFresher = true;
+        }
+        resultObj->appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
+        resultObj->append("fresher", weAreFresher);
+
+        std::string errmsg;
+        bool veto = _shouldVeto(id, &errmsg);
+        resultObj->append("veto", veto);
+        if (veto) {
+            resultObj->append("errmsg", errmsg);
+        }
+
+        return Status::OK();
+    }
+
     void LegacyReplicationCoordinator::incrementRollbackID() {
         ++_rbid;
     }

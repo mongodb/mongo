@@ -99,6 +99,13 @@ namespace repl {
         virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj);
 
         virtual void incrementRollbackID();
+
+        virtual Status processReplSetFresh(const StringData& setName,
+                                           const StringData& who,
+                                           unsigned id,
+                                           int cfgver,
+                                           const OpTime& opTime,
+                                           BSONObjBuilder* resultObj);
     private:
         Status _stepDownHelper(bool force,
                                const Milliseconds& initialWaitTime,

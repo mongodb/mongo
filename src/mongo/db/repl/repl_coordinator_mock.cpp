@@ -150,5 +150,14 @@ namespace repl {
 
     void ReplicationCoordinatorMock::incrementRollbackID() {}
 
+    Status ReplicationCoordinatorMock::processReplSetFresh(const StringData& setName,
+                                                           const StringData& who,
+                                                           unsigned id,
+                                                           int cfgver,
+                                                           const OpTime& opTime,
+                                                           BSONObjBuilder* resultObj) {
+        return Status::OK();
+    }
+
 } // namespace repl
 } // namespace mongo

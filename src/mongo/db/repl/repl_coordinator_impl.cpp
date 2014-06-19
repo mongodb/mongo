@@ -229,6 +229,16 @@ namespace repl {
 
     void ReplicationCoordinatorImpl::incrementRollbackID() { /* TODO */ }
 
+    Status ReplicationCoordinatorImpl::processReplSetFresh(const StringData& setName,
+                                                           const StringData& who,
+                                                           unsigned id,
+                                                           int cfgver,
+                                                           const OpTime& opTime,
+                                                           BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
     void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(
             const TopologyCoordinator::ReplicaSetConfig& newConfig) {
         invariant(getReplicationMode() == modeReplSet);

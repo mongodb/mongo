@@ -258,6 +258,17 @@ namespace repl {
          */
         virtual void incrementRollbackID() = 0;
 
+        /*
+         * Handles an incoming replSetFresh command.
+         * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
+         */
+        virtual Status processReplSetFresh(const StringData& setName,
+                                           const StringData& who,
+                                           unsigned id,
+                                           int cfgver,
+                                           const OpTime& opTime,
+                                           BSONObjBuilder* resultObj) = 0;
+
     protected:
 
         ReplicationCoordinator();

@@ -110,6 +110,13 @@ namespace repl {
 
         virtual void incrementRollbackID();
 
+        virtual Status processReplSetFresh(const StringData& setName,
+                                           const StringData& who,
+                                           unsigned id,
+                                           int cfgver,
+                                           const OpTime& opTime,
+                                           BSONObjBuilder* resultObj);
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions
