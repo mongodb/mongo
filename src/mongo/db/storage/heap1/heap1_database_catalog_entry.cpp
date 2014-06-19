@@ -31,6 +31,7 @@
 #include "mongo/db/storage/heap1/heap1_database_catalog_entry.h"
 
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
@@ -134,9 +135,22 @@ namespace mongo {
                                                             const CollectionCatalogEntry* collection,
                                                             IndexCatalogEntry* index ) {
         const Entry* entry = dynamic_cast<const Entry*>( collection );
+
         Entry::Indexes::const_iterator i = entry->indexes.find( index->descriptor()->indexName() );
-        invariant( i != entry->indexes.end() );
-        invariant( i->second->access.get() );
+        if ( i == entry->indexes.end() ) {
+            // index doesn't exist
+            return NULL;
+        }
+
+        if ( !i->second->access.get() ) {
+            // hasn't been initialized yet
+            const string& type = index->descriptor()->getAccessMethodName();
+            invariant( type.empty() ); // we don't support other index types right now
+
+            HeapRecordStore* rs = new HeapRecordStore( index->descriptor()->indexName() );
+            i->second->access.reset( new BtreeAccessMethod( index, rs ) );
+        }
+
         return i->second->access.get();
     }
 
@@ -229,7 +243,6 @@ namespace mongo {
         newEntry->spec = spec->infoObj();
         newEntry->ready = false;
         newEntry->isMultikey = false;
-        //TODO : newEntry->access.reset( XXX );
 
         indexes[spec->indexName()] = newEntry.release();
         return Status::OK();
