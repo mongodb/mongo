@@ -95,11 +95,19 @@ namespace repl {
         virtual Status processReplSetInitiate(OperationContext* txn,
                                               const BSONObj& configObj,
                                               BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj);
+
+        virtual void incrementRollbackID();
     private:
         Status _stepDownHelper(bool force,
                                const Milliseconds& initialWaitTime,
                                const Milliseconds& stepdownTime,
                                const Milliseconds& postStepdownWaitTime);
+
+        // Rollback id. used to check if a rollback happened during some interval of time
+        // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.
+        int _rbid;
     };
 
 } // namespace repl

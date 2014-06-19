@@ -99,6 +99,10 @@ namespace repl {
         virtual Status processReplSetInitiate(OperationContext* txn,
                                               const BSONObj& configObj,
                                               BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj);
+
+        virtual void incrementRollbackID();
     };
 
 } // namespace repl

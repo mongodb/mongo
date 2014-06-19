@@ -106,6 +106,10 @@ namespace repl {
                                               const BSONObj& configObj,
                                               BSONObjBuilder* resultObj);
 
+        virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj);
+
+        virtual void incrementRollbackID();
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions

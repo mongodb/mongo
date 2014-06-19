@@ -54,7 +54,11 @@
 namespace mongo {
 namespace repl {
 
-    LegacyReplicationCoordinator::LegacyReplicationCoordinator() {}
+    LegacyReplicationCoordinator::LegacyReplicationCoordinator() {
+        // this is ok but micros or combo with some rand() and/or 64 bits might be better --
+        // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
+        _rbid = (int) curTimeMillis64();
+    }
     LegacyReplicationCoordinator::~LegacyReplicationCoordinator() {}
 
     void LegacyReplicationCoordinator::startReplication(TopologyCoordinator*,
@@ -657,5 +661,19 @@ namespace {
 
         return Status::OK();
     }
+
+    Status LegacyReplicationCoordinator::processReplSetGetRBID(BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+        resultObj->append("rbid", _rbid);
+        return Status::OK();
+    }
+
+    void LegacyReplicationCoordinator::incrementRollbackID() {
+        ++_rbid;
+    }
+
 } // namespace repl
 } // namespace mongo

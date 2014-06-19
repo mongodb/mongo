@@ -247,6 +247,17 @@ namespace repl {
                                               const BSONObj& configObj,
                                               BSONObjBuilder* resultObj) = 0;
 
+        /*
+         * Handles an incoming replSetGetRBID command.
+         * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
+         */
+        virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj) = 0;
+
+        /**
+         * Increments this process's rollback id.  Called every time a rollback occurs.
+         */
+        virtual void incrementRollbackID() = 0;
+
     protected:
 
         ReplicationCoordinator();

@@ -103,16 +103,10 @@ namespace repl {
     */
     class CmdReplSetGetRBID : public ReplSetCommand {
     public:
-        /* todo: ideally this should only change on rollbacks NOT on mongod restarts also. fix... */
-        int rbid;
         virtual void help( stringstream &help ) const {
             help << "internal";
         }
-        CmdReplSetGetRBID() : ReplSetCommand("replSetGetRBID") {
-            // this is ok but micros or combo with some rand() and/or 64 bits might be better --
-            // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
-            rbid = (int) curTimeMillis64();
-        }
+        CmdReplSetGetRBID() : ReplSetCommand("replSetGetRBID") {}
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -121,17 +115,10 @@ namespace repl {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( !check(errmsg, result) )
-                return false;
-            result.append("rbid",rbid);
-            return true;
+            Status status = getGlobalReplicationCoordinator()->processReplSetGetRBID(&result);
+            return appendCommandStatus(result, status);
         }
     } cmdReplSetRBID;
-
-    /** we increment the rollback id on every rollback event. */
-    void incRBID() {
-        cmdReplSetRBID.rbid++;
-    }
 
     /** helper to get rollback id from another server. */
     int getRBID(DBClientConnection *c) {

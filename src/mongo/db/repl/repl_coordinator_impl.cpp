@@ -222,6 +222,13 @@ namespace repl {
         return Status::OK();
     }
 
+    Status ReplicationCoordinatorImpl::processReplSetGetRBID(BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    void ReplicationCoordinatorImpl::incrementRollbackID() { /* TODO */ }
+
     void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(
             const TopologyCoordinator::ReplicaSetConfig& newConfig) {
         invariant(getReplicationMode() == modeReplSet);

@@ -144,5 +144,11 @@ namespace repl {
         return Status::OK();
     }
 
+    Status ReplicationCoordinatorMock::processReplSetGetRBID(BSONObjBuilder* resultObj) {
+        return Status::OK();
+    }
+
+    void ReplicationCoordinatorMock::incrementRollbackID() {}
+
 } // namespace repl
 } // namespace mongo
