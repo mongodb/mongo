@@ -55,7 +55,7 @@ namespace mongo {
             return true;
         }
 
-        virtual const Record* recordFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( const DiskLoc& loc ) const;
 
     private:
 

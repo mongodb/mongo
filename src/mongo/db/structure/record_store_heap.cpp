@@ -64,6 +64,10 @@ namespace mongo {
 
     const char* HeapRecordStore::name() const { return "heap"; }
 
+    RecordData HeapRecordStore::dataFor( const DiskLoc& loc ) const {
+        return recordFor(loc)->toRecordData();
+    }
+
     Record* HeapRecordStore::recordFor(const DiskLoc& loc) const {
         Records::const_iterator it = _records.find(loc);
         invariant(it != _records.end());
@@ -269,7 +273,7 @@ namespace mongo {
             for (Records::const_iterator it = _records.begin(); it != _records.end(); ++it) {
                 Record* rec = reinterpret_cast<Record*>(it->second.get());
                 size_t dataSize;
-                const Status status = adaptor->validate(rec, &dataSize);
+                const Status status = adaptor->validate(rec->toRecordData(), &dataSize);
                 if (!status.isOK()) {
                     results->valid = false;
                     results->errors.push_back("invalid object detected (see logs)");
@@ -400,8 +404,8 @@ namespace mongo {
         return !_killedByInvalidate;
     }
 
-    const Record* HeapRecordIterator::recordFor(const DiskLoc& loc) const {
-        return _rs.recordFor(loc);
+    RecordData HeapRecordIterator::dataFor(const DiskLoc& loc) const {
+        return _rs.dataFor(loc);
     }
 
     //
@@ -463,7 +467,7 @@ namespace mongo {
         return !_killedByInvalidate;
     }
 
-    const Record* HeapRecordReverseIterator::recordFor(const DiskLoc& loc) const {
-        return _rs.recordFor(loc);
+    RecordData HeapRecordReverseIterator::dataFor(const DiskLoc& loc) const {
+        return _rs.dataFor(loc);
     }
 } // namespace mongo

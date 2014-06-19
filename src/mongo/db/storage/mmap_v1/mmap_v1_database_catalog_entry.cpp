@@ -184,8 +184,7 @@ namespace mongo {
 
         while ( !it->isEOF() ) {
             DiskLoc loc = it->getNext();
-            const Record* rec = it->recordFor( loc );
-            BSONObj oldIndexSpec( rec->data() );
+            BSONObj oldIndexSpec = it->dataFor( loc ).toBson();
             if ( fromNS != oldIndexSpec["ns"].valuestrsafe() )
                 continue;
 
@@ -293,8 +292,7 @@ namespace mongo {
                 scoped_ptr<RecordIterator> it( rs->getIterator() );
                 while ( !it->isEOF() ) {
                     DiskLoc loc = it->getNext();
-                    const Record* rec = it->recordFor( loc );
-                    BSONObj entry( rec->data() );
+                    BSONObj entry = it->dataFor( loc ).toBson();
                     if ( fromNS == entry["name"].String() ) {
                         oldSpecLocation = loc;
                         oldSpec = entry.getOwned();
@@ -778,8 +776,7 @@ namespace mongo {
         scoped_ptr<RecordIterator> it( rs->getIterator() );
         while ( !it->isEOF() ) {
             DiskLoc loc = it->getNext();
-            const Record* rec = it->recordFor( loc );
-            BSONObj entry( rec->data() );
+            BSONObj entry = it->dataFor( loc ).toBson();
             BSONElement name = entry["name"];
             if ( name.type() == String && name.String() == ns ) {
                 rs->deleteRecord( txn, loc );

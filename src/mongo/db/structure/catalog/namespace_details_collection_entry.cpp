@@ -63,7 +63,7 @@ namespace mongo {
         NamespaceDetails::IndexIterator i = _details->ii( true );
         while ( i.more() ) {
             const IndexDetails& id = i.next();
-            const BSONObj obj( _indexRecordStore->recordFor( id.info )->data() );
+            const BSONObj obj = _indexRecordStore->dataFor( id.info ).toBson();
             names->push_back( obj.getStringField("name") );
         }
     }
@@ -124,7 +124,7 @@ namespace mongo {
         int idxNo = _findIndexNumber( idxName );
         invariant( idxNo >= 0 );
         const IndexDetails& id = _details->idx( idxNo );
-        return BSONObj( _indexRecordStore->recordFor( id.info )->data() );
+        return _indexRecordStore->dataFor( id.info ).toBson();
     }
 
     void NamespaceDetailsCollectionCatalogEntry::setIndexHead( OperationContext* txn,
@@ -146,7 +146,7 @@ namespace mongo {
         while ( i.more() ) {
             const IndexDetails& id = i.next();
             int idxNo = i.pos() - 1;
-            const BSONObj obj( _indexRecordStore->recordFor( id.info )->data() );
+            const BSONObj obj = _indexRecordStore->dataFor( id.info ).toBson();
             if ( idxName == obj.getStringField("name") )
                 return idxNo;
         }
@@ -186,9 +186,7 @@ namespace mongo {
         DiskLoc infoLocation = _details->idx( idxNo ).info;
 
         { // sanity check
-            Record* record = _indexRecordStore->recordFor( infoLocation );
-            invariant( record );
-            BSONObj info( record->data() );
+            BSONObj info = _indexRecordStore->dataFor( infoLocation ).toBson();
             invariant( info["name"].String() == indexName );
         }
 
@@ -302,8 +300,7 @@ namespace mongo {
 
         IndexDetails& indexDetails = _details->idx( idx );
 
-        Record* record = _indexRecordStore->recordFor( indexDetails.info );
-        BSONObj obj( record->data() );
+        BSONObj obj = _indexRecordStore->dataFor( indexDetails.info ).toBson();
         const BSONElement oldExpireSecs = obj.getField("expireAfterSeconds");
 
         // Important that we set the new value in-place.  We are writing directly to the

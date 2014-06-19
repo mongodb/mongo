@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/diskloc.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {
@@ -86,6 +87,8 @@ namespace mongo {
         };
 
         NP* np() { return (NP*) &_nextOfs; }
+
+        RecordData toRecordData() const { return RecordData(_data, _netLength()); }
 
     private:
 

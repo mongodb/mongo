@@ -128,7 +128,7 @@ namespace mongo {
 
         virtual int64_t storageSize( BSONObjBuilder* extraInfo = NULL, int level = 0 ) const;
 
-        Record* recordFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( const DiskLoc& loc ) const;
 
         void deleteRecord( OperationContext* txn,
                            const DiskLoc& dl );
@@ -167,8 +167,6 @@ namespace mongo {
 
         virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
 
-        const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
-
         const RecordStoreV1MetaData* details() const { return _details.get(); }
 
         /**
@@ -204,6 +202,10 @@ namespace mongo {
                                         const BSONElement& option,
                                         BSONObjBuilder* info = NULL );
     protected:
+
+        virtual Record* recordFor( const DiskLoc& loc ) const;
+
+        const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
 
         virtual bool isCapped() const = 0;
 
@@ -265,7 +267,7 @@ namespace mongo {
      */
     class RecordStoreV1Base::IntraExtentIterator : public RecordIterator {
     public:
-        IntraExtentIterator(DiskLoc start, const RecordStore* rs, bool forward = true)
+        IntraExtentIterator(DiskLoc start, const RecordStoreV1Base* rs, bool forward = true)
             : _curr(start), _rs(rs), _forward(forward) {}
 
         virtual bool isEOF() { return _curr.isNull(); }
@@ -280,11 +282,12 @@ namespace mongo {
 
         virtual bool recoverFromYield() { return true; }
 
-        virtual const Record* recordFor( const DiskLoc& loc ) const { return _rs->recordFor(loc); }
+        virtual RecordData dataFor( const DiskLoc& loc ) const { return _rs->dataFor(loc); }
 
     private:
+        virtual const Record* recordFor( const DiskLoc& loc ) const { return _rs->recordFor(loc); }
         DiskLoc _curr;
-        const RecordStore* _rs;
+        const RecordStoreV1Base* _rs;
         bool _forward;
     };
 

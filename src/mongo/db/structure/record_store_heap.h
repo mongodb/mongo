@@ -54,7 +54,7 @@ namespace mongo {
 
         virtual const char* name() const;
 
-        virtual Record* recordFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( const DiskLoc& loc ) const;
 
         virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl );
 
@@ -116,6 +116,10 @@ namespace mongo {
 
         virtual long long numRecords() const { return _records.size(); }
 
+    protected:
+        virtual Record* recordFor( const DiskLoc& loc ) const;
+
+    public:
         //
         // Not in RecordStore interface
         //
@@ -162,7 +166,7 @@ namespace mongo {
 
         virtual bool recoverFromYield();
 
-        virtual const Record* recordFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( const DiskLoc& loc ) const;
 
     private:
         HeapRecordStore::Records::const_iterator _it;
@@ -192,7 +196,7 @@ namespace mongo {
 
         virtual bool recoverFromYield();
 
-        virtual const Record* recordFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( const DiskLoc& loc ) const;
 
     private:
         HeapRecordStore::Records::const_reverse_iterator _it;

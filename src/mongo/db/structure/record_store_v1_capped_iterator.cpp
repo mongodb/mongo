@@ -217,8 +217,8 @@ namespace mongo {
         return _recordStore->lastRecord();
     }
 
-    const Record* CappedRecordStoreV1Iterator::recordFor( const DiskLoc& loc ) const {
-        return _recordStore->recordFor( loc );
+    RecordData CappedRecordStoreV1Iterator::dataFor( const DiskLoc& loc ) const {
+        return _recordStore->dataFor( loc );
     }
 
     Extent* CappedRecordStoreV1Iterator::_getExtent( const DiskLoc& loc ) {

@@ -196,9 +196,8 @@ namespace mongo {
                                                                                  CollectionScanParams::FORWARD ) );
         while ( !iterator->isEOF() ) {
             DiskLoc loc = iterator->getNext();
-            const Record* rec = iterator->recordFor( loc );
 
-            BSONObj oldEntry( rec->data() );
+            BSONObj oldEntry = iterator->dataFor( loc ).toBson();
             BSONElement e = oldEntry["name"];
             if ( e.type() != String )
                 continue;
