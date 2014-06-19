@@ -668,8 +668,13 @@ namespace mongo {
 
         // TODO(greg): This will go away soon.
         if (!shardingState.getVersion(pq.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {
-            // if the version changed during the query we might be missing some data and its safe to
-            // send this as mongos can resend at this point
+            // If the version changed during the query we might be missing some data, and it's safe
+            // to send this as mongos can resend at this point.
+            //
+            // This check is particularly important for the IDHackRunner, which can yield between
+            // getting the config metadata and checking ownership of the document to be returned.
+            // If the version changes during that yield, this branch will be taken to force a retry
+            // of the query.
             throw SendStaleConfigException(pq.ns(), "version changed during initial query",
                                            shardingVersionAtStart,
                                            shardingState.getVersion(pq.ns()));
