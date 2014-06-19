@@ -191,6 +191,7 @@ add_option( "mute" , "do not display commandlines for compiling and linking, to 
 add_option( "prefix" , "installation prefix" , 1 , False, default=DEFAULT_INSTALL_DIR )
 add_option( "distname" , "dist name (0.8.0)" , 1 , False )
 add_option( "distmod", "additional piece for full dist name" , 1 , False )
+add_option( "distarch", "override the architecture name in dist output" , 1 , False )
 add_option( "nostrip", "do not strip installed binaries" , 0 , False )
 add_option( "extra-variant-dirs", "extra variant dir components, separated by commas", 1, False)
 add_option( "add-branch-to-variant-dir", "add current git branch to the variant dir", 0, False )
@@ -1817,7 +1818,9 @@ env.AlwaysBuild( "lint" )
 #  ----  INSTALL -------
 
 def getSystemInstallName():
-    n = platform + "-" + processor
+    dist_arch = GetOption("distarch")
+    arch_name = processor if not dist_arch else dist_arch
+    n = platform + "-" + arch_name
     if static:
         n += "-static"
     if has_option("nostrip"):
