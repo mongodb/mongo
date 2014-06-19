@@ -165,7 +165,7 @@ namespace mongo {
             bob.append(queryObj["_id"]);
             return bob.obj();
         }
-        else if (_query->getProj()->requiresDocument() || _query->getProj()->wantIndexKey()) {
+        else if (_query->getProj()->requiresDocument()) {
             // Not a simple projection, so fallback on the regular projection path.
             BSONObj projectedObj;
             ProjectionExec projExec(projObj,
