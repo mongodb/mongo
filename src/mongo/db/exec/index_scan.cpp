@@ -226,7 +226,7 @@ namespace mongo {
     void IndexScan::recoverFromYield() {
         ++_commonStats.unyields;
 
-        if (isEOF() || (NULL == _indexCursor.get())) { return; }
+        if (_hitEnd || (NULL == _indexCursor.get())) { return; }
 
         // We can have a valid position before we check isEOF(), restore the position, and then be
         // EOF upon restore.

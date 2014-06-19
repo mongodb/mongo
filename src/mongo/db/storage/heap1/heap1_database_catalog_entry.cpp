@@ -31,11 +31,17 @@
 #include "mongo/db/storage/heap1/heap1_database_catalog_entry.h"
 
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
+#include "mongo/db/index/fts_access_method.h"
+#include "mongo/db/index/hash_access_method.h"
+#include "mongo/db/index/haystack_access_method.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/heap1/heap1_btree_impl.h"
 #include "mongo/db/storage/heap1/heap1_recovery_unit.h"
 #include "mongo/db/structure/record_store_heap.h"
 
@@ -142,24 +148,49 @@ namespace mongo {
             return NULL;
         }
 
-        if ( !i->second->access.get() ) {
-            // hasn't been initialized yet
-            const string& type = index->descriptor()->getAccessMethodName();
-            invariant( type.empty() ); // we don't support other index types right now
+        const string& type = index->descriptor()->getAccessMethodName();
 
-            HeapRecordStore* rs = new HeapRecordStore( index->descriptor()->indexName() );
-            std::auto_ptr<BtreeInterface> btree(
-                BtreeInterface::getInterface(index->headManager(),
-                                             rs,
-                                             index->ordering(),
-                                             index->descriptor()->indexNamespace(),
-                                             index->descriptor()->version(),
-                                             &BtreeBasedAccessMethod::invalidateCursors));
+#if 1 // Toggle to use Btree on HeapRecordStore
 
-            i->second->access.reset( new BtreeAccessMethod( index, btree.release()) );
-        }
+        // Need the Head to be non-Null to avoid asserts. TODO remove the asserts.
+        index->headManager()->setHead(txn, DiskLoc(0xDEAD, 0xBEAF));
 
-        return i->second->access.get();
+        // When is a btree not a Btree? When it is a Heap1BtreeImpl!
+        std::auto_ptr<BtreeInterface> btree(getHeap1BtreeImpl(index, &i->second->data));
+#else
+
+        if (!i->second->rs)
+            i->second->rs.reset(new HeapRecordStore( index->descriptor()->indexName() ));
+
+        std::auto_ptr<BtreeInterface> btree(
+            BtreeInterface::getInterface(index->headManager(),
+                                         i->second->rs,
+                                         index->ordering(),
+                                         index->descriptor()->indexNamespace(),
+                                         index->descriptor()->version(),
+                                         &BtreeBasedAccessMethod::invalidateCursors));
+#endif
+
+        if ("" == type)
+            return new BtreeAccessMethod( index, btree.release() );
+
+        if (IndexNames::HASHED == type)
+            return new HashAccessMethod( index, btree.release() );
+
+        if (IndexNames::GEO_2DSPHERE == type)
+            return new S2AccessMethod( index, btree.release() );
+
+        if (IndexNames::TEXT == type)
+            return new FTSAccessMethod( index, btree.release() );
+
+        if (IndexNames::GEO_HAYSTACK == type)
+            return new HaystackAccessMethod( index, btree.release() );
+
+        if (IndexNames::GEO_2D == type)
+            return new TwoDAccessMethod( index, btree.release() );
+
+        log() << "Can't find index for keyPattern " << index->descriptor()->keyPattern();
+        fassertFailed(18518);
     }
 
     Status Heap1DatabaseCatalogEntry::renameCollection( OperationContext* txn,
@@ -215,7 +246,11 @@ namespace mongo {
                                                               bool multikey ) {
         Indexes::const_iterator i = indexes.find( idxName.toString() );
         invariant( i != indexes.end() );
-        return i->second->isMultikey;
+        if (i->second->isMultikey == multikey)
+            return false;
+
+        i->second->isMultikey = multikey;
+        return true;
     }
 
     DiskLoc Heap1DatabaseCatalogEntry::Entry::getIndexHead( const StringData& idxName ) const {

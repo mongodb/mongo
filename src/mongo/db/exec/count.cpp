@@ -137,10 +137,11 @@ namespace mongo {
     }
 
     void Count::recoverFromYield() {
-        if (isEOF() || (NULL == _btreeCursor.get())) { return; }
+        if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
 
         if (!_btreeCursor->restorePosition().isOK()) {
             _hitEnd = true;
+            return;
         }
 
         if (_btreeCursor->isEOF()) {
