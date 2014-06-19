@@ -774,5 +774,21 @@ namespace {
         ++_rbid;
     }
 
+    Status LegacyReplicationCoordinator::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+        if (theReplSet->freeze(secs)) {
+            if (secs == 0) {
+                resultObj->append("info","unfreezing");
+            }
+        }
+        if (secs == 1) {
+            resultObj->append("warning", "you really want to freeze for only 1 second?");
+        }
+        return Status::OK();
+    }
+
 } // namespace repl
 } // namespace mongo

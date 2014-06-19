@@ -88,6 +88,8 @@ namespace repl {
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
+        virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj);
+
         virtual Status processHeartbeat(const BSONObj& cmdObj, 
                                         BSONObjBuilder* resultObj);
 

@@ -216,16 +216,10 @@ namespace repl {
         }
         CmdReplSetFreeze() : ReplSetCommand("replSetFreeze") { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( !check(errmsg, result) )
-                return false;
             int secs = (int) cmdObj.firstElement().numberInt();
-            if( theReplSet->freeze(secs) ) {
-                if( secs == 0 )
-                    result.append("info","unfreezing");
-            }
-            if( secs == 1 )
-                result.append("warning", "you really want to freeze for only 1 second?");
-            return true;
+            return appendCommandStatus(
+                    result,
+                    getGlobalReplicationCoordinator()->processReplSetFreeze(secs, &result));
         }
     } cmdReplSetFreeze;
 

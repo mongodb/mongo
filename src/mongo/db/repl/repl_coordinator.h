@@ -224,6 +224,13 @@ namespace repl {
         virtual void processReplSetGetStatus(BSONObjBuilder* result) = 0;
 
         /**
+         * Handles an incoming replSetFreeze command. Adds BSON to 'resultObj' 
+         * returns Status::OK() if the node is a member of a replica set with a config and an
+         * error Status otherwise
+         */
+        virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj) = 0;
+
+        /**
          * Handles an incoming heartbeat command. Adds BSON to 'resultObj'; 
          * returns a Status with either OK or an error message.
          */

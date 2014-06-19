@@ -124,6 +124,12 @@ namespace repl {
 
     void ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
         //TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorMock::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
     }
 
     Status ReplicationCoordinatorMock::processHeartbeat(const BSONObj& cmdObj, 
