@@ -990,7 +990,7 @@ __wt_lsm_tree_lock(
 	 * Diagnostic: avoid deadlocks with the schema lock: if we need it for
 	 * an operation, we should already have it.
 	 */
-	F_SET(session, WT_SESSION_LSM_TREE_LOCK | WT_SESSION_NO_SCHEMA_LOCK);
+	F_SET(session, WT_SESSION_NO_CACHE_CHECK | WT_SESSION_NO_SCHEMA_LOCK);
 	return (0);
 }
 
@@ -1002,7 +1002,7 @@ int
 __wt_lsm_tree_unlock(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-	F_CLR(session, WT_SESSION_LSM_TREE_LOCK | WT_SESSION_NO_SCHEMA_LOCK);
+	F_CLR(session, WT_SESSION_NO_CACHE_CHECK | WT_SESSION_NO_SCHEMA_LOCK);
 	return (__wt_rwunlock(session, lsm_tree->rwlock));
 }
 
