@@ -516,4 +516,10 @@ namespace mongo {
         }
 
     }
+
+    void ShardingConnectionHook::onRelease(DBClientBase* conn) {
+        // This is currently for making the replica set connections release
+        // secondary connections to the pool.
+        conn->reset();
+    }
 }

@@ -223,6 +223,10 @@ static bool runMongosServer( bool doUpgrade ) {
     ReplicaSetMonitor::setConfigChangeHook(
         stdx::bind(&ConfigServer::replicaSetChange, &configServer, stdx::placeholders::_1 , stdx::placeholders::_2));
 
+    // Mongos connection pools already takes care of authenticating new connections so the
+    // replica set connection shouldn't need to.
+    DBClientReplicaSet::setAuthPooledSecondaryConn(false);
+
     if (getHostName().empty()) {
         dbexit(EXIT_BADOPTIONS);
     }

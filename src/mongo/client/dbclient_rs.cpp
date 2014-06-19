@@ -156,6 +156,7 @@ namespace {
     // --------------------------------
 
     const size_t DBClientReplicaSet::MAX_RETRY = 3;
+    bool DBClientReplicaSet::_authPooledSecondaryConn = true;
 
     DBClientReplicaSet::DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout )
         : _setName( name ), _so_timeout( so_timeout ) {
@@ -163,6 +164,9 @@ namespace {
     }
 
     DBClientReplicaSet::~DBClientReplicaSet() {
+        if (_lastSlaveOkConn.get() == _master.get()) {
+            _lastSlaveOkConn.release();
+        }
     }
 
     ReplicaSetMonitorPtr DBClientReplicaSet::_getMonitor() const {
@@ -189,7 +193,7 @@ namespace {
         if (_master) {
             _master->setRunCommandHook(func);
         }
-        if (_lastSlaveOkConn) {
+        if (_lastSlaveOkConn.get()) {
            _lastSlaveOkConn->setRunCommandHook(func);
         }
         _runCommandHook = func;
@@ -201,7 +205,7 @@ namespace {
         if (_master) {
             _master->setPostRunCommandHook(func);
         }
-        if (_lastSlaveOkConn) {
+        if (_lastSlaveOkConn.get()) {
            _lastSlaveOkConn->setPostRunCommandHook(func);
         }
         _postRunCommandHook = func;
@@ -215,16 +219,12 @@ namespace {
     bool DBClientReplicaSet::isStillConnected() {
 
         if ( _master && !_master->isStillConnected() ) {
-            _master.reset();
-            _masterHost = HostAndPort();
+            resetMaster();
             // Don't notify monitor of bg failure, since it's not clear how long ago it happened
         }
 
-        if ( _lastSlaveOkConn && !_lastSlaveOkConn->isStillConnected() ) {
-            _lastSlaveOkConn.reset();
-            _lastSlaveOkHost = HostAndPort();
-            // Reset read pref too, since we're re-selecting the slaveOk host anyway
-            _lastReadPref.reset();
+        if ( _lastSlaveOkConn.get() && !_lastSlaveOkConn->isStillConnected() ) {
+            resetSlaveOkConn();
             // Don't notify monitor of bg failure, since it's not clear how long ago it happened
         }
 
@@ -318,6 +318,9 @@ namespace {
                       << (errmsg.empty()? "" : ", err: ") << errmsg);
         }
 
+        resetMaster();
+
+        _masterHost = h;
         _master.reset(newConn);
         _master->setReplSetClientCallback(this);
         _master->setRunCommandHook(_runCommandHook);
@@ -329,7 +332,7 @@ namespace {
 
     bool DBClientReplicaSet::checkLastHost(const ReadPreferenceSetting* readPref) {
         // Can't use a cached host if we don't have one.
-        if (!_lastSlaveOkConn || _lastSlaveOkHost.empty()) {
+        if (!_lastSlaveOkConn.get() || _lastSlaveOkHost.empty()) {
             return false;
         }
 
@@ -356,6 +359,19 @@ namespace {
                 warning() << "cached auth failed for set: " << _setName <<
                     " db: " << i->second[saslCommandUserDBFieldName].str() <<
                     " user: " << i->second[saslCommandUserFieldName].str() << endl;
+            }
+        }
+    }
+
+    void DBClientReplicaSet::logoutAll(DBClientConnection* conn) {
+        for (map<string, BSONObj>::const_iterator i = _auths.begin(); i != _auths.end(); ++i) {
+            BSONObj response;
+            try {
+                conn->logout(i->first, response);
+            }
+            catch (const UserException& ex) {
+                warning() << "Failed to logout: " << conn->getServerAddress() <<
+                    " on db: " << i->first << endl;
             }
         }
     }
@@ -415,12 +431,10 @@ namespace {
                 // NOTE: _lastSlaveOkConn may or may not be the same as _master
                 dassert(_lastSlaveOkConn.get() == conn || _master.get() == conn);
                 if ( conn != _lastSlaveOkConn.get() ) {
-                    _lastSlaveOkHost = HostAndPort();
-                    _lastSlaveOkConn.reset();
+                    resetSlaveOkConn();
                 }
                 if ( conn != _master.get() ) {
-                    _masterHost = HostAndPort();
-                    _master.reset();
+                    resetMaster();
                 }
 
                 return;
@@ -626,7 +640,8 @@ namespace {
         if ( monitor ) {
             monitor->failedHost( _masterHost );
         }
-        _master.reset(); 
+
+        resetMaster();
     }
 
     auto_ptr<DBClientCursor> DBClientReplicaSet::checkSlaveQueryResult( auto_ptr<DBClientCursor> result ){
@@ -654,7 +669,8 @@ namespace {
         log() << "slave no longer has secondary status: " << _lastSlaveOkHost << endl;
         // Failover to next slave
         _getMonitor()->failedHost( _lastSlaveOkHost );
-        _lastSlaveOkConn.reset();
+
+        resetSlaveOkConn();
     }
 
     DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
@@ -668,38 +684,41 @@ namespace {
         }
 
         ReplicaSetMonitorPtr monitor = _getMonitor();
-        _lastSlaveOkHost = monitor->getHostOrRefresh(*readPref);
+        HostAndPort selectedNode = monitor->getHostOrRefresh(*readPref);
 
-        if ( _lastSlaveOkHost.empty() ){
+        if ( selectedNode.empty() ){
 
             LOG( 3 ) << "dbclient_rs no compatible node found" << endl;
 
             return NULL;
         }
 
+        // We are now about to get a new connection from the pool, so cleanup
+        // the current one and release it back to the pool.
+        resetSlaveOkConn();
+
         _lastReadPref = readPref;
+        _lastSlaveOkHost = selectedNode;
 
         // Primary connection is special because it is the only connection that is
         // versioned in mongos. Therefore, we have to make sure that this object
         // maintains only one connection to the primary and use that connection
         // every time we need to talk to the primary.
-        if (monitor->isPrimary(_lastSlaveOkHost)) {
+        if (monitor->isPrimary(selectedNode)) {
             checkMaster();
-            _lastSlaveOkConn = _master;
-            _lastSlaveOkHost = _masterHost; // implied, but still assign just to be safe
 
-            LOG( 3 ) << "dbclient_rs selecting primary node " << _lastSlaveOkHost << endl;
+            LOG( 3 ) << "dbclient_rs selecting primary node " << selectedNode << endl;
+
+            _lastSlaveOkConn.reset(_master.get());
 
             return _master.get();
         }
 
-        string errmsg;
-        ConnectionString connStr(_lastSlaveOkHost);
         // Needs to perform a dynamic_cast because we need to set the replSet
         // callback. We should eventually not need this after we remove the
         // callback.
         DBClientConnection* newConn = dynamic_cast<DBClientConnection*>(
-                connStr.connect(errmsg, _so_timeout));
+                pool.get(_lastSlaveOkHost.toString(true), _so_timeout));
 
         // Assert here instead of returning NULL since the contract of this method is such
         // that returning NULL means none of the nodes were good, which is not the case here.
@@ -711,7 +730,13 @@ namespace {
         _lastSlaveOkConn->setRunCommandHook(_runCommandHook);
         _lastSlaveOkConn->setPostRunCommandHook(_postRunCommandHook);
 
-        _auth(_lastSlaveOkConn.get());
+        if (_authPooledSecondaryConn) {
+            _auth(_lastSlaveOkConn.get());
+        }
+        else {
+            // Mongos pooled connections are authenticated through
+            // ShardingConnectionHook::onCreate().
+        }
 
         LOG( 3 ) << "dbclient_rs selecting node " << _lastSlaveOkHost << endl;
 
@@ -981,8 +1006,47 @@ namespace {
          * as failed. For example, asserts 13079, 13080, 16386
          */
         _getMonitor()->failedHost(_lastSlaveOkHost);
+        resetSlaveOkConn();
+    }
+
+    void DBClientReplicaSet::reset() {
+        resetSlaveOkConn();
+        _lazyState._lastClient = NULL;
+        _lastReadPref.reset();
+    }
+
+    void DBClientReplicaSet::setAuthPooledSecondaryConn(bool setting) {
+        _authPooledSecondaryConn = setting;
+    }
+
+    void DBClientReplicaSet::resetMaster() {
+        if (_master.get() == _lastSlaveOkConn.get()) {
+            _lastSlaveOkConn.release();
+            _lastSlaveOkHost = HostAndPort();
+        }
+
+        _master.reset();
+        _masterHost = HostAndPort();
+    }
+
+    void DBClientReplicaSet::resetSlaveOkConn() {
+        if (_lastSlaveOkConn.get() == _master.get()) {
+            _lastSlaveOkConn.release();
+        }
+        else if (_lastSlaveOkConn.get() != NULL) {
+            if (_authPooledSecondaryConn) {
+                logoutAll(_lastSlaveOkConn.get());
+            }
+            else {
+                // Mongos pooled connections are all authenticated with the same credentials;
+                // so no need to logout.
+            }
+
+            // If the connection was bad, the pool will clean it up.
+            pool.release(_lastSlaveOkHost.toString(), _lastSlaveOkConn.release());
+        }
+
         _lastSlaveOkHost = HostAndPort();
-        _lastSlaveOkConn.reset();
     }
 
     // trying to optimize for the common dont-care-about-tags case.

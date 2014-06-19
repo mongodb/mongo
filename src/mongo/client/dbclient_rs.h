@@ -169,6 +169,18 @@ namespace mongo {
         virtual void setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func);
         virtual void setPostRunCommandHook(DBClientWithCommands::PostRunCommandHookFunc func);
 
+        /**
+         * Performs a "soft reset" by clearing all states relating to secondary nodes and
+         * returning secondary connections to the pool.
+         */
+        virtual void reset();
+
+        /**
+         * @bool setting if true, DBClientReplicaSet connections will make sure that secondary
+         *    connections are authenticated and log them before returning them to the pool.
+         */
+        static void setAuthPooledSecondaryConn(bool setting);
+
     protected:
         /** Authorize.  Authorizes all nodes as needed
         */
@@ -216,10 +228,29 @@ namespace mongo {
         void _auth( DBClientConnection * conn );
 
         /**
+         * Calls logout on the connection for all known database this DBClientRS instance has
+         * logged in.
+         */
+        void logoutAll(DBClientConnection* conn);
+
+        /**
+         * Clears the master connection.
+         */
+        void resetMaster();
+
+        /**
+         * Clears the slaveOk connection and returns it to the pool if not the same as _master.
+         */
+        void resetSlaveOkConn();
+
+        /**
          * Maximum number of retries to make for auto-retry logic when performing a slave ok
          * operation.
          */
         static const size_t MAX_RETRY;
+
+        // TODO: remove this when processes other than mongos uses the driver version.
+        static bool _authPooledSecondaryConn;
 
         // Throws a DBException if the monitor doesn't exist and there isn't a cached seed to use.
         ReplicaSetMonitorPtr _getMonitor() const;
@@ -227,18 +258,15 @@ namespace mongo {
         std::string _setName;
 
         HostAndPort _masterHost;
-        // Note: reason why this is a shared_ptr is because we want _lastSlaveOkConn to
-        // keep a reference of the _master connection when it selected a primary node.
-        // This is because the primary connection is special in mongos - it is the only
-        // connection that is versioned.
-        // WARNING: do not assign this variable (which will increment the internal ref
-        // counter) to any other variable other than _lastSlaveOkConn.
-        boost::shared_ptr<DBClientConnection> _master;
+        boost::scoped_ptr<DBClientConnection> _master;
 
-        // Last used host in a slaveOk query (can be a primary)
+        // Last used host in a slaveOk query (can be a primary).
         HostAndPort _lastSlaveOkHost;
-        // Last used connection in a slaveOk query (can be a primary)
-        boost::shared_ptr<DBClientConnection> _lastSlaveOkConn;
+        // Last used connection in a slaveOk query (can be a primary).
+        // Connection can either be owned here or returned to the connection pool. Note that
+        // if connection is primary, it is owned by _master so it is incorrect to return
+        // it to the pool.
+        std::auto_ptr<DBClientConnection> _lastSlaveOkConn;
         boost::shared_ptr<ReadPreferenceSetting> _lastReadPref;
 
         double _so_timeout;

@@ -1190,6 +1190,8 @@ namespace mongo {
             return INVALID_SOCK_CREATION_TIME;
         }
 
+        virtual void reset() {}
+
     }; // DBClientBase
 
     class DBClientReplicaSet;

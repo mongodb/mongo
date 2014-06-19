@@ -89,7 +89,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -181,7 +180,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -255,7 +253,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -344,7 +341,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -503,7 +499,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
