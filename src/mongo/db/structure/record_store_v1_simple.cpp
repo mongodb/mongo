@@ -364,15 +364,16 @@ namespace mongo {
             if( !L.isNull() ) {
                 while( 1 ) {
                     Record *recOld = recordFor(L);
+                    RecordData oldData = recOld->toRecordData();
                     L = getNextRecordInExtent(L);
 
-                    if ( compactOptions->validateDocuments && !adaptor->isDataValid(recOld) ) {
+                    if ( compactOptions->validateDocuments && !adaptor->isDataValid( oldData ) ) {
                         // object is corrupt!
                         log() << "compact skipping corrupt document!";
                         stats->corruptDocuments++;
                     }
                     else {
-                        unsigned dataSize = adaptor->dataSize( recOld );
+                        unsigned dataSize = adaptor->dataSize( oldData );
                         unsigned docSize = dataSize;
 
                         nrecords++;
@@ -404,7 +405,7 @@ namespace mongo {
                         uassertStatusOK( status.getStatus() );
                         datasize += recordFor( status.getValue() )->netLength();
 
-                        adaptor->inserted( recordFor( status.getValue() ), status.getValue() );
+                        adaptor->inserted( dataFor( status.getValue() ), status.getValue() );
                     }
 
                     if( L.isNull() ) {

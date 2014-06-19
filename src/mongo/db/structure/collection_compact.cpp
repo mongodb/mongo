@@ -77,20 +77,20 @@ namespace mongo {
                   _multiIndexBlock(indexBlock) {
             }
 
-            virtual bool isDataValid( Record* rec ) {
-                return BSONObj( rec->data() ).valid();
+            virtual bool isDataValid( const RecordData& recData ) {
+                return recData.toBson().valid();
             }
 
-            virtual size_t dataSize( Record* rec ) {
-                return BSONObj( rec->data() ).objsize();
+            virtual size_t dataSize( const RecordData& recData ) {
+                return recData.toBson().objsize();
             }
 
-            virtual void inserted( Record* rec, const DiskLoc& newLocation ) {
+            virtual void inserted( const RecordData& recData, const DiskLoc& newLocation ) {
                 InsertDeleteOptions options;
                 options.logIfError = false;
                 options.dupsAllowed = true; // in compact we should be doing no checking
 
-                _multiIndexBlock->insert( BSONObj( rec->data() ), newLocation, options );
+                _multiIndexBlock->insert( recData.toBson(), newLocation, options );
             }
 
         private:

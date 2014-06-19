@@ -100,6 +100,10 @@ namespace mongo {
         return total;
     }
 
+    RecordData RecordStoreV1Base::dataFor( const DiskLoc& loc ) const {
+        return recordFor(loc)->toRecordData();
+    }
+
     Record* RecordStoreV1Base::recordFor( const DiskLoc& loc ) const {
         return _extentManager->recordForV1( loc );
     }
@@ -657,7 +661,7 @@ namespace mongo {
 
                     if (full){
                         size_t dataSize = 0;
-                        const Status status = adaptor->validate( r, &dataSize );
+                        const Status status = adaptor->validate( r->toRecordData(), &dataSize );
                         if (!status.isOK()) {
                             results->valid = false;
                             if (nInvalid == 0) // only log once;

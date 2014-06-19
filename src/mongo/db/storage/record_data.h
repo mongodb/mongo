@@ -1,5 +1,7 @@
+// record_data.h
+
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,42 +30,39 @@
 
 #pragma once
 
-#include "mongo/db/structure/record_store.h"
-
 namespace mongo {
 
-    class SimpleRecordStoreV1;
-
     /**
-     * This class iterates over a non-capped collection identified by 'ns'.
-     * The collection must exist when the constructor is called.
-     *
-     * If start is not DiskLoc(), the iteration begins at that DiskLoc.
+     * A replacement for the Record class. This class represents data in a record store.
+     * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
+     * the memory pointed to by _data is owned by the RecordStore. If _dataPtr is not NULL, then
+     * it must point to _data. This means that the memory pointed to by _data is owned by the
+     * RecordData class, and will be cleaned up automatically when the RecordData destructor
+     * calls the _dataPtr destructor.
      */
-    class SimpleRecordStoreV1Iterator : public RecordIterator {
+    class RecordData {
     public:
-        SimpleRecordStoreV1Iterator( const SimpleRecordStoreV1* records,
-                                     const DiskLoc& start,
-                                     const CollectionScanParams::Direction& dir );
-        virtual ~SimpleRecordStoreV1Iterator() { }
+        RecordData(const char* data, int size): _data(data), _size(size), _dataPtr() { }
 
-        virtual bool isEOF();
-        virtual DiskLoc getNext();
-        virtual DiskLoc curr();
+        RecordData(const char* data, int size, const boost::shared_array<char>& dataPtr)
+            : _data(data), _size(size), _dataPtr(dataPtr) { }
 
-        virtual void invalidate(const DiskLoc& dl);
-        virtual void prepareToYield();
-        virtual bool recoverFromYield();
+        const char* data() const { return _data; }
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const;
+        int size() const { return _size; }
+
+        /**
+         * Returns true if this owns its own memory, and false otherwise
+         */
+        bool isOwned() const { return _dataPtr; }
+
+        // TODO eliminate double-copying
+        BSONObj toBson() const { return isOwned() ? BSONObj(_data).getOwned() : BSONObj(_data); }
 
     private:
-        // The result returned on the next call to getNext().
-        DiskLoc _curr;
-
-        const SimpleRecordStoreV1* _recordStore;
-
-        CollectionScanParams::Direction _direction;
+        const char* _data;
+        int _size;
+        const boost::shared_array<char> _dataPtr;
     };
 
-}  // namespace mongo
+} // namespace mongo

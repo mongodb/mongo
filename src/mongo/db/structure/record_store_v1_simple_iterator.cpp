@@ -122,8 +122,8 @@ namespace mongo {
         return true;
     }
 
-    const Record* SimpleRecordStoreV1Iterator::recordFor( const DiskLoc& loc ) const {
-        return _recordStore->recordFor( loc );
+    RecordData SimpleRecordStoreV1Iterator::dataFor( const DiskLoc& loc ) const {
+        return _recordStore->dataFor( loc );
     }
 
 }

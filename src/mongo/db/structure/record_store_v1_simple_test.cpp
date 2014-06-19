@@ -164,7 +164,7 @@ namespace {
         ASSERT( result.isOK() );
 
         // The length of the allocated record is quantized.
-        ASSERT_EQUALS( 320, rs.recordFor( result.getValue() )->lengthWithHeaders() );
+        ASSERT_EQUALS( 320, rs.dataFor( result.getValue() ).size() + Record::HeaderSize );
     }
 
     /**
@@ -184,7 +184,7 @@ namespace {
         ASSERT( result.isOK() );
 
         // The length of the allocated record is not quantized.
-        ASSERT_EQUALS( 300, rs.recordFor( result.getValue() )->lengthWithHeaders() );
+        ASSERT_EQUALS( 300, rs.dataFor( result.getValue() ).size() + Record::HeaderSize );
 
     }
 
@@ -201,7 +201,7 @@ namespace {
         StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), 0 );
         ASSERT( result.isOK() );
 
-        ASSERT_EQUALS( 300, rs.recordFor( result.getValue() )->lengthWithHeaders() );
+        ASSERT_EQUALS( 300, rs.dataFor( result.getValue() ).size() + Record::HeaderSize );
     }
 
     /** alloc() returns a non quantized record larger than the requested size. */
@@ -448,8 +448,8 @@ namespace {
         StatusWith<DiskLoc> result = rs.insertRecord( &txn, "abc", 4, 1000 );
         ASSERT_TRUE( result.isOK() );
         ASSERT_EQUALS( 1, md->numRecords() );
-        Record* record = rs.recordFor( result.getValue() );
-        ASSERT_EQUALS( string("abc"), string(record->data()) );
+        RecordData recordData = rs.dataFor( result.getValue() );
+        ASSERT_EQUALS( string("abc"), string(recordData.data()) );
     }
 
     // ----------------

@@ -34,6 +34,7 @@
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/storage/record_data.h"
 
 namespace mongo {
 
@@ -108,7 +109,7 @@ namespace mongo {
 
         // normally this will just go back to the RecordStore and convert
         // but this gives the iterator an oppurtnity to optimize
-        virtual const Record* recordFor( const DiskLoc& loc ) const = 0;
+        virtual RecordData dataFor( const DiskLoc& loc ) const = 0;
     };
 
 
@@ -139,7 +140,7 @@ namespace mongo {
 
         // CRUD related
 
-        virtual Record* recordFor( const DiskLoc& loc ) const = 0;
+        virtual RecordData dataFor( const DiskLoc& loc) const = 0;
 
         virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl ) = 0;
 
@@ -248,9 +249,9 @@ namespace mongo {
     class RecordStoreCompactAdaptor {
     public:
         virtual ~RecordStoreCompactAdaptor(){}
-        virtual bool isDataValid( Record* rec ) = 0;
-        virtual size_t dataSize( Record* rec ) = 0;
-        virtual void inserted( Record* rec, const DiskLoc& newLocation ) = 0;
+        virtual bool isDataValid( const RecordData& recData ) = 0;
+        virtual size_t dataSize( const RecordData& recData ) = 0;
+        virtual void inserted( const RecordData& recData, const DiskLoc& newLocation ) = 0;
     };
 
     struct ValidateResults {
@@ -270,6 +271,6 @@ namespace mongo {
     public:
         virtual ~ValidateAdaptor(){}
 
-        virtual Status validate( Record* record, size_t* dataSize ) = 0;
+        virtual Status validate( const RecordData& recordData, size_t* dataSize ) = 0;
     };
 }

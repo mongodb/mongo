@@ -2429,8 +2429,12 @@ namespace mongo {
             return NULL;
         }
 
-        Record* record = _recordStore->recordFor(dl);
-        return reinterpret_cast<BucketType*>(record->dataNoThrowing());
+        RecordData recordData = _recordStore->dataFor(dl);
+
+        // we need to be working on the raw bytes, not a transient copy
+        invariant(!recordData.isOwned());
+
+        return reinterpret_cast<BucketType*>(const_cast<char*>(recordData.data()));
     }
 
     template <class BtreeLayout>

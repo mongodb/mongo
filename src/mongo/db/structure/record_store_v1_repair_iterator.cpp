@@ -184,8 +184,8 @@ namespace mongo {
         verify(!"Invalidate is not supported for RecordStoreV1RepairIterator.");
     }
 
-    const Record* RecordStoreV1RepairIterator::recordFor(const DiskLoc& loc) const {
-        return _recordStore->recordFor( loc );
+    RecordData RecordStoreV1RepairIterator::dataFor(const DiskLoc& loc) const {
+        return _recordStore->dataFor( loc );
     }
 
 }  // namespace mongo

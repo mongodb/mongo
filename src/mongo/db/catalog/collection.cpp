@@ -145,8 +145,7 @@ namespace mongo {
     }
 
     BSONObj Collection::docFor(const DiskLoc& loc) const {
-        Record* rec = _recordStore->recordFor( loc );
-        return BSONObj( rec->data() );
+        return  _recordStore->dataFor( loc ).toBson();
     }
 
     StatusWith<DiskLoc> Collection::insertDocument( OperationContext* txn,
@@ -297,8 +296,7 @@ namespace mongo {
                                                     bool enforceQuota,
                                                     OpDebug* debug ) {
 
-        Record* oldRecord = _recordStore->recordFor( oldLocation );
-        BSONObj objOld( oldRecord->data() );
+        BSONObj objOld = _recordStore->dataFor( oldLocation ).toBson();
 
         if ( objOld.hasElement( "_id" ) ) {
             BSONElement oldId = objOld["_id"];
@@ -492,8 +490,8 @@ namespace mongo {
         public:
             virtual ~MyValidateAdaptor(){}
 
-            virtual Status validate( Record* record, size_t* dataSize ) {
-                BSONObj obj = BSONObj( record->data() );
+            virtual Status validate( const RecordData& record, size_t* dataSize ) {
+                BSONObj obj = record.toBson();
                 const Status status = validateBSON(obj.objdata(), obj.objsize());
                 if ( status.isOK() )
                     *dataSize = obj.objsize();
