@@ -981,16 +981,17 @@ int
 __wt_lsm_tree_lock(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int exclusive)
 {
+	if (exclusive)
+		WT_RET(__wt_writelock(session, lsm_tree->rwlock));
+	else
+		WT_RET(__wt_readlock(session, lsm_tree->rwlock));
+
 	/*
 	 * Diagnostic: avoid deadlocks with the schema lock: if we need it for
 	 * an operation, we should already have it.
 	 */
-	F_SET(session, WT_SESSION_NO_SCHEMA_LOCK);
-
-	if (exclusive)
-		return (__wt_writelock(session, lsm_tree->rwlock));
-	else
-		return (__wt_readlock(session, lsm_tree->rwlock));
+	F_SET(session, WT_SESSION_NO_CACHE_CHECK | WT_SESSION_NO_SCHEMA_LOCK);
+	return (0);
 }
 
 /*
@@ -1001,8 +1002,7 @@ int
 __wt_lsm_tree_unlock(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-	F_CLR(session, WT_SESSION_NO_SCHEMA_LOCK);
-
+	F_CLR(session, WT_SESSION_NO_CACHE_CHECK | WT_SESSION_NO_SCHEMA_LOCK);
 	return (__wt_rwunlock(session, lsm_tree->rwlock));
 }
 
