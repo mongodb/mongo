@@ -395,7 +395,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_index_meta
 	},
 	{ "session.begin_transaction",
-	  "isolation=,name=,priority=0,sync=0",
+	  "isolation=,name=,priority=0,sync=",
 	  confchk_session_begin_transaction
 	},
 	{ "session.checkpoint",

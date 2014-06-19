@@ -596,8 +596,9 @@ methods = {
 	    priority of the transaction for resolving conflicts.
 	    Transactions with higher values are less likely to abort''',
 	    min='-100', max='100'),
-	Config('sync', 'false', r'''
-	    whether to sync log records when the transaction commits''',
+	Config('sync', '', r'''
+	    whether to sync log records when the transaction commits,
+	    inherited from ::wiredtiger_open \c transaction_sync''',
 	    type='boolean'),
 ]),
 
@@ -755,7 +756,9 @@ methods = {
 	    how to sync log records when the transaction commits''',
 	    type='category', subconfig=[
 	    Config('enabled', 'false', r'''
-	        whether to sync the log on every commit''',
+	        whether to sync the log on every commit by default, can
+		be overridden by the \c sync setting to
+		WT_SESSION::begin_transaction''',
 	        type='boolean'),
 	    Config('method', 'fsync', r'''
 	        the method used to ensure log records are stable on disk''',

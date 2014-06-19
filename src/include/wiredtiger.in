@@ -1401,7 +1401,8 @@ struct __wt_session {
 	 * conflicts.  Transactions with higher values are less likely to
 	 * abort., an integer between -100 and 100; default \c 0.}
 	 * @config{sync, whether to sync log records when the transaction
-	 * commits., a boolean flag; default \c false.}
+	 * commits\, inherited from ::wiredtiger_open \c transaction_sync., a
+	 * boolean flag; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1991,7 +1992,8 @@ struct __wt_connection {
  * @config{transaction_sync = (, how to sync log records when the transaction
  * commits., a set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether to sync the log on every
- * commit., a boolean flag; default \c false.}
+ * commit by default\, can be overridden by the \c sync setting to
+ * WT_SESSION::begin_transaction., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;method, the method used to ensure log records
  * are stable on disk., a string\, chosen from the following options: \c
  * "dsync"\, \c "fsync"\, \c "none"; default \c fsync.}
