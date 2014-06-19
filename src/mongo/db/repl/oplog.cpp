@@ -142,11 +142,12 @@ namespace repl {
                     log() << "replication oplog stream went back in time. previous timestamp: "
                           << theReplSet->lastOpTimeWritten << " newest timestamp: " << ts
                           << ". attempting to sync directly from primary." << endl;
-                    std::string errmsg;
                     BSONObjBuilder result;
-                    if (!theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
-                                                   errmsg, result)) {
-                        log() << "Can't sync from primary: " << errmsg << endl;
+                    Status status =
+                            theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
+                                                      &result);
+                    if (!status.isOK()) {
+                        log() << "Can't sync from primary: " << status;
                     }
                 }
                 theReplSet->lastOpTimeWritten = ts;
@@ -301,11 +302,11 @@ namespace repl {
                 log() << "replication oplog stream went back in time. previous timestamp: "
                       << theReplSet->lastOpTimeWritten << " newest timestamp: " << ts
                       << ". attempting to sync directly from primary." << endl;
-                std::string errmsg;
                 BSONObjBuilder result;
-                if (!theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
-                                               errmsg, result)) {
-                    log() << "Can't sync from primary: " << errmsg << endl;
+                Status status = theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
+                                                          &result);
+                if (!status.isOK()) {
+                    log() << "Can't sync from primary: " << status;
                 }
             }
             theReplSet->lastOpTimeWritten = ts;

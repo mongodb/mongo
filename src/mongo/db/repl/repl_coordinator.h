@@ -230,6 +230,14 @@ namespace repl {
         virtual bool setMaintenanceMode(bool activate) = 0;
 
         /**
+         * Handles an incoming replSetSyncFrom command. Adds BSON to 'result'
+         * returns Status::OK if the sync target could be set and an ErrorCode indicating why it
+         * couldn't otherwise.
+         */
+        virtual Status processReplSetSyncFrom(const std::string& target,
+                                              BSONObjBuilder* resultObj) = 0;
+
+        /**
          * Handles an incoming replSetMaintenance command. 'activate' indicates whether to activate
          * or deactivate maintenanceMode.
          * returns Status::OK() if maintenanceMode is successfully changed, otherwise returns a

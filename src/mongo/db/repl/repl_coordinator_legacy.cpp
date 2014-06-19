@@ -812,5 +812,16 @@ namespace {
         return Status::OK();
     }
 
+    Status LegacyReplicationCoordinator::processReplSetSyncFrom(const std::string& target,
+                                                                BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+        resultObj->append("syncFromRequested", target);
+
+        return theReplSet->forceSyncFrom(target, resultObj);
+    }
+
 } // namespace repl
 } // namespace mongo

@@ -101,7 +101,7 @@ namespace repl {
         // hash we use to make sure we are reading the right flow of ops and aren't on
         // an out-of-date "fork"
         long long lastH; 
-        bool forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result);
+        Status forceSyncFrom(const string& host, BSONObjBuilder* result);
         // Check if the current sync target is suboptimal. This must be called while holding a mutex
         // that prevents the sync source from changing.
         bool shouldChangeSyncTarget(const OpTime& target) const;

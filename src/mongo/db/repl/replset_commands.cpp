@@ -299,12 +299,11 @@ namespace repl {
                          string& errmsg, 
                          BSONObjBuilder& result, 
                          bool fromRepl) {
-            if (!check(errmsg, result)) {
-                return false;
-            }
             string newTarget = cmdObj["replSetSyncFrom"].valuestrsafe();
-            result.append("syncFromRequested", newTarget);
-            return theReplSet->forceSyncFrom(newTarget, errmsg, result);
+            return appendCommandStatus(
+                    result,
+                    getGlobalReplicationCoordinator()->processReplSetSyncFrom(newTarget,
+                                                                              &result));
         }
     } cmdReplSetSyncFrom;
 

@@ -193,6 +193,12 @@ namespace repl {
         return false;
     }
 
+    Status ReplicationCoordinatorImpl::processReplSetSyncFrom(const std::string& target,
+                                                              BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
     Status ReplicationCoordinatorImpl::processReplSetMaintenance(bool activate,
                                                                  BSONObjBuilder* resultObj) {
         // TODO

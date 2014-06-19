@@ -92,6 +92,9 @@ namespace repl {
 
         virtual Status processReplSetMaintenance(bool activate, BSONObjBuilder* resultObj);
 
+        virtual Status processReplSetSyncFrom(const std::string& target,
+                                              BSONObjBuilder* resultObj);
+
         virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj);
 
         virtual Status processHeartbeat(const BSONObj& cmdObj, 
