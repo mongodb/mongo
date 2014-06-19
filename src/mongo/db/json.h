@@ -161,6 +161,8 @@ namespace mongo {
              *   | REFOBJECT
              *   | UNDEFINEDOBJECT
              *   | NUMBERLONGOBJECT
+             *   | MINKEYOBJECT
+             *   | MAXKEYOBJECT
              *
              */
         public:
@@ -230,6 +232,18 @@ namespace mongo {
              *     { FIELD("$numberLong") : "<number>" }
              */
             Status numberLongObject(const StringData& fieldName, BSONObjBuilder&);
+
+            /*
+             * MINKEYOBJECT :
+             *     { FIELD("$minKey") : 1 }
+             */
+            Status minKeyObject(const StringData& fieldName, BSONObjBuilder& builder);
+
+            /*
+             * MAXKEYOBJECT :
+             *     { FIELD("$maxKey") : 1 }
+             */
+            Status maxKeyObject(const StringData& fieldName, BSONObjBuilder& builder);
 
             /*
              * ARRAY :

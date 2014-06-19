@@ -293,6 +293,24 @@ namespace mongo {
                 return ret;
             }
         }
+        else if (firstField == "$minKey") {
+            if (!subObject) {
+                return parseError("Reserved field name in base object: $minKey");
+            }
+            Status ret = minKeyObject(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (firstField == "$maxKey") {
+            if (!subObject) {
+                return parseError("Reserved field name in base object: $maxKey");
+            }
+            Status ret = maxKeyObject(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
         else { // firstField != <reserved field name>
             // Normal object
 
@@ -649,6 +667,28 @@ namespace mongo {
         }
 
         builder.appendNumber(fieldName, numberLong);
+        return Status::OK();
+    }
+
+    Status JParse::minKeyObject(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!readToken(COLON)) {
+            return parseError("Expecting ':'");
+        }
+        if (!readToken("1")) {
+            return parseError("Reserved field \"$minKey\" requires value of 1");
+        }
+        builder.appendMinKey(fieldName);
+        return Status::OK();
+    }
+
+    Status JParse::maxKeyObject(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!readToken(COLON)) {
+            return parseError("Expecting ':'");
+        }
+        if (!readToken("1")) {
+            return parseError("Reserved field \"$maxKey\" requires value of 1");
+        }
+        builder.appendMaxKey(fieldName);
         return Status::OK();
     }
 
