@@ -110,6 +110,10 @@ namespace mongo {
             return _btree->isEmpty();
         }
 
+        virtual Status touch(OperationContext* txn) const{
+            return _btree->touch(txn);
+        }
+
         class Cursor : public BtreeInterface::Cursor {
         public:
             Cursor(const BtreeLogic<OnDiskFormat>* btree, int direction)

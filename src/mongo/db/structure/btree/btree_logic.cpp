@@ -56,6 +56,15 @@ namespace mongo {
           _numAdded(0),
           _txn(txn) {
 
+        // XXX: Due to the way bulk building works, we may already have an empty root bucket that we
+        // must now dispose of. This isn't the case in some unit tests that use the Builder directly
+        // rather than going through an IndexAccessMethod.
+        DiskLoc oldHead = _logic->_headManager->getHead();
+        if (!oldHead.isNull()) {
+            _logic->_headManager->setHead(_txn, DiskLoc());
+            _logic->_recordStore->deleteRecord(_txn, oldHead);
+        }
+
         _first = _cur = _logic->_addBucket(txn);
         _b = _getModifiableBucket(_cur);
         _committed = false;
@@ -2039,6 +2048,11 @@ namespace mongo {
         else {
             return getFullKey(bucket, keyOffset).data.toBson();
         }
+    }
+
+    template <class BtreeLayout>
+    Status BtreeLogic<BtreeLayout>::touch(OperationContext* txn) const {
+        return _recordStore->touch( txn, NULL );
     }
 
     template <class BtreeLayout>

@@ -529,23 +529,31 @@ namespace mongo {
         RecordStore* rs = _getRecordStore( txn, entry->descriptor()->indexNamespace() );
         invariant( rs );
 
+        std::auto_ptr<BtreeInterface> btree(
+            BtreeInterface::getInterface(entry->headManager(),
+                                         rs,
+                                         entry->ordering(),
+                                         entry->descriptor()->indexNamespace(),
+                                         entry->descriptor()->version(),
+                                         &BtreeBasedAccessMethod::invalidateCursors));
+
         if (IndexNames::HASHED == type)
-            return new HashAccessMethod( entry, rs );
+            return new HashAccessMethod( entry, btree.release() );
 
         if (IndexNames::GEO_2DSPHERE == type)
-            return new S2AccessMethod( entry, rs );
+            return new S2AccessMethod( entry, btree.release() );
 
         if (IndexNames::TEXT == type)
-            return new FTSAccessMethod( entry, rs );
+            return new FTSAccessMethod( entry, btree.release() );
 
         if (IndexNames::GEO_HAYSTACK == type)
-            return new HaystackAccessMethod( entry, rs );
+            return new HaystackAccessMethod( entry, btree.release() );
 
         if ("" == type)
-            return new BtreeAccessMethod( entry, rs );
+            return new BtreeAccessMethod( entry, btree.release() );
 
         if (IndexNames::GEO_2D == type)
-            return new TwoDAccessMethod( entry, rs );
+            return new TwoDAccessMethod( entry, btree.release() );
 
         log() << "Can't find index for keyPattern " << entry->descriptor()->keyPattern();
         fassertFailed(17489);
