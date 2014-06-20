@@ -481,7 +481,7 @@ namespace mongo {
                                               bool inclusive) {
         invariant( isCapped() );
         reinterpret_cast<CappedRecordStoreV1*>(
-            _recordStore.get())->temp_cappedTruncateAfter( txn, end, inclusive );
+                           _recordStore)->temp_cappedTruncateAfter( txn, end, inclusive );
     }
 
     namespace {

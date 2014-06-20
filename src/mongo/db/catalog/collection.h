@@ -104,16 +104,16 @@ namespace mongo {
     public:
         Collection( OperationContext* txn,
                     const StringData& fullNS,
-                    CollectionCatalogEntry* details, // takes ownership
-                    RecordStore* recordStore, // takes ownership
+                    CollectionCatalogEntry* details, // does not own
+                    RecordStore* recordStore, // does not own
                     Database* database ); // does not own
 
         ~Collection();
 
         bool ok() const { return _magic == 1357924; }
 
-        CollectionCatalogEntry* getCatalogEntry() { return _details.get(); }
-        const CollectionCatalogEntry* getCatalogEntry() const { return _details.get(); }
+        CollectionCatalogEntry* getCatalogEntry() { return _details; }
+        const CollectionCatalogEntry* getCatalogEntry() const { return _details; }
 
         CollectionInfoCache* infoCache() { return &_infoCache; }
         const CollectionInfoCache* infoCache() const { return &_infoCache; }
@@ -123,8 +123,8 @@ namespace mongo {
         const IndexCatalog* getIndexCatalog() const { return &_indexCatalog; }
         IndexCatalog* getIndexCatalog() { return &_indexCatalog; }
 
-        const RecordStore* getRecordStore() const { return _recordStore.get(); }
-        RecordStore* getRecordStore() { return _recordStore.get(); }
+        const RecordStore* getRecordStore() const { return _recordStore; }
+        RecordStore* getRecordStore() { return _recordStore; }
 
         CollectionCursorCache* cursorCache() const { return &_cursorCache; }
 
@@ -281,8 +281,8 @@ namespace mongo {
         int _magic;
 
         NamespaceString _ns;
-        scoped_ptr<CollectionCatalogEntry> _details;
-        scoped_ptr<RecordStore> _recordStore;
+        CollectionCatalogEntry* _details;
+        RecordStore* _recordStore;
         Database* _database;
         CollectionInfoCache _infoCache;
         IndexCatalog _indexCatalog;

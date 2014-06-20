@@ -86,17 +86,14 @@ namespace mongo {
         void getCollectionNamespaces( std::list<std::string>* tofill ) const;
 
         /*
-         * ownership passes to caller
          * will return NULL if ns does not exist
          */
         CollectionCatalogEntry* getCollectionCatalogEntry( OperationContext* txn,
                                                            const StringData& ns );
 
-        // TODO(ERH): ownership passes to caller (i think this is wrong)
         RecordStore* getRecordStore( OperationContext* txn,
                                      const StringData& ns );
 
-        // TODO(ERH): ownership passes to caller (i think this is wrong)
         IndexAccessMethod* getIndex( OperationContext* txn,
                                      const CollectionCatalogEntry* collection,
                                      IndexCatalogEntry* index );
@@ -106,9 +103,10 @@ namespace mongo {
 
     private:
 
-        RecordStoreV1Base* _getIndexRecordStore( OperationContext* txn );
-        RecordStoreV1Base* _getNamespaceRecordStore( OperationContext* txn,
-                                                     const StringData& whosAsking );
+        RecordStoreV1Base* _getIndexRecordStore_inlock();
+        RecordStoreV1Base* _getIndexRecordStore();
+        RecordStoreV1Base* _getNamespaceRecordStore_inlock();
+        RecordStoreV1Base* _getNamespaceRecordStore();
 
         RecordStoreV1Base* _getRecordStore( OperationContext* txn,
                                             const StringData& ns );
@@ -116,6 +114,10 @@ namespace mongo {
         void _addNamespaceToNamespaceCollection( OperationContext* txn,
                                                  const StringData& ns,
                                                  const BSONObj* options );
+        void _addNamespaceToNamespaceCollection_inlock( OperationContext* txn,
+                                                        const StringData& ns,
+                                                        const BSONObj* options );
+
 
         void _removeNamespaceFromNamespaceCollection( OperationContext* txn,
                                                       const StringData& ns );
@@ -125,16 +127,35 @@ namespace mongo {
                                        const StringData& toNS,
                                        bool stayTemp );
 
+        void _removeFromCache( const StringData& ns );
+
         /**
          * @throws DatabaseDifferCaseCode if the name is a duplicate based on
          * case insensitive matching.
          */
         void _checkDuplicateUncasedNames() const;
 
+        void _ensureSystemCollection_inlock( OperationContext* txn,
+                                             const StringData& ns );
+        void _lazyInit( OperationContext* txn );
+
+
         std::string _path;
 
         MmapV1ExtentManager _extentManager;
         NamespaceIndex _namespaceIndex;
+
+        // this is all a cache, and not definitive
+        struct Entry {
+            scoped_ptr<CollectionCatalogEntry> catalogEntry;
+            scoped_ptr<RecordStoreV1Base> recordStore;
+        };
+
+        void _fillInEntry_inlock( OperationContext* opCtx, const StringData& ns, Entry* entry );
+
+        boost::mutex _collectionsLock;
+        typedef std::map<std::string,Entry*> CollectionMap;
+        CollectionMap _collections;
 
         friend class NamespaceDetailsCollectionCatalogEntry;
     };
