@@ -69,10 +69,6 @@ namespace mongo {
      */
     class BtreeInterface {
     public:
-        struct SavedPositionData {
-            BSONObj key;
-            DiskLoc loc;
-        };
 
         virtual ~BtreeInterface() { }
 
@@ -183,9 +179,9 @@ namespace mongo {
             //
             // Saving and restoring state
             //
-            virtual void savePosition(SavedPositionData* savedOut) const = 0;
+            virtual void savePosition() = 0;
 
-            virtual void restorePosition(const SavedPositionData& saved) = 0;
+            virtual void restorePosition() = 0;
         };
 
         /**

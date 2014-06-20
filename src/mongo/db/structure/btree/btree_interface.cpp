@@ -189,17 +189,21 @@ namespace mongo {
                 _btree->advance(&_bucket, &_ofs, _direction);
             }
 
-            virtual void savePosition(SavedPositionData* savedOut) const {
-                savedOut->key = getKey().getOwned();
-                savedOut->loc = getDiskLoc();
+            virtual void savePosition() {
+                if (!_bucket.isNull()) {
+                    _savedKey = getKey().getOwned();
+                    _savedLoc = getDiskLoc();
+                }
             }
 
-            virtual void restorePosition(const SavedPositionData& saved) {
-                _btree->restorePosition(saved.key,
-                                        saved.loc,
-                                        _direction,
-                                        &_bucket,
-                                        &_ofs);
+            virtual void restorePosition() {
+                if (!_bucket.isNull()) {
+                    _btree->restorePosition(_savedKey,
+                                            _savedLoc,
+                                            _direction,
+                                            &_bucket,
+                                            &_ofs);
+                }
             }
 
         private:
@@ -208,6 +212,10 @@ namespace mongo {
 
             DiskLoc _bucket;
             int _ofs;
+
+            // Only used by save/restorePosition() if _bucket is non-Null.
+            BSONObj _savedKey;
+            DiskLoc _savedLoc;
         };
 
         virtual Cursor* newCursor(int direction) const {

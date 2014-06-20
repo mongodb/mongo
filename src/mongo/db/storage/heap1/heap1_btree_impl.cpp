@@ -367,19 +367,33 @@ namespace {
                     ++_it;
             }
 
-            virtual void savePosition(SavedPositionData* savedOut) const {
-                invariant(_it != _data.end());
-                savedOut->key = _it->key;
-                savedOut->loc = _it->loc;
+            virtual void savePosition() {
+                if (_it == _data.end()) {
+                    _savedAtEnd = true;
+                    return;
+                }
+
+                _savedKey = _it->key;
+                _savedLoc = _it->loc;
             }
 
-            virtual void restorePosition(const SavedPositionData& saved) {
-                locate(saved.key, saved.loc);
+            virtual void restorePosition() {
+                if (_savedAtEnd) {
+                    _it = _data.end();
+                }
+                else {
+                    locate(_savedKey, _savedLoc);
+                }
             }
 
         private:
             const IndexSet& _data;
             IndexSet::const_iterator _it;
+
+            // For save/restorePosition since _it may be invalidated durring a yield.
+            bool _savedAtEnd;
+            BSONObj _savedKey;
+            DiskLoc _savedLoc;
         };
 
         // TODO see if this can share any code with ForwardIterator
@@ -450,14 +464,23 @@ namespace {
                     ++_it;
             }
 
-            virtual void savePosition(SavedPositionData* savedOut) const {
-                invariant(_it != _data.rend());
-                savedOut->key = _it->key;
-                savedOut->loc = _it->loc;
+            virtual void savePosition() {
+                if (_it == _data.rend()) {
+                    _savedAtEnd = true;
+                    return;
+                }
+
+                _savedKey = _it->key;
+                _savedLoc = _it->loc;
             }
 
-            virtual void restorePosition(const SavedPositionData& saved) {
-                locate(saved.key, saved.loc);
+            virtual void restorePosition() {
+                if (_savedAtEnd) {
+                    _it = _data.rend();
+                }
+                else {
+                    locate(_savedKey, _savedLoc);
+                }
             }
 
         private:
@@ -478,6 +501,11 @@ namespace {
 
             const IndexSet& _data;
             IndexSet::const_reverse_iterator _it;
+
+            // For save/restorePosition since _it may be invalidated durring a yield.
+            bool _savedAtEnd;
+            BSONObj _savedKey;
+            DiskLoc _savedLoc;
         };
 
         virtual BtreeInterface::Cursor* newCursor(int direction) const {

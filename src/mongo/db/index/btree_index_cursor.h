@@ -110,9 +110,6 @@ namespace mongo {
         static unordered_set<BtreeIndexCursor*> _activeCursors;
         static SimpleMutex _activeCursorsMutex;
 
-        // For saving/restoring position.
-        BtreeInterface::SavedPositionData _savedData;
-
         boost::scoped_ptr<BtreeInterface::Cursor> _cursor;
     };
 

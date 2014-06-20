@@ -127,20 +127,18 @@ namespace mongo {
     }
 
     void Count::prepareToYield() {
-        if (isEOF() || (NULL == _btreeCursor.get())) { return; }
+        if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
 
-        verify(!_btreeCursor->isEOF());
         _btreeCursor->savePosition();
-        if (!_endCursor->isEOF()) {
-            _endCursor->savePosition();
-        }
+        _endCursor->savePosition();
     }
 
     void Count::recoverFromYield() {
-        if (isEOF() || (NULL == _btreeCursor.get())) { return; }
+        if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
 
         if (!_btreeCursor->restorePosition().isOK()) {
             _hitEnd = true;
+            return;
         }
 
         if (_btreeCursor->isEOF()) {
@@ -156,11 +154,9 @@ namespace mongo {
             return;
         }
 
-        if (!_endCursor->isEOF()) {
-            if (!_endCursor->restorePosition().isOK()) {
-                _hitEnd = true;
-                return;
-            }
+        if (!_endCursor->restorePosition().isOK()) {
+            _hitEnd = true;
+            return;
         }
 
         // If we were EOF when we yielded we don't always want to have _btreeCursor run until
