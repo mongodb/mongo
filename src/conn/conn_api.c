@@ -127,6 +127,10 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	return (&conn->extension_api);
 }
 
+#ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
+	extern int snappy_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+#endif
+
 /*
  * __conn_load_default_extensions --
  *	Load extensions that are enabled via --with-builtins

@@ -188,15 +188,7 @@ wt_snappy_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 	return (0);
 }
 
-/*
- * wiredtiger_extension_init --
- *	WiredTiger snappy compression extension.
- */
-int
-wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
-{
-	return snappy_extension_init(connection, config);
-}
+extern int snappy_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 
 /*
  * snappy_extension_init --
@@ -224,4 +216,14 @@ snappy_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 
 	return (connection->add_compressor(
 	    connection, "snappy", (WT_COMPRESSOR *)snappy_compressor, NULL));
+}
+
+/*
+ * wiredtiger_extension_init --
+ *	WiredTiger snappy compression extension.
+ */
+int
+wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+{
+	return snappy_extension_init(connection, config);
 }

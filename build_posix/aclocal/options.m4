@@ -37,6 +37,10 @@ for builtin_i in $builtin_list; do
 	*)	AC_MSG_ERROR([Unknown builtin extension "$builtin_i"]);;
 	esac
 done
+AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_SNAPPY],
+    [test $wt_cv_with_builtin_extension_snappy = yes])
+AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_ZLIB],
+    [test $wt_cv_with_builtin_extension_zlib = yes])
 AC_MSG_RESULT($with_builtins)
 
 AC_MSG_CHECKING(if --enable-bzip2 option specified)
