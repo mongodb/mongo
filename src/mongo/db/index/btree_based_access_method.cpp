@@ -50,19 +50,31 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(failIndexKeyTooLong, bool, true);
 
-    void BtreeBasedAccessMethod::InvalidateCursorsNotification::aboutToDeleteBucket(
-            const DiskLoc& bucket) {
-        BtreeIndexCursor::aboutToDeleteBucket(bucket);
-    }
+    /**
+     * Invalidates all active cursors, which point at the bucket being deleted.
+     */
+    class InvalidateCursorsNotification : public BucketDeletionNotification {
+    public:
+        virtual void aboutToDeleteBucket(const DiskLoc& bucket) {
+            BtreeIndexCursor::aboutToDeleteBucket(bucket);
+        }
+    };
 
-    BtreeBasedAccessMethod::InvalidateCursorsNotification BtreeBasedAccessMethod::invalidateCursors;
+    static InvalidateCursorsNotification invalidateCursors;
 
     BtreeBasedAccessMethod::BtreeBasedAccessMethod(IndexCatalogEntry* btreeState,
-                                                   BtreeInterface* btree)
+                                                   RecordStore* recordStore)
         : _btreeState(btreeState),
-          _descriptor(btreeState->descriptor()),
-          _newInterface(btree) {
+          _recordStore( recordStore ),
+          _descriptor(btreeState->descriptor()) {
+
         verify(0 == _descriptor->version() || 1 == _descriptor->version());
+        _newInterface.reset(BtreeInterface::getInterface(btreeState->headManager(),
+                                                         recordStore,
+                                                         btreeState->ordering(),
+                                                         _descriptor->indexNamespace(),
+                                                         _descriptor->version(),
+                                                         &invalidateCursors));
     }
 
     // Find the keys for obj, put them in the tree pointing to loc
@@ -212,7 +224,7 @@ namespace mongo {
 
 
     Status BtreeBasedAccessMethod::touch( OperationContext* txn ) const {
-        return _btree->touch(txn);
+        return _recordStore->touch( txn, NULL );
     }
 
     DiskLoc BtreeBasedAccessMethod::findSingle(const BSONObj& key) const {

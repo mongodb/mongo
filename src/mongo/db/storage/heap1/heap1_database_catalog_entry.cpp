@@ -148,15 +148,7 @@ namespace mongo {
             invariant( type.empty() ); // we don't support other index types right now
 
             HeapRecordStore* rs = new HeapRecordStore( index->descriptor()->indexName() );
-            std::auto_ptr<BtreeInterface> btree(
-                BtreeInterface::getInterface(index->headManager(),
-                                             rs,
-                                             index->ordering(),
-                                             index->descriptor()->indexNamespace(),
-                                             index->descriptor()->version(),
-                                             &BtreeBasedAccessMethod::invalidateCursors));
-
-            i->second->access.reset( new BtreeAccessMethod( index, btree.release()) );
+            i->second->access.reset( new BtreeAccessMethod( index, rs ) );
         }
 
         return i->second->access.get();

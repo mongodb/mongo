@@ -37,11 +37,11 @@
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/structure/btree/btree_interface.h"
-#include "mongo/db/structure/btree/bucket_deletion_notification.h"
 
 namespace mongo {
 
     class ExternalSortComparison;
+    class RecordStore;
 
     /**
      * Any access method that is Btree based subclasses from this.
@@ -58,7 +58,7 @@ namespace mongo {
         MONGO_DISALLOW_COPYING( BtreeBasedAccessMethod );
     public:
         BtreeBasedAccessMethod( IndexCatalogEntry* btreeState,
-                                BtreeInterface* btree );
+                                RecordStore* recordStore );
 
         virtual ~BtreeBasedAccessMethod() { }
 
@@ -103,16 +103,6 @@ namespace mongo {
         // XXX: consider migrating callers to use IndexCursor instead
         virtual DiskLoc findSingle( const BSONObj& key ) const;
 
-        /**
-         * Invalidates all active cursors, which point at the bucket being deleted.
-         * TODO see if there is a better place to put this.
-         */
-        class InvalidateCursorsNotification : public BucketDeletionNotification {
-        public:
-            virtual void aboutToDeleteBucket(const DiskLoc& bucket);
-        };
-        static InvalidateCursorsNotification invalidateCursors;
-
     protected:
         // Friends who need getKeys.
         friend class BtreeBasedBulkAccessMethod;
@@ -123,7 +113,7 @@ namespace mongo {
         virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) = 0;
 
         IndexCatalogEntry* _btreeState; // owned by IndexCatalogEntry
-        scoped_ptr<BtreeInterface> _btree; // owned by us
+        scoped_ptr<RecordStore> _recordStore; // owned by us
         const IndexDescriptor* _descriptor;
 
     private:

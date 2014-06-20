@@ -45,7 +45,7 @@ namespace mongo {
     public:
         using BtreeBasedAccessMethod::_descriptor;
 
-        HashAccessMethod(IndexCatalogEntry* btreeState, BtreeInterface* btree);
+        HashAccessMethod(IndexCatalogEntry* btreeState, RecordStore* rs);
         virtual ~HashAccessMethod() { }
 
     private:

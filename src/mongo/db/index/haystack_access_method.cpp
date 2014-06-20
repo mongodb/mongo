@@ -39,8 +39,8 @@
 
 namespace mongo {
 
-    HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState, BtreeInterface* btree)
-        : BtreeBasedAccessMethod(btreeState, btree) {
+    HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState, RecordStore* rs)
+        : BtreeBasedAccessMethod(btreeState, rs) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();
 
