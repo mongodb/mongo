@@ -134,9 +134,11 @@ struct __wt_session_impl {
 	 * oldest transaction ID has moved beyond that point, the memory can
 	 * be discarded for real.
 	 */
+	WT_BTREE *active_btree;
 	struct __wt_fotxn {
+		WT_BTREE   *btree;	/* Tree that owned the memory */
 		uint64_t    txnid;	/* Transaction ID */
-		void *p;		/* Memory, length */
+		void       *p;		/* Memory, length */
 		size_t	    len;
 	} *fotxn;			/* Free-on-transaction array */
 	size_t  fotxn_cnt;		/* Array entries */

@@ -14,7 +14,7 @@
 int
 __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 {
-	WT_BTREE *btree;
+	WT_BTREE *btree, *prev_tree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
@@ -25,6 +25,14 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 
 	btree = S2BT(session);
 	descending = 0;
+
+	/*
+	 * Tree walks are special: they look inside page structures that splits
+	 * may want to free.  Publish that the tree is active during this
+	 * window.
+	 */
+	prev_tree = session->active_btree;
+	WT_PUBLISH(session->active_btree, btree);
 
 	/*
 	 * !!!
@@ -271,5 +279,6 @@ descend:		couple = ref;
 done:
 err:	if (txn_state != NULL)
 		txn_state->snap_min = WT_TXN_NONE;
+	session->active_btree = prev_tree;
 	return (ret);
 }

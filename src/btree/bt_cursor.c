@@ -216,7 +216,14 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 static inline int
 __cursor_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
-	return (__wt_col_search(session, cbt->iface.recno, NULL, cbt));
+	WT_BTREE *prev_btree;
+	WT_DECL_RET;
+
+	prev_btree = session->active_btree;
+	WT_PUBLISH(session->active_btree, cbt->btree);
+	ret = __wt_col_search(session, cbt->iface.recno, NULL, cbt);
+	session->active_btree = prev_btree;
+	return (ret);
 }
 
 /*
@@ -226,7 +233,14 @@ __cursor_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 static inline int
 __cursor_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int insert)
 {
-	return (__wt_row_search(session, &cbt->iface.key, NULL, cbt, insert));
+	WT_BTREE *prev_btree;
+	WT_DECL_RET;
+
+	prev_btree = session->active_btree;
+	WT_PUBLISH(session->active_btree, cbt->btree);
+	ret = __wt_row_search(session, &cbt->iface.key, NULL, cbt, insert);
+	session->active_btree = prev_btree;
+	return (ret);
 }
 
 /*

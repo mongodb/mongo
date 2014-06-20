@@ -302,7 +302,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	 * list that we can.
 	 */
 	if (session->fotxn_cnt > 0)
-		__wt_session_fotxn_discard(session, session, 0);
+		__wt_session_fotxn_discard(session);
 
 	/*
 	 * Reset the transaction state to not running.

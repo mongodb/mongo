@@ -15,7 +15,6 @@ int
 __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 {
 	WT_FOTXN *fotxn;
-	size_t i;
 
 	/*
 	 * Make sure the current thread has a transaction pinned so that
@@ -28,25 +27,20 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 	WT_RET(__wt_realloc_def(session,
 	    &session->fotxn_size, session->fotxn_cnt + 1, &session->fotxn));
 
-	/* Find an empty slot. */
-	for (i = 0, fotxn = session->fotxn;
-	    i < session->fotxn_size / sizeof(session->fotxn[0]);  ++i, ++fotxn)
-		if (fotxn->p == NULL) {
-			fotxn->txnid = __wt_txn_new_id(session);
-			WT_ASSERT(session,
-			    !__wt_txn_visible_all(session, fotxn->txnid));
-			fotxn->p = p;
-			fotxn->len = len;
-			break;
-		}
-	++session->fotxn_cnt;
+	fotxn = session->fotxn + session->fotxn_cnt++;
+	fotxn->btree = S2BT(session);
+	fotxn->txnid = __wt_txn_current_id(session) + 1;
+	WT_ASSERT(session, !__wt_txn_visible_all(session, fotxn->txnid));
+	WT_ASSERT(session, fotxn->p == NULL);
+	fotxn->p = p;
+	fotxn->len = len;
 
 	WT_STAT_FAST_CONN_INCRV(session, rec_split_stashed_bytes, len);
 	WT_STAT_FAST_CONN_ATOMIC_INCR(session, rec_split_stashed_objects);
 
 	/* See if we can free any previous entries. */
 	if (session->fotxn_cnt > 1)
-		__wt_session_fotxn_discard(session, session, 0);
+		__wt_session_fotxn_discard(session);
 
 	return (0);
 }
@@ -54,11 +48,65 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 /*
  * __wt_session_fotxn_discard --
  *	Discard any memory from the session's free-on-transaction generation
- * list that we can.
+ *	list that we can.
  */
 void
-__wt_session_fotxn_discard(WT_SESSION_IMPL *session_safe,
-    WT_SESSION_IMPL *session, int connection_close)
+__wt_session_fotxn_discard(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *prev_btree;
+	WT_FOTXN *fotxn;
+	size_t i;
+
+	/* The last known tree that wasn't busy. */
+	prev_btree = NULL;
+
+	/* Bump the oldest transaction ID. */
+	__wt_txn_update_oldest(session);
+
+	for (i = 0, fotxn = session->fotxn;
+	    i < session->fotxn_cnt;
+	    ++i, ++fotxn) {
+		if (fotxn->p == NULL)
+			continue;
+		else if (fotxn->btree == prev_btree)
+			;
+		else if (__wt_btree_exclusive(session, fotxn->btree))
+			prev_btree = fotxn->btree;
+		else if (!__wt_txn_visible_all(session, fotxn->txnid))
+			break;
+		/*
+		 * It's a bad thing if another thread is in this memory
+		 * after we free it, make sure nothing good happens to
+		 * that thread.
+		 */
+		__wt_overwrite_and_free_len(session, fotxn->p, fotxn->len);
+		WT_STAT_FAST_CONN_INCRV(
+		    session, rec_split_stashed_bytes, -fotxn->len);
+		WT_STAT_FAST_CONN_ATOMIC_DECR(
+		    session, rec_split_stashed_objects);
+	}
+
+	/*
+	 * If there are enough free slots at the beginning of the list, shuffle
+	 * everything down.
+	 */
+	if (i > 100 &&
+	    (session->fotxn_cnt -= i) > 0) {
+		memmove(session->fotxn, session->fotxn + i,
+		    session->fotxn_cnt * sizeof(session->fotxn[0]));
+		memset(session->fotxn + session->fotxn_cnt, 0,
+		    i * sizeof(session->fotxn[0]));
+	}
+}
+
+/*
+ * __wt_session_fotxn_discard_all --
+ *	Discard all memory from a session's free-on-transaction generation
+ *	list.
+ */
+void
+__wt_session_fotxn_discard_all(
+    WT_SESSION_IMPL *session_safe, WT_SESSION_IMPL *session)
 {
 	WT_FOTXN *fotxn;
 	size_t i;
@@ -71,25 +119,10 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session_safe,
 	 * session is the WT_SESSION_IMPL we're cleaning up.
 	 */
 	for (i = 0, fotxn = session->fotxn;
-	    session->fotxn_cnt > 0 &&
-	    i < session->fotxn_size / sizeof(session->fotxn[0]);  ++i, ++fotxn)
-		if (fotxn->p != NULL && (connection_close ||
-		    __wt_txn_visible_all(session_safe, fotxn->txnid))) {
-			--session->fotxn_cnt;
+	    i < session->fotxn_cnt;
+	    ++i, ++fotxn)
+		if (fotxn->p != NULL)
+			__wt_free(session_safe, fotxn->p);
 
-			/*
-			 * It's a bad thing if another thread is in this memory
-			 * after we free it, make sure nothing good happens to
-			 * that thread.
-			 */
-			__wt_overwrite_and_free_len(
-			    session_safe, fotxn->p, fotxn->len);
-
-			WT_STAT_FAST_CONN_INCRV(
-			    session, rec_split_stashed_bytes, -fotxn->len);
-			WT_STAT_FAST_CONN_ATOMIC_DECR(
-			    session, rec_split_stashed_objects);
-		}
-	if (connection_close)
-		__wt_free(session_safe, session->fotxn);
+	__wt_free(session_safe, session->fotxn);
 }

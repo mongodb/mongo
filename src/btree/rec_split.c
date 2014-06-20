@@ -17,6 +17,32 @@ static u_int __split_deepen_per_child = 100;
 static u_int __split_deepen_split_child = 100;
 
 /*
+ * __safe_free --
+ *	Free a buffer if we can be sure no thread is accessing it, or schedule
+ *	it to be freed otherwise.
+ */
+static int
+__safe_free(
+    WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive, void *p, size_t s)
+{
+	WT_UNUSED(page);
+
+	/*
+	 * We have swapped something in a page: if we don't have exclusive
+	 * access, check whether there are other threads in the same tree.
+	 */
+	if (!exclusive && __wt_btree_exclusive(session, S2BT(session)))
+		exclusive = 1;
+
+	if (exclusive) {
+		__wt_free(session, p);
+		return (0);
+	}
+
+	return (__wt_session_fotxn_add(session, p, s));
+}
+
+/*
  * __split_should_deepen --
  *	Return if we should deepen the tree.
  */
@@ -363,32 +389,6 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	    parent_refp - pindex->index == pindex->entries - SPLIT_CORRECT_1);
 
 	/*
-	 * We can't free the previous parent's index, there may be threads using
-	 * it.  Add to the session's discard list, to be freed once we know no
-	 * threads can still be using it.
-	 *
-	 * This change affects error handling, we'd have to unwind this change
-	 * in order to revert to the previous parent page's state.
-	 */
-	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	parent_decr += size;
-	WT_ERR(__wt_session_fotxn_add(session, pindex, size));
-
-	/* Adjust the parent's memory footprint. */
-	if (parent_incr >= parent_decr) {
-		parent_incr -= parent_decr;
-		parent_decr = 0;
-	}
-	if (parent_decr >= parent_incr) {
-		parent_decr -= parent_incr;
-		parent_incr = 0;
-	}
-	if (parent_incr != 0)
-		__wt_cache_page_inmem_incr(session, parent, parent_incr);
-	if (parent_decr != 0)
-		__wt_cache_page_inmem_decr(session, parent, parent_decr);
-
-	/*
 	 * Update the parent's index; this is the update which splits the page,
 	 * making the change visible to threads descending the tree.  From now
 	 * on, we're committed to the split.  If any subsequent work fails, we
@@ -403,7 +403,6 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * needs to be paid.
 	 */
 	WT_INTL_INDEX_SET(parent, alloc_index);
-	alloc_index = NULL;
 	panic = 1;
 
 #ifdef HAVE_DIAGNOSTIC
@@ -419,9 +418,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * page to be updated, which we do here: walk the children and fix them
 	 * up.
 	 */
-	pindex = WT_INTL_INDEX_COPY(parent);
-	for (parent_refp = pindex->index,
-	    i = pindex->entries; i > 0; ++parent_refp, --i) {
+	for (parent_refp = alloc_index->index,
+	    i = alloc_index->entries; i > 0; ++parent_refp, --i) {
 		parent_ref = *parent_refp;
 		WT_ASSERT(session, parent_ref->home == parent);
 		if (parent_ref->state != WT_REF_MEM)
@@ -458,6 +456,33 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * threads spin on incorrect page references longer than necessary.
 	 */
 	WT_FULL_BARRIER();
+	alloc_index = NULL;
+
+	/*
+	 * We can't free the previous parent's index, there may be threads using
+	 * it.  Add to the session's discard list, to be freed once we know no
+	 * threads can still be using it.
+	 *
+	 * This change affects error handling, we'd have to unwind this change
+	 * in order to revert to the previous parent page's state.
+	 */
+	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
+	parent_decr += size;
+	WT_ERR(__safe_free(session, parent, 0, pindex, size));
+
+	/* Adjust the parent's memory footprint. */
+	if (parent_incr >= parent_decr) {
+		parent_incr -= parent_decr;
+		parent_decr = 0;
+	}
+	if (parent_decr >= parent_incr) {
+		parent_decr -= parent_incr;
+		parent_incr = 0;
+	}
+	if (parent_incr != 0)
+		__wt_cache_page_inmem_incr(session, parent, parent_incr);
+	if (parent_decr != 0)
+		__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
 	if (0) {
 err:		__wt_free_ref_index(session, parent, alloc_index, 1);
@@ -664,7 +689,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PAGE *parent, *child;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_PAGE_MODIFY *mod;
-	WT_REF **alloc_refp, *parent_ref, **ref_tmp;
+	WT_REF **alloc_refp, *parent_ref, ref_copy, **ref_tmp;
 	size_t parent_decr, parent_incr, size;
 	uint32_t i, j, parent_entries, result_entries, split_entries;
 	int complete, hazard, locked;
@@ -716,14 +741,15 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	locked = 1;
 
 	/*
-	 * We have exclusive access to the parent, and at this point, the child
-	 * prevents the parent from being evicted.  However, once we update the
-	 * parent's index, it will no longer refer to the child, and could
-	 * conceivably be evicted.  Get a hazard pointer on the parent now, so
-	 * that we can safely access it after updating the index.
+	 * We have exclusive access to split the parent, and at this point, the
+	 * child prevents the parent from being evicted.  However, once we
+	 * update the parent's index, it will no longer refer to the child, and
+	 * could conceivably be evicted.  Get a hazard pointer on the parent
+	 * now, so that we can safely access it after updating the index.
 	 */
 	if (!__wt_ref_is_root(parent_ref = parent->pg_intl_parent_ref)) {
 		WT_ERR(__wt_page_in(session, parent_ref, WT_READ_NO_GEN));
+		WT_ASSERT(session, parent_ref->page == parent);
 		hazard = 1;
 	}
 
@@ -810,14 +836,19 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	parent_decr += size;
-	WT_TRET(__wt_session_fotxn_add(session, pindex, size));
+	WT_TRET(__safe_free(session, parent, exclusive, pindex, size));
 	if (parent->type == WT_PAGE_ROW_INT &&
 	    (ikey = __wt_ref_key_instantiated(ref)) != NULL) {
 		size = sizeof(WT_IKEY) + ikey->size;
 		parent_decr += size;
-		WT_TRET(__wt_session_fotxn_add(session, ikey, size));
+		WT_TRET(__safe_free(session, parent, exclusive, ikey, size));
 	}
-	WT_TRET(__wt_session_fotxn_add(session, ref, sizeof(WT_REF)));
+	/*
+	 * Take a copy of the ref in case we can free it immediately: we still
+	 * need to discard the page.
+	 */
+	ref_copy = *ref;
+	WT_TRET(__safe_free(session, parent, exclusive, ref, sizeof(WT_REF)));
 	parent_decr += sizeof(WT_REF);
 
 	/* Adjust the parent's memory footprint. */
@@ -880,7 +911,7 @@ err:	if (locked)
 			 mod->write_gen = 0;
 			 __wt_cache_dirty_decr(session, child);
 		}
-		__wt_ref_out(session, ref);
+		__wt_ref_out(session, &ref_copy);
 	}
 
 	/*

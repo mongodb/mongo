@@ -171,7 +171,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 */
 	if ((s = conn->sessions) != NULL)
 		for (i = 0; i < conn->session_size; ++s, ++i)
-			__wt_session_fotxn_discard(session, s, 1);
+			__wt_session_fotxn_discard_all(session, s);
 
 	/*
 	 * The session's hazard pointer memory isn't discarded during normal
