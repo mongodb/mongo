@@ -80,6 +80,10 @@ namespace mongo {
             return NULL;
         };
 
+        virtual Transaction* getTransaction() {
+            return NULL;
+        }
+
     private:
         boost::scoped_ptr<RecoveryUnitNoop> _recoveryUnit;
     };
