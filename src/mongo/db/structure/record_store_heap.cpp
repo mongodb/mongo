@@ -155,21 +155,64 @@ namespace mongo {
 
         return StatusWith<DiskLoc>(loc);
     }
-    
+
     StatusWith<DiskLoc> HeapRecordStore::updateRecord(OperationContext* txn,
                                                       const DiskLoc& oldLocation,
                                                       const char* data,
                                                       int len,
                                                       int quotaMax,
                                                       UpdateMoveNotifier* notifier ) {
-        invariant(!"updateRecord not yet implemented");
+        Record* oldRecord = recordFor( oldLocation );
+        int oldLen = oldRecord->netLength();
+
+        // If the length of the new data is <= the length of the old data then just
+        // memcopy into the old space
+        if ( len <= oldLen) {
+            memcpy(oldRecord->data(), data, len);
+            _dataSize += len - oldLen;
+            return StatusWith<DiskLoc>(oldLocation);
+        }
+
+        if ( _isCapped ) {
+            return StatusWith<DiskLoc>( ErrorCodes::InternalError,
+                                        "failing update: objects in a capped ns cannot grow",
+                                        10003 );
+        }
+
+        // If the length of the new data exceeds the size of the old Record, we need to allocate
+        // a new Record, and delete the old one
+
+        const int lengthWithHeaders = len + Record::HeaderSize;
+        boost::shared_array<char> buf(new char[lengthWithHeaders]);
+        Record* rec = reinterpret_cast<Record*>(buf.get());
+        rec->lengthWithHeaders() = lengthWithHeaders;
+        memcpy(rec->data(), data, len);
+
+        _records[oldLocation] = buf;
+        _dataSize += len - oldLen;
+
+        cappedDeleteAsNeeded(txn);
+
+        return StatusWith<DiskLoc>(oldLocation);
     }
-    
+
     Status HeapRecordStore::updateWithDamages( OperationContext* txn,
                                                const DiskLoc& loc,
                                                const char* damangeSource,
                                                const mutablebson::DamageVector& damages ) {
-        invariant(!"updateRecord not yet implemented");
+        Record* rec = recordFor( loc );
+        char* root = rec->data();
+
+        // All updates were in place. Apply them via durability and writing pointer.
+        mutablebson::DamageVector::const_iterator where = damages.begin();
+        const mutablebson::DamageVector::const_iterator end = damages.end();
+        for( ; where != end; ++where ) {
+            const char* sourcePtr = damangeSource + where->sourceOffset;
+            char* targetPtr = root + where->targetOffset;
+            std::memcpy(targetPtr, sourcePtr, where->size);
+        }
+
+        return Status::OK();
     }
 
     RecordIterator* HeapRecordStore::getIterator(const DiskLoc& start,
@@ -221,8 +264,6 @@ namespace mongo {
                                      ValidateAdaptor* adaptor,
                                      ValidateResults* results,
                                      BSONObjBuilder* output) const {
-        // TODO put stuff in output
-
         results->valid = true;
         if (scanData && full) {
             for (Records::const_iterator it = _records.begin(); it != _records.end(); ++it) {
@@ -237,12 +278,14 @@ namespace mongo {
             }
         }
 
+        output->appendNumber( "nrecords", _records.size() );
+
         return Status::OK();
 
     }
     
     void HeapRecordStore::appendCustomStats( BSONObjBuilder* result, double scale ) const {
-        invariant(!"appendCustomStats not yet implemented");
+        result->append( "note", "HeapRecordStore has no cusom stats yet" );
     }
 
     Status HeapRecordStore::touch(OperationContext* txn, BSONObjBuilder* output) const {
