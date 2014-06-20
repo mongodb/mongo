@@ -861,7 +861,7 @@ __wt_btree_exclusive(WT_SESSION_IMPL *session, WT_BTREE *btree)
 	/* No lock is required because the session array is fixed size. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i)
-		if (s != session && s->active_btree == btree)
+		if (s->active_btree == btree)
 			return (0);
 	return (1);
 }
