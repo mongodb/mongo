@@ -239,6 +239,15 @@ namespace repl {
         return Status::OK();
     }
 
+    Status ReplicationCoordinatorImpl::processReplSetElect(const StringData& set,
+                                                           unsigned whoid,
+                                                           int cfgver,
+                                                           const OID& round,
+                                                           BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
     void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(
             const TopologyCoordinator::ReplicaSetConfig& newConfig) {
         invariant(getReplicationMode() == modeReplSet);

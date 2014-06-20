@@ -159,5 +159,12 @@ namespace repl {
         return Status::OK();
     }
 
+    Status ReplicationCoordinatorMock::processReplSetElect(const StringData& set,
+                                                           unsigned whoid,
+                                                           int cfgver,
+                                                           const OID& round,
+                                                           BSONObjBuilder* resultObj) {
+        return Status::OK();
+    }
 } // namespace repl
 } // namespace mongo

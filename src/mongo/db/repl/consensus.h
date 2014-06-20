@@ -80,7 +80,11 @@ namespace repl {
         bool aMajoritySeemsToBeUp() const;
         bool shouldRelinquish() const;
         void electSelf();
-        void electCmdReceived(BSONObj, BSONObjBuilder*);
+        void electCmdReceived(const StringData& set,
+                              unsigned whoid,
+                              int cfgver,
+                              const OID& round,
+                              BSONObjBuilder* result);
 
         OID getElectionId() const { return _electionId; }
         void setElectionId(OID oid) { _electionId = oid; }

@@ -269,6 +269,16 @@ namespace repl {
                                            const OpTime& opTime,
                                            BSONObjBuilder* resultObj) = 0;
 
+        /*
+         * Handles an incoming replSetElect command.
+         * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
+         */
+        virtual Status processReplSetElect(const StringData& set,
+                                           unsigned whoid,
+                                           int cfgver,
+                                           const OID& round,
+                                           BSONObjBuilder* resultObj) = 0;
+
     protected:
 
         ReplicationCoordinator();

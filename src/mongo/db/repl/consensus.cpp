@@ -28,6 +28,7 @@
 
 #include "mongo/db/repl/consensus.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/global_optime.h"
 #include "mongo/db/repl/multicmd.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
@@ -81,21 +82,29 @@ namespace repl {
         }
     private:
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( !check(errmsg, result) )
-                return false;
-            theReplSet->elect.electCmdReceived(cmdObj, &result);
-            return true;
+            DEV log() << "replSet received elect msg " << cmdObj.toString() << rsLog;
+            else LOG(2) << "replSet received elect msg " << cmdObj.toString() << rsLog;
+
+            std::string set = cmdObj["set"].String();
+            unsigned whoid = cmdObj["whoid"].Int();
+            int cfgver = cmdObj["cfgver"].Int();
+            OID round = cmdObj["round"].OID();
+
+            Status status = getGlobalReplicationCoordinator()->processReplSetElect(set,
+                                                                                   whoid,
+                                                                                   cfgver,
+                                                                                   round,
+                                                                                   &result);
+            return appendCommandStatus(result, status);
         }
     } cmdReplSetElect;
 
-    void Consensus::electCmdReceived(BSONObj cmd, BSONObjBuilder* _b) {
+    void Consensus::electCmdReceived(const StringData& set,
+                                     unsigned whoid,
+                                     int cfgver,
+                                     const OID& round,
+                                     BSONObjBuilder* _b) {
         BSONObjBuilder& b = *_b;
-        DEV log() << "replSet received elect msg " << cmd.toString() << rsLog;
-        else LOG(2) << "replSet received elect msg " << cmd.toString() << rsLog;
-        string set = cmd["set"].String();
-        unsigned whoid = cmd["whoid"].Int();
-        int cfgver = cmd["cfgver"].Int();
-        OID round = cmd["round"].OID();
         int myver = rs.config().version;
 
         const Member* primary = rs.box.getPrimary();

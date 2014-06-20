@@ -83,6 +83,14 @@ namespace repl {
          */
         void msgUpdateHBRecv(unsigned id, time_t newTime);
 
+        void electCmdReceived(const StringData& set,
+                              unsigned whoid,
+                              int cfgver,
+                              const OID& round,
+                              BSONObjBuilder* result) {
+            elect.electCmdReceived(set, whoid, cfgver, round, result);
+        }
+
         StateBox box;
 
         SyncSourceFeedback syncSourceFeedback;
@@ -274,8 +282,7 @@ namespace repl {
         void _getTargets(list<Target>&, int &configVersion);
         void getTargets(list<Target>&, int &configVersion);
         void startThreads();
-        friend class FeedbackThread;
-        friend class CmdReplSetElect;
+        friend class LegacyReplicationCoordinator;
         friend class Member;
         friend class Manager;
         friend class Consensus;

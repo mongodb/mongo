@@ -117,6 +117,12 @@ namespace repl {
                                            const OpTime& opTime,
                                            BSONObjBuilder* resultObj);
 
+        virtual Status processReplSetElect(const StringData& set,
+                                           unsigned whoid,
+                                           int cfgver,
+                                           const OID& round,
+                                           BSONObjBuilder* resultObj);
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions

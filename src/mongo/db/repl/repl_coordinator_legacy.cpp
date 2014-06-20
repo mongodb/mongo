@@ -757,6 +757,19 @@ namespace {
         return Status::OK();
     }
 
+    Status LegacyReplicationCoordinator::processReplSetElect(const StringData& set,
+                                                             unsigned whoid,
+                                                             int cfgver,
+                                                             const OID& round,
+                                                             BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+        theReplSet->electCmdReceived(set, whoid, cfgver, round, resultObj);
+        return Status::OK();
+    }
+
     void LegacyReplicationCoordinator::incrementRollbackID() {
         ++_rbid;
     }

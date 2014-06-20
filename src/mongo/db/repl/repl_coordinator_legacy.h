@@ -106,6 +106,12 @@ namespace repl {
                                            int cfgver,
                                            const OpTime& opTime,
                                            BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetElect(const StringData& set,
+                                           unsigned whoid,
+                                           int cfgver,
+                                           const OID& round,
+                                           BSONObjBuilder* resultObj);
     private:
         Status _stepDownHelper(bool force,
                                const Milliseconds& initialWaitTime,
