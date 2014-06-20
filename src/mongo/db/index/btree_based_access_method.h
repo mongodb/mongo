@@ -123,7 +123,6 @@ namespace mongo {
         virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) = 0;
 
         IndexCatalogEntry* _btreeState; // owned by IndexCatalogEntry
-        scoped_ptr<BtreeInterface> _btree; // owned by us
         const IndexDescriptor* _descriptor;
 
     private:

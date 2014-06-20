@@ -212,7 +212,7 @@ namespace mongo {
 
 
     Status BtreeBasedAccessMethod::touch( OperationContext* txn ) const {
-        return _btree->touch(txn);
+        return _newInterface->touch(txn);
     }
 
     DiskLoc BtreeBasedAccessMethod::findSingle(const BSONObj& key) const {
