@@ -1092,14 +1092,13 @@ namespace mongo {
         }
 
         ///////////////////////////////////////////
-        Lock::DBWrite writeLock(txn->lockState(), nsString.ns());
+        Lock::DBWrite writeLock(txn->lockState(), nsString.ns(), useExperimentalDocLocking);
         ///////////////////////////////////////////
 
         if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
             return;
 
-        Client::Context ctx( nsString.ns(),
-                             false /* don't check version */ );
+        Client::Context ctx(nsString.ns(), false /* don't check version */);
 
         try {
             UpdateResult res = executor.execute(txn, ctx.db());

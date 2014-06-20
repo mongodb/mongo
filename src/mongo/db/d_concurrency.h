@@ -170,7 +170,8 @@ namespace mongo {
 
             void lockTop();
             void lockNestable(Nestable db);
-            void lockOther(const StringData& db);
+            void lockOtherWrite(const StringData& db);
+            void lockOtherRead(const StringData& db);
             void lockDB(const std::string& ns);
             void unlockDB();
 
@@ -179,12 +180,13 @@ namespace mongo {
             void _relock();
 
         public:
-            DBWrite(LockState* lockState, const StringData& dbOrNs);
+            DBWrite(LockState* lockState, const StringData& dbOrNs, bool intentWrite = false);
             virtual ~DBWrite();
 
         private:
             bool _locked_w;
             bool _locked_W;
+            bool _isIntentWrite;
             WrapperForRWLock *_weLocked;
             const std::string _what;
             bool _nested;
@@ -248,4 +250,7 @@ namespace mongo {
         ~writelocktry();
         bool got() const { return _got; }
     };
+
+    // Defined in instance.cpp
+    extern bool useExperimentalDocLocking;
 }

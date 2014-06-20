@@ -37,6 +37,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/concurrency/lock_mgr.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
@@ -406,6 +407,8 @@ namespace mongo {
 
         // Broadcast the mutation so that query results stay correct.
         _cursorCache.invalidateDocument(loc, INVALIDATION_MUTATION);
+
+        ExclusiveResourceLock lk((size_t)txn->getCurOp()->opNum(), *(size_t*)&loc);
         return _recordStore->updateWithDamages( txn, loc, damangeSource, damages );
     }
 

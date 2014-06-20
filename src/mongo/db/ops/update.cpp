@@ -56,6 +56,7 @@
 namespace mongo {
 
     namespace mb = mutablebson;
+
     namespace {
 
         const char idFieldName[] = "_id";
@@ -624,7 +625,6 @@ namespace mongo {
             runner->saveState();
 
             if (inPlace && !driver->modsAffectIndices()) {
-
                 // If a set of modifiers were all no-ops, we are still 'in place', but there is
                 // no work to do, in which case we want to consider the object unchanged.
                 if (!damages.empty() ) {
@@ -636,8 +636,12 @@ namespace mongo {
                 newObj = oldObj;
             }
             else {
-
                 // The updates were not in place. Apply them through the file manager.
+
+                // XXX: With experimental document-level locking, we do not hold the sufficient
+                // locks, so this would cause corruption.
+                fassert(18516, !useExperimentalDocLocking);
+
                 newObj = doc.getObject();
                 uassert(17419,
                         str::stream() << "Resulting document after update is larger than "

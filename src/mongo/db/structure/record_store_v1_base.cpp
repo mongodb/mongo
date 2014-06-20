@@ -325,7 +325,7 @@ namespace mongo {
 
     Status RecordStoreV1Base::updateWithDamages( OperationContext* txn,
                                                  const DiskLoc& loc,
-                                                 const char* damangeSource,
+                                                 const char* damageSource,
                                                  const mutablebson::DamageVector& damages ) {
         _paddingFits( txn );
 
@@ -336,7 +336,7 @@ namespace mongo {
         mutablebson::DamageVector::const_iterator where = damages.begin();
         const mutablebson::DamageVector::const_iterator end = damages.end();
         for( ; where != end; ++where ) {
-            const char* sourcePtr = damangeSource + where->sourceOffset;
+            const char* sourcePtr = damageSource + where->sourceOffset;
             void* targetPtr = txn->recoveryUnit()->writingPtr(root + where->targetOffset, where->size);
             std::memcpy(targetPtr, sourcePtr, where->size);
         }
