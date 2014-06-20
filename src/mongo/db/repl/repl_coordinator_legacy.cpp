@@ -823,5 +823,44 @@ namespace {
         return theReplSet->forceSyncFrom(target, resultObj);
     }
 
+    Status LegacyReplicationCoordinator::processReplSetUpdatePosition(const BSONArray& updates,
+                                                                      BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        BSONForEach(elem, updates) {
+            BSONObj entry = elem.Obj();
+            OID id = entry["_id"].OID();
+            OpTime ot = entry["optime"]._opTime();
+            BSONObj config = entry["config"].Obj();
+            Status status = setLastOptime(id, ot, config);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+        return Status::OK();
+    }
+
+    Status LegacyReplicationCoordinator::processReplSetUpdatePositionHandshake(
+            const BSONObj& handshake,
+            BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if (!cc().gotHandshake(handshake)) {
+            return Status(ErrorCodes::NodeNotFound,
+                          "node could not be found in replica set config during handshake");
+        }
+
+        // if we aren't primary, pass the handshake along
+        if (!theReplSet->isPrimary()) {
+            theReplSet->syncSourceFeedback.forwardSlaveHandshake();
+        }
+        return Status::OK();
+    }
 } // namespace repl
 } // namespace mongo

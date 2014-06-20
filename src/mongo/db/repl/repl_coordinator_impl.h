@@ -132,6 +132,12 @@ namespace repl {
                                            const OID& round,
                                            BSONObjBuilder* resultObj);
 
+        virtual Status processReplSetUpdatePosition(const BSONArray& updates,
+                                                    BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
+                                                             BSONObjBuilder* resultObj);
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions
@@ -139,7 +145,6 @@ namespace repl {
 
         // Called by the TopologyCoordinator whenever the replica set configuration is updated
         void setCurrentReplicaSetConfig(const TopologyCoordinator::ReplicaSetConfig& newConfig);
-
 
     private:
 

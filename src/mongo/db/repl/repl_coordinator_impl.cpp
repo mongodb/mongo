@@ -277,5 +277,17 @@ namespace repl {
         _rsConfig = newConfig;
     }
 
+    Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const BSONArray& updates,
+                                                                    BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorImpl::processReplSetUpdatePositionHandshake(
+            const BSONObj& handshake,
+            BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
 } // namespace repl
 } // namespace mongo

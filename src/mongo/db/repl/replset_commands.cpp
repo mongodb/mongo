@@ -328,34 +328,22 @@ namespace repl {
             if (cmdObj.hasField("handshake")) {
                 // we have received a handshake, not an update message
                 // handshakes are done here to ensure the receiving end supports the update command
-                if (!cc().gotHandshake(cmdObj["handshake"].embeddedObject())) {
-                    errmsg = "node could not be found in replica set config during handshake";
-                    return false;
-                }
-                // if we aren't primary, pass the handshake along
-                if (!theReplSet->isPrimary()) {
-                    theReplSet->syncSourceFeedback.forwardSlaveHandshake();
-                }
-                return true;
+
+                return appendCommandStatus(
+                        result,
+                        getGlobalReplicationCoordinator()->processReplSetUpdatePositionHandshake(
+                                cmdObj["handshake"].embeddedObject(),
+                                &result));
             }
 
             uassert(16888, "optimes field should be an array with an object for each secondary",
                     cmdObj["optimes"].type() == Array);
-            BSONArray optimes = BSONArray(cmdObj["optimes"].Obj());
-            BSONForEach(elem, optimes) {
-                BSONObj entry = elem.Obj();
-                OID id = entry["_id"].OID();
-                OpTime ot = entry["optime"]._opTime();
-                BSONObj config = entry["config"].Obj();
-                Status status = getGlobalReplicationCoordinator()->setLastOptime(id, ot, config);
-                if (!status.isOK()) {
-                    errmsg = str::stream() << "could not update position upstream; will retry"
-                                           << causedBy(status);
-                    result.append("code", status.code());
-                    return false;
-                }
-            }
-            return true;
+
+            return appendCommandStatus(
+                    result,
+                    getGlobalReplicationCoordinator()->processReplSetUpdatePosition(
+                            BSONArray(cmdObj["optimes"].Obj()),
+                            &result));
         }
     } cmdReplSetUpdatePosition;
 

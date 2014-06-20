@@ -186,6 +186,20 @@ namespace repl {
                                                            int cfgver,
                                                            const OID& round,
                                                            BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorMock::processReplSetUpdatePosition(const BSONArray& updates,
+                                                                    BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorMock::processReplSetUpdatePositionHandshake(
+            const BSONObj& handshake,
+            BSONObjBuilder* resultObj) {
+        // TODO
         return Status::OK();
     }
 } // namespace repl

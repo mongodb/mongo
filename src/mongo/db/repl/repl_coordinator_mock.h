@@ -125,6 +125,13 @@ namespace repl {
                                            int cfgver,
                                            const OID& round,
                                            BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetUpdatePosition(const BSONArray& updates,
+                                                    BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
+                                                             BSONObjBuilder* resultObj);
+
     };
 
 } // namespace repl

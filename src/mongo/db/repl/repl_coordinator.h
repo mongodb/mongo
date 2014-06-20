@@ -308,6 +308,23 @@ namespace repl {
                                            const OID& round,
                                            BSONObjBuilder* resultObj) = 0;
 
+        /**
+         * Handles an incoming replSetPositionUpdate command, updating each nodes oplog progress.
+         * returns Status::OK() if the all updates are processed correctly, ErrorCodes::NodeNotFound
+         * if any updating node cannot be found in the config, or any of the normal replset
+         * command ErrorCodes.
+         */
+        virtual Status processReplSetUpdatePosition(const BSONArray& updates,
+                                                    BSONObjBuilder* resultObj) = 0;
+
+        /**
+         * Handles an incoming replSetPositionUpdate command that contains a handshake.
+         * returns Status::OK() if the handshake processes properly, ErrorCodes::NodeNotFound
+         * if the handshaking node cannot be found in the config, or any of the normal replset
+         * command ErrorCodes.
+         */
+        virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
+                                                             BSONObjBuilder* resultObj) = 0;
     protected:
 
         ReplicationCoordinator();
