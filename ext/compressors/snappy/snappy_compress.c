@@ -195,6 +195,18 @@ wt_snappy_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
+	return snappy_extension_init(connection, config);
+}
+
+/*
+ * snappy_extension_init --
+ *	WiredTiger snappy compression extension - called directly when
+ *	Snappy support is built in, or via wiredtiger_extension_init when
+ *	snappy support is included via extension loading.
+ */
+int
+snappy_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+{
 	SNAPPY_COMPRESSOR *snappy_compressor;
 
 	(void)config;				/* Unused parameters */

@@ -128,6 +128,23 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 }
 
 /*
+ * __conn_load_default_extensions --
+ *	Load extensions that are enabled via --with-builtins
+ */
+static int
+__conn_load_default_extensions(WT_CONNECTION_IMPL *conn)
+{
+	WT_UNUSED(conn);
+#ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
+	WT_RET(snappy_extension_init(&conn->iface, NULL));
+#endif
+#ifdef HAVE_BUILTIN_EXTENSION_ZLIB
+	WT_RET(zlib_extension_init(&conn->iface, NULL));
+#endif
+	return (0);
+}
+
+/*
  * __conn_load_extension --
  *	WT_CONNECTION->load_extension method.
  */
@@ -202,6 +219,8 @@ __conn_load_extensions(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 
 	conn = S2C(session);
+
+	WT_ERR(__conn_load_default_extensions(conn));
 
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
 	WT_ERR(__wt_config_subinit(session, &subconfig, &cval));

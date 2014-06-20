@@ -31,10 +31,8 @@ builtin_list=`echo "$with_builtins"|tr -s , ' '`
 for builtin_i in $builtin_list; do
 	case "$builtin_i" in
 	snappy)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_SNAPPY)
-		LIBBUILTINSNAPPY=-lwiredtiger_snappy
 		wt_cv_with_builtin_extension_snappy=yes;;
 	zlib)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_ZLIB)
-		LIBBUILTINZLIB=-lwiredtiger_zlib
 		wt_cv_with_builtin_extension_zlib=yes;;
 	*)	AC_MSG_ERROR([Unknown builtin extension "$builtin_i"]);;
 	esac
@@ -115,7 +113,11 @@ no)	if test "$wt_cv_with_builtin_extension_snappy" = "yes"; then
 		wt_cv_enable_snappy=no
 	fi
 	;;
-*)	wt_cv_enable_snappy=yes;;
+*)	if test "$wt_cv_with_builtin_extension_snappy" = "yes"; then
+		AC_MSG_ERROR(
+		   [Only one of --enable-snappy --with-builtins=snappy allowed])
+	fi
+	wt_cv_enable_snappy=yes;;
 esac
 AC_MSG_RESULT($wt_cv_enable_snappy)
 if test "$wt_cv_enable_snappy" = "yes"; then
@@ -168,7 +170,11 @@ no)	if test "$wt_cv_with_builtin_extension_zlib" = "yes"; then
 		wt_cv_enable_zlib=no
 	fi
 	;;
-*)	wt_cv_enable_zlib=yes;;
+*)	if test "$wt_cv_with_builtin_extension_zlib" = "yes"; then
+		AC_MSG_ERROR(
+		   [Only one of --enable-zlib --with-builtins=zlib allowed])
+	fi
+	wt_cv_enable_zlib=yes;;
 esac
 AC_MSG_RESULT($wt_cv_enable_zlib)
 if test "$wt_cv_enable_zlib" = "yes"; then

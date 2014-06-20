@@ -374,7 +374,21 @@ zlib_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
  *	WiredTiger zlib compression extension.
  */
 int
-wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+wiredtiger_extension_init(
+    WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+{
+	return (zlib_extension_init(connection, config));
+}
+
+/*
+ * zlib_extension_init --
+ *	WiredTiger zlib compression extension - called directly when zlib
+ *	support is built in, or via wiredtiger_extension_init when zlib
+ *	support is included via extension loading.
+ */
+int
+zlib_extension_init(
+    WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	int ret;
 
