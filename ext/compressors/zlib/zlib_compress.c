@@ -34,6 +34,12 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
+/*
+ * We need to include the configuration file to detect whether this extension
+ * is being built into the WiredTiger library.
+ */
+#include "wiredtiger_config.h"
+
 /* Local compressor structure. */
 typedef struct {
 	WT_COMPRESSOR compressor;		/* Must come first */
@@ -393,6 +399,11 @@ zlib_extension_init(
 }
 
 /*
+ * We have to remove this symbol when building as a builtin extension otherwise
+ * it will conflict with other builtin libraries.
+ */
+#ifndef	HAVE_BUILTIN_EXTENSION_SNAPPY
+/*
  * wiredtiger_extension_init --
  *	WiredTiger zlib compression extension.
  */
@@ -402,3 +413,4 @@ wiredtiger_extension_init(
 {
 	return (zlib_extension_init(connection, config));
 }
+#endif
