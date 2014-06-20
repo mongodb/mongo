@@ -32,14 +32,6 @@ from buildscripts import moduleconfig
 import libdeps
 
 EnsureSConsVersion( 1, 1, 0 )
-if "uname" in dir(os):
-    scons_data_dir = ".scons/%s/%s" % ( os.uname()[0] , os.getenv( "HOST" , "nohost" ) )
-else:
-    scons_data_dir = ".scons/%s/" % os.getenv( "HOST" , "nohost" )
-SConsignFile( scons_data_dir + "/sconsign" )
-
-DEFAULT_INSTALL_DIR = "/usr/local"
-
 
 def findSettingsSetup():
     sys.path.append( "." )
@@ -140,8 +132,11 @@ def using_system_version_of_cxx_libraries():
     return True in [use_system_version_of_library(x) for x in cxx_library_names]
 
 def get_variant_dir():
+
+    build_dir = get_option('build-dir').rstrip('/')
+
     if has_option('variant-dir'):
-        return "#build/" + get_option('variant-dir') 
+        return (build_dir + '/' + get_option('variant-dir')).rstrip('/')
 
     substitute = lambda x: re.sub( "[:,\\\\/]" , "_" , x )
 
@@ -170,10 +165,10 @@ def get_variant_dir():
         extras += ["branch_" + substitute( utils.getGitBranch() )]
 
     if has_option('cache'):
-        s = "#build/cached/"
+        s = "cached"
         s += "/".join(extras) + "/"
     else:
-        s = "#build/${PYSYSPLATFORM}/"
+        s = "${PYSYSPLATFORM}/"
         a += extras
 
         if len(a) > 0:
@@ -182,19 +177,20 @@ def get_variant_dir():
         else:
             s += "normal/"
 
-    return s
+    return (build_dir + '/' + s).rstrip('/')
 
 # build output
 add_option( "mute" , "do not display commandlines for compiling and linking, to reduce screen noise", 0, False )
 
 # installation/packaging
-add_option( "prefix" , "installation prefix" , 1 , False, default=DEFAULT_INSTALL_DIR )
+add_option( "prefix" , "installation prefix" , 1 , False, default='$BUILD_ROOT/install' )
 add_option( "distname" , "dist name (0.8.0)" , 1 , False )
 add_option( "distmod", "additional piece for full dist name" , 1 , False )
 add_option( "distarch", "override the architecture name in dist output" , 1 , False )
 add_option( "nostrip", "do not strip installed binaries" , 0 , False )
 add_option( "extra-variant-dirs", "extra variant dir components, separated by commas", 1, False)
 add_option( "add-branch-to-variant-dir", "add current git branch to the variant dir", 0, False )
+add_option( "build-dir", "build output directory", 1, False, default='#build')
 add_option( "variant-dir", "override variant subdirectory", 1, False )
 
 # linking options
@@ -337,7 +333,7 @@ add_option('cache',
 
 add_option('cache-dir',
            "Specify the directory to use for caching objects if --cache is in use",
-           1, False, default="#build/cached/.cache")
+           1, False, default="$BUILD_ROOT/scons/cache")
 
 # don't run configure if user calls --help
 if GetOption('help'):
@@ -345,7 +341,30 @@ if GetOption('help'):
 
 # --- environment setup ---
 
-variantDir = get_variant_dir()
+# If the user isn't using the # to indicate top-of-tree or $ to expand a variable, forbid
+# relative paths. Relative paths don't really work as expected, because they end up relative to
+# the top level SConstruct, not the invokers CWD. We could in theory fix this with
+# GetLaunchDir, but that seems a step too far.
+buildDir = get_option('build-dir').rstrip('/')
+if buildDir[0] not in ['$', '#']:
+    if not os.path.isabs(buildDir):
+        print("Do not use relative paths with --build-dir")
+        Exit(1)
+
+cacheDir = get_option('cache-dir').rstrip('/')
+if cacheDir[0] not in ['$', '#']:
+    if not os.path.isabs(cachdDIr):
+        print("Do not use relative paths with --cache-dir")
+        Exit(1)
+
+installDir = get_option('prefix').rstrip('/')
+if installDir[0] not in ['$', '#']:
+    if not os.path.isabs(installDir):
+        print("Do not use relative paths with --prefix")
+        Exit(1)
+
+sconsDataDir = Dir(buildDir).Dir('scons')
+SConsignFile(str(sconsDataDir.File('sconsign')))
 
 def printLocalInfo():
     import sys, SCons
@@ -407,7 +426,13 @@ v8suffix = '' if v8version == '3.12' else '-' + v8version
 
 usePCH = has_option( "usePCH" )
 
-env = Environment( BUILD_DIR=variantDir,
+# Yes, BUILD_ROOT vs BUILD_DIR is confusing. Ideally, BUILD_DIR would actually be called
+# VARIANT_DIR, and at some point we should probably do that renaming. Until we do though, we
+# also need an Environment variable for the argument to --build-dir, which is the parent of all
+# variant dirs. For now, we call that BUILD_ROOT. If and when we s/BUILD_DIR/VARIANT_DIR/g,
+# then also s/BUILD_ROOT/BUILD_DIR/g.
+env = Environment( BUILD_ROOT=buildDir,
+                   BUILD_DIR=get_variant_dir(),
                    DIST_ARCHIVE_SUFFIX='.tgz',
                    EXTRAPATH=get_option("extrapath"),
                    MODULE_BANNERS=[],
@@ -419,12 +444,14 @@ env = Environment( BUILD_DIR=variantDir,
                    TARGET_ARCH=msarch ,
                    tools=["default", "gch", "jsheader", "mergelib", "unittest"],
                    UNITTEST_ALIAS='unittests',
-                   UNITTEST_LIST='#build/unittests.txt',
+                   # TODO: Move unittests.txt to $BUILD_DIR, but that requires
+                   # changes to MCI.
+                   UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
                    PYSYSPLATFORM=os.sys.platform,
-
                    PCRE_VERSION='8.30',
-                   CONFIGUREDIR = '#' + scons_data_dir + '/sconf_temp',
-                   CONFIGURELOG = '#' + scons_data_dir + '/config.log'
+                   CONFIGUREDIR=sconsDataDir.Dir('sconf_temp'),
+                   CONFIGURELOG=sconsDataDir.File('config.log'),
+                   INSTALL_DIR=installDir,
                    )
 
 if has_option("cache"):
@@ -435,7 +462,7 @@ if has_option("cache"):
     if has_option("gcov"):
         print("Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084")
         Exit(1)
-    env.CacheDir(str(env.Dir(get_option('cache-dir'))))
+    env.CacheDir(str(env.Dir(cacheDir)))
 
 # This could be 'if solaris', but unfortuantely that variable hasn't been set yet.
 if "sunos5" == os.sys.platform:
@@ -588,14 +615,10 @@ if force64:
 
 env['PROCESSOR_ARCHITECTURE'] = processor
 
-installDir = DEFAULT_INSTALL_DIR
 nixLibPrefix = "lib"
 
 dontReplacePackage = False
 isBuildingLatest = False
-
-if has_option( "prefix" ):
-    installDir = GetOption( "prefix" )
 
 def filterExists(paths):
     return filter(os.path.exists, paths)
@@ -1844,7 +1867,6 @@ env['SERVER_DIST_BASENAME'] = 'mongodb-%s-%s' % (getSystemInstallName(), distNam
 distFile = "${SERVER_ARCHIVE}"
 
 env['NIX_LIB_DIR'] = nixLibPrefix
-env['INSTALL_DIR'] = installDir
 
 #  ---- CONVENIENCE ----
 
