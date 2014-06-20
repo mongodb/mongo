@@ -26,7 +26,7 @@ AC_ARG_WITH(builtins,
 
 # Validate and setup each builtin extension library.
 builtin_list=`echo "$with_builtins"|tr -s , ' '`
-for builtin_i in "$builtin_list"; do
+for builtin_i in $builtin_list; do
 	case "$builtin_i" in
 	snappy)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_SNAPPY)
 		wt_cv_with_builtin_extension_snappy=yes;;
