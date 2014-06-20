@@ -41,6 +41,9 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 		}
 	++session->fotxn_cnt;
 
+	WT_STAT_FAST_CONN_INCRV(session, rec_split_stashed_bytes, len);
+	WT_STAT_FAST_CONN_ATOMIC_INCR(session, rec_split_stashed_objects);
+
 	/* See if we can free any previous entries. */
 	if (session->fotxn_cnt > 1)
 		__wt_session_fotxn_discard(session, session, 0);
@@ -81,6 +84,11 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session_safe,
 			 */
 			__wt_overwrite_and_free_len(
 			    session_safe, fotxn->p, fotxn->len);
+
+			WT_STAT_FAST_CONN_INCRV(
+			    session, rec_split_stashed_bytes, -fotxn->len);
+			WT_STAT_FAST_CONN_ATOMIC_DECR(
+			    session, rec_split_stashed_objects);
 		}
 	if (connection_close)
 		__wt_free(session_safe, session->fotxn);

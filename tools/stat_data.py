@@ -9,6 +9,8 @@ no_scale_per_second_list = [
     'cache: pages currently held in the cache',
     'files currently open',
     'log: total log buffer size',
+    'split bytes awaiting free',
+    'split objects awaiting free',
     'open cursor count',
     'transaction checkpoint currently running',
     'block manager: file allocation unit size',
