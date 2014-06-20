@@ -65,5 +65,5 @@ if HAVE_BUILTIN_EXTENSION_SNAPPY
 libwiredtiger_la_LIBADD += ext/compressors/snappy/libwiredtiger_snappy.la
 endif
 if HAVE_BUILTIN_EXTENSION_ZLIB
-libwiredtiger_la_LIBADD += ext/compressors/snappy/libwiredtiger_zlib.la
+libwiredtiger_la_LIBADD += ext/compressors/zlib/libwiredtiger_zlib.la
 endif

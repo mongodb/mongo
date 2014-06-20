@@ -369,16 +369,7 @@ zlib_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
 	    connection, name, &zlib_compressor->compressor, NULL));
 }
 
-/*
- * wiredtiger_extension_init --
- *	WiredTiger zlib compression extension.
- */
-int
-wiredtiger_extension_init(
-    WT_CONNECTION *connection, WT_CONFIG_ARG *config)
-{
-	return (zlib_extension_init(connection, config));
-}
+extern int zlib_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 
 /*
  * zlib_extension_init --
@@ -399,4 +390,15 @@ zlib_extension_init(
 	if ((ret = zlib_add_compressor(connection, 0, "zlib-noraw")) != 0)
 		return (ret);
 	return (0);
+}
+
+/*
+ * wiredtiger_extension_init --
+ *	WiredTiger zlib compression extension.
+ */
+int
+wiredtiger_extension_init(
+    WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+{
+	return (zlib_extension_init(connection, config));
 }

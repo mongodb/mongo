@@ -24,11 +24,9 @@ AC_ARG_WITH(builtins,
 	    [with_builtins=$withval],
 	    [with_builtins=])
 
-# Convert to space separated list
-builtin_list=`echo "$with_builtins"|tr -s , ' '`
-
 # Validate and setup each builtin extension library.
-for builtin_i in $builtin_list; do
+save_IFS="$IFS" ; IFS=","
+for builtin_i in $with_builtins; do
 	case "$builtin_i" in
 	snappy)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_SNAPPY)
 		wt_cv_with_builtin_extension_snappy=yes;;
@@ -37,6 +35,7 @@ for builtin_i in $builtin_list; do
 	*)	AC_MSG_ERROR([Unknown builtin extension "$builtin_i"]);;
 	esac
 done
+IFS="$save_IFS"
 AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_SNAPPY],
     [test $wt_cv_with_builtin_extension_snappy = yes])
 AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_ZLIB],
