@@ -9,19 +9,19 @@ noinst_PROGRAMS = leveldb_test
 # subdirectory, so we don't interfere with other LevelDB installs.
 leveldbincludedir = $(includedir)/wiredtiger/leveldb
 leveldbinclude_HEADERS = \
-	 include/cache.h \
-	 include/c.h \
-	 include/comparator.h\
-	 include/db.h \
-	 include/env.h \
-	 include/filter_policy.h \
-	 include/iterator.h \
-	 include/options.h \
-	 include/slice.h \
-	 include/status.h \
-	 include/table_builder.h \
-	 include/table.h \
-	 include/write_batch.h
+	 include/leveldb/cache.h \
+	 include/leveldb/c.h \
+	 include/leveldb/comparator.h\
+	 include/leveldb/db.h \
+	 include/leveldb/env.h \
+	 include/leveldb/filter_policy.h \
+	 include/leveldb/iterator.h \
+	 include/leveldb/options.h \
+	 include/leveldb/slice.h \
+	 include/leveldb/status.h \
+	 include/leveldb/table_builder.h \
+	 include/leveldb/table.h \
+	 include/leveldb/write_batch.h
 
 libwiredtiger_leveldb_la_LDFLAGS = -release @VERSION@
 libwiredtiger_leveldb_la_SOURCES = \
