@@ -3,36 +3,36 @@
 #include "wt_internal.h"
 
 static const WT_CONFIG_CHECK confchk_colgroup_meta[] = {
-	{ "columns", "list", NULL, NULL},
-	{ "source", "string", NULL, NULL},
-	{ "type", "string", NULL, NULL},
+	{ "columns", "list", NULL, NULL },
+	{ "source", "string", NULL, NULL },
+	{ "type", "string", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_connection_async_new_op[] = {
-	{ "append", "boolean", NULL, NULL},
-	{ "overwrite", "boolean", NULL, NULL},
-	{ "raw", "boolean", NULL, NULL},
-	{ "timeout", "int", NULL, NULL},
+	{ "append", "boolean", NULL, NULL },
+	{ "overwrite", "boolean", NULL, NULL },
+	{ "raw", "boolean", NULL, NULL },
+	{ "timeout", "int", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_connection_close[] = {
-	{ "leak_memory", "boolean", NULL, NULL},
+	{ "leak_memory", "boolean", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_connection_load_extension[] = {
-	{ "config", "string", NULL, NULL},
-	{ "entry", "string", NULL, NULL},
-	{ "terminate", "string", NULL, NULL},
+	{ "config", "string", NULL, NULL },
+	{ "entry", "string", NULL, NULL },
+	{ "terminate", "string", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_connection_open_session[] = {
 	{ "isolation", "string",
 	    "choices=[\"read-uncommitted\",\"read-committed\",\"snapshot\"]",
-	    NULL},
+	    NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -66,97 +66,98 @@ static const WT_CONFIG_CHECK confchk_statistics_log_subconfigs[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
-	{ "async", "category", NULL, confchk_async_subconfigs},
-	{ "cache_size", "int", "min=1MB,max=10TB", NULL},
-	{ "checkpoint", "category", NULL, confchk_checkpoint_subconfigs}
-	    ,
-	{ "error_prefix", "string", NULL, NULL},
-	{ "eviction_dirty_target", "int", "min=10,max=99", NULL},
-	{ "eviction_target", "int", "min=10,max=99", NULL},
-	{ "eviction_trigger", "int", "min=10,max=99", NULL},
-	{ "eviction_workers", "int", "min=0,max=20", NULL},
+	{ "async", "category", NULL, confchk_async_subconfigs },
+	{ "cache_size", "int", "min=1MB,max=10TB", NULL },
+	{ "checkpoint", "category", NULL,
+	     confchk_checkpoint_subconfigs },
+	{ "error_prefix", "string", NULL, NULL },
+	{ "eviction_dirty_target", "int", "min=10,max=99", NULL },
+	{ "eviction_target", "int", "min=10,max=99", NULL },
+	{ "eviction_trigger", "int", "min=10,max=99", NULL },
+	{ "eviction_workers", "int", "min=0,max=20", NULL },
 	{ "shared_cache", "category", NULL,
-	     confchk_shared_cache_subconfigs},
+	     confchk_shared_cache_subconfigs },
 	{ "statistics", "list",
 	    "choices=[\"all\",\"fast\",\"none\",\"clear\"]",
-	    NULL},
+	    NULL },
 	{ "statistics_log", "category", NULL,
-	     confchk_statistics_log_subconfigs},
+	     confchk_statistics_log_subconfigs },
 	{ "verbose", "list",
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
 	    ",\"evictserver\",\"fileops\",\"log\",\"lsm\",\"metadata\","
 	    "\"mutex\",\"overflow\",\"read\",\"readserver\",\"reconcile\","
 	    "\"recovery\",\"salvage\",\"shared_cache\",\"split\",\"verify\","
 	    "\"version\",\"write\"]",
-	    NULL},
+	    NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_file_meta[] = {
-	{ "allocation_size", "int", "min=512B,max=128MB", NULL},
+	{ "allocation_size", "int", "min=512B,max=128MB", NULL },
 	{ "block_allocation", "string",
 	    "choices=[\"first\",\"best\"]",
-	    NULL},
-	{ "block_compressor", "string", NULL, NULL},
-	{ "cache_resident", "boolean", NULL, NULL},
-	{ "checkpoint", "string", NULL, NULL},
-	{ "checkpoint_lsn", "string", NULL, NULL},
+	    NULL },
+	{ "block_compressor", "string", NULL, NULL },
+	{ "cache_resident", "boolean", NULL, NULL },
+	{ "checkpoint", "string", NULL, NULL },
+	{ "checkpoint_lsn", "string", NULL, NULL },
 	{ "checksum", "string",
 	    "choices=[\"on\",\"off\",\"uncompressed\"]",
-	    NULL},
-	{ "collator", "string", NULL, NULL},
-	{ "columns", "list", NULL, NULL},
-	{ "dictionary", "int", "min=0", NULL},
-	{ "format", "string", "choices=[\"btree\"]", NULL},
-	{ "huffman_key", "string", NULL, NULL},
-	{ "huffman_value", "string", NULL, NULL},
-	{ "id", "string", NULL, NULL},
-	{ "internal_item_max", "int", "min=0", NULL},
-	{ "internal_key_truncate", "boolean", NULL, NULL},
-	{ "internal_page_max", "int", "min=512B,max=512MB", NULL},
-	{ "key_format", "format", NULL, NULL},
-	{ "key_gap", "int", "min=0", NULL},
-	{ "leaf_item_max", "int", "min=0", NULL},
-	{ "leaf_page_max", "int", "min=512B,max=512MB", NULL},
-	{ "memory_page_max", "int", "min=512B,max=10TB", NULL},
-	{ "os_cache_dirty_max", "int", "min=0", NULL},
-	{ "os_cache_max", "int", "min=0", NULL},
-	{ "prefix_compression", "boolean", NULL, NULL},
-	{ "prefix_compression_min", "int", "min=0", NULL},
-	{ "split_pct", "int", "min=25,max=100", NULL},
-	{ "value_format", "format", NULL, NULL},
-	{ "version", "string", NULL, NULL},
+	    NULL },
+	{ "collator", "string", NULL, NULL },
+	{ "columns", "list", NULL, NULL },
+	{ "dictionary", "int", "min=0", NULL },
+	{ "format", "string", "choices=[\"btree\"]", NULL },
+	{ "huffman_key", "string", NULL, NULL },
+	{ "huffman_value", "string", NULL, NULL },
+	{ "id", "string", NULL, NULL },
+	{ "internal_item_max", "int", "min=0", NULL },
+	{ "internal_key_truncate", "boolean", NULL, NULL },
+	{ "internal_page_max", "int", "min=512B,max=512MB", NULL },
+	{ "key_format", "format", NULL, NULL },
+	{ "key_gap", "int", "min=0", NULL },
+	{ "leaf_item_max", "int", "min=0", NULL },
+	{ "leaf_page_max", "int", "min=512B,max=512MB", NULL },
+	{ "memory_page_max", "int", "min=512B,max=10TB", NULL },
+	{ "os_cache_dirty_max", "int", "min=0", NULL },
+	{ "os_cache_max", "int", "min=0", NULL },
+	{ "prefix_compression", "boolean", NULL, NULL },
+	{ "prefix_compression_min", "int", "min=0", NULL },
+	{ "split_pct", "int", "min=25,max=100", NULL },
+	{ "value_format", "format", NULL, NULL },
+	{ "version", "string", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_index_meta[] = {
-	{ "columns", "list", NULL, NULL},
-	{ "key_format", "format", NULL, NULL},
-	{ "source", "string", NULL, NULL},
-	{ "type", "string", NULL, NULL},
-	{ "value_format", "format", NULL, NULL},
+	{ "columns", "list", NULL, NULL },
+	{ "key_format", "format", NULL, NULL },
+	{ "source", "string", NULL, NULL },
+	{ "type", "string", NULL, NULL },
+	{ "value_format", "format", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_session_begin_transaction[] = {
 	{ "isolation", "string",
 	    "choices=[\"read-uncommitted\",\"read-committed\",\"snapshot\"]",
-	    NULL},
-	{ "name", "string", NULL, NULL},
-	{ "priority", "int", "min=-100,max=100", NULL},
+	    NULL },
+	{ "name", "string", NULL, NULL },
+	{ "priority", "int", "min=-100,max=100", NULL },
+	{ "sync", "boolean", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_session_checkpoint[] = {
-	{ "drop", "list", NULL, NULL},
-	{ "force", "boolean", NULL, NULL},
-	{ "name", "string", NULL, NULL},
-	{ "target", "list", NULL, NULL},
+	{ "drop", "list", NULL, NULL },
+	{ "force", "boolean", NULL, NULL },
+	{ "name", "string", NULL, NULL },
+	{ "target", "list", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_session_compact[] = {
-	{ "timeout", "int", NULL, NULL},
+	{ "timeout", "int", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -176,92 +177,92 @@ static const WT_CONFIG_CHECK confchk_lsm_subconfigs[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_session_create[] = {
-	{ "allocation_size", "int", "min=512B,max=128MB", NULL},
+	{ "allocation_size", "int", "min=512B,max=128MB", NULL },
 	{ "block_allocation", "string",
 	    "choices=[\"first\",\"best\"]",
-	    NULL},
-	{ "block_compressor", "string", NULL, NULL},
-	{ "cache_resident", "boolean", NULL, NULL},
+	    NULL },
+	{ "block_compressor", "string", NULL, NULL },
+	{ "cache_resident", "boolean", NULL, NULL },
 	{ "checksum", "string",
 	    "choices=[\"on\",\"off\",\"uncompressed\"]",
-	    NULL},
-	{ "colgroups", "list", NULL, NULL},
-	{ "collator", "string", NULL, NULL},
-	{ "columns", "list", NULL, NULL},
-	{ "dictionary", "int", "min=0", NULL},
-	{ "exclusive", "boolean", NULL, NULL},
-	{ "format", "string", "choices=[\"btree\"]", NULL},
-	{ "huffman_key", "string", NULL, NULL},
-	{ "huffman_value", "string", NULL, NULL},
-	{ "internal_item_max", "int", "min=0", NULL},
-	{ "internal_key_truncate", "boolean", NULL, NULL},
-	{ "internal_page_max", "int", "min=512B,max=512MB", NULL},
-	{ "key_format", "format", NULL, NULL},
-	{ "key_gap", "int", "min=0", NULL},
-	{ "leaf_item_max", "int", "min=0", NULL},
-	{ "leaf_page_max", "int", "min=512B,max=512MB", NULL},
-	{ "lsm", "category", NULL, confchk_lsm_subconfigs},
-	{ "memory_page_max", "int", "min=512B,max=10TB", NULL},
-	{ "os_cache_dirty_max", "int", "min=0", NULL},
-	{ "os_cache_max", "int", "min=0", NULL},
-	{ "prefix_compression", "boolean", NULL, NULL},
-	{ "prefix_compression_min", "int", "min=0", NULL},
-	{ "source", "string", NULL, NULL},
-	{ "split_pct", "int", "min=25,max=100", NULL},
-	{ "type", "string", NULL, NULL},
-	{ "value_format", "format", NULL, NULL},
+	    NULL },
+	{ "colgroups", "list", NULL, NULL },
+	{ "collator", "string", NULL, NULL },
+	{ "columns", "list", NULL, NULL },
+	{ "dictionary", "int", "min=0", NULL },
+	{ "exclusive", "boolean", NULL, NULL },
+	{ "format", "string", "choices=[\"btree\"]", NULL },
+	{ "huffman_key", "string", NULL, NULL },
+	{ "huffman_value", "string", NULL, NULL },
+	{ "internal_item_max", "int", "min=0", NULL },
+	{ "internal_key_truncate", "boolean", NULL, NULL },
+	{ "internal_page_max", "int", "min=512B,max=512MB", NULL },
+	{ "key_format", "format", NULL, NULL },
+	{ "key_gap", "int", "min=0", NULL },
+	{ "leaf_item_max", "int", "min=0", NULL },
+	{ "leaf_page_max", "int", "min=512B,max=512MB", NULL },
+	{ "lsm", "category", NULL, confchk_lsm_subconfigs },
+	{ "memory_page_max", "int", "min=512B,max=10TB", NULL },
+	{ "os_cache_dirty_max", "int", "min=0", NULL },
+	{ "os_cache_max", "int", "min=0", NULL },
+	{ "prefix_compression", "boolean", NULL, NULL },
+	{ "prefix_compression_min", "int", "min=0", NULL },
+	{ "source", "string", NULL, NULL },
+	{ "split_pct", "int", "min=25,max=100", NULL },
+	{ "type", "string", NULL, NULL },
+	{ "value_format", "format", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_session_drop[] = {
-	{ "force", "boolean", NULL, NULL},
-	{ "remove_files", "boolean", NULL, NULL},
+	{ "force", "boolean", NULL, NULL },
+	{ "remove_files", "boolean", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_session_open_cursor[] = {
-	{ "append", "boolean", NULL, NULL},
-	{ "bulk", "string", NULL, NULL},
-	{ "checkpoint", "string", NULL, NULL},
+	{ "append", "boolean", NULL, NULL },
+	{ "bulk", "string", NULL, NULL },
+	{ "checkpoint", "string", NULL, NULL },
 	{ "dump", "string",
 	    "choices=[\"hex\",\"json\",\"print\"]",
-	    NULL},
-	{ "next_random", "boolean", NULL, NULL},
-	{ "overwrite", "boolean", NULL, NULL},
-	{ "raw", "boolean", NULL, NULL},
-	{ "readonly", "boolean", NULL, NULL},
+	    NULL },
+	{ "next_random", "boolean", NULL, NULL },
+	{ "overwrite", "boolean", NULL, NULL },
+	{ "raw", "boolean", NULL, NULL },
+	{ "readonly", "boolean", NULL, NULL },
 	{ "statistics", "list",
 	    "choices=[\"all\",\"fast\",\"clear\"]",
-	    NULL},
-	{ "target", "list", NULL, NULL},
+	    NULL },
+	{ "target", "list", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_session_reconfigure[] = {
 	{ "isolation", "string",
 	    "choices=[\"read-uncommitted\",\"read-committed\",\"snapshot\"]",
-	    NULL},
+	    NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_session_salvage[] = {
-	{ "force", "boolean", NULL, NULL},
+	{ "force", "boolean", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_session_verify[] = {
-	{ "dump_address", "boolean", NULL, NULL},
-	{ "dump_blocks", "boolean", NULL, NULL},
-	{ "dump_offsets", "list", NULL, NULL},
-	{ "dump_pages", "boolean", NULL, NULL},
+	{ "dump_address", "boolean", NULL, NULL },
+	{ "dump_blocks", "boolean", NULL, NULL },
+	{ "dump_offsets", "list", NULL, NULL },
+	{ "dump_pages", "boolean", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
 static const WT_CONFIG_CHECK confchk_table_meta[] = {
-	{ "colgroups", "list", NULL, NULL},
-	{ "columns", "list", NULL, NULL},
-	{ "key_format", "format", NULL, NULL},
-	{ "value_format", "format", NULL, NULL},
+	{ "colgroups", "list", NULL, NULL },
+	{ "columns", "list", NULL, NULL },
+	{ "key_format", "format", NULL, NULL },
+	{ "value_format", "format", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -273,48 +274,55 @@ static const WT_CONFIG_CHECK confchk_log_subconfigs[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
+static const WT_CONFIG_CHECK confchk_transaction_sync_subconfigs[] = {
+	{ "enabled", "boolean", NULL, NULL },
+	{ "method", "string",
+	    "choices=[\"dsync\",\"fsync\",\"none\"]",
+	    NULL },
+	{ NULL, NULL, NULL, NULL }
+};
+
 static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
-	{ "async", "category", NULL, confchk_async_subconfigs},
-	{ "buffer_alignment", "int", "min=-1,max=1MB", NULL},
-	{ "cache_size", "int", "min=1MB,max=10TB", NULL},
-	{ "checkpoint", "category", NULL, confchk_checkpoint_subconfigs}
-	    ,
-	{ "checkpoint_sync", "boolean", NULL, NULL},
-	{ "create", "boolean", NULL, NULL},
+	{ "async", "category", NULL, confchk_async_subconfigs },
+	{ "buffer_alignment", "int", "min=-1,max=1MB", NULL },
+	{ "cache_size", "int", "min=1MB,max=10TB", NULL },
+	{ "checkpoint", "category", NULL,
+	     confchk_checkpoint_subconfigs },
+	{ "checkpoint_sync", "boolean", NULL, NULL },
+	{ "create", "boolean", NULL, NULL },
 	{ "direct_io", "list",
 	    "choices=[\"checkpoint\",\"data\",\"log\"]",
-	    NULL},
-	{ "error_prefix", "string", NULL, NULL},
-	{ "eviction_dirty_target", "int", "min=10,max=99", NULL},
-	{ "eviction_target", "int", "min=10,max=99", NULL},
-	{ "eviction_trigger", "int", "min=10,max=99", NULL},
-	{ "eviction_workers", "int", "min=0,max=20", NULL},
-	{ "extensions", "list", NULL, NULL},
-	{ "file_extend", "list", "choices=[\"data\",\"log\"]", NULL},
-	{ "hazard_max", "int", "min=15", NULL},
-	{ "log", "category", NULL, confchk_log_subconfigs},
-	{ "lsm_merge", "boolean", NULL, NULL},
-	{ "mmap", "boolean", NULL, NULL},
-	{ "multiprocess", "boolean", NULL, NULL},
-	{ "session_max", "int", "min=1", NULL},
+	    NULL },
+	{ "error_prefix", "string", NULL, NULL },
+	{ "eviction_dirty_target", "int", "min=10,max=99", NULL },
+	{ "eviction_target", "int", "min=10,max=99", NULL },
+	{ "eviction_trigger", "int", "min=10,max=99", NULL },
+	{ "eviction_workers", "int", "min=0,max=20", NULL },
+	{ "extensions", "list", NULL, NULL },
+	{ "file_extend", "list", "choices=[\"data\",\"log\"]", NULL },
+	{ "hazard_max", "int", "min=15", NULL },
+	{ "log", "category", NULL, confchk_log_subconfigs },
+	{ "lsm_merge", "boolean", NULL, NULL },
+	{ "mmap", "boolean", NULL, NULL },
+	{ "multiprocess", "boolean", NULL, NULL },
+	{ "session_max", "int", "min=1", NULL },
 	{ "shared_cache", "category", NULL,
-	     confchk_shared_cache_subconfigs},
+	     confchk_shared_cache_subconfigs },
 	{ "statistics", "list",
 	    "choices=[\"all\",\"fast\",\"none\",\"clear\"]",
-	    NULL},
+	    NULL },
 	{ "statistics_log", "category", NULL,
-	     confchk_statistics_log_subconfigs},
-	{ "transaction_sync", "string",
-	    "choices=[\"dsync\",\"fsync\",\"none\"]",
-	    NULL},
-	{ "use_environment_priv", "boolean", NULL, NULL},
+	     confchk_statistics_log_subconfigs },
+	{ "transaction_sync", "category", NULL,
+	     confchk_transaction_sync_subconfigs },
+	{ "use_environment_priv", "boolean", NULL, NULL },
 	{ "verbose", "list",
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
 	    ",\"evictserver\",\"fileops\",\"log\",\"lsm\",\"metadata\","
 	    "\"mutex\",\"overflow\",\"read\",\"readserver\",\"reconcile\","
 	    "\"recovery\",\"salvage\",\"shared_cache\",\"split\",\"verify\","
 	    "\"version\",\"write\"]",
-	    NULL},
+	    NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -387,7 +395,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_index_meta
 	},
 	{ "session.begin_transaction",
-	  "isolation=,name=,priority=0",
+	  "isolation=,name=,priority=0,sync=",
 	  confchk_session_begin_transaction
 	},
 	{ "session.checkpoint",
@@ -475,8 +483,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "mmap=,multiprocess=0,session_max=100,shared_cache=(chunk=10MB,"
 	  "name=,reserve=0,size=500MB),statistics=none,"
 	  "statistics_log=(path=\"WiredTigerStat.%d.%H\",sources=,"
-	  "timestamp=\"%b %d %H:%M:%S\",wait=0),transaction_sync=fsync,"
-	  "use_environment_priv=0,verbose=",
+	  "timestamp=\"%b %d %H:%M:%S\",wait=0),transaction_sync=(enabled=0"
+	  ",method=fsync),use_environment_priv=0,verbose=",
 	  confchk_wiredtiger_open
 	},
 	{ NULL, NULL, NULL }

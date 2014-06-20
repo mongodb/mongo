@@ -108,6 +108,7 @@ struct __wt_txn {
 	uint64_t snap_min, snap_max;
 	uint64_t *snapshot;
 	uint32_t snapshot_count;
+	uint32_t txn_logsync;	/* Log sync configuration */
 
 	/* Array of modifications by this transaction. */
 	WT_TXN_OP      *mod;

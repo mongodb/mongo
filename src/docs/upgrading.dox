@@ -33,6 +33,17 @@ configured \c os_cache_dirty_max, causing additional system calls that slowed
 some workloads.  Applications that benefit from this setting should set it
 explicitly in WT_SESSION::create.
 </dd>
+
+<dt>\c transaction_sync setting change</dt>
+<dd>
+In the 2.2.1 release of WiredTiger the ::wiredtiger_open \c transaction_sync
+configuration setting has changed from a string value to a structure with two
+fields: \c method, which corresponds to the previous value (\c dsync, \c fsync
+or \c none), and \c enabled, which determines whether there is a sync on
+every transaction commit by default.  Applications can enable or disable sync
+for a specific transaction with the \c sync setting to
+WT_SESSION::begin_transaction.
+</dd>
 </dl>
 
 @section version_220 Upgrading to Version 2.2.0

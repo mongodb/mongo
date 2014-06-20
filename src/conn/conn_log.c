@@ -8,24 +8,43 @@
 #include "wt_internal.h"
 
 /*
+ * __logmgr_sync_cfg --
+ *	Interpret the transaction_sync config.
+ */
+static int
+__logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+
+	WT_RET(
+	    __wt_config_gets(session, cfg, "transaction_sync.enabled", &cval));
+	if (cval.val)
+		FLD_SET(conn->txn_logsync, WT_LOG_FLUSH);
+	else
+		FLD_CLR(conn->txn_logsync, WT_LOG_FLUSH);
+
+	WT_RET(
+	    __wt_config_gets(session, cfg, "transaction_sync.method", &cval));
+	FLD_CLR(conn->txn_logsync, WT_LOG_DSYNC | WT_LOG_FSYNC);
+	if (WT_STRING_MATCH("dsync", cval.str, cval.len))
+		FLD_SET(conn->txn_logsync, WT_LOG_DSYNC);
+	else if (WT_STRING_MATCH("fsync", cval.str, cval.len))
+		FLD_SET(conn->txn_logsync, WT_LOG_FSYNC);
+	return (0);
+}
+
+/*
  * __logmgr_config --
  *	Parse and setup the logging server options.
  */
 static int
 __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 {
-	static const struct {
-		const char *name;
-		uint32_t flag;
-	} *st, sync_types[] = {
-		{ "dsync",	WT_LOG_DSYNC},
-		{ "fsync",	WT_LOG_FSYNC},
-		{ "none",	0 },
-		{ NULL, 0 }
-	};
-	WT_CONFIG_ITEM cval, sval;
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 
 	conn = S2C(session);
 
@@ -47,19 +66,8 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
-	conn->txn_logsync = WT_LOG_DSYNC;
-	WT_RET(__wt_config_gets(session, cfg, "transaction_sync", &cval));
-	for (st = sync_types; st->name != NULL; st++) {
-		ret = __wt_config_subgets(session, &cval, st->name, &sval);
-		if (ret == 0) {
-			if (sval.val)
-				conn->txn_logsync = st->flag;
-		} else if (ret != WT_NOTFOUND)
-			goto err;
-	}
-	ret = 0;
-err:
-	return (ret);
+	WT_RET(__logmgr_sync_cfg(session, cfg));
+	return (0);
 }
 
 /*
