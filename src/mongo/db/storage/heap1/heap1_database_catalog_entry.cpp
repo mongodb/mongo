@@ -108,9 +108,12 @@ namespace mongo {
         entry = new Entry( ns );
 
         if ( options.capped ) {
-            entry->rs.reset( new HeapRecordStore( ns,
-                                                  true,
-                                                  options.cappedSize ) );
+            entry->rs.reset(new HeapRecordStore(ns,
+                                                true,
+                                                options.cappedSize
+                                                     ? options.cappedSize : 4096, // default size
+                                                options.cappedMaxDocs
+                                                     ? options.cappedMaxDocs : -1)); // no limit
         }
         else {
             entry->rs.reset( new HeapRecordStore( ns ) );

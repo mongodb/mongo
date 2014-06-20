@@ -57,6 +57,10 @@ namespace mongo {
 
         virtual Status truncate(OperationContext* txn);
 
+        virtual void temp_cappedTruncateAfter(OperationContext* txn, DiskLoc end, bool inclusive) {
+            invariant(!"cappedTruncateAfter not supported");
+        }
+
         virtual bool compactSupported() const { return true; }
         virtual Status compact( OperationContext* txn,
                                 RecordStoreCompactAdaptor* adaptor,
