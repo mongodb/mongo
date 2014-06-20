@@ -130,6 +130,9 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 #ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
 	extern int snappy_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 #endif
+#ifdef HAVE_BUILTIN_EXTENSION_ZLIB
+	extern int zlib_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+#endif
 
 /*
  * __conn_load_default_extensions --

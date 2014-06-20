@@ -25,8 +25,8 @@ AC_ARG_WITH(builtins,
 	    [with_builtins=])
 
 # Validate and setup each builtin extension library.
-save_IFS="$IFS" ; IFS=","
-for builtin_i in $with_builtins; do
+builtin_list=`echo "$with_builtins"|tr -s , ' '`
+for builtin_i in "$builtin_list"; do
 	case "$builtin_i" in
 	snappy)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_SNAPPY)
 		wt_cv_with_builtin_extension_snappy=yes;;
@@ -35,11 +35,10 @@ for builtin_i in $with_builtins; do
 	*)	AC_MSG_ERROR([Unknown builtin extension "$builtin_i"]);;
 	esac
 done
-IFS="$save_IFS"
 AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_SNAPPY],
-    [test $wt_cv_with_builtin_extension_snappy = yes])
+    [test "$wt_cv_with_builtin_extension_snappy" = "yes"])
 AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_ZLIB],
-    [test $wt_cv_with_builtin_extension_zlib = yes])
+    [test "$wt_cv_with_builtin_extension_zlib" = "yes"])
 AC_MSG_RESULT($with_builtins)
 
 AC_MSG_CHECKING(if --enable-bzip2 option specified)

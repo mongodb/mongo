@@ -188,7 +188,7 @@ wt_snappy_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 	return (0);
 }
 
-extern int snappy_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+int snappy_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 
 /*
  * snappy_extension_init --

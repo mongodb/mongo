@@ -369,7 +369,7 @@ zlib_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
 	    connection, name, &zlib_compressor->compressor, NULL));
 }
 
-extern int zlib_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+int zlib_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 
 /*
  * zlib_extension_init --
