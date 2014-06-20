@@ -153,7 +153,7 @@ namespace mongo {
     void DistinctScan::recoverFromYield() {
         ++_commonStats.unyields;
 
-        if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
+        if (isEOF() || (NULL == _btreeCursor.get())) { return; }
 
         // We can have a valid position before we check isEOF(), restore the position, and then be
         // EOF upon restore.
