@@ -1393,8 +1393,10 @@ namespace mongo {
 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 13091 , "how could chunk manager be null!" , cm );
-                if(cm->getShardKey().key() == BSON("files_id" << 1)) {
-                    BSONObj finder = BSON("files_id" << cmdObj.firstElement());
+                if( (cm->getShardKey().key() == BSON("files_id" << 1)) ||
+                    (cm->getShardKey().key() == BSON("files_id" << "hashed")) ) {
+
+                	BSONObj finder = BSON("files_id" << cmdObj.firstElement());
 
                     vector<Strategy::CommandResult> results;
                     STRATEGY->commandOp(dbName, cmdObj, 0, fullns, finder, &results);
@@ -1479,7 +1481,7 @@ namespace mongo {
                 }
 
                 // We could support arbitrary shard keys by sending commands to all shards but I don't think we should
-                errmsg = "GridFS fs.chunks collection must be sharded on either {files_id:1} or {files_id:1, n:1}";
+                errmsg = "GridFS fs.chunks collection must be sharded on either {files_id:1}, {files_id:'hashed'}, or {files_id:1, n:1}";
                 return false;
             }
         } fileMD5Cmd;

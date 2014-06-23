@@ -56,6 +56,12 @@ test.adminCommand({enablesharding: name})
 test.adminCommand({shardcollection: name+'.fs.chunks', key: {files_id:1}})
 testGridFS(name)
 
+print('\n\n\t**** sharded collection on files_id (hashed) ****\n\n')
+name = 'sharded_files_id_hashed'
+test.adminCommand({enablesharding: name})
+test.adminCommand({shardcollection: name+'.fs.chunks', key: {files_id:'hashed'}})
+testGridFS(name)
+
 print('\n\n\t**** sharded collection on files_id,n ****\n\n')
 name = 'sharded_files_id_n'
 test.adminCommand({enablesharding: name})
