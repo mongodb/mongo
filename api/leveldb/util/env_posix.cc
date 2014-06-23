@@ -44,7 +44,11 @@ class PosixSequentialFile: public SequentialFile {
 
   virtual Status Read(size_t n, Slice* result, char* scratch) {
     Status s;
+#ifdef	HAVE_FREAD_UNLOCKED
     size_t r = fread_unlocked(scratch, 1, n, file_);
+#else
+    size_t r = fread(scratch, 1, n, file_);
+#endif
     *result = Slice(scratch, r);
     if (r < n) {
       if (feof(file_)) {
@@ -265,7 +269,11 @@ class PosixMmapFile : public WritableFile {
     if (pending_sync_) {
       // Some unmapped data was not synced
       pending_sync_ = false;
+#ifdef	HAVE_FDATASYNC
       if (fdatasync(fd_) < 0) {
+#else
+      if (fsync(fd_) < 0) {
+#endif
         s = IOError(filename_, errno);
       }
     }
