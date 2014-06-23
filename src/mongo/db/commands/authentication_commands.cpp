@@ -288,12 +288,14 @@ namespace mongo {
 #ifdef MONGO_SSL
     void canonicalizeClusterDN(std::vector<std::string>* dn) {
         // remove all RDNs we don't care about
-        for (std::vector<string>::iterator it=dn->begin(); it != dn->end(); it++) {
-            boost::algorithm::trim(*it);
-            if (!mongoutils::str::startsWith(it->c_str(), "DC=") &&
-                !mongoutils::str::startsWith(it->c_str(), "O=") && 
-                !mongoutils::str::startsWith(it->c_str(), "OU=")) { 
-                dn->erase(it--);
+        for (size_t i=0; i<dn->size(); i++) {
+            std::string& comp = dn->at(i);
+            boost::algorithm::trim(comp);
+            if (!mongoutils::str::startsWith(comp.c_str(), "DC=") &&
+                !mongoutils::str::startsWith(comp.c_str(), "O=") && 
+                !mongoutils::str::startsWith(comp.c_str(), "OU=")) { 
+                dn->erase(dn->begin()+i);
+                i--;
             }
         }
         std::stable_sort(dn->begin(), dn->end());
