@@ -29,7 +29,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/pdfile.h"
 
 namespace mongo {
 

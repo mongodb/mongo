@@ -33,7 +33,6 @@
 
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"

@@ -38,7 +38,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/repl/initial_sync.h"

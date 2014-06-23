@@ -36,7 +36,6 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"

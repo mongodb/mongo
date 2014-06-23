@@ -44,6 +44,12 @@
 
 namespace mongo {
 
+    static DatabaseHolder _dbHolder;
+
+    DatabaseHolder& dbHolder() {
+        return _dbHolder;
+    }
+
     Database* DatabaseHolder::get(OperationContext* txn,
                                   const std::string& ns) const {
 
