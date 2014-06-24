@@ -231,6 +231,7 @@ namespace mongo {
         {"$first", AccumulatorFirst::create},
         {"$last", AccumulatorLast::create},
         {"$max", AccumulatorMinMax::createMax},
+        {"$median", AccumulatorMedian::create},
         {"$min", AccumulatorMinMax::createMin},
         {"$push", AccumulatorPush::create},
         {"$sum", AccumulatorSum::create},

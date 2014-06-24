@@ -165,7 +165,7 @@ namespace mongo {
 
         static intrusive_ptr<Accumulator> create();
 
-    private:
+    protected:
         AccumulatorPush();
 
         std::vector<Value> vpValue;
@@ -186,5 +186,15 @@ namespace mongo {
 
         double _total;
         long long _count;
+    };
+
+    class AccumulatorMedian : public AccumulatorPush {
+        typedef AccumulatorPush Super;
+    public:
+        virtual void processInternal(const Value& input, bool merging);
+        virtual Value getValue(bool toBeMerged) const;
+        virtual const char* getOpName() const;
+
+        static intrusive_ptr<Accumulator> create();
     };
 }

@@ -1546,3 +1546,58 @@ var g7 = db.runCommand(
     }}
 ]});
 assert.eq(g7.result[0].count, 7);
+
+// $median
+var g8 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+        author : 1,
+        tags : 1,
+        pageViews : 1
+    }},
+    { $unwind : "$tags" },
+    { $group : {
+        _id: { tags : "$tags" },
+        docsByTag : { $sum : 1 },
+        viewsByTag : { $sum : "$pageViews" },
+        medianByTag : { $median : "$pageViews" },
+    }},
+    {$sort: {'_id': 1}}
+]});
+
+var g8result = [
+    {
+        "_id" : {
+            "tags" : "filthy"
+        },
+        "docsByTag" : 1,
+        "viewsByTag" : 6,
+        "medianByTag" : 6
+    },
+    {
+        "_id" : {
+            "tags" : "fun"
+        },
+        "docsByTag" : 3,
+        "viewsByTag" : 17,
+        "medianByTag" : 5
+    },
+    {
+        "_id" : {
+            "tags" : "good"
+        },
+        "docsByTag" : 1,
+        "viewsByTag" : 5,
+        "medianByTag" : 5
+    },
+    {
+        "_id" : {
+            "tags" : "nasty"
+        },
+        "docsByTag" : 2,
+        "viewsByTag" : 13,
+        "medianByTag" : 6.5
+    }
+];
+
+assert.eq(g8.result, g8result, 'g8 failed');
