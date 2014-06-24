@@ -1,7 +1,6 @@
 package mongoexport
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
@@ -9,6 +8,9 @@ import (
 	"io"
 	"labix.org/v2/mgo/bson"
 	"os"
+	"strings"
+	//"reflect"
+	"time"
 )
 
 const (
@@ -23,16 +25,17 @@ type MongoExport struct {
 
 	OutputOpts *options.OutputFormatOptions
 
+	InputOpts *options.InputOptions
+
 	// for connecting to the db
 	SessionProvider *db.SessionProvider
 	ExportOutput    ExportOutput
 }
 
 func (exp *MongoExport) ValidateSettings() error {
-
 	//TODO - on legacy mongoexport, if -d is blank, it assumes some default database.
-	//Do we want to use that same behavior? seems weird to assume a specific database
-	//when only a collection is provided.
+	//Do we want to use that same behavior? It seems very odd to assume the DB
+	//when only a collection is provided, but that's the behavior of the legacy tools.
 
 	//Namespace must have a valid database and collection
 	if exp.ToolOptions.Namespace.DB == "" || exp.ToolOptions.Namespace.Collection == "" {
@@ -43,7 +46,7 @@ func (exp *MongoExport) ValidateSettings() error {
 
 func (exp *MongoExport) getOutputWriter() (io.Writer, error) {
 	if exp.OutputOpts.OutputFile != "" {
-		//TODO do we care if the file exists already?
+		//TODO do we care if the file exists already? Overwrite it, or fail?
 		file, err := os.Create(exp.OutputOpts.OutputFile)
 		if err != nil {
 			return nil, err
@@ -54,18 +57,21 @@ func (exp *MongoExport) getOutputWriter() (io.Writer, error) {
 	}
 }
 
-func (exp *MongoExport) Export() error {
+func (exp *MongoExport) Export() (int64, error) {
 	session, err := exp.SessionProvider.GetSession()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	out, err := exp.getOutputWriter()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	exportOutput := exp.getExportOutput(out)
+	exportOutput, err := exp.getExportOutput(out)
+	if err != nil {
+		return 0, err
+	}
 
 	collection := session.DB(exp.ToolOptions.Namespace.DB).C(exp.ToolOptions.Namespace.Collection)
 
@@ -77,28 +83,48 @@ func (exp *MongoExport) Export() error {
 	//Write headers
 	err = exportOutput.WriteHeader()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	var result bson.M
+
+	docsCount := int64(0)
 	//Write document content
 	for cursor.Next(&result) {
-		exportOutput.ExportDocument(result)
+		err := exportOutput.ExportDocument(result)
+		if err != nil {
+			fmt.Println("err is !, ", err)
+			return docsCount, err
+		}
+		docsCount++
 	}
 
 	//Write footers
 	err = exportOutput.WriteFooter()
 	if err != nil {
-		return err
+		return docsCount, err
 	}
 
-	return nil
+	return docsCount, nil
 }
 
-func (exp *MongoExport) getExportOutput(out io.Writer) ExportOutput {
-	//if !OutputOpts.CSV {
-	return NewJSONExportOutput(exp.OutputOpts.JSONArray, out)
-	//}
+func (exp *MongoExport) getExportOutput(out io.Writer) (ExportOutput, error) {
+	if !exp.OutputOpts.CSV {
+		//TODO what if user specifies *both* --fields and --fieldFile?
+		var fields []string
+		var err error
+		if len(exp.OutputOpts.Fields) > 0 {
+			fields = strings.Split(exp.OutputOpts.Fields, ",")
+		} else if exp.OutputOpts.FieldFile != "" {
+			fields, err = getFieldsFromFile(exp.OutputOpts.FieldFile)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return NewCSVExportOutput(fields, out), nil
+	} else {
+		return NewJSONExportOutput(exp.OutputOpts.JSONArray, out), nil
+	}
 
 }
 
@@ -116,44 +142,39 @@ type ExportOutput interface {
 	WriteFooter() error
 }
 
-type JSONExportOutput struct {
-	//ArrayOutput when set to true indicates that the output should be written
-	//as a JSON array, where each document is an element in the array.
-	ArrayOutput bool
-	Encoder     *json.Encoder
-	Out         io.Writer
-}
-
-func NewJSONExportOutput(arrayOutput bool, out io.Writer) *JSONExportOutput {
-	return &JSONExportOutput{
-		arrayOutput,
-		json.NewEncoder(out),
-		out,
-	}
-}
-
-func (jsonExporter *JSONExportOutput) WriteHeader() error {
-	if jsonExporter.ArrayOutput {
-		//TODO check # bytes written?
-		_, err := jsonExporter.Out.Write([]byte(JSON_ARRAY_START))
-		if err != nil {
-			return err
+func getExtendedJsonRepr(value interface{}) interface{} {
+	switch t := value.(type) {
+	case bson.M:
+		for key, val := range t {
+			t[key] = getExtendedJsonRepr(val)
 		}
-	}
-	return nil
-}
-
-func (jsonExporter *JSONExportOutput) WriteFooter() error {
-	if jsonExporter.ArrayOutput {
-		_, err := jsonExporter.Out.Write([]byte(JSON_ARRAY_END))
-		//TODO check # bytes written?
-		if err != nil {
-			return err
+		return t
+	case []interface{}:
+		for index, val := range t {
+			t[index] = getExtendedJsonRepr(val)
 		}
+		return t
+	case int64:
+		return NumberLongExt(t)
+	case bson.ObjectId:
+		return ObjectIdExt(t)
+	case bson.MongoTimestamp:
+		return MongoTimestampExt(t)
+	case []byte:
+		return GenericBinaryExt(t)
+	case bson.Binary:
+		return BinaryExt(t)
+	case bson.JavaScript:
+		return JavascriptExt(t)
+	case time.Time:
+		return TimeExt(t)
+	case bson.RegEx:
+		return RegExExt(t)
+	default:
+		return t
+		//TODO
+		// handle DBRefs
+		// handle MinKey, MaxKey, and Undefined
 	}
-	return nil
-}
-
-func (jsonExporter *JSONExportOutput) ExportDocument(document bson.M) error {
-	return jsonExporter.Encoder.Encode(document)
+	return value
 }

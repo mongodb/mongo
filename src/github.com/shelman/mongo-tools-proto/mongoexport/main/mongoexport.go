@@ -51,10 +51,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = exporter.Export()
+	numDocs, err := exporter.Export()
 	if err != nil {
 		//TODO log to stderr for real
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
+	}
+
+	if !opts.Quiet {
+		if numDocs == 1 {
+			fmt.Fprintf(os.Stderr, fmt.Sprintf("exported %v record\n", numDocs))
+		} else {
+			fmt.Fprintf(os.Stderr, fmt.Sprintf("exported %v records\n", numDocs))
+		}
 	}
 }
