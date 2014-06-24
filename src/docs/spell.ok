@@ -33,6 +33,7 @@ LIBS
 LSB
 LSM
 Lameter
+LevelDB
 Levyx
 MERCHANTABILITY
 MVCC's
@@ -193,6 +194,7 @@ keyvalue
 kvs
 lastname
 len
+leveldb
 li
 libdir
 libhe
