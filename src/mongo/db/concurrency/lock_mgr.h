@@ -31,7 +31,6 @@
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <iterator>
-#include <list>
 #include <map>
 #include <set>
 #include <string>
@@ -41,12 +40,18 @@
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/timer.h"
 
+#include "mongo/bson/util/atomic_int.h"
+
 /*
  * LockManager controls access to resources through two functions: acquire and release
  *
- * Resources are either RecordStores, or Records within an RecordStore, identified by a ResourceId.
- * Resources are acquired for either shared or exclusive use, by transactions identified by a TxId.
- * Acquiring Records in any mode implies acquisition of the Record's RecordStore
+ * Resources can be databases, collections, oplogs, records, btree-nodes, key-value pairs,
+ * forward/backward pointers, or anything at all that can be unambiguously identified.
+ *
+ * Resources are acquired by Transactions for either shared or exclusive use. If an
+ * acquisition request conflicts with a pre-existing use of a resource, the requesting
+ * transaction will block until the original conflicting requests and any new conflicting
+ * requests have been released.
  *
  * Contention for a resource is resolved by a LockingPolicy, which determines which blocked
  * resource requests to awaken when the blocker releases the resource.
@@ -55,23 +60,10 @@
 
 namespace mongo {
 
-#if 1
-    class TxId {
-    public:
-    TxId() : _xid(0) { }
-    TxId(size_t xid) : _xid(xid) { }
-        bool operator<(const TxId& other) const { return _xid < other._xid; }
-        bool operator==(const TxId& other) const { return _xid == other._xid; }
-        operator size_t() const { return _xid; }
-
-    private:
-        size_t _xid;
-    };
-
     class ResourceId {
     public:
-    ResourceId() : _rid(0) { }
-    ResourceId(size_t rid) : _rid(rid) { }
+        ResourceId() : _rid(0) { }
+        ResourceId(size_t rid) : _rid(rid) { }
         bool operator<(const ResourceId& other) const { return _rid < other._rid; }
         bool operator==(const ResourceId& other) const { return _rid == other._rid; }
         operator size_t() const { return _rid; }
@@ -79,12 +71,18 @@ namespace mongo {
     private:
         size_t _rid;
     };
-#else
-    typedef size_t TxId;        // identifies requesting transaction. 0 is reserved
-    typedef size_t ResourceId;  // identifies requested resource. 0 is reserved
-#endif
-    static const TxId kReservedTxId = 0;
     static const ResourceId kReservedResourceId = 0;
+
+
+    /**
+     * LockModes: shared and exclusive
+     */
+    enum LockMode {
+        kShared = 0, // conflicts only with kExclusive
+        kExclusive = 1, // conflicts with all lock modes
+        kInvalid
+    };
+
 
     class Transaction;
 
@@ -94,7 +92,7 @@ namespace mongo {
     class LockRequest {
     public:
         LockRequest(const ResourceId& resId,
-                    const unsigned& mode,
+                    const LockMode& mode,
                     Transaction* requestor,
                     bool heapAllocated = false);
 
@@ -102,7 +100,7 @@ namespace mongo {
         ~LockRequest();
 
         bool matches(const Transaction* tx,
-                     const unsigned& mode,
+                     const LockMode& mode,
                      const ResourceId& resId) const;
 
         bool isBlocked() const;
@@ -110,6 +108,7 @@ namespace mongo {
 
         std::string toString() const;
 
+        // insert/append in resource chain
         void insert(LockRequest* lr);
         void append(LockRequest* lr);
 
@@ -117,14 +116,17 @@ namespace mongo {
         Transaction* requestor;
 
         // shared or exclusive use
-        const unsigned mode;
+        const LockMode mode;
 
         // resource requested
         const ResourceId resId;
-        unsigned resSlice;
 
-        // number of times xid requested this resource in this mode
-        // request will be deleted when count goes to 0
+        // a hash of resId modulo kNumResourcePartitions
+        // used to mitigate cost of mutex locking
+        unsigned slice;
+
+        // number of times a tx requested resource in this mode
+        // lock request will be deleted when count goes to 0
         size_t count;
 
         // number of existing things blocking this request
@@ -135,8 +137,11 @@ namespace mongo {
         // allocate LockRequests on the stack.
         bool heapAllocated;
 
+        // lock requests are chained by their resource
         LockRequest* nextOnResource;
         LockRequest* prevOnResource;
+
+        // lock requests are also chained by their requesting transaction
         LockRequest* nextOfTransaction;
         LockRequest* prevOfTransaction;
 
@@ -144,12 +149,20 @@ namespace mongo {
         boost::condition_variable lock;
     };
 
+    /**
+     * Data structure used to describe resource requestors,
+     * used for conflict resolution, deadlock detection, and abort
+     */
     class Transaction {
     public:
         Transaction(unsigned txId=0, int priority=0);
         ~Transaction();
 
+        /**
+         * transactions are identified by an id
+         */
         Transaction* setTxIdOnce(unsigned txId);
+        unsigned getTxId() const { return _txId; }
 
         /**
          * override default LockManager's default Policy for a transaction.
@@ -165,11 +178,20 @@ namespace mongo {
         void setPriority(int newPriority);
         int getPriority() const;
 
+        /**
+         * maintain the queue of lock requests made by the transaction
+         */
         void removeLock(LockRequest* lr);
 	void addLock(LockRequest* lr);
 
+        /**
+         * should be age of the transaction.  currently using txId as a proxy.
+         */
         bool operator<(const Transaction& other);
 
+        /**
+         * for debug
+         */
         std::string toString() const;
 
     private:
@@ -178,17 +200,22 @@ namespace mongo {
 
         void _addWaiter(Transaction* waiter);
 
+        /**
+         * it might be useful to reject lock manager requests from inactive TXs.
+         */
         enum TxState {
             kInvalid,
             kActive,
-            kCompleted
+            kAborted,
+            kCommitted
         };
 
         // uniquely identify the transaction
         unsigned _txId;
-
-        // for mutex parallelism in LockManager
+#ifdef REGISTER_TRANSACTIONS
+        // for mutex parallelism while handling transactions
         unsigned _txSlice;
+#endif
 
         // transaction priorities:
         //     0 => neutral, use LockManager's default _policy
@@ -207,7 +234,16 @@ namespace mongo {
         // NB: a transaction can only be directly waiting for a single resource/transaction
         // but to facilitate deadlock detection, if T1 is waiting for T2 and T2 is waiting
         // for T3, then both T1 and T2 are listed as T3's waiters.
-        std::set<Transaction*> _waiters;
+        //
+        // This is a multiset to handle some obscure situations.  If T1 has upgraded or downgraded
+        // its lock on a resource, it has two lock requests.  If T2 then requests exclusive
+        // access to the same resource, it must wait for BOTH T1's locks to be relased.
+        //
+        // the max size of the set is ~2*number-concurrent-transactions.  the set is only
+        // consulted/updated when there's a lock conflict.  When there are many more documents
+        // than transactions, the set will usually be empty.
+        //
+        std::multiset<Transaction*> _waiters;
     };
 
     /**
@@ -216,7 +252,6 @@ namespace mongo {
      *
      *  Primary functions are:
      *     acquire    - acquire a resource for shared or exclusive use; may throw Abort.
-     *     acquireOne - acquire one of a vector of resources, hopefully without blocking
      *     release    - release a resource previously acquired for shared/exclusive use
      */
     class LockManager {
@@ -229,14 +264,6 @@ namespace mongo {
         class AbortException : public std::exception {
         public:
             const char* what() const throw ();
-        };
-
-        /**
-         * LockModes: shared and exclusive
-         */
-        enum LockModes {
-            kShared = 0x0,
-            kExclusive = 0x1
         };
 
         /**
@@ -265,21 +292,21 @@ namespace mongo {
         };
 
         /**
-         * returned by ::find_lock, and ::release and, mostly for testing
+         * returned by find_lock(), and release() and, mostly for testing
          * explains why a lock wasn't found or released
          */
         enum LockStatus {
             kLockFound,             // found a matching lock request
             kLockReleased,          // released requested lock
             kLockCountDecremented,  // decremented lock count, but didn't release
-            kLockNotFound,          // no locks with this id
+            kLockNotFound,          // specific lock not found
             kLockResourceNotFound,  // no locks on the resource
             kLockModeNotFound       // locks on the resource, but not of the specified mode
         };
 
 
         /**
-         * Used to do something just before an acquisition request blocks.
+         * A Notifier is used to do something just before an acquisition request blocks.
          *
          * XXX: should perhaps define Notifier as a functor so C++11 lambda's match
          * for the test.cpp, it was convenient for the call operator to access private
@@ -292,23 +319,19 @@ namespace mongo {
         };
 
         /**
-         * Tracks locking statistics.  For now, just aggregated across all resources/transactions
-         * Eventually might keep per Transaction and/or per Resource, to facilitate identifying
-         * hotspots and problem transactions.
+         * Tracks locking statistics.
          */
         class LockStats {
         public:
         LockStats()
             : _numRequests(0)
-                , _numPreexistingRequests(0)
-                , _numSameRequests(0)
-                , _numBlocks(0)
-                , _numDeadlocks(0)
-                , _numDowngrades(0)
-                , _numUpgrades(0)
-                , _numMillisBlocked(0)
-                , _numCurrentActiveReadRequests(0)
-                , _numCurrentActiveWriteRequests(0) { }
+            , _numPreexistingRequests(0)
+            , _numSameRequests(0)
+            , _numBlocks(0)
+            , _numDeadlocks(0)
+            , _numDowngrades(0)
+            , _numUpgrades(0)
+            , _numMillisBlocked(0) { }
 
             void incRequests() { _numRequests++; }
             void incPreexisting() { _numPreexistingRequests++; }
@@ -318,21 +341,6 @@ namespace mongo {
             void incDowngrades() { _numDowngrades++; }
             void incUpgrades() { _numUpgrades++; }
             void incTimeBlocked(size_t numMillis ) { _numMillisBlocked += numMillis; }
-
-            void incStatsForMode(const unsigned mode) {
-                0==mode ? incActiveReads() : incActiveWrites();
-            }
-            void decStatsForMode(const unsigned mode) {
-                0==mode ? decActiveReads() : decActiveWrites();
-            }
-
-            void incActiveReads() { _numCurrentActiveReadRequests++; }
-            void decActiveReads() { _numCurrentActiveReadRequests--; }
-            void incActiveWrites() { _numCurrentActiveWriteRequests++; }
-            void decActiveWrites() { _numCurrentActiveWriteRequests--; }
-
-            unsigned numActiveReads() const { return _numCurrentActiveReadRequests; }
-            unsigned numActiveWrites() const { return _numCurrentActiveWriteRequests; }
 
             size_t getNumRequests() const { return _numRequests; }
             size_t getNumPreexistingRequests() const { return _numPreexistingRequests; }
@@ -347,16 +355,28 @@ namespace mongo {
             std::string toString() const;
 
         private:
+            // total number of resource requests. >= number or resources requested.
             size_t _numRequests;
+
+            // the number of times a resource was requested when there
+            // was a pre-existing request (possibly compatible)
             size_t _numPreexistingRequests;
+
+            // the number of times a transaction requested the same resource in the
+            // same mode while already holding a lock on that resource
             size_t _numSameRequests;
+
+            // the number of times a resource request blocked.  This is usually 
+            // because of a conflicting pre-existing request, but could be because
+            // of a policy like READERS_ONLY
             size_t _numBlocks;
+
             size_t _numDeadlocks;
             size_t _numDowngrades;
             size_t _numUpgrades;
+
+            // aggregates time requests spent blocked.
             size_t _numMillisBlocked;
-            unsigned long _numCurrentActiveReadRequests;
-            unsigned long _numCurrentActiveWriteRequests;
         };
 
 
@@ -379,7 +399,7 @@ namespace mongo {
          * Change the current Policy.  For READERS/kPolicyWritersOnly, this
          * call may block until all current writers/readers have released their locks.
          */
-        void setPolicy(const Transaction* tx, const Policy& policy, Notifier* notifier = NULL);
+        void setPolicy(Transaction* tx, const Policy& policy, Notifier* notifier = NULL);
 
         /**
          * Get the current policy
@@ -407,13 +427,16 @@ namespace mongo {
          * acquire a resource in a mode.
          * can throw AbortException
          */
-        void acquire(const ResourceId& resId,
-                     const uint32_t& mode,
-                     Transaction* requestor,
+        void acquire(Transaction* requestor,
+                     const LockMode& mode,
+                     const ResourceId& resId,
                      Notifier* notifier = NULL);
 
-        void acquireLock(LockRequest* request,
-                         Notifier* notifier = NULL);
+        /**
+         * acquire a designated lock.  usually called from RAII objects
+         * that have allocated their lock on the stack.  May throw AbortException.
+         */
+        void acquireLock(LockRequest* request, Notifier* notifier = NULL);
 
         /**
          * for bulk operations:
@@ -422,7 +445,7 @@ namespace mongo {
          * acquired ResourceId, or -1 if vector was empty
          */
         int acquireOne(Transaction* requestor,
-                       const uint32_t& mode,
+                       const LockMode& mode,
                        const std::vector<ResourceId>& records,
                        Notifier* notifier = NULL);
 
@@ -431,7 +454,7 @@ namespace mongo {
          * The mode here is just the mode that applies to the resId
          */
         LockStatus release(const Transaction* holder,
-                           const uint32_t& mode,
+                           const LockMode& mode,
                            const ResourceId& resId);
 
         /**
@@ -457,13 +480,13 @@ namespace mongo {
          */
         LockStats getStats() const;
 
-        void removeFromResourceQueue(LockRequest* lr);
-
-        void insert(LockRequest* position, LockRequest* lr);
-        void push_back(LockRequest* lr);
-
+        /**
+         * slices the space of ResourceIds and TransactionIds into
+         * multiple partitions that can be separately guarded to
+         * spread the cost of mutex locking.
+         */
         static unsigned partitionResource(const ResourceId& resId);
-        static unsigned partitionTransaction(const TxId& txId);
+        static unsigned partitionTransaction(unsigned txId);
 
 
 
@@ -472,13 +495,12 @@ namespace mongo {
         std::string toString() const;
 
         /**
-         * test whether a Transaction has locked a ResourceId in a mode
+         * test whether a Transaction has locked a ResourceId in a mode.
+         * most callers should use acquireOne instead
          */
         bool isLocked(const Transaction* holder,
-                      const unsigned& mode,
+                      const LockMode& mode,
                       const ResourceId& resId) const;
-
-    protected:
 
     private: // alphabetical
 
@@ -490,21 +512,15 @@ namespace mongo {
         MONGO_COMPILER_NORETURN void _abortInternal(Transaction* goner);
 
         /**
-         *
-         */
-        void _acquireInternal(LockRequest* lr,
-                              Notifier* notifier,
-                              boost::unique_lock<boost::mutex>& guard);
-
-        /**
          * main workhorse for acquiring locks on resources, blocking
          * or aborting on conflict
          *
          * throws AbortException on deadlock
          */
-        void _acquireInternal(Transaction* requestor,
-                              const unsigned& mode,
-                              const ResourceId& resId,
+        void _acquireInternal(LockRequest* lr,
+                              LockRequest* queue,
+                              LockRequest* conflictPosition,
+                              ResourceStatus resourceStatus,
                               Notifier* notifier,
                               boost::unique_lock<boost::mutex>& guard);
 
@@ -515,11 +531,6 @@ namespace mongo {
         void _addLockToQueueUsingPolicy(LockRequest* lr,
                                         LockRequest* queue,
                                         LockRequest*& position);
-
-        /**
-         * set up for future deadlock detection, called from acquire
-         */
-        void _addWaiter(Transaction* blocker, Transaction* waiter);
 
         /**
          * when inserting a new lock request into the middle of a queue,
@@ -536,7 +547,7 @@ namespace mongo {
          * conflicts with a previous upgrade-to-exclusive request that is blocked.
          */
         bool _comesBeforeUsingPolicy(const Transaction* newReqTx,
-                                     const unsigned& newReqMode,
+                                     const LockMode& newReqMode,
                                      const LockRequest* oldReq) const;
 
         /**
@@ -545,9 +556,9 @@ namespace mongo {
          * the position of the first conflict, or the end of the queue, or to an existing lock
          */
         ResourceStatus _conflictExists(Transaction* requestor,
-                                       const unsigned& mode,
+                                       const LockMode& mode,
                                        const ResourceId& resId,
-                                       unsigned resSlice,
+                                       unsigned slice,
                                        LockRequest* queue,
                                        LockRequest*& position /* in/out */);
 
@@ -557,18 +568,38 @@ namespace mongo {
          * sets outLock to the LockRequest that matches and returns kLockFound
          */
         LockStatus _findLock(const Transaction* requestor,
-                             const unsigned& mode,
+                             const LockMode& mode,
                              const ResourceId& resId,
-                             unsigned resSlice,
+                             unsigned slice,
                              LockRequest*& outLock) const;
+
+	/**
+	 * @return status of requested resource id
+	 * set conflictPosition on output if conflict
+	 * update several status variables
+	 */
+	ResourceStatus _getConflictInfo(Transaction* requestor,
+					const LockMode& mode,
+					const ResourceId& resId,
+					unsigned slice,
+					LockRequest* queue,
+					LockRequest*& conflictPosition);
 
         /**
          * returns true if acquire would return without waiting
          * used by acquireOne
          */
         bool _isAvailable(const Transaction* requestor,
-                          const unsigned& mode,
-                          const ResourceId& resId) const;
+                          const LockMode& mode,
+                          const ResourceId& resId,
+                          unsigned slice) const;
+
+        /**
+         * maintain the resourceLocks queue
+         */
+        void _push_back(LockRequest* lr);
+        void _removeFromResourceQueue(LockRequest* lr);
+
 
         /**
          * called by public ::release and internally by abort.
@@ -584,10 +615,20 @@ namespace mongo {
 
 
     private:
+        // support functions for changing policy to/from read/write only
 
-        // Singleton instance
-        static boost::mutex _getSingletonMutex;
-        static LockManager* _singleton;
+        void _incStatsForMode(const LockMode& mode) {
+            kShared==mode ? _numCurrentActiveReadRequests++ : _numCurrentActiveWriteRequests++;
+        }
+        void _decStatsForMode(const LockMode& mode) {
+            kShared==mode ? _numCurrentActiveReadRequests-- : _numCurrentActiveWriteRequests--;
+        }
+
+        unsigned _numActiveReads() const { return _numCurrentActiveReadRequests; }
+        unsigned _numActiveWrites() const { return _numCurrentActiveWriteRequests; }
+
+
+    private:
 
         // The Policy controls which requests should be honored first.  This is
         // used to guide the position of a request in a list of requests waiting for
@@ -605,9 +646,12 @@ namespace mongo {
 
         // synchronizes access to the lock manager, which is shared across threads
         static const unsigned kNumResourcePartitions = 16;
-        static const unsigned kNumTransactionPartitions = 16;
         mutable boost::mutex _resourceMutexes[kNumResourcePartitions];
+
+#ifdef REGISTER_TRANSACTIONS
+        static const unsigned kNumTransactionPartitions = 16;
         mutable boost::mutex _transactionMutexes[kNumTransactionPartitions];
+#endif
         mutable boost::mutex _mutex;
 
         // for blocking when setting kPolicyReadersOnly or kPolicyWritersOnly policy
@@ -628,11 +672,19 @@ namespace mongo {
         //
         std::map<ResourceId, LockRequest*> _resourceLocks[kNumResourcePartitions];
 
+#ifdef REGISTER_TRANSACTIONS
         std::set<Transaction*> _activeTransactions[kNumTransactionPartitions];
+#endif
+
+        // used to track conflicts due to kPolicyReadersOnly or WritersOnly
         Transaction* _systemTransaction;
 
-        // stats, but also used internally
-        LockStats _stats[kNumTransactionPartitions];
+        // stats
+        LockStats _stats[kNumResourcePartitions];
+
+        // used when changing policy to/from Readers/Writers Only
+        AtomicUInt _numCurrentActiveReadRequests;
+        AtomicUInt _numCurrentActiveWriteRequests;
     };
 
     /**
@@ -642,7 +694,7 @@ namespace mongo {
     public:
         ResourceLock(LockManager& lm,
                      Transaction* requestor,
-                     const uint32_t& mode,
+                     const LockMode& mode,
                      const ResourceId& resId,
                      LockManager::Notifier* notifier = NULL);
 
@@ -657,12 +709,12 @@ namespace mongo {
     SharedResourceLock(Transaction* requestor, void* resource)
         : ResourceLock(LockManager::getSingleton(),
                        requestor,
-                       LockManager::kShared,
+                       kShared,
                        (size_t)resource) { }
     SharedResourceLock(Transaction* requestor, size_t resource)
         : ResourceLock(LockManager::getSingleton(),
                        requestor,
-                       LockManager::kShared,
+                       kShared,
                        resource) { }
     };
 
@@ -671,12 +723,12 @@ namespace mongo {
     ExclusiveResourceLock(Transaction* requestor, void* resource)
         : ResourceLock(LockManager::getSingleton(),
                        requestor,
-                       LockManager::kExclusive,
+                       kExclusive,
                        (size_t)resource) { }
     ExclusiveResourceLock(Transaction* requestor, size_t resource)
         : ResourceLock(LockManager::getSingleton(),
                        requestor,
-                       LockManager::kExclusive,
+                       kExclusive,
                        resource) { }
     };
 } // namespace mongo
