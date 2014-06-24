@@ -49,7 +49,7 @@ REPOPATH="/var/www/repo"
 ARCHES=["x86_64"]
 
 # Made up names for the flavors of distribution we package for.
-DISTROS=["redhat","ubuntu"]
+DISTROS=["debian","redhat","ubuntu"]
 
 
 class Spec(object):
@@ -138,17 +138,30 @@ class Distro(object):
         repo/apt/ubuntu/dists/precise/mongodb-enterprise/2.5/multiverse/binary-amd64
         repo/apt/ubuntu/dists/precise/mongodb-enterprise/2.5/multiverse/binary-i386
 
+        repo/apt/debian/dists/wheezy/mongodb-enterprise/2.5/main/binary-amd64
+        repo/apt/debian/dists/wheezy/mongodb-enterprise/2.5/main/binary-i386
+
         repo/yum/redhat/6/mongodb-enterprise/2.5/x86_64
         yum/redhat/6/mongodb-enterprise/2.5/i386
 
         """
 
         if re.search("^(debian|ubuntu)", self.n):
-            return "repo/apt/%s/dists/%s/mongodb-enterprise/%s/multiverse/binary-%s/" % (self.n, self.repo_os_version(build_os), spec.branch(), self.archname(arch))
+            return "repo/apt/%s/dists/%s/mongodb-enterprise/%s/%s/binary-%s/" % (self.n, self.repo_os_version(build_os), spec.branch(), self.repo_component(), self.archname(arch))
         elif re.search("(redhat|fedora|centos)", self.n):
             return "repo/yum/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), spec.branch(), self.archname(arch))
         else:
             raise Exception("BUG: unsupported platform?")
+
+    def repo_component(self):
+        """Return the name of the section/component/pool we are publishing into -
+        e.g. "multiverse" for Ubuntu, "main" for debian."""
+        if self.n == 'ubuntu':
+          return "multiverse"
+        elif self.n == 'debian':
+          return "main"
+        else:
+            raise Exception("unsupported distro: %s" % self.n)
 
     def repo_os_version(self, build_os):
         """Return an OS version suitable for package repo directory
@@ -159,6 +172,11 @@ class Distro(object):
         elif self.n == 'ubuntu':
             if build_os == 'ubuntu1204':
                 return "precise"
+            else:
+                raise Exception("unsupported build_os: %s" % build_os)
+        elif self.n == 'debian':
+            if build_os == 'debian71':
+                return 'wheezy'
             else:
                 raise Exception("unsupported build_os: %s" % build_os)
         else:
@@ -174,12 +192,14 @@ class Distro(object):
 
     def build_os(self):
         """Return the build os label in the binary package to download ("rhel57" and "rhel62"
-        for redhat, "ubuntu1204" for Ubuntu and Debian)"""
+        for redhat, "ubuntu1204" for Ubuntu and "debian71" for Debian)"""
 
-        if re.search("^(debian|ubuntu)", self.n):
-            return [ "ubuntu1204" ]
-        elif re.search("(redhat|fedora|centos)", self.n):
+        if re.search("(redhat|fedora|centos)", self.n):
             return [ "rhel62", "rhel57" ]
+        elif self.n == 'ubuntu':
+            return [ "ubuntu1204" ]
+        elif self.n == 'debian':
+            return [ "debian71" ]
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -421,7 +441,7 @@ def make_deb_repo(repo, distro, build_os, spec):
     # Note: the Debian repository Packages files must be generated
     # very carefully in order to be usable.
     oldpwd=os.getcwd()
-    os.chdir(repo+"../../../../")
+    os.chdir(repo+"../../../../../../")
     try:
         dirs=set([os.path.dirname(deb)[2:] for deb in backtick(["find", ".", "-name", "*.deb"]).split()])
         for d in dirs:
@@ -447,9 +467,9 @@ Label: mongodb
 Suite: mongodb
 Codename: %s/mongodb-enterprise
 Architectures: amd64
-Components: multiverse
+Components: %s
 Description: MongoDB packages
-""" % (distro.repo_os_version(build_os))
+""" % (distro.repo_os_version(build_os), distro.repo_component())
     if os.path.exists(repo+"../../Release"):
         os.unlink(repo+"../../Release")
     if os.path.exists(repo+"../../Release.gpg"):
