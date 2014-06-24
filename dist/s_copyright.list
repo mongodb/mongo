@@ -1,4 +1,3 @@
-skip	api/leveldb/leveldb_wt.h
 skip	bench/tcbench/wttest.c
 skip	build_posix/wiredtiger_config.h
 skip	dist/api_config.py
