@@ -10,7 +10,7 @@ Changes to the WiredTiger API (see upgrading documentation for details):
   wiredtiger_open. [#1010][#1034]
 
 * Split the global transaction_sync configuration into two parts: a sync method
-  (dsync, fsync or none), and a sync_on_commit flag (false by default). [#1074]
+  (dsync, fsync or none), and an enabled flag (false by default). [#1074]
 
 * Add ability to sync with per transaction granularity. [#1074]
 
