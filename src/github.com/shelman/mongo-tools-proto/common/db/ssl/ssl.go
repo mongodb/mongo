@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"labix.org/v2/mgo"
 	"net"
-	"strings"
 	"time"
 )
 
@@ -61,7 +60,7 @@ func createDialerFunc(opts *options.ToolOptions) (dialerFunc, error) {
 	// the tls config
 	config := &tls.Config{}
 
-	// allow invalid certs
+	// allow invalid certs, if specified in the options
 	if opts.SSLAllowInvalid {
 		config.InsecureSkipVerify = true
 	}
@@ -77,12 +76,10 @@ func createDialerFunc(opts *options.ToolOptions) (dialerFunc, error) {
 				opts.SSLCAFile, err)
 		}
 
-		// check if the file is a pem file
-		if strings.HasSuffix(opts.SSLCAFile, ".pem") {
-			if !pool.AppendCertsFromPEM(fileBytes) {
-				return nil, fmt.Errorf("error adding pem-encoded ca certs"+
-					" from %v: %v", opts.SSLCAFile, err)
-			}
+		// append the certificate
+		if !pool.AppendCertsFromPEM(fileBytes) {
+			return nil, fmt.Errorf("error adding pem-encoded ca certs"+
+				" from %v: %v", opts.SSLCAFile, err)
 		}
 
 		// TODO: support non-pem encoded ca files?
