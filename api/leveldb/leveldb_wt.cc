@@ -670,8 +670,8 @@ DbImpl::Get(const ReadOptions& options,
   } else if (ret == WT_NOTFOUND)
     errmsg = "DB::Get key not found";
 err:
-  // There is no need to release the cursor if we are in a snapshot
-  if (si != NULL)
+  // Release the cursor if we are not in a snapshot
+  if (si == NULL)
     releaseCursor(cursor);
   return WiredTigerErrorToStatus(ret, errmsg);
 }
