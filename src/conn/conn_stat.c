@@ -362,8 +362,6 @@ err:	if (fp != NULL)
 static void *
 __statlog_server(void *arg)
 {
-	struct timespec ts;
-	struct tm *tm, _tm;
 	FILE *fp;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
