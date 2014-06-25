@@ -838,8 +838,8 @@ populate_thread(void *arg)
 		}
 		++thread->insert.ops;	/* Same as trk->ops */
 
-		if (cfg->stress_checkpoint_rate != 0 &&
-		    (op % cfg->stress_checkpoint_rate) == 0)
+		if (cfg->checkpoint_stress_rate != 0 &&
+		    (op % cfg->checkpoint_stress_rate) == 0)
 			stress_checkpoint_due = 1;
 
 		if (cfg->populate_ops_per_txn != 0) {
@@ -1975,7 +1975,7 @@ main(int argc, char *argv[])
 				goto einval;
 			break;
 		}
-	
+
 	cfg->async_config = NULL;
 	/*
 	 * If the user specified async_threads we use async for all ops.
