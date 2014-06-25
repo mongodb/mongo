@@ -25,17 +25,25 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  * ex_access.java
- * 	demonstrates how to create and access a simple table.
+ *    demonstrates how to create and access a simple table.
  */
 package com.wiredtiger.examples;
 import com.wiredtiger.db.*;
 
 public class ex_access {
     public static void main(String[] args) {
-        Connection conn = wiredtiger.open("WT_HOME", "create");
-        Session s = conn.open_session(null);
-        s.create("table:t", "key_format=S,value_format=u");
-        Cursor c = s.open_cursor("table:t", null, null);
+        Connection conn;
+        Session s;
+        Cursor c;
+        try {
+            conn = wiredtiger.open("WT_HOME", "create");
+            s = conn.open_session(null);
+            s.create("table:t", "key_format=S,value_format=u");
+            c = s.open_cursor("table:t", null, null);
+        } catch (WiredTigerException wte) {
+            System.err.println("WiredTigerException: " + wte);
+            return;
+        }
         System.out.println("Key format: " + c.getKeyFormat());
         System.out.println("Value format: " + c.getValueFormat());
         try {
@@ -47,7 +55,14 @@ public class ex_access {
                 System.out.println("Got: " + c.getKeyString());
             }
         } catch (WiredTigerPackingException wtpe) {
+            System.err.println("WiredTigerPackingException: " + wtpe);
+        } catch (WiredTigerException wte) {
+            System.err.println("WiredTigerException: " + wte);
         }
-        conn.close(null);
+        try {
+            conn.close(null);
+        } catch (WiredTigerException wte) {
+            System.err.println("WiredTigerException: " + wte);
+        }
     }
 }

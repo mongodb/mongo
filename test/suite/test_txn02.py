@@ -41,7 +41,12 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
     archive_list = ['true', 'false']
     conn_list = ['reopen', 'stay_open']
-    sync_list = ['dsync', 'fsync', 'none']
+    sync_list = [
+        '(method=dsync,enabled)',
+        '(method=fsync,enabled)',
+        '(method=none,enabled)',
+        '(enabled=false)'
+    ]
 
     types = [
         ('row', dict(tabletype='row',
@@ -210,7 +215,8 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
                 self.reopen_conn()
                 c = self.session.open_cursor(self.uri, None, 'overwrite')
 
-            self.session.begin_transaction()
+            self.session.begin_transaction(
+                (self.scenario_number % 2) and 'sync' or None)
             # Test multiple operations per transaction by always
             # doing the same operation on key k + 1.
             k1 = k + 1

@@ -55,6 +55,38 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	int busy, count, full;
 
 	/*
+	 * LSM sets the no-cache-check flag when holding the LSM tree lock,
+	 * in that case, or when holding the schema lock, we don't want to
+	 * highjack the thread for eviction.
+	 */
+	if (F_ISSET(session,
+	    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
+		return (0);
+
+	/*
+	 * Bulk-load threads or threads operating on trees that cannot be
+	 * evicted are ignore, mostly because they're not contributing to
+	 * the problem.
+	 */
+	if ((btree = S2BT_SAFE(session)) != NULL &&
+	    F_ISSET(btree, WT_BTREE_BULK | WT_BTREE_NO_EVICTION))
+		return (0);
+
+	/*
+	 * Only wake the eviction server the first time through here (if the
+	 * cache is too full).
+	 *
+	 * If the cache is less than 95% full, no work to be done.
+	 */
+	WT_RET(__wt_eviction_check(session, &full, 1));
+	if (full < 95)
+		return (0);
+
+	/*
+	 * If we are at the API boundary and the cache is more than 95% full,
+	 * try to evict at least one page before we start an operation.  This
+	 * helps with some eviction-dominated workloads.
+	 *
 	 * If the current transaction is keeping the oldest ID pinned, it is in
 	 * the middle of an operation.	This may prevent the oldest ID from
 	 * moving forward, leading to deadlock, so only evict what we can.
@@ -67,27 +99,9 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	    session->nhazard > 0 ||
 	    (txn_state->snap_min != WT_TXN_NONE &&
 	    txn_global->current != txn_global->oldest_id);
+	if (busy && full < 100)
+		return (0);
 	count = busy ? 1 : 10;
-
-	/*
-	 * Only wake the eviction server the first time through here (if the
-	 * cache is too full).
-	 */
-	WT_RET(__wt_eviction_check(session, &full, 1));
-
-	/*
-	 * If this is an ordinary page read and the cache isn't full, we're
-	 * done.  If we are at the API boundary and the cache is more than 95%
-	 * full, try to evict a page before we start an operation.  This helps
-	 * with some eviction-dominated workloads.
-	 */
-	if (full < (busy ? 100 : 95) || F_ISSET(session,
-	    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
-		return (0);
-
-	if ((btree = S2BT_SAFE(session)) != NULL &&
-	    F_ISSET(btree, WT_BTREE_BULK | WT_BTREE_NO_EVICTION))
-		return (0);
 
 	for (;;) {
 		switch (ret = __wt_evict_lru_page(session, 1)) {

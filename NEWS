@@ -1,3 +1,47 @@
+WiredTiger release 2.2.1, 2014-06-24
+------------------------------------
+
+The WiredTiger 2.2.1 release contains mainly performance enhancements and bug
+fixes.  Significant changes are described below.
+
+Changes to the WiredTiger API (see upgrading documentation for details):
+
+* Change the order in which configuration setting mechanisms are applied by
+  wiredtiger_open. [#1010][#1034]
+
+* Split the global transaction_sync configuration into two parts: a sync method
+  (dsync, fsync or none), and an enabled flag (false by default). [#1074]
+
+* Add ability to sync with per transaction granularity. [#1074]
+
+* Update WiredTiger Java API to throw WiredTigerException consistently. [#1011]
+
+* Add ability to dump and load databases using JSON format. [#740][#1049]
+
+Other significant changes:
+
+* Various performance improvements to the main cursor search routine including
+  reductions in how often we need to copy data and profiling based optimizations
+  for tight search loops. [#1050][#1070]
+
+* Fix a bug in recovery with missing files (e.g., after a hotbackup that raced
+  with file creation). [#1042][#1045]
+
+* Several bug fixes and performance enhancements related to LSM trees and
+  snapshot isolation transactions. [#1057][#1060][#1075]
+
+* Several performance tuning enhancements to LSM trees around locking,
+  throttling and switching chunks. [#1051]
+
+* Algorithmic improvements to LSM tree compact operation. It is now faster
+  and more reliable. [#1063]
+
+* Create a separate thread to manage open file handles - which means that:
+ - Application threads are less likely to be responsible for closing handles
+ - Multi threaded workloads don't open/close handles more often than necessary
+  [#1018]
+
+
 WiredTiger release 2.2.0, 2014-05-21
 ------------------------------------
 

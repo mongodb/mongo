@@ -334,8 +334,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * references; this "pin" based on the current transaction makes
 		 * that safe as well.)
 		 */
-		child->modify->mod_split_txn =
-		    S2C(session)->txn_global.current + 1;
+		child->modify->mod_split_txn = __wt_txn_new_id(session);
 
 		/*
 		 * The newly allocated child's page index references the same
