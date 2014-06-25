@@ -298,11 +298,12 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * points somewhere other than the original page), and if so, free
 	 * the memory.
 	 */
-	WT_ROW_FOREACH(page, rip, i) {
-		ikey = WT_ROW_KEY_COPY(rip);
-		if (ikey != NULL && __wt_off_page(page, ikey))
-			__wt_free(session, ikey);
-	}
+	if (!F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY))
+		WT_ROW_FOREACH(page, rip, i) {
+			ikey = WT_ROW_KEY_COPY(rip);
+			if (ikey != NULL && __wt_off_page(page, ikey))
+				__wt_free(session, ikey);
+		}
 
 	/*
 	 * Free the insert array.
