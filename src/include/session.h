@@ -36,6 +36,8 @@ typedef	enum {
 
 /* Get the connection implementation for a session */
 #define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
+#define	S2C_SAFE(session) ((session) == NULL ? NULL :                   \
+	((WT_CONNECTION_IMPL *)(session)->iface.connection)
 
 /* Get the btree for a session */
 #define	S2BT(session) ((WT_BTREE *)(session)->dhandle->handle)
