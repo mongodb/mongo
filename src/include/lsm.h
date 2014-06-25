@@ -27,7 +27,7 @@ struct __wt_cursor_lsm {
 	WT_CURSOR *current;     	/* The current cursor for iteration */
 	WT_LSM_CHUNK *primary_chunk;	/* The current primary chunk */
 
-	uint64_t *txnid_max;		/* Maximum txn for each chunk */
+	uint64_t *switch_txn;		/* Switch txn for each chunk */
 	size_t txnid_alloc;
 
 	u_int update_count;		/* Updates performed. */
@@ -54,7 +54,14 @@ struct __wt_lsm_chunk {
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
 	uint64_t count;			/* Approximate count of records */
 	uint64_t size;			/* Final chunk size */
-	uint64_t txnid_max;		/* Newest transactional update */
+
+	uint64_t switch_txn;		/*
+					 * Largest transaction that can write
+					 * to this chunk, set by a worker
+					 * thread when the chunk is switched
+					 * out, or by compact to get the most
+					 * recent chunk flushed.
+					 */
 
 	uint32_t id;			/* ID used to generate URIs */
 	uint32_t generation;		/* Merge generation */
@@ -105,6 +112,8 @@ struct __wt_lsm_tree {
 	u_int merge_min, merge_max;
 	u_int merge_threads;
 
+	u_int merge_idle;		/* Count of idle merge threads */
+
 #define	WT_LSM_BLOOM_MERGED				0x00000001
 #define	WT_LSM_BLOOM_OFF				0x00000002
 #define	WT_LSM_BLOOM_OLDEST				0x00000004
@@ -128,11 +137,13 @@ struct __wt_lsm_tree {
 	size_t old_alloc;		/* Space allocated for old chunks */
 	u_int nold_chunks;		/* Number of old chunks */
 
-#define	WT_LSM_TREE_COMPACTING	0x01
-#define	WT_LSM_TREE_NEED_SWITCH	0x02
-#define	WT_LSM_TREE_OPEN	0x04
-#define	WT_LSM_TREE_THROTTLE	0x08
-#define	WT_LSM_TREE_WORKING	0x10
+#define	WT_LSM_TREE_COMPACTING	0x01	/* Tree is being compacted */
+#define	WT_LSM_TREE_FLUSH_ALL	0x02	/* All chunks should be flushed */
+#define	WT_LSM_TREE_MERGING	0x04	/* Ordinary merging is active */
+#define	WT_LSM_TREE_NEED_SWITCH	0x08	/* A new chunk should be created */
+#define	WT_LSM_TREE_OPEN	0x10	/* The tree is open */
+#define	WT_LSM_TREE_THROTTLE	0x20	/* Throttle updates */
+#define	WT_LSM_TREE_WORKING	0x40	/* Workers are active */
 	uint32_t flags;
 };
 

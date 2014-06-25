@@ -146,9 +146,19 @@ __wt_lsm_merge_worker(void *vargs)
 			stallms = 0;
 		else if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+			if (WT_ATOMIC_ADD(lsm_tree->merge_idle, 1) ==
+			    lsm_tree->merge_threads &&
+			    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING |
+			    WT_LSM_TREE_MERGING))
+				F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING |
+				    WT_LSM_TREE_MERGING);
+
 			/* Poll 10 times per second. */
 			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
+
+			(void)WT_ATOMIC_SUB(lsm_tree->merge_idle, 1);
+
 			/*
 			 * Randomize the tracking of stall time so that with
 			 * multiple LSM trees open, they don't all get
@@ -253,7 +263,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 	int locked;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
-	j = 0;
 	lsm_tree = arg;
 	session = lsm_tree->ckpt_session;
 
@@ -261,15 +270,15 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-			WT_WITH_SCHEMA_LOCK(session, ret =
-			    __wt_lsm_tree_switch(session, lsm_tree));
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret = __wt_lsm_tree_switch(session, lsm_tree));
 			WT_ERR(ret);
 		}
 
 		WT_ERR(__lsm_copy_chunks(session, lsm_tree, &cookie, 0));
 
 		/* Write checkpoints in all completed files. */
-		for (i = 0, j = 0; i < cookie.nchunks - 1; i++) {
+		for (i = 0, j = 0; i < cookie.nchunks; i++) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 				goto err;
 
@@ -277,11 +286,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 				break;
 
 			chunk = cookie.chunk_array[i];
-
-			/* Stop if a running transaction needs the chunk. */
-			__wt_txn_update_oldest(session);
-			if (!__wt_txn_visible_all(session, chunk->txnid_max))
-				break;
 
 			/*
 			 * If the chunk is already checkpointed, make sure it
@@ -302,6 +306,12 @@ __wt_lsm_checkpoint_worker(void *arg)
 			}
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 				continue;
+
+			/* Stop if a running transaction needs the chunk. */
+			__wt_txn_update_oldest(session);
+			if (chunk->switch_txn == WT_TXN_NONE ||
+			    !__wt_txn_visible_all(session, chunk->switch_txn))
+				break;
 
 			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 			     "LSM worker flushing %u", i));
@@ -366,7 +376,28 @@ __wt_lsm_checkpoint_worker(void *arg)
 				break;
 			}
 
+			/* Now the file is written, get the chunk size. */
 			WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
+
+			/*
+			 * Lock the tree, mark the chunk as on disk and update
+			 * the metadata.
+			 */
+			++j;
+			WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
+			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
+			ret = __wt_lsm_meta_write(session, lsm_tree);
+			++lsm_tree->dsk_gen;
+
+			/* Update the throttle time. */
+			__wt_lsm_tree_throttle(session, lsm_tree, 1);
+			WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+
+			if (ret != 0) {
+				__wt_err(session, ret, "LSM metadata write");
+				break;
+			}
+
 			/*
 			 * Clear the "cache resident" flag so the primary can
 			 * be evicted and eventually closed.  Only do this once
@@ -379,45 +410,23 @@ __wt_lsm_checkpoint_worker(void *arg)
 			__wt_btree_evictable(session, 1);
 			WT_ERR(__wt_session_release_btree(session));
 
-			++j;
-			WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
-			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
-			ret = __wt_lsm_meta_write(session, lsm_tree);
-			++lsm_tree->dsk_gen;
-
-			/* Update the throttle time. */
-			__wt_lsm_tree_throttle(session, lsm_tree, 1);
-			WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
-
 			/* Make sure we aren't pinning a transaction ID. */
 			__wt_txn_release_snapshot(session);
-
-			if (ret != 0) {
-				__wt_err(session, ret,
-				    "LSM checkpoint metadata write");
-				break;
-			}
 
 			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 			     "LSM worker checkpointed %u", i));
 		}
-keep_going:
 		__lsm_unpin_chunks(session, &cookie);
 		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
-		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
+		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+			if (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL))
+				F_CLR(lsm_tree, WT_LSM_TREE_FLUSH_ALL);
 			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
+		}
 	}
 
-err:	/*
-	 * XXX an EBUSY is being returned from somewhere.  Until we can track
-	 * it down, don't have the worker thread give up (and panic).  Just
-	 * keep going.
-	 */
-	if (ret == EBUSY)
-		goto keep_going;
-
-	__lsm_unpin_chunks(session, &cookie);
+err:	__lsm_unpin_chunks(session, &cookie);
 	__wt_free(session, cookie.chunk_array);
 	/*
 	 * The thread will only exit with failure if we run out of memory or
@@ -534,8 +543,6 @@ __lsm_discard_handle(
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 
-	WT_ASSERT(session, S2BT(session)->modified == 0);
-
 	/*
 	 * We need the checkpoint lock to discard in-memory handles: otherwise,
 	 * an application checkpoint could see this file locked and fail with
@@ -550,6 +557,12 @@ __lsm_discard_handle(
 		locked = 1;
 	if (ret == 0)
 		F_SET(session->dhandle, WT_DHANDLE_DISCARD);
+
+	/*
+	 * This check must come after taking the checkpoint lock - since
+	 * otherwise an in progress checkpoint may have set the modified
+	 * flag in the file we're discarding.
+	 */
 	WT_TRET(__wt_session_release_btree(session));
 	if (locked)
 		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);

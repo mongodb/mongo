@@ -300,7 +300,7 @@ __rec_review(
 	 * set a transaction value, once that's globally visible, we know we
 	 * can evict the created page.
 	 */
-	if (mod != NULL && WT_PAGE_IS_INTERNAL(page) &&
+	if (!exclusive && mod != NULL && WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
 		return (EBUSY);
 

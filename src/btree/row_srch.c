@@ -340,9 +340,13 @@ leaf_only:
 	 * an existing entry.  Check that case and get out fast.
 	 */
 	if (cmp == 0) {
-		WT_ASSERT(session, rip != NULL);
 		cbt->compare = 0;
 		cbt->ref = child;
+
+		/*
+		 * Safe: if the page had entries, rip will be set in the loop
+		 * above, if the page has no entries, then cmp will not be 0.
+		 */
 		cbt->slot = WT_ROW_SLOT(page, rip);
 		return (0);
 	}

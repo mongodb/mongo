@@ -7,13 +7,13 @@
 
 #include "wt_internal.h"
 
-static int __evict_clear_walks(WT_SESSION_IMPL *);
-static int  __evict_lru(WT_SESSION_IMPL *, uint32_t);
-static int  __evict_lru_cmp(const void *, const void *);
-static int __evict_lru_pages(WT_SESSION_IMPL *, int);
-static int  __evict_pass(WT_SESSION_IMPL *);
-static int  __evict_walk(WT_SESSION_IMPL *, uint32_t *, uint32_t);
-static int  __evict_walk_file(WT_SESSION_IMPL *, u_int *, uint32_t);
+static int   __evict_clear_walks(WT_SESSION_IMPL *);
+static int   __evict_lru(WT_SESSION_IMPL *, uint32_t);
+static int   __evict_lru_cmp(const void *, const void *);
+static int   __evict_lru_pages(WT_SESSION_IMPL *, int);
+static int   __evict_pass(WT_SESSION_IMPL *);
+static int   __evict_walk(WT_SESSION_IMPL *, uint32_t *, uint32_t);
+static int   __evict_walk_file(WT_SESSION_IMPL *, u_int *, uint32_t);
 static void *__evict_worker(void *);
 
 typedef struct {

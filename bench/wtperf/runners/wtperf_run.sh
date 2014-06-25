@@ -22,20 +22,20 @@ outfile=./wtperf.out
 rm -f $outfile
 runmax=5
 run=1
-# First run the test N times accumulating the sum, min and max
-# as we go along.
-ins_max=0
-ins_min=0
-ins_sum=0
-load_max=0
-load_min=0
-load_sum=0
-rd_max=0
-rd_min=0
-rd_sum=0
-upd_max=0
-upd_min=0
-upd_sum=0
+
+avg=(0 0 0)
+max=(0 0 0)
+min=(0 0 0)
+sum=(0 0 0)
+# Load needs floating point and bc, handle separately.
+loadindex=4
+avg[$loadindex]=0
+max[$loadindex]=0
+min[$loadindex]=0
+sum[$loadindex]=0
+ops=(read insert update)
+outp=("Read count:" "Insert count:" "Update count:")
+outp[$loadindex]="Load time:"
 
 # getval min/max val cur
 # Returns the minimum or maximum of val and cur.
@@ -46,12 +46,26 @@ getval()
 	val="$2"
 	cur="$3"
 	ret=$cur
+	echo "getval: max $max val $val cur $cur" >> $outfile
 	if test "$max" -eq "1"; then
 		if test "$val" -gt "$cur"; then
 			ret=$val
 		fi
 	elif test "$val" -lt "$cur"; then
 			ret=$val
+	fi
+	echo "$ret"
+}
+
+isstable()
+{
+	min="$1"
+	max="$2"
+	tmp=`echo "scale=3; $min * 1.03" | bc`
+	if (($(bc <<< "$tmp < $max") )); then
+		ret=0
+	else
+		ret=1
 	fi
 	echo "$ret"
 }
@@ -65,62 +79,90 @@ while test "$run" -le "$runmax"; do
 	if test "$?" -ne "0"; then
 		exit 1
 	fi
-	load=`grep "^Load time:" ./WT_TEST/test.stat | cut -d ' ' -f 3`
-	rd=`grep "Executed.*read operations" ./WT_TEST/test.stat | cut -d ' ' -f 2`
-	ins=`grep "Executed.*insert operations" ./WT_TEST/test.stat | cut -d ' ' -f 2`
-	upd=`grep "Executed.*update operations" ./WT_TEST/test.stat | cut -d ' ' -f 2`
-	#
-	# Test this value against the min and max values.
-	# Load times are floating point.  Send those through bc.
-	#
-	load_sum=`echo "$load_sum + $load" | bc`
-	rd_sum=`expr $rd_sum + $rd`
-	ins_sum=`expr $ins_sum + $ins`
-	upd_sum=`expr $upd_sum + $upd`
+	# Load is always using floating point, so handle separately
+	l=`grep "^Load time:" ./WT_TEST/test.stat`
+	if test "$?" -eq "0"; then
+		load=`echo $l | cut -d ' ' -f 3`
+	else
+		load=0
+	fi
+	cur[$loadindex]=$load
+	sum[$loadindex]=`echo "${sum[$loadindex]} + $load" | bc`
+	echo "cur ${cur[$loadindex]} sum ${sum[$loadindex]}" >> $outfile
+	for i in ${!ops[*]}; do
+		l=`grep "Executed.*${ops[$i]} operations" ./WT_TEST/test.stat`
+		if test "$?" -eq "0"; then
+			n=`echo $l | cut -d ' ' -f 2`
+		else
+			n=0
+		fi
+		cur[$i]=$n
+		sum[$i]=`expr $n + ${sum[$i]}`
+	done
 	#
 	# Keep running track of min and max for each operation type.
 	#
 	if test "$run" -eq "1"; then
-		load_min=$load
-		load_max=$load
-		rd_min=$rd
-		rd_max=$rd
-		ins_min=$ins
-		ins_max=$ins
-		upd_min=$upd
-		upd_max=$upd
+		for i in ${!cur[*]}; do
+			min[$i]=${cur[$i]}
+			max[$i]=${cur[$i]}
+		done
 	else
-		if (($(bc <<< "$load < $load_min") )); then
-			load_min=$load
+		for i in ${!cur[*]}; do
+			if test "$i" -eq "$loadindex"; then
+				if (($(bc <<< "${cur[$i]} < ${min[$i]}") )); then
+					min[$i]=${cur[$i]}
+				fi
+				if (($(bc <<< "${cur[$i]} > ${max[$i]}") )); then
+					max[$i]=${cur[$i]}
+				fi
+			else
+				min[$i]=$(getval $getmin ${cur[$i]} ${min[$i]})
+				max[$i]=$(getval $getmax ${cur[$i]} ${max[$i]})
+			fi
+		done
+	fi
+	#
+	# After 3 runs see if this is a very stable test.  If so, we
+	# can skip the last 2 runs and just use these values.  We
+	# define "very stable" to be that the min and max are within
+	# 3% of each other.
+	if test "$run" -eq "3"; then
+		# Only if all values are stable, we can break.
+		unstable=0
+		for i in ${!min[*]}; do
+			stable=$(isstable ${min[$i]} ${max[$i]})
+			if test "$stable" -eq "0"; then
+				unstable=1
+				break
+			fi
+		done
+		if test "$unstable" -eq "0"; then
+			break
 		fi
-		if (($(bc <<< "$load > $load_max") )); then
-			load_max=$load
-		fi
-		rd_min=$(getval $getmin $rd $rd_min)
-		rd_max=$(getval $getmax $rd $rd_max)
-		ins_min=$(getval $getmin $ins $ins_min)
-		ins_max=$(getval $getmax $ins $ins_max)
-		upd_min=$(getval $getmin $upd $upd_min)
-		upd_max=$(getval $getmax $upd $upd_max)
 	fi
 	run=`expr $run + 1`
 done
 
-numruns=`expr $runmax - 2`
+if test "$run" -le "$runmax"; then
+	numruns=`expr $run - 2`
+else
+	numruns=`expr $runmax - 2`
+fi
 #
 # The sum contains all runs.  Subtract out the min/max values.
 # Average the remaining and write it out to the file.
 #
-load_sum=`echo "scale=3; $load_sum - $load_min - $load_max" | bc`
-load_avg=`echo "scale=3; $load_sum / $numruns" | bc`
-rd_sum=`expr $rd_sum - $rd_min - $rd_max`
-rd_avg=`expr $rd_sum / $numruns`
-ins_sum=`expr $ins_sum - $ins_min - $ins_max`
-ins_avg=`expr $ins_sum / $numruns`
-upd_sum=`expr $upd_sum - $upd_min - $upd_max`
-upd_avg=`expr $upd_sum / $numruns`
-echo "Load time: $load_avg" >> $outfile
-echo "Read count: $rd_avg" >> $outfile
-echo "Insert count: $ins_avg" >> $outfile
-echo "Update count: $upd_avg" >> $outfile
+for i in ${!min[*]}; do
+	if test "$i" -eq "$loadindex"; then
+		s=`echo "scale=3; ${sum[$i]} - ${min[$i]} - ${max[$i]}" | bc`
+		avg[$i]=`echo "scale=3; $s / $numruns" | bc`
+	else
+		s=`expr ${sum[$i]} - ${min[$i]} - ${max[$i]}`
+		avg[$i]=`expr $s / $numruns`
+	fi
+done
+for i in ${!outp[*]}; do
+	echo "${outp[$i]} ${avg[$i]}" >> $outfile
+done
 exit 0

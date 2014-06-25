@@ -34,8 +34,21 @@ import glob, json, os, re, sys
 # Set paths
 suitedir = sys.path[0]
 wt_disttop = os.path.dirname(os.path.dirname(suitedir))
-wt_builddir = os.path.join(wt_disttop, 'build_posix')
 wt_3rdpartydir = os.path.join(wt_disttop, 'test', '3rdparty')
+
+# Check for a local build that contains the wt utility. First check in
+# current working directory, then in build_posix and finally in the disttop
+# directory. This isn't ideal - if a user has multiple builds in a tree we
+# could pick the wrong one.
+if os.path.isfile(os.path.join(os.getcwd(), 'wt')):
+    wt_builddir = os.getcwd()
+elif os.path.isfile(os.path.join(wt_disttop, 'wt')):
+    wt_builddir = wt_disttop
+elif os.path.isfile(os.path.join(wt_disttop, 'build_posix', 'wt')):
+    wt_builddir = os.path.join(wt_disttop, 'build_posix')
+else:
+    print 'Unable to find useable WiredTiger build'
+    sys.exit(False)
 
 # Cannot import wiredtiger and supporting utils until we set up paths
 sys.path.append(os.path.join(wt_builddir, 'lang', 'python'))
