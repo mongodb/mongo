@@ -85,11 +85,12 @@ def getconfcheck(c):
         # Manually re-wrap when there is a check string to avoid ugliness
         # between string and non-string wrapping
         if len(check + ' ' + cstr + ',\n\t    ' + sstr + '},') >= 68:
-            check = check + '\n\t    ' + cstr + ',\n\t    ' + sstr + '},'
+            check = check + '\n\t    ' + cstr + ',\n\t    ' + sstr + ' },'
         else:
-            check = check + ' ' + cstr + ', ' + sstr + '},'
+            check = check + ' ' + cstr + ', ' + sstr + ' },'
     else:
-        check = '\n\t    '.join(w.wrap(check + ' ' + cstr + ', ' + sstr + '},'))
+        check = '\n\t    '.join(
+            w.wrap(check + ' ' + cstr + ', ' + sstr + ' },'))
     return check
 
 skip = False
@@ -122,8 +123,8 @@ for line in open(f, 'r'):
 
     w = textwrap.TextWrapper(width=80-len(prefix.expandtabs()),
             break_on_hyphens=False,
-			replace_whitespace=False,
-			fix_sentence_endings=True)
+            replace_whitespace=False,
+            fix_sentence_endings=True)
     lastname = None
     for c in sorted(api_data.methods[config_name].config):
         name = c.name
@@ -190,7 +191,7 @@ def get_default(c):
         return '(%s)' % (','.join('%s=%s' % (subc.name, get_default(subc))
             for subc in sorted(c.subconfig)))
     elif (c.default or t == 'int') and c.default != 'true':
-	return str(c.default).replace('"', '\\"')
+        return str(c.default).replace('"', '\\"')
     else:
         return ''
 
@@ -206,10 +207,7 @@ static const WT_CONFIG_CHECK confchk_%(name)s_subconfigs[] = {
 };
 ''' % {
     'name' : c.name,
-    'check' : '\n\t'.join('"\n\t    "'.join(
-        w.wrap('{ "%s", "%s", %s, NULL },' %
-        (subc.name, gettype(subc), checkstr(subc))))
-        for subc in sorted(c.subconfig)),
+    'check' : '\n\t'.join(getconfcheck(subc) for subc in sorted(c.subconfig)),
 })
 
 def getsubconfigstr(c):
@@ -249,9 +247,9 @@ for name in sorted(api_data.methods.keys()):
     # Build a list of #defines that reference specific slots in the list (the
     # #defines are used to avoid a list search where we know the correct slot).
     config_defines +=\
-	'#define\tWT_CONFIG_ENTRY_' + name.replace('.', '_') + '\t' * \
-	    max(1, 6 - (len('WT_CONFIG_ENTRY_' + name) / 8)) + \
-	    "%2s" % str(slot) + '\n'
+        '#define\tWT_CONFIG_ENTRY_' + name.replace('.', '_') + '\t' * \
+            max(1, 6 - (len('WT_CONFIG_ENTRY_' + name) / 8)) + \
+            "%2s" % str(slot) + '\n'
 
     # Write the method name and base.
     tfile.write('''
@@ -319,15 +317,15 @@ compare_srcfile(tmp_file, f)
 tfile = open(tmp_file, 'w')
 skip = 0
 for line in open('../src/include/config.h', 'r'):
-	if skip:
-		if 'configuration section: END' in line:
-			tfile.write('/*\n' + line)
-			skip = 0
-	else:
-		tfile.write(line)
-	if 'configuration section: BEGIN' in line:
-		skip = 1
-		tfile.write(' */\n')
-		tfile.write(config_defines)
+    if skip:
+        if 'configuration section: END' in line:
+            tfile.write('/*\n' + line)
+            skip = 0
+    else:
+        tfile.write(line)
+    if 'configuration section: BEGIN' in line:
+        skip = 1
+        tfile.write(' */\n')
+        tfile.write(config_defines)
 tfile.close()
 compare_srcfile(tmp_file, '../src/include/config.h')

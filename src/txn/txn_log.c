@@ -189,7 +189,7 @@ __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Write updates to the log. */
 	return (__wt_log_write(session,
-	    txn->logrec, NULL, S2C(session)->txn_logsync));
+	    txn->logrec, NULL, txn->txn_logsync));
 }
 
 /*
