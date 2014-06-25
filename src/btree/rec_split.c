@@ -16,6 +16,14 @@ static u_int __split_deepen_min_child = 10;
 static u_int __split_deepen_per_child = 100;
 static u_int __split_deepen_split_child = 100;
 
+#define	WT_INCR_ADD(total, len)	do {					\
+	total += (len) + WT_ALLOC_OVERHEAD;				\
+} while (0)
+#define	WT_INCR_TRANSFER(from_decr, to_incr, len) do {			\
+	WT_INCR_ADD(from_decr, len);					\
+	WT_INCR_ADD(to_incr, len);					\
+} while (0)
+
 /*
  * __safe_free --
  *	Free a buffer if we can be sure no thread is accessing it, or schedule
@@ -160,10 +168,10 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 			ref->key.ikey = ikey;
 		} else {
 			WT_RET(__split_ovfl_key_cleanup(session, page, ref));
-
-			*parent_decrp += sizeof(WT_IKEY) + ikey->size;
+			WT_INCR_ADD(*parent_decrp,
+			    sizeof(WT_IKEY) + ikey->size);
 		}
-		*child_incrp += sizeof(WT_IKEY) + ikey->size;
+		WT_INCR_ADD(*child_incrp, sizeof(WT_IKEY) + ikey->size);
 	}
 
 	/*
@@ -173,10 +181,10 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 	 */
 	if ((addr = ref->addr) == NULL)
 		return (0);
-	if (__wt_off_page(page, addr)) {
-		*child_incrp += sizeof(WT_ADDR) + addr->size;
-		*parent_decrp += sizeof(WT_ADDR) + addr->size;
-	} else {
+	if (__wt_off_page(page, addr))
+		WT_INCR_TRANSFER(*parent_decrp, *child_incrp,
+		    sizeof(WT_ADDR) + addr->size);
+	else {
 		__wt_cell_unpack((WT_CELL *)ref->addr, &unpack);
 		WT_RET(__wt_calloc_def(session, 1, &addr));
 		if ((ret = __wt_strndup(
@@ -188,7 +196,7 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 		addr->type =
 		    unpack.raw == WT_CELL_ADDR_INT ? WT_ADDR_INT : WT_ADDR_LEAF;
 		ref->addr = addr;
-		*child_incrp += sizeof(WT_ADDR) + addr->size;
+		WT_INCR_ADD(*child_incrp, sizeof(WT_ADDR) + addr->size);
 	}
 	return (0);
 }
@@ -256,13 +264,13 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	WT_PAGE_INDEX *alloc_index, *child_pindex, *pindex;
 	WT_REF **alloc_refp;
 	WT_REF *child_ref, **child_refp, *parent_ref, **parent_refp, *ref;
-	size_t child_incr, parent_decr, parent_incr, size;
+	size_t child_incr, child_total, parent_decr, parent_incr, size;
 	uint32_t children, chunk, i, j, remain, slots;
 	int panic;
 	void *p;
 
 	alloc_index = NULL;
-	parent_incr = parent_decr = 0;
+	child_total = parent_incr = parent_decr = 0;
 	panic = 0;
 
 	pindex = WT_INTL_INDEX_COPY(parent);
@@ -302,8 +310,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 */
 	size = sizeof(WT_PAGE_INDEX) +
 	    (children + SPLIT_CORRECT_2) * sizeof(WT_REF *);
-	parent_incr += size;
 	WT_ERR(__wt_calloc(session, 1, size, &alloc_index));
+	WT_INCR_ADD(parent_incr, size);
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = children + SPLIT_CORRECT_2;
 	alloc_index->index[0] = pindex->index[0];
@@ -311,8 +319,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	    pindex->index[pindex->entries - 1];
 	for (alloc_refp = alloc_index->index + SPLIT_CORRECT_1,
 	    i = 0; i < children; ++alloc_refp, ++i) {
-		parent_incr += sizeof(WT_REF);
 		WT_ERR(__wt_calloc_def(session, 1, alloc_refp));
+		WT_INCR_ADD(parent_incr, sizeof(WT_REF));
 	}
 
 	/* Allocate child pages, and connect them into the new page index. */
@@ -337,7 +345,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			__wt_ref_key(parent, *parent_refp, &p, &size);
 			WT_ERR(
 			    __wt_row_ikey(session, 0, p, size, &ref->key.ikey));
-			parent_incr += sizeof(WT_IKEY) + size;
+			WT_INCR_ADD(parent_incr, sizeof(WT_IKEY) + size);
 		} else
 			ref->key.recno = (*parent_refp)->key.recno;
 		ref->state = WT_REF_MEM;
@@ -379,10 +387,11 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			    parent, *parent_refp, &parent_decr, &child_incr));
 			*child_refp++ = *parent_refp++;
 
-			child_incr += sizeof(WT_REF);
-			parent_decr += sizeof(WT_REF);
+			WT_INCR_TRANSFER(parent_decr, child_incr,
+			    sizeof(WT_REF));
 		}
 		__wt_cache_page_inmem_incr(session, child, child_incr);
+		child_total += child_incr;
 	}
 	WT_ASSERT(session, alloc_refp -
 	    alloc_index->index == alloc_index->entries - SPLIT_CORRECT_1);
@@ -468,22 +477,12 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * in order to revert to the previous parent page's state.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	parent_decr += size;
+	WT_INCR_ADD(parent_decr, size);
 	WT_ERR(__safe_free(session, parent, 0, pindex, size));
 
 	/* Adjust the parent's memory footprint. */
-	if (parent_incr >= parent_decr) {
-		parent_incr -= parent_decr;
-		parent_decr = 0;
-	}
-	if (parent_decr >= parent_incr) {
-		parent_decr -= parent_incr;
-		parent_incr = 0;
-	}
-	if (parent_incr != 0)
-		__wt_cache_page_inmem_incr(session, parent, parent_incr);
-	if (parent_decr != 0)
-		__wt_cache_page_inmem_decr(session, parent, parent_decr);
+	__wt_cache_page_inmem_incr(session, parent, parent_incr);
+	__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
 	if (0) {
 err:		__wt_free_ref_index(session, parent, alloc_index, 1);
@@ -623,8 +622,8 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 
 	/* In some cases, the underlying WT_REF has not yet been allocated. */
 	if (*refp == NULL) {
-		incr += sizeof(WT_REF);
 		WT_RET(__wt_calloc_def(session, 1, refp));
+		WT_INCR_ADD(incr, sizeof(WT_REF));
 	}
 	ref = *refp;
 
@@ -645,12 +644,13 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		 * the confusion.
 		 */
 		WT_RET(__wt_calloc_def(session, 1, &addr));
+		WT_INCR_ADD(incr, sizeof(WT_ADDR));
 		ref->addr = addr;
 		addr->size = multi->addr.size;
 		addr->type = multi->addr.type;
 		WT_RET(__wt_strndup(session,
 		    multi->addr.addr, addr->size, &addr->addr));
-		incr += sizeof(WT_ADDR) + addr->size;
+		WT_INCR_ADD(incr, (size_t)addr->size);
 	} else
 		WT_RET(__split_inmem_build(session, page, ref, multi));
 
@@ -660,7 +660,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		ikey = multi->key.ikey;
 		WT_RET(__wt_row_ikey(session, 0,
 		    WT_IKEY_DATA(ikey), ikey->size, &ref->key.ikey));
-		incr += sizeof(WT_IKEY) + ikey->size;
+		WT_INCR_ADD(incr, sizeof(WT_IKEY) + ikey->size);
 		break;
 	default:
 		ref->key.recno = multi->key.recno;
@@ -764,8 +764,8 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * the newly created split array, into place.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + result_entries * sizeof(WT_REF *);
-	parent_incr += size;
 	WT_ERR(__wt_calloc(session, 1, size, &alloc_index));
+	WT_INCR_ADD(parent_incr, size);
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = result_entries;
 	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i)
@@ -836,13 +836,13 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * them to the session discard list, to be freed once we know it's safe.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	parent_decr += size;
 	WT_TRET(__safe_free(session, parent, exclusive, pindex, size));
+	WT_INCR_ADD(parent_decr, size);
 	if (parent->type == WT_PAGE_ROW_INT &&
 	    (ikey = __wt_ref_key_instantiated(ref)) != NULL) {
 		size = sizeof(WT_IKEY) + ikey->size;
-		parent_decr += size;
 		WT_TRET(__safe_free(session, parent, exclusive, ikey, size));
+		WT_INCR_ADD(parent_decr, size);
 	}
 	/*
 	 * Take a copy of the ref in case we can free it immediately: we still
@@ -850,21 +850,11 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 */
 	ref_copy = *ref;
 	WT_TRET(__safe_free(session, parent, exclusive, ref, sizeof(WT_REF)));
-	parent_decr += sizeof(WT_REF);
+	WT_INCR_ADD(parent_decr, sizeof(WT_REF));
 
 	/* Adjust the parent's memory footprint. */
-	if (parent_incr >= parent_decr) {
-		parent_incr -= parent_decr;
-		parent_decr = 0;
-	}
-	if (parent_decr > parent_incr) {
-		parent_decr -= parent_incr;
-		parent_incr = 0;
-	}
-	if (parent_incr != 0)
-		__wt_cache_page_inmem_incr(session, parent, parent_incr);
-	if (parent_decr != 0)
-		__wt_cache_page_inmem_decr(session, parent, parent_decr);
+	__wt_cache_page_inmem_incr(session, parent, parent_incr);
+	__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
