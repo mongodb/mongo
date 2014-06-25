@@ -1,7 +1,7 @@
 // group.cpp
 
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2012-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -147,7 +147,7 @@ namespace mongo {
                 }
 
                 Runner* rawRunner;
-                if (!getRunner(collection, cq, &rawRunner).isOK()) {
+                if (!getRunner(txn,collection, cq, &rawRunner).isOK()) {
                     uasserted(17213, "Can't get runner for query " + query.toString());
                     return 0;
                 }

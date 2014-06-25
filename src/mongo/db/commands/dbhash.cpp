@@ -1,7 +1,7 @@
 // dbhash.cpp
 
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2013-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -84,7 +84,8 @@ namespace mongo {
 
         auto_ptr<Runner> runner;
         if ( desc ) {
-            runner.reset(InternalPlanner::indexScan(collection,
+            runner.reset(InternalPlanner::indexScan(opCtx,
+                                                    collection,
                                                     desc,
                                                     BSONObj(),
                                                     BSONObj(),
@@ -93,7 +94,8 @@ namespace mongo {
                                                     InternalPlanner::IXSCAN_FETCH));
         }
         else if ( collection->isCapped() ) {
-            runner.reset(InternalPlanner::collectionScan(fullCollectionName,
+            runner.reset(InternalPlanner::collectionScan(opCtx,
+                                                         fullCollectionName,
                                                          collection));
         }
         else {

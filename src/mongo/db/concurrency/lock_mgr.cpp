@@ -33,10 +33,11 @@
 #include <boost/thread/locks.hpp>
 #include <sstream>
 
+#include "mongo/base/init.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
-#include "mongo/base/init.h"
 
 using boost::unique_lock;
 
@@ -274,6 +275,11 @@ namespace mongo {
 
     /*---------- LockManager public functions (mutex guarded) ---------*/
 
+
+    // This startup parameter enables experimental document-level locking features
+    // It should be removed once full document-level locking is checked-in.
+    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useExperimentalDocLocking, bool, false);
+
     static LockManager* _singleton = NULL;
 
     MONGO_INITIALIZER(InstantiateLockManager)(InitializerContext* context) {
@@ -379,7 +385,12 @@ namespace mongo {
     }
 
     void LockManager::acquireLock(LockRequest* lr, Notifier* notifier) {
-        if (NULL == lr) return;
+        if (!useExperimentalDocLocking)  {
+            return;
+        }
+
+        invariant(lr);
+
         {
             unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown();
@@ -408,6 +419,10 @@ namespace mongo {
                               const LockMode& mode,
                               const ResourceId& resId,
                               Notifier* notifier) {
+        if (kReservedResourceId == resId || !useExperimentalDocLocking) {
+            return;
+        }
+
         {
             unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown();
@@ -472,7 +487,8 @@ namespace mongo {
     }
 
     LockManager::LockStatus LockManager::releaseLock(LockRequest* lr) {
-        if (NULL == lr) return kLockNotFound;
+        if (!useExperimentalDocLocking) return kLockNotFound;
+        invariant(lr);
         {
             unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown(lr->requestor);
@@ -485,6 +501,10 @@ namespace mongo {
     LockManager::LockStatus LockManager::release(const Transaction* holder,
                                                  const LockMode& mode,
                                                  const ResourceId& resId) {
+        if (kReservedResourceId == resId || !useExperimentalDocLocking) {
+            return kLockNotFound;
+        }
+
         {
             unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown(holder);
@@ -529,7 +549,7 @@ namespace mongo {
         return numLocksReleased;
     }
 #endif
-    void LockManager::abort(Transaction* goner) {
+    void LockManager::abort(Transaction* goner) {   
         {
             unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown(goner);
@@ -619,6 +639,9 @@ namespace mongo {
     bool LockManager::isLocked(const Transaction* holder,
                                const LockMode& mode,
                                const ResourceId& resId) const {
+        if (!useExperimentalDocLocking) {
+            return false;
+        }
         {
             unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown(holder);

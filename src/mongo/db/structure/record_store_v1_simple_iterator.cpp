@@ -39,23 +39,24 @@ namespace mongo {
     // Regular / non-capped collection traversal
     //
 
-    SimpleRecordStoreV1Iterator::SimpleRecordStoreV1Iterator(const SimpleRecordStoreV1* collection,
+    SimpleRecordStoreV1Iterator::SimpleRecordStoreV1Iterator(OperationContext* txn,
+                                                             const SimpleRecordStoreV1* collection,
                                                              const DiskLoc& start,
                                                              const CollectionScanParams::Direction& dir)
-        : _curr(start), _recordStore(collection), _direction(dir) {
+        : _txn(txn), _curr(start), _recordStore(collection), _direction(dir) {
 
         if (_curr.isNull()) {
 
             const ExtentManager* em = _recordStore->_extentManager;
 
-            if ( _recordStore->details()->firstExtent().isNull() ) {
+            if ( _recordStore->details()->firstExtent(txn).isNull() ) {
                 // nothing in the collection
-                verify( _recordStore->details()->lastExtent().isNull() );
+                verify( _recordStore->details()->lastExtent(txn).isNull() );
             }
             else if (CollectionScanParams::FORWARD == _direction) {
 
                 // Find a non-empty extent and start with the first record in it.
-                Extent* e = em->getExtent( _recordStore->details()->firstExtent() );
+                Extent* e = em->getExtent( _recordStore->details()->firstExtent(txn) );
 
                 while (e->firstRecord.isNull() && !e->xnext.isNull()) {
                     e = em->getExtent( e->xnext );
@@ -68,7 +69,7 @@ namespace mongo {
             else {
                 // Walk backwards, skipping empty extents, and use the last record in the first
                 // non-empty extent we see.
-                Extent* e = em->getExtent( _recordStore->details()->lastExtent() );
+                Extent* e = em->getExtent( _recordStore->details()->lastExtent(txn) );
 
                 // TODO ELABORATE
                 // Does one of e->lastRecord.isNull(), e.firstRecord.isNull() imply the other?
@@ -95,10 +96,10 @@ namespace mongo {
         // Move to the next thing.
         if (!isEOF()) {
             if (CollectionScanParams::FORWARD == _direction) {
-                _curr = _recordStore->getNextRecord( _curr );
+                _curr = _recordStore->getNextRecord( _txn, _curr );
             }
             else {
-                _curr = _recordStore->getPrevRecord( _curr );
+                _curr = _recordStore->getPrevRecord( _txn, _curr );
             }
         }
 

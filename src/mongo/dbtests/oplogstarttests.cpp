@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 MongoDB Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -77,7 +77,7 @@ namespace OplogStartTests {
             ASSERT(s.isOK());
             _cq.reset(cq);
             _oplogws.reset(new WorkingSet());
-            _stage.reset(new OplogStart(collection(), _cq->root(), _oplogws.get()));
+            _stage.reset(new OplogStart(&_txn, collection(), _cq->root(), _oplogws.get()));
         }
 
         void assertWorkingSetMemberHasId(WorkingSetID id, int expectedId) {

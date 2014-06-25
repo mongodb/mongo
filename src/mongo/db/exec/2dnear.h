@@ -64,7 +64,7 @@ namespace mongo {
 
     class TwoDNear : public PlanStage {
     public:
-        TwoDNear(const TwoDNearParams& params, WorkingSet* ws);
+        TwoDNear(OperationContext* txn, const TwoDNearParams& params, WorkingSet* ws);
         virtual ~TwoDNear();
 
         virtual bool isEOF();
@@ -83,6 +83,10 @@ namespace mongo {
         static const char* kStageType;
 
     private:
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
+
         WorkingSet* _workingSet;
 
         // Stats

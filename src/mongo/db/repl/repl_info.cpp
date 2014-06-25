@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -83,7 +83,8 @@ namespace repl {
                 const char* localSources = "local.sources";
                 Client::ReadContext ctx(txn, localSources);
                 auto_ptr<Runner> runner(
-                    InternalPlanner::collectionScan(localSources,
+                    InternalPlanner::collectionScan(txn,
+                                                    localSources,
                                                     ctx.ctx().db()->getCollection(txn,
                                                                                   localSources)));
                 BSONObj obj;

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -42,10 +42,12 @@ namespace mongo {
     // static
     const char* CollectionScan::kStageType = "COLLSCAN";
 
-    CollectionScan::CollectionScan(const CollectionScanParams& params,
+    CollectionScan::CollectionScan(OperationContext* txn,
+                                   const CollectionScanParams& params,
                                    WorkingSet* workingSet,
                                    const MatchExpression* filter)
-        : _workingSet(workingSet),
+        : _txn(txn),
+          _workingSet(workingSet),
           _filter(filter),
           _params(params),
           _nsDropped(false),
@@ -66,7 +68,8 @@ namespace mongo {
                 return PlanStage::DEAD;
             }
 
-            _iter.reset( _params.collection->getIterator( _params.start,
+            _iter.reset( _params.collection->getIterator( _txn,
+                                                          _params.start,
                                                           _params.tailable,
                                                           _params.direction ) );
 

@@ -98,7 +98,8 @@ namespace mongo {
          * TODO: the regular run() command for count should call this instead of getting
          * a runner.
          */
-        Status parseCountToExecutor(const BSONObj& cmdObj,
+        Status parseCountToExecutor(OperationContext* txn,
+                                    const BSONObj& cmdObj,
                                     const std::string& dbname,
                                     const std::string& ns,
                                     Collection* collection,

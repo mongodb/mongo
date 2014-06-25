@@ -1,7 +1,7 @@
 // documentsourcetests.cpp : Unit tests for DocumentSource classes.
 
 /**
- *    Copyright (C) 2012 10gen Inc.
+ *    Copyright (C) 2012-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -178,7 +178,7 @@ namespace DocumentSourceTests {
                 CanonicalQuery* cq;
                 uassertStatusOK(CanonicalQuery::canonicalize(ns, /*query=*/BSONObj(), &cq));
                 Runner* runnerBare;
-                uassertStatusOK(getRunner(ctx.ctx().db()->getCollection(&_opCtx, ns), cq, &runnerBare));
+                uassertStatusOK(getRunner(&_opCtx, ctx.ctx().db()->getCollection(&_opCtx, ns), cq, &runnerBare));
 
                 _runner.reset(runnerBare);
                 _runner->saveState();

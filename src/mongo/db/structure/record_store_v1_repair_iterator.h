@@ -42,7 +42,8 @@ namespace mongo {
      */
     class RecordStoreV1RepairIterator : public RecordIterator {
     public:
-        RecordStoreV1RepairIterator(const RecordStoreV1Base* recordStore);
+        RecordStoreV1RepairIterator(OperationContext* txn,
+                                    const RecordStoreV1Base* recordStore);
         virtual ~RecordStoreV1RepairIterator() { }
 
         virtual bool isEOF();
@@ -67,6 +68,9 @@ namespace mongo {
          *         false otherwise and _currExtent will be null
          */
         bool _advanceToNextValidExtent();
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
 
         // Reference to the owning RecordStore. The store must not be deleted while there are 
         // active iterators on it.

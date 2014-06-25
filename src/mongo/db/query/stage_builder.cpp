@@ -53,7 +53,8 @@
 
 namespace mongo {
 
-    PlanStage* buildStages(Collection* collection,
+    PlanStage* buildStages(OperationContext* txn,
+                           Collection* collection,
                            const QuerySolution& qsol,
                            const QuerySolutionNode* root,
                            WorkingSet* ws) {
@@ -65,7 +66,7 @@ namespace mongo {
             params.direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
                                                      : CollectionScanParams::BACKWARD;
             params.maxScan = csn->maxScan;
-            return new CollectionScan(params, ws, csn->filter.get());
+            return new CollectionScan(txn, params, ws, csn->filter.get());
         }
         else if (STAGE_IXSCAN == root->getType()) {
             const IndexScanNode* ixn = static_cast<const IndexScanNode*>(root);
@@ -89,17 +90,17 @@ namespace mongo {
             params.direction = ixn->direction;
             params.maxScan = ixn->maxScan;
             params.addKeyMetadata = ixn->addKeyMetadata;
-            return new IndexScan(params, ws, ixn->filter.get());
+            return new IndexScan(txn, params, ws, ixn->filter.get());
         }
         else if (STAGE_FETCH == root->getType()) {
             const FetchNode* fn = static_cast<const FetchNode*>(root);
-            PlanStage* childStage = buildStages(collection, qsol, fn->children[0], ws);
+            PlanStage* childStage = buildStages(txn, collection, qsol, fn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new FetchStage(ws, childStage, fn->filter.get(), collection);
         }
         else if (STAGE_SORT == root->getType()) {
             const SortNode* sn = static_cast<const SortNode*>(root);
-            PlanStage* childStage = buildStages(collection, qsol, sn->children[0], ws);
+            PlanStage* childStage = buildStages(txn, collection, qsol, sn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             SortStageParams params;
             params.collection = collection;
@@ -110,7 +111,7 @@ namespace mongo {
         }
         else if (STAGE_PROJECTION == root->getType()) {
             const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
-            PlanStage* childStage = buildStages(collection, qsol, pn->children[0], ws);
+            PlanStage* childStage = buildStages(txn, collection, qsol, pn->children[0], ws);
             if (NULL == childStage) { return NULL; }
 
             ProjectionStageParams params(WhereCallbackReal(collection->ns().db()));
@@ -135,13 +136,13 @@ namespace mongo {
         }
         else if (STAGE_LIMIT == root->getType()) {
             const LimitNode* ln = static_cast<const LimitNode*>(root);
-            PlanStage* childStage = buildStages(collection, qsol, ln->children[0], ws);
+            PlanStage* childStage = buildStages(txn, collection, qsol, ln->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new LimitStage(ln->limit, ws, childStage);
         }
         else if (STAGE_SKIP == root->getType()) {
             const SkipNode* sn = static_cast<const SkipNode*>(root);
-            PlanStage* childStage = buildStages(collection, qsol, sn->children[0], ws);
+            PlanStage* childStage = buildStages(txn, collection, qsol, sn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new SkipStage(sn->skip, ws, childStage);
         }
@@ -149,7 +150,7 @@ namespace mongo {
             const AndHashNode* ahn = static_cast<const AndHashNode*>(root);
             auto_ptr<AndHashStage> ret(new AndHashStage(ws, ahn->filter.get(), collection));
             for (size_t i = 0; i < ahn->children.size(); ++i) {
-                PlanStage* childStage = buildStages(collection, qsol, ahn->children[i], ws);
+                PlanStage* childStage = buildStages(txn, collection, qsol, ahn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
                 ret->addChild(childStage);
             }
@@ -159,7 +160,7 @@ namespace mongo {
             const OrNode * orn = static_cast<const OrNode*>(root);
             auto_ptr<OrStage> ret(new OrStage(ws, orn->dedup, orn->filter.get()));
             for (size_t i = 0; i < orn->children.size(); ++i) {
-                PlanStage* childStage = buildStages(collection, qsol, orn->children[i], ws);
+                PlanStage* childStage = buildStages(txn, collection, qsol, orn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
                 ret->addChild(childStage);
             }
@@ -169,7 +170,7 @@ namespace mongo {
             const AndSortedNode* asn = static_cast<const AndSortedNode*>(root);
             auto_ptr<AndSortedStage> ret(new AndSortedStage(ws, asn->filter.get(), collection));
             for (size_t i = 0; i < asn->children.size(); ++i) {
-                PlanStage* childStage = buildStages(collection, qsol, asn->children[i], ws);
+                PlanStage* childStage = buildStages(txn, collection, qsol, asn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
                 ret->addChild(childStage);
             }
@@ -182,7 +183,7 @@ namespace mongo {
             params.pattern = msn->sort;
             auto_ptr<MergeSortStage> ret(new MergeSortStage(params, ws, collection));
             for (size_t i = 0; i < msn->children.size(); ++i) {
-                PlanStage* childStage = buildStages(collection, qsol, msn->children[i], ws);
+                PlanStage* childStage = buildStages(txn, collection, qsol, msn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
                 ret->addChild(childStage);
             }
@@ -198,7 +199,7 @@ namespace mongo {
             params.numWanted = node->numWanted;
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
-            return new TwoDNear(params, ws);
+            return new TwoDNear(txn, params, ws);
         }
         else if (STAGE_GEO_NEAR_2DSPHERE == root->getType()) {
             const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(root);
@@ -210,7 +211,7 @@ namespace mongo {
             params.filter = node->filter.get();
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
-            return new S2NearStage(params, ws);
+            return new S2NearStage(txn, params, ws);
         }
         else if (STAGE_TEXT == root->getType()) {
             const TextNode* node = static_cast<const TextNode*>(root);
@@ -245,18 +246,18 @@ namespace mongo {
                 return NULL;
             }
 
-            return new TextStage(params, ws, node->filter.get());
+            return new TextStage(txn, params, ws, node->filter.get());
         }
         else if (STAGE_SHARDING_FILTER == root->getType()) {
             const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
-            PlanStage* childStage = buildStages(collection, qsol, fn->children[0], ws);
+            PlanStage* childStage = buildStages(txn, collection, qsol, fn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new ShardFilterStage(shardingState.getCollectionMetadata(collection->ns()),
                                         ws, childStage);
         }
         else if (STAGE_KEEP_MUTATIONS == root->getType()) {
             const KeepMutationsNode* km = static_cast<const KeepMutationsNode*>(root);
-            PlanStage* childStage = buildStages(collection, qsol, km->children[0], ws);
+            PlanStage* childStage = buildStages(txn, collection, qsol, km->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new KeepMutationsStage(km->filter.get(), ws, childStage);
         }
@@ -275,7 +276,7 @@ namespace mongo {
             params.direction = dn->direction;
             params.bounds = dn->bounds;
             params.fieldNo = dn->fieldNo;
-            return new DistinctScan(params, ws);
+            return new DistinctScan(txn, params, ws);
         }
         else if (STAGE_COUNT == root->getType()) {
             const CountNode* cn = static_cast<const CountNode*>(root);
@@ -294,7 +295,7 @@ namespace mongo {
             params.endKey = cn->endKey;
             params.endKeyInclusive = cn->endKeyInclusive;
 
-            return new Count(params, ws);
+            return new Count(txn, params, ws);
         }
         else {
             mongoutils::str::stream ss;
@@ -306,14 +307,15 @@ namespace mongo {
     }
 
     // static (this one is used for Cached and MultiPlanStage)
-    bool StageBuilder::build(Collection* collection,
+    bool StageBuilder::build(OperationContext* txn,
+                             Collection* collection,
                              const QuerySolution& solution,
                              WorkingSet* wsIn,
                              PlanStage** rootOut) {
         if (NULL == wsIn || NULL == rootOut) { return false; }
         QuerySolutionNode* solutionNode = solution.root.get();
         if (NULL == solutionNode) { return false; }
-        return NULL != (*rootOut = buildStages(collection, solution, solutionNode, wsIn));
+        return NULL != (*rootOut = buildStages(txn, collection, solution, solutionNode, wsIn));
     }
 
 }  // namespace mongo

@@ -51,7 +51,7 @@ namespace mongo {
 
         // ------- indexes ----------
 
-        virtual CollectionOptions getCollectionOptions() const = 0;
+        virtual CollectionOptions getCollectionOptions( OperationContext* txn ) const = 0;
 
         virtual int getTotalIndexCount() const = 0;
 

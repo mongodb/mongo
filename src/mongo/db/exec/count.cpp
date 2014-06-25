@@ -36,8 +36,9 @@ namespace mongo {
     // static
     const char* Count::kStageType = "COUNT";
 
-    Count::Count(const CountParams& params, WorkingSet* workingSet)
-        : _workingSet(workingSet),
+    Count::Count(OperationContext* txn, const CountParams& params, WorkingSet* workingSet)
+        : _txn(txn),
+          _workingSet(workingSet),
           _descriptor(params.descriptor),
           _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
           _btreeCursor(NULL),
@@ -54,7 +55,7 @@ namespace mongo {
         cursorOptions.direction = CursorOptions::INCREASING;
 
         IndexCursor *cursor;
-        Status s = _iam->newCursor(cursorOptions, &cursor);
+        Status s = _iam->newCursor(_txn, cursorOptions, &cursor);
         verify(s.isOK());
         verify(cursor);
 
@@ -69,7 +70,7 @@ namespace mongo {
 
         // Create the cursor that points at our end position.
         IndexCursor* endCursor;
-        verify(_iam->newCursor(cursorOptions, &endCursor).isOK());
+        verify(_iam->newCursor(_txn, cursorOptions, &endCursor).isOK());
         verify(endCursor);
 
         // Is this assumption always valid?  See SERVER-12397

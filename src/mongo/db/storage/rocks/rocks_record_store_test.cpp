@@ -330,8 +330,9 @@ namespace mongo {
         }
 
         {
+            MyOperationContext opCtx( db.get() );
             BSONObjBuilder b;
-            rs.appendCustomStats( &b, 1 );
+            rs.appendCustomStats( &opCtx, &b, 1 );
             BSONObj obj = b.obj();
             ASSERT( obj["stats"].String().find( "WAL" ) != string::npos );
         }

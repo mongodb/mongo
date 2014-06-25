@@ -1,7 +1,7 @@
 // record_store_v1_simple.h
 
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2013-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -50,10 +50,10 @@ namespace mongo {
 
         const char* name() const { return "SimpleRecordStoreV1"; }
 
-        virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
+        virtual RecordIterator* getIterator( OperationContext* txn, const DiskLoc& start, bool tailable,
                                              const CollectionScanParams::Direction& dir) const;
 
-        virtual std::vector<RecordIterator*> getManyIterators() const;
+        virtual std::vector<RecordIterator*> getManyIterators(OperationContext* txn) const;
 
         virtual Status truncate(OperationContext* txn);
 

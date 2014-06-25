@@ -64,15 +64,17 @@ namespace mongo {
                              const BSONObj& key,
                              const DiskLoc& loc);
 
-        virtual Status dupKeyCheck(const BSONObj& key, const DiskLoc& loc);
+        virtual Status dupKeyCheck(OperationContext* txn,
+                                   const BSONObj& key,
+                                   const DiskLoc& loc);
 
-        virtual void fullValidate(long long* numKeysOut);
+        virtual void fullValidate(OperationContext* txn, long long* numKeysOut);
 
         virtual bool isEmpty();
 
         virtual Status touch(OperationContext* txn) const;
 
-        virtual Cursor* newCursor(int direction) const;
+        virtual Cursor* newCursor(OperationContext* int direction) const;
 
         virtual Status initAsEmpty(OperationContext* txn);
 

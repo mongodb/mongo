@@ -39,10 +39,11 @@ namespace mongo {
     //
     // Capped collection traversal
     //
-    CappedRecordStoreV1Iterator::CappedRecordStoreV1Iterator( const CappedRecordStoreV1* collection,
+    CappedRecordStoreV1Iterator::CappedRecordStoreV1Iterator( OperationContext* txn,
+                                                              const CappedRecordStoreV1* collection,
                                                               const DiskLoc& start, bool tailable,
                                                               const CollectionScanParams::Direction& dir)
-        : _recordStore(collection), _curr(start), _tailable(tailable),
+        : _txn(txn), _recordStore(collection), _curr(start), _tailable(tailable),
           _direction(dir), _killedByInvalidate(false) {
 
         if (_curr.isNull()) {
@@ -55,7 +56,7 @@ namespace mongo {
                 // Going forwards.
                 if (!nsd->capLooped()) {
                     // If our capped collection doesn't loop around, the first record is easy.
-                    _curr = collection->firstRecord();
+                    _curr = collection->firstRecord(_txn);
                 }
                 else {
                     // Our capped collection has "looped' around.
@@ -72,7 +73,7 @@ namespace mongo {
                 // Going backwards
                 if (!nsd->capLooped()) {
                     // Start at the end.
-                    _curr = collection->lastRecord();
+                    _curr = collection->lastRecord(_txn);
                 }
                 else {
                     _curr = _getExtent( nsd->capExtent() )->lastRecord;
@@ -205,7 +206,7 @@ namespace mongo {
         if (!next.isNull()) {
             return next;
         }
-        return _recordStore->firstRecord();
+        return _recordStore->firstRecord(_txn);
     }
 
     DiskLoc CappedRecordStoreV1Iterator::prevLoop(const DiskLoc& curr) {
@@ -214,7 +215,7 @@ namespace mongo {
         if (!prev.isNull()) {
             return prev;
         }
-        return _recordStore->lastRecord();
+        return _recordStore->lastRecord(_txn);
     }
 
     RecordData CappedRecordStoreV1Iterator::dataFor( const DiskLoc& loc ) const {
@@ -226,11 +227,11 @@ namespace mongo {
     }
 
     DiskLoc CappedRecordStoreV1Iterator::_getNextRecord( const DiskLoc& loc ) {
-        return _recordStore->getNextRecord( loc );
+        return _recordStore->getNextRecord( _txn, loc );
     }
 
     DiskLoc CappedRecordStoreV1Iterator::_getPrevRecord( const DiskLoc& loc ) {
-        return _recordStore->getPrevRecord( loc );
+        return _recordStore->getPrevRecord( _txn, loc );
     }
 
 }  // namespace mongo

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -52,6 +52,8 @@ namespace mongo {
     using fts::FTSSpec;
     using fts::MAX_WEIGHT;
 
+    class OperationContext;
+
     struct TextStageParams {
         TextStageParams(const FTSSpec& s) : spec(s) {}
 
@@ -93,7 +95,10 @@ namespace mongo {
             DONE,
         };
 
-        TextStage(const TextStageParams& params, WorkingSet* ws, const MatchExpression* filter);
+        TextStage(OperationContext* txn,
+                  const TextStageParams& params,
+                  WorkingSet* ws,
+                  const MatchExpression* filter);
 
         virtual ~TextStage();
 
@@ -136,6 +141,9 @@ namespace mongo {
          * evaluate all filters.
          */
         StageState returnResults(WorkingSetID* out);
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
 
         // Parameters of this text stage.
         TextStageParams _params;

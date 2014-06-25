@@ -40,8 +40,8 @@ namespace mongo {
     // static
     const char* TwoDNear::kStageType = "GEO_NEAR_2D";
 
-    TwoDNear::TwoDNear(const TwoDNearParams& params, WorkingSet* ws)
-        : _commonStats(kStageType) {
+    TwoDNear::TwoDNear(OperationContext* txn, const TwoDNearParams& params, WorkingSet* ws)
+        : _txn(txn), _commonStats(kStageType) {
         _params = params;
         _workingSet = ws;
         _initted = false;

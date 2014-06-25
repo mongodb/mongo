@@ -1,7 +1,7 @@
 //@file update.cpp
 
 /**
- *    Copyright (C) 2008 10gen Inc.
+ *    Copyright (C) 2008-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -457,8 +457,8 @@ namespace mongo {
 
         Runner* rawRunner;
         Status status = cq ?
-            getRunner(collection, cqHolder.release(), &rawRunner) :
-            getRunner(collection, nsString.ns(), request.getQuery(), &rawRunner, &cq);
+            getRunner(txn, collection, cqHolder.release(), &rawRunner) :
+            getRunner(txn, collection, nsString.ns(), request.getQuery(), &rawRunner, &cq);
         uassert(17243,
                 "could not get runner " + request.getQuery().toString() + "; " + causedBy(status),
                 status.isOK());

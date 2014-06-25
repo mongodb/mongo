@@ -231,7 +231,7 @@ namespace {
             LocAndSize drecs[] = {
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
         }
     }
 
@@ -262,7 +262,7 @@ namespace {
             LocAndSize drecs[] = {
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
         }
     }
 
@@ -296,7 +296,7 @@ namespace {
             LocAndSize drecs[] = {
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
         }
     }
 
@@ -334,7 +334,7 @@ namespace {
                 {DiskLoc(0, 1320), 24},
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
         }
     }
 
@@ -372,7 +372,7 @@ namespace {
             LocAndSize drecs[] = {
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
         }
     }
 
@@ -497,7 +497,7 @@ namespace {
                 {DiskLoc(1, 1000), 1000},
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
         }
     }
 
@@ -550,7 +550,7 @@ namespace {
                 {DiskLoc(0, 1700), 999},
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
         }
     }
 
@@ -657,7 +657,7 @@ namespace {
                 {DiskLoc(0, 4100),  75},
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
         }
     }
 
@@ -769,7 +769,7 @@ namespace {
                 {DiskLoc(0, 9000), 140},
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
         }
     }
 }

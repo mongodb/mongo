@@ -981,7 +981,7 @@ namespace mongo {
                                                 whereCallback).isOK());
 
             Runner* rawRunner;
-            verify(getRunner(ctx->ctx().db()->getCollection(_txn, _config.incLong),
+            verify(getRunner(_txn, ctx->ctx().db()->getCollection(_txn, _config.incLong),
                              cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
             auto_ptr<Runner> runner(rawRunner);
@@ -1324,7 +1324,7 @@ namespace mongo {
                         }
 
                         Runner* rawRunner;
-                        if (!getRunner(ctx->db()->getCollection(txn, config.ns), cq, &rawRunner).isOK()) {
+                        if (!getRunner(txn, ctx->db()->getCollection(txn, config.ns), cq, &rawRunner).isOK()) {
                             uasserted(17239, "Can't get runner for query " + config.filter.toString());
                             return 0;
                         }

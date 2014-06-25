@@ -1,7 +1,7 @@
 // @file oplog.cpp
 
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -473,7 +473,7 @@ namespace repl {
         if ( collection ) {
 
             if (replSettings.oplogSize != 0) {
-                int o = (int)(collection->getRecordStore()->storageSize() / ( 1024 * 1024 ) );
+                int o = (int)(collection->getRecordStore()->storageSize(&txn) / ( 1024 * 1024 ) );
                 int n = (int)(replSettings.oplogSize / (1024 * 1024));
                 if ( n != o ) {
                     stringstream ss;

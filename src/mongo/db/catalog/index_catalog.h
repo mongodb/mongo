@@ -1,7 +1,7 @@
 // index_catalog.h
 
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2013-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -247,7 +247,7 @@ namespace mongo {
          * checks all unique indexes and checks for conflicts
          * should not throw
          */
-        Status checkNoIndexConflicts( const BSONObj& obj );
+        Status checkNoIndexConflicts( OperationContext* txn, const BSONObj& obj );
 
         // ------- temp internal -------
 

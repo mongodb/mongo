@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -37,6 +37,7 @@ namespace mongo {
 
     class RecordIterator;
     class WorkingSet;
+    class OperationContext;
 
     /**
      * Scans over a collection, starting at the DiskLoc provided in params and continuing until
@@ -46,7 +47,8 @@ namespace mongo {
      */
     class CollectionScan : public PlanStage {
     public:
-        CollectionScan(const CollectionScanParams& params,
+        CollectionScan(OperationContext* txn,
+                       const CollectionScanParams& params,
                        WorkingSet* workingSet,
                        const MatchExpression* filter);
 
@@ -70,6 +72,9 @@ namespace mongo {
          * Returns true if the record 'loc' references is in memory, false otherwise.
          */
         bool diskLocInMemory(DiskLoc loc);
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
 
         // WorkingSet is not owned by us.
         WorkingSet* _workingSet;

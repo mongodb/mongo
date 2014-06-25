@@ -39,8 +39,9 @@ namespace mongo {
     // static
     const char* DistinctScan::kStageType = "DISTINCT";
 
-    DistinctScan::DistinctScan(const DistinctParams& params, WorkingSet* workingSet)
-        : _workingSet(workingSet),
+    DistinctScan::DistinctScan(OperationContext* txn, const DistinctParams& params, WorkingSet* workingSet)
+        : _txn(txn),
+          _workingSet(workingSet),
           _descriptor(params.descriptor),
           _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
           _btreeCursor(NULL),
@@ -60,7 +61,7 @@ namespace mongo {
         }
 
         IndexCursor *cursor;
-        Status s = _iam->newCursor(cursorOptions, &cursor);
+        Status s = _iam->newCursor(_txn, cursorOptions, &cursor);
         verify(s.isOK());
         verify(cursor);
         // Is this assumption always valid?  See SERVER-12397

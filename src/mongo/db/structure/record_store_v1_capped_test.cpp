@@ -70,7 +70,7 @@ namespace {
 
         {
             BSONObjBuilder b;
-            int64_t storageSize = rs.storageSize( &b );
+            int64_t storageSize = rs.storageSize( &txn, &b );
             BSONObj obj = b.obj();
             ASSERT_EQUALS( 1, obj["numExtents"].numberInt() );
             ASSERT_EQUALS( storageSize, em.quantizeExtentSize( 1024 ) );
@@ -127,7 +127,7 @@ namespace {
                 {DiskLoc(0, 1100), 900},
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc().setInvalid()); // unlooped
         }
@@ -173,7 +173,7 @@ namespace {
                 {DiskLoc(0, 1500), 50}, // gap at end of extent
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -219,7 +219,7 @@ namespace {
                 {DiskLoc(0, 1500), 50}, // gap at end of extent
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -268,7 +268,7 @@ namespace {
                 {DiskLoc(0, 1500), 123}, // gap at end of extent
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -315,7 +315,7 @@ namespace {
                 {DiskLoc(0, 1600), 24}, // gap at end of extent
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -362,7 +362,7 @@ namespace {
                 {DiskLoc(1, 1100), 900},
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(1, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc().setInvalid()); // unlooped
         }
@@ -413,7 +413,7 @@ namespace {
                 {DiskLoc(1, 1900), 100},
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(1, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(1, 1000));
         }
@@ -468,7 +468,7 @@ namespace {
                 {DiskLoc(0, 1920), 80},
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -550,7 +550,7 @@ namespace {
                 {DiskLoc(0, 1628), 84},
                 {}
             };
-            assertStateV1RS(recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }

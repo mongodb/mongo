@@ -79,7 +79,7 @@ namespace mongo {
      */
     class DistinctScan : public PlanStage {
     public:
-        DistinctScan(const DistinctParams& params, WorkingSet* workingSet);
+        DistinctScan(OperationContext* txn, const DistinctParams& params, WorkingSet* workingSet);
         virtual ~DistinctScan() { }
 
         virtual StageState work(WorkingSetID* out);
@@ -104,6 +104,9 @@ namespace mongo {
 
         /** See if the cursor is pointing at or past _endKey, if _endKey is non-empty. */
         void checkEnd();
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
 
         // The WorkingSet we annotate with results.  Not owned by us.
         WorkingSet* _workingSet;

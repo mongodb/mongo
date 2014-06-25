@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -32,10 +32,14 @@
 #include "mongo/db/geo/shapes.h"
 
 #include "mongo/db/index/2d_access_method.h"
+#include "mongo/db/operation_context_noop.h"
 
 #pragma once
 
 namespace mongo {
+
+    class OperationContext;
+
 namespace twod_exec {
 
     //
@@ -111,7 +115,6 @@ namespace twod_exec {
 
     struct BtreeLocation {
         BtreeLocation() : _eof(false) { }
-
         scoped_ptr<IndexScan> _scan;
         scoped_ptr<WorkingSet> _ws;
         DiskLoc _loc;
@@ -130,8 +133,12 @@ namespace twod_exec {
         // Returns the min and max keys which bound a particular location.
         // The only time these may be equal is when we actually equal the location
         // itself, otherwise our expanding algorithm will fail.
-        static bool initial(const IndexDescriptor* descriptor, const TwoDIndexingParams& params,
-                            BtreeLocation& min, BtreeLocation& max, GeoHash start);
+        static bool initial(OperationContext* txn,
+                            const IndexDescriptor* descriptor,
+                            const TwoDIndexingParams& params,
+                            BtreeLocation& min,
+                            BtreeLocation& max,
+                            GeoHash start);
     };
 
     //
@@ -207,7 +214,9 @@ namespace twod_exec {
 
         // Fills the stack, but only checks a maximum number of maxToCheck points at a time.
         // Further calls to this function will continue the expand/check neighbors algorithm.
-        virtual void fillStack(int maxToCheck, int maxToAdd = -1, bool onlyExpand = false);
+        virtual void fillStack(int maxToCheck,
+                               int maxToAdd = -1,
+                               bool onlyExpand = false);
 
         bool checkAndAdvance(BtreeLocation* bl, const GeoHash& hash, int& totalFound);
 
@@ -273,6 +282,7 @@ namespace twod_exec {
 
     private:
         const Collection* _collection;
+        OperationContextNoop _txn;
     };
 
 }  // namespace twod_exec

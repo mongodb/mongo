@@ -98,7 +98,7 @@ namespace mongo {
             limit = -limit;
         }
 
-        uassertStatusOK(getRunnerCount(collection, query, hintObj, &rawRunner));
+        uassertStatusOK(getRunnerCount(txn, collection, query, hintObj, &rawRunner));
         auto_ptr<Runner> runner(rawRunner);
 
         // Store the plan summary string in CurOp.
@@ -177,7 +177,7 @@ namespace mongo {
         // Get an executor for the command and use it to generate the explain output.
         CanonicalQuery* rawCq;
         PlanExecutor* rawExec;
-        Status execStatus = parseCountToExecutor(cmdObj, dbname, ns, collection,
+        Status execStatus = parseCountToExecutor(txn, cmdObj, dbname, ns, collection,
                                                  &rawCq, &rawExec);
         if (!execStatus.isOK()) {
             return execStatus;
@@ -189,7 +189,8 @@ namespace mongo {
         return Explain::explainStages(exec.get(), cq.get(), verbosity, out);
     }
 
-    Status CmdCount::parseCountToExecutor(const BSONObj& cmdObj,
+    Status CmdCount::parseCountToExecutor(OperationContext* txn,
+                                          const BSONObj& cmdObj,
                                           const std::string& dbname,
                                           const std::string& ns,
                                           Collection* collection,
@@ -229,7 +230,7 @@ namespace mongo {
 
         auto_ptr<CanonicalQuery> autoCq(cq);
 
-        Status execStat = getExecutor(collection, cq, execOut,
+        Status execStat = getExecutor(txn, collection, cq, execOut,
                                       QueryPlannerParams::PRIVATE_IS_COUNT);
         if (!execStat.isOK()) {
             return execStat;

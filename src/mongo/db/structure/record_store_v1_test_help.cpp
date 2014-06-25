@@ -121,7 +121,7 @@ namespace mongo {
         invariant( false );
     }
 
-    const DiskLoc& DummyRecordStoreV1MetaData::firstExtent() const {
+    const DiskLoc& DummyRecordStoreV1MetaData::firstExtent(OperationContext* txn) const {
         return _firstExtent;
     }
 
@@ -130,7 +130,7 @@ namespace mongo {
         _firstExtent = loc;
     }
 
-    const DiskLoc& DummyRecordStoreV1MetaData::lastExtent() const {
+    const DiskLoc& DummyRecordStoreV1MetaData::lastExtent(OperationContext* txn) const {
         return _lastExtent;
     }
 
@@ -171,7 +171,7 @@ namespace mongo {
     }
 
 
-    int DummyRecordStoreV1MetaData::lastExtentSize() const {
+    int DummyRecordStoreV1MetaData::lastExtentSize(OperationContext* txn) const {
         return _lastExtentSize;
     }
 
@@ -302,9 +302,11 @@ namespace {
         }
     }
 
-    void printRecList(const ExtentManager* em, const RecordStoreV1MetaData* md) {
+    void printRecList(OperationContext* txn,
+                      const ExtentManager* em,
+                      const RecordStoreV1MetaData* md) {
         log() << " *** BEGIN ACTUAL RECORD LIST *** ";
-        DiskLoc extLoc = md->firstExtent();
+        DiskLoc extLoc = md->firstExtent(txn);
         std::set<DiskLoc> seenLocs;
         while (!extLoc.isNull()) {
             Extent* ext = em->getExtent(extLoc, true);
@@ -371,7 +373,7 @@ namespace {
         
         // Need to start with a blank slate
         invariant(em->numFiles() == 0);
-        invariant(md->firstExtent().isNull());
+        invariant(md->firstExtent(txn).isNull());
 
         // pre-allocate extents (even extents that aren't part of this RS)
         {
@@ -410,7 +412,7 @@ namespace {
 
         if (records && !records[0].loc.isNull()) {
             int recIdx = 0;
-            DiskLoc extLoc = md->firstExtent();
+            DiskLoc extLoc = md->firstExtent(txn);
             while (!extLoc.isNull()) {
                 Extent* ext = em->getExtent(extLoc);
                 int prevOfs = DiskLoc::NullOfs;
@@ -492,10 +494,11 @@ namespace {
         }
 
         // Make sure we set everything up as requested.
-        assertStateV1RS(records, drecs, em, md);
+        assertStateV1RS(txn, records, drecs, em, md);
     }
 
-    void assertStateV1RS(const LocAndSize* records,
+    void assertStateV1RS(OperationContext* txn,
+                         const LocAndSize* records,
                          const LocAndSize* drecs,
                          const ExtentManager* em,
                          const DummyRecordStoreV1MetaData* md) {
@@ -508,7 +511,7 @@ namespace {
 
                 int recIdx = 0;
 
-                DiskLoc extLoc = md->firstExtent();
+                DiskLoc extLoc = md->firstExtent(txn);
                 while (!extLoc.isNull()) { // for each Extent
                     Extent* ext = em->getExtent(extLoc, true);
                     int expectedPrevOfs = DiskLoc::NullOfs;
@@ -534,7 +537,7 @@ namespace {
                     }
 
                     if (ext->xnext.isNull()) {
-                        ASSERT_EQUALS(md->lastExtent(), extLoc);
+                        ASSERT_EQUALS(md->lastExtent(txn), extLoc);
                     }
 
                     extLoc = ext->xnext;
@@ -557,7 +560,7 @@ namespace {
                         // the first drec in the capExtent. If the capExtent is the first Extent,
                         // it should be Null.
 
-                        if (md->capExtent() == md->firstExtent()) {
+                        if (md->capExtent() == md->firstExtent(txn)) {
                             ASSERT_EQUALS(actualLoc, DiskLoc());
                         }
                         else {
@@ -597,7 +600,7 @@ namespace {
         }
         catch (...) {
             // If a test fails, provide extra info to make debugging easier
-            printRecList(em, md);
+            printRecList(txn, em, md);
             printDRecList(em, md);
             throw;
         }

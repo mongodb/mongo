@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -37,6 +37,7 @@
 namespace mongo {
 
     class Collection;
+    class OperationContext;
 
     /**
      * Get a runner for a query.  Takes ownership of rawCanonicalQuery.
@@ -47,7 +48,8 @@ namespace mongo {
      * If the query cannot be executed, returns a Status indicating why.  Deletes
      * rawCanonicalQuery.
      */
-    Status getRunner(Collection* collection,
+    Status getRunner(OperationContext* txn,
+                     Collection* collection,
                      CanonicalQuery* rawCanonicalQuery,
                      Runner** out,
                      size_t plannerOptions = 0);
@@ -63,7 +65,8 @@ namespace mongo {
      * the returned runner.  On failure, returns other status values, and '*outRunner' and
      * '*outCanonicalQuery' have unspecified values.
      */
-    Status getRunner(Collection* collection,
+    Status getRunner(OperationContext* txn,
+                     Collection* collection,
                      const std::string& ns,
                      const BSONObj& unparsedQuery,
                      Runner** outRunner,
@@ -76,7 +79,8 @@ namespace mongo {
      * possible values of a certain field.  As such, we can skip lots of data in certain cases (see
      * body of method for detail).
      */
-    Status getRunnerDistinct(Collection* collection,
+    Status getRunnerDistinct(OperationContext* txn,
+                             Collection* collection,
                              const BSONObj& query,
                              const std::string& field,
                              Runner** out);
@@ -88,7 +92,8 @@ namespace mongo {
      * As such, with certain covered queries, we can skip the overhead of fetching etc. when
      * executing a count.
      */
-    Status getRunnerCount(Collection* collection,
+    Status getRunnerCount(OperationContext* txn,
+                          Collection* collection,
                           const BSONObj& query,
                           const BSONObj& hintObj,
                           Runner** out);
@@ -96,7 +101,8 @@ namespace mongo {
     /**
      * Get a runner for a query.  Ignores the cache and always plans the full query.
      */
-    Status getRunnerAlwaysPlan(Collection* collection,
+    Status getRunnerAlwaysPlan(OperationContext* txn,
+                               Collection* collection,
                                CanonicalQuery* rawCanonicalQuery,
                                const QueryPlannerParams& plannerParams,
                                Runner** out);

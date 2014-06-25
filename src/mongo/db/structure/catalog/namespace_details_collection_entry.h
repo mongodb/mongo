@@ -52,7 +52,7 @@ namespace mongo {
 
         virtual ~NamespaceDetailsCollectionCatalogEntry(){}
 
-        virtual CollectionOptions getCollectionOptions() const;
+        virtual CollectionOptions getCollectionOptions(OperationContext* txn) const;
 
         virtual int getTotalIndexCount() const;
 

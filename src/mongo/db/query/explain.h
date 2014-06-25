@@ -38,6 +38,7 @@
 namespace mongo {
 
     class Collection;
+    class OperationContext;
 
     // Temporarily hide the new explain implementation behind a setParameter.
     // TODO: take this out, and make the new implementation the default.
@@ -131,7 +132,6 @@ namespace mongo {
          * are no stages, this requires a special explain format.
          */
         static void explainCountEmptyQuery(BSONObjBuilder* out);
-
     };
 
 } // namespace

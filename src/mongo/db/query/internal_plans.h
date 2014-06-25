@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     /**
      * The internal planner is a one-stop shop for "off-the-shelf" plans.  Most internal procedures
      * that do not require advanced queries could be served by plans already in here.
@@ -62,7 +64,8 @@ namespace mongo {
         /**
          * Return a collection scan.  Caller owns pointer.
          */
-        static Runner* collectionScan(const StringData& ns,
+        static Runner* collectionScan(OperationContext* txn,
+                                      const StringData& ns,
                                       Collection* collection,
                                       const Direction direction = FORWARD,
                                       const DiskLoc startLoc = DiskLoc()) {
@@ -84,14 +87,15 @@ namespace mongo {
             }
 
             WorkingSet* ws = new WorkingSet();
-            CollectionScan* cs = new CollectionScan(params, ws, NULL);
+            CollectionScan* cs = new CollectionScan(txn, params, ws, NULL);
             return new InternalRunner(collection, cs, ws);
         }
 
         /**
          * Return an index scan.  Caller owns returned pointer.
          */
-        static Runner* indexScan(const Collection* collection,
+        static Runner* indexScan(OperationContext* txn,
+                                 const Collection* collection,
                                  const IndexDescriptor* descriptor,
                                  const BSONObj& startKey, const BSONObj& endKey,
                                  bool endKeyInclusive, Direction direction = FORWARD,
@@ -108,11 +112,11 @@ namespace mongo {
             params.bounds.endKeyInclusive = endKeyInclusive;
 
             WorkingSet* ws = new WorkingSet();
-            IndexScan* ix = new IndexScan(params, ws, NULL);
+            IndexScan* ix = new IndexScan(txn, params, ws, NULL);
 
             if (IXSCAN_FETCH & options) {
                 return new InternalRunner(
-                                collection, new FetchStage(ws, ix, NULL, collection), ws);
+                    collection, new FetchStage(ws, ix, NULL, collection), ws);
             }
             else {
                 return new InternalRunner(collection, ix, ws);

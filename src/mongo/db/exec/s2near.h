@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 MongoDB Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     struct S2NearParams {
         S2NearParams() : collection(NULL) { }
         Collection* collection;
@@ -63,7 +65,7 @@ namespace mongo {
          * Takes: index to scan over, MatchExpression with near point, other MatchExpressions for
          * covered data,
          */
-        S2NearStage(const S2NearParams& params, WorkingSet* ws);
+        S2NearStage(OperationContext* txn, const S2NearParams& params, WorkingSet* ws);
 
         virtual ~S2NearStage();
 
@@ -86,6 +88,9 @@ namespace mongo {
         void init();
         StageState addResultToQueue(WorkingSetID* out);
         void nextAnnulus();
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
 
         bool _worked;
 

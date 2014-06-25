@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     /**
      * The StageBuilder converts a QuerySolution to an executable tree of PlanStage(s).
      */
@@ -47,7 +49,8 @@ namespace mongo {
          *
          * Returns false otherwise.  *rootOut and *wsOut are invalid.
          */
-        static bool build(Collection* collection,
+        static bool build(OperationContext* txn,
+                          Collection* collection,
                           const QuerySolution& solution,
                           WorkingSet* wsIn,
                           PlanStage** rootOut);

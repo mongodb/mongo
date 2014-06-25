@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -58,7 +58,8 @@ namespace mongo {
                                                     "repl.preload.docs",
                                                     &prefetchDocStats );
 
-    void prefetchIndexPages(Collection* collection,
+    void prefetchIndexPages(OperationContext* txn,
+                            Collection* collection,
                             const repl::ReplSetImpl::IndexPrefetchConfig& prefetchConfig,
                             const BSONObj& obj);
 
@@ -111,7 +112,7 @@ namespace mongo {
         // a way to achieve that would be to prefetch the record first, and then afterwards do 
         // this part.
         //
-        prefetchIndexPages(collection, prefetchConfig, obj);
+        prefetchIndexPages(txn, collection, prefetchConfig, obj);
 
         // do not prefetch the data for inserts; it doesn't exist yet
         // 
@@ -128,7 +129,8 @@ namespace mongo {
     }
 
     // page in pages needed for all index lookups on a given object
-    void prefetchIndexPages(Collection* collection,
+    void prefetchIndexPages(OperationContext* txn,
+                            Collection* collection,
                             const repl::ReplSetImpl::IndexPrefetchConfig& prefetchConfig,
                             const BSONObj& obj) {
         DiskLoc unusedDl; // unused
@@ -151,7 +153,7 @@ namespace mongo {
                     return;
                 IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex( desc );
                 verify( iam );
-                iam->touch(obj);
+                iam->touch(txn, obj);
             }
             catch (const DBException& e) {
                 LOG(2) << "ignoring exception in prefetchIndexPages(): " << e.what() << endl;
@@ -170,7 +172,7 @@ namespace mongo {
                     IndexDescriptor* desc = ii.next();
                     IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex( desc );
                     verify( iam );
-                    iam->touch(obj);
+                    iam->touch(txn, obj);
                 }
                 catch (const DBException& e) {
                     LOG(2) << "ignoring exception in prefetchIndexPages(): " << e.what() << endl;

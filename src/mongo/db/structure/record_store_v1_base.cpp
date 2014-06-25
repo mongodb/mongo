@@ -1,7 +1,7 @@
 // record_store_v1_base.cpp
 
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -31,6 +31,7 @@
 #include "mongo/db/structure/record_store_v1_base.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/concurrency/lock_mgr.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
@@ -71,13 +72,16 @@ namespace mongo {
     }
 
 
-    int64_t RecordStoreV1Base::storageSize( BSONObjBuilder* extraInfo, int level ) const {
+    int64_t RecordStoreV1Base::storageSize( OperationContext* txn,
+                                            BSONObjBuilder* extraInfo,
+                                            int level ) const {
         BSONArrayBuilder extentInfo;
 
         int64_t total = 0;
         int n = 0;
 
-        DiskLoc cur = _details->firstExtent();
+        DiskLoc cur = _details->firstExtent(txn);
+
         while ( !cur.isNull() ) {
             Extent* e = _extentManager->getExtent( cur );
 
@@ -87,8 +91,7 @@ namespace mongo {
             if ( extraInfo && level > 0 ) {
                 extentInfo.append( BSON( "len" << e->length << "loc: " << e->myLoc.toBSONObj() ) );
             }
-
-            cur = e->xnext;
+            cur = e->xnext;            
         }
 
         if ( extraInfo ) {
@@ -118,27 +121,28 @@ namespace mongo {
         return reinterpret_cast<DeletedRecord*>( recordFor( loc ) );
     }
 
-    Extent* RecordStoreV1Base::_getExtent( const DiskLoc& loc ) const {
+    Extent* RecordStoreV1Base::_getExtent( OperationContext* txn, const DiskLoc& loc ) const {
         return _extentManager->getExtent( loc );
     }
 
-    DiskLoc RecordStoreV1Base::_getExtentLocForRecord( const DiskLoc& loc ) const {
+    DiskLoc RecordStoreV1Base::_getExtentLocForRecord( OperationContext* txn, const DiskLoc& loc ) const {
         return _extentManager->extentLocForV1( loc );
     }
 
 
-    DiskLoc RecordStoreV1Base::getNextRecord( const DiskLoc& loc ) const {
-        DiskLoc next = getNextRecordInExtent( loc );
-        if ( !next.isNull() )
+    DiskLoc RecordStoreV1Base::getNextRecord( OperationContext* txn, const DiskLoc& loc ) const {
+        DiskLoc next = getNextRecordInExtent( txn, loc );
+        if ( !next.isNull() ) {
             return next;
+        }
 
         // now traverse extents
 
-        Extent* e = _getExtent( _getExtentLocForRecord(loc) );
+        Extent* e = _getExtent( txn, _getExtentLocForRecord(txn, loc) );
         while ( 1 ) {
             if ( e->xnext.isNull() )
                 return DiskLoc(); // end of collection
-            e = _getExtent( e->xnext );
+            e = _getExtent( txn, e->xnext );
             if ( !e->firstRecord.isNull() )
                 break;
             // entire extent could be empty, keep looking
@@ -146,18 +150,19 @@ namespace mongo {
         return e->firstRecord;
     }
 
-    DiskLoc RecordStoreV1Base::getPrevRecord( const DiskLoc& loc ) const {
-        DiskLoc prev = getPrevRecordInExtent( loc );
-        if ( !prev.isNull() )
+    DiskLoc RecordStoreV1Base::getPrevRecord( OperationContext* txn, const DiskLoc& loc ) const {
+        DiskLoc prev = getPrevRecordInExtent( txn, loc );
+        if ( !prev.isNull() ) {
             return prev;
+        }
 
         // now traverse extents
 
-        Extent *e = _getExtent(_getExtentLocForRecord(loc));
+        Extent *e = _getExtent(txn, _getExtentLocForRecord(txn, loc));
         while ( 1 ) {
             if ( e->xprev.isNull() )
                 return DiskLoc(); // end of collection
-            e = _getExtent( e->xprev );
+            e = _getExtent( txn, e->xprev );
             if ( !e->firstRecord.isNull() )
                 break;
             // entire extent could be empty, keep looking
@@ -167,7 +172,8 @@ namespace mongo {
     }
 
     DiskLoc RecordStoreV1Base::_findFirstSpot( OperationContext* txn,
-                                               const DiskLoc& extDiskLoc, Extent* e ) {
+                                               const DiskLoc& extDiskLoc,
+                                               Extent* e ) {
         DiskLoc emptyLoc = extDiskLoc;
         emptyLoc.inc( Extent::HeaderSize() );
         int delRecLength = e->length - Extent::HeaderSize();
@@ -188,25 +194,26 @@ namespace mongo {
 
     }
 
-    DiskLoc RecordStoreV1Base::getNextRecordInExtent( const DiskLoc& loc ) const {
+    DiskLoc RecordStoreV1Base::getNextRecordInExtent( OperationContext* txn, const DiskLoc& loc ) const {
         int nextOffset = recordFor( loc )->nextOfs();
 
         if ( nextOffset == DiskLoc::NullOfs )
             return DiskLoc();
 
         fassert( 17441, abs(nextOffset) >= 8 ); // defensive
-        return DiskLoc( loc.a(), nextOffset );
+        DiskLoc result( loc.a(), nextOffset );
+        return result;
     }
 
-    DiskLoc RecordStoreV1Base::getPrevRecordInExtent( const DiskLoc& loc ) const {
+    DiskLoc RecordStoreV1Base::getPrevRecordInExtent( OperationContext* txn, const DiskLoc& loc ) const {
         int prevOffset = recordFor( loc )->prevOfs();
 
         if ( prevOffset == DiskLoc::NullOfs )
             return DiskLoc();
 
         fassert( 17442, abs(prevOffset) >= 8 ); // defensive
-        return DiskLoc( loc.a(), prevOffset );
-
+        DiskLoc result( loc.a(), prevOffset );
+        return result;
     }
 
 
@@ -356,13 +363,13 @@ namespace mongo {
         /* remove ourself from the record next/prev chain */
         {
             if ( todelete->prevOfs() != DiskLoc::NullOfs ) {
-                DiskLoc prev = getPrevRecordInExtent( dl );
+                DiskLoc prev = getPrevRecordInExtent( txn, dl );
                 Record* prevRecord = recordFor( prev );
                 txn->recoveryUnit()->writingInt( prevRecord->nextOfs() ) = todelete->nextOfs();
             }
 
             if ( todelete->nextOfs() != DiskLoc::NullOfs ) {
-                DiskLoc next = getNextRecord( dl );
+                DiskLoc next = getNextRecord( txn, dl );
                 Record* nextRecord = recordFor( next );
                 txn->recoveryUnit()->writingInt( nextRecord->prevOfs() ) = todelete->prevOfs();
             }
@@ -370,7 +377,8 @@ namespace mongo {
 
         /* remove ourself from extent pointers */
         {
-            Extent *e =  _getExtent( todelete->myExtentLoc(dl) );
+            DiskLoc extentLoc = todelete->myExtentLoc(dl);
+            Extent *e =  _getExtent( txn, extentLoc );
             if ( e->firstRecord == dl ) {
                 txn->recoveryUnit()->writing(&e->firstRecord);
                 if ( todelete->nextOfs() == DiskLoc::NullOfs )
@@ -410,15 +418,16 @@ namespace mongo {
 
     }
 
-    RecordIterator* RecordStoreV1Base::getIteratorForRepair() const {
-        return new RecordStoreV1RepairIterator(this);
+    RecordIterator* RecordStoreV1Base::getIteratorForRepair(OperationContext* txn) const {
+        return new RecordStoreV1RepairIterator(txn, this);
     }
 
     void RecordStoreV1Base::_addRecordToRecListInExtent(OperationContext* txn,
                                                         Record *r,
                                                         DiskLoc loc) {
         dassert( recordFor(loc) == r );
-        Extent *e = _getExtent( _getExtentLocForRecord( loc ) );
+        DiskLoc extentLoc = _getExtentLocForRecord( txn, loc );
+        Extent *e = _getExtent( txn, extentLoc );
         if ( e->lastRecord.isNull() ) {
             *txn->recoveryUnit()->writing(&e->firstRecord) = loc;
             *txn->recoveryUnit()->writing(&e->lastRecord) = loc;
@@ -440,7 +449,6 @@ namespace mongo {
                                                        isCapped(),
                                                        size,
                                                        enforceQuota );
-
         Extent *e = _extentManager->getExtent( eloc );
         invariant( e );
 
@@ -453,8 +461,8 @@ namespace mongo {
 
         DiskLoc emptyLoc = _findFirstSpot( txn, eloc, e );
 
-        if ( _details->lastExtent().isNull() ) {
-            invariant( _details->firstExtent().isNull() );
+        if ( _details->lastExtent(txn).isNull() ) {
+            invariant( _details->firstExtent(txn).isNull() );
             _details->setFirstExtent( txn, eloc );
             _details->setLastExtent( txn, eloc );
             _details->setCapExtent( txn, eloc );
@@ -462,9 +470,9 @@ namespace mongo {
             invariant( e->xnext.isNull() );
         }
         else {
-            invariant( !_details->firstExtent().isNull() );
-            *txn->recoveryUnit()->writing(&e->xprev) = _details->lastExtent();
-            *txn->recoveryUnit()->writing(&_extentManager->getExtent(_details->lastExtent())->xnext) = eloc;
+            invariant( !_details->firstExtent(txn).isNull() );
+            *txn->recoveryUnit()->writing(&e->xprev) = _details->lastExtent(txn);
+            *txn->recoveryUnit()->writing(&_extentManager->getExtent(_details->lastExtent(txn))->xnext) = eloc;
             _details->setLastExtent( txn, eloc );
         }
 
@@ -494,36 +502,37 @@ namespace mongo {
 
         output->appendNumber("datasize", _details->dataSize());
         output->appendNumber("nrecords", _details->numRecords());
-        output->appendNumber("lastExtentSize", _details->lastExtentSize());
+        output->appendNumber("lastExtentSize", _details->lastExtentSize(txn));
         output->appendNumber("padding", _details->paddingFactor());
 
-        if ( _details->firstExtent().isNull() )
+        if ( _details->firstExtent(txn).isNull() )
             output->append( "firstExtent", "null" );
         else
             output->append( "firstExtent",
-                            str::stream() << _details->firstExtent().toString()
+                            str::stream() << _details->firstExtent(txn).toString()
                             << " ns:"
-                            << _getExtent( _details->firstExtent() )->nsDiagnostic.toString());
-        if ( _details->lastExtent().isNull() )
+                            << _getExtent( txn, _details->firstExtent(txn) )->nsDiagnostic.toString());
+        if ( _details->lastExtent(txn).isNull() )
             output->append( "lastExtent", "null" );
         else
-            output->append( "lastExtent", str::stream() << _details->lastExtent().toString()
+            output->append( "lastExtent", str::stream() << _details->lastExtent(txn).toString()
                             << " ns:"
-                            << _getExtent( _details->lastExtent() )->nsDiagnostic.toString());
+                            << _getExtent( txn, _details->lastExtent(txn) )->nsDiagnostic.toString());
 
         // 22222222222222222222222222
         { // validate extent basics
             BSONArrayBuilder extentData;
             int extentCount = 0;
+            DiskLoc extentDiskLoc;
             try {
-                if ( !_details->firstExtent().isNull() ) {
-                    _getExtent( _details->firstExtent() )->assertOk();
-                    _getExtent( _details->lastExtent() )->assertOk();
+                if ( !_details->firstExtent(txn).isNull() ) {
+                    _getExtent( txn, _details->firstExtent(txn) )->assertOk();
+                    _getExtent( txn, _details->lastExtent(txn) )->assertOk();
                 }
 
-                DiskLoc extentDiskLoc = _details->firstExtent();
+                extentDiskLoc = _details->firstExtent(txn);
                 while (!extentDiskLoc.isNull()) {
-                    Extent* thisExtent = _getExtent( extentDiskLoc );
+                    Extent* thisExtent = _getExtent( txn, extentDiskLoc );
                     if (full) {
                         extentData << thisExtent->dump();
                     }
@@ -531,18 +540,19 @@ namespace mongo {
                         results->valid = false;
                     }
                     DiskLoc nextDiskLoc = thisExtent->xnext;
+                    
                     if (extentCount > 0 && !nextDiskLoc.isNull()
-                        &&  _getExtent( nextDiskLoc )->xprev != extentDiskLoc) {
+                        &&  _getExtent( txn, nextDiskLoc )->xprev != extentDiskLoc) {
                         StringBuilder sb;
-                        sb << "'xprev' pointer " << _getExtent( nextDiskLoc )->xprev.toString()
+                        sb << "'xprev' pointer " << _getExtent( txn, nextDiskLoc )->xprev.toString()
                            << " in extent " << nextDiskLoc.toString()
                            << " does not point to extent " << extentDiskLoc.toString();
                         results->errors.push_back( sb.str() );
                         results->valid = false;
                     }
-                    if (nextDiskLoc.isNull() && extentDiskLoc != _details->lastExtent()) {
+                    if (nextDiskLoc.isNull() && extentDiskLoc != _details->lastExtent(txn)) {
                         StringBuilder sb;
-                        sb << "'lastExtent' pointer " << _details->lastExtent().toString()
+                        sb << "'lastExtent' pointer " << _details->lastExtent(txn).toString()
                            << " does not point to last extent in list " << extentDiskLoc.toString();
                         results->errors.push_back( sb.str() );
                         results->valid = false;
@@ -571,31 +581,33 @@ namespace mongo {
             // 333333333333333333333333333
             bool testingLastExtent = false;
             try {
-                if (_details->firstExtent().isNull()) {
+                DiskLoc firstExtentLoc = _details->firstExtent(txn);
+                if (firstExtentLoc.isNull()) {
                     // this is ok
                 }
                 else {
-                    output->append("firstExtentDetails", _getExtent(_details->firstExtent())->dump());
-                    if (!_getExtent(_details->firstExtent())->xprev.isNull()) {
+                    output->append("firstExtentDetails", _getExtent(txn, firstExtentLoc)->dump());
+                    if (!_getExtent(txn, firstExtentLoc)->xprev.isNull()) {
                         StringBuilder sb;
-                        sb << "'xprev' pointer in 'firstExtent' " << _details->firstExtent().toString()
-                           << " is " << _getExtent(_details->firstExtent())->xprev.toString()
+                        sb << "'xprev' pointer in 'firstExtent' " << _details->firstExtent(txn).toString()
+                           << " is " << _getExtent(txn, firstExtentLoc)->xprev.toString()
                            << ", should be null";
                         results->errors.push_back( sb.str() );
                         results->valid = false;
                     }
                 }
                 testingLastExtent = true;
-                if (_details->lastExtent().isNull()) {
+                DiskLoc lastExtentLoc = _details->lastExtent(txn);
+                if (lastExtentLoc.isNull()) {
                     // this is ok
                 }
                 else {
-                    if (_details->firstExtent() != _details->lastExtent()) {
-                        output->append("lastExtentDetails", _getExtent(_details->lastExtent())->dump());
-                        if (!_getExtent(_details->lastExtent())->xnext.isNull()) {
+                    if (firstExtentLoc != lastExtentLoc) {
+                        output->append("lastExtentDetails", _getExtent(txn, lastExtentLoc)->dump());
+                        if (!_getExtent(txn, lastExtentLoc)->xnext.isNull()) {
                             StringBuilder sb;
-                            sb << "'xnext' pointer in 'lastExtent' " << _details->lastExtent().toString()
-                               << " is " << _getExtent(_details->lastExtent())->xnext.toString()
+                            sb << "'xnext' pointer in 'lastExtent' " << lastExtentLoc.toString()
+                               << " is " << _getExtent(txn, lastExtentLoc)->xnext.toString()
                                << ", should be null";
                             results->errors.push_back( sb.str() );
                             results->valid = false;
@@ -626,7 +638,8 @@ namespace mongo {
                 int outOfOrder = 0;
                 DiskLoc cl_last;
 
-                scoped_ptr<RecordIterator> iterator( getIterator( DiskLoc(),
+                scoped_ptr<RecordIterator> iterator( getIterator( txn,
+                                                                  DiskLoc(),
                                                                   false,
                                                                   CollectionScanParams::FORWARD ) );
                 DiskLoc cl;
@@ -771,8 +784,10 @@ namespace mongo {
         return Status::OK();
     }
 
-    void RecordStoreV1Base::appendCustomStats( BSONObjBuilder* result, double scale ) const {
-        result->append( "lastExtentSize", _details->lastExtentSize() / scale );
+    void RecordStoreV1Base::appendCustomStats( OperationContext* txn,
+                                               BSONObjBuilder* result,
+                                               double scale ) const {
+        result->append( "lastExtentSize", _details->lastExtentSize(txn) / scale );
         result->append( "paddingFactor", _details->paddingFactor() );
         result->append( "userFlags", _details->userFlags() );
 
@@ -793,21 +808,21 @@ namespace mongo {
     Status RecordStoreV1Base::touch( OperationContext* txn, BSONObjBuilder* output ) const {
         Timer t;
 
-        // Note: when this class has document level locking, we'll need a lock to get extents
-        // and then ideally only hold the collection lock from above while doing actual touching.
-
         std::vector<touch_location> ranges;
         {
-            Extent* ext = _getExtent( _details->firstExtent() );
+            DiskLoc nextLoc = _details->firstExtent(txn);
+            Extent* ext = _getExtent( txn, nextLoc );
             while ( ext ) {
                 touch_location tl;
                 tl.root = reinterpret_cast<const char*>(ext);
                 tl.length = ext->length;
                 ranges.push_back(tl);
-                if ( ext->xnext.isNull() )
+
+                nextLoc = ext->xnext;
+                if ( nextLoc.isNull() )
                     ext = NULL;
                 else
-                    ext = _getExtent( ext->xnext );
+                    ext = _getExtent( txn, nextLoc );
             }
         }
 
@@ -859,8 +874,9 @@ namespace mongo {
     }
 
     void RecordStoreV1Base::IntraExtentIterator::invalidate(const DiskLoc& dl) {
-        if (dl == _curr)
+        if (dl == _curr) {
             getNext();
+        }
     }
 
     /* @return the size for an allocated record quantized to 1/16th of the BucketSize

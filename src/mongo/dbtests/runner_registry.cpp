@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -75,7 +75,7 @@ namespace RunnerRegistry {
             params.collection = collection();
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
-            auto_ptr<CollectionScan> scan(new CollectionScan(params, ws.get(), NULL));
+            auto_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, ws.get(), NULL));
 
             // Create a runner to hold it
             CanonicalQuery* cq;

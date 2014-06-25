@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -134,7 +134,7 @@ namespace mongo {
             OwnedPointerVector<MatchExpression> exprs;
             auto_ptr<WorkingSet> ws(new WorkingSet());
 
-            PlanStage* userRoot = parseQuery(collection, planObj, ws.get(), &exprs);
+            PlanStage* userRoot = parseQuery(txn, collection, planObj, ws.get(), &exprs);
             uassert(16911, "Couldn't parse plan from " + cmdObj.toString(), NULL != userRoot);
 
             // Add a fetch at the top for the user so we can get obj back for sure.
@@ -153,7 +153,8 @@ namespace mongo {
             return true;
         }
 
-        PlanStage* parseQuery(Collection* collection,
+        PlanStage* parseQuery(OperationContext* txn,
+                              Collection* collection,
                               BSONObj obj,
                               WorkingSet* workingSet,
                               OwnedPointerVector<MatchExpression>* exprs) {
@@ -211,7 +212,7 @@ namespace mongo {
                 params.bounds.endKeyInclusive = nodeArgs["endKeyInclusive"].Bool();
                 params.direction = nodeArgs["direction"].numberInt();
 
-                return new IndexScan(params, workingSet, matcher);
+                return new IndexScan(txn, params, workingSet, matcher);
             }
             else if ("andHash" == nodeName) {
                 uassert(16921, "Nodes argument must be provided to AND",
@@ -226,7 +227,7 @@ namespace mongo {
                     uassert(16922, "node of AND isn't an obj?: " + e.toString(),
                             e.isABSONObj());
 
-                    PlanStage* subNode = parseQuery(collection, e.Obj(), workingSet, exprs);
+                    PlanStage* subNode = parseQuery(txn, collection, e.Obj(), workingSet, exprs);
                     uassert(16923, "Can't parse sub-node of AND: " + e.Obj().toString(),
                             NULL != subNode);
                     // takes ownership
@@ -252,7 +253,7 @@ namespace mongo {
                     uassert(16925, "node of AND isn't an obj?: " + e.toString(),
                             e.isABSONObj());
 
-                    PlanStage* subNode = parseQuery(collection, e.Obj(), workingSet, exprs);
+                    PlanStage* subNode = parseQuery(txn, collection, e.Obj(), workingSet, exprs);
                     uassert(16926, "Can't parse sub-node of AND: " + e.Obj().toString(),
                             NULL != subNode);
                     // takes ownership
@@ -275,7 +276,7 @@ namespace mongo {
                 while (it.more()) {
                     BSONElement e = it.next();
                     if (!e.isABSONObj()) { return NULL; }
-                    PlanStage* subNode = parseQuery(collection, e.Obj(), workingSet, exprs);
+                    PlanStage* subNode = parseQuery(txn, collection, e.Obj(), workingSet, exprs);
                     uassert(16936, "Can't parse sub-node of OR: " + e.Obj().toString(),
                             NULL != subNode);
                     // takes ownership
@@ -287,7 +288,8 @@ namespace mongo {
             else if ("fetch" == nodeName) {
                 uassert(16929, "Node argument must be provided to fetch",
                         nodeArgs["node"].isABSONObj());
-                PlanStage* subNode = parseQuery(collection,
+                PlanStage* subNode = parseQuery(txn,
+                                                collection,
                                                 nodeArgs["node"].Obj(),
                                                 workingSet,
                                                 exprs);
@@ -300,7 +302,8 @@ namespace mongo {
                         nodeArgs["node"].isABSONObj());
                 uassert(16931, "Num argument must be provided to limit",
                         nodeArgs["num"].isNumber());
-                PlanStage* subNode = parseQuery(collection,
+                PlanStage* subNode = parseQuery(txn,
+                                                collection,
                                                 nodeArgs["node"].Obj(),
                                                 workingSet,
                                                 exprs);
@@ -313,7 +316,8 @@ namespace mongo {
                         nodeArgs["node"].isABSONObj());
                 uassert(16933, "Num argument must be provided to skip",
                         nodeArgs["num"].isNumber());
-                PlanStage* subNode = parseQuery(collection,
+                PlanStage* subNode = parseQuery(txn,
+                                                collection,
                                                 nodeArgs["node"].Obj(),
                                                 workingSet,
                                                 exprs);
@@ -333,7 +337,7 @@ namespace mongo {
                     params.direction = CollectionScanParams::BACKWARD;
                 }
 
-                return new CollectionScan(params, workingSet, matcher);
+                return new CollectionScan(txn, params, workingSet, matcher);
             }
             // sort is disabled for now.
 #if 0
@@ -342,7 +346,7 @@ namespace mongo {
                         nodeArgs["node"].isABSONObj());
                 uassert(16970, "Pattern argument must be provided to sort",
                         nodeArgs["pattern"].isABSONObj());
-                PlanStage* subNode = parseQuery(db, nodeArgs["node"].Obj(), workingSet, exprs);
+                PlanStage* subNode = parseQuery(txn, db, nodeArgs["node"].Obj(), workingSet, exprs);
                 SortStageParams params;
                 params.pattern = nodeArgs["pattern"].Obj();
                 return new SortStage(params, workingSet, subNode);
@@ -367,7 +371,7 @@ namespace mongo {
                     uassert(16973, "node of mergeSort isn't an obj?: " + e.toString(),
                             e.isABSONObj());
 
-                    PlanStage* subNode = parseQuery(collection, e.Obj(), workingSet, exprs);
+                    PlanStage* subNode = parseQuery(txn, collection, e.Obj(), workingSet, exprs);
                     uassert(16974, "Can't parse sub-node of mergeSort: " + e.Obj().toString(),
                             NULL != subNode);
                     // takes ownership
@@ -403,7 +407,7 @@ namespace mongo {
                     return NULL;
                 }
 
-                return new TextStage(params, workingSet, matcher);
+                return new TextStage(txn, params, workingSet, matcher);
             }
             else {
                 return NULL;

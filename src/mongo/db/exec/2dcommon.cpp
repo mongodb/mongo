@@ -231,8 +231,12 @@ namespace twod_exec {
     // The only time these may be equal is when we actually equal the location
     // itself, otherwise our expanding algorithm will fail.
     // static
-    bool BtreeLocation::initial(const IndexDescriptor* descriptor, const TwoDIndexingParams& params,
-            BtreeLocation& min, BtreeLocation& max, GeoHash start) {
+    bool BtreeLocation::initial(OperationContext* txn,
+                                const IndexDescriptor* descriptor,
+                                const TwoDIndexingParams& params,
+                                BtreeLocation& min,
+                                BtreeLocation& max,
+                                GeoHash start) {
         verify(descriptor);
 
         min._eof = false;
@@ -294,10 +298,10 @@ namespace twod_exec {
         verify(maxParams.bounds.isValidFor(descriptor->keyPattern(), 1));
 
         min._ws.reset(new WorkingSet());
-        min._scan.reset(new IndexScan(minParams, min._ws.get(), NULL));
+        min._scan.reset(new IndexScan(txn, minParams, min._ws.get(), NULL));
 
         max._ws.reset(new WorkingSet());
-        max._scan.reset(new IndexScan(maxParams, max._ws.get(), NULL));
+        max._scan.reset(new IndexScan(txn, maxParams, max._ws.get(), NULL));
 
         min.advance();
         max.advance();
@@ -396,7 +400,9 @@ namespace twod_exec {
     // Are we finished getting points?
     bool GeoBrowse::moreToDo() { return _state != DONE; }
 
-    bool GeoBrowse::checkAndAdvance(BtreeLocation* bl, const GeoHash& hash, int& totalFound) {
+    bool GeoBrowse::checkAndAdvance(BtreeLocation* bl,
+                                    const GeoHash& hash,
+                                    int& totalFound) {
         if (bl->eof()) { return false; }
 
         //cout << "looking at " << bl->_loc.obj().toString() << " dl " << bl->_loc.toString() << endl;
@@ -433,7 +439,7 @@ namespace twod_exec {
             if(! isNeighbor)
                 _prefix = expandStartHash();
 
-            if (!BtreeLocation::initial(_descriptor, _params, _min, _max, _prefix)) {
+            if (!BtreeLocation::initial(&_txn, _descriptor, _params, _min, _max, _prefix)) {
                 _state = isNeighbor ? DONE_NEIGHBOR : DONE;
             } else {
                 _state = DOING_EXPAND;

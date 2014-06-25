@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     /**
      * The SubplanStage is used for rooted $or queries. It plans each clause of the $or
      * individually, and then creates an overall query plan based on the winning plan from
@@ -55,7 +57,8 @@ namespace mongo {
          *
          * 'out' is valid only if an OK status is returned.
          */
-        static Status make(Collection* collection,
+        static Status make(OperationContext* txn,
+                           Collection* collection,
                            WorkingSet* ws,
                            const QueryPlannerParams& params,
                            CanonicalQuery* cq,
@@ -91,7 +94,8 @@ namespace mongo {
         Status planSubqueries();
 
     private:
-        SubplanStage(Collection* collection,
+        SubplanStage(OperationContext* txn,
+                     Collection* collection,
                      WorkingSet* ws,
                      const QueryPlannerParams& params,
                      CanonicalQuery* cq);
@@ -102,6 +106,9 @@ namespace mongo {
             PLANNING,
             RUNNING,
         };
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
 
         SubplanningState _state;
 

@@ -1,7 +1,7 @@
 // index_create.cpp
 
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -104,7 +104,7 @@ namespace mongo {
         unsigned long long n = 0;
         unsigned long long numDropped = 0;
 
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,collection));
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(txn,ns,collection));
 
         std::string idxName = descriptor->indexName();
 

@@ -98,12 +98,14 @@ namespace mongo {
             return _btree->unindex(txn, key, loc);
         }
 
-        virtual void fullValidate(long long *numKeysOut) {
-            *numKeysOut = _btree->fullValidate(NULL, false, false, 0);
+        virtual void fullValidate(OperationContext* txn, long long *numKeysOut) {
+            *numKeysOut = _btree->fullValidate(txn, NULL, false, false, 0);
         }
 
-        virtual Status dupKeyCheck(const BSONObj& key, const DiskLoc& loc) {
-            return _btree->dupKeyCheck(key, loc);
+        virtual Status dupKeyCheck(OperationContext* txn,
+                                   const BSONObj& key,
+                                   const DiskLoc& loc) {
+            return _btree->dupKeyCheck(txn, key, loc);
         }
 
         virtual bool isEmpty() {
@@ -116,8 +118,11 @@ namespace mongo {
 
         class Cursor : public BtreeInterface::Cursor {
         public:
-            Cursor(const BtreeLogic<OnDiskFormat>* btree, int direction)
-                : _btree(btree),
+            Cursor(OperationContext* txn,
+                   const BtreeLogic<OnDiskFormat>* btree,
+                   int direction)
+                : _txn(txn),
+                  _btree(btree),
                   _direction(direction),
                   _bucket(btree->getHead()), // XXX this shouldn't be nessisary, but is.
                   _ofs(0) {
@@ -142,7 +147,7 @@ namespace mongo {
             }
 
             virtual bool locate(const BSONObj& key, const DiskLoc& loc) {
-                return _btree->locate(key, loc, _direction, &_ofs, &_bucket);
+                return _btree->locate(_txn, key, loc, _direction, &_ofs, &_bucket);
             }
 
             virtual void customLocate(const BSONObj& keyBegin,
@@ -151,7 +156,8 @@ namespace mongo {
                                       const vector<const BSONElement*>& keyEnd,
                                       const vector<bool>& keyEndInclusive) {
 
-                _btree->customLocate(&_bucket,
+                _btree->customLocate(_txn,
+                                     &_bucket,
                                      &_ofs,
                                      keyBegin,
                                      keyBeginLen,
@@ -167,7 +173,8 @@ namespace mongo {
                            const vector<const BSONElement*>& keyEnd,
                            const vector<bool>& keyEndInclusive) {
 
-                _btree->advanceTo(&_bucket,
+                _btree->advanceTo(_txn,
+                                  &_bucket,
                                   &_ofs,
                                   keyBegin,
                                   keyBeginLen,
@@ -186,7 +193,7 @@ namespace mongo {
             }
 
             virtual void advance() {
-                _btree->advance(&_bucket, &_ofs, _direction);
+                _btree->advance(_txn, &_bucket, &_ofs, _direction);
             }
 
             virtual void savePosition() {
@@ -198,7 +205,8 @@ namespace mongo {
 
             virtual void restorePosition() {
                 if (!_bucket.isNull()) {
-                    _btree->restorePosition(_savedKey,
+                    _btree->restorePosition(_txn,
+                                            _savedKey,
                                             _savedLoc,
                                             _direction,
                                             &_bucket,
@@ -207,6 +215,7 @@ namespace mongo {
             }
 
         private:
+            OperationContext* _txn; // not owned
             const BtreeLogic<OnDiskFormat>* const _btree;
             const int _direction;
 
@@ -218,8 +227,8 @@ namespace mongo {
             DiskLoc _savedLoc;
         };
 
-        virtual Cursor* newCursor(int direction) const {
-            return new Cursor(_btree.get(), direction);
+        virtual Cursor* newCursor(OperationContext* txn, int direction) const {
+            return new Cursor(txn, _btree.get(), direction);
         }
 
         virtual Status initAsEmpty(OperationContext* txn) {

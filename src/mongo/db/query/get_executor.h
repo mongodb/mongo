@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -62,7 +62,8 @@ namespace mongo {
      * If the query cannot be executed, returns a Status indicating why.  Deletes
      * rawCanonicalQuery.
      */
-    Status getExecutor(Collection* collection,
+    Status getExecutor(OperationContext* txn,
+                       Collection* collection,
                        CanonicalQuery* canonicalQuery,
                        PlanExecutor** out,
                        size_t plannerOptions = 0);
@@ -94,7 +95,8 @@ namespace mongo {
      * possible values of a certain field.  As such, we can skip lots of data in certain cases (see
      * body of method for detail).
      */
-    Status getExecutorDistinct(Collection* collection,
+    Status getExecutorDistinct(OperationContext* txn,
+                               Collection* collection,
                                const BSONObj& query,
                                const std::string& field,
                                PlanExecutor** out);
@@ -106,7 +108,8 @@ namespace mongo {
      * As such, with certain covered queries, we can skip the overhead of fetching etc. when
      * executing a count.
      */
-    Status getExecutorCount(Collection* collection,
+    Status getExecutorCount(OperationContext* txn,
+                            Collection* collection,
                             const BSONObj& query,
                             const BSONObj& hintObj,
                             PlanExecutor** execOut);
@@ -119,7 +122,8 @@ namespace mongo {
      * Returns the resulting executor through 'execOut'. The caller must delete 'execOut',
      * if an OK status is returned.
      */
-    Status getExecutorAlwaysPlan(Collection* collection,
+    Status getExecutorAlwaysPlan(OperationContext* txn,
+                                 Collection* collection,
                                  CanonicalQuery* canonicalQuery,
                                  const QueryPlannerParams& plannerParams,
                                  PlanExecutor** execOut);
