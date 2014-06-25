@@ -47,6 +47,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/db/concurrency/lock_mgr.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -887,7 +888,7 @@ TEST(LockManagerTest, TxShutdown) {
     t2.quit();
 #endif
     // after the quiescing period, t1's request should be refused
-    sleep(3);
+    sleepsecs(3);
     t1.acquire(kShared, 4, ABORTED);
 }
 }
