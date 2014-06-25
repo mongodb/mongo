@@ -336,6 +336,7 @@ __wt_statlog_log_one(WT_SESSION_IMPL *session)
 	FILE *fp;
 
 	conn = S2C(session);
+	WT_CLEAR(path);
 	fp = NULL;
 
 	if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
@@ -465,6 +466,7 @@ __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	int start;
 
 	session = conn->default_session;
+	start = 0;
 
 	/*
 	 * Stop any server that is already running. This means that each time
