@@ -26,44 +26,24 @@ type SessionProvider struct {
 
 func (self *SessionProvider) RunCommand(dbToUse string,
 	cmd command.Command) error {
-	session, err := self.GetSession()
-	if err != nil {
-		return fmt.Errorf("error connecting to database server: %v", err)
-	}
+
+	session := self.GetSession()
 	defer session.Close()
 
 	return session.DB(dbToUse).Run(cmd.AsRunnable(), cmd)
 }
 
 // Returns a session connected to the database server for which the
-// session provider is configured.  Initializes a master session if necessary,
-// in order to do connection pooling.
-func (self *SessionProvider) GetSession() (*mgo.Session, error) {
+// session provider is configured.
+func (self *SessionProvider) GetSession() *mgo.Session {
 
-	// initialize the master session, if necessary
-	if self.masterSession == nil {
-
-		// lock to avoid a race condition
-		self.masterSessionLock.Lock()
-		defer self.masterSessionLock.Unlock()
-
-		// check again, in case another goroutine initialized the session in
-		// between the above two checks
-		if self.masterSession == nil {
-			var err error
-			self.masterSession, err = self.connector.GetNewSession()
-			if err != nil {
-				return nil, fmt.Errorf("error connecting to db server: %v", err)
-			}
-		}
-	}
-
-	// copy and return the master session
-	return self.masterSession.Copy(), nil
+	// copy the provider's master session, for connection pooling
+	return self.masterSession.Copy()
 }
 
 // Initialize a session provider to connect to the database server, based on
-// the options passed in.  Returns a fully initialized provider.
+// the options passed in.  Connects to the db and returns a fully initialized
+// provider.
 func InitSessionProvider(opts *options.ToolOptions) (*SessionProvider,
 	error) {
 
@@ -79,6 +59,13 @@ func InitSessionProvider(opts *options.ToolOptions) (*SessionProvider,
 
 	// configure the connector
 	provider.connector.Configure(opts)
+
+	// initialize the provider's master session
+	var err error
+	provider.masterSession, err = provider.connector.GetNewSession()
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to db server: %v", err)
+	}
 
 	return provider, nil
 }
