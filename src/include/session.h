@@ -129,20 +129,20 @@ struct __wt_session_impl {
 
 	/*
 	 * Sessions can "free" memory that may still be in use, and we use a
-	 * transactional generation to track it, that is, the session stores
-	 * a reference to the memory and a current transaction ID; when the
-	 * oldest transaction ID has moved beyond that point, the memory can
-	 * be discarded for real.
+	 * split generation number to track it, that is, the session stores a
+	 * reference to the memory and allocates a split generation; when no
+	 * session is reading from that split generation, the memory can be
+	 * discarded for real.
 	 */
-	WT_BTREE *active_btree;
 	struct __wt_fotxn {
-		WT_BTREE   *btree;	/* Tree that owned the memory */
-		uint64_t    txnid;	/* Transaction ID */
+		uint64_t    split_gen;	/* Tree generation */
 		void       *p;		/* Memory, length */
 		size_t	    len;
 	} *fotxn;			/* Free-on-transaction array */
 	size_t  fotxn_cnt;		/* Array entries */
 	size_t  fotxn_size;		/* Array size */
+
+	uint64_t split_gen;		/* Reading split generation */
 
 	/*
 	 * Hazard pointers.

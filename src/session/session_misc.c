@@ -8,6 +8,29 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_oldest_split_gen --
+ *	Calculate the oldest active split generation.
+ */
+uint64_t
+__wt_oldest_split_gen(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *s;
+	uint64_t gen, oldest;
+	u_int i, session_cnt;
+
+	conn = S2C(session);
+	WT_ORDERED_READ(session_cnt, conn->session_cnt);
+	for (i = 0, s = conn->sessions, oldest = conn->split_gen + 1;
+	    i < session_cnt;
+	    i++, s++)
+		if (((gen = s->split_gen) != 0) && gen < oldest)
+			oldest = gen;
+
+	return (oldest);
+}
+
+/*
  * __wt_session_fotxn_add --
  *	Add a new entry into the session's free-on-transaction generation list.
  */
@@ -16,22 +39,14 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 {
 	WT_FOTXN *fotxn;
 
-	/*
-	 * Make sure the current thread has a transaction pinned so that
-	 * we don't immediately free the memory we are stashing.
-	 */
-	WT_ASSERT(session,
-	    WT_SESSION_TXN_STATE(session)->snap_min != WT_TXN_NONE);
+	WT_ASSERT(session, p != NULL);
 
 	/* Grow the list as necessary. */
 	WT_RET(__wt_realloc_def(session,
 	    &session->fotxn_size, session->fotxn_cnt + 1, &session->fotxn));
 
 	fotxn = session->fotxn + session->fotxn_cnt++;
-	fotxn->btree = S2BT(session);
-	fotxn->txnid = __wt_txn_current_id(session) + 1;
-	WT_ASSERT(session, !__wt_txn_visible_all(session, fotxn->txnid));
-	WT_ASSERT(session, fotxn->p == NULL);
+	fotxn->split_gen = WT_ATOMIC_ADD(S2C(session)->split_gen, 1);
 	fotxn->p = p;
 	fotxn->len = len;
 
@@ -53,26 +68,19 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 void
 __wt_session_fotxn_discard(WT_SESSION_IMPL *session)
 {
-	WT_BTREE *prev_btree;
 	WT_FOTXN *fotxn;
+	uint64_t oldest;
 	size_t i;
 
-	/* The last known tree that wasn't busy. */
-	prev_btree = NULL;
-
-	/* Bump the oldest transaction ID. */
-	__wt_txn_update_oldest(session);
+	/* Get the oldest split generation. */
+	oldest = __wt_oldest_split_gen(session);
 
 	for (i = 0, fotxn = session->fotxn;
 	    i < session->fotxn_cnt;
 	    ++i, ++fotxn) {
 		if (fotxn->p == NULL)
 			continue;
-		else if (fotxn->btree == prev_btree)
-			;
-		else if (__wt_btree_exclusive(session, fotxn->btree))
-			prev_btree = fotxn->btree;
-		else if (!__wt_txn_visible_all(session, fotxn->txnid))
+		else if (fotxn->split_gen >= oldest)
 			break;
 		/*
 		 * It's a bad thing if another thread is in this memory
@@ -90,12 +98,12 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session)
 	 * If there are enough free slots at the beginning of the list, shuffle
 	 * everything down.
 	 */
-	if ((i > 100 || i == session->fotxn_cnt) &&
-	    (session->fotxn_cnt -= i) > 0) {
-		memmove(session->fotxn, session->fotxn + i,
-		    session->fotxn_cnt * sizeof(session->fotxn[0]));
+	if (i > 100 || i == session->fotxn_cnt) {
+		if ((session->fotxn_cnt -= i) > 0)
+			memmove(session->fotxn, fotxn,
+			    session->fotxn_cnt * sizeof(*fotxn));
 		memset(session->fotxn + session->fotxn_cnt, 0,
-		    i * sizeof(session->fotxn[0]));
+		    i * sizeof(*fotxn));
 	}
 }
 

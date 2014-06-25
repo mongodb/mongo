@@ -31,7 +31,8 @@ __safe_free(
 	 * We have swapped something in a page: if we don't have exclusive
 	 * access, check whether there are other threads in the same tree.
 	 */
-	if (!exclusive && __wt_btree_exclusive(session, S2BT(session)))
+	if (!exclusive &&
+	    __wt_oldest_split_gen(session) == S2C(session)->split_gen + 1)
 		exclusive = 1;
 
 	if (exclusive) {

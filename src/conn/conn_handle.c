@@ -28,6 +28,8 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
 	TAILQ_INIT(&conn->lsmqh);		/* WT_LSM_TREE list */
 
+	conn->split_gen = 1;
+
 	/* Configuration. */
 	WT_RET(__wt_conn_config_init(session));
 

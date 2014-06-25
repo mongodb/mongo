@@ -109,6 +109,8 @@ struct __wt_connection_impl {
 	pthread_t cache_evict_tid;	/* Eviction server thread ID */
 	int	  cache_evict_tid_set;	/* Eviction server thread ID set */
 
+	uint64_t  split_gen;		/* Generation number for splits */
+
 	WT_SPINLOCK dhandle_lock;	/* Locked: dhandle sweep */
 					/* Locked: data handle list */
 	SLIST_HEAD(__wt_dhandle_lh, __wt_data_handle) dhlh;

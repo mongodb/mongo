@@ -1387,6 +1387,7 @@ extern int __wt_session_lock_checkpoint(WT_SESSION_IMPL *session,
     const char *checkpoint);
 extern void __wt_session_discard_btree( WT_SESSION_IMPL *session,
     WT_DATA_HANDLE_CACHE *dhandle_cache);
+extern uint64_t __wt_oldest_split_gen(WT_SESSION_IMPL *session);
 extern int __wt_session_fotxn_add(WT_SESSION_IMPL *session,
     void *p,
     size_t len);

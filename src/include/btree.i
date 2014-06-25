@@ -937,27 +937,6 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_btree_exclusive --
- *	Check if there is another thread active in this tree.
- */
-static inline int
-__wt_btree_exclusive(WT_SESSION_IMPL *session, WT_BTREE *btree)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *s;
-	uint32_t i, session_cnt;
-
-	conn = S2C(session);
-
-	/* No lock is required because the session array is fixed size. */
-	WT_ORDERED_READ(session_cnt, conn->session_cnt);
-	for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i)
-		if (s->active_btree == btree)
-			return (0);
-	return (1);
-}
-
-/*
  * __wt_skip_choose_depth --
  *	Randomly choose a depth for a skiplist insert.
  */

@@ -413,8 +413,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "page reconciliation calls for eviction";
 	stats->rec_skipped_update.desc =
 	    "reconciliation failed because an update could not be included";
-	stats->rec_split_stashed_bytes.desc = "split bytes awaiting free";
-	stats->rec_split_stashed_objects.desc = "split objects awaiting free";
+	stats->rec_split_stashed_bytes.desc = "split bytes stashed";
+	stats->rec_split_stashed_objects.desc = "split objects stashed";
 	stats->rwlock_read.desc = "pthread mutex shared lock read-lock calls";
 	stats->rwlock_write.desc =
 	    "pthread mutex shared lock write-lock calls";
