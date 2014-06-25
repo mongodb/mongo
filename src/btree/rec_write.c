@@ -4002,6 +4002,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	uint32_t i;
 	int dictionary, onpage_ovfl, ovfl_key;
 	const void *p;
+	void *copy;
 
 	btree = S2BT(session);
 	slvg_skip = salvage == NULL ? 0 : salvage->skip;
@@ -4048,14 +4049,22 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		 * Set the WT_IKEY reference (if the key was instantiated), and
 		 * the key cell reference, unpack the key cell.
 		 */
-		ikey = WT_ROW_KEY_COPY(rip);
-		if (__wt_off_page(page, ikey))
-			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-		else {
-			cell = (WT_CELL *)ikey;
+		copy = WT_ROW_KEY_COPY(rip);
+		if (F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY)) {
 			ikey = NULL;
+			cell = NULL;
+			kpack = NULL;
+		} else if (__wt_off_page(page, copy)) {
+			ikey = copy;
+			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
+			kpack = &_kpack;
+			__wt_cell_unpack(cell, kpack);
+		} else {
+			ikey = NULL;
+			cell = (WT_CELL *)copy;
+			kpack = &_kpack;
+			__wt_cell_unpack(cell, kpack);
 		}
-		__wt_cell_unpack(cell, kpack);
 
 		/* Unpack the on-page value cell, and look for an update. */
 		if ((val_cell = __wt_row_leaf_value(page, rip)) == NULL)
@@ -4134,7 +4143,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				 * to imagine a real workload where this test is
 				 * worth the effort, but it's a simple test.
 				 */
-				if (kpack->raw == WT_CELL_KEY_OVFL_RM)
+				if (kpack != NULL &&
+				    kpack->raw == WT_CELL_KEY_OVFL_RM)
 					goto leaf_insert;
 
 				/*
@@ -4175,7 +4185,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				 * keys from a row-store page reconciliation
 				 * seems unlikely enough to ignore.
 				 */
-				if (kpack->ovfl &&
+				if (kpack != NULL && kpack->ovfl &&
 				    kpack->raw != WT_CELL_KEY_OVFL_RM) {
 					/*
 					 * Keys are part of the name-space, we
@@ -4186,7 +4196,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 					 * it now.
 					 */
 					if (ikey == NULL)
-						WT_ERR(__wt_row_leaf_key_work(
+						WT_ERR(__wt_row_leaf_key(
 						    session,
 						    page, rip, tmpkey, 1));
 
@@ -4227,7 +4237,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		 * If the key is an overflow key that hasn't been removed, use
 		 * the original backing blocks.
 		 */
-		onpage_ovfl = kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM;
+		onpage_ovfl = kpack != NULL &&
+		    kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM;
 		if (onpage_ovfl) {
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_total_len(kpack);
@@ -4245,12 +4256,15 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			r->ovfl_items = 1;
 		} else {
 			/*
+			 * Use a direct-key from the page, or
 			 * Use an already instantiated key, or
 			 * Use the key from the disk image, or
 			 * Build a key from a previous key, or
 			 * Instantiate the key from scratch.
 			 */
-			if (ikey != NULL) {
+			if (kpack == NULL)
+				__wt_row_leaf_direct(page, copy, tmpkey);
+			else if (ikey != NULL) {
 				tmpkey->data = WT_IKEY_DATA(ikey);
 				tmpkey->size = ikey->size;
 			} else if (btree->huffman_key == NULL &&

@@ -531,11 +531,12 @@ struct __wt_page {
 	uint8_t type;			/* Page type */
 
 #define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
-#define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
-#define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
-#define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
-#define	WT_PAGE_SCANNING	0x10	/* Obsolete updates are being scanned */
-#define	WT_PAGE_SPLITTING	0x20	/* An internal page is growing. */
+#define	WT_PAGE_DIRECT_KEY	0x02	/* Row-store leaf keys direct access */
+#define	WT_PAGE_DISK_ALLOC	0x04	/* Disk image in allocated memory */
+#define	WT_PAGE_DISK_MAPPED	0x08	/* Disk image in mapped memory */
+#define	WT_PAGE_EVICT_LRU	0x10	/* Page is on the LRU queue */
+#define	WT_PAGE_SCANNING	0x20	/* Obsolete updates are being scanned */
+#define	WT_PAGE_SPLITTING	0x40	/* An internal page is growing. */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 
@@ -669,7 +670,7 @@ struct __wt_ref {
  * WT_ROW --
  * Each in-memory page row-store leaf page has an array of WT_ROW structures:
  * this is created from on-page data when a page is read from the file.  It's
- * sorted by key, fixed in size, and references data on the page.
+ * sorted by key, fixed in size, and starts with a reference to on-page data.
  *
  * Multiple threads of control may be searching the in-memory row-store pages,
  * and the key may be instantiated at any time.  Code must be able to handle
@@ -689,11 +690,11 @@ struct __wt_ref {
  * references to the field (so the code doesn't read it multiple times), all
  * to make sure we don't introduce this bug (again).
  */
-struct __wt_row {
-	void * volatile __key;		/* On-page cell or off-page WT_IKEY */
+struct __wt_row {	/* On-page key, on-page cell, or off-page WT_IKEY */
+	void * volatile __key;
 };
 #define	WT_ROW_KEY_COPY(rip)	((rip)->__key)
-#define	WT_ROW_KEY_SET(rip, v)	((rip)->__key) = (v)
+#define	WT_ROW_KEY_SET(rip, v)	((rip)->__key) = (void *)(v)
 
 /*
  * WT_ROW_FOREACH --
