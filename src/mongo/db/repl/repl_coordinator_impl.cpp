@@ -367,8 +367,7 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
-                                                              const BSONObj& newConfigObj,
-                                                              bool force,
+                                                              const ReplSetReconfigArgs& args,
                                                               BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();
@@ -388,20 +387,13 @@ namespace repl {
 
     void ReplicationCoordinatorImpl::incrementRollbackID() { /* TODO */ }
 
-    Status ReplicationCoordinatorImpl::processReplSetFresh(const StringData& setName,
-                                                           const StringData& who,
-                                                           unsigned id,
-                                                           int cfgver,
-                                                           const OpTime& opTime,
+    Status ReplicationCoordinatorImpl::processReplSetFresh(const ReplSetFreshArgs& args,
                                                            BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorImpl::processReplSetElect(const StringData& set,
-                                                           unsigned whoid,
-                                                           int cfgver,
-                                                           const OID& round,
+    Status ReplicationCoordinatorImpl::processReplSetElect(const ReplSetElectArgs& args,
                                                            BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();

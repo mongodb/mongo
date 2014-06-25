@@ -154,8 +154,7 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorMock::processReplSetReconfig(OperationContext* txn,
-                                                              const BSONObj& newConfigObj,
-                                                              bool force,
+                                                              const ReplSetReconfigArgs& args,
                                                               BSONObjBuilder* resultObj) {
         return Status::OK();
     }
@@ -172,19 +171,12 @@ namespace repl {
 
     void ReplicationCoordinatorMock::incrementRollbackID() {}
 
-    Status ReplicationCoordinatorMock::processReplSetFresh(const StringData& setName,
-                                                           const StringData& who,
-                                                           unsigned id,
-                                                           int cfgver,
-                                                           const OpTime& opTime,
+    Status ReplicationCoordinatorMock::processReplSetFresh(const ReplSetFreshArgs& args,
                                                            BSONObjBuilder* resultObj) {
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorMock::processReplSetElect(const StringData& set,
-                                                           unsigned whoid,
-                                                           int cfgver,
-                                                           const OID& round,
+    Status ReplicationCoordinatorMock::processReplSetElect(const ReplSetElectArgs& args,
                                                            BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();

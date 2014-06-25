@@ -108,8 +108,7 @@ namespace repl {
                                         BSONObjBuilder* resultObj);
 
         virtual Status processReplSetReconfig(OperationContext* txn,
-                                              const BSONObj& newConfigObj,
-                                              bool force,
+                                              const ReplSetReconfigArgs& args,
                                               BSONObjBuilder* resultObj);
 
         virtual Status processReplSetInitiate(OperationContext* txn,
@@ -120,17 +119,10 @@ namespace repl {
 
         virtual void incrementRollbackID();
 
-        virtual Status processReplSetFresh(const StringData& setName,
-                                           const StringData& who,
-                                           unsigned id,
-                                           int cfgver,
-                                           const OpTime& opTime,
+        virtual Status processReplSetFresh(const ReplSetFreshArgs& args,
                                            BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetElect(const StringData& set,
-                                           unsigned whoid,
-                                           int cfgver,
-                                           const OID& round,
+        virtual Status processReplSetElect(const ReplSetElectArgs& args,
                                            BSONObjBuilder* resultObj);
 
         virtual Status processReplSetUpdatePosition(const BSONArray& updates,

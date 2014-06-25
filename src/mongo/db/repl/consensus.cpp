@@ -58,18 +58,21 @@ namespace repl {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
-        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            unsigned id = cmdObj["id"].Int();
-            std::string setName = cmdObj["set"].String();
-            std::string who = cmdObj["who"].String();
-            int cfgver = cmdObj["cfgver"].Int();
-            OpTime opTime(cmdObj["opTime"].Date());
+        virtual bool run(OperationContext* txn,
+                         const string&,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+            ReplicationCoordinator::ReplSetFreshArgs parsedArgs;
+            parsedArgs.id = cmdObj["id"].Int();
+            parsedArgs.setName = cmdObj["set"].checkAndGetStringData();
+            parsedArgs.who = HostAndPort(cmdObj["who"].String());
+            parsedArgs.cfgver = cmdObj["cfgver"].Int();
+            parsedArgs.opTime = OpTime(cmdObj["opTime"].Date());
 
-            Status status = getGlobalReplicationCoordinator()->processReplSetFresh(setName,
-                                                                                   who,
-                                                                                   id,
-                                                                                   cfgver,
-                                                                                   opTime,
+            Status status = getGlobalReplicationCoordinator()->processReplSetFresh(parsedArgs,
                                                                                    &result);
             return appendCommandStatus(result, status);
         }
@@ -87,19 +90,23 @@ namespace repl {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
     private:
-        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn,
+                         const string&,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
             DEV log() << "replSet received elect msg " << cmdObj.toString() << rsLog;
             else LOG(2) << "replSet received elect msg " << cmdObj.toString() << rsLog;
 
-            std::string set = cmdObj["set"].String();
-            unsigned whoid = cmdObj["whoid"].Int();
-            int cfgver = cmdObj["cfgver"].Int();
-            OID round = cmdObj["round"].OID();
+            ReplicationCoordinator::ReplSetElectArgs parsedArgs;
+            parsedArgs.set = cmdObj["set"].checkAndGetStringData();
+            parsedArgs.whoid = cmdObj["whoid"].Int();
+            parsedArgs.cfgver = cmdObj["cfgver"].Int();
+            parsedArgs.round = cmdObj["round"].OID();
 
-            Status status = getGlobalReplicationCoordinator()->processReplSetElect(set,
-                                                                                   whoid,
-                                                                                   cfgver,
-                                                                                   round,
+            Status status = getGlobalReplicationCoordinator()->processReplSetElect(parsedArgs,
                                                                                    &result);
             return appendCommandStatus(result, status);
         }
