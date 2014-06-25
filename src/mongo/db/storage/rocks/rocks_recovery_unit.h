@@ -1,4 +1,4 @@
-// storage_engine.cpp
+// rocks_recovery_unit.h
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -28,42 +28,54 @@
 *    it in the license file.
 */
 
-#include "mongo/db/storage/storage_engine.h"
+#pragma once
 
-#include "mongo/base/init.h"
-#include "mongo/db/storage_options.h"
-#include "mongo/db/storage/heap1/heap1_engine.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
-#include "mongo/util/log.h"
+#include <map>
+#include <string>
 
-#ifdef MONGO_ROCKSDB
-#include "mongo/db/storage/rocks/rocks_engine.h"
-#endif
+#include <boost/scoped_ptr.hpp>
+
+#include "mongo/base/disallow_copying.h"
+#include "mongo/db/storage/recovery_unit.h"
+
+namespace rocksdb {
+    class DB;
+    class WriteBatch;
+}
 
 namespace mongo {
 
-    StorageEngine* globalStorageEngine = 0;
+    class RocksRecoveryUnit : public RecoveryUnit {
+        MONGO_DISALLOW_COPYING(RocksRecoveryUnit);
+    public:
+        RocksRecoveryUnit( rocksdb::DB* db, bool defaultCommit );
+        virtual ~RocksRecoveryUnit();
 
-    MONGO_INITIALIZER_GENERAL(StorageEngineInit,
-                              ("EndStartupOptionStorage"),
-                              MONGO_NO_DEPENDENTS )
-        (InitializerContext* context) {
-        if ( storageGlobalParams.engine == "mmapv1" ) {
-            globalStorageEngine = new MMAPV1Engine();
-        }
-        else if ( storageGlobalParams.engine == "heap1" ) {
-            globalStorageEngine = new Heap1Engine();
-        }
-#ifdef MONGO_ROCKSDB
-        else if ( storageGlobalParams.engine == "rocksExperiment" ) {
-            globalStorageEngine = new RocksEngine( storageGlobalParams.dbpath );
-        }
-#endif
-        else {
-            log() << "unknown storage engine: " << storageGlobalParams.engine;
-            return Status( ErrorCodes::BadValue, "unknown storage engine" );
-        }
-        return Status::OK();
-    }
+        virtual void beginUnitOfWork();
+        virtual void commitUnitOfWork();
+
+        virtual void endUnitOfWork();
+
+        virtual bool commitIfNeeded(bool force = false);
+
+        virtual bool awaitCommit();
+
+        virtual bool isCommitNeeded() const;
+
+        virtual void* writingPtr(void* data, size_t len);
+
+        virtual void syncDataAndTruncateJournal();
+
+        // local api
+
+        rocksdb::WriteBatch* writeBatch();
+
+    private:
+        rocksdb::DB* _db; // now owned
+        bool _defaultCommit;
+
+        boost::scoped_ptr<rocksdb::WriteBatch> _writeBatch; // owned
+        int _depth;
+    };
+
 }
-
