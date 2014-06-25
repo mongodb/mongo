@@ -242,43 +242,11 @@ err:	if (locked)
 }
 
 /*
- * __wt_statlog_log_one --
- *	Log a set of statistics into the configured statistics log. Requires
- *	that the server is not currently running.
- */
-int
-__wt_statlog_log_one(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	WT_ITEM path;
-	FILE *fp;
-
-	conn = S2C(session);
-	fp = NULL;
-
-	if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
-		return (0);
-
-	if (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
-	    F_ISSET(conn, WT_CONN_SERVER_STATISTICS))
-		WT_RET_MSG(session, EINVAL,
-		    "Attempt to log statistics while a server is running");
-
-	WT_RET(__wt_buf_init(session, &path, strlen(conn->stat_path) + 128));
-	WT_ERR(__statlog_log_one(session, fp, NULL, &path));
-	
-err:	if (fp != NULL)
-		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
-	__wt_buf_free(session, &path);
-	return (0);
-}
-
-/*
  * __statlog_log_one --
  *	Output a set of statistics into the current log file.
  */
-int __statlog_log_one(WT_SESSION_IMPL *session,
+static int
+__statlog_log_one(WT_SESSION_IMPL *session,
     FILE *log_file, WT_ITEM *old_path, WT_ITEM *path_buf) {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -351,6 +319,39 @@ int __statlog_log_one(WT_SESSION_IMPL *session,
 
 	/* Flush. */
 	WT_RET(fflush(log_file) == 0 ? 0 : __wt_errno());
+	return (0);
+}
+
+/*
+ * __wt_statlog_log_one --
+ *	Log a set of statistics into the configured statistics log. Requires
+ *	that the server is not currently running.
+ */
+int
+__wt_statlog_log_one(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_ITEM path;
+	FILE *fp;
+
+	conn = S2C(session);
+	fp = NULL;
+
+	if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
+		return (0);
+
+	if (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
+	    F_ISSET(conn, WT_CONN_SERVER_STATISTICS))
+		WT_RET_MSG(session, EINVAL,
+		    "Attempt to log statistics while a server is running");
+
+	WT_RET(__wt_buf_init(session, &path, strlen(conn->stat_path) + 128));
+	WT_ERR(__statlog_log_one(session, fp, NULL, &path));
+	
+err:	if (fp != NULL)
+		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
+	__wt_buf_free(session, &path);
 	return (0);
 }
 
