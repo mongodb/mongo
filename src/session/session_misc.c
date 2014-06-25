@@ -35,7 +35,7 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 	fotxn->p = p;
 	fotxn->len = len;
 
-	WT_STAT_FAST_CONN_INCRV(session, rec_split_stashed_bytes, len);
+	WT_STAT_FAST_CONN_ATOMIC_INCRV(session, rec_split_stashed_bytes, len);
 	WT_STAT_FAST_CONN_ATOMIC_INCR(session, rec_split_stashed_objects);
 
 	/* See if we can free any previous entries. */
@@ -79,18 +79,18 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session)
 		 * after we free it, make sure nothing good happens to
 		 * that thread.
 		 */
-		__wt_overwrite_and_free_len(session, fotxn->p, fotxn->len);
-		WT_STAT_FAST_CONN_INCRV(
-		    session, rec_split_stashed_bytes, -fotxn->len);
+		WT_STAT_FAST_CONN_ATOMIC_DECRV(
+		    session, rec_split_stashed_bytes, fotxn->len);
 		WT_STAT_FAST_CONN_ATOMIC_DECR(
 		    session, rec_split_stashed_objects);
+		__wt_overwrite_and_free_len(session, fotxn->p, fotxn->len);
 	}
 
 	/*
 	 * If there are enough free slots at the beginning of the list, shuffle
 	 * everything down.
 	 */
-	if (i > 100 &&
+	if ((i > 100 || i == session->fotxn_cnt) &&
 	    (session->fotxn_cnt -= i) > 0) {
 		memmove(session->fotxn, session->fotxn + i,
 		    session->fotxn_cnt * sizeof(session->fotxn[0]));
