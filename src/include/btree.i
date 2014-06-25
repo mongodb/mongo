@@ -446,10 +446,12 @@ __wt_off_page(WT_PAGE *page, const void *p)
 static inline void
 __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 {
+	uintptr_t v;
+
 	/*
 	 * An internal page key is in one of two places: if we instantiated the
 	 * key (for example, when reading the page), WT_REF.key.ikey references
-	 * a WT_IKEY structure, otherwise, WT_REF.key.pkey references an on-page
+	 * a WT_IKEY structure, otherwise WT_REF.key.ikey references an on-page
 	 * key.
 	 *
 	 * Now the magic: Any allocated memory will have a low-order bit of 0
@@ -459,14 +461,13 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 	 * pair.  We can fit the maximum page size into 31 bits, so we use the
 	 * low-order bit in the on-page value to flag the next 31 bits as a
 	 * page offset and the other 32 bits as the key's length, not a WT_IKEY
-	 * pointer.  This breaks if allocation chunks aren't even-byte aligned
-	 * or pointers and uint64_t's don't always map their low-order bits to
-	 * the same location.
+	 * pointer.  This breaks if allocation chunks aren't even-byte aligned.
 	 */
-	if (ref->key.pkey & 0x01) {
+	v = (uintptr_t)ref->key.ikey;
+	if (v & 0x01) {
 		*(void **)keyp =
-		    WT_PAGE_REF_OFFSET(page, (ref->key.pkey & 0xFFFFFFFF) >> 1);
-		*sizep = ref->key.pkey >> 32;
+		    WT_PAGE_REF_OFFSET(page, (v & 0xFFFFFFFF) >> 1);
+		*sizep = v >> 32;
 	} else {
 		*(void **)keyp = WT_IKEY_DATA(ref->key.ikey);
 		*sizep = ((WT_IKEY *)ref->key.ikey)->size;
@@ -480,26 +481,31 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 static inline void
 __wt_ref_key_onpage_set(WT_PAGE *page, WT_REF *ref, WT_CELL_UNPACK *unpack)
 {
+	uintptr_t v;
+
 	/*
 	 * See the comment in __wt_ref_key for an explanation of the magic.
 	 */
-	ref->key.pkey =
-	    (uint64_t)unpack->size << 32 |
+	v = (uint64_t)unpack->size << 32 |
 	    (uint32_t)WT_PAGE_DISK_OFFSET(page, unpack->data) << 1 |
 	    0x01;
+	ref->key.ikey = (void *)v;
 }
 
 /*
  * __wt_ref_key_instantiated --
- *	Return an instantiated key from a WT_REF.
+ *	Return if a WT_REF key is instantiated.
  */
 static inline WT_IKEY *
 __wt_ref_key_instantiated(WT_REF *ref)
 {
+	uintptr_t v;
+
 	/*
 	 * See the comment in __wt_ref_key for an explanation of the magic.
 	 */
-	return (ref->key.pkey & 0x01 ? NULL : ref->key.ikey);
+	v = (uintptr_t)ref->key.ikey;
+	return (v & 0x01 ? NULL : ref->key.ikey);
 }
 
 /*
@@ -509,7 +515,7 @@ __wt_ref_key_instantiated(WT_REF *ref)
 static inline void
 __wt_ref_key_clear(WT_REF *ref)
 {
-	/* The key union has 3 fields, all of which are 8B. */
+	/* The key union has 2 fields, both of which are 8B. */
 	ref->key.recno = 0;
 }
 

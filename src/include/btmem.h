@@ -654,8 +654,7 @@ struct __wt_ref {
 	 */
 	union {
 		uint64_t recno;		/* Column-store: starting recno */
-		void	*ikey;		/* Row-store: instantiated key */
-		uint64_t pkey;		/* Row-store: on-page key */
+		void	*ikey;		/* Row-store: key */
 	} key;
 
 	WT_PAGE_DELETED	*page_del;	/* Deleted on-disk page information */
