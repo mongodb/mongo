@@ -201,7 +201,7 @@ __wt_spin_trylock_func(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
-        conn = S2C_SAFE(session);
+	conn = S2C_SAFE(session);
 	/* If we're not maintaining statistics, it's simple. */
 	if (session == NULL || !FLD_ISSET(conn->stat_flags, WT_STAT_CONN_FAST))
 		return (pthread_mutex_trylock(&t->lock));
@@ -254,7 +254,7 @@ __wt_spin_lock_func(WT_SESSION_IMPL *session,
 {
 	/* If we're not maintaining statistics, it's simple. */
 	if (session == NULL ||
-            !FLD_ISSET(conn->stat_flags, WT_STAT_CONN_FAST)) {
+	    !FLD_ISSET(conn->stat_flags, WT_STAT_CONN_FAST)) {
 		pthread_mutex_lock(&t->lock);
 		return;
 	}

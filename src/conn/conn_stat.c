@@ -44,17 +44,23 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 
 	conn = S2C(session);
 
-	/*
-	 * The statistics logging configuration requires a wait time -- if it's
-	 * not set, we're not running at all.
-	 */
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.wait", &cval));
-	if (cval.val == 0) {
-		*runp = 0;
-		return (0);
-	}
-	*runp = 1;
+	/* Only start the server if wait time is non-zero */
+	*runp = (cval.val == 0) ? 0 : 1;
 	conn->stat_usecs = (long)cval.val * 1000000;
+
+	WT_RET(__wt_config_gets(
+	    session, cfg, "statistics_log.on_close", &cval));
+	if (cval.val != 0)
+		FLD_SET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE);
+
+	/*
+	 * Statistics logging configuration requires either a wait time or
+	 * an on close setting.
+	 */
+	if (*runp == 0 && !FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
+		return (0);
+
 
 	ret = (__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
 	ret = (__wt_config_subinit(session, &objectconf, &cval));
@@ -236,6 +242,119 @@ err:	if (locked)
 }
 
 /*
+ * __wt_statlog_log_one --
+ *	Log a set of statistics into the configured statistics log. Requires
+ *	that the server is not currently running.
+ */
+int
+__wt_statlog_log_one(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_ITEM path;
+	FILE *fp;
+
+	conn = S2C(session);
+	fp = NULL;
+
+	if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
+		return (0);
+
+	if (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
+	    F_ISSET(conn, WT_CONN_SERVER_STATISTICS))
+		WT_RET_MSG(session, EINVAL,
+		    "Attempt to log statistics while a server is running");
+
+	WT_RET(__wt_buf_init(session, &path, strlen(conn->stat_path) + 128));
+	WT_ERR(__statlog_log_one(session, fp, NULL, &path));
+	
+err:	if (fp != NULL)
+		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
+	__wt_buf_free(session, &path);
+	return (0);
+}
+
+/*
+ * __statlog_log_one --
+ *	Output a set of statistics into the current log file.
+ */
+int __statlog_log_one(WT_SESSION_IMPL *session,
+    FILE *log_file, WT_ITEM *old_path, WT_ITEM *path_buf) {
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	struct timespec ts;
+	struct tm *tm, _tm;
+
+	conn = S2C(session);
+	/* Get the current local time of day. */
+	WT_RET(__wt_epoch(session, &ts));
+	tm = localtime_r(&ts.tv_sec, &_tm);
+
+	/* Create the logging path name for this time of day. */
+	if (strftime(path_buf->mem,
+	    path_buf->memsize, conn->stat_path, tm) == 0)
+		WT_RET_MSG(
+		    session, ENOMEM, "strftime path conversion");
+
+	/* If the path has changed, close/open the new log file. */
+	if (log_file == NULL || strcmp(path_buf->mem, old_path->mem) != 0) {
+		if (log_file != NULL) {
+			(void)fclose(log_file);
+			log_file = NULL;
+		}
+
+		if (old_path != NULL)
+			(void)strcpy(old_path->mem, path_buf->mem);
+		WT_RET_TEST((log_file =
+		    fopen(path_buf->mem, "a")) == NULL, __wt_errno());
+	}
+
+	/* Create the entry prefix for this time of day. */
+	if (strftime(path_buf->mem,
+	    path_buf->memsize, conn->stat_format, tm) == 0)
+		WT_RET_MSG(
+		    session, ENOMEM, "strftime timestamp conversion");
+
+	/* Reference temporary values from the connection structure. */
+	conn->stat_fp = log_file;
+	conn->stat_stamp = path_buf->mem;
+
+	/* Dump the connection statistics. */
+	WT_RET(__statlog_dump(session, conn->home, 1));
+
+#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
+	/* Dump the spinlock statistics. */
+	WT_RET(__wt_statlog_dump_spinlock(conn, conn->home));
+#endif
+
+	/*
+	 * Lock the schema and walk the list of open handles, dumping
+	 * any that match the list of object sources.
+	 */
+	if (conn->stat_sources != NULL) {
+		WT_WITH_SCHEMA_LOCK(session,
+		    ret = __wt_conn_btree_apply(
+		    session, 0, __statlog_apply, NULL));
+		WT_RET(ret);
+	}
+
+	/*
+	 * Walk the list of open LSM trees, dumping any that match the
+	 * the list of object sources.
+	 *
+	 * XXX
+	 * This code should be removed when LSM objects are converted to
+	 * data handles.
+	 */
+	if (conn->stat_sources != NULL)
+		WT_RET(__statlog_lsm_apply(session));
+
+	/* Flush. */
+	WT_RET(fflush(log_file) == 0 ? 0 : __wt_errno());
+	return (0);
+}
+
+/*
  * __statlog_server --
  *	The statistics server thread.
  */
@@ -279,68 +398,7 @@ __statlog_server(void *arg)
 			continue;
 		}
 
-		/* Get the current local time of day. */
-		WT_ERR(__wt_epoch(session, &ts));
-		tm = localtime_r(&ts.tv_sec, &_tm);
-
-		/* Create the logging path name for this time of day. */
-		if (strftime(tmp.mem, tmp.memsize, conn->stat_path, tm) == 0)
-			WT_ERR_MSG(
-			    session, ENOMEM, "strftime path conversion");
-
-		/* If the path has changed, close/open the new log file. */
-		if (fp == NULL || strcmp(tmp.mem, path.mem) != 0) {
-			if (fp != NULL) {
-				(void)fclose(fp);
-				fp = NULL;
-			}
-
-			(void)strcpy(path.mem, tmp.mem);
-			WT_ERR_TEST(
-			    (fp = fopen(path.mem, "a")) == NULL, __wt_errno());
-		}
-
-		/* Create the entry prefix for this time of day. */
-		if (strftime(tmp.mem, tmp.memsize, conn->stat_format, tm) == 0)
-			WT_ERR_MSG(
-			    session, ENOMEM, "strftime timestamp conversion");
-
-		/* Reference temporary values from the connection structure. */
-		conn->stat_fp = fp;
-		conn->stat_stamp = tmp.mem;
-
-		/* Dump the connection statistics. */
-		WT_ERR(__statlog_dump(session, conn->home, 1));
-
-#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-		/* Dump the spinlock statistics. */
-		WT_ERR(__wt_statlog_dump_spinlock(conn, conn->home));
-#endif
-
-		/*
-		 * Lock the schema and walk the list of open handles, dumping
-		 * any that match the list of object sources.
-		 */
-		if (conn->stat_sources != NULL) {
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_conn_btree_apply(
-			    session, 0, __statlog_apply, NULL));
-			WT_ERR(ret);
-		}
-
-		/*
-		 * Walk the list of open LSM trees, dumping any that match the
-		 * the list of object sources.
-		 *
-		 * XXX
-		 * This code should be removed when LSM objects are converted to
-		 * data handles.
-		 */
-		if (conn->stat_sources != NULL)
-			WT_ERR(__statlog_lsm_apply(session));
-
-		/* Flush. */
-		WT_ERR(fflush(fp) == 0 ? 0 : __wt_errno());
+		WT_ERR(__statlog_log_one(session, fp, &path, &tmp));
 
 		/* Wait until the next event. */
 		WT_ERR_TIMEDOUT_OK(

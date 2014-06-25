@@ -1629,6 +1629,8 @@ struct __wt_connection {
 	 * @config{statistics_log = (, log any statistics the database is
 	 * configured to maintain\, to a file.  See @ref statistics for more
 	 * information., a set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log statistics on database
+	 * close., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into
 	 * which the log records are written\, may contain ISO C standard
 	 * strftime conversion specifications.  If the value is not an absolute
@@ -1972,14 +1974,16 @@ struct __wt_connection {
  * @config{statistics_log = (, log any statistics the database is configured to
  * maintain\, to a file.  See @ref statistics for more information., a set of
  * related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into which the
- * log records are written\, may contain ISO C standard strftime conversion
- * specifications.  If the value is not an absolute path name\, the file is
- * created relative to the database home., a string; default \c
- * "WiredTigerStat.%d.%H".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;sources, if
- * non-empty\, include statistics for the list of data source URIs\, if they are
- * open at the time of the statistics logging.  The list may include URIs
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log statistics on database close.,
+ * a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the
+ * pathname to a file into which the log records are written\, may contain ISO C
+ * standard strftime conversion specifications.  If the value is not an absolute
+ * path name\, the file is created relative to the database home., a string;
+ * default \c "WiredTigerStat.%d.%H".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;sources,
+ * if non-empty\, include statistics for the list of data source URIs\, if they
+ * are open at the time of the statistics logging.  The list may include URIs
  * matching a single data source ("table:mytable")\, or a URI matching all data
  * sources of a particular type ("table:")., a list of strings; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to each log

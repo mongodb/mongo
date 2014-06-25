@@ -167,6 +167,7 @@ struct __wt_connection_impl {
 #define	WT_CONN_STAT_CLEAR	0x02	/* don't gather statistics */
 #define	WT_CONN_STAT_FAST	0x04	/* "fast" statistics configured */
 #define	WT_CONN_STAT_NONE	0x08	/* "none" statistics configured */
+#define	WT_CONN_STAT_ON_CLOSE	0x10	/* output statistics on close */
 	uint32_t stat_flags;
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
