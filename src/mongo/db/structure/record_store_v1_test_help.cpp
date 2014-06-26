@@ -36,7 +36,7 @@
 #include <vector>
 
 #include "mongo/db/storage/extent.h"
-#include "mongo/db/storage/record.h"
+#include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

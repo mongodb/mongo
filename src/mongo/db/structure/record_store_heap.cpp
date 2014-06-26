@@ -31,8 +31,6 @@
 
 #include "mongo/db/structure/record_store_heap.h"
 
-#include "mongo/db/storage/record.h"
-
 namespace mongo {
 
     //
@@ -68,14 +66,14 @@ namespace mongo {
         return recordFor(loc)->toRecordData();
     }
 
-    Record* HeapRecordStore::recordFor(const DiskLoc& loc) const {
+    HeapRecordStore::HeapRecord* HeapRecordStore::recordFor(const DiskLoc& loc) const {
         Records::const_iterator it = _records.find(loc);
         invariant(it != _records.end());
-        return reinterpret_cast<Record*>(it->second.get());
+        return reinterpret_cast<HeapRecord*>(it->second.get());
     }
 
     void HeapRecordStore::deleteRecord(OperationContext* txn, const DiskLoc& loc) {
-        Record* rec = recordFor(loc);
+        HeapRecord* rec = recordFor(loc);
         _dataSize -= rec->netLength();
         invariant(_records.erase(loc) == 1);
     }
@@ -118,9 +116,9 @@ namespace mongo {
         }
 
         // TODO padding?
-        const int lengthWithHeaders = len + Record::HeaderSize;
+        const int lengthWithHeaders = len + HeapRecord::HeaderSize;
         boost::shared_array<char> buf(new char[lengthWithHeaders]);
-        Record* rec = reinterpret_cast<Record*>(buf.get());
+        HeapRecord* rec = reinterpret_cast<HeapRecord*>(buf.get());
         rec->lengthWithHeaders() = lengthWithHeaders;
         memcpy(rec->data(), data, len);
 
@@ -145,9 +143,9 @@ namespace mongo {
         }
 
         // TODO padding?
-        const int lengthWithHeaders = len + Record::HeaderSize;
+        const int lengthWithHeaders = len + HeapRecord::HeaderSize;
         boost::shared_array<char> buf(new char[lengthWithHeaders]);
-        Record* rec = reinterpret_cast<Record*>(buf.get());
+        HeapRecord* rec = reinterpret_cast<HeapRecord*>(buf.get());
         rec->lengthWithHeaders() = lengthWithHeaders;
         doc->writeDocument(rec->data());
 
@@ -166,7 +164,7 @@ namespace mongo {
                                                       int len,
                                                       int quotaMax,
                                                       UpdateMoveNotifier* notifier ) {
-        Record* oldRecord = recordFor( oldLocation );
+        HeapRecord* oldRecord = recordFor( oldLocation );
         int oldLen = oldRecord->netLength();
 
         // If the length of the new data is <= the length of the old data then just
@@ -186,9 +184,9 @@ namespace mongo {
         // If the length of the new data exceeds the size of the old Record, we need to allocate
         // a new Record, and delete the old one
 
-        const int lengthWithHeaders = len + Record::HeaderSize;
+        const int lengthWithHeaders = len + HeapRecord::HeaderSize;
         boost::shared_array<char> buf(new char[lengthWithHeaders]);
-        Record* rec = reinterpret_cast<Record*>(buf.get());
+        HeapRecord* rec = reinterpret_cast<HeapRecord*>(buf.get());
         rec->lengthWithHeaders() = lengthWithHeaders;
         memcpy(rec->data(), data, len);
 
@@ -204,7 +202,7 @@ namespace mongo {
                                                const DiskLoc& loc,
                                                const char* damangeSource,
                                                const mutablebson::DamageVector& damages ) {
-        Record* rec = recordFor( loc );
+        HeapRecord* rec = recordFor( loc );
         char* root = rec->data();
 
         // All updates were in place. Apply them via durability and writing pointer.
@@ -257,7 +255,7 @@ namespace mongo {
         Records::iterator it = inclusive ? _records.lower_bound(end)
                                          : _records.upper_bound(end);
         while(it != _records.end()) {
-            _dataSize -= reinterpret_cast<Record*>(it->second.get())->netLength();
+            _dataSize -= reinterpret_cast<HeapRecord*>(it->second.get())->netLength();
             _records.erase(it++);
         }
     }
@@ -282,7 +280,7 @@ namespace mongo {
         results->valid = true;
         if (scanData && full) {
             for (Records::const_iterator it = _records.begin(); it != _records.end(); ++it) {
-                Record* rec = reinterpret_cast<Record*>(it->second.get());
+                HeapRecord* rec = reinterpret_cast<HeapRecord*>(it->second.get());
                 size_t dataSize;
                 const Status status = adaptor->validate(rec->toRecordData(), &dataSize);
                 if (!status.isOK()) {
@@ -323,7 +321,7 @@ namespace mongo {
 
     int64_t HeapRecordStore::storageSize(BSONObjBuilder* extraInfo, int infoLevel) const {
         // Note: not making use of extraInfo or infoLevel since we don't have extents
-        const int64_t recordOverhead = numRecords() * Record::HeaderSize;
+        const int64_t recordOverhead = numRecords() * HeapRecord::HeaderSize;
         return _dataSize + recordOverhead;
     }
 

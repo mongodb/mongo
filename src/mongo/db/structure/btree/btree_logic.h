@@ -31,7 +31,6 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/structure/btree/btree_ondisk.h"
 #include "mongo/db/structure/btree/key.h"

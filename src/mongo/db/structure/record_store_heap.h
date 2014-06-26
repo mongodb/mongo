@@ -119,7 +119,26 @@ namespace mongo {
         virtual long long numRecords() const { return _records.size(); }
 
     protected:
-        virtual Record* recordFor( const DiskLoc& loc ) const;
+        class HeapRecord {
+        public:
+            enum HeaderSizeValue { HeaderSize = 16 };
+
+            int lengthWithHeaders() const {  return _lengthWithHeaders; }
+            int& lengthWithHeaders() {  return _lengthWithHeaders; }
+
+            const char* data() const { return _data; }
+            char* data() { return _data; }
+
+            int netLength() const { return _lengthWithHeaders - HeaderSize; }
+
+            RecordData toRecordData() const { return RecordData(_data, netLength()); }
+
+        private:
+            int _lengthWithHeaders;
+            char _data[4];
+        };
+
+        virtual HeapRecord* recordFor( const DiskLoc& loc ) const;
 
     public:
         //

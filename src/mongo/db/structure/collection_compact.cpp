@@ -39,9 +39,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/storage/extent.h"
-#include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/touch_pages.h"
 

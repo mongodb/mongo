@@ -35,6 +35,7 @@
 
 namespace mongo {
 
+    class DeletedRecord;
     class DocWriter;
     class ExtentManager;
     class Record;

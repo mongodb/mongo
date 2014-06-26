@@ -33,7 +33,7 @@
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/storage/record.h"
+#include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/structure/record_store_v1_capped_iterator.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"

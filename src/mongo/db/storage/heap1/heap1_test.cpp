@@ -33,7 +33,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/heap1/heap1_database_catalog_entry.h"
 #include "mongo/db/storage/heap1/heap1_recovery_unit.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/db/structure/record_store.h"
 
 #include "mongo/unittest/unittest.h"
@@ -132,7 +131,7 @@ namespace {
             StatusWith<DiskLoc> loc = rs->insertRecord( &op, "abc", 4, -1 );
             ASSERT_OK( loc.getStatus() );
             ASSERT_EQUALS( 1, rs->numRecords() );
-            ASSERT_EQUALS( std::string( "abc" ), rs->recordFor( loc.getValue() )->data() );
+            ASSERT_EQUALS( std::string( "abc" ), rs->dataFor( loc.getValue() )->data() );
         }
 
     }
