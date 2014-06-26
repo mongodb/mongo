@@ -634,12 +634,18 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 	__wt_spin_unlock(session, &cache->evict_lock);
 
 	/*
-	 * Signal any application or worker threads waiting for the eviction
-	 * queue to have candidates.
+	 * If threads are waiting to do eviction, signal them, then look for
+	 * more pages to evict.  Otherwise, evict some pages in the server
+	 * thread.
 	 */
-	WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
+	if (__wt_cond_has_waiters(session, cache->evict_waiter_cond)) {
+		F_CLR(cache, WT_EVICT_NO_PROGRESS);
+		WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
+		__wt_yield();
+	} else
+		WT_RET(__evict_lru_pages(session, 0));
 
-	return (__evict_lru_pages(session, 0));
+	return (0);
 }
 
 /*
@@ -979,6 +985,8 @@ __evict_get_ref(
 			return (WT_NOTFOUND);
 		if (__wt_spin_trylock(session, &cache->evict_lock, &id) == 0)
 			break;
+		if (!is_app)
+			return (WT_NOTFOUND);
 		__wt_yield();
 	}
 
