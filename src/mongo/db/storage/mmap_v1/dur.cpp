@@ -86,6 +86,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/server.h"
 #include "mongo/util/concurrency/race.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/hash.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
@@ -94,6 +95,8 @@
 using namespace mongoutils;
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kStorage);
 
     namespace dur {
 

@@ -32,7 +32,7 @@
    if you don't care about journaling/durability (temp sort files & such) use MemoryMappedFile class, not this.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 
@@ -41,10 +41,13 @@
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/log.h"
 
 using namespace mongoutils;
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kStorage);
 
     void DurableMappedFile::remapThePrivateView() {
         verify(storageGlobalParams.dur);

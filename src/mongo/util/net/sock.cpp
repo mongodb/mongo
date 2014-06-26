@@ -27,7 +27,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/net/sock.h"
 
@@ -49,11 +49,15 @@
 #include "mongo/util/concurrency/value.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/socket_poll.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kNetworking);
+
     MONGO_FP_DECLARE(throwSockExcep);
 
     static bool ipv6 = false;

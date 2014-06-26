@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 
@@ -49,6 +49,7 @@
 #include "mongo/util/compress.h"
 #include "mongo/util/concurrency/race.h"
 #include "mongo/util/file.h"
+#include "mongo/util/log.h"
 #include "mongo/util/logfile.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
@@ -59,6 +60,8 @@
 using namespace mongoutils;
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kStorage);
 
     class AlignedBuilder;
 

@@ -41,8 +41,11 @@
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kStorage);
 
     MmapV1ExtentManager::MmapV1ExtentManager( const StringData& dbname,
                                   const StringData& path,

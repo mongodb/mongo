@@ -28,11 +28,12 @@
  */
 
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/net/listen.h"
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/message_port.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/scopeguard.h"
@@ -67,6 +68,7 @@
 
 namespace mongo {
 
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kNetworking);
 
     // ----- Listener -------
 

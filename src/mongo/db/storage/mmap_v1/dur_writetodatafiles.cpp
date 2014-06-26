@@ -28,15 +28,19 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/util/log.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kStorage);
+
     namespace dur {
 
         void debugValidateAllMapsMatch();

@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/durop.h"
 
@@ -38,6 +38,7 @@
 #include "mongo/util/alignedbuilder.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace mongoutils;
@@ -45,6 +46,8 @@ using namespace mongoutils;
 #include <boost/filesystem/operations.hpp>
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kStorage);
 
     namespace dur {
 

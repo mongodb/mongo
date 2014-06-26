@@ -27,7 +27,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/net/message_port.h"
 
@@ -36,6 +36,7 @@
 
 #include "mongo/util/background.h"
 #include "mongo/util/goodies.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -53,6 +54,7 @@
 
 namespace mongo {
 
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kNetworking);
 
 // if you want trace output:
 #define mmm(x)

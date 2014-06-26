@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/structure/record_store_v1_simple.h"
 
 #include "mongo/base/counter.h"
@@ -39,11 +41,14 @@
 #include "mongo/db/storage/record.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/structure/record_store_v1_simple_iterator.h"
+#include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kStorage);
 
     static Counter64 freelistAllocs;
     static Counter64 freelistBucketExhausted;
