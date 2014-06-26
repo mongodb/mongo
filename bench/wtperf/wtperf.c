@@ -1347,6 +1347,11 @@ retry:			 if ((ret = cfg->conn->async_new_op(cfg->conn,
 	 */
 	if ((ret = cfg->conn->close(cfg->conn, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "Closing the connection failed");
+
+		/*
+		 * Don't repeat the close in our caller based on the failure.
+		 */
+		cfg->conn = NULL;
 		return (ret);
 	}
 	if ((ret = wiredtiger_open(
