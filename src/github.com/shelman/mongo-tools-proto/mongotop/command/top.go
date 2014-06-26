@@ -27,12 +27,14 @@ type TopField struct {
 	Count int `bson:"count"`
 }
 
+// Struct representing the diff between two top command results.
 type TopDiff struct {
 	// namespace -> totals
 	Totals map[string][]int
 }
 
-// implement dat interface
+// Implement the Diff interface. Serializes the information about the time
+// spent in locks into rows to be printed.
 func (self *TopDiff) ToRows() [][]string {
 	// to return
 	rows := [][]string{}
@@ -70,7 +72,8 @@ func (self *TopDiff) ToRows() [][]string {
 	return rows
 }
 
-// skip dat namespace
+// Determines whether or not a namespace should be skipped for the purposes
+// of printing the top results.
 func skipNamespace(ns string) bool {
 	return ns == "" ||
 		!strings.Contains(ns, ".") ||

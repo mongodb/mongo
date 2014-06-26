@@ -23,6 +23,9 @@ type SSLDBConnector struct {
 	dialInfo *mgo.DialInfo
 }
 
+// Configure the connector to connect to the server over ssl. Parses the
+// connection string, and sets up the correct function to dial the server
+// based on the ssl options passed in.
 func (self *SSLDBConnector) Configure(opts *options.ToolOptions) error {
 
 	// create the addresses to be used to connect
@@ -46,6 +49,7 @@ func (self *SSLDBConnector) Configure(opts *options.ToolOptions) error {
 
 }
 
+// Dial the server.
 func (self *SSLDBConnector) GetNewSession() (*mgo.Session, error) {
 	return mgo.DialWithInfo(self.dialInfo)
 }

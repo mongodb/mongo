@@ -25,6 +25,8 @@ type VanillaDBConnector struct {
 	dialInfo *mgo.DialInfo
 }
 
+// Configure the db connector. Parses the connection string and sets up
+// the dial info with the default dial timeout.
 func (self *VanillaDBConnector) Configure(opts *options.ToolOptions) error {
 
 	// create the addresses to be used to connect
@@ -39,6 +41,7 @@ func (self *VanillaDBConnector) Configure(opts *options.ToolOptions) error {
 	return nil
 }
 
+// Dial the database.
 func (self *VanillaDBConnector) GetNewSession() (*mgo.Session, error) {
 	return mgo.DialWithInfo(self.dialInfo)
 }

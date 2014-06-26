@@ -6,20 +6,24 @@ import (
 	"strconv"
 )
 
+// Struct implementing the Command interface for the serverStatus command.
 type ServerStatus struct {
 	Locks map[string]NSLocksInfo `bson:"locks"`
 }
 
+// Subfield of the serverStatus command.
 type NSLocksInfo struct {
 	TimeLockedMicros map[string]int `bson:"timeLockedMicros"`
 }
 
+// Implements the Diff interface for the diff between two serverStatus commands.
 type ServerStatusDiff struct {
 	// namespace - > totals
 	Totals map[string][]int
 }
 
-// implement dat interface
+// Implement the Diff interface.  Serializes the lock totals into rows by
+// namespace.
 func (self *ServerStatusDiff) ToRows() [][]string {
 	// to return
 	rows := [][]string{}
@@ -42,12 +46,14 @@ func (self *ServerStatusDiff) ToRows() [][]string {
 	return rows
 }
 
-// implement dat interface
+// Needed to implement the common/db/command's Command interface, in order to
+// be run as a command against the database.
 func (self *ServerStatus) AsRunnable() interface{} {
 	return "serverStatus"
 }
 
-// implement dat other interface
+// Needed to implement the local package's Command interface. Diffs the server
+// status result against another server status result.
 func (self *ServerStatus) Diff(other Command) (Diff, error) {
 
 	// the diff to eventually return
