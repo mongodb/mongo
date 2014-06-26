@@ -379,17 +379,8 @@ __statlog_server(void *arg)
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
 	    F_ISSET(conn, WT_CONN_SERVER_STATISTICS)) {
-		/*
-		 * If statistics are turned off, wait until it's time to output
-		 * statistics and check again.
-		 */
-		if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_NONE)) {
-			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
-			    session, conn->stat_cond, conn->stat_usecs));
-			continue;
-		}
-
-		WT_ERR(__statlog_log_one(session, &path, &tmp));
+		if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_NONE))
+			WT_ERR(__statlog_log_one(session, &path, &tmp));
 
 		/* Wait until the next event. */
 		WT_ERR_TIMEDOUT_OK(
