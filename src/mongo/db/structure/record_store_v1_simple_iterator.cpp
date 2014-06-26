@@ -29,8 +29,8 @@
 #include "mongo/db/structure/record_store_v1_simple_iterator.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/storage/extent.h"
-#include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/extent.h"
+#include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/structure/record_store_v1_simple.h"
 
 namespace mongo {

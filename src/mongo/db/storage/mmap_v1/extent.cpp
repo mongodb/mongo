@@ -28,9 +28,9 @@
 *    it in the license file.
 */
 
-#include "mongo/db/storage/extent.h"
+#include "mongo/db/storage/mmap_v1/extent.h"
 
-#include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

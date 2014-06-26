@@ -35,7 +35,7 @@
 #include <set>
 #include <vector>
 
-#include "mongo/db/storage/extent.h"
+#include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/unittest/unittest.h"
 

@@ -43,7 +43,6 @@ namespace mongo {
     struct CompactOptions;
     struct CompactStats;
     class DocWriter;
-    class ExtentManager;
     class MAdvise;
     class NamespaceDetails;
     class OperationContext;
