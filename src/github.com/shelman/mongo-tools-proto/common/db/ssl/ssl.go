@@ -42,6 +42,11 @@ func (self *SSLDBConnector) Configure(opts *options.ToolOptions) error {
 		Addrs:      connectionAddrs,
 		Timeout:    DefaultSSLDialTimeout,
 		DialServer: dialer,
+
+		Username:  opts.Auth.Username,
+		Password:  opts.Auth.Password,
+		Source:    opts.Auth.Source,
+		Mechanism: opts.Auth.Mechanism,
 	}
 
 	return nil
