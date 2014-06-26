@@ -46,7 +46,7 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *fullp, int wake)
  *	Wait for there to be space in the cache before a read or update.
  */
 static inline int
-__wt_cache_full_check(WT_SESSION_IMPL *session)
+__wt_cache_full_check(WT_SESSION_IMPL *session, int fault)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -72,6 +72,16 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	    F_ISSET(btree, WT_BTREE_BULK | WT_BTREE_NO_EVICTION))
 		return (0);
 
+        /*
+         * If we are just checking because this session isn't busy, only
+         * continue if we have caused a read while the cache was full recently.
+         */
+        if (!fault) {
+                if (session->cache_checks == 0)
+                        return (0);
+                --session->cache_checks;
+        }
+
 	/*
 	 * Only wake the eviction server the first time through here (if the
 	 * cache is too full).
@@ -79,8 +89,17 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	 * If the cache is less than 95% full, no work to be done.
 	 */
 	WT_RET(__wt_eviction_check(session, &full, 1));
-	if (full < 95)
+	if (full < 95) {
+                session->cache_checks = 0;
 		return (0);
+        }
+
+        /*
+         * If the cache is full and we're trying to read, check for a while
+         * when the session is quiet.
+         */
+        if (fault && full >= 100)
+                session->cache_checks = 100;
 
 	/*
 	 * If we are at the API boundary and the cache is more than 95% full,

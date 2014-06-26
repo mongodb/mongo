@@ -28,12 +28,6 @@ struct __wt_hazard {
 #endif
 };
 
-typedef	enum {
-	WT_SERIAL_NONE=0,		/* No request */
-	WT_SERIAL_FUNC=1,		/* Function, then return */
-	WT_SERIAL_EVICT=2,		/* Function, then schedule evict */
-} wq_state_t;
-
 /* Get the connection implementation for a session */
 #define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
 
@@ -111,6 +105,8 @@ struct __wt_session_impl {
 	int	(*block_manager_cleanup)(WT_SESSION_IMPL *);
 	void	*reconcile;		/* Reconciliation support */
 	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
+
+	u_int	cache_checks;		/* Count of cache full checks */
 
 	int compaction;			/* Compaction did some work */
 	int skip_schema_lock;		/* Another thread holds the schema lock
