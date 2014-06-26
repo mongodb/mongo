@@ -42,6 +42,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/heartbeat.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_set_seed_list.h"  // parseReplSetSeedList
@@ -63,7 +64,7 @@ namespace repl {
         int me = 0;
         stringstream selfs;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
-            if( i->h.isSelf() ) {
+            if (isSelf(i->h)) {
                 me++;
                 if( me > 1 )
                     selfs << ',';
@@ -88,7 +89,7 @@ namespace repl {
         vector<string> down;
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
             // we know we're up
-            if (i->h.isSelf()) {
+            if (isSelf(i->h)) {
                 continue;
             }
 
@@ -155,7 +156,7 @@ namespace repl {
             if( initial ) {
                 bool hasData = res["hasData"].Bool();
                 uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.",
-                        !hasData || i->h.isSelf());
+                        !hasData || isSelf(i->h));
             }
         }
         if (down.size() > 0) {

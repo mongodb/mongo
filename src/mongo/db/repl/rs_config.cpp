@@ -34,6 +34,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/heartbeat.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h"
@@ -65,9 +66,10 @@ namespace {
 
     list<HostAndPort> ReplSetConfig::otherMemberHostnames() const {
         list<HostAndPort> L;
-        for( vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); i++ ) {
-            if( !i->h.isSelf() )
+        for (vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); i++) {
+            if (!isSelf(i->h)) {
                 L.push_back(i->h);
+            }
         }
         return L;
     }
@@ -289,8 +291,9 @@ namespace {
                     uasserted(13510, "arbiterOnly may not change for members");
                 }
             }
-            if( m.h.isSelf() )
+            if (isSelf(m.h)) {
                 me++;
+            }
         }
 
         uassert(13433, "can't find self in new replset config", me == 1);
@@ -429,7 +432,7 @@ namespace {
                          cfg != (*sgs).second->m.end(); 
                          cfg++) 
                     {
-                        if ((*cfg)->h.isSelf()) {
+                        if (isSelf((*cfg)->h)) {
                             node->actualTarget--;
                             foundMe = true;
                         }
@@ -656,7 +659,7 @@ namespace {
         BSONObj cfg;
         int v = -5;
         try {
-            if( h.isSelf() ) {
+            if (isSelf(h)) {
                 ;
             }
             else {
@@ -695,7 +698,7 @@ namespace {
                 count = conn.count(rsConfigNs);
             }
             catch ( DBException& ) {
-                if ( !h.isSelf() ) {
+                if (!isSelf(h)) {
                     throw;
                 }
 
@@ -723,7 +726,7 @@ namespace {
         from(cfg);
         checkRsConfig();
         _ok = true;
-        LOG(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
+        LOG(level) << "replSet load config ok from " << (isSelf(h) ? "self" : h.toString()) << rsLog;
     }
 
 } // namespace repl

@@ -47,6 +47,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/storage_options.h"
@@ -352,7 +353,7 @@ namespace mongo {
 
 #if !defined(_WIN32) && !defined(__sunos__)
         // isSelf() only does the necessary comparisons on os x and linux (SERVER-14165)
-        bool masterSameProcess = HostAndPort(masterHost).isSelf();
+        bool masterSameProcess = repl::isSelf(HostAndPort(masterHost));
 #else
         stringstream a,b;
         a << "localhost:" << serverGlobalParams.port;

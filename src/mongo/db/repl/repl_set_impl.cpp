@@ -35,6 +35,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
@@ -397,7 +398,7 @@ namespace {
         for (set<HostAndPort>::iterator i = replSetSeedList.seedSet.begin();
                 i != replSetSeedList.seedSet.end();
                 i++) {
-            if (i->isSelf()) {
+            if (isSelf(*i)) {
                 if (sss == 1) {
                     LOG(1) << "replSet warning self is listed in the seed list and there are no "
                               "other seeds listed did you intend that?" << rsLog;
@@ -534,7 +535,7 @@ namespace {
                     i++) {
                 
                 ReplSetConfig::MemberCfg& m = *i;
-                if (m.h.isSelf()) {
+                if (isSelf(m.h)) {
                     me++;
                 }
                 
@@ -619,7 +620,7 @@ namespace {
                     const ReplSetConfig::MemberCfg& m = *i;
                     Member *mi;
                     members += (members == "" ? "" : ", ") + m.h.toString();
-                    if (m.h.isSelf()) {
+                    if (isSelf(m.h)) {
                         verify(me++ == 0);
                         mi = new Member(m.h, m._id, &m, true);
                         setSelfTo(mi);
@@ -681,7 +682,7 @@ namespace {
             const ReplSetConfig::MemberCfg& m = *i;
             Member *mi;
             members += (members == "" ? "" : ", ") + m.h.toString();
-            if (m.h.isSelf()) {
+            if (isSelf(m.h)) {
                 verify(me++ == 0);
                 mi = new Member(m.h, m._id, &m, true);
                 if (!reconf) {

@@ -32,6 +32,7 @@
 #include "mongo/db/repl/manager.h"
 
 #include "mongo/db/repl/connections.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/client.h"
 
@@ -140,7 +141,7 @@ namespace repl {
                 " is priority " << highestPriority->config().priority << " and " <<
                 (otherOp - highestPriority->hbinfo().opTime.getSecs()) << " seconds behind" << endl;
 
-            if (primary->h().isSelf()) {
+            if (isSelf(primary->h())) {
                 // replSetStepDown tries to acquire the same lock
                 // msgCheckNewState takes, so we can't call replSetStepDown on
                 // ourselves.
