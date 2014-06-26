@@ -117,8 +117,6 @@ namespace mongo {
     extern int diagLogging;
     extern int lockFile;
 
-    void exitCleanly( ExitCode code );
-
 #ifdef _WIN32
     ntservice::NtServiceDefaultStrings defaultServiceStrings = {
         L"MongoDB",
@@ -328,7 +326,6 @@ namespace mongo {
         LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
         OperationContextImpl txn;
-
         Lock::GlobalWrite lk(txn.lockState());
 
         vector< string > dbNames;
@@ -401,12 +398,6 @@ namespace mongo {
         }
 
         LOG(1) << "done repairDatabases" << endl;
-
-        if (mongodGlobalParams.upgrade) {
-            log() << "finished checking dbs" << endl;
-            cc().shutdown();
-            dbexit( EXIT_CLEAN );
-        }
     }
 
     void clearTmpFiles() {
@@ -597,8 +588,7 @@ namespace mongo {
 #endif // __linux__
     }
 
-    void _initAndListen(int listenPort ) {
-
+    static void _initAndListen(int listenPort ) {
         Client::initThread("initandlisten");
 
         bool is32bit = sizeof(int*) == 4;
@@ -685,8 +675,11 @@ namespace mongo {
                                          || repl::replSettings.slave == repl::SimpleSlave);
         repairDatabasesAndCheckVersion(shouldClearNonLocalTmpCollections);
 
-        if (mongodGlobalParams.upgrade)
-            return;
+        if (mongodGlobalParams.upgrade) {
+            log() << "finished checking dbs" << endl;
+            cc().shutdown();
+            exitCleanly(EXIT_CLEAN);
+        }
 
         uassertStatusOK(getGlobalAuthorizationManager()->initialize());
 
@@ -733,7 +726,7 @@ namespace mongo {
         exitCleanly(EXIT_NET_ERROR);
     }
 
-    void initAndListen(int listenPort) {
+    static void initAndListen(int listenPort) {
         try {
             _initAndListen(listenPort);
         }
@@ -992,6 +985,5 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
 
     StartupTest::runTests();
     initAndListen(serverGlobalParams.port);
-    dbexit(EXIT_CLEAN);
-    return 0;
+    fassertFailed(18000);
 }

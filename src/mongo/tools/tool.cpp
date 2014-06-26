@@ -188,8 +188,9 @@ namespace mongo {
         if ( currentClient.get() )
             currentClient.get()->shutdown();
 
-        if (toolGlobalParams.useDirectClient)
-            dbexit( EXIT_CLEAN );
+        if (toolGlobalParams.useDirectClient) {
+            exitCleanly(EXIT_CLEAN);
+        }
 
         fflush(stdout);
         fflush(stderr);
