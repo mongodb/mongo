@@ -538,9 +538,18 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
 
-	WT_ERR(__wt_config_gets(session, cfg, "leak_memory", &cval));
+	WT_TRET(__wt_config_gets(session, cfg, "leak_memory", &cval));
 	if (cval.val != 0)
 		F_SET(conn, WT_CONN_LEAK_MEMORY);
+
+err:	API_END(session, ret);
+	/*
+	 * Map WT_NOTFOUND to ENOENT, only cursor methods return WT_NOTFOUND.
+	 * Done explicitly because the api-end macro that has the mapping has
+	 * a return out of the function.
+	 */
+	if (ret == WT_NOTFOUND)
+		ret = ENOENT;
 
 	/*
 	 * Rollback all running transactions.
@@ -572,10 +581,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 
 	WT_TRET(__wt_connection_close(conn));
 
-	/* We no longer have a session, don't try to update it. */
-	session = NULL;
-
-err:	API_END_NOTFOUND_MAP(session, ret);
+	return (ret);
 }
 
 /*
