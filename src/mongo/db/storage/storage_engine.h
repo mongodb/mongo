@@ -40,6 +40,7 @@ namespace mongo {
     class DatabaseCatalogEntry;
     class OperationContext;
     class RecoveryUnit;
+    struct StorageGlobalParams;
 
     class StorageEngine {
     public:
@@ -64,6 +65,14 @@ namespace mongo {
                                        const std::string& dbName,
                                        bool preserveClonedFilesOnFailure = false,
                                        bool backupOriginalFiles = false ) = 0;
+
+        class Factory {
+        public:
+            virtual ~Factory(){}
+            virtual StorageEngine* create( const StorageGlobalParams& params ) const = 0;
+        };
+
+        static void registerFactory( const std::string& name, const Factory* factory );
     };
 
     // TODO: this is temporary

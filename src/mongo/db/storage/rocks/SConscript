@@ -3,10 +3,6 @@ Import("has_option")
 
 if has_option("rocksdb"):
 
-    env.Append( CPPDEFINES=["MONGO_ROCKSDB"] )
-    #z and bz2 are dependencies for rocks
-    env.Append( LIBS=["rocksdb","z","bz2"] )
-
     env.Library(
         target= 'storage_rocks_base',
         source= [
@@ -23,13 +19,17 @@ if has_option("rocksdb"):
             '$BUILD_DIR/mongo/db/structure/record_store',
             '$BUILD_DIR/mongo/foundation',
             '$BUILD_DIR/third_party/shim_snappy',
-            ]
+            ],
+        SYSLIBDEPS=["rocksdb",
+                    "z",
+                    "bz2"] #z and bz2 are dependencies for rocks
         )
 
     env.Library(
         target= 'storage_rocks',
         source= [
             'rocks_database_catalog_entry_mongod.cpp',
+            'rocks_init.cpp'
             ],
         LIBDEPS= [
             'storage_rocks_base'
