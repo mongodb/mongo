@@ -246,7 +246,8 @@ err:	if (locked)
  */
 static int
 __statlog_log_one(WT_SESSION_IMPL *session,
-    FILE *log_file, WT_ITEM *old_path, WT_ITEM *path_buf) {
+    FILE *log_file, WT_ITEM *old_path, WT_ITEM *path_buf)
+{
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	struct timespec ts;
@@ -350,7 +351,7 @@ __wt_statlog_log_one(WT_SESSION_IMPL *session)
 err:	if (fp != NULL)
 		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
 	__wt_buf_free(session, &path);
-	return (0);
+	return (ret);
 }
 
 /*
