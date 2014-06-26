@@ -42,7 +42,7 @@ func (self *SSLDBConnector) Configure(opts *options.ToolOptions) error {
 		Addrs:      connectionAddrs,
 		Timeout:    DefaultSSLDialTimeout,
 		DialServer: dialer,
-		Mechanism:  "MONGODB-X509",
+		//	Mechanism:  "MONGODB-X509",
 	}
 
 	return nil
