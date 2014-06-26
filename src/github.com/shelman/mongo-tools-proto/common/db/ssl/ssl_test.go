@@ -202,6 +202,7 @@ func TestAuthOverSSL(t *testing.T) {
 				},
 				SSL: &options.SSL{
 					UseSSL:        true,
+					SSLCAFile:     "testdata/ca.pem",
 					SSLPEMKeyFile: "testdata/server.pem",
 				},
 				Auth: &options.Auth{},
@@ -229,6 +230,7 @@ func TestAuthOverSSL(t *testing.T) {
 				},
 				SSL: &options.SSL{
 					UseSSL:        true,
+					SSLCAFile:     "testdata/ca.pem",
 					SSLPEMKeyFile: "testdata/server.pem",
 				},
 				Auth: &options.Auth{
