@@ -245,8 +245,7 @@ err:	if (locked)
  *	Output a set of statistics into the current log file.
  */
 static int
-__statlog_log_one(
-    WT_SESSION_IMPL *session, WT_ITEM *old_path, WT_ITEM *path_buf)
+__statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 {
 	FILE *log_file;
 	WT_CONNECTION_IMPL *conn;
@@ -261,31 +260,29 @@ __statlog_log_one(
 	tm = localtime_r(&ts.tv_sec, &_tm);
 
 	/* Create the logging path name for this time of day. */
-	if (strftime(path_buf->mem,
-	    path_buf->memsize, conn->stat_path, tm) == 0)
+	if (strftime(tmp->mem, tmp->memsize, conn->stat_path, tm) == 0)
 		WT_RET_MSG(session, ENOMEM, "strftime path conversion");
 
 	/* If the path has changed, cycle the log file. */
 	if ((log_file = conn->stat_fp) == NULL ||
-	    old_path == NULL || strcmp(path_buf->mem, old_path->mem) != 0) {
+	    path == NULL || strcmp(tmp->mem, path->mem) != 0) {
 		conn->stat_fp = NULL;
 		if (log_file != NULL)
 			WT_RET(fclose(log_file) == 0 ? 0 : __wt_errno());
 
-		if (old_path != NULL)
-			(void)strcpy(old_path->mem, path_buf->mem);
+		if (path != NULL)
+			(void)strcpy(path->mem, tmp->mem);
 		WT_RET_TEST((log_file =
-		    fopen(path_buf->mem, "a")) == NULL, __wt_errno());
+		    fopen(tmp->mem, "a")) == NULL, __wt_errno());
 	}
 
 	/* Create the entry prefix for this time of day. */
-	if (strftime(path_buf->mem,
-	    path_buf->memsize, conn->stat_format, tm) == 0)
+	if (strftime(tmp->mem, tmp->memsize, conn->stat_format, tm) == 0)
 		WT_RET_MSG(session, ENOMEM, "strftime timestamp conversion");
 
 	/* Reference temporary values from the connection structure. */
 	conn->stat_fp = log_file;
-	conn->stat_stamp = path_buf->mem;
+	conn->stat_stamp = tmp->mem;
 
 	/* Dump the connection statistics. */
 	WT_RET(__statlog_dump(session, conn->home, 1));
@@ -333,10 +330,9 @@ __wt_statlog_log_one(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_ITEM path;
+	WT_DECL_ITEM(tmp);
 
 	conn = S2C(session);
-	WT_CLEAR(path);
 
 	if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
 		return (0);
@@ -346,10 +342,10 @@ __wt_statlog_log_one(WT_SESSION_IMPL *session)
 		WT_RET_MSG(session, EINVAL,
 		    "Attempt to log statistics while a server is running");
 
-	WT_RET(__wt_buf_init(session, &path, strlen(conn->stat_path) + 128));
-	WT_ERR(__statlog_log_one(session, NULL, &path));
+	WT_RET(__wt_scr_alloc(session, strlen(conn->stat_path) + 128, &tmp));
+	WT_ERR(__statlog_log_one(session, NULL, tmp));
 
-err:	__wt_buf_free(session, &path);
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
