@@ -30,6 +30,7 @@ func TestConfigureSSLConnector(t *testing.T) {
 				SSL: &options.SSL{
 					UseSSL: true,
 				},
+				Auth: &options.Auth{},
 			}
 			So(connector.Configure(opts), ShouldBeNil)
 			So(connector.dialInfo.Addrs, ShouldResemble,
