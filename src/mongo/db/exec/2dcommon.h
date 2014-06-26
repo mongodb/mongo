@@ -30,7 +30,6 @@
 #include "mongo/db/geo/core.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"
-#include "mongo/db/pdfile.h"
 
 #include "mongo/db/index/2d_access_method.h"
 

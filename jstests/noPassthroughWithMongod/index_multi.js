@@ -55,7 +55,7 @@ for (var i = 90; i < 93; i++) {
                                                                   "{ background: true });" +
                                       "db.results.insert(db.runCommand({ getlasterror: 1 }));",
                                       null, // port
-                                      false)); // noconnect
+                                      true)); // noconnect
     specs.push(spec);
     multikey.push(i % 10 == 0 || (i+1) % 10 == 0 || (i+2) % 10 == 0);
 }
@@ -70,7 +70,7 @@ for (var i = 30; i < 90; i += 2) {
                                                                   "{ background: true });" +
                                       "db.results.insert(db.runCommand({ getlasterror: 1 }));",
                                       null, // port
-                                      false)); // noconnect
+                                      true)); // noconnect
     specs.push(spec);
     multikey.push(i % 10 == 0 || (i+1) % 10 == 0);
 }
@@ -84,7 +84,7 @@ for (var i = 0; i < 30; i++) {
                                                                   "{ background: true });" +
                                       "db.results.insert(db.runCommand({ getlasterror: 1 }));",
                                       null, // port
-                                      false)); // noconnect
+                                      true)); // noconnect
     specs.push(spec);
     multikey.push(i % 10 == 0);
 }

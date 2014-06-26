@@ -47,7 +47,8 @@
 #include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/db/repair_database.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -503,4 +504,91 @@ namespace mongo {
         return _dbEntry.get();
     }
 
+    void dropAllDatabasesExceptLocal(OperationContext* txn) {
+        Lock::GlobalWrite lk(txn->lockState());
+
+        vector<string> n;
+        globalStorageEngine->listDatabases( &n );
+        if( n.size() == 0 ) return;
+        log() << "dropAllDatabasesExceptLocal " << n.size() << endl;
+        for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
+            if( *i != "local" ) {
+                Client::Context ctx(*i);
+                dropDatabase(txn, ctx.db());
+            }
+        }
+    }
+
+    void dropDatabase(OperationContext* txn, Database* db ) {
+        invariant( db );
+
+        string name = db->name(); // just to have safe
+        LOG(1) << "dropDatabase " << name << endl;
+
+        txn->lockState()->assertWriteLocked( name );
+
+        BackgroundOperation::assertNoBgOpInProgForDb(name.c_str());
+
+        audit::logDropDatabase( currentClient.get(), name );
+
+        // Not sure we need this here, so removed.  If we do, we need to move it down
+        // within other calls both (1) as they could be called from elsewhere and
+        // (2) to keep the lock order right - groupcommitmutex must be locked before
+        // mmmutex (if both are locked).
+        //
+        //  RWLockRecursive::Exclusive lk(MongoFile::mmmutex);
+
+        txn->recoveryUnit()->syncDataAndTruncateJournal();
+
+        Database::closeDatabase(txn, name );
+        db = 0; // d is now deleted
+
+        _deleteDataFiles( name );
+    }
+
+    /** { ..., capped: true, size: ..., max: ... }
+     * @param createDefaultIndexes - if false, defers id (and other) index creation.
+     * @return true if successful
+    */
+    Status userCreateNS( OperationContext* txn,
+                         Database* db,
+                         const StringData& ns,
+                         BSONObj options,
+                         bool logForReplication,
+                         bool createDefaultIndexes ) {
+
+        invariant( db );
+
+        LOG(1) << "create collection " << ns << ' ' << options;
+
+        if ( !NamespaceString::validCollectionComponent(ns) )
+            return Status( ErrorCodes::InvalidNamespace,
+                           str::stream() << "invalid ns: " << ns );
+
+        Collection* collection = db->getCollection( txn, ns );
+
+        if ( collection )
+            return Status( ErrorCodes::NamespaceExists,
+                           "collection already exists" );
+
+        CollectionOptions collectionOptions;
+        Status status = collectionOptions.parse( options );
+        if ( !status.isOK() )
+            return status;
+
+        invariant( db->createCollection( txn, ns, collectionOptions, true, createDefaultIndexes ) );
+
+        if ( logForReplication ) {
+            if ( options.getField( "create" ).eoo() ) {
+                BSONObjBuilder b;
+                b << "create" << nsToCollectionSubstring( ns );
+                b.appendElements( options );
+                options = b.obj();
+            }
+            string logNs = nsToDatabase(ns) + ".$cmd";
+            repl::logOp(txn, "c", logNs.c_str(), options);
+        }
+
+        return Status::OK();
+    }
 } // namespace mongo

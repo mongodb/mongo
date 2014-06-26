@@ -251,6 +251,17 @@ namespace mongo {
         return Status::OK();
     }
 
+    void HeapRecordStore::temp_cappedTruncateAfter(OperationContext* txn,
+                                                   DiskLoc end,
+                                                   bool inclusive) {
+        Records::iterator it = inclusive ? _records.lower_bound(end)
+                                         : _records.upper_bound(end);
+        while(it != _records.end()) {
+            _dataSize -= reinterpret_cast<Record*>(it->second.get())->netLength();
+            _records.erase(it++);
+        }
+    }
+
     bool HeapRecordStore::compactSupported() const {
         return false;
     }
@@ -333,6 +344,7 @@ namespace mongo {
                                            DiskLoc start,
                                            bool tailable)
             : _tailable(tailable),
+              _lastLoc(minDiskLoc),
               _killedByInvalidate(false),
               _records(records),
               _rs(rs) {
@@ -358,6 +370,9 @@ namespace mongo {
     DiskLoc HeapRecordIterator::getNext() {
         if (isEOF()) {
             if (!_tailable)
+                return DiskLoc();
+
+            if (_records.empty())
                 return DiskLoc();
 
             invariant(!_killedByInvalidate);
@@ -393,7 +408,7 @@ namespace mongo {
             return;
         }
 
-        if (_it->first == loc)
+        if (_it != _records.end() && _it->first == loc)
             ++_it;
     }
 

@@ -102,7 +102,10 @@ namespace mongo {
             DiskLoc head;
             bool ready;
             bool isMultikey;
-            scoped_ptr<IndexAccessMethod> access;
+            
+            // Only one of these will be in use. See getIndex() implementation.
+            scoped_ptr<RecordStore> rs; // used by Btree on HeapRecordStore
+            shared_ptr<void> data; // used by Heap1BtreeImpl
         };
 
         class Entry : public CollectionCatalogEntry {

@@ -388,14 +388,18 @@ namespace mongo {
     }
 
     void CollectionCursorCache::registerRunner( Runner* runner ) {
-        SimpleMutex::scoped_lock lk( _mutex );
-        const std::pair<RunnerSet::iterator, bool> result = _nonCachedRunners.insert(runner);
-        invariant(result.second); // make sure this was inserted
+        if (!useExperimentalDocLocking) {
+            SimpleMutex::scoped_lock lk(_mutex);
+            const std::pair<RunnerSet::iterator, bool> result = _nonCachedRunners.insert(runner);
+            invariant(result.second); // make sure this was inserted
+        }
     }
 
     void CollectionCursorCache::deregisterRunner( Runner* runner ) {
-        SimpleMutex::scoped_lock lk( _mutex );
-        _nonCachedRunners.erase( runner );
+        if (!useExperimentalDocLocking) {
+            SimpleMutex::scoped_lock lk(_mutex);
+            _nonCachedRunners.erase(runner);
+        }
     }
 
     ClientCursor* CollectionCursorCache::find( CursorId id, bool pin ) {

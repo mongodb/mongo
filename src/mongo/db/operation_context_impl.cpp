@@ -174,4 +174,8 @@ namespace mongo {
                 NamespaceString(ns).db());
     }
 
+    Transaction* OperationContextImpl::getTransaction() {
+        return _tx.setTxIdOnce((unsigned)getCurOp()->opNum());
+    }
+
 }  // namespace mongo

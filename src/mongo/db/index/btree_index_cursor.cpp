@@ -124,16 +124,12 @@ namespace mongo {
     }
 
     Status BtreeIndexCursor::savePosition() {
-        if (isEOF()) {
-            return Status(ErrorCodes::IllegalOperation, "Can't save position when EOF");
-        }
-
-        _cursor->savePosition(&_savedData);
+        _cursor->savePosition();
         return Status::OK();
     }
 
     Status BtreeIndexCursor::restorePosition() {
-        _cursor->restorePosition(_savedData);
+        _cursor->restorePosition();
         return Status::OK();
     }
 

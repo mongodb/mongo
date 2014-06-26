@@ -36,6 +36,10 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/util/log.h"
 
+#ifdef MONGO_ROCKSDB
+#include "mongo/db/storage/rocks/rocks_engine.h"
+#endif
+
 namespace mongo {
 
     StorageEngine* globalStorageEngine = 0;
@@ -50,6 +54,11 @@ namespace mongo {
         else if ( storageGlobalParams.engine == "heap1" ) {
             globalStorageEngine = new Heap1Engine();
         }
+#ifdef MONGO_ROCKSDB
+        else if ( storageGlobalParams.engine == "rocksExperiment" ) {
+            globalStorageEngine = new RocksEngine( storageGlobalParams.dbpath );
+        }
+#endif
         else {
             log() << "unknown storage engine: " << storageGlobalParams.engine;
             return Status( ErrorCodes::BadValue, "unknown storage engine" );

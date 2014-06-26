@@ -605,7 +605,7 @@ namespace mongo {
         UpdateExecutor executor(&request, &op.debug());
         uassertStatusOK(executor.prepare());
 
-        Lock::DBWrite lk(txn->lockState(), ns.ns());
+        Lock::DBWrite lk(txn->lockState(), ns.ns(), useExperimentalDocLocking);
 
         // if this ever moves to outside of lock, need to adjust check
         // Client::Context::_finishInit

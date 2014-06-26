@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/d_concurrency.h"
 
 #include "mongo/db/client.h"
@@ -36,6 +38,7 @@
 #include "mongo/db/d_globals.h"
 #include "mongo/db/lockstat.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/server.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mapsf.h"
@@ -402,7 +405,46 @@ namespace mongo {
         }
     }
 
-    void Lock::DBWrite::lockOther(const StringData& db) {
+    void Lock::DBWrite::lockOtherRead(const StringData& db) {
+        fassert(18517, !db.empty());
+
+        // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
+        if( _lockState->otherCount() ) { 
+            // nested. prev could be read or write. if/when we do temprelease with DBRead/DBWrite we will need to increment/decrement here
+            // (so we can not release or assert if nested).  temprelease we should avoid if we can though, it's a bit of an anti-pattern.
+            massert(18513,
+                    str::stream() << "internal error tried to lock two databases at the same time. old:" 
+                                  << _lockState->otherName() << " new:" << db,
+                    db == _lockState->otherName());
+            return;
+        }
+
+        // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
+        massert(18514,
+                str::stream() << "can't dblock:" << db 
+                              << " when local or admin is already locked",
+                _lockState->nestableCount() == 0);
+
+        if (db != _lockState->otherName()) {
+            DBLocksMap::ref r(dblocks);
+            WrapperForRWLock*& lock = r[db];
+            if (lock == NULL) {
+                lock = new WrapperForRWLock(db);
+            }
+
+            _lockState->lockedOther(db, -1, lock);
+        }
+        else { 
+            DEV OCCASIONALLY{ dassert(dblocks.get(db) == _lockState->otherLock()); }
+            _lockState->lockedOther(-1);
+        }
+
+        fassert(18515, _weLocked == 0);
+        _lockState->otherLock()->lock_shared();
+        _weLocked = _lockState->otherLock();
+    }
+
+    void Lock::DBWrite::lockOtherWrite(const StringData& db) {
         fassert(16252, !db.empty());
 
         // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
@@ -470,8 +512,16 @@ namespace mongo {
             _locked_W = true;
             return;
         } 
-        if( !nested )
-            lockOther(db);
+
+        if (!nested) {
+            if (_isIntentWrite) {
+                lockOtherRead(db);
+            }
+            else {
+                lockOtherWrite(db);
+            }
+        }
+
         lockTop();
         if( nested )
             lockNestable(nested);
@@ -496,9 +546,12 @@ namespace mongo {
             lockNestable(nested);
     }
 
-    Lock::DBWrite::DBWrite(LockState* lockState, const StringData& ns)
-        : ScopedLock(lockState, 'w' ), _what(ns.toString()), _nested(false) {
-        lockDB( _what );
+    Lock::DBWrite::DBWrite(LockState* lockState, const StringData& ns, bool intentWrite)
+        : ScopedLock(lockState, 'w'),
+          _isIntentWrite(intentWrite),
+          _what(ns.toString()),
+          _nested(false) {
+        lockDB(_what);
     }
 
     Lock::DBRead::DBRead(LockState* lockState, const StringData& ns)
@@ -752,5 +805,11 @@ namespace mongo {
         }
 
     } lockStatsServerStatusSection;
+
+
+    // This startup parameter enables experimental document-level locking features, which work
+    // for update-in-place changes only (i.e., no index updates and no document growth or 
+    // movement). It should be removed once full document-level locking is checked-in.
+    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useExperimentalDocLocking, bool, false);
 
 }

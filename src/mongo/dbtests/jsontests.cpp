@@ -578,10 +578,10 @@ namespace JsonTests {
             virtual ~Base() {}
             void run() {
                 ASSERT( fromjson( json() ).valid() );
-                assertEquals( bson(), fromjson( json() ), "mode: <default>" );
-                assertEquals( bson(), fromjson( bson().jsonString( Strict ) ), "mode: strict" );
-                assertEquals( bson(), fromjson( bson().jsonString( TenGen ) ), "mode: tengen" );
-                assertEquals( bson(), fromjson( bson().jsonString( JS ) ), "mode: js" );
+                assertEquals( bson(), fromjson( tojson( bson() ) ), "mode: <default>" );
+                assertEquals( bson(), fromjson( tojson( bson(), Strict ) ), "mode: strict" );
+                assertEquals( bson(), fromjson( tojson( bson(), TenGen ) ), "mode: tengen" );
+                assertEquals( bson(), fromjson( tojson( bson(), JS ) ), "mode: js" );
             }
         protected:
             virtual BSONObj bson() const = 0;
@@ -811,6 +811,27 @@ namespace JsonTests {
             }
             virtual string json() const {
                 return "{ \"a\" : [] }";
+            }
+        };
+
+        class TopLevelArrayEmpty : public Base {
+            virtual BSONObj bson() const {
+                return BSONArray();
+            }
+            virtual string json() const {
+                return "[]";
+            }
+        };
+
+        class TopLevelArray : public Base {
+            virtual BSONObj bson() const {
+                BSONArrayBuilder builder;
+                builder.append(123);
+                builder.append("abc");
+                return builder.arr();
+            }
+            virtual string json() const {
+                return "[ 123, \"abc\" ]";
             }
         };
 
@@ -2607,6 +2628,40 @@ namespace JsonTests {
             }
         };
 
+        class MinKeyAlone : public Bad {
+            virtual string json() const {
+                return "{ \"$minKey\" : 1 }";
+            }
+        };
+
+        class MaxKeyAlone : public Bad {
+            virtual string json() const {
+                return "{ \"$maxKey\" : 1 }";
+            }
+        };
+
+        class MinKey : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendMinKey("a");
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : { \"$minKey\" : 1 } }";
+            }
+        };
+
+        class MaxKey : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendMaxKey("a");
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : { \"$maxKey\" : 1 } }";
+            }
+        };
+
     } // namespace FromJsonTests
 
     class All : public Suite {
@@ -2675,6 +2730,8 @@ namespace JsonTests {
             add< FromJsonTests::Subobject >();
             add< FromJsonTests::DeeplyNestedObject >();
             add< FromJsonTests::ArrayEmpty >();
+            add< FromJsonTests::TopLevelArrayEmpty >();
+            add< FromJsonTests::TopLevelArray >();
             add< FromJsonTests::Array >();
             add< FromJsonTests::True >();
             add< FromJsonTests::False >();
@@ -2866,6 +2923,8 @@ namespace JsonTests {
             add< FromJsonTests::EmbeddedDatesFormat3 >();
             add< FromJsonTests::NullString >();
             add< FromJsonTests::NullFieldUnquoted >();
+            add< FromJsonTests::MinKey >();
+            add< FromJsonTests::MaxKey >();
         }
     } myall;
 

@@ -1,5 +1,7 @@
+// rocks_recovery_unit.h
+
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,37 +28,54 @@
 *    it in the license file.
 */
 
-/* pdfile.h
-
-   Files:
-     database.ns - namespace index
-     database.1  - data files
-     database.2
-     ...
-*/
-
 #pragma once
 
+#include <map>
 #include <string>
 
-#include "mongo/base/status.h"
-#include "mongo/db/jsobj.h"
+#include <boost/scoped_ptr.hpp>
+
+#include "mongo/base/disallow_copying.h"
+#include "mongo/db/storage/recovery_unit.h"
+
+namespace rocksdb {
+    class DB;
+    class WriteBatch;
+}
 
 namespace mongo {
 
-    class Database;
-    class OperationContext;
+    class RocksRecoveryUnit : public RecoveryUnit {
+        MONGO_DISALLOW_COPYING(RocksRecoveryUnit);
+    public:
+        RocksRecoveryUnit( rocksdb::DB* db, bool defaultCommit );
+        virtual ~RocksRecoveryUnit();
 
-    void dropDatabase(OperationContext* txn, Database* db );
+        virtual void beginUnitOfWork();
+        virtual void commitUnitOfWork();
 
-    void dropAllDatabasesExceptLocal(OperationContext* txn);
+        virtual void endUnitOfWork();
 
-    Status userCreateNS( OperationContext* txn,
-                         Database* db,
-                         const StringData& ns,
-                         BSONObj options,
-                         bool logForReplication,
-                         bool createDefaultIndexes = true );
+        virtual bool commitIfNeeded(bool force = false);
 
+        virtual bool awaitCommit();
 
-} // namespace mongo
+        virtual bool isCommitNeeded() const;
+
+        virtual void* writingPtr(void* data, size_t len);
+
+        virtual void syncDataAndTruncateJournal();
+
+        // local api
+
+        rocksdb::WriteBatch* writeBatch();
+
+    private:
+        rocksdb::DB* _db; // now owned
+        bool _defaultCommit;
+
+        boost::scoped_ptr<rocksdb::WriteBatch> _writeBatch; // owned
+        int _depth;
+    };
+
+}

@@ -60,8 +60,11 @@ namespace mongo {
 
         virtual bool isPrimaryFor( const StringData& ns );
 
+        virtual Transaction* getTransaction();
+
     private:
         boost::scoped_ptr<RecoveryUnit> _recovery;
+        Transaction _tx;
     };
 
 }  // namespace mongo

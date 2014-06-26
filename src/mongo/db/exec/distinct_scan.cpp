@@ -142,18 +142,20 @@ namespace mongo {
     void DistinctScan::prepareToYield() {
         ++_commonStats.yields;
 
-        if (isEOF() || (NULL == _btreeCursor.get())) { return; }
+        if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
         // We save these so that we know if the cursor moves during the yield.  If it moves, we have
         // to make sure its ending position is valid w.r.t. our bounds.
-        _savedKey = _btreeCursor->getKey().getOwned();
-        _savedLoc = _btreeCursor->getValue();
+        if (!_btreeCursor->isEOF()) {
+            _savedKey = _btreeCursor->getKey().getOwned();
+            _savedLoc = _btreeCursor->getValue();
+        }
         _btreeCursor->savePosition();
     }
 
     void DistinctScan::recoverFromYield() {
         ++_commonStats.unyields;
 
-        if (isEOF() || (NULL == _btreeCursor.get())) { return; }
+        if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
 
         // We can have a valid position before we check isEOF(), restore the position, and then be
         // EOF upon restore.

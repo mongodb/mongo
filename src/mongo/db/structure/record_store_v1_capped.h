@@ -60,7 +60,7 @@ namespace mongo {
          * @param inclusive - Truncate 'end' as well iff true
          * XXX: this will go away soon, just needed to move for now
          */
-        void temp_cappedTruncateAfter( OperationContext* txn, DiskLoc end, bool inclusive );
+        virtual void temp_cappedTruncateAfter( OperationContext* txn, DiskLoc end, bool inclusive );
 
         virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
                                              const CollectionScanParams::Direction& dir) const;

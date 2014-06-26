@@ -37,7 +37,6 @@
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pdfile.h"
 
 namespace mongo {
 

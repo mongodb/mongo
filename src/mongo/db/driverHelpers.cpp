@@ -45,7 +45,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/background.h"
 

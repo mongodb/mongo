@@ -34,7 +34,6 @@
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/haystack_access_method_internal.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
 
 namespace mongo {

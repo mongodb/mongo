@@ -35,7 +35,6 @@
 #include "mongo/util/net/message.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/concurrency/spin_lock.h"
-#include "mongo/db/pdfile.h"
 
 namespace mongo {
 

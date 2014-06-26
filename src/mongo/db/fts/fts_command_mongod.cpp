@@ -34,7 +34,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/fts/fts_command.h"
 #include "mongo/db/fts/fts_util.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/type_explain.h"
 #include "mongo/util/mongoutils/str.h"

@@ -202,6 +202,17 @@ namespace mongo {
          */
         virtual Status truncate( OperationContext* txn ) = 0;
 
+        /**
+         * Truncate documents newer than the document at 'end' from the capped
+         * collection.  The collection cannot be completely emptied using this
+         * function.  An assertion will be thrown if that is attempted.
+         * @param inclusive - Truncate 'end' as well iff true
+         * XXX: this will go away soon, just needed to move for now
+         */
+        virtual void temp_cappedTruncateAfter(OperationContext* txn,
+                                              DiskLoc end,
+                                              bool inclusive) = 0;
+
         // does this RecordStore support the compact operation
         virtual bool compactSupported() const = 0;
         virtual Status compact( OperationContext* txn,

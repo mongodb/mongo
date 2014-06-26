@@ -65,7 +65,9 @@ config.version = 2;
 // Add #3 using rs.add() configuration document.
 // Since 'db' currently points to slave2, reset 'db' to admin db on master before running rs.add().
 db = admin;
-rs.add({_id:2, host:hostname+":"+ports[2]});
+
+// If _id is not provided, rs.add() will generate _id for #3 based on existing members' _ids.
+assert.commandWorked(rs.add({host:hostname+":"+ports[2]}), "failed to add #3 to replica set");
 
 reconnect(slave1);
 reconnect(slave2);

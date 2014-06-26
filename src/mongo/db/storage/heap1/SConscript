@@ -3,8 +3,9 @@ Import("env")
 env.Library(
     target= 'storage_heap1',
     source= [
+        'heap1_btree_impl.cpp',
         'heap1_database_catalog_entry.cpp',
-        'heap1_engine.cpp'
+        'heap1_engine.cpp',
         ],
     LIBDEPS= [
         '$BUILD_DIR/mongo/bson',

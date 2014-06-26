@@ -20,6 +20,7 @@ env.SConscript(['base/SConscript',
                 'db/auth/SConscript',
                 'db/catalog/SConscript',
                 'db/commands/SConscript',
+                'db/concurrency/SConscript',
                 'db/exec/SConscript',
                 'db/fts/SConscript',
                 'db/index/SConscript',
@@ -29,6 +30,7 @@ env.SConscript(['base/SConscript',
                 'db/sorter/SConscript',
                 'db/storage/SConscript',
                 'db/storage/heap1/SConscript',
+                'db/storage/rocks/SConscript',
                 'db/structure/SConscript',
                 'db/structure/btree/SConscript',
                 'db/SConscript',
@@ -628,7 +630,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/catalog/collection_info_cache.cpp",
                     "db/catalog/database_holder.cpp",
                     "db/background.cpp",
-                    "db/pdfile.cpp",
                     "db/structure/catalog/index_details.cpp",
                     "db/index_builder.cpp",
                     "db/index_rebuilder.cpp",
@@ -897,11 +898,11 @@ env.CppUnitTest('range_deleter_test',
                     'range_deleter',
                 ])
 
-env.Library("serveronly", serverOnlyFiles,
-            LIBDEPS=["coreshard",
+serveronlyLibdeps = ["coreshard",
                      "db/auth/authmongod",
                      "db/fts/ftsmongod",
                      "db/common",
+                     "db/concurrency/lock_mgr",
                      "db/ops/update_driver",
                      "defaultversion",
                      "geoparser",
@@ -927,8 +928,13 @@ env.Library("serveronly", serverOnlyFiles,
                      'db/structure/record_store',
                      'db/structure/record_store_v1',
                      'db/structure/btree/btree',
-                     '$BUILD_DIR/third_party/shim_snappy'])
+                     '$BUILD_DIR/third_party/shim_snappy']
 
+if has_option("rocksdb" ):
+    serveronlyLibdeps.append( 'db/storage/rocks/storage_rocks' )
+
+env.Library("serveronly", serverOnlyFiles,
+            LIBDEPS=serveronlyLibdeps )
 
 env.Library("message_server_port", "util/net/message_server_port.cpp")
 

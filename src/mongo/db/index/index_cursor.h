@@ -103,9 +103,7 @@ namespace mongo {
          */
 
         /**
-         * Save our current position in the index.  Assumes that we are currently pointing to a
-         * valid position in the index.
-         * If not, we error.  Otherwise, succeed.
+         * Save our current position in the index.
          */
         virtual Status savePosition() = 0;
 

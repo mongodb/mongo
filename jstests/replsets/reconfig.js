@@ -28,6 +28,7 @@ master = replTest.getMaster();
 config = master.getDB("local").system.replset.findOne();
 var oldVersion = config.version++;
 config.members[0].votes = 2;
+config.members[0].priority = 5;
 config.members[3].votes = 2;
 try {
     assert.commandWorked(master.getDB("admin").runCommand({replSetReconfig : config}));
