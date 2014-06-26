@@ -984,7 +984,7 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
-		FLD_SET(conn->stat_flags, WT_CONN_STAT_FAST | WT_CONN_STAT_ALL);
+		FLD_SET(conn->stat_flags, WT_CONN_STAT_ALL | WT_CONN_STAT_FAST);
 		++set;
 	}
 	WT_RET_NOTFOUND_OK(ret);
