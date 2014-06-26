@@ -162,9 +162,29 @@ func TestAuthOverSSL(t *testing.T) {
 
 	testutil.VerifyTestType(t, "ssl_auth")
 
-	testutil.CreateUserAdmin(t, "localhost", "20000")
-	testutil.CreateUserWithRole(t, "localhost", "20000", "cAdmin", "password",
+	// set up the necessary users on the server
+	connector := &SSLDBConnector{}
+	opts := &options.ToolOptions{
+		Connection: &options.Connection{
+			Host: "localhost",
+			Port: "20000",
+		},
+		SSL: &options.SSL{
+			UseSSL:        true,
+			SSLCAFile:     "testdata/ca.pem",
+			SSLPEMKeyFile: "testdata/server.pem",
+		},
+		Auth: &options.Auth{},
+	}
+	connector.Configure(opts)
+	session, err := connector.GetNewSession()
+	if err != nil {
+		t.Fatalf("error dialing server: %v", err)
+	}
+	testutil.CreateUserAdmin(t, session)
+	testutil.CreateUserWithRole(t, session, "cAdmin", "password",
 		mgo.RoleClusterAdmin, true)
+	session.Close()
 
 	Convey("When running mongodb-cr auth over bidirectional ssl", t, func() {
 

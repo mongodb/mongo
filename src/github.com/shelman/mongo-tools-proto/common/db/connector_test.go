@@ -64,9 +64,15 @@ func TestVanillaDBConnectorWithAuth(t *testing.T) {
 
 	testutil.VerifyTestType(t, "auth")
 
-	testutil.CreateUserAdmin(t, "localhost", "27017")
-	testutil.CreateUserWithRole(t, "localhost", "27017", "cAdmin", "password",
+	session, err := mgo.Dial("localhost:27017")
+	if err != nil {
+		t.Fatalf("error dialing server: %v", err)
+	}
+
+	testutil.CreateUserAdmin(t, session)
+	testutil.CreateUserWithRole(t, session, "cAdmin", "password",
 		mgo.RoleClusterAdmin, true)
+	session.Close()
 
 	Convey("With a vanilla db connector and a mongod running with"+
 		" auth", t, func() {

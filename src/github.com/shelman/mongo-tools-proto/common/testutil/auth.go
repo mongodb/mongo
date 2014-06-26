@@ -13,23 +13,17 @@ var (
 
 // Initialize a user admin for the specified server.  Assumes that there are
 // no existing users, otherwise will fail with a permissions issue.
-func CreateUserAdmin(t *testing.T, host, port string) {
-	CreateUserWithRole(t, host, port, UserAdmin, UserAdminPassword,
+func CreateUserAdmin(t *testing.T, session *mgo.Session) {
+	CreateUserWithRole(t, session, UserAdmin, UserAdminPassword,
 		mgo.RoleUserAdminAny, false)
 }
 
-func CreateUserWithRole(t *testing.T, host, port, user, password string,
-	role mgo.Role, needsLogin bool) {
-
-	session, err := mgo.Dial(host + ":" + port)
-	if err != nil {
-		t.Fatalf("error dialing %v:%v - %v", host, port, err)
-	}
-	defer session.Close()
+func CreateUserWithRole(t *testing.T, session *mgo.Session, user,
+	password string, role mgo.Role, needsLogin bool) {
 
 	adminDB := session.DB("admin")
 	if needsLogin {
-		err = adminDB.Login(
+		err := adminDB.Login(
 			UserAdmin,
 			UserAdminPassword,
 		)
@@ -38,7 +32,7 @@ func CreateUserWithRole(t *testing.T, host, port, user, password string,
 		}
 	}
 
-	err = adminDB.Run(
+	err := adminDB.Run(
 		bson.D{
 			{"createUser", user},
 			{"pwd", password},
