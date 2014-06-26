@@ -245,15 +245,17 @@ err:	if (locked)
  *	Output a set of statistics into the current log file.
  */
 static int
-__statlog_log_one(WT_SESSION_IMPL *session,
-    FILE *log_file, WT_ITEM *old_path, WT_ITEM *path_buf)
+__statlog_log_one(
+    WT_SESSION_IMPL *session, WT_ITEM *old_path, WT_ITEM *path_buf)
 {
+	FILE *log_file;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	struct timespec ts;
 	struct tm *tm, _tm;
 
 	conn = S2C(session);
+
 	/* Get the current local time of day. */
 	WT_RET(__wt_epoch(session, &ts));
 	tm = localtime_r(&ts.tv_sec, &_tm);
@@ -263,12 +265,12 @@ __statlog_log_one(WT_SESSION_IMPL *session,
 	    path_buf->memsize, conn->stat_path, tm) == 0)
 		WT_RET_MSG(session, ENOMEM, "strftime path conversion");
 
-	/* If the path has changed, close/open the new log file. */
-	if (log_file == NULL || strcmp(path_buf->mem, old_path->mem) != 0) {
-		if (log_file != NULL) {
-			(void)fclose(log_file);
-			log_file = NULL;
-		}
+	/* If the path has changed, cycle the log file. */
+	if ((log_file = conn->stat_fp) == NULL ||
+	    old_path == NULL || strcmp(path_buf->mem, old_path->mem) != 0) {
+		conn->stat_fp = NULL;
+		if (log_file != NULL)
+			WT_RET(fclose(log_file) == 0 ? 0 : __wt_errno());
 
 		if (old_path != NULL)
 			(void)strcpy(old_path->mem, path_buf->mem);
@@ -316,7 +318,8 @@ __statlog_log_one(WT_SESSION_IMPL *session,
 		WT_RET(__statlog_lsm_apply(session));
 
 	/* Flush. */
-	WT_RET(fflush(log_file) == 0 ? 0 : __wt_errno());
+	WT_RET(fflush(conn->stat_fp) == 0 ? 0 : __wt_errno());
+
 	return (0);
 }
 
@@ -331,11 +334,9 @@ __wt_statlog_log_one(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_ITEM path;
-	FILE *fp;
 
 	conn = S2C(session);
 	WT_CLEAR(path);
-	fp = NULL;
 
 	if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
 		return (0);
@@ -346,11 +347,9 @@ __wt_statlog_log_one(WT_SESSION_IMPL *session)
 		    "Attempt to log statistics while a server is running");
 
 	WT_RET(__wt_buf_init(session, &path, strlen(conn->stat_path) + 128));
-	WT_ERR(__statlog_log_one(session, fp, NULL, &path));
+	WT_ERR(__statlog_log_one(session, NULL, &path));
 
-err:	if (fp != NULL)
-		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
-	__wt_buf_free(session, &path);
+err:	__wt_buf_free(session, &path);
 	return (ret);
 }
 
@@ -361,7 +360,6 @@ err:	if (fp != NULL)
 static void *
 __statlog_server(void *arg)
 {
-	FILE *fp;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_ITEM path, tmp;
@@ -372,7 +370,6 @@ __statlog_server(void *arg)
 
 	WT_CLEAR(path);
 	WT_CLEAR(tmp);
-	fp = NULL;
 
 	/*
 	 * We need a temporary place to build a path and an entry prefix.
@@ -396,7 +393,7 @@ __statlog_server(void *arg)
 			continue;
 		}
 
-		WT_ERR(__statlog_log_one(session, fp, &path, &tmp));
+		WT_ERR(__statlog_log_one(session, &path, &tmp));
 
 		/* Wait until the next event. */
 		WT_ERR_TIMEDOUT_OK(
@@ -406,8 +403,6 @@ __statlog_server(void *arg)
 	if (0) {
 err:		__wt_err(session, ret, "statistics log server error");
 	}
-	if (fp != NULL)
-		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
 	__wt_buf_free(session, &path);
 	__wt_buf_free(session, &tmp);
 	return (NULL);
@@ -526,7 +521,10 @@ __wt_statlog_destroy(WT_CONNECTION_IMPL *conn, int is_close)
 	conn->stat_session = NULL;
 	conn->stat_tid_set = 0;
 	conn->stat_format = NULL;
-	conn->stat_fp = NULL;
+	if (conn->stat_fp != NULL) {
+		WT_TRET(fclose(conn->stat_fp) == 0 ? 0 : __wt_errno());
+		conn->stat_fp = NULL;
+	}
 	conn->stat_path = NULL;
 	conn->stat_sources = NULL;
 	conn->stat_stamp = NULL;
