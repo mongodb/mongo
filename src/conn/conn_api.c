@@ -543,6 +543,13 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 		F_SET(conn, WT_CONN_LEAK_MEMORY);
 
 err:	API_END(session, ret);
+	/*
+	 * Map WT_NOTFOUND to ENOENT, only cursor methods return WT_NOTFOUND.
+	 * Done explicitly because the api-end macro that has the mapping has
+	 * a return out of the function.
+	 */
+	if (ret == WT_NOTFOUND)
+		ret = ENOENT;
 
 	/*
 	 * Rollback all running transactions.
