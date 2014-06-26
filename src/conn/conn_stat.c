@@ -55,8 +55,8 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 		FLD_SET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE);
 
 	/*
-	 * Statistics logging configuration requires either a wait time or
-	 * an on close setting.
+	 * Statistics logging configuration requires either a wait time or an
+	 * on-close setting.
 	 */
 	if (*runp == 0 && !FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
 		return (0);
