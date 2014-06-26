@@ -93,6 +93,7 @@ namespace QueryStageKeep {
         DBDirectClient _client;
     };
 
+
     // Test that we actually merge flagged results.
 
     //

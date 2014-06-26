@@ -108,11 +108,11 @@ namespace mongo {
 
             if ( method == "GET" ) {
                 responseCode = 200;
-                html = handleRESTQuery( db, fullns, action, params, responseCode, ss  );
+                html = handleRESTQuery(txn, fullns, action, params, responseCode, ss);
             }
             else if ( method == "POST" ) {
                 responseCode = 201;
-                handlePost( db, fullns, MiniWebServer::body( rq ), params, responseCode, ss  );
+                handlePost(txn, fullns, MiniWebServer::body(rq), params, responseCode, ss);
             }
             else {
                 responseCode = 400;
@@ -129,7 +129,7 @@ namespace mongo {
             responseMsg = ss.str();
         }
 
-        bool handleRESTQuery( DBDirectClient& db,
+        bool handleRESTQuery( OperationContext* txn,
                               const std::string& ns,
                               const std::string& action,
                               BSONObj & params,
@@ -170,6 +170,8 @@ namespace mongo {
             }
 
             BSONObj query = queryBuilder.obj();
+
+            DBDirectClient db(txn);
             auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , query, num , skip );
             uassert( 13085 , "query failed for dbwebserver" , cursor.get() );
 
@@ -232,7 +234,7 @@ namespace mongo {
         }
 
         // TODO Generate id and revision per couch POST spec
-        void handlePost( DBDirectClient& db,
+        void handlePost( OperationContext* txn,
                          const std::string& ns,
                          const char *body,
                          BSONObj& params,
@@ -240,6 +242,8 @@ namespace mongo {
                          stringstream & out ) {
             try {
                 BSONObj obj = fromjson( body );
+
+                DBDirectClient db(txn);
                 db.insert( ns.c_str(), obj );
             }
             catch ( ... ) {
@@ -259,7 +263,6 @@ namespace mongo {
                 return atoi( e.valuestr() );
             return def;
         }
-
     } restHandler;
 
     bool RestAdminAccess::haveAdminUsers(OperationContext* txn) const {

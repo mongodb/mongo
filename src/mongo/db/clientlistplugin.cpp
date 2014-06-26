@@ -30,10 +30,59 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/util/mongoutils/html.h"
 
+
 namespace mongo {
+
+    class OperationsDataBuilder : public GlobalEnvironmentExperiment::ProcessOperationContext {
+    public:
+        OperationsDataBuilder(std::stringstream& stringStream)
+            : _stringStream(stringStream) {
+
+        }
+
+        virtual void processOpContext(OperationContext* txn) {
+            using namespace mongoutils::html;
+
+            CurOp& co = *(txn->getCurOp());
+
+            _stringStream << "<tr><td>" << txn->getClient()->desc() << "</td>";
+
+            tablecell(_stringStream, co.opNum());
+            tablecell(_stringStream, co.active());
+            tablecell(_stringStream, txn->lockState()->reportState());
+            if (co.active()) {
+                tablecell(_stringStream, co.elapsedSeconds());
+            }
+            else {
+                tablecell(_stringStream, "");
+            }
+
+            tablecell(_stringStream, co.getOp());
+            tablecell(_stringStream, html::escape(co.getNS()));
+            if (co.haveQuery()) {
+                tablecell(_stringStream, html::escape(co.query().toString()));
+            }
+            else {
+                tablecell(_stringStream, "");
+            }
+
+            tablecell(_stringStream, co.getRemoteString());
+
+            tablecell(_stringStream, co.getMessage());
+            tablecell(_stringStream, co.getProgressMeter().toString());
+
+            _stringStream << "</tr>\n";
+        }
+
+    private:
+        std::stringstream& _stringStream;
+    };
+
 namespace {
     class ClientListPlugin : public WebStatusPlugin {
     public:
@@ -58,35 +107,10 @@ namespace {
                << "<th>progress</th>"
 
                << "</tr>\n";
-            {
-                scoped_lock bl(Client::clientsMutex);
-                for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
-                    Client *c = *i;
-                    CurOp& co = *(c->curop());
-                    ss << "<tr><td>" << c->desc() << "</td>";
-
-                    tablecell( ss , co.opNum() );
-                    tablecell( ss , co.active() );
-                    tablecell( ss , c->lockState().reportState() );
-                    if ( co.active() )
-                        tablecell( ss , co.elapsedSeconds() );
-                    else
-                        tablecell( ss , "" );
-                    tablecell( ss , co.getOp() );
-                    tablecell( ss , html::escape( co.getNS() ) );
-                    if ( co.haveQuery() )
-                        tablecell( ss , html::escape( co.query().toString() ) );
-                    else
-                        tablecell( ss , "" );
-                    tablecell( ss , co.getRemoteString() );
-
-                    tablecell( ss , co.getMessage() );
-                    tablecell( ss , co.getProgressMeter().toString() );
-
-
-                    ss << "</tr>\n";
-                }
-            }
+            
+            OperationsDataBuilder opCtxDataBuilder(ss);
+            getGlobalEnvironment()->forEachOperationContext(&opCtxDataBuilder);
+            
             ss << "</table>\n";
 
         }

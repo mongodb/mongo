@@ -115,7 +115,7 @@ namespace mongo {
 
     MONGO_FP_DECLARE(rsStopGetMore);
 
-    void inProgCmd( Message &m, DbResponse &dbresponse ) {
+    static void inProgCmd( Message &m, DbResponse &dbresponse ) {
         DbMessage d(m);
         QueryMessage q(d);
         BSONObjBuilder b;
@@ -160,7 +160,10 @@ namespace mongo {
                     }
                     verify( co );
                     if( all || co->displayInCurop() ) {
-                        BSONObj info = co->info();
+                        BSONObjBuilder infoBuilder;
+                        co->reportState(&infoBuilder);
+
+                        const BSONObj info = infoBuilder.obj();
                         if ( all || m.matches( info )) {
                             vals.push_back( info );
                         }
@@ -1013,19 +1016,10 @@ namespace {
         return (unsigned long long )res;
     }
 
-    DBClientBase * createDirectClient() {
+    DBClientBase* createDirectClient() {
         return new DBDirectClient();
     }
 
-    MONGO_INITIALIZER_GENERAL(CreateJSDirectClient,
-                              ("StorageEngineInit"),
-                              MONGO_NO_DEPENDENTS)
-        (InitializerContext* context) {
-
-        directDBClient = createDirectClient();
-
-        return Status::OK();
-    }
 
     mongo::mutex exitMutex("exit");
     AtomicUInt numExitCalls = 0;

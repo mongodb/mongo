@@ -904,6 +904,7 @@ namespace JSTests {
         verify(0);
     }
 
+
     class Utf8Check {
     public:
         Utf8Check() { reset(); }
@@ -930,6 +931,7 @@ namespace JSTests {
             client.dropCollection( ns() );
         }
         static const char *ns() { return "unittest.jstests.utf8check"; }
+
         DBDirectClient client;
     };
 
@@ -947,6 +949,7 @@ namespace JSTests {
             client.dropCollection( ns() );
         }
         static const char *ns() { return "unittest.jstests.longutf8string"; }
+
         DBDirectClient client;
     };
 
@@ -1077,6 +1080,7 @@ namespace JSTests {
             virtual string jsonOut() const {
                 return json();
             }
+
             DBDirectClient client;
         };
 
@@ -1982,13 +1986,14 @@ namespace JSTests {
     class InvalidStoredJS {
     public:
         void run() {
-            DBDirectClient client;
             BSONObjBuilder query;
             query.append( "_id" , "invalidstoredjs1" );
             
             BSONObjBuilder update;
             update.append( "_id" , "invalidstoredjs1" );
             update.appendCode( "value" , "function () { db.test.find().forEach(function(obj) { continue; }); }" );
+
+            DBDirectClient client;
             client.update( "test.system.js" , query.obj() , update.obj() , true /* upsert */ );
 
             scoped_ptr<Scope> s( globalScriptEngine->newScope() );

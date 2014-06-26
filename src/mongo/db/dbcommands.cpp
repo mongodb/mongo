@@ -826,7 +826,7 @@ namespace mongo {
                         break; // skipped chunk is probably on another shard
                     }
                     log() << "should have chunk: " << n << " have:" << myn << endl;
-                    dumpChunks( ns , query , sort );
+                    dumpChunks(txn, ns, query, sort);
                     uassert( 10040 ,  "chunks out of order" , n == myn );
                 }
 
@@ -850,8 +850,11 @@ namespace mongo {
             return true;
         }
 
-        void dumpChunks( const string& ns , const BSONObj& query , const BSONObj& sort ) {
-            DBDirectClient client;
+        void dumpChunks(OperationContext* txn,
+                        const string& ns,
+                        const BSONObj& query,
+                        const BSONObj& sort) {
+            DBDirectClient client(txn);
             Query q(query);
             q.sort(sort);
             auto_ptr<DBClientCursor> c = client.query(ns, q);
@@ -1250,8 +1253,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            BSONObj info = txn->getCurOp()->info();
-            result << "you" << info[ "client" ];
+            result << "you" << txn->getCurOp()->getRemoteString();
             return true;
         }
     } cmdWhatsMyUri;

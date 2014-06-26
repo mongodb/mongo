@@ -43,9 +43,6 @@
 namespace IndexUpdateTests {
 
     static const char* const _ns = "unittests.indexupdate";
-#if 0
-    ExternalSortComparison* _aFirstSort = BtreeBasedBulkAccessMethod::getComparison(0, BSON("a" << 1));
-#endif
 
     /**
      * Test fixture for a write locked test using collection _ns.  Includes functionality to
@@ -55,9 +52,10 @@ namespace IndexUpdateTests {
     class IndexBuildBase {
     public:
         IndexBuildBase() :
-            _ctx(&_txn, _ns) {
+            _ctx(&_txn, _ns),
+            _client(&_txn) {
+
             _client.createCollection( _ns );
-            setGlobalEnvironment(new GlobalEnvironmentMongoD());
         }
         ~IndexBuildBase() {
             _client.dropCollection( _ns );
@@ -93,9 +91,9 @@ namespace IndexUpdateTests {
         }
 #endif
 
-        DBDirectClient _client;
         OperationContextImpl _txn;
         Client::WriteContext _ctx;
+        DBDirectClient _client;
     };
 
     /** addKeysToPhaseOne() adds keys from a collection's documents to an external sorter. */

@@ -61,7 +61,9 @@ namespace UpdateTests {
         bool error() {
             return !client_.getPrevError().getField( "err" ).isNull();
         }
-        DBDirectClient &client() { return client_; }
+
+        DBDirectClient& client() { return client_; }
+
     private:
         DBDirectClient client_;
     };

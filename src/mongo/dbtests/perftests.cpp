@@ -68,18 +68,14 @@ namespace PerfTests {
 
     const bool profiling = false;
 
-    typedef DBDirectClient DBClientType;
-    //typedef DBClientConnection DBClientType;
-
     class ClientBase {
     public:
         // NOTE: Not bothering to backup the old error record.
         ClientBase() {
-            //_client.connect("localhost");
             mongo::lastError.reset( new LastError() );
         }
         virtual ~ClientBase() {
-            //mongo::lastError.release();
+
         }
     protected:
         void insert( const char *ns, BSONObj o ) {
@@ -91,9 +87,11 @@ namespace PerfTests {
         bool error() {
             return !_client.getPrevError().getField( "err" ).isNull();
         }
+
         DBClientBase* client() { return &_client; }
+
     private:
-        DBClientType _client;
+        DBDirectClient _client;
     };
 
     /* if you want recording of the timings, place the password for the perf database
@@ -358,7 +356,7 @@ namespace PerfTests {
             static int z;
             srand( ++z ^ (unsigned) time(0));
 #endif
-            DBClientType c;
+            DBDirectClient c;
             Client::initThreadIfNotAlready("perftestthr");
             const unsigned int Batch = batchSize();
             while( 1 ) {

@@ -44,6 +44,18 @@ namespace mongo {
         return false;
     }
 
+    void GlobalEnvironmentNoop::registerOperationContext(OperationContext* txn) {
+
+    }
+
+    void GlobalEnvironmentNoop::unregisterOperationContext(OperationContext* txn) {
+
+    }
+
+    void GlobalEnvironmentNoop::forEachOperationContext(ProcessOperationContext* procOpCtx) {
+
+    }
+
     OperationContext* GlobalEnvironmentNoop::newOpCtx() {
         return new OperationContextNoop();
     }

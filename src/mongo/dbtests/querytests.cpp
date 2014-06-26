@@ -190,10 +190,9 @@ namespace QueryTests {
     public:
         ClientBase() {
             mongo::lastError.reset( new LastError() );
-            setGlobalEnvironment(new GlobalEnvironmentMongoD());
         }
         ~ClientBase() {
-            //mongo::lastError.release();
+
         }
 
     protected:

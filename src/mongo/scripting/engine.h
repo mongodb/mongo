@@ -258,5 +258,4 @@ namespace mongo {
     const char* jsSkipWhiteSpace(const char* raw);
 
     extern ScriptEngine* globalScriptEngine;
-    extern DBClientBase* directDBClient;
 }

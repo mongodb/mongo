@@ -78,6 +78,7 @@ namespace QueryStageFetch {
         DBDirectClient _client;
     };
 
+
     //
     // Test that a WSM with an obj is passed through verbatim.
     //

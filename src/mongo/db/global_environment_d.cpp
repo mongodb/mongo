@@ -38,7 +38,17 @@
 
 namespace mongo {
 
-    GlobalEnvironmentMongoD::GlobalEnvironmentMongoD() : _globalKill(false) { }
+    GlobalEnvironmentMongoD::GlobalEnvironmentMongoD()
+        : _globalKill(false),
+          _registeredOpContextsMutex("RegisteredOpContextsMutex") {
+
+    }
+
+    GlobalEnvironmentMongoD::~GlobalEnvironmentMongoD() {
+        if (!_registeredOpContexts.empty()) {
+            warning() << "Terminating with outstanding operation contexts." << endl;
+        }
+    }
 
     namespace {
         void interruptJs(AtomicUInt* op) {
@@ -95,6 +105,34 @@ namespace mongo {
 
     void GlobalEnvironmentMongoD::unsetKillAllOperations() {
         _globalKill = false;
+    }
+
+    void GlobalEnvironmentMongoD::registerOperationContext(OperationContext* txn) {
+        scoped_lock lock(_registeredOpContextsMutex);
+
+        // It is an error to register twice
+        pair<OperationContextSet::const_iterator, bool> inserted 
+                    = _registeredOpContexts.insert(txn);
+        invariant(inserted.second);
+    }
+
+    void GlobalEnvironmentMongoD::unregisterOperationContext(OperationContext* txn) {
+        scoped_lock lock(_registeredOpContextsMutex);
+
+        // It is an error to unregister twice or to unregister something that's not been registered
+        OperationContextSet::const_iterator it = _registeredOpContexts.find(txn);
+        invariant(it != _registeredOpContexts.end());
+
+        _registeredOpContexts.erase(it);
+    }
+
+    void GlobalEnvironmentMongoD::forEachOperationContext(ProcessOperationContext* procOpCtx) {
+        scoped_lock lock(_registeredOpContextsMutex);
+
+        OperationContextSet::iterator it;
+        for (it = _registeredOpContexts.begin(); it != _registeredOpContexts.end(); it++) {
+            procOpCtx->processOpContext(*it);
+        }
     }
 
     OperationContext* GlobalEnvironmentMongoD::newOpCtx() {

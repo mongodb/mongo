@@ -283,7 +283,7 @@ namespace mongo {
         Command * getCommand() const { return _command; }
         void setCommand(Command* command) { _command = command; }
         
-        BSONObj info();
+        void reportState(BSONObjBuilder* builder);
 
         // Fetches less information than "info()"; used to search for ops with certain criteria
         BSONObj description();

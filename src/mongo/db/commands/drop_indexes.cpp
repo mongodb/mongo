@@ -214,7 +214,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
-            DBDirectClient db;
+            DBDirectClient db(txn);
 
             BSONElement e = jsobj.firstElement();
             string toDeleteNs = dbname + '.' + e.valuestr();

@@ -49,7 +49,9 @@ namespace RunnerRegistry {
 
     class RunnerRegistryBase {
     public:
-        RunnerRegistryBase() {
+        RunnerRegistryBase()
+            : _client(&_opCtx)
+        {
             _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
             _client.dropCollection(ns());
 
@@ -94,10 +96,13 @@ namespace RunnerRegistry {
         }
 
         static const char* ns() { return "unittests.RunnerRegistryDiskLocInvalidation"; }
-        DBDirectClient _client;
-        auto_ptr<Client::WriteContext> _ctx;
+
+        // Order of these is important for initialization
         OperationContextImpl _opCtx;
+        auto_ptr<Client::WriteContext> _ctx;
+        DBDirectClient _client;
     };
+
 
     // Test that a registered runner receives invalidation notifications.
     class RunnerRegistryDiskLocInvalid : public RunnerRegistryBase {

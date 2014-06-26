@@ -42,7 +42,8 @@ namespace {
     public:
         virtual void run() {
             DBDirectClient client;
-            GridFS grid( client, "gridtest" );
+
+            GridFS grid(client, "gridtest");
             grid.setChunkSize( 5 );
 
             ASSERT_EQUALS( 5U, grid.getChunkSize() );

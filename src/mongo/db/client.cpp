@@ -32,7 +32,7 @@
    to an open socket (or logical connection if pooling on sockets) from a client.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
 
@@ -66,6 +66,7 @@
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mongoutils/checksum.h"
 #include "mongo/util/mongoutils/str.h"
+
 
 namespace mongo {
 
@@ -293,20 +294,6 @@ namespace mongo {
         return "";
     }
 
-    string Client::toString() const {
-        stringstream ss;
-        if ( _curOp )
-            ss << _curOp->info().jsonString();
-        return ss.str();
-    }
-
-    string sayClientState() {
-        Client* c = currentClient.get();
-        if ( !c )
-            return "no client";
-        return c->toString();
-    }
-
     bool Client::gotHandshake( const BSONObj& o ) {
         BSONObjIterator i(o);
 
@@ -330,10 +317,6 @@ namespace mongo {
         }
 
         return repl::theReplSet->registerSlave(_remoteId, o["member"].Int());
-    }
-
-    bool ClientBasic::hasCurrent() {
-        return currentClient.get();
     }
 
     ClientBasic* ClientBasic::getCurrent() {
@@ -362,57 +345,7 @@ namespace mongo {
 
     } handshakeCmd;
 
-    int Client::recommendedYieldMicros( int * writers , int * readers, bool needExact ) {
-        int num = 0;
-        int w = 0;
-        int r = 0;
-        {
-            scoped_lock bl(clientsMutex);
-            for ( set<Client*>::iterator i=clients.begin(); i!=clients.end(); ++i ) {
-                Client* c = *i;
-                if ( c->lockState().hasLockPending() ) {
-                    num++;
-                    if ( c->lockState().isWriteLocked() )
-                        w++;
-                    else
-                        r++;
-                }
-                if (num > 100 && !needExact)
-                    break;
-            }
-        }
 
-        if ( writers )
-            *writers = w;
-        if ( readers )
-            *readers = r;
-
-        int time = r * 10; // we have to be nice to readers since they don't have priority
-        time += w; // writers are greedy, so we can be mean tot hem
-
-        time = min( time , 1000000 );
-
-        return time;
-    }
-
-    int Client::getActiveClientCount( int& writers, int& readers ) {
-        writers = 0;
-        readers = 0;
-
-        scoped_lock bl(clientsMutex);
-        for ( set<Client*>::iterator i=clients.begin(); i!=clients.end(); ++i ) {
-            Client* c = *i;
-            if ( ! c->curop()->active() )
-                continue;
-
-            if ( c->lockState().isWriteLocked() )
-                writers++;
-            if ( c->lockState().hasAnyReadLock() )
-                readers++;
-        }
-
-        return writers + readers;
-    }
 
     void OpDebug::reset() {
         extra.reset();
