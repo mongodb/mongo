@@ -710,6 +710,21 @@ namespace mongo {
             }
         }
 
+        // NEAR cannot have a $natural sort or $natural hint.
+        if (numGeoNear > 0) {
+            BSONObj sortObj = parsed.getSort();
+            if (!sortObj["$natural"].eoo()) {
+                return Status(ErrorCodes::BadValue,
+                              "geoNear expression not allowed with $natural sort order");
+            }
+
+            BSONObj hintObj = parsed.getHint();
+            if (!hintObj["$natural"].eoo()) {
+                return Status(ErrorCodes::BadValue,
+                              "geoNear expression not allowed with $natural hint");
+            }
+        }
+
         // TEXT and NEAR cannot both be in the query.
         if (numText > 0 && numGeoNear > 0) {
             return Status(ErrorCodes::BadValue, "text and geoNear not allowed in same query");
