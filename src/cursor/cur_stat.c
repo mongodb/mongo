@@ -525,7 +525,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
 			if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ALL))
 				goto config_err;
-			F_SET(cst, WT_CONN_STAT_ALL);
+			F_SET(cst, WT_CONN_STAT_ALL | WT_CONN_STAT_FAST);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 		if ((ret = __wt_config_subgets(
