@@ -55,12 +55,18 @@ namespace mongo {
                                                     "repl.preload.docs",
                                                     &prefetchDocStats );
 
-    void prefetchIndexPages(Collection* collection, const BSONObj& obj);
+    void prefetchIndexPages(Collection* collection,
+                            const repl::ReplSetImpl::IndexPrefetchConfig& prefetchConfig,
+                            const BSONObj& obj);
+
     void prefetchRecordPages(OperationContext* txn, const char* ns, const BSONObj& obj);
 
 
     // prefetch for an oplog operation
-    void prefetchPagesForReplicatedOp(OperationContext* txn, Database* db, const BSONObj& op) {
+    void prefetchPagesForReplicatedOp(OperationContext* txn,
+                                      Database* db,
+                                      const repl::ReplSetImpl::IndexPrefetchConfig& prefetchConfig,
+                                      const BSONObj& op) {
         const char *opField;
         const char *opType = op.getStringField("op");
         switch (*opType) {
@@ -102,7 +108,7 @@ namespace mongo {
         // a way to achieve that would be to prefetch the record first, and then afterwards do 
         // this part.
         //
-        prefetchIndexPages(collection, obj);
+        prefetchIndexPages(collection, prefetchConfig, obj);
 
         // do not prefetch the data for inserts; it doesn't exist yet
         // 
@@ -119,11 +125,11 @@ namespace mongo {
     }
 
     // page in pages needed for all index lookups on a given object
-    void prefetchIndexPages(Collection* collection, const BSONObj& obj) {
+    void prefetchIndexPages(Collection* collection,
+                            const repl::ReplSetImpl::IndexPrefetchConfig& prefetchConfig,
+                            const BSONObj& obj) {
         DiskLoc unusedDl; // unused
         BSONObjSet unusedKeys;
-        repl::ReplSetImpl::IndexPrefetchConfig prefetchConfig =
-                                                    repl::theReplSet->getIndexPrefetchConfig();
 
         // do we want prefetchConfig to be (1) as-is, (2) for update ops only, or (3) configured per op type?  
         // One might want PREFETCH_NONE for updates, but it's more rare that it is a bad idea for inserts.  

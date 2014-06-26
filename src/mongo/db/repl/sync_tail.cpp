@@ -130,7 +130,10 @@ namespace repl {
                 // for multiple prefetches if they are for the same database.
                 OperationContextImpl txn;
                 Client::ReadContext ctx(&txn, ns);
-                prefetchPagesForReplicatedOp(&txn, ctx.ctx().db(), op);
+                prefetchPagesForReplicatedOp(&txn,
+                                             ctx.ctx().db(),
+                                             theReplSet->getIndexPrefetchConfig(),
+                                             op);
             }
             catch (const DBException& e) {
                 LOG(2) << "ignoring exception in prefetchOp(): " << e.what() << endl;
