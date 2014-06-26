@@ -92,6 +92,17 @@ namespace repl {
         // update internal state with heartbeat response
         virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
 
+        // produce a reply to a status request
+        virtual void prepareStatusResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result,
+                                           unsigned uptime);
+
+        // produce a reply to a freeze request
+        virtual void prepareFreezeResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result);
+
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn);
 
@@ -177,6 +188,9 @@ namespace repl {
 
         // Block syncing -- in case we fail auth when heartbeating other nodes
         bool _blockSync;
+
+        // The number of calls we have had to enter maintenance mode
+        int _maintenanceModeCalls;
 
 
         // Functions to call when a reconfig is finished.  We pass the new config object.

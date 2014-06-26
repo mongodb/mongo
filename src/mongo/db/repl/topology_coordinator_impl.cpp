@@ -45,7 +45,8 @@ namespace mongo {
 namespace repl {
 
     TopologyCoordinatorImpl::TopologyCoordinatorImpl() :
-        _startupStatus(PRESTART), _busyWithElectSelf(false), _blockSync(false)
+        _startupStatus(PRESTART), _busyWithElectSelf(false), _blockSync(false),
+        _maintenanceModeCalls(0)
     {
     }
 
@@ -882,6 +883,137 @@ namespace repl {
         for (std::vector<StateChangeCallbackFn>::const_iterator it = _stateChangeCallbacks.begin();
              it != _stateChangeCallbacks.end(); ++it) {
             (*it)(_memberState);
+        }
+    }
+
+    void TopologyCoordinatorImpl::prepareStatusResponse(Date_t now,
+                                                        const BSONObj& cmdObj,
+                                                        BSONObjBuilder& result,
+                                                        unsigned uptime) {
+        // output for each member
+        vector<BSONObj> membersOut;
+        MemberState myState = _memberState;
+
+        // add self
+        {
+            BSONObjBuilder bb;
+            bb.append("_id", (int) _self->id());
+            bb.append("name", _self->fullName());
+            bb.append("health", 1.0);
+            bb.append("state", (int)myState.s);
+            bb.append("stateStr", myState.toString());
+            bb.append("uptime", uptime);
+            if (!_self->config().arbiterOnly) {
+                bb.appendTimestamp("optime", _lastApplied.asDate());
+                bb.appendDate("optimeDate", _lastApplied.getSecs() * 1000LL);
+            }
+
+            if (_maintenanceModeCalls) {
+                bb.append("maintenanceMode", _maintenanceModeCalls);
+            }
+
+            std::string s = _getHbmsg();
+            if( !s.empty() )
+                bb.append("infoMessage", s);
+
+            if (myState == MemberState::RS_PRIMARY) {
+                bb.append("electionTime", _electionTime);
+                bb.appendDate("electionDate", _electionTime.asDate());
+            }
+            bb.append("self", true);
+            membersOut.push_back(bb.obj());
+        }
+
+        // add other members
+        Member* m = _otherMembers.head();
+        while( m ) {
+            BSONObjBuilder bb;
+            bb.append("_id", (int) m->id());
+            bb.append("name", m->fullName());
+            double h = m->hbinfo().health;
+            bb.append("health", h);
+            bb.append("state", (int) m->state().s);
+            if( h == 0 ) {
+                // if we can't connect the state info is from the past
+                // and could be confusing to show
+                bb.append("stateStr", "(not reachable/healthy)");
+            }
+            else {
+                bb.append("stateStr", m->state().toString());
+            }
+            bb.append("uptime",
+                     (unsigned) (m->hbinfo().upSince ? (time(0)-m->hbinfo().upSince) : 0));
+            if (!m->config().arbiterOnly) {
+                bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
+                bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
+            }
+            bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
+            bb.appendTimeT("lastHeartbeatRecv", m->hbinfo().lastHeartbeatRecv);
+            bb.append("pingMs", m->hbinfo().ping);
+            string s = m->lhb();
+            if( !s.empty() )
+                bb.append("lastHeartbeatMessage", s);
+
+            if (m->hbinfo().authIssue) {
+                bb.append("authenticated", false);
+            }
+
+            string syncingTo = m->hbinfo().syncingTo;
+            if (!syncingTo.empty()) {
+                bb.append("syncingTo", syncingTo);
+            }
+
+            if (m->state() == MemberState::RS_PRIMARY) {
+                bb.appendTimestamp("electionTime", m->hbinfo().electionTime.asDate());
+                bb.appendDate("electionDate", m->hbinfo().electionTime.getSecs() * 1000LL);
+            }
+
+            membersOut.push_back(bb.obj());
+            m = m->next();
+        }
+
+        // sort members bson
+        sort(membersOut.begin(), membersOut.end());
+
+        result.append("set", _currentConfig.replSetName);
+        result.appendTimeT("date", now);
+        result.append("myState", myState.s);
+
+        // Add sync source info
+        if ( _syncSource &&
+            (myState != MemberState::RS_PRIMARY) &&
+            (myState != MemberState::RS_SHUNNED) ) {
+            result.append("syncingTo", _syncSource->fullName());
+        }
+
+        result.append("members", membersOut);
+        /* TODO: decide where this lands
+        if( replSetBlind )
+            result.append("blind",true); // to avoid confusion if set...
+                                         // normally never set except for testing.
+        */
+    }
+    void TopologyCoordinatorImpl::prepareFreezeResponse(Date_t now,
+                                                        const BSONObj& cmdObj,
+                                                        BSONObjBuilder& result) {
+        int secs = (int) cmdObj.firstElement().numberInt();
+
+        if (secs == 0) {
+            _stepDownUntil = now;
+            log() << "replSet info 'unfreezing'" << rsLog;
+            result.append("info","unfreezing");
+        }
+        else {
+            if( secs == 1 )
+                result.append("warning", "you really want to freeze for only 1 second?");
+
+            if (_memberState != MemberState::RS_PRIMARY) {
+                _stepDownUntil = now + secs;
+                log() << "replSet info 'freezing' for " << secs << " seconds" << rsLog;
+            }
+            else {
+                log() << "replSet info received freeze command but we are primary" << rsLog;
+            }
         }
     }
 } // namespace repl

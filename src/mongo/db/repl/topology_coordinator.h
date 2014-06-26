@@ -157,6 +157,17 @@ namespace repl {
         // update internal state with heartbeat response
         virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo) = 0;
 
+        // produce a reply to a status request
+        virtual void prepareStatusResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result,
+                                           unsigned uptime) = 0;
+
+        // produce a reply to a freeze request
+        virtual void prepareFreezeResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result) = 0;
+
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn) = 0;
     protected:

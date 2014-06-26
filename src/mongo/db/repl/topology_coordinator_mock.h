@@ -71,6 +71,15 @@ namespace repl {
 
         virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
 
+        virtual void prepareStatusResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result,
+                                           unsigned uptime);
+
+        virtual void prepareFreezeResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result);
+
         virtual void relinquishPrimary(OperationContext* txn);
 
     };

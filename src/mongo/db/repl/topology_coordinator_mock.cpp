@@ -71,6 +71,17 @@ namespace repl {
                                                            Status* result) {
     }
 
+    void TopologyCoordinatorMock::prepareStatusResponse(Date_t now,
+                                                        const BSONObj& cmdObj,
+                                                        BSONObjBuilder& result,
+                                                        unsigned uptime) {
+    }
+
+    void TopologyCoordinatorMock::prepareFreezeResponse(Date_t now,
+                                                        const BSONObj& cmdObj,
+                                                        BSONObjBuilder& result) {
+    }
+
     void TopologyCoordinatorMock::updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo) {}
 
 } // namespace repl
