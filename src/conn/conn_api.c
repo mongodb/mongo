@@ -965,7 +965,7 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 		return (ret == WT_NOTFOUND ? 0 : ret);
 
 	/* Configuring statistics clears any existing values. */
-	FLD_SET(conn->stat_flags, 0);
+	conn->stat_flags = 0;
 
 	set = 0;
 	if ((ret = __wt_config_subgets(

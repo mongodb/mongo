@@ -521,8 +521,6 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_NONE))
 		goto config_err;
 	if ((ret = __wt_config_gets(session, cfg, "statistics", &cval)) == 0) {
-		/* Start with a valid setting, this will be overridden. */
-		F_SET(cst, WT_CONN_STAT_NONE);
 		if ((ret = __wt_config_subgets(
 		    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
 			if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ALL))
@@ -545,8 +543,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		WT_ERR_NOTFOUND_OK(ret);
 
 		/* If no configuration, use the connection's configuration. */
-		if (F_ISSET(cst, WT_CONN_STAT_NONE)) {
-			F_CLR(cst, WT_CONN_STAT_NONE);
+		if (cst->flags == 0) {
 			if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ALL))
 				F_SET(cst, WT_CONN_STAT_ALL);
 			if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_FAST))

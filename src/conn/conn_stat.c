@@ -61,7 +61,6 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	if (*runp == 0 && !FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
 		return (0);
 
-
 	ret = (__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
 	ret = (__wt_config_subinit(session, &objectconf, &cval));
 	for (cnt = 0; (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt)
@@ -349,7 +348,7 @@ __wt_statlog_log_one(WT_SESSION_IMPL *session)
 
 	WT_RET(__wt_buf_init(session, &path, strlen(conn->stat_path) + 128));
 	WT_ERR(__statlog_log_one(session, fp, NULL, &path));
-	
+
 err:	if (fp != NULL)
 		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
 	__wt_buf_free(session, &path);
