@@ -143,9 +143,9 @@ namespace repl {
         return false;
     }
 
-    bool ReplicationCoordinatorImpl::canServeReadsFor(const NamespaceString& collection) {
+    Status ReplicationCoordinatorImpl::canServeReadsFor(const NamespaceString& ns, bool slaveOk) {
         // TODO
-        return false;
+        return Status::OK();
     }
 
     bool ReplicationCoordinatorImpl::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {

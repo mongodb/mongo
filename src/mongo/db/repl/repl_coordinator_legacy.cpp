@@ -317,9 +317,29 @@ namespace {
         return dbName == "local";
     }
 
-    bool LegacyReplicationCoordinator::canServeReadsFor(const NamespaceString& collection) {
-        // TODO
-        return false;
+    Status LegacyReplicationCoordinator::canServeReadsFor(const NamespaceString& ns, bool slaveOk) {
+        if (cc().isGod()) {
+            return Status::OK();
+        }
+        if (canAcceptWritesForDatabase(ns.db())) {
+            return Status::OK();
+        }
+        if (getReplicationMode() == modeMasterSlave && replSettings.slave == SimpleSlave) {
+            return Status::OK();
+        }
+        if (slaveOk) {
+            if (getReplicationMode() == modeMasterSlave || getReplicationMode() == modeNone) {
+                return Status::OK();
+            }
+            if (getCurrentMemberState().secondary()) {
+                return Status::OK();
+            }
+            return Status(ErrorCodes::NotMasterOrSecondaryCode,
+                         "not master or secondary; cannot currently read from this replSet member");
+        }
+        return Status(ErrorCodes::NotMasterNoSlaveOkCode,
+                      "not master and slaveOk=false");
+
     }
 
     bool LegacyReplicationCoordinator::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {

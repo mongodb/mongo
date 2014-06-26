@@ -193,9 +193,10 @@ namespace repl {
         virtual bool canAcceptWritesForDatabase(const StringData& dbName) = 0;
 
         /**
-         * Returns true if it is valid for this node to serve reads on the given collection.
+         * Returns Status::OK() if it is valid for this node to serve reads on the given collection
+         * and an errorcode indicating why the node cannot if it cannot.
          */
-        virtual bool canServeReadsFor(const NamespaceString& collection) = 0;
+        virtual Status canServeReadsFor(const NamespaceString& ns, bool slaveOk) = 0;
 
         /**
          * Returns true if this node should ignore unique index constraints on new documents.

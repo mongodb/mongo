@@ -80,7 +80,7 @@ namespace repl {
 
         virtual bool canAcceptWritesForDatabase(const StringData& dbName);
 
-        virtual bool canServeReadsFor(const NamespaceString& collection);
+        virtual Status canServeReadsFor(const NamespaceString& ns, bool slaveOk);
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 

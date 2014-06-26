@@ -105,9 +105,9 @@ namespace repl {
         return true;
     }
 
-    bool ReplicationCoordinatorMock::canServeReadsFor(const NamespaceString& collection) {
+    Status ReplicationCoordinatorMock::canServeReadsFor(const NamespaceString& ns, bool slaveOk) {
         // TODO
-        return true;
+        return Status::OK();
     }
 
     bool ReplicationCoordinatorMock::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {
