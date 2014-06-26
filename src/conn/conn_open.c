@@ -82,11 +82,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	F_CLR(conn, WT_CONN_SERVER_RUN);
 	WT_TRET(__wt_async_destroy(conn));
 	WT_TRET(__wt_checkpoint_server_destroy(conn));
-	WT_TRET(__wt_statlog_destroy(conn));
+	WT_TRET(__wt_statlog_destroy(conn, 1));
 	WT_TRET(__wt_sweep_destroy(conn));
-
-	/* Log a set of statistics if configured. */
-	WT_TRET(__wt_statlog_log_one(session));
 
 	/* Clean up open LSM handles. */
 	WT_TRET(__wt_lsm_tree_close_all(session));

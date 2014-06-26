@@ -473,7 +473,7 @@ __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 * configuration changes - but that makes our lives easier.
 	 */
 	if (conn->stat_session != NULL)
-		WT_RET(__wt_statlog_destroy(conn));
+		WT_RET(__wt_statlog_destroy(conn, 0));
 
 	WT_RET_NOTFOUND_OK(__statlog_config(session, cfg, &start));
 	if (start)
@@ -487,7 +487,7 @@ __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
  *	Destroy the statistics server thread.
  */
 int
-__wt_statlog_destroy(WT_CONNECTION_IMPL *conn)
+__wt_statlog_destroy(WT_CONNECTION_IMPL *conn, int is_close)
 {
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
@@ -502,6 +502,11 @@ __wt_statlog_destroy(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_thread_join(session, conn->stat_tid));
 		conn->stat_tid_set = 0;
 	}
+
+	/* Log a set of statistics on shutdown if configured. */
+	if (is_close)
+		WT_TRET(__wt_statlog_log_one(session));
+
 	WT_TRET(__wt_cond_destroy(session, &conn->stat_cond));
 
 	if ((p = conn->stat_sources) != NULL) {
