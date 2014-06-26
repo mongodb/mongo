@@ -46,13 +46,13 @@ namespace mongo {
     public:
 
         OpCounters();
-        void incInsertInWriteLock(int n) { _insert.x += n; }
-        void gotInsert() { _insert++; }
-        void gotQuery() { _query++; }
-        void gotUpdate() { _update++; }
-        void gotDelete() { _delete++; }
-        void gotGetMore() { _getmore++; }
-        void gotCommand() { _command++; }
+        void incInsertInWriteLock(int n);
+        void gotInsert();
+        void gotQuery();
+        void gotUpdate();
+        void gotDelete();
+        void gotGetMore();
+        void gotCommand();
 
         void gotOp( int op , bool isCommand );
 
