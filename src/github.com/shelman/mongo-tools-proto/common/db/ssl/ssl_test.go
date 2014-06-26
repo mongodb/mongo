@@ -47,7 +47,7 @@ func TestConfigureSSLConnector(t *testing.T) {
 }
 
 // Relies on a mongod running on port 20000, with --sslCAFile and
-// --sslPEMKeyFile defined.
+// --sslPEMKeyFile specified.
 func TestBidirectionalSSL(t *testing.T) {
 
 	testutil.VerifyTestType(t, "ssl")
@@ -156,8 +156,8 @@ func TestBidirectionalSSL(t *testing.T) {
 
 }
 
-// Relies on a mongod running on port 20000, with --auth, --sslCAFile and
-// --sslPEMKeyFile defined.
+// Relies on a mongod running on port 20000, with --sslCAFile, --sslPEMKeyFile,
+// and --auth specified.
 func TestAuthOverSSL(t *testing.T) {
 
 	testutil.VerifyTestType(t, "ssl_auth")
