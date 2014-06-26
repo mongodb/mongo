@@ -298,16 +298,23 @@ namespace mongo {
         clientResponse->setErrCode( ErrorCodes::ManualInterventionRequired );
         clientResponse->setErrMessage( "config write was not consistent, "
                                        "manual intervention may be required. "
-                                       "config responses: " + builder.obj().toString() );
+                                       "config responses: " + builder.obj().toString(false, true) );
     }
 
     static void combineFsyncErrors( const vector<ConfigFsyncResponse*>& responses,
                                     BatchedCommandResponse* clientResponse ) {
 
+        BSONObjBuilder builder;                                                                          
+        for ( vector<ConfigFsyncResponse*>::const_iterator it = responses.begin(); it != responses.end();
+                ++it ) {
+            builder.append( ( *it )->configHost.toString(), ( *it )->response.toBSON() );
+        }
+
         clientResponse->setOk( false );
         clientResponse->setErrCode( ErrorCodes::RemoteValidationError );
         clientResponse->setErrMessage( "could not verify config servers were "
-                                       "active and reachable before write" );
+                                       "active and reachable before write. "
+                                       "config responses: " + builder.obj().toString(false, true) );
     }
 
     /**
