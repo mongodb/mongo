@@ -81,10 +81,10 @@ type SSL struct {
 
 // Struct holding auth-related options
 type Auth struct {
-	Username      string `short:"u" long:"username" description:"Specify a user name for authentication"`
-	Password      string `short:"p" long:"password" description:"Specify a password for authentication"`
-	AuthDB        string `long:"authenticationDatabase" description:"Specify the database that holds the user's credentials"`
-	AuthMechanism string `long:"authenticationMechanism" description:"Specify the authentication mechanism to be used"`
+	Username  string `short:"u" long:"username" description:"Specify a user name for authentication"`
+	Password  string `short:"p" long:"password" description:"Specify a password for authentication"`
+	Source    string `long:"authenticationDatabase" description:"Specify the database that holds the user's credentials"`
+	Mechanism string `long:"authenticationMechanism" description:"Specify the authentication mechanism to be used"`
 }
 
 // Ask for a new instance of tool options

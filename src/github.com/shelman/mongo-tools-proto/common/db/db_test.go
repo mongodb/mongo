@@ -28,6 +28,7 @@ func TestInitSessionProvider(t *testing.T) {
 			opts := &options.ToolOptions{
 				Connection: &options.Connection{},
 				SSL:        &options.SSL{},
+				Auth:       &options.Auth{},
 			}
 			provider, err := InitSessionProvider(opts)
 			So(err, ShouldBeNil)
@@ -41,6 +42,7 @@ func TestInitSessionProvider(t *testing.T) {
 			opts := &options.ToolOptions{
 				Connection: &options.Connection{},
 				SSL:        &options.SSL{},
+				Auth:       &options.Auth{},
 			}
 			provider, err := InitSessionProvider(opts)
 			So(err, ShouldBeNil)
@@ -73,6 +75,7 @@ func TestRunCommand(t *testing.T) {
 			opts := &options.ToolOptions{
 				Connection: &options.Connection{},
 				SSL:        &options.SSL{},
+				Auth:       &options.Auth{},
 			}
 			provider, err := InitSessionProvider(opts)
 			So(err, ShouldBeNil)

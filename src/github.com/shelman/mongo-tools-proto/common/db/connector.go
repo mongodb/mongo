@@ -36,6 +36,11 @@ func (self *VanillaDBConnector) Configure(opts *options.ToolOptions) error {
 	self.dialInfo = &mgo.DialInfo{
 		Addrs:   connectionAddrs,
 		Timeout: DefaultDialTimeout,
+
+		Username:  opts.Auth.Username,
+		Password:  opts.Auth.Password,
+		Source:    opts.Auth.Source,
+		Mechanism: opts.Auth.Mechanism,
 	}
 
 	return nil
