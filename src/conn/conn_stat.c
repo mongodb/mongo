@@ -260,8 +260,7 @@ __statlog_log_one(WT_SESSION_IMPL *session,
 	/* Create the logging path name for this time of day. */
 	if (strftime(path_buf->mem,
 	    path_buf->memsize, conn->stat_path, tm) == 0)
-		WT_RET_MSG(
-		    session, ENOMEM, "strftime path conversion");
+		WT_RET_MSG(session, ENOMEM, "strftime path conversion");
 
 	/* If the path has changed, close/open the new log file. */
 	if (log_file == NULL || strcmp(path_buf->mem, old_path->mem) != 0) {
@@ -279,8 +278,7 @@ __statlog_log_one(WT_SESSION_IMPL *session,
 	/* Create the entry prefix for this time of day. */
 	if (strftime(path_buf->mem,
 	    path_buf->memsize, conn->stat_format, tm) == 0)
-		WT_RET_MSG(
-		    session, ENOMEM, "strftime timestamp conversion");
+		WT_RET_MSG(session, ENOMEM, "strftime timestamp conversion");
 
 	/* Reference temporary values from the connection structure. */
 	conn->stat_fp = log_file;
