@@ -543,14 +543,6 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 		F_SET(conn, WT_CONN_LEAK_MEMORY);
 
 err:	/*
-	 * Map WT_NOTFOUND to ENOENT, only cursor methods return WT_NOTFOUND.
-	 * Done explicitly because the api-end macro that has the mapping has
-	 * a return out of the function.
-	 */
-	if (ret == WT_NOTFOUND)
-		ret = ENOENT;
-
-	/*
 	 * Rollback all running transactions.
 	 * We do this as a separate pass because an active transaction in one
 	 * session could cause trouble when closing a file, even if that
@@ -584,7 +576,6 @@ err:	/*
 	session = NULL;
 
 	API_END_NOTFOUND_MAP(session, ret);
-	return (ret);
 }
 
 /*
