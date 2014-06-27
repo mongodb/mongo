@@ -87,7 +87,6 @@
 #include "mongo/server.h"
 #include "mongo/util/concurrency/race.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/hash.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/timer.h"
