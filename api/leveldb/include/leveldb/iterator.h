@@ -15,8 +15,13 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_ITERATOR_H_
 #define STORAGE_LEVELDB_INCLUDE_ITERATOR_H_
 
-#include "leveldb/slice.h"
-#include "leveldb/status.h"
+#include "wiredtiger_config.h"
+#if defined(HAVE_ROCKSDB) && !defined(leveldb)
+#define leveldb rocksdb
+#endif
+
+#include "slice.h"
+#include "status.h"
 
 namespace leveldb {
 

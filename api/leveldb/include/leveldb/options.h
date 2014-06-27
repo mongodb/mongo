@@ -5,6 +5,11 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_OPTIONS_H_
 #define STORAGE_LEVELDB_INCLUDE_OPTIONS_H_
 
+#include "wiredtiger_config.h"
+#if defined(HAVE_ROCKSDB) && !defined(leveldb)
+#define leveldb rocksdb
+#endif
+
 #include <stddef.h>
 
 namespace leveldb {
@@ -144,6 +149,19 @@ struct Options {
   //
   // Default: NULL
   const FilterPolicy* filter_policy;
+
+#ifdef HAVE_HYPERLEVELDB
+  // Is the database used with the Replay mechanism?  If yes, the lower bound on
+  // values to compact is (somewhat) left up to the application; if no, then
+  // LevelDB functions as usual, and uses snapshots to determine the lower
+  // bound.  HyperLevelDB will always maintain the integrity of snapshots, so
+  // the application merely has the option to hold data as if it's holding a
+  // snapshot.  This just prevents compaction from grabbing data before the app
+  // can get a snapshot.
+  //
+  // Default: false/no.
+  bool manual_garbage_collection;
+#endif
 
   // Create an Options object with default values for all fields.
   Options();

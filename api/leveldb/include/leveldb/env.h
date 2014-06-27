@@ -13,14 +13,19 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_ENV_H_
 #define STORAGE_LEVELDB_INCLUDE_ENV_H_
 
+#include "wiredtiger_config.h"
+#if defined(HAVE_ROCKSDB) && !defined(leveldb)
+#define leveldb rocksdb
+#endif
+
 #include <string>
 #include <vector>
 #include <stdarg.h>
 #include <stdint.h>
 #if HAVE_ELEVELDB
-#include "leveldb/perf_count.h"
+#include "perf_count.h"
 #endif
-#include "leveldb/status.h"
+#include "status.h"
 
 namespace leveldb {
 

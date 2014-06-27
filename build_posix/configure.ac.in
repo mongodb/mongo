@@ -164,6 +164,10 @@ fi
 # Output files
 AC_CONFIG_HEADERS([wiredtiger_config.h:build_posix/config.hin])
 
+# The LevelDB API needs some configuration knowledge
+AM_COND_IF([LEVELDB],
+    AC_CONFIG_HEADERS([api/leveldb/wiredtiger_config.h:build_posix/config.hin]))
+
 # BEGIN check existence -- maintained by reconf and Make.subdirs
 # END check existence
 

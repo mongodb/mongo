@@ -16,6 +16,11 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_FILTER_POLICY_H_
 #define STORAGE_LEVELDB_INCLUDE_FILTER_POLICY_H_
 
+#include "wiredtiger_config.h"
+#if defined(HAVE_ROCKSDB) && !defined(leveldb)
+#define leveldb rocksdb
+#endif
+
 #include <string>
 
 namespace leveldb {

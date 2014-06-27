@@ -15,6 +15,11 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_SLICE_H_
 #define STORAGE_LEVELDB_INCLUDE_SLICE_H_
 
+#include "wiredtiger_config.h"
+#if defined(HAVE_ROCKSDB) && !defined(leveldb)
+#define leveldb rocksdb
+#endif
+
 #include <assert.h>
 #include <stddef.h>
 #include <string.h>

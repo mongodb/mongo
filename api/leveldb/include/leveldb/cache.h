@@ -18,8 +18,13 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_CACHE_H_
 #define STORAGE_LEVELDB_INCLUDE_CACHE_H_
 
+#include "wiredtiger_config.h"
+#if defined(HAVE_ROCKSDB) && !defined(leveldb)
+#define leveldb rocksdb
+#endif
+
 #include <stdint.h>
-#include "leveldb/slice.h"
+#include "slice.h"
 
 namespace leveldb {
 

@@ -60,30 +60,36 @@ AC_MSG_CHECKING(if --enable-leveldb option specified)
 AC_ARG_ENABLE(leveldb,
 	[AS_HELP_STRING([--enable-leveldb],
 	    [Build the LevelDB API.])], r=$enableval, r=no)
-wt_cv_enable_hyperleveldb=no
+
+wt_cv_enable_leveldb=yes
 wt_cv_enable_eleveldb=no
+wt_cv_enable_hyperleveldb=no
+wt_cv_enable_rocksdb=no
 case "$r" in
-no)	wt_cv_enable_leveldb=no;;
-hyper)	wt_cv_enable_leveldb=yes
-	wt_cv_enable_hyperleveldb=yes;;
-eleveldb)	wt_cv_enable_leveldb=yes
-	wt_cv_enable_eleveldb=yes;;
-*)	wt_cv_enable_leveldb=yes;;
+no)		wt_cv_enable_leveldb=no;;
+eleveldb)	wt_cv_enable_eleveldb=yes;;
+hyper)		wt_cv_enable_hyperleveldb=yes;;
+rocksdb)	wt_cv_enable_rocksdb=yes;;
 esac
+
 AH_TEMPLATE(HAVE_ELEVELDB, [Build the LevelDB API with ELevelDB support.])
 if test "$wt_cv_enable_eleveldb" = "yes"; then
 	AC_DEFINE(HAVE_ELEVELDB)
 fi
-AH_TEMPLATE(HAVE_HYPERLEVELDB, [Build the LevelDB API with HyperLevelDB support.])
-AC_MSG_RESULT($wt_cv_enable_leveldb)
+AH_TEMPLATE(HAVE_HYPERLEVELDB,
+    [Build the LevelDB API with HyperLevelDB support.])
 if test "$wt_cv_enable_hyperleveldb" = "yes"; then
-	AC_LANG_PUSH([C++])
-	AC_CHECK_HEADER(hyperleveldb/db.h,,
-	    [AC_MSG_ERROR([--enable-leveldb=hyper requires hyperleveldb/db.h])])
-	AC_LANG_POP([C++])
 	AC_DEFINE(HAVE_HYPERLEVELDB)
 fi
+AH_TEMPLATE(HAVE_ROCKSDB, [Build the LevelDB API with RocksDB support.])
+if test "$wt_cv_enable_rocksdb" = "yes"; then
+	AC_DEFINE(HAVE_ROCKSDB)
+fi
+AC_MSG_RESULT($wt_cv_enable_leveldb)
 AM_CONDITIONAL([LEVELDB], [test "$wt_cv_enable_leveldb" = "yes"])
+AM_CONDITIONAL([HAVE_ELEVELDB], [test "$wt_cv_enable_eleveldb" = "yes"])
+AM_CONDITIONAL([HAVE_HYPERLEVELDB], [test "$wt_cv_enable_hyperleveldb" = "yes"])
+AM_CONDITIONAL([HAVE_ROCKSDB], [test "$wt_cv_enable_rocksdb" = "yes"])
 
 AC_MSG_CHECKING(if --enable-python option specified)
 AC_ARG_ENABLE(python,

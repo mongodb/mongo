@@ -5,6 +5,12 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_COMPARATOR_H_
 #define STORAGE_LEVELDB_INCLUDE_COMPARATOR_H_
 
+#include "wiredtiger_config.h"
+#if defined(HAVE_ROCKSDB) && !defined(leveldb)
+#define leveldb rocksdb
+#endif
+
+#include <stdint.h>
 #include <string>
 
 namespace leveldb {
@@ -51,6 +57,11 @@ class Comparator {
   // Simple comparator implementations may return with *key unchanged,
   // i.e., an implementation of this method that does nothing is correct.
   virtual void FindShortSuccessor(std::string* key) const = 0;
+
+#ifdef HAVE_HYPERLEVELDB
+  // If unsure, return 0;
+  virtual uint64_t KeyNum(const Slice& key) const;
+#endif
 };
 
 // Return a builtin comparator that uses lexicographic byte-wise

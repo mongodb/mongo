@@ -23,9 +23,11 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_PERF_COUNT_H_
 #define STORAGE_LEVELDB_INCLUDE_PERF_COUNT_H_
 
+#include "wiredtiger_config.h"
+
 #include <stdint.h>
 #include <string>
-#include "leveldb/status.h"
+#include "status.h"
 
 namespace leveldb {
 
