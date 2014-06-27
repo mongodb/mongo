@@ -639,12 +639,15 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 	 * thread.
 	 */
 	if (__wt_cond_has_waiters(session, cache->evict_waiter_cond)) {
+		WT_STAT_FAST_CONN_INCR(
+		    session, cache_eviction_server_not_evicting);
 		F_CLR(cache, WT_EVICT_NO_PROGRESS);
 		WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
 		__wt_yield();
-	} else
+	} else {
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_server_evicting);
 		WT_RET(__evict_lru_pages(session, 0));
-
+	}
 	return (0);
 }
 
@@ -683,6 +686,10 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	 */
 	slot = cache->evict_entries;
 	max_entries = slot + WT_EVICT_WALK_INCR;
+	if (cache->evict_current == NULL)
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_empty);
+	else
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_not_empty);
 
 	/*
 	 * Lock the dhandle list so sweeping cannot change the pointers out
@@ -985,8 +992,6 @@ __evict_get_ref(
 			return (WT_NOTFOUND);
 		if (__wt_spin_trylock(session, &cache->evict_lock, &id) == 0)
 			break;
-		if (!is_app)
-			return (WT_NOTFOUND);
 		__wt_yield();
 	}
 

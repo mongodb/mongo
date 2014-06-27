@@ -106,8 +106,6 @@ struct __wt_session_impl {
 	void	*reconcile;		/* Reconciliation support */
 	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
 
-	u_int	cache_checks;		/* Count of cache full checks */
-
 	int compaction;			/* Compaction did some work */
 	int skip_schema_lock;		/* Another thread holds the schema lock
 					 * on our behalf */
