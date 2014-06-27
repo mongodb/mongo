@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -38,8 +39,8 @@ namespace repl {
 
     void parseReplSetSeedList(const std::string& cfgString,
                               std::string& setname,
-                              vector<HostAndPort>& seeds,
-                              set<HostAndPort>& seedSet);
+                              std::vector<HostAndPort>& seeds,
+                              std::set<HostAndPort>& seedSet);
 
     /** Parameter given to the --replSet command line option (parsed).
         Syntax is "<setname>/<seedhost1>,<seedhost2>"
@@ -50,8 +51,8 @@ namespace repl {
             parseReplSetSeedList(cfgString, setname, seeds, seedSet);
         }
         std::string setname;
-        vector<HostAndPort> seeds;
-        set<HostAndPort> seedSet;
+        std::vector<HostAndPort> seeds;
+        std::set<HostAndPort> seedSet;
     };
 
 } // namespace repl

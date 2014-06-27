@@ -33,6 +33,7 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/db/server_options.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/s/type_locks.h"
 #include "mongo/s/type_lockpings.h"

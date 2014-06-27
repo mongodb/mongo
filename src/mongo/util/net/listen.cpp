@@ -32,6 +32,7 @@
 
 #include "mongo/util/net/listen.h"
 
+#include "mongo/db/server_options.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message_port.h"
@@ -135,7 +136,10 @@ namespace mongo {
         _mine = ipToAddrs(_ip.c_str(), _port, false);
 #endif
 
-        for (vector<SockAddr>::const_iterator it=_mine.begin(), end=_mine.end(); it != end; ++it) {
+        for (std::vector<SockAddr>::const_iterator it=_mine.begin(), end=_mine.end();
+             it != end;
+             ++it) {
+
             const SockAddr& me = *it;
 
             SOCKET sock = ::socket(me.getType(), SOCK_STREAM, 0);

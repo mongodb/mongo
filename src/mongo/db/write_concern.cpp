@@ -32,6 +32,7 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/write_concern.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"

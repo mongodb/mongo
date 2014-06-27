@@ -33,6 +33,7 @@
 #include "mongo/bson/bson_validate.h"
 #include "mongo/client/constants.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_port.h"
 

@@ -32,12 +32,13 @@
 #include <string>
 #include <vector>
 
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/password_digest.h"
 
 namespace mongo {

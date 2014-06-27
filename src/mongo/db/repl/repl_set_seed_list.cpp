@@ -44,9 +44,9 @@ namespace repl {
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
     void parseReplSetSeedList(const std::string& cfgString,
-                              string& setname,
-                              vector<HostAndPort>& seeds,
-                              set<HostAndPort>& seedSet) {
+                              std::string& setname,
+                              std::vector<HostAndPort>& seeds,
+                              std::set<HostAndPort>& seedSet) {
         const char *p = cfgString.c_str();
         const char *slash = strchr(p, '/');
         if( slash )

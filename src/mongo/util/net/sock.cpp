@@ -45,6 +45,7 @@
 # endif
 #endif
 
+#include "mongo/db/server_options.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/value.h"
 #include "mongo/util/fail_point_service.h"

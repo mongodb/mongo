@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include "mongo/db/jsobj.h"
 #include "mongo/util/concurrency/list.h"
 #include "mongo/util/concurrency/race.h"
 #include "mongo/util/net/hostandport.h"

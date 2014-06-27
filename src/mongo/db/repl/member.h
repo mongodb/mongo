@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <sstream>
+
 #include "mongo/db/repl/heartbeat_info.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/util/concurrency/list.h"
@@ -63,7 +65,7 @@ namespace repl {
 
         // not arbiter, not priority 0
         bool potentiallyHot() const { return _config.potentiallyHot(); }
-        void summarizeMember(stringstream& s) const;
+        void summarizeMember(std::stringstream& s) const;
         // If we could sync from this member.  This doesn't tell us anything about the quality of
         // this member, just if they are a possible sync target.
         bool syncable() const;
