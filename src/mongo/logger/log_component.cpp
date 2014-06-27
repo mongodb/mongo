@@ -25,48 +25,33 @@
  *    then also delete it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <string>
+#include "mongo/logger/log_component.h"
+
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace logger {
 
-    /**
-     * Log tags.
-     * Debug messages logged using the LOG() or MONGO_LOG_TAG()
-     * macros may be associated with one or more log tags.
-     */
-    class LogTag {
-    public:
-        enum Value {
-            kDefault = 0,
-            kAccessControl,
-            kCommands,
-            kIndexing,
-            kJournalling,
-            kNetworking,
-            kQuery,
-            kReplication,
-            kSharding,
-            kStorage,
-            kWrites,
-            kNumLogTags
-        };
+    std::string LogComponent::getShortName() const {
+        switch (_value) {
+        case kDefault: return "Default";
+        case kAccessControl: return "AccessControl";
+        case kCommands: return "Commands";
+        case kIndexing: return "Indexing";
+        case kJournalling: return "Journalling";
+        case kNetworking: return "Networking";
+        case kQuery: return "Query";
+        case kReplication: return "Replication";
+        case kSharding: return "Sharding";
+        case kStorage: return "Storage";
+        case kWrites: return "Writes";
+        case kNumLogComponents: return "Total";
+        // No default. Compiler should complain if there's a log component that's not handled.
+        }
+        invariant(0);
+    }
 
-        /* implicit */ LogTag(Value value) : _value(value) {}
-
-        operator Value() const { return _value; }
-
-        /**
-         * Returns short name of log tag.
-         * Used to generate server parameter names in the format "logLevel_<tag short name>".
-         */
-        std::string getShortName() const;
-
-    private:
-        Value _value;
-    };
-
-}  // namespace logger
-}  // namespace mongo
+}  // logger
+}  // mongo

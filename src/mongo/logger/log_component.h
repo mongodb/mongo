@@ -25,33 +25,50 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/logger/log_tag.h"
-
-#include "mongo/util/assert_util.h"
+#include <string>
 
 namespace mongo {
 namespace logger {
 
-    std::string LogTag::getShortName() const {
-        switch (_value) {
-        case kDefault: return "Default";
-        case kAccessControl: return "AccessControl";
-        case kCommands: return "Commands";
-        case kIndexing: return "Indexing";
-        case kJournalling: return "Journalling";
-        case kNetworking: return "Networking";
-        case kQuery: return "Query";
-        case kReplication: return "Replication";
-        case kSharding: return "Sharding";
-        case kStorage: return "Storage";
-        case kWrites: return "Writes";
-        case kNumLogTags: return "Total";
-        // No default. Compiler should complain if there's a tag that's not handled.
-        }
-        invariant(0);
-    }
+    /**
+     * Log components.
+     * Debug messages logged using the LOG() or MONGO_LOG_COMPONENT().
+     * Macros may be associated with one or more log components.
+     */
+    class LogComponent {
+    public:
+        enum Value {
+            kDefault = 0,
+            kAccessControl,
+            kCommands,
+            kIndexing,
+            kJournalling,
+            kNetworking,
+            kQuery,
+            kReplication,
+            kSharding,
+            kStorage,
+            kWrites,
+            kNumLogComponents
+        };
 
-}  // logger
-}  // mongo
+        /* implicit */ LogComponent(Value value) : _value(value) {}
+
+        operator Value() const { return _value; }
+
+        /**
+         * Returns short name of log component.
+         * Used to generate server parameter names in the format "logLevel_<component short name>".
+         */
+        std::string getShortName() const;
+
+    private:
+        Value _value;
+    };
+
+    typedef LogComponent LogTag;
+
+}  // namespace logger
+}  // namespace mongo
