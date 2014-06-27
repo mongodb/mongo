@@ -35,6 +35,7 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/map_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace repl {
@@ -63,7 +64,7 @@ namespace repl {
                 request,
                 StatusWith<BSONObj>(
                         ErrorCodes::NoSuchKey,
-                        mongoutils::str::stream() << "Could not find response for " <<
+                        str::stream() << "Could not find response for " <<
                                 "Request(" << request.target.toString() << ", " <<
                                 request.dbname << ", " << request.cmdObj << ')'));
     }

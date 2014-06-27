@@ -40,6 +40,7 @@
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_port.h"
 
