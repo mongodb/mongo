@@ -32,6 +32,7 @@
 
 #include <set>
 
+#include "mongo/base/init.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -247,6 +248,60 @@ namespace mongo {
             }
         } logLevelSetting;
 
+        /**
+         * Tag log levels.
+         * Non-negative value means this tag is configured with a debug level.
+         * Negative value means log messages with this tag will use the default log level.
+         */
+        class TagLogLevelSetting : public ServerParameter {
+            MONGO_DISALLOW_COPYING(TagLogLevelSetting);
+        public:
+            explicit TagLogLevelSetting(logger::LogTag tag)
+                : ServerParameter(ServerParameterSet::getGlobal(),
+                                  "logLevel_" + tag.getShortName()),
+                  _tag(tag) {}
+
+            virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+                if (!logger::globalLogDomain()->hasMinimumLogSeverity(_tag)) {
+                    b << name << -1;
+                    return;
+                }
+                b << name << logger::globalLogDomain()->getMinimumLogSeverity(_tag).toInt();
+            }
+
+            virtual Status set(const BSONElement& newValueElement) {
+                typedef logger::LogSeverity LogSeverity;
+                int newValue;
+                if (!newValueElement.coerce(&newValue))
+                    return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                  "Invalid value for logLevel: " << newValueElement);
+                return _setLogLevel(newValue);
+            }
+
+            virtual Status setFromString(const std::string& str) {
+                typedef logger::LogSeverity LogSeverity;
+                int newValue;
+                Status status = parseNumberFromString(str, &newValue);
+                if (!status.isOK())
+                    return status;
+                return _setLogLevel(newValue);
+                return Status::OK();
+            }
+        private:
+            Status _setLogLevel(int newValue) {
+                if (newValue < 0) {
+                    logger::globalLogDomain()->clearMinimumLoggedSeverity(_tag);
+                    return Status::OK();
+                }
+                typedef logger::LogSeverity LogSeverity;
+                LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) :
+                    LogSeverity::Log();
+                logger::globalLogDomain()->setMinimumLoggedSeverity(_tag, newSeverity);
+                return Status::OK();
+            }
+            logger::LogTag _tag;
+        };
+
         class SSLModeSetting : public ServerParameter {
         public:
             SSLModeSetting() : ServerParameter(ServerParameterSet::getGlobal(), "sslMode",
@@ -421,5 +476,24 @@ namespace mongo {
                                                              true); // allowedToChangeAtRuntime
     }
 
+    namespace {
+        //
+        // Command instances.
+        // Registers commands with the command system and make commands
+        // available to the client.
+        //
+
+        MONGO_INITIALIZER_WITH_PREREQUISITES(SetupTagLogLevelSettings,
+                                             MONGO_NO_PREREQUISITES)(InitializerContext* context) {
+            for (int i = 0; i < int(logger::LogTag::kNumLogTags); ++i) {
+                logger::LogTag tag = static_cast<logger::LogTag::Value>(i);
+                if (tag == logger::LogTag::kDefault) { continue; }
+                new TagLogLevelSetting(tag);
+            }
+
+            return Status::OK();
+        }
+
+    } // namespace
 }
 
