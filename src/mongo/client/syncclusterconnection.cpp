@@ -177,7 +177,7 @@ namespace mongo {
         c->setPostRunCommandHook(_postRunCommandHook);
         c->setSoTimeout( _socketTimeout );
         string errmsg;
-        if ( ! c->connect( host , errmsg ) )
+        if ( ! c->connect( HostAndPort(host), errmsg ) )
             log() << "SyncClusterConnection connect fail to: " << host << " errmsg: " << errmsg << endl;
         _connAddresses.push_back( host );
         _conns.push_back( c );

@@ -255,7 +255,7 @@ namespace mongo {
             isSelfCommand.init();
             DBClientConnection conn;
             string errmsg;
-            if ( ! conn.connect( host , errmsg ) ) {
+            if ( ! conn.connect( *this , errmsg ) ) {
                 // should this go in the cache?
                 return false;
             }

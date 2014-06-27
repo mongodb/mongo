@@ -329,8 +329,10 @@ again:
     }
 
     HostAndPort MessagingPort::remote() const {
-        if ( ! _remoteParsed.hasPort() )
-            _remoteParsed = HostAndPort( psock->remoteAddr() );
+        if ( ! _remoteParsed.hasPort() ) {
+            SockAddr sa = psock->remoteAddr();
+            _remoteParsed = HostAndPort( sa.getAddr(), sa.getPort());
+        }
         return _remoteParsed;
     }
 

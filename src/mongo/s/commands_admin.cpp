@@ -1221,7 +1221,8 @@ namespace mongo {
 
                     // it's fine if mongods of a set all use default port
                     if ( ! serverAddrs[i].hasPort() ) {
-                        serverAddrs[i].setPort(ServerGlobalParams::ShardServerPort);
+                        serverAddrs[i] = HostAndPort(serverAddrs[i].host(),
+                                                     ServerGlobalParams::ShardServerPort);
                     }
                 }
 
@@ -1495,7 +1496,7 @@ namespace mongo {
                 help << "{whatsmyuri:1}";
             }
             virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                result << "you" << ClientInfo::get()->getRemote();
+                result << "you" << ClientInfo::get()->getRemote().toString();
                 return true;
             }
         } cmdWhatsMyUri;

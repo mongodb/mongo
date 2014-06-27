@@ -508,7 +508,7 @@ namespace {
                     m.h = HostAndPort(s);
                     if ( !m.h.hasPort() ) {
                         // make port explicit even if default 
-                        m.h.setPort(m.h.port());
+                        m.h = HostAndPort(m.h.host(), m.h.port());
                     }
                 }
                 catch (const DBException& e) {

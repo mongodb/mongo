@@ -72,10 +72,10 @@ namespace mongo {
 
         string::size_type idx;
         while ( ( idx = s.find( ',' ) ) != string::npos ) {
-            _servers.push_back( s.substr( 0 , idx ) );
+            _servers.push_back(HostAndPort(s.substr(0, idx)));
             s = s.substr( idx + 1 );
         }
-        _servers.push_back( s );
+        _servers.push_back(HostAndPort(s));
 
     }
     
@@ -1521,7 +1521,7 @@ namespace mongo {
     bool serverAlive( const string &uri ) {
         DBClientConnection c( false, 0, 20 ); // potentially the connection to server could fail while we're checking if it's alive - so use timeouts
         string err;
-        if ( !c.connect( uri, err ) )
+        if ( !c.connect( HostAndPort(uri), err ) )
             return false;
         if ( !c.simpleCommand( "admin", 0, "ping" ) )
             return false;

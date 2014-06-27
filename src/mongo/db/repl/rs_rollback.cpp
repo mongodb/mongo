@@ -352,7 +352,7 @@ namespace repl {
         // cloner owns _conn in auto_ptr
         cloner.setConnection(tmpConn);
         uassert(15908, errmsg,
-                tmpConn->connect(host, errmsg) && repl::replAuthenticate(tmpConn));
+                tmpConn->connect(HostAndPort(host), errmsg) && repl::replAuthenticate(tmpConn));
 
         return cloner.copyCollection(txn, ns, BSONObj(), errmsg, true, false, true, false);
     }
