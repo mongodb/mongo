@@ -37,6 +37,8 @@ namespace mongo {
     struct WriteConcernOptions {
     public:
 
+        static const int kNoTimeout = 0;
+        static const int kNoWaiting = -1;
         static const BSONObj Default;
         static const BSONObj Acknowledged;
         static const BSONObj AllConfigs;
