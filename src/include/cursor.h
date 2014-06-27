@@ -262,10 +262,6 @@ struct __wt_cursor_stat {
 
 	int	notpositioned;		/* Cursor not positioned */
 
-	int	stat_all;		/* "all" statistics configured */
-	int	stat_fast;		/* "fast" statistics configured */
-	int	stat_clear;		/* "clear" statistics configured */
-
 	WT_STATS *stats;		/* Stats owned by the cursor */
 	WT_STATS *stats_first;		/* First stats reference */
 	int	  stats_base;		/* Base statistics value */
@@ -279,6 +275,9 @@ struct __wt_cursor_stat {
 	int	 key;			/* Current stats key */
 	uint64_t v;			/* Current stats value */
 	WT_ITEM	 pv;			/* Current stats value (string) */
+
+	/* Uses the same values as WT_CONNECTION::stat_flags field */
+	uint32_t flags;
 };
 
 /*
