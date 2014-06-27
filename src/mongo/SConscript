@@ -237,6 +237,12 @@ env.Library('spin_lock', ["util/concurrency/spin_lock.cpp"])
 env.CppUnitTest('spin_lock_test', ['util/concurrency/spin_lock_test.cpp'],
                 LIBDEPS=['spin_lock', '$BUILD_DIR/third_party/shim_boost'])
 
+env.Library('hostandport', ['util/net/hostandport.cpp'],
+            LIBDEPS=[
+                'foundation',
+                'server_options_core',
+            ])
+
 env.Library('network', [
             "util/net/sock.cpp",
             "util/net/socket_poll.cpp",
@@ -250,6 +256,7 @@ env.Library('network', [
                      'background_job',
                      'fail_point',
                      'foundation',
+                     'hostandport',
                      'server_options_core',
             ])
 
