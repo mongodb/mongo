@@ -25,18 +25,21 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/net/ssl_manager.h"
 
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/tss.hpp>
+#include <ostream>
 #include <string>
 #include <vector>
 
 #include "mongo/base/init.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_options.h"
@@ -47,7 +50,12 @@
 #include <openssl/x509v3.h>
 #endif
 
+using std::endl;
+
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
+
     SSLGlobalParams sslGlobalParams;
 
 #ifndef MONGO_SSL   

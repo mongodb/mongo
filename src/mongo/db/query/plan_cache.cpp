@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/query/plan_cache.h"
 
 #include <algorithm>
@@ -38,9 +40,12 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_knobs.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
     //
     // Cache-related functions for CanonicalQuery

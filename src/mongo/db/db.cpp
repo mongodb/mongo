@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -94,6 +94,7 @@
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/file_allocator.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
@@ -111,6 +112,8 @@
 #endif
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     void (*snmpInit)() = NULL;
 
@@ -451,6 +454,7 @@ namespace mongo {
 
         void run() {
             Client::initThread( name().c_str() );
+
             if (storageGlobalParams.syncdelay == 0) {
                 log() << "warning: --syncdelay 0 is not recommended and can have strange performance" << endl;
             }

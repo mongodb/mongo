@@ -33,6 +33,7 @@
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -121,6 +122,8 @@ namespace mongo {
     int ConfigDiffTracker<ValType,ShardType>::
         calculateConfigDiff( DBClientCursorInterface& diffCursor )
     {
+        MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kSharding);
+
         verifyAttached();
 
         // Apply the chunk changes to the ranges and versions

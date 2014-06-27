@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/dbhelpers.h"
 
@@ -56,6 +56,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -307,6 +308,8 @@ namespace mongo {
                                     bool fromMigrate,
                                     bool onlyRemoveOrphanedDocs )
     {
+        MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kSharding);
+
         Timer rangeRemoveTimer;
         const string& ns = range.ns;
 

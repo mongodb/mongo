@@ -28,7 +28,7 @@
 
 // strategy_sharded.cpp
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/owned_pointer_vector.h"
@@ -54,11 +54,14 @@
 #include "mongo/s/request.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 // error codes 8010-8040
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     static bool _isSystemIndexes( const char* ns ) {
         return nsToCollectionSubstring(ns) == "system.indexes";

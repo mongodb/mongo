@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/scripting/engine_v8.h"
 
 #include "mongo/base/init.h"
@@ -34,11 +36,14 @@
 #include "mongo/scripting/v8_db.h"
 #include "mongo/scripting/v8_utils.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace mongoutils;
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
 #ifndef _MSC_EXTENSIONS
     const int V8Scope::objectDepthLimit;

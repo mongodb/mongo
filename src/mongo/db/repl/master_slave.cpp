@@ -36,6 +36,8 @@
    local.pair.sync       - [deprecated] { initialsynccomplete: 1 }
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/repl/master_slave.h"
 
 #include <pcrecpp.h>
@@ -57,8 +59,12 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
 namespace repl {
 
     void pretouchOperation(OperationContext* txn, const BSONObj& op);

@@ -33,6 +33,7 @@
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/util/background.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
@@ -71,6 +72,8 @@ namespace repl {
 
     private:
         void _resetConnection() {
+            MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
             LOG(1) << "resetting connection in sync source feedback";
             _connection.reset();
         }

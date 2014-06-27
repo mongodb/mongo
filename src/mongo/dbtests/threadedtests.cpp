@@ -29,7 +29,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/thread.hpp>
 
@@ -47,6 +47,7 @@
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/concurrency/qlock.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/log.h"
 #include "mongo/server.h"
 
 namespace mongo { 
@@ -54,6 +55,8 @@ namespace mongo {
 }
 
 namespace ThreadedTests {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     template <int nthreads_param=10>
     class ThreadedTest {

@@ -28,7 +28,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/shard.h"
 
@@ -52,8 +52,11 @@
 #include "mongo/s/scc_fast_query_handler.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/s/version_manager.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     static bool initWireVersion( DBClientBase* conn, std::string* errMsg ) {
         BSONObj response;

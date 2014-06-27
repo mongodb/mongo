@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/repl/consensus.h"
 
 #include "mongo/base/string_data.h"
@@ -33,8 +35,12 @@
 #include "mongo/db/repl/multicmd.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/replset_commands.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
 namespace repl {
 
     /** the first cmd called by a node seeking election and it's a basic sanity 

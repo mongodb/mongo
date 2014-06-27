@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
@@ -36,10 +36,14 @@
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 #include "mongo/base/counter.h"
 #include "mongo/db/stats/timer_stats.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
 namespace repl {
 
     int SleepToAllowBatchingMillis = 2;

@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/query/new_find.h"
 
 #include "mongo/client/dbclientinterface.h"
@@ -52,6 +54,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -108,6 +111,8 @@ namespace {
 }  // namespace
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
     // TODO: Move this and the other command stuff in newRunQuery outta here and up a level.
     static bool runCommands(OperationContext* txn,

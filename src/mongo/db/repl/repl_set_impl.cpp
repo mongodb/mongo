@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/repl/repl_set_impl.h"
 
 #include "mongo/db/client.h"
@@ -43,8 +45,12 @@
 #include "mongo/s/d_logic.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
 namespace repl {
 #ifdef MONGO_PLATFORM_64
     const int ReplSetImpl::replWriterThreadCount = 16;
