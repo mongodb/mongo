@@ -92,8 +92,7 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 		    ctable->cg_cursors, ctable->plan, ap);
 	va_end(ap);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -196,8 +195,7 @@ __curtable_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	ret = WT_CURSOR_PRIMARY(a)->compare(
 	    WT_CURSOR_PRIMARY(a), WT_CURSOR_PRIMARY(b), cmpp);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -215,8 +213,7 @@ __curtable_next(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, next, NULL);
 	APPLY_CG(ctable, next);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -250,8 +247,7 @@ __curtable_next_random(WT_CURSOR *cursor)
 		WT_ERR((*cp)->search(*cp));
 	}
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -269,8 +265,7 @@ __curtable_prev(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, prev, NULL);
 	APPLY_CG(ctable, prev);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -288,8 +283,7 @@ __curtable_reset(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 	APPLY_CG(ctable, reset);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -307,8 +301,7 @@ __curtable_search(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, search, NULL);
 	APPLY_CG(ctable, search);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -338,8 +331,7 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
 		WT_ERR((*cp)->search(*cp));
 	}
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -595,8 +587,7 @@ __curtable_close(WT_CURSOR *cursor)
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
