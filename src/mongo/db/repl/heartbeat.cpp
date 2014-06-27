@@ -45,7 +45,6 @@
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/goodies.h"
-#include "mongo/util/mongoutils/html.h"
 #include "mongo/util/ramlog.h"
 
 namespace mongo {

@@ -46,7 +46,7 @@ namespace mongo {
         }
 
         virtual void processOpContext(OperationContext* txn) {
-            using namespace mongoutils::html;
+            using namespace html;
 
             CurOp& co = *(txn->getCurOp());
 
@@ -90,7 +90,7 @@ namespace {
         virtual void init() {}
 
         virtual void run(OperationContext* txn, std::stringstream& ss ) {
-            using namespace mongoutils::html;
+            using namespace html;
 
             ss << "\n<table border=1 cellpadding=2 cellspacing=0>";
             ss << "<tr align='left'>"

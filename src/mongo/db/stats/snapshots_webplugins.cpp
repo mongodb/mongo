@@ -37,8 +37,7 @@
 namespace mongo {
 namespace {
 
-    using namespace mongoutils;
-    using namespace mongoutils::html;
+    using namespace html;
 
     class WriteLockStatus : public WebStatusPlugin {
     public:
