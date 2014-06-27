@@ -23,6 +23,7 @@
 #define leveldb rocksdb
 #endif
 
+#include <memory>
 #include <stdint.h>
 #include "slice.h"
 
@@ -33,6 +34,11 @@ class Cache;
 // Create a new cache with a fixed size capacity.  This implementation
 // of Cache uses a least-recently-used eviction policy.
 extern Cache* NewLRUCache(size_t capacity);
+#ifdef HAVE_ROCKSDB
+extern Cache* NewLRUCache(size_t capacity, int numSharedBits);
+extern Cache* NewLRUCache(size_t capacity, int numSharedBits,
+		int removeScanCountLimit);
+#endif
 
 class Cache {
  public:

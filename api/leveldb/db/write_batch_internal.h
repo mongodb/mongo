@@ -14,6 +14,20 @@ namespace leveldb {
 // WriteBatch that we don't want in the public WriteBatch interface.
 class WriteBatchInternal {
  public:
+#ifdef HAVE_ROCKSDB
+  // WriteBatch methods with column_family_id instead of ColumnFamilyHandle*
+  static void Put(WriteBatch* batch, uint32_t column_family_id,
+                  const Slice& key, const Slice& value);
+
+  static void Put(WriteBatch* batch, uint32_t column_family_id,
+                  const SliceParts& key, const SliceParts& value);
+
+  static void Delete(WriteBatch* batch, uint32_t column_family_id,
+                     const Slice& key);
+
+  static void Merge(WriteBatch* batch, uint32_t column_family_id,
+                    const Slice& key, const Slice& value);
+#endif
   // Return the number of entries in the batch.
   static int Count(const WriteBatch* batch);
 

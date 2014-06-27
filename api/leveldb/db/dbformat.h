@@ -44,6 +44,16 @@ class InternalKey;
 enum ValueType {
   kTypeDeletion = 0x0,
   kTypeValue = 0x1
+#ifdef HAVE_ROCKSDB
+  ,kTypeMerge = 0x2,
+  // Following types are used only in write ahead logs. They are not used in
+  // memtables or sst files:
+  kTypeLogData = 0x3,
+  kTypeColumnFamilyDeletion = 0x4,
+  kTypeColumnFamilyValue = 0x5,
+  kTypeColumnFamilyMerge = 0x6,
+  kMaxValue = 0x7F
+#endif
 };
 // kValueTypeForSeek defines the ValueType that should be passed when
 // constructing a ParsedInternalKey object for seeking to a particular

@@ -10,10 +10,13 @@
 #define leveldb rocksdb
 #endif
 
+#include <memory>
 #include <stdint.h>
 #include <stdio.h>
+#include <vector>
 #include "iterator.h"
 #include "options.h"
+#include "write_batch.h"
 #ifdef HAVE_HYPERLEVELDB
 #include "replay_iterator.h"
 #endif
@@ -24,10 +27,28 @@ namespace leveldb {
 static const int kMajorVersion = 1;
 static const int kMinorVersion = 17;
 
-struct Options;
 struct ReadOptions;
 struct WriteOptions;
 class WriteBatch;
+
+#ifdef HAVE_ROCKSDB
+struct FlushOptions;
+class ColumnFamilyHandle {
+ public:
+  virtual ~ColumnFamilyHandle() {}
+};
+extern const std::string kDefaultColumnFamilyName;
+ 
+struct ColumnFamilyDescriptor {
+  std::string name;
+  ColumnFamilyOptions options;
+  ColumnFamilyDescriptor()
+      : name(kDefaultColumnFamilyName), options(ColumnFamilyOptions()) {}
+  ColumnFamilyDescriptor(const std::string& _name,
+                         const ColumnFamilyOptions& _options)
+      : name(_name), options(_options) {}
+};
+#endif
 
 // Abstract handle to particular state of a DB.
 // A Snapshot is an immutable object and can therefore be safely
@@ -72,6 +93,112 @@ class DB {
   static Status Open(const Options& options,
                      const std::string& name,
                      DB** dbptr);
+
+#ifdef HAVE_ROCKSDB
+ // Open DB with column families.
+ // db_options specify database specific options
+ // column_families is the vector of all column families in the databse,
+ // containing column family name and options. You need to open ALL column
+ // families in the database. To get the list of column families, you can use
+ // ListColumnFamilies(). Also, you can open only a subset of column families
+ // for read-only access.
+ // The default column family name is 'default' and it's stored
+ // in rocksdb::kDefaultColumnFamilyName.
+ // If everything is OK, handles will on return be the same size
+ // as column_families --- handles[i] will be a handle that you
+ // will use to operate on column family column_family[i]
+ static Status Open(const Options& db_options, const std::string& name,
+                    const std::vector<ColumnFamilyDescriptor>& column_families,
+                    std::vector<ColumnFamilyHandle*>* handles, DB** dbptr);
+
+ // ListColumnFamilies will open the DB specified by argument name
+ // and return the list of all column families in that DB
+ // through column_families argument. The ordering of
+ // column families in column_families is unspecified.
+ static Status ListColumnFamilies(const Options& db_options,
+                                  const std::string& name,
+                                  std::vector<std::string>* column_families);
+
+  // Create a column_family and return the handle of column family
+  // through the argument handle.
+  virtual Status CreateColumnFamily(const Options& options,
+                                    const std::string& column_family_name,
+                                    ColumnFamilyHandle** handle) = 0;
+
+  // Drop a column family specified by column_family handle. This call
+  // only records a drop record in the manifest and prevents the column
+  // family from flushing and compacting.
+  virtual Status DropColumnFamily(ColumnFamilyHandle* column_family) = 0;
+
+  // Set the database entry for "key" to "value".
+  // Returns OK on success, and a non-OK status on error.
+  // Note: consider setting options.sync = true.
+  virtual Status Put(const WriteOptions& options,
+                     ColumnFamilyHandle* column_family, const Slice& key,
+                     const Slice& value) = 0;
+
+  // Remove the database entry (if any) for "key".  Returns OK on
+  // success, and a non-OK status on error.  It is not an error if "key"
+  // did not exist in the database.
+  // Note: consider setting options.sync = true.
+  virtual Status Delete(const WriteOptions& options,
+                        ColumnFamilyHandle* column_family,
+                        const Slice& key) = 0;
+
+  // Merge the database entry for "key" with "value".  Returns OK on success,
+  // and a non-OK status on error. The semantics of this operation is
+  // determined by the user provided merge_operator when opening DB.
+  // Note: consider setting options.sync = true.
+  virtual Status Merge(const WriteOptions& options,
+                       ColumnFamilyHandle* column_family, const Slice& key,
+                       const Slice& value) = 0;
+
+  // May return some other Status on an error.
+  virtual Status Get(const ReadOptions& options,
+                     ColumnFamilyHandle* column_family, const Slice& key,
+                     std::string* value) = 0;
+
+  // If keys[i] does not exist in the database, then the i'th returned
+  // status will be one for which Status::IsNotFound() is true, and
+  // (*values)[i] will be set to some arbitrary value (often ""). Otherwise,
+  // the i'th returned status will have Status::ok() true, and (*values)[i]
+  // will store the value associated with keys[i].
+  //
+  // (*values) will always be resized to be the same size as (keys).
+  // Similarly, the number of returned statuses will be the number of keys.
+  // Note: keys will not be "de-duplicated". Duplicate keys will return
+  // duplicate values in order.
+  virtual std::vector<Status> MultiGet(
+      const ReadOptions& options,
+      const std::vector<ColumnFamilyHandle*>& column_family,
+      const std::vector<Slice>& keys, std::vector<std::string>* values) = 0;
+
+  // If the key definitely does not exist in the database, then this method
+  // returns false, else true. If the caller wants to obtain value when the key
+  // is found in memory, a bool for 'value_found' must be passed. 'value_found'
+  // will be true on return if value has been set properly.
+  // This check is potentially lighter-weight than invoking DB::Get(). One way
+  // to make this lighter weight is to avoid doing any IOs.
+  // Default implementation here returns true and sets 'value_found' to false
+  virtual bool KeyMayExist(const ReadOptions& options,
+                           ColumnFamilyHandle* column_family, const Slice& key,
+                           std::string* value, bool* value_found = NULL) {
+    if (value_found != NULL) {
+      *value_found = false;
+    }
+    return true;
+  }
+
+  virtual Iterator* NewIterator(const ReadOptions& options,
+                                ColumnFamilyHandle* column_family) = 0;
+
+  virtual bool GetProperty(ColumnFamilyHandle* column_family,
+                           const Slice& property, std::string* value) = 0;
+
+  // Flush all mem-table data.
+  virtual Status Flush(const FlushOptions& options,
+                       ColumnFamilyHandle* column_family) = 0;
+#endif
 
   DB() { }
   virtual ~DB();
@@ -212,6 +339,6 @@ Status DestroyDB(const std::string& name, const Options& options);
 // on a database that contains important information.
 Status RepairDB(const std::string& dbname, const Options& options);
 
-}  // namespace leveldb
+};  // namespace leveldb
 
 #endif  // STORAGE_LEVELDB_INCLUDE_DB_H_

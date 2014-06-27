@@ -31,19 +31,7 @@
 #include <unistd.h>
 #include <sstream>
 
-using leveldb::Cache;
-using leveldb::FilterPolicy;
-using leveldb::Iterator;
-using leveldb::Options;
-using leveldb::ReadOptions;
-using leveldb::WriteBatch;
-using leveldb::WriteOptions;
-using leveldb::Range;
-using leveldb::Slice;
-using leveldb::Snapshot;
-using leveldb::Status;
 #if HAVE_ELEVELDB
-using leveldb::Value;
 namespace leveldb {
 Value::~Value() {}
 
@@ -63,14 +51,33 @@ class StringValue : public Value {
 }
 #endif
 
-#define WT_URI          "table:data"
-#define WT_CONN_CONFIG  "log=(enabled),checkpoint_sync=false,session_max=8192,"\
-    "mmap=false,transaction_sync=(enabled=true,method=none),"
-#define WT_TABLE_CONFIG "type=lsm,leaf_page_max=4KB,leaf_item_max=1KB," \
-    "internal_page_max=128K,lsm=(chunk_size=100MB," \
-    "bloom_config=(leaf_page_max=8MB)," \
-    "bloom_bit_count=28,bloom_hash_count=19," \
-    "bloom_oldest=true),"
+Cache *NewLRUCache(size_t capacity) {
+  return new CacheImpl(capacity);
+}
+
+Status leveldb::DestroyDB(const std::string& name, const Options& options) {
+  WT_CONNECTION *conn;
+  int ret, t_ret;
+  /* If the database doesn't exist, there is nothing to destroy. */
+  if (access((name + "/WiredTiger").c_str(), F_OK) != 0)
+    return Status::OK();
+  if ((ret = ::wiredtiger_open(name.c_str(), NULL, NULL, &conn)) != 0)
+    return WiredTigerErrorToStatus(ret, NULL);
+  WT_SESSION *session;
+  if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+    goto cleanup;
+  if ((ret = session->drop(session, WT_URI, "force")) != 0)
+    goto cleanup;
+
+cleanup:
+  if ((t_ret = conn->close(conn, NULL)) != 0 && ret == 0)
+    ret = t_ret;
+  return WiredTigerErrorToStatus(ret, NULL);
+}
+
+Status leveldb::RepairDB(const std::string& dbname, const Options& options) {
+  return Status::NotSupported("sorry!");
+}
 
 /* Destructors required for interfaces. */
 leveldb::DB::~DB() {}
@@ -186,259 +193,7 @@ const FilterPolicy *NewBloomFilterPolicy2(int bits_per_key) {
 #endif
 
 Cache::~Cache() {}
-
-class CacheImpl : public Cache {
-public:
-  CacheImpl(size_t capacity) : Cache(), capacity_(capacity) {}
-
-  virtual Handle* Insert(const Slice& key, void* value, size_t charge,
-      void (*deleter)(const Slice& key, void* value)) { return 0; }
-  virtual Handle* Lookup(const Slice& key) { return 0; }
-  virtual void Release(Handle* handle) {}
-  virtual void* Value(Handle* handle) { return 0; }
-  virtual void Erase(const Slice& key) {}
-  virtual uint64_t NewId() { return 0; }
-
-  size_t capacity_;
-};
-
-Cache *NewLRUCache(size_t capacity) {
-  return new CacheImpl(capacity);
 }
-
-Status DestroyDB(const std::string& name, const Options& options) {
-  WT_CONNECTION *conn;
-  int ret, t_ret;
-  /* If the database doesn't exist, there is nothing to destroy. */
-  if (access((name + "/WiredTiger").c_str(), F_OK) != 0)
-    return Status::OK();
-  if ((ret = ::wiredtiger_open(name.c_str(), NULL, NULL, &conn)) != 0)
-    return WiredTigerErrorToStatus(ret, NULL);
-  WT_SESSION *session;
-  if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-    goto cleanup;
-  if ((ret = session->drop(session, WT_URI, "force")) != 0)
-    goto cleanup;
-
-cleanup:
-  if ((t_ret = conn->close(conn, NULL)) != 0 && ret == 0)
-    ret = t_ret;
-  return WiredTigerErrorToStatus(ret, NULL);
-}
-
-Status RepairDB(const std::string& dbname, const Options& options) {
-  return Status::NotSupported("sorry!");
-}
-}
-
-/* POSIX thread-local storage */
-template <class T>
-class ThreadLocal {
-public:
-  static void cleanup(void *val) {
-    delete (T *)val;
-  }
-
-  ThreadLocal() {
-    int ret = pthread_key_create(&key_, cleanup);
-    assert(ret == 0);
-  }
-
-  ~ThreadLocal() {
-    int ret = pthread_key_delete(key_);
-    assert(ret == 0);
-  }
-
-  T *get() {
-    return (T *)(pthread_getspecific(key_));
-  }
-
-  void set(T *value) {
-    int ret = pthread_setspecific(key_, value);
-    assert(ret == 0);
-  }
-
-private:
-  pthread_key_t key_;
-};
-
-/* WiredTiger implementations. */
-class DbImpl;
-
-/* Context for operations (including snapshots, write batches, transactions) */
-class OperationContext {
-public:
-  OperationContext(WT_CONNECTION *conn) : conn_(conn), in_use_(false) {
-    int ret = conn->open_session(conn, NULL, "isolation=snapshot", &session_);
-    assert(ret == 0);
-    ret = session_->open_cursor(
-        session_, WT_URI, NULL, NULL, &cursor_);
-    assert(ret == 0);
-  }
-
-  ~OperationContext() {
-#ifdef WANT_SHUTDOWN_RACES
-    int ret = session_->close(session_, NULL);
-    assert(ret == 0);
-#endif
-  }
-
-  WT_CURSOR *getCursor();
-  void releaseCursor(WT_CURSOR *cursor);
-
-private:
-  WT_CONNECTION *conn_;
-  WT_SESSION *session_;
-  WT_CURSOR *cursor_;
-  bool in_use_;
-};
-
-class IteratorImpl : public Iterator {
-public:
-  IteratorImpl(DbImpl *db, const ReadOptions &options);
-  virtual ~IteratorImpl();
-
-  // An iterator is either positioned at a key/value pair, or
-  // not valid.  This method returns true iff the iterator is valid.
-  virtual bool Valid() const { return valid_; }
-
-  virtual void SeekToFirst();
-
-  virtual void SeekToLast();
-
-  virtual void Seek(const Slice& target);
-
-  virtual void Next();
-
-  virtual void Prev();
-
-  virtual Slice key() const {
-    return key_;
-  }
-
-  virtual Slice value() const {
-    return value_;
-  }
-
-  virtual Status status() const {
-    return status_;
-  }
-
-private:
-  DbImpl *db_;
-  WT_CURSOR *cursor_;
-  Slice key_, value_;
-  Status status_;
-  bool valid_;
-  bool snapshot_iterator_;
-
-  void SetError(int wiredTigerError) {
-    valid_ = false;
-    status_ = WiredTigerErrorToStatus(wiredTigerError, NULL);
-  }
-
-  // No copying allowed
-  IteratorImpl(const IteratorImpl&);
-  void operator=(const IteratorImpl&);
-};
-
-class SnapshotImpl : public Snapshot {
-friend class DbImpl;
-friend class IteratorImpl;
-public:
-  SnapshotImpl(DbImpl *db) :
-    Snapshot(), db_(db), cursor_(NULL), status_(Status::OK()) {}
-  virtual ~SnapshotImpl() {}
-protected:
-  WT_CURSOR *getCursor() const { return cursor_; }
-  Status getStatus() const { return status_; }
-  Status setupTransaction();
-  Status releaseTransaction();
-private:
-  DbImpl *db_;
-  WT_CURSOR *cursor_;
-  Status status_;
-};
-
-class DbImpl : public leveldb::DB {
-friend class IteratorImpl;
-friend class SnapshotImpl;
-public:
-  DbImpl(WT_CONNECTION *conn) :
-    DB(), conn_(conn), context_(new ThreadLocal<OperationContext>) {}
-  virtual ~DbImpl() {
-    delete context_;
-    int ret = conn_->close(conn_, NULL);
-    assert(ret == 0);
-  }
-
-  virtual Status Put(const WriteOptions& options,
-         const Slice& key,
-         const Slice& value);
-
-  virtual Status Delete(const WriteOptions& options, const Slice& key);
-
-  virtual Status Write(const WriteOptions& options, WriteBatch* updates);
-
-  virtual Status Get(const ReadOptions& options,
-         const Slice& key, std::string* value);
-
-#if HAVE_ELEVELDB
-  virtual Status Get(const ReadOptions& options,
-         const Slice& key, Value* value);
-#endif
-
-#ifdef HAVE_HYPERLEVELDB
-  virtual Status LiveBackup(const Slice& name) {
-    return Status::NotSupported("sorry!");
-  }
-  virtual void GetReplayTimestamp(std::string* timestamp) {}
-  virtual void AllowGarbageCollectBeforeTimestamp(const std::string& timestamp) {}
-  virtual bool ValidateTimestamp(const std::string& timestamp) {}
-  virtual int CompareTimestamps(const std::string& lhs, const std::string& rhs) {}
-  virtual Status GetReplayIterator(const std::string& timestamp,
-             leveldb::ReplayIterator** iter) { return Status::NotSupported("sorry!"); }
-  virtual void ReleaseReplayIterator(leveldb::ReplayIterator* iter) {}
-#endif
-
-  virtual Iterator* NewIterator(const ReadOptions& options);
-
-  virtual const Snapshot* GetSnapshot();
-
-  virtual void ReleaseSnapshot(const Snapshot* snapshot);
-
-  virtual bool GetProperty(const Slice& property, std::string* value);
-
-  virtual void GetApproximateSizes(const Range* range, int n,
-           uint64_t* sizes);
-
-  virtual void CompactRange(const Slice* begin, const Slice* end);
-
-  virtual void SuspendCompactions();
-  
-  virtual void ResumeCompactions();
-
-private:
-  WT_CONNECTION *conn_;
-  ThreadLocal<OperationContext> *context_;
-
-  OperationContext *getContext() {
-    OperationContext *ctx = context_->get();
-    if (ctx == NULL) {
-      ctx = new OperationContext(conn_);
-      context_->set(ctx);
-    }
-    return (ctx);
-  }
-
-  // No copying allowed
-  DbImpl(const DbImpl&);
-  void operator=(const DbImpl&);
-
-protected:
-  WT_CURSOR *getCursor() { return getContext()->getCursor(); }
-  void releaseCursor(WT_CURSOR *cursor) { getContext()->releaseCursor(cursor); }
-};
 
 // Return a cursor for the current operation to use. In the "normal" case
 // we will return the cursor opened when the OperationContext was created.

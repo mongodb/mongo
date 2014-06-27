@@ -10,6 +10,7 @@
 #define leveldb rocksdb
 #endif
 
+#include <memory>
 #include <stddef.h>
 
 namespace leveldb {
@@ -60,6 +61,16 @@ struct Options {
   // become unreadable or for the entire DB to become unopenable.
   // Default: false
   bool paranoid_checks;
+
+#ifdef HAVE_ROCKSDB
+  // By default, RocksDB uses only one background thread for flush and
+  // compaction. Calling this function will set it up such that total of
+  // `total_threads` is used. Good value for `total_threads` is the number of
+  // cores. You almost definitely want to call this function if your system is
+  // bottlenecked by RocksDB.
+  Options* IncreaseParallelism(int total_threads = 16) { return this; }
+  Options* OptimizeLevelStyleCompaction() { return this; }
+#endif
 
 #if HAVE_ELEVELDB
   // Riak specific: this variable replaces paranoid_checks at one
@@ -167,6 +178,16 @@ struct Options {
   Options();
 };
 
+#ifdef HAVE_ROCKSDB
+struct ColumnFamilyOptions : public Options {
+  ColumnFamilyOptions() : Options() {}
+};
+
+struct DBOptions : public Options {
+  DBOptions() : Options() {}
+};
+#endif
+
 // Options that control read operations
 struct ReadOptions {
   // If true, all data read from underlying storage will be
@@ -217,6 +238,17 @@ struct WriteOptions {
       : sync(false) {
   }
 };
+
+#ifdef HAVE_ROCKSDB
+// Options that control flush operations
+struct FlushOptions {
+  // If true, the flush will wait until the flush is done.
+  // Default: true
+  bool wait;
+
+  FlushOptions() : wait(true) {}
+};
+#endif
 
 }  // namespace leveldb
 

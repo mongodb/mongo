@@ -48,6 +48,10 @@ libwiredtiger_leveldb_la_SOURCES = \
 if HAVE_ELEVELDB
 libwiredtiger_leveldb_la_SOURCES += util/perf_count.cc
 endif
+if HAVE_ROCKSDB
+libwiredtiger_leveldb_la_SOURCES += rocks_wt.cc
+endif
+
 
 leveldb_test_SOURCES = leveldb_test.cc
 #leveldb_test_LDADD = $(top_builddir)/libwiredtiger.la
