@@ -537,8 +537,6 @@ namespace repl {
             string threadName = str::stream() << "repl writer worker "
                                               << replWriterWorkerId.addAndFetch(1);
             Client::initThread( threadName.c_str() );
-            // allow us to get through the magic barrier
-            Lock::ParallelBatchWriterMode::iAmABatchParticipant(&cc().lockState());
             replLocalAuth();
         }
     }
@@ -546,6 +544,11 @@ namespace repl {
     // This free function is used by the writer threads to apply each op
     void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
         initializeWriterThread();
+
+        OperationContextImpl txn;
+
+        // allow us to get through the magic barrier
+        Lock::ParallelBatchWriterMode::iAmABatchParticipant(txn.lockState());
 
         // convert update operations only for 2.2.1 or greater, because we need guaranteed
         // idempotent operations for this to work.  See SERVER-6825
@@ -555,7 +558,6 @@ namespace repl {
              it != ops.end();
              ++it) {
             try {
-                OperationContextImpl txn;
                 if (!st->syncApply(&txn, *it, convertUpdatesToUpserts)) {
                     fassertFailedNoTrace(16359);
                 }
@@ -570,12 +572,16 @@ namespace repl {
     // This free function is used by the initial sync writer threads to apply each op
     void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
         initializeWriterThread();
+
+        OperationContextImpl txn;
+
+        // allow us to get through the magic barrier
+        Lock::ParallelBatchWriterMode::iAmABatchParticipant(txn.lockState());
+
         for (std::vector<BSONObj>::const_iterator it = ops.begin();
              it != ops.end();
              ++it) {
             try {
-                OperationContextImpl txn;
-
                 if (!st->syncApply(&txn, *it)) {
                     bool status;
                     {
