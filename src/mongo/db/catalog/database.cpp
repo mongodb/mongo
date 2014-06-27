@@ -39,12 +39,12 @@
 #include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/repair_database.h"
@@ -459,8 +459,8 @@ namespace mongo {
         if (NamespaceString::normal(ns)) {
             // This check only applies for actual collections, not indexes or other types of ns.
             uassert(17381, str::stream() << "fully qualified namespace " << ns << " is too long "
-                                         << "(max is " << Namespace::MaxNsColletionLen << " bytes)",
-                    ns.size() <= Namespace::MaxNsColletionLen);
+                                         << "(max is " << NamespaceString::MaxNsCollectionLen << " bytes)",
+                    ns.size() <= NamespaceString::MaxNsCollectionLen);
         }
 
         NamespaceString nss( ns );

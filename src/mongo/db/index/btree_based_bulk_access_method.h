@@ -36,7 +36,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/structure/btree/btree_interface.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
 
@@ -48,7 +48,7 @@ namespace mongo {
          */
         BtreeBasedBulkAccessMethod(OperationContext* txn,
                                    BtreeBasedAccessMethod* real,
-                                   BtreeInterface* interface,
+                                   SortedDataInterface* interface,
                                    const IndexDescriptor* descriptor);
 
         ~BtreeBasedBulkAccessMethod() {}
@@ -135,7 +135,7 @@ namespace mongo {
         BtreeBasedAccessMethod* _real;
 
         // Not owned here.
-        BtreeInterface* _interface;
+        SortedDataInterface* _interface;
 
         // The external sorter.
         boost::scoped_ptr<BSONObjExternalSorter> _sorter;

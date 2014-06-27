@@ -34,7 +34,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/structure/btree/key.h"
+#include "mongo/db/storage/mmap_v1/btree/key.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/float_utils.h"
 #include "mongo/util/stringutils.h"

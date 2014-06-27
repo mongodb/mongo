@@ -40,7 +40,7 @@
 namespace mongo {
 
     TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState,
-                                       BtreeInterface* btree)
+                                       SortedDataInterface* btree)
         : BtreeBasedAccessMethod(btreeState, btree) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();

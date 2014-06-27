@@ -33,10 +33,10 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/structure/head_manager.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
 

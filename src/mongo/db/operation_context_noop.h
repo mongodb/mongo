@@ -85,8 +85,8 @@ namespace mongo {
             return true;
         }
 
-        virtual const char * getNS() const {
-            return NULL;
+        virtual string getNS() const {
+            return string();
         };
 
         virtual Transaction* getTransaction() {

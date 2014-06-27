@@ -45,7 +45,7 @@ namespace mongo {
         using BtreeBasedAccessMethod::_descriptor;
 
         TwoDAccessMethod(IndexCatalogEntry* btreeState,
-                         BtreeInterface* btree);
+                         SortedDataInterface* btree);
         virtual ~TwoDAccessMethod() { }
 
     private:

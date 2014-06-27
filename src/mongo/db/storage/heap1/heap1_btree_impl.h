@@ -28,17 +28,18 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include "mongo/db/structure/btree/btree_interface.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 
 #pragma once
 
 namespace mongo {
+
     class IndexCatalogEntry;
 
     /**
      * Caller takes ownership.
      * All permanent data will be stored and fetch from dataInOut.
      */
-    BtreeInterface* getHeap1BtreeImpl(IndexCatalogEntry* info, boost::shared_ptr<void>* dataInOut);
+    SortedDataInterface* getHeap1BtreeImpl(IndexCatalogEntry* info, boost::shared_ptr<void>* dataInOut);
 
 }  // namespace mongo

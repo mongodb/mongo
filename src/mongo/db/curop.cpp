@@ -64,10 +64,6 @@ namespace mongo {
         _op = 0;
         _opNum = _nextOpNum++;
         _command = NULL;
-        // These addresses should never be written to again.  The zeroes are
-        // placed here as a precaution because currentOp may be accessed
-        // without the db mutex.
-        memset(_ns, 0, sizeof(_ns));
     }
 
     void CurOp::_reset() {
@@ -89,7 +85,6 @@ namespace mongo {
         _reset();
         _start = 0;
         _opNum = _nextOpNum++;
-        _ns[0] = 0;
         _debug.reset();
         _query.reset();
         _active = true; // this should be last for ui clarity
@@ -132,9 +127,9 @@ namespace mongo {
     }
 
     void CurOp::setNS( const StringData& ns ) {
-        ns.substr( 0, Namespace::MaxNsLen ).copyTo( _ns, true );
+        // _ns copies the data in the null-terminated ptr it's given
+        _ns = ns.toString().c_str();
     }
-
 
     void CurOp::ensureStarted() {
         if ( _start == 0 ) {
@@ -151,15 +146,13 @@ namespace mongo {
 
     void CurOp::enter( Client::Context * context ) {
         ensureStarted();
-
-        strncpy( _ns, context->ns(), Namespace::MaxNsLen);
-        _ns[Namespace::MaxNsLen] = 0;
-
+        _ns = context->ns();
         _dbprofile = std::max( context->_db ? context->_db->getProfilingLevel() : 0 , _dbprofile );
     }
 
     void CurOp::recordGlobalTime(bool isWriteLocked, long long micros) const {
-        Top::global.record(_ns, _op, isWriteLocked ? 1 : -1, micros, _isCommand);
+        string nsStr = _ns.toString();
+        Top::global.record(nsStr, _op, isWriteLocked ? 1 : -1, micros, _isCommand);
     }
 
     void CurOp::reportState(BSONObjBuilder* builder) {
@@ -174,7 +167,7 @@ namespace mongo {
 
         builder->append( "op" , opToString( _op ) );
 
-        builder->append("ns", _ns);
+        builder->append("ns", _ns.toString());
 
         if (_op == dbInsert) {
             _query.append(*builder, "insert");
@@ -218,7 +211,7 @@ namespace mongo {
         bool a = _active && _start;
         bob.append("active", a);
         bob.append( "op" , opToString( _op ) );
-        bob.append("ns", _ns);
+        bob.append("ns", _ns.toString());
         if (_op == dbInsert) {
             _query.append(bob, "insert");
         }

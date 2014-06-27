@@ -36,8 +36,8 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/structure/btree/btree_interface.h"
-#include "mongo/db/structure/btree/bucket_deletion_notification.h"
+#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/mmap_v1/btree/bucket_deletion_notification.h"  // XXX HK this can go away
 
 namespace mongo {
 
@@ -58,7 +58,7 @@ namespace mongo {
         MONGO_DISALLOW_COPYING( BtreeBasedAccessMethod );
     public:
         BtreeBasedAccessMethod( IndexCatalogEntry* btreeState,
-                                BtreeInterface* btree );
+                                SortedDataInterface* btree );
 
         virtual ~BtreeBasedAccessMethod() { }
 
@@ -133,7 +133,7 @@ namespace mongo {
                           const BSONObj& key,
                           const DiskLoc& loc);
 
-        scoped_ptr<BtreeInterface> _newInterface;
+        scoped_ptr<SortedDataInterface> _newInterface;
     };
 
     /**

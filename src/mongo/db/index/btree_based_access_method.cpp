@@ -40,8 +40,6 @@
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/structure/btree/btree_interface.h"
-#include "mongo/db/structure/btree/bucket_deletion_notification.h"
 #include "mongo/util/progress_meter.h"
 
 
@@ -57,7 +55,7 @@ namespace mongo {
     BtreeBasedAccessMethod::InvalidateCursorsNotification BtreeBasedAccessMethod::invalidateCursors;
 
     BtreeBasedAccessMethod::BtreeBasedAccessMethod(IndexCatalogEntry* btreeState,
-                                                   BtreeInterface* btree)
+                                                   SortedDataInterface* btree)
         : _btreeState(btreeState),
           _descriptor(btreeState->descriptor()),
           _newInterface(btree) {
@@ -201,7 +199,7 @@ namespace mongo {
         BSONObjSet keys;
         getKeys(obj, &keys);
 
-        boost::scoped_ptr<BtreeInterface::Cursor> cursor(_newInterface->newCursor(txn, 1));
+        boost::scoped_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn, 1));
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
             cursor->locate(*i, DiskLoc());
         }
@@ -214,8 +212,8 @@ namespace mongo {
         return _newInterface->touch(txn);
     }
 
-    DiskLoc BtreeBasedAccessMethod::findSingle( OperationContext* txn, const BSONObj& key) const {
-        boost::scoped_ptr<BtreeInterface::Cursor> cursor(_newInterface->newCursor(txn, 1));
+    DiskLoc BtreeBasedAccessMethod::findSingle(OperationContext* txn, const BSONObj& key) const {
+        boost::scoped_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn, 1));
         cursor->locate(key, minDiskLoc);
 
         // A null bucket means the key wasn't found (nor was anything found after it).

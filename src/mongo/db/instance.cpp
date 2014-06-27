@@ -561,7 +561,7 @@ namespace mongo {
         DbMessage d(m);
         NamespaceString ns(d.getns());
         uassertStatusOK( userAllowedWriteNS( ns ) );
-        op.debug().ns = ns.ns();
+        op.debug().ns = ns.ns().c_str();
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
 
@@ -619,7 +619,7 @@ namespace mongo {
         NamespaceString ns(d.getns());
         uassertStatusOK( userAllowedWriteNS( ns ) );
 
-        op.debug().ns = ns.ns();
+        op.debug().ns = ns.ns().c_str();
         int flags = d.pullInt();
         bool justOne = flags & RemoveOption_JustOne;
         bool broadcast = flags & RemoveOption_Broadcast;

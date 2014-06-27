@@ -33,7 +33,6 @@
 
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/client.h"
-#include "mongo/db/structure/catalog/namespace.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/progress_meter.h"
@@ -117,7 +116,7 @@ namespace mongo {
     /* lifespan is different than CurOp because of recursives with DBDirectClient */
     class OpDebug {
     public:
-        OpDebug() : ns(""), planSummary(2048) { reset(); }
+        OpDebug() : planSummary(2048) { reset(); }
 
         void reset();
 
@@ -147,7 +146,7 @@ namespace mongo {
         // basic options
         int op;
         bool iscommand;
-        Namespace ns;
+        ThreadSafeString ns;
         BSONObj query;
         BSONObj updateobj;
         
@@ -204,7 +203,7 @@ namespace mongo {
         void markCommand() { _isCommand = true; }
         OpDebug& debug()           { return _debug; }
         int profileLevel() const   { return _dbprofile; }
-        const char * getNS() const { return _ns; }
+        string getNS() const { return _ns.toString(); }
 
         bool shouldDBProfile( int ms ) const {
             if ( _dbprofile <= 0 )
@@ -338,7 +337,7 @@ namespace mongo {
         bool _isCommand;
         int _dbprofile;                  // 0=off, 1=slow, 2=all
         AtomicUInt _opNum;               // todo: simple being "unsigned" may make more sense here
-        char _ns[Namespace::MaxNsLen+2];
+        ThreadSafeString _ns;
         HostAndPort _remote;             // CAREFUL here with thread safety
         CachedBSONObj<512> _query;       // CachedBSONObj is thread safe
         OpDebug _debug;

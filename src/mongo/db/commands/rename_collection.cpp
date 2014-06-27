@@ -165,8 +165,8 @@ namespace mongo {
                 }
 
                 unsigned int longestAllowed =
-                    min(int(Namespace::MaxNsColletionLen),
-                        int(Namespace::MaxNsLen) - 2/*strlen(".$")*/ - longestIndexNameLength);
+                    min(int(NamespaceString::MaxNsCollectionLen),
+                        int(NamespaceString::MaxNsLen) - 2/*strlen(".$")*/ - longestIndexNameLength);
                 if (target.size() > longestAllowed) {
                     StringBuilder sb;
                     sb << "collection name length of " << target.size()

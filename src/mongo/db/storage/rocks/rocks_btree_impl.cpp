@@ -87,7 +87,7 @@ namespace mongo {
             rocksdb::Slice sliced[2];
         };
 
-        class RocksCursor : public BtreeInterface::Cursor {
+        class RocksCursor : public SortedDataInterface::Cursor {
         public:
             RocksCursor( rocksdb::Iterator* iterator, bool direction )
                 : _iterator( iterator ), _direction( direction ), _cached( false ) {
@@ -285,8 +285,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    BtreeInterface::Cursor* RocksBtreeImpl::newCursor(OperationContext* txn,
-                                                      int direction) const {
+    SortedDataInterface::Cursor* RocksBtreeImpl::newCursor(OperationContext* txn,
+                                                           int direction) const {
         return new RocksCursor( _db->NewIterator( rocksdb::ReadOptions(),
                                                   _columnFamily ),
                                 txn,
