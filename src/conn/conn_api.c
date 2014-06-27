@@ -580,7 +580,10 @@ err:	/*
 
 	WT_TRET(__wt_connection_close(conn));
 
-	API_END(session, ret);
+	/* We no longer have a session, don't try to update it. */
+	session = NULL;
+
+	API_END_NOTFOUND_MAP(session, ret);
 	return (ret);
 }
 
