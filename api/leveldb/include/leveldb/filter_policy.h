@@ -64,6 +64,9 @@ class FilterPolicy {
 // FilterPolicy (like NewBloomFilterPolicy) that does not ignore
 // trailing spaces in keys.
 extern const FilterPolicy* NewBloomFilterPolicy(int bits_per_key);
+#if HAVE_ELEVELDB
+extern const FilterPolicy* NewBloomFilterPolicy2(int bits_per_key);
+#endif
 
 }
 

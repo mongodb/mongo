@@ -61,12 +61,19 @@ AC_ARG_ENABLE(leveldb,
 	[AS_HELP_STRING([--enable-leveldb],
 	    [Build the LevelDB API.])], r=$enableval, r=no)
 wt_cv_enable_hyperleveldb=no
+wt_cv_enable_eleveldb=no
 case "$r" in
 no)	wt_cv_enable_leveldb=no;;
 hyper)	wt_cv_enable_leveldb=yes
 	wt_cv_enable_hyperleveldb=yes;;
+eleveldb)	wt_cv_enable_leveldb=yes
+	wt_cv_enable_eleveldb=yes;;
 *)	wt_cv_enable_leveldb=yes;;
 esac
+AH_TEMPLATE(HAVE_ELEVELDB, [Build the LevelDB API with ELevelDB support.])
+if test "$wt_cv_enable_eleveldb" = "yes"; then
+	AC_DEFINE(HAVE_ELEVELDB)
+fi
 AH_TEMPLATE(HAVE_HYPERLEVELDB, [Build the LevelDB API with HyperLevelDB support.])
 AC_MSG_RESULT($wt_cv_enable_leveldb)
 if test "$wt_cv_enable_hyperleveldb" = "yes"; then

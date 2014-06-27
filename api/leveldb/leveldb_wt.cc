@@ -42,15 +42,35 @@ using leveldb::Range;
 using leveldb::Slice;
 using leveldb::Snapshot;
 using leveldb::Status;
-#ifdef HAVE_HYPERLEVELDB
+#if HAVE_ELEVELDB
+using leveldb::Value;
 namespace leveldb {
-class ReplayIterator;
+Value::~Value() {}
+
+class StringValue : public Value {
+ public:
+  explicit StringValue(std::string& val) : value_(val) {}
+  ~StringValue() {}
+
+  StringValue& assign(const char* data, size_t size) {
+    value_.assign(data, size);
+    return *this;
+  }
+
+ private:
+  std::string& value_;
+};
 }
 #endif
 
 #define WT_URI          "table:data"
-#define WT_CONN_CONFIG  "log=(enabled),checkpoint_sync=false,session_max=256,"
-#define WT_TABLE_CONFIG "type=lsm,leaf_page_max=4KB,leaf_item_max=1KB,"
+#define WT_CONN_CONFIG  "log=(enabled),checkpoint_sync=false,session_max=8192,"\
+    "mmap=false,transaction_sync=(enabled=true,method=none),"
+#define WT_TABLE_CONFIG "type=lsm,leaf_page_max=4KB,leaf_item_max=1KB," \
+    "internal_page_max=128K,lsm=(chunk_size=100MB," \
+    "bloom_config=(leaf_page_max=8MB)," \
+    "bloom_bit_count=28,bloom_hash_count=19," \
+    "bloom_oldest=true),"
 
 /* Destructors required for interfaces. */
 leveldb::DB::~DB() {}
@@ -153,13 +173,17 @@ public:
 };
 };
 
-
 namespace leveldb {
 FilterPolicy::~FilterPolicy() {}
 
 const FilterPolicy *NewBloomFilterPolicy(int bits_per_key) {
   return new FilterPolicyImpl(bits_per_key);
 }
+#if HAVE_ELEVELDB
+const FilterPolicy *NewBloomFilterPolicy2(int bits_per_key) {
+  return NewBloomFilterPolicy(bits_per_key);
+}
+#endif
 
 Cache::~Cache() {}
 
@@ -359,6 +383,11 @@ public:
   virtual Status Get(const ReadOptions& options,
          const Slice& key, std::string* value);
 
+#if HAVE_ELEVELDB
+  virtual Status Get(const ReadOptions& options,
+         const Slice& key, Value* value);
+#endif
+
 #ifdef HAVE_HYPERLEVELDB
   virtual Status LiveBackup(const Slice& name) {
     return Status::NotSupported("sorry!");
@@ -460,13 +489,17 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
     s_conn << "exclusive,";
   if (options.compression == kSnappyCompression)
     s_conn << "extensions=[libwiredtiger_snappy.so],";
-  size_t cache_size = 25 * options.write_buffer_size;
+  size_t cache_size = 2 * options.write_buffer_size;
+  cache_size += options.max_open_files * (4 << 20);
   if (options.block_cache)
     cache_size += ((CacheImpl *)options.block_cache)->capacity_;
+  else
+    cache_size += 100 << 20;
   s_conn << "cache_size=" << cache_size << ",";
   std::string conn_config = s_conn.str();
 
   WT_CONNECTION *conn;
+  fprintf(stderr,"Open: Home %s config %s\r\n",name.c_str(),conn_config.c_str());
   int ret = ::wiredtiger_open(name.c_str(), NULL, conn_config.c_str(), &conn);
   if (ret == ENOENT)
     return Status::NotFound(Slice("Database does not exist."));
@@ -674,6 +707,51 @@ err:
     releaseCursor(cursor);
   return WiredTigerErrorToStatus(ret, errmsg);
 }
+
+#if HAVE_ELEVELDB
+// If the database contains an entry for "key" store the
+// corresponding value in *value and return OK.
+//
+// If there is no entry for "key" leave *value unchanged and return
+// a status for which Status::IsNotFound() returns true.
+//
+// May return some other Status on an error.
+Status
+DbImpl::Get(const ReadOptions& options,
+       const Slice& key, Value* value)
+{
+  WT_CURSOR *cursor;
+  WT_ITEM item;
+  const SnapshotImpl *si = NULL;
+  const char *errmsg = NULL;
+
+  // Read options can contain a snapshot for us to use
+  if (options.snapshot == NULL) {
+    cursor = getCursor();
+  } else {
+    si = static_cast<const SnapshotImpl *>(options.snapshot);
+    if (!si->getStatus().ok())
+      return si->getStatus();
+    cursor = si->getCursor();
+  }
+
+  item.data = key.data();
+  item.size = key.size();
+  cursor->set_key(cursor, &item);
+  int ret = cursor->search(cursor);
+  if (ret == 0) {
+    ret = cursor->get_value(cursor, &item);
+    if (ret == 0)
+      value->assign((const char *)item.data, item.size);
+  } else if (ret == WT_NOTFOUND)
+    errmsg = "DB::Get key not found";
+err:
+  // Release the cursor if we are not in a snapshot
+  if (si == NULL)
+    releaseCursor(cursor);
+  return WiredTigerErrorToStatus(ret, errmsg);
+}
+#endif
 
 // Return a heap-allocated iterator over the contents of the database.
 // The result of NewIterator() is initially invalid (caller must

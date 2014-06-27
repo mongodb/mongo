@@ -27,7 +27,7 @@
 
 #include "wiredtiger_config.h"
 
-#ifdef HAVE_HYPERLEVELDB
+#ifdef	HAVE_HYPERLEVELDB
 #include <hyperleveldb/cache.h>
 #include <hyperleveldb/comparator.h>
 #include <hyperleveldb/db.h>
@@ -43,10 +43,14 @@
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "leveldb/filter_policy.h"
+#include "leveldb/options.h"
 #include "leveldb/slice.h"
 #include "leveldb/status.h"
 #include "leveldb/table_builder.h"
 #include "leveldb/write_batch.h"
+#endif
+#if HAVE_ELEVELDB
+#include "leveldb/perf_count.h"
 #endif
 
 #include "wiredtiger.h"

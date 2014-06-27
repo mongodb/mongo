@@ -23,12 +23,21 @@ leveldbinclude_HEADERS = \
 	 include/leveldb/table.h \
 	 include/leveldb/write_batch.h
 
+if HAVE_ELEVELDB
+leveldbinclude_HEADERS += \
+	 include/leveldb/perf_count.h
+endif
+
 libwiredtiger_leveldb_la_LDFLAGS = -release @VERSION@
 libwiredtiger_leveldb_la_SOURCES = \
 	leveldb_wt.cc \
 	db/write_batch.cc \
 	util/coding.cc util/comparator.cc util/env.cc util/env_posix.cc \
 	util/logging.cc util/options.cc util/status.cc
+
+if HAVE_ELEVELDB
+libwiredtiger_leveldb_la_SOURCES += util/perf_count.cc
+endif
 
 leveldb_test_SOURCES = leveldb_test.cc
 #leveldb_test_LDADD = $(top_builddir)/libwiredtiger.la

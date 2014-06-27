@@ -17,6 +17,9 @@
 #include <vector>
 #include <stdarg.h>
 #include <stdint.h>
+#if HAVE_ELEVELDB
+#include "leveldb/perf_count.h"
+#endif
 #include "leveldb/status.h"
 
 namespace leveldb {
@@ -144,6 +147,14 @@ class Env {
 
   // Sleep/delay the thread for the perscribed number of micro-seconds.
   virtual void SleepForMicroseconds(int micros) = 0;
+
+#if HAVE_ELEVELDB
+  // Riak specific:  Where supported, give count of background jobs pending.
+  virtual int GetBackgroundBacklog() const {return(0);};
+  
+  // Riak specific:  Get object that is tracking various software counters
+  virtual PerformanceCounters * GetPerformanceCounters() {return(gPerfCounters);}
+#endif
 
  private:
   // No copying allowed
