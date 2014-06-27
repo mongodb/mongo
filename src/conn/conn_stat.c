@@ -275,13 +275,11 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 		WT_RET_TEST((log_file =
 		    fopen(tmp->mem, "a")) == NULL, __wt_errno());
 	}
+	conn->stat_fp = log_file;
 
 	/* Create the entry prefix for this time of day. */
 	if (strftime(tmp->mem, tmp->memsize, conn->stat_format, tm) == 0)
 		WT_RET_MSG(session, ENOMEM, "strftime timestamp conversion");
-
-	/* Reference temporary values from the connection structure. */
-	conn->stat_fp = log_file;
 	conn->stat_stamp = tmp->mem;
 
 	/* Dump the connection statistics. */
@@ -297,9 +295,8 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	 * any that match the list of object sources.
 	 */
 	if (conn->stat_sources != NULL) {
-		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_conn_btree_apply(
-		    session, 0, __statlog_apply, NULL));
+		WT_WITH_SCHEMA_LOCK(session, ret =
+		    __wt_conn_btree_apply(session, 0, __statlog_apply, NULL));
 		WT_RET(ret);
 	}
 
