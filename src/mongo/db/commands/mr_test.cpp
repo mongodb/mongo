@@ -140,6 +140,22 @@ namespace {
         // inline
         _testConfigParseOutputOptions("mydb1", "{out: {inline: 'mycoll', db: 'mydb2'}}",
                                       "mydb2", "", "", false, mr::Config::INMEMORY);
+
+        // Order should not matter in fields of 'out' object.
+        _testConfigParseOutputOptions("mydb1", "{out: {db: 'mydb2', normal: 'mycoll'}}",
+                                      "mydb2", "mycoll", "mydb2.mycoll", false,
+                                      mr::Config::REPLACE);
+        _testConfigParseOutputOptions("mydb1", "{out: {db: 'mydb2', replace: 'mycoll'}}",
+                                      "mydb2", "mycoll", "mydb2.mycoll", false,
+                                      mr::Config::REPLACE);
+        _testConfigParseOutputOptions("mydb1", "{out: {nonAtomic: true, merge: 'mycoll'}}",
+                                      "", "mycoll", "mydb1.mycoll", true,
+                                      mr::Config::MERGE);
+        _testConfigParseOutputOptions("mydb1", "{out: {nonAtomic: true, reduce: 'mycoll'}}",
+                                      "", "mycoll", "mydb1.mycoll", true,
+                                      mr::Config::REDUCE);
+        _testConfigParseOutputOptions("mydb1", "{out: {db: 'mydb2', inline: 'mycoll'}}",
+                                      "mydb2", "", "", false, mr::Config::INMEMORY);
     }
 
 }  // namespace
