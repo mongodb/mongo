@@ -724,16 +724,16 @@ namespace mongo {
         return entry->recordStore.get();
     }
 
-    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getNamespaceRecordStore() {
+    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getNamespaceRecordStore() const {
         boost::mutex::scoped_lock lk( _collectionsLock );
         return _getNamespaceRecordStore_inlock();
     }
 
-    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getNamespaceRecordStore_inlock() {
+    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getNamespaceRecordStore_inlock() const {
         NamespaceString nss( name(), "system.namespaces" );
-        Entry* entry = _collections[nss.toString()];
-        invariant( entry );
-        return entry->recordStore.get();
+        CollectionMap::const_iterator i = _collections.find( nss.toString() );
+        invariant( i != _collections.end() );
+        return i->second->recordStore.get();
     }
 
     void MMAPV1DatabaseCatalogEntry::_addNamespaceToNamespaceCollection( OperationContext* txn,
@@ -784,4 +784,31 @@ namespace mongo {
             }
         }
     }
+
+    CollectionOptions MMAPV1DatabaseCatalogEntry::getCollectionOptions( const StringData& ns ) const {
+        if ( nsToCollectionSubstring( ns ) == "system.namespaces" ) {
+            return CollectionOptions();
+        }
+
+        RecordStoreV1Base* rs = _getNamespaceRecordStore();
+        invariant( rs );
+
+        scoped_ptr<RecordIterator> it( rs->getIterator() );
+        while ( !it->isEOF() ) {
+            DiskLoc loc = it->getNext();
+            BSONObj entry = it->dataFor( loc ).toBson();
+            BSONElement name = entry["name"];
+            if ( name.type() == String && name.String() == ns ) {
+                CollectionOptions options;
+                if ( entry["options"].isABSONObj() ) {
+                    Status status = options.parse( entry["options"].Obj() );
+                    fassert( 18522, status );
+                }
+                return options;
+            }
+        }
+
+        return CollectionOptions();
+    }
+
 }

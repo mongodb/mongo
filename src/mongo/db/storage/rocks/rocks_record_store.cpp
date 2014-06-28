@@ -30,7 +30,6 @@
  */
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 

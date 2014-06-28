@@ -109,7 +109,6 @@ namespace mongo {
         : _name(name),
           _dbEntry( dbEntry ),
           _profileName(_name + ".system.profile"),
-          _namespacesName(_name + ".system.namespaces"),
           _indexesName(_name + ".system.indexes"),
           _collectionLock( "Database::_collectionLock" )
     {
@@ -161,39 +160,30 @@ namespace mongo {
 
         txn->lockState()->assertWriteLocked( _name );
 
-        // Note: we build up a toDelete vector rather than dropping the collection inside the loop
-        // to avoid modifying the system.namespaces collection while iterating over it since that
-        // would corrupt the cursor.
-        vector<string> toDelete;
-        {
-            Collection* coll = getCollection( txn, _namespacesName );
-            if ( coll ) {
-                scoped_ptr<RecordIterator> it( coll->getIterator() );
-                DiskLoc next;
-                while ( !( next = it->getNext() ).isNull() ) {
-                    BSONObj nsObj = coll->docFor( next );
+        list<string> collections;
+        _dbEntry->getCollectionNamespaces( &collections );
 
-                    BSONElement e = nsObj.getFieldDotted( "options.temp" );
-                    if ( !e.trueValue() )
-                        continue;
+        for ( list<string>::iterator i = collections.begin(); i != collections.end(); ++i ) {
+            string ns = *i;
+            invariant( NamespaceString::normal( ns ) );
 
-                    string ns = nsObj["name"].String();
+            CollectionCatalogEntry* coll = _dbEntry->getCollectionCatalogEntry( txn, ns );
 
-                    // Do not attempt to drop indexes
-                    if ( !NamespaceString::normal(ns.c_str()) )
-                        continue;
+            CollectionOptions options = coll->getCollectionOptions();
+            if ( !options.temp )
+                continue;
 
-                    toDelete.push_back(ns);
-                }
+            Status status = dropCollection( txn, ns );
+            if ( !status.isOK() ) {
+                warning() << "could not drop temp collection '" << ns << "': " << status;
             }
-        }
-
-        for (size_t i=0; i < toDelete.size(); i++) {
-            BSONObj info;
-            // using DBDirectClient to ensure this ends up in opLog
-            bool ok = DBDirectClient().dropCollection(toDelete[i], &info);
-            if (!ok)
-                warning() << "could not drop temp collection '" << toDelete[i] << "': " << info;
+            else {
+                string cmdNs = _name + ".$cmd";
+                repl::logOp( txn,
+                             "c",
+                             cmdNs.c_str(),
+                             BSON( "drop" << nsToCollectionSubstring( ns ) ) );
+            }
         }
     }
 

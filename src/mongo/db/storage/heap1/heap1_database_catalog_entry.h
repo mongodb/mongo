@@ -110,7 +110,7 @@ namespace mongo {
 
         class Entry : public CollectionCatalogEntry {
         public:
-            Entry( const StringData& ns );
+            Entry( const StringData& ns, const CollectionOptions& options );
             virtual ~Entry();
 
             int getTotalIndexCount() const;
@@ -150,6 +150,9 @@ namespace mongo {
                                    const StringData& idxName,
                                    long long newExpireSeconds );
 
+            CollectionOptions getCollectionOptions() const { return options; }
+
+            CollectionOptions options;
             scoped_ptr<HeapRecordStore> rs;
             typedef std::map<std::string,IndexEntry*> Indexes;
             Indexes indexes;

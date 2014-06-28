@@ -99,9 +99,7 @@ namespace mongo {
             return false;
         }
 
-        if ( _ns == _database->_namespacesName ||
-             _ns == _database->_indexesName ||
-             _ns == _database->_profileName ) {
+        if ( _ns.isSystem() ) {
             return false;
         }
 

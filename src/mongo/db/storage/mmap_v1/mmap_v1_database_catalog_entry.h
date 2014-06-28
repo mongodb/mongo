@@ -98,15 +98,17 @@ namespace mongo {
                                      const CollectionCatalogEntry* collection,
                                      IndexCatalogEntry* index );
 
-        const MmapV1ExtentManager* getExtentManager() const { return &_extentManager; } // TODO(ERH): remove
-        MmapV1ExtentManager* getExtentManager() { return &_extentManager; } // TODO(ERH): remove
+        const MmapV1ExtentManager* getExtentManager() const { return &_extentManager; }
+        MmapV1ExtentManager* getExtentManager() { return &_extentManager; }
+
+        CollectionOptions getCollectionOptions( const StringData& ns ) const;
 
     private:
 
         RecordStoreV1Base* _getIndexRecordStore_inlock();
         RecordStoreV1Base* _getIndexRecordStore();
-        RecordStoreV1Base* _getNamespaceRecordStore_inlock();
-        RecordStoreV1Base* _getNamespaceRecordStore();
+        RecordStoreV1Base* _getNamespaceRecordStore_inlock() const;
+        RecordStoreV1Base* _getNamespaceRecordStore() const;
 
         RecordStoreV1Base* _getRecordStore( OperationContext* txn,
                                             const StringData& ns );
@@ -153,7 +155,7 @@ namespace mongo {
 
         void _fillInEntry_inlock( OperationContext* opCtx, const StringData& ns, Entry* entry );
 
-        boost::mutex _collectionsLock;
+        mutable boost::mutex _collectionsLock;
         typedef std::map<std::string,Entry*> CollectionMap;
         CollectionMap _collections;
 

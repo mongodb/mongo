@@ -105,7 +105,7 @@ namespace mongo {
             return Status( ErrorCodes::NamespaceExists,
                            "cannot create collection, already exists" );
 
-        entry = new Entry( ns );
+        entry = new Entry( ns, options );
 
         if ( options.capped ) {
             entry->rs.reset(new HeapRecordStore(ns,
@@ -205,8 +205,8 @@ namespace mongo {
 
     // ------------------
 
-    Heap1DatabaseCatalogEntry::Entry::Entry( const StringData& ns)
-        : CollectionCatalogEntry( ns ) {
+    Heap1DatabaseCatalogEntry::Entry::Entry( const StringData& ns, const CollectionOptions& o )
+        : CollectionCatalogEntry( ns ), options( o ) {
     }
 
     Heap1DatabaseCatalogEntry::Entry::~Entry() {
