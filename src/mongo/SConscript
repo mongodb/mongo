@@ -875,6 +875,19 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="mr_test",
+    source=[
+        "db/commands/mr_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/coredb",
+    ],
+    NO_CRUTCH = True,
+)
+
+env.CppUnitTest(
     target="plan_cache_commands_test",
     source=[
         "db/commands/plan_cache_commands_test.cpp",
