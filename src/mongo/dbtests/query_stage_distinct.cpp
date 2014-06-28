@@ -46,9 +46,7 @@ namespace QueryStageDistinct {
 
     class DistinctBase {
     public:
-        DistinctBase() : _client(&_txn) { 
-
-        }
+        DistinctBase() { }
 
         virtual ~DistinctBase() {
             Client::WriteContext ctx(&_txn, ns());

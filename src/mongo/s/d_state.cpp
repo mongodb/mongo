@@ -1247,7 +1247,7 @@ namespace mongo {
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context ctx(txn, dbname);
+            Client::Context ctx(dbname);
 
             shardingState.appendInfo( result );
             return true;

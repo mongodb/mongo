@@ -106,7 +106,7 @@ namespace repl {
             lk.reset(new Lock::DBWrite(txn->lockState(), ns)); 
         }
 
-        Client::Context ctx(txn, ns);
+        Client::Context ctx(ns);
         ctx.getClient()->curop()->reset();
         // For non-initial-sync, we convert updates to upserts
         // to suppress errors when replaying oplog entries.

@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/instance.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/unittest/unittest.h"
@@ -39,7 +38,7 @@ namespace mongo {
 
     class CustomDirectClient: public DBDirectClient {
     public:
-        CustomDirectClient(OperationContext* txn) : DBDirectClient(txn) {
+        CustomDirectClient() {
             setWireVersions(minWireVersion, maxWireVersion);
         }
 
@@ -71,16 +70,15 @@ namespace mongo {
         }
     };
 
-    class CustomConnectHook : public ConnectionString::ConnectionHook {
+    class CustomConnectHook: public ConnectionString::ConnectionHook {
     public:
-        CustomConnectHook(OperationContext* txn);
-
         virtual DBClientBase* connect(const ConnectionString& connStr,
                                       std::string& errmsg,
-                                      double socketTimeout);
-
-    private:
-        OperationContext* _txn;
+                                      double socketTimeout)
+        {
+            // Note - must be new, since it gets owned elsewhere
+            return new CustomDirectClient();
+        }
     };
 
     /**
@@ -91,10 +89,6 @@ namespace mongo {
      */
     class ConfigServerFixture: public mongo::unittest::Test {
     public:
-
-        ConfigServerFixture() : _client(&_txn) {
-
-        }
 
         /**
          * Returns a client connection to the virtual config server.
@@ -136,9 +130,8 @@ namespace mongo {
 
     private:
 
-        OperationContextImpl _txn;
-        CustomDirectClient _client;
         CustomConnectHook* _connectHook;
+        CustomDirectClient _client;
     };
 
 }

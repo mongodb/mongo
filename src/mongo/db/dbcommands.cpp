@@ -181,7 +181,7 @@ namespace mongo {
                 // this is suboptimal but syncDataAndTruncateJournal is called from dropDatabase,
                 // and that may need a global lock.
                 Lock::GlobalWrite lk(txn->lockState());
-                Client::Context context(txn, dbname);
+                Client::Context context(dbname);
 
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
@@ -258,7 +258,7 @@ namespace mongo {
             // SERVER-4328 todo don't lock globally. currently syncDataAndTruncateJournal is being
             // called within, and that requires a global lock i believe.
             Lock::GlobalWrite lk(txn->lockState());
-            Client::Context context(txn,  dbname );
+            Client::Context context( dbname );
 
             log() << "repairDatabase " << dbname;
             std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, context.db(), cmdObj);
@@ -331,7 +331,7 @@ namespace mongo {
             // in the local database.
             //
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context ctx(txn, dbname);
+            Client::Context ctx(dbname);
 
             BSONElement e = cmdObj.firstElement();
             result.append("was", ctx.db()->getProfilingLevel());
@@ -381,7 +381,7 @@ namespace mongo {
             // locking, but originally the lock was set to be WRITE, so preserving the behaviour.
             //
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context ctx(txn, dbname);
+            Client::Context ctx(dbname);
 
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
             _diaglog.flush();
@@ -436,7 +436,7 @@ namespace mongo {
             }
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context ctx(txn, nsToDrop);
+            Client::Context ctx(nsToDrop);
             Database* db = ctx.db();
 
             Collection* coll = db->getCollection( txn, nsToDrop );
@@ -534,7 +534,7 @@ namespace mongo {
                         options.hasField("$nExtents"));
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context ctx(txn, ns);
+            Client::Context ctx(ns);
 
             // Create collection.
             return appendCommandStatus( result,
@@ -648,7 +648,7 @@ namespace mongo {
 
         bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             Lock::GlobalWrite globalWriteLock(txn->lockState());
-            Client::Context ctx(txn, dbname);
+            Client::Context ctx(dbname);
 
             try {
                 return dbHolder().closeAll(txn, result, false);
@@ -1032,7 +1032,7 @@ namespace mongo {
             const string ns = dbname + "." + jsobj.firstElement().valuestr();
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context ctx(txn,  ns );
+            Client::Context ctx( ns );
 
             Collection* coll = ctx.db()->getCollection( txn, ns );
             if ( !coll ) {

@@ -105,7 +105,7 @@ namespace {
             if (*it == "local")
                 continue;
 
-            Client::Context ctx(&txn, *it);
+            Client::Context ctx(*it);
             ctx.db()->clearTmpCollections(&txn);
         }
     }

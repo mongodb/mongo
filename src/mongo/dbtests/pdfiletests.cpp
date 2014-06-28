@@ -48,7 +48,7 @@ namespace PdfileTests {
         class Base {
         public:
             Base() : _lk(_txn.lockState()),
-                     _context(&_txn, ns()) {
+                     _context(ns()) {
 
             }
 

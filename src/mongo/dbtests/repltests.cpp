@@ -65,7 +65,7 @@ namespace ReplTests {
     public:
         Base() : _lk(_txn.lockState()),
                  _client(&_txn),
-                 _context(&_txn, ns()) {
+                 _context(ns()) {
 
             oldRepl();
             replSettings.replSet = "";
@@ -121,7 +121,7 @@ namespace ReplTests {
         }
         int count() const {
             Lock::GlobalWrite lk(_txn.lockState());
-            Client::Context ctx(&_txn,  ns() );
+            Client::Context ctx( ns() );
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &_txn, ns() );
             if ( !coll ) {
@@ -140,7 +140,7 @@ namespace ReplTests {
         static int opCount() {
             OperationContextImpl txn;
             Lock::GlobalWrite lk(txn.lockState());
-            Client::Context ctx(&txn,  cllNS() );
+            Client::Context ctx( cllNS() );
 
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &txn, cllNS() );
@@ -163,7 +163,7 @@ namespace ReplTests {
 
             vector< BSONObj > ops;
             {
-                Client::Context ctx(&txn,  cllNS() );
+                Client::Context ctx( cllNS() );
                 Database* db = ctx.db();
                 Collection* coll = db->getCollection( &txn, cllNS() );
 
@@ -176,7 +176,7 @@ namespace ReplTests {
                 delete it;
             }
             {
-                Client::Context ctx(&txn,  ns() );
+                Client::Context ctx( ns() );
                 BSONObjBuilder b;
                 b.append("host", "localhost");
                 b.appendTimestamp("syncedTo", 0);
@@ -192,7 +192,7 @@ namespace ReplTests {
         static void printAll( const char *ns ) {
             OperationContextImpl txn;
             Lock::GlobalWrite lk(txn.lockState());
-            Client::Context ctx(&txn,  ns );
+            Client::Context ctx( ns );
 
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &txn, ns );
@@ -213,7 +213,7 @@ namespace ReplTests {
         static void deleteAll( const char *ns ) {
             OperationContextImpl txn;
             Lock::GlobalWrite lk(txn.lockState());
-            Client::Context ctx(&txn,  ns );
+            Client::Context ctx( ns );
 
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &txn, ns );
@@ -235,7 +235,7 @@ namespace ReplTests {
         static void insert( const BSONObj &o ) {
             OperationContextImpl txn;
             Lock::GlobalWrite lk(txn.lockState());
-            Client::Context ctx(&txn,  ns() );
+            Client::Context ctx( ns() );
 
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &txn, ns() );

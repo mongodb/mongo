@@ -109,7 +109,7 @@ namespace repl {
 
         // should already have write lock
         const char *ns = o.getStringField("ns");
-        Client::Context ctx(txn, ns);
+        Client::Context ctx(ns);
 
         // we don't have the object yet, which is possible on initial sync.  get it.
         log() << "replication info adding missing object" << endl; // rare enough we can log

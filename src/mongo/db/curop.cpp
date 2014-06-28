@@ -158,8 +158,12 @@ namespace mongo {
         _dbprofile = std::max( context->_db ? context->_db->getProfilingLevel() : 0 , _dbprofile );
     }
 
-    void CurOp::recordGlobalTime(bool isWriteLocked, long long micros) const {
-        Top::global.record(_ns, _op, isWriteLocked ? 1 : -1, micros, _isCommand);
+    void CurOp::recordGlobalTime( long long micros ) const {
+        if ( _client ) {
+            const LockState& ls = _client->lockState();
+            verify( ls.threadState() );
+            Top::global.record( _ns , _op , ls.isWriteLocked() ? 1 : -1 , micros , _isCommand );
+        }
     }
 
     void CurOp::reportState(BSONObjBuilder* builder) {

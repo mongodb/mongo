@@ -35,7 +35,6 @@
 
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/bits.h"
@@ -110,9 +109,7 @@ namespace ThreadedTests {
                 // in _DEBUG builds on linux we mprotect each time a writelock
                 // is taken. That can greatly slow down this test if there are
                 // many open files
-                OperationContextImpl txn;
-                DBDirectClient db(&txn);
-
+                DBDirectClient db;
                 db.simpleCommand("admin", NULL, "closeAllDatabases");
             }
 

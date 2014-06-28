@@ -47,9 +47,7 @@ namespace QueryStageSortTests {
 
     class QueryStageSortTestBase {
     public:
-        QueryStageSortTestBase() : _client(&_txn) {
-        
-        }
+        QueryStageSortTestBase() { }
 
         void fillData() {
             for (int i = 0; i < numObj(); ++i) {
@@ -170,9 +168,7 @@ namespace QueryStageSortTests {
 
 
         static const char* ns() { return "unittests.QueryStageSort"; }
-
-    protected:
-        OperationContextImpl _txn;
+    private:
         DBDirectClient _client;
     };
 
@@ -183,12 +179,13 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, ns());
 
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(&txn, ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             fillData();
@@ -202,12 +199,13 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, ns());
 
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(&txn, ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             fillData();
@@ -230,12 +228,13 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 10000; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, ns());
 
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(&txn, ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             fillData();
@@ -249,12 +248,13 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 2000; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, ns());
             
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(&txn, ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
             fillData();
 
@@ -339,12 +339,13 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, ns());
             
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(&txn, ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             WorkingSet* ws = new WorkingSet();

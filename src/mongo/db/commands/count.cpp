@@ -73,7 +73,7 @@ namespace mongo {
                        string &err,
                        int &errCode) {
         // Lock 'ns'.
-        Client::Context cx(txn, ns);
+        Client::Context cx(ns);
         Collection* collection = cx.db()->getCollection(txn, ns);
 
         if (NULL == collection) {

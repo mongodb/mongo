@@ -68,7 +68,7 @@ namespace repl {
 
             const std::string ns = parseNs(dbname, cmdObj);
             Lock::GlobalWrite globalWriteLock(txn->lockState());
-            Client::Context ctx(txn, ns);
+            Client::Context ctx(ns);
             if (replSettings.usingReplSets()) {
                 if (!theReplSet) {
                     errmsg = "no replication yet active";

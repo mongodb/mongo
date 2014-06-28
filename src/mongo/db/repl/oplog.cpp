@@ -123,8 +123,7 @@ namespace repl {
 
         {
             if ( localOplogRSCollection == 0 ) {
-                Client::Context ctx(&txn, rsoplog);
-
+                Client::Context ctx(rsoplog);
                 localDB = ctx.db();
                 verify( localDB );
                 localOplogRSCollection = localDB->getCollection( &txn, rsoplog );
@@ -132,7 +131,7 @@ namespace repl {
                         "local.oplog.rs missing. did you drop it? if so restart server",
                         localOplogRSCollection);
             }
-            Client::Context ctx(&txn, rsoplog, localDB);
+            Client::Context ctx(rsoplog, localDB);
             checkOplogInsert( localOplogRSCollection->insertDocument( &txn, op, false ) );
 
             /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
@@ -284,14 +283,14 @@ namespace repl {
         DEV verify( logNS == 0 ); // check this was never a master/slave master
 
         if ( localOplogRSCollection == 0 ) {
-            Client::Context ctx(txn, rsoplog);
+            Client::Context ctx(rsoplog);
             localDB = ctx.db();
             verify( localDB );
             localOplogRSCollection = localDB->getCollection( txn, rsoplog );
             massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", localOplogRSCollection);
         }
 
-        Client::Context ctx(txn, rsoplog, localDB);
+        Client::Context ctx(rsoplog, localDB);
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( localOplogRSCollection->insertDocument( txn, &writer, false ) );
 
@@ -362,14 +361,14 @@ namespace repl {
         }
 
         if ( localOplogMainCollection == 0 ) {
-            Client::Context ctx(txn, logNS);
+            Client::Context ctx(logNS);
             localDB = ctx.db();
             verify( localDB );
             localOplogMainCollection = localDB->getCollection(txn, logNS);
             verify( localOplogMainCollection );
         }
 
-        Client::Context ctx(txn, logNS , localDB);
+        Client::Context ctx(logNS , localDB);
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( localOplogMainCollection->insertDocument( txn, &writer, false ) );
 
@@ -455,7 +454,7 @@ namespace repl {
         if( rs )
             ns = rsoplog;
 
-        Client::Context ctx(&txn, ns);
+        Client::Context ctx(ns);
         Collection* collection = ctx.db()->getCollection( &txn, ns );
 
         if ( collection ) {

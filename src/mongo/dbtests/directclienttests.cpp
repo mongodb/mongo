@@ -35,7 +35,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -53,8 +52,7 @@ namespace DirectClientTests {
     class Capped : public ClientBase {
     public:
         virtual void run() {
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
+            DBDirectClient client;
             for( int pass=0; pass < 3; pass++ ) {
                 client.createCollection(ns, 1024 * 1024, true, 999);
                 for( int j =0; j < pass*3; j++ )
@@ -78,9 +76,7 @@ namespace DirectClientTests {
     class InsertMany : ClientBase {
     public:
         virtual void run(){
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
+            DBDirectClient client;
             vector<BSONObj> objs;
             objs.push_back(BSON("_id" << 1));
             objs.push_back(BSON("_id" << 1));
@@ -103,9 +99,7 @@ namespace DirectClientTests {
     class BadNSCmd : ClientBase {
     public:
         virtual void run(){
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
+            DBDirectClient client;
             BSONObj result;
             BSONObj cmdObj = BSON( "count" << "" );
             ASSERT_THROWS( client.runCommand( "", cmdObj, result ), UserException );
@@ -115,9 +109,7 @@ namespace DirectClientTests {
     class BadNSQuery : ClientBase {
     public:
         virtual void run(){
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
+            DBDirectClient client;
             auto_ptr<DBClientCursor> cursor = client.query( "", Query(), 1 );
             ASSERT(cursor->more());
             BSONObj result = cursor->next().getOwned();
@@ -129,9 +121,7 @@ namespace DirectClientTests {
     class BadNSGetMore : ClientBase {
     public:
         virtual void run(){
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
+            DBDirectClient client;
             auto_ptr<DBClientCursor> cursor = client.getMore("", 1, 1);
             ASSERT(cursor->more());
             BSONObj result = cursor->next().getOwned();
@@ -143,9 +133,7 @@ namespace DirectClientTests {
     class BadNSInsert : ClientBase {
     public:
         virtual void run(){
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
+            DBDirectClient client;
             client.insert( "", BSONObj(), 0 );
             ASSERT( !client.getLastError().empty() );
         }
@@ -154,9 +142,7 @@ namespace DirectClientTests {
     class BadNSUpdate : ClientBase {
     public:
         virtual void run(){
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
+            DBDirectClient client;
             client.update( "", Query(), BSON( "$set" << BSON( "x" << 1 )) );
             ASSERT( !client.getLastError().empty() );
         }
@@ -165,9 +151,7 @@ namespace DirectClientTests {
     class BadNSRemove : ClientBase {
     public:
         virtual void run(){
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
+            DBDirectClient client;
             client.remove( "", Query() );
             ASSERT( !client.getLastError().empty() );
         }

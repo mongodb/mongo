@@ -30,7 +30,6 @@
 
 #include <list>
 
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/s/config.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/type_changelog.h"
@@ -49,7 +48,7 @@ namespace mongo {
         DBException::traceExceptions = true;
 
         // Make all connections redirect to the direct client
-        _connectHook = new CustomConnectHook(&_txn);
+        _connectHook = new CustomConnectHook();
         ConnectionString::setConnectionHook(_connectHook);
         // Disable the lock pinger
         setLockPingerEnabled(false);
@@ -130,18 +129,10 @@ namespace mongo {
 
         // Make all connections redirect to the direct client
         ConnectionString::setConnectionHook(NULL);
+        delete _connectHook;
+        _connectHook = NULL;
 
         DBException::traceExceptions = false;
     }
 
-
-    CustomConnectHook::CustomConnectHook(OperationContext* txn) : _txn(txn) {
-
-    }
-
-    DBClientBase* CustomConnectHook::connect(const ConnectionString& connStr,
-                                  std::string& errmsg, double socketTimeout) {
-        // Note - must be new, since it gets owned elsewhere
-        return new CustomDirectClient(_txn);
-    }
 }

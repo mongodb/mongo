@@ -157,20 +157,20 @@ namespace mongo {
         /* Set database we want to use, then, restores when we finish (are out of scope)
            Note this is also helpful if an exception happens as the state if fixed up.
         */
-        class Context {
-            MONGO_DISALLOW_COPYING(Context);
+        class Context : boost::noncopyable {
         public:
             /** this is probably what you want */
-            Context(OperationContext* txn, const std::string& ns, bool doVersion = true);
+            Context(const std::string& ns,
+                    bool doVersion = true);
 
             /** note: this does not call finishInit -- i.e., does not call 
                       shardVersionOk() for example. 
                 see also: reset().
             */
-            Context(OperationContext* txn, const std::string& ns, Database * db);
+            Context(const std::string& ns , Database * db);
 
             // used by ReadContext
-            Context(OperationContext* txn, const std::string& ns, Database *db, bool doVersion);
+            Context(const std::string& ns, Database *db, bool doVersion );
 
             ~Context();
             Client* getClient() const { return _client; }
@@ -199,7 +199,6 @@ namespace mongo {
             bool _doVersion;
             const std::string _ns;
             Database * _db;
-            OperationContext* _txn;
             
             Timer _timer;
         }; // class Client::Context

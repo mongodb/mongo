@@ -60,10 +60,7 @@ namespace PlanRankingTests {
 
     class PlanRankingTestBase {
     public:
-        PlanRankingTestBase()
-            : _internalQueryForceIntersectionPlans(internalQueryForceIntersectionPlans),
-              _client(&_txn) {
-
+        PlanRankingTestBase() : _internalQueryForceIntersectionPlans(internalQueryForceIntersectionPlans) {
             Client::WriteContext ctx(&_txn, ns);
             _client.dropCollection(ns);
         }
@@ -143,13 +140,12 @@ namespace PlanRankingTests {
         OperationContextImpl _txn;
 
     private:
+
+        DBDirectClient _client;
+        scoped_ptr<MultiPlanStage> _mps;
         // Holds the value of global "internalQueryForceIntersectionPlans" setParameter flag.
         // Restored at end of test invocation regardless of test result.
         bool _internalQueryForceIntersectionPlans;
-
-        scoped_ptr<MultiPlanStage> _mps;
-
-        DBDirectClient _client;
     };
 
     // static
