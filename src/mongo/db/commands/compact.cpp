@@ -142,7 +142,7 @@ namespace mongo {
 
             Lock::DBWrite lk(txn->lockState(), ns.ns());
             BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
-            Client::Context ctx(ns);
+            Client::Context ctx(txn, ns);
 
             Collection* collection = ctx.db()->getCollection(txn, ns.ns());
             if( ! collection ) {

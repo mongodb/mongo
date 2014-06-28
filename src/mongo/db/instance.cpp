@@ -615,7 +615,7 @@ namespace mongo {
         if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
             return;
 
-        Client::Context ctx( ns );
+        Client::Context ctx(txn,  ns );
 
         UpdateResult res = executor.execute(txn, ctx.db());
 
@@ -654,7 +654,7 @@ namespace mongo {
         if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
             return;
 
-        Client::Context ctx(ns);
+        Client::Context ctx(txn, ns);
 
         long long n = executor.execute(txn, ctx.db());
         lastError.getSafe()->recordDelete( n );
@@ -895,7 +895,7 @@ namespace mongo {
         if ( handlePossibleShardedMessage( m , 0 ) )
             return;
 
-        Client::Context ctx(ns);
+        Client::Context ctx(txn, ns);
 
         if (multi.size() > 1) {
             const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;

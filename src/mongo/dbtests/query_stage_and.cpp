@@ -51,7 +51,9 @@ namespace QueryStageAnd {
 
     class QueryStageAndBase {
     public:
-        QueryStageAndBase() { }
+        QueryStageAndBase() : _client(&_txn) { 
+
+        }
 
         virtual ~QueryStageAndBase() {
             _client.dropCollection(ns());

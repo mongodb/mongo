@@ -52,7 +52,9 @@ namespace QueryStageKeep {
 
     class QueryStageKeepBase {
     public:
-        QueryStageKeepBase() { }
+        QueryStageKeepBase() : _client(&_txn) {
+        
+        }
 
         virtual ~QueryStageKeepBase() {
             _client.dropCollection(ns());
@@ -89,7 +91,8 @@ namespace QueryStageKeep {
             return WorkingSet::INVALID_ID;
         }
 
-    private:
+    protected:
+        OperationContextImpl _txn;
         DBDirectClient _client;
     };
 
@@ -102,13 +105,12 @@ namespace QueryStageKeep {
     class KeepStageBasic : public QueryStageKeepBase {
     public:
         void run() {
-            OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&txn, ns());
+            Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
-                coll = db->createCollection(&txn, ns());
+                coll = db->createCollection(&_txn, ns());
             }
             WorkingSet ws;
 

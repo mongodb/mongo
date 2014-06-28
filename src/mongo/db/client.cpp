@@ -54,7 +54,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage_options.h"
@@ -162,23 +162,27 @@ namespace mongo {
     }
 
     BSONObj CachedBSONObjBase::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
-    Client::Context::Context(const std::string& ns , Database * db) :
-        _client( currentClient.get() ), 
-        _justCreated(false),
-        _doVersion( true ),
-        _ns( ns ), 
-        _db(db)
-    {
+
+    Client::Context::Context(OperationContext* txn, const std::string& ns, Database * db)
+        : _client( currentClient.get() ), 
+          _justCreated(false),
+          _doVersion( true ),
+          _ns( ns ), 
+          _db(db),
+          _txn(txn) {
 
     }
 
-    Client::Context::Context(const string& ns, bool doVersion) :
-        _client( currentClient.get() ), 
-        _justCreated(false), // set for real in finishInit
-        _doVersion(doVersion),
-        _ns( ns ), 
-        _db(0) 
-    {
+    Client::Context::Context(OperationContext* txn,
+                             const string& ns,
+                             bool doVersion)
+        : _client( currentClient.get() ), 
+          _justCreated(false), // set for real in finishInit
+          _doVersion(doVersion),
+          _ns( ns ), 
+          _db(NULL),
+          _txn(txn) {
+
         _finishInit();
     }
        
@@ -191,7 +195,7 @@ namespace mongo {
             _lk.reset(new Lock::DBRead(txn->lockState(), ns));
             Database *db = dbHolder().get(txn, ns);
             if( db ) {
-                _c.reset(new Context(ns, db, doVersion));
+                _c.reset(new Context(txn, ns, db, doVersion));
                 return;
             }
         }
@@ -202,18 +206,18 @@ namespace mongo {
             if (txn->lockState()->isW()) {
                 // write locked already
                 DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
-                _c.reset(new Context(ns, doVersion));
+                _c.reset(new Context(txn, ns, doVersion));
             }
             else if (!txn->lockState()->isRecursive()) {
                 _lk.reset(0);
                 {
                     Lock::GlobalWrite w(txn->lockState());
-                    Context c(ns, doVersion);
+                    Context c(txn, ns, doVersion);
                 }
 
                 // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
                 _lk.reset(new Lock::DBRead(txn->lockState(), ns));
-                _c.reset(new Context(ns, doVersion));
+                _c.reset(new Context(txn, ns, doVersion));
             }
             else { 
                 uasserted(15928, str::stream() << "can't open a database from a nested read lock " << ns);
@@ -228,7 +232,8 @@ namespace mongo {
     Client::WriteContext::WriteContext(
                 OperationContext* opCtx, const std::string& ns, bool doVersion)
         : _lk(opCtx->lockState(), ns),
-          _c(ns, doVersion) {
+          _c(opCtx, ns, doVersion) {
+
     }
 
 
@@ -252,21 +257,24 @@ namespace mongo {
     }
 
     // invoked from ReadContext
-    Client::Context::Context(const string& ns, Database *db, bool doVersion) :
-        _client( currentClient.get() ), 
-        _justCreated(false),
-        _doVersion( doVersion ),
-        _ns( ns ), 
-        _db(db)
-    {
+    Client::Context::Context(OperationContext* txn,
+                             const string& ns,
+                             Database *db,
+                             bool doVersion)
+        : _client( currentClient.get() ), 
+          _justCreated(false),
+          _doVersion( doVersion ),
+          _ns( ns ), 
+          _db(db),
+          _txn(txn) {
+
         verify(_db);
         if (_doVersion) checkNotStale();
         _client->_curOp->enter( this );
     }
        
     void Client::Context::_finishInit() {
-        OperationContextImpl txn; // TODO get rid of this once reads require transactions
-        _db = dbHolder().getOrCreate(&txn, _ns, _justCreated);
+        _db = dbHolder().getOrCreate(_txn, _ns, _justCreated);
         invariant(_db);
 
         if( _doVersion ) checkNotStale();
@@ -276,7 +284,11 @@ namespace mongo {
     
     Client::Context::~Context() {
         DEV verify( _client == currentClient.get() );
-        _client->_curOp->recordGlobalTime( _timer.micros() );
+
+        // Lock must still be held
+        invariant(_txn->lockState()->isLocked());
+
+        _client->_curOp->recordGlobalTime(_txn->lockState()->isWriteLocked(), _timer.micros());
     }
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {

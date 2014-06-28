@@ -196,9 +196,10 @@ namespace repl {
         LOG( 1 ) << "Saving repl source: " << o << endl;
 
         {
-            OpDebug debug;
-            Client::Context ctx("local.sources");
             OperationContextImpl txn;
+            OpDebug debug;
+
+            Client::Context ctx(&txn, "local.sources");
 
             const NamespaceString requestNs("local.sources");
             UpdateRequest request(requestNs);
@@ -234,7 +235,7 @@ namespace repl {
     */
     void ReplSource::loadAll(OperationContext* txn, SourceVector &v) {
         const char* localSources = "local.sources";
-        Client::Context ctx(localSources);
+        Client::Context ctx(txn, localSources);
         SourceVector old = v;
         v.clear();
 
@@ -364,7 +365,7 @@ namespace repl {
 
     void ReplSource::resyncDrop( OperationContext* txn, const string& db ) {
         log() << "resync: dropping database " << db;
-        Client::Context ctx(db);
+        Client::Context ctx(txn, db);
         dropDatabase(txn, ctx.db());
     }
 
@@ -513,8 +514,9 @@ namespace repl {
             ___databaseIgnorer.doIgnoreUntilAfter( *i, lastTime );
             incompleteCloneDbs.erase(*i);
             addDbNextPass.erase(*i);
-            Client::Context ctx(*i);
-            dropDatabase(txn, ctx.db() );
+
+            Client::Context ctx(txn, *i);
+            dropDatabase(txn, ctx.db());
         }
         
         massert(14034, "Duplicate database names present after attempting to delete duplicates",
@@ -626,11 +628,11 @@ namespace repl {
         if (!handleDuplicateDbName(txn, op, ns, clientName)) {
             return;   
         }
-                
+
         // This code executes on the slaves only, so it doesn't need to be sharding-aware since
         // mongos will not send requests there. That's why the last argument is false (do not do
         // version checking).
-        Client::Context ctx(ns, false);
+        Client::Context ctx(txn, ns, false);
         ctx.getClient()->curop()->reset();
 
         bool empty = ctx.db()->getDatabaseCatalogEntry()->isEmpty();
@@ -661,7 +663,7 @@ namespace repl {
                     log() << "An earlier initial clone of '" << clientName << "' did not complete, now resyncing." << endl;
                 }
                 save();
-                Client::Context ctx(ns);
+                Client::Context ctx(txn, ns);
                 nClonedThisPass++;
                 resync(txn, ctx.db()->name());
                 addDbNextPass.erase(clientName);
@@ -1285,7 +1287,7 @@ namespace repl {
                     BSONObjBuilder b;
                     b.append(_id);
                     BSONObj result;
-                    Client::Context ctx( ns );
+                    Client::Context ctx(&txn, ns);
                     if( Helpers::findById(&txn, ctx.db(), ns, b.done(), result) )
                         _dummy_z += result.objsize(); // touch
                 }

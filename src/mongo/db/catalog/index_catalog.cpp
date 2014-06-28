@@ -420,7 +420,8 @@ namespace mongo {
             return;
         }
 
-        Client::Context context( _collection->ns().ns(),
+        Client::Context context( _txn,
+                                 _collection->ns().ns(),
                                  _collection->_database );
 
         // if we're here, the index build failed or was interrupted

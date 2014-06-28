@@ -46,7 +46,7 @@ namespace QueryStageTests {
 
     class IndexScanBase {
     public:
-        IndexScanBase() {
+        IndexScanBase() : _client(&_txn) {
             Client::WriteContext ctx(&_txn, ns());
 
             for (int i = 0; i < numObj(); ++i) {
