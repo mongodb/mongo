@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kNetworking);
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
 
     // ------ PoolForHost ------
 
