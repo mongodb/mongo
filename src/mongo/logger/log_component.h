@@ -68,7 +68,5 @@ namespace logger {
         Value _value;
     };
 
-    typedef LogComponent LogTag;
-
 }  // namespace logger
 }  // namespace mongo
