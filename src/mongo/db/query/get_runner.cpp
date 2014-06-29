@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+// THIS FILE IS DEPRECATED -- replaced by get_executor.cpp
+
 #include "mongo/db/query/get_runner.h"
 
 #include <limits>
@@ -33,10 +35,14 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/exec/cached_plan.h"
+#include "mongo/db/exec/eof.h"
+#include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/subplan.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/eof_runner.h"
 #include "mongo/db/query/explain_plan.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/idhack_runner.h"
 #include "mongo/db/query/index_bounds_builder.h"
@@ -57,33 +63,6 @@
 #include "mongo/s/d_logic.h"
 
 namespace mongo {
-
-    // static
-    void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
-                                   std::vector<IndexEntry>* indexEntries) {
-        invariant(indexEntries);
-
-        // Filter index entries
-        // Check BSON objects in AllowedIndices::_indexKeyPatterns against IndexEntry::keyPattern.
-        // Removes IndexEntrys that do not match _indexKeyPatterns.
-        std::vector<IndexEntry> temp;
-        for (std::vector<IndexEntry>::const_iterator i = indexEntries->begin();
-             i != indexEntries->end(); ++i) {
-            const IndexEntry& indexEntry = *i;
-            for (std::vector<BSONObj>::const_iterator j = allowedIndices.indexKeyPatterns.begin();
-                 j != allowedIndices.indexKeyPatterns.end(); ++j) {
-                const BSONObj& index = *j;
-                // Copy index entry to temp vector if found in query settings.
-                if (0 == indexEntry.keyPattern.woCompare(index)) {
-                    temp.push_back(indexEntry);
-                    break;
-                }
-            }
-        }
-
-        // Update results.
-        temp.swap(*indexEntries);
-    }
 
     Status getRunner(Collection* collection,
                      const std::string& ns,
@@ -124,70 +103,6 @@ namespace mongo {
     }  // namespace
 
 
-    void fillOutPlannerParams(Collection* collection,
-                              CanonicalQuery* canonicalQuery,
-                              QueryPlannerParams* plannerParams) {
-        // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
-        IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(false);
-        while (ii.more()) {
-            const IndexDescriptor* desc = ii.next();
-            plannerParams->indices.push_back(IndexEntry(desc->keyPattern(),
-                                                        desc->getAccessMethodName(),
-                                                        desc->isMultikey(),
-                                                        desc->isSparse(),
-                                                        desc->indexName(),
-                                                        desc->infoObj()));
-        }
-
-        // If query supports index filters, filter params.indices by indices in query settings.
-        QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
-        AllowedIndices* allowedIndicesRaw;
-
-        // Filter index catalog if index filters are specified for query.
-        // Also, signal to planner that application hint should be ignored.
-        if (querySettings->getAllowedIndices(*canonicalQuery, &allowedIndicesRaw)) {
-            boost::scoped_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
-            filterAllowedIndexEntries(*allowedIndices, &plannerParams->indices);
-            plannerParams->indexFiltersApplied = true;
-        }
-
-        // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
-        // overrides this behavior by not outputting a collscan even if there are no indexed
-        // solutions.
-        if (storageGlobalParams.noTableScan) {
-            const string& ns = canonicalQuery->ns();
-            // There are certain cases where we ignore this restriction:
-            bool ignore = canonicalQuery->getQueryObj().isEmpty()
-                          || (string::npos != ns.find(".system."))
-                          || (0 == ns.find("local."));
-            if (!ignore) {
-                plannerParams->options |= QueryPlannerParams::NO_TABLE_SCAN;
-            }
-        }
-
-        // If the caller wants a shard filter, make sure we're actually sharded.
-        if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-            CollectionMetadataPtr collMetadata =
-                shardingState.getCollectionMetadata(canonicalQuery->ns());
-
-            if (collMetadata) {
-                plannerParams->shardKey = collMetadata->getKeyPattern();
-            }
-            else {
-                // If there's no metadata don't bother w/the shard filter since we won't know what
-                // the key pattern is anyway...
-                plannerParams->options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-            }
-        }
-
-        if (internalQueryPlannerEnableIndexIntersection) {
-            plannerParams->options |= QueryPlannerParams::INDEX_INTERSECTION;
-        }
-
-        plannerParams->options |= QueryPlannerParams::KEEP_MUTATIONS;
-        plannerParams->options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
-    }
-
     /**
      * For a given query, get a runner.
      */
@@ -209,7 +124,7 @@ namespace mongo {
         }
 
         // If we have an _id index we can use the idhack runner.
-        if (IDHackRunner::supportsQuery(*canonicalQuery) &&
+        if (IDHackStage::supportsQuery(*canonicalQuery) &&
             collection->getIndexCatalog()->findIdIndex()) {
             LOG(2) << "Using idhack: " << canonicalQuery->toStringShort();
             *out = new IDHackRunner(collection, canonicalQuery.release());
@@ -275,7 +190,7 @@ namespace mongo {
 
                 // add a CachedPlanStage on top of the previous root
                 root = new CachedPlanStage(collection, rawCanonicalQuery, root, backupRoot);
-                
+
                 *out = new SingleSolutionRunner(collection,
                                                 canonicalQuery.release(),
                                                 chosenSolution, root, sharedWs);
@@ -307,7 +222,6 @@ namespace mongo {
                                CanonicalQuery* rawCanonicalQuery,
                                const QueryPlannerParams& plannerParams,
                                Runner** out) {
-
         invariant(collection);
         invariant(rawCanonicalQuery);
         auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
@@ -612,62 +526,6 @@ namespace mongo {
     //
     // Distinct hack
     //
-
-    /**
-     * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode
-     * to provide results for the distinct command.
-     *
-     * If the provided solution could be mutated successfully, returns true, otherwise returns
-     * false.
-     */
-    bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
-        QuerySolutionNode* root = soln->root.get();
-
-        // We're looking for a project on top of an ixscan.
-        if (STAGE_PROJECTION == root->getType() && (STAGE_IXSCAN == root->children[0]->getType())) {
-            IndexScanNode* isn = static_cast<IndexScanNode*>(root->children[0]);
-
-            // An additional filter must be applied to the data in the key, so we can't just skip
-            // all the keys with a given value; we must examine every one to find the one that (may)
-            // pass the filter.
-            if (NULL != isn->filter.get()) {
-                return false;
-            }
-
-            // We only set this when we have special query modifiers (.max() or .min()) or other
-            // special cases.  Don't want to handle the interactions between those and distinct.
-            // Don't think this will ever really be true but if it somehow is, just ignore this
-            // soln.
-            if (isn->bounds.isSimpleRange) {
-                return false;
-            }
-
-            // Make a new DistinctNode.  We swap this for the ixscan in the provided solution.
-            DistinctNode* dn = new DistinctNode();
-            dn->indexKeyPattern = isn->indexKeyPattern;
-            dn->direction = isn->direction;
-            dn->bounds = isn->bounds;
-
-            // Figure out which field we're skipping to the next value of.  TODO: We currently only
-            // try to distinct-hack when there is an index prefixed by the field we're distinct-ing
-            // over.  Consider removing this code if we stick with that policy.
-            dn->fieldNo = 0;
-            BSONObjIterator it(isn->indexKeyPattern);
-            while (it.more()) {
-                if (field == it.next().fieldName()) {
-                    break;
-                }
-                dn->fieldNo++;
-            }
-
-            // Delete the old index scan, set the child of project to the fast distinct scan.
-            delete root->children[0];
-            root->children[0] = dn;
-            return true;
-        }
-
-        return false;
-    }
 
     Status getRunnerDistinct(Collection* collection,
                              const BSONObj& query,

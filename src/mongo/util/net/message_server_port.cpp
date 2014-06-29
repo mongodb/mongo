@@ -35,6 +35,7 @@
 
 
 #include "mongo/db/lasterror.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/thread_name.h"

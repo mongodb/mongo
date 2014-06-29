@@ -1,10 +1,4 @@
-/* @file test.cpp
-  utils/mongoutils/test.cpp
-  unit tests for mongoutils
-*/
-
-/*
- *    Copyright 2010 10gen Inc.
+/*    Copyright 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -31,27 +25,33 @@
  *    then also delete it in the license file.
  */
 
-#include <assert.h>
-#include "str.h"
-#include "html.h"
+#include "mongo/platform/basic.h"
 
-using namespace std;
-using namespace mongoutils;
+#include "mongo/logger/log_tag.h"
 
-int main() {
-    {
-        string s = "abcde";
-        str::stripTrailing(s, "ef");
-        verify( s == "abcd" );
-        str::stripTrailing(s, "abcd");
-        verify( s.empty() );
-        s = "abcddd";
-        str::stripTrailing(s, "d");
-        verify( s == "abc" );
+#include "mongo/util/assert_util.h"
+
+namespace mongo {
+namespace logger {
+
+    std::string LogTag::getShortName() const {
+        switch (_value) {
+        case kDefault: return "Default";
+        case kAccessControl: return "AccessControl";
+        case kCommands: return "Commands";
+        case kIndexing: return "Indexing";
+        case kJournalling: return "Journalling";
+        case kNetworking: return "Networking";
+        case kQuery: return "Query";
+        case kReplication: return "Replication";
+        case kSharding: return "Sharding";
+        case kStorage: return "Storage";
+        case kWrites: return "Writes";
+        case kNumLogTags: return "Total";
+        // No default. Compiler should complain if there's a tag that's not handled.
+        }
+        invariant(0);
     }
 
-    string x = str::after("abcde", 'c');
-    verify( x == "de" );
-    verify( str::after("abcde", 'x') == "" );
-    return 0;
-}
+}  // logger
+}  // mongo

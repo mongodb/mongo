@@ -69,6 +69,9 @@ namespace mongo {
     PlanStage::StageState CachedPlanStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (isEOF()) { return PlanStage::IS_EOF; }
 
 	StageState childStatus = getActiveChild()->work(out);
@@ -121,6 +124,17 @@ namespace mongo {
 	    _backupChildPlan->invalidate(dl, type);
 	}
         ++_commonStats.invalidates;
+    }
+
+    vector<PlanStage*> CachedPlanStage::getChildren() const {
+        vector<PlanStage*> children;
+        if (_usingBackupChild) {
+            children.push_back(_backupChildPlan.get());
+        }
+        else {
+            children.push_back(_mainChildPlan.get());
+        }
+        return children;
     }
 
     PlanStageStats* CachedPlanStage::getStats() {

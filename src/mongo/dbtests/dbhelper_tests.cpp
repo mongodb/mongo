@@ -49,15 +49,17 @@ namespace mongo {
                 _min( 4 ), _max( 8 )
         {
         }
+
         void run() {
-            DBDirectClient client;
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
             for ( int i = 0; i < 10; ++i ) {
                 client.insert( ns, BSON( "_id" << i ) );
             }
 
             {
                 // Remove _id range [_min, _max).
-                OperationContextImpl txn;
                 Lock::DBWrite lk(txn.lockState(), ns);
                 Client::Context ctx( ns );
 
@@ -69,7 +71,7 @@ namespace mongo {
             }
 
             // Check that the expected documents remain.
-            ASSERT_EQUALS( expected(), docs() );
+            ASSERT_EQUALS( expected(), docs(&txn) );
         }
     private:
         BSONArray expected() const {
@@ -82,8 +84,9 @@ namespace mongo {
             }
             return bab.arr();
         }
-        BSONArray docs() const {
-            DBDirectClient client;
+
+        BSONArray docs(OperationContext* txn) const {
+            DBDirectClient client(txn);
             auto_ptr<DBClientCursor> cursor = client.query( ns,
                                                             Query().hint( BSON( "_id" << 1 ) ) );
             BSONArrayBuilder bab;

@@ -119,6 +119,9 @@ namespace mongo {
     }
 
     PlanStage::StageState S2NearStage::work(WorkingSetID* out) {
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (!_initted) { init(); }
 
         if (_failed) {
@@ -424,6 +427,11 @@ namespace mongo {
         if (_failed) { return true; }
         // We're only done if we exhaust the search space.
         return _innerRadius >= _maxDistance;
+    }
+
+    vector<PlanStage*> S2NearStage::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
     }
 
     PlanStageStats* S2NearStage::getStats() {

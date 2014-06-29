@@ -62,7 +62,7 @@ namespace mongo {
             /** read a durop from journal file referenced by br.
                 @param opcode the opcode which has already been written from the bufreader
             */
-            static shared_ptr<DurOp> read(unsigned opcode, BufReader& br);
+            static boost::shared_ptr<DurOp> read(unsigned opcode, BufReader& br);
 
             /** replay the operation (during recovery)
                 throws

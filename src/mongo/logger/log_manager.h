@@ -30,7 +30,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/logger/message_log_domain.h"
+#include "mongo/logger/tag_message_log_domain.h"
 #include "mongo/logger/rotatable_file_writer.h"
 #include "mongo/platform/unordered_map.h"
 
@@ -51,7 +51,7 @@ namespace logger {
         /**
          * Gets the global domain for this manager.  It has no name.
          */
-        MessageLogDomain* getGlobalDomain() { return &_globalDomain; }
+        TagMessageLogDomain* getGlobalDomain() { return &_globalDomain; }
 
         /**
          * Get the log domain with the given name, creating if needed.
@@ -62,7 +62,7 @@ namespace logger {
         typedef unordered_map<std::string, MessageLogDomain*> DomainsByNameMap;
 
         DomainsByNameMap _domains;
-        MessageLogDomain _globalDomain;
+        TagMessageLogDomain _globalDomain;
     };
 
 }  // namespace logger

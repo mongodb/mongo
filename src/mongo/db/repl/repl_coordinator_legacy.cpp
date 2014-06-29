@@ -34,7 +34,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/optime.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/master_slave.h"
@@ -43,15 +45,20 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rs_initiate.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/util/assert_util.h" // TODO: remove along with invariant from getCurrentMemberState
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 namespace repl {
 
-    LegacyReplicationCoordinator::LegacyReplicationCoordinator() {}
+    LegacyReplicationCoordinator::LegacyReplicationCoordinator() {
+        // this is ok but micros or combo with some rand() and/or 64 bits might be better --
+        // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
+        _rbid = (int) curTimeMillis64();
+    }
     LegacyReplicationCoordinator::~LegacyReplicationCoordinator() {}
 
     void LegacyReplicationCoordinator::startReplication(TopologyCoordinator*,
@@ -367,6 +374,10 @@ namespace {
         theReplSet->summarizeStatus(*result);
     }
 
+    bool LegacyReplicationCoordinator::setMaintenanceMode(bool activate) {
+        return theReplSet->setMaintenanceMode(activate);
+    }
+
     Status LegacyReplicationCoordinator::processHeartbeat(const BSONObj& cmdObj, 
                                                           BSONObjBuilder* resultObj) {
         if( cmdObj["pv"].Int() != 1 ) {
@@ -444,6 +455,411 @@ namespace {
                                          theReplSet, from->hbinfo().id(), time(0)));
 
 
+        return Status::OK();
+    }
+
+namespace {
+    Status _checkReplEnabledForCommand(BSONObjBuilder* result) {
+        if( !replSet ) {
+            if (serverGlobalParams.configsvr) {
+                result->append("info", "configsvr"); // for shell prompt
+            }
+            return Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet");
+        }
+
+        if( theReplSet == 0 ) {
+            result->append("startupStatus", ReplSet::startupStatus);
+            if( ReplSet::startupStatus == ReplSet::EMPTYCONFIG )
+                result->append("info", "run rs.initiate(...) if not yet done for the set");
+            return Status(ErrorCodes::NotYetInitialized, ReplSet::startupStatusMsg.empty() ?
+                    "replset unknown error 2" : ReplSet::startupStatusMsg.get());
+        }
+
+        return Status::OK();
+    }
+} // namespace
+
+    Status LegacyReplicationCoordinator::processReplSetReconfig(OperationContext* txn,
+                                                                const BSONObj& newConfigObj,
+                                                                bool force,
+                                                                BSONObjBuilder* resultObj) {
+
+        if( force && !theReplSet ) {
+            replSettings.reconfig = newConfigObj.getOwned();
+            resultObj->append("msg",
+                              "will try this config momentarily, try running rs.conf() again in a "
+                                      "few seconds");
+            return Status::OK();
+        }
+
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if( !force && !theReplSet->box.getState().primary() ) {
+            return Status(ErrorCodes::NotMaster,
+                          "replSetReconfig command must be sent to the current replica set "
+                                  "primary.");
+        }
+
+        try {
+            {
+                // just make sure we can get a write lock before doing anything else.  we'll
+                // reacquire one later.  of course it could be stuck then, but this check lowers the
+                // risk if weird things are up - we probably don't want a change to apply 30 minutes
+                // after the initial attempt.
+                time_t t = time(0);
+                Lock::GlobalWrite lk(txn->lockState());
+                if( time(0)-t > 20 ) {
+                    return Status(ErrorCodes::ExceededTimeLimit,
+                                  "took a long time to get write lock, so not initiating.  "
+                                          "Initiate when server less busy?");
+                }
+            }
+
+
+            scoped_ptr<ReplSetConfig> newConfig(ReplSetConfig::make(newConfigObj, force));
+
+            log() << "replSet replSetReconfig config object parses ok, " <<
+                    newConfig->members.size() << " members specified" << rsLog;
+
+            Status status = ReplSetConfig::legalChange(theReplSet->getConfig(), *newConfig);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            checkMembersUpForConfigChange(*newConfig, *resultObj, false);
+
+            log() << "replSet replSetReconfig [2]" << rsLog;
+
+            theReplSet->haveNewConfig(*newConfig, true);
+            ReplSet::startupStatusMsg.set("replSetReconfig'd");
+        }
+        catch(const DBException& e) {
+            log() << "replSet replSetReconfig exception: " << e.what() << rsLog;
+            return e.toStatus();
+        }
+
+        resetSlaveCache();
+        return Status::OK();
+    }
+
+    Status LegacyReplicationCoordinator::processReplSetInitiate(OperationContext* txn,
+                                                                const BSONObj& givenConfig,
+                                                                BSONObjBuilder* resultObj) {
+
+        log() << "replSet replSetInitiate admin command received from client" << rsLog;
+
+        if( !replSet ) {
+            return Status(ErrorCodes::NoReplicationEnabled, "server is not running with --replSet");
+        }
+
+        if( theReplSet ) {
+            resultObj->append("info",
+                              "try querying " + rsConfigNs + " to see current configuration");
+            return Status(ErrorCodes::AlreadyInitialized, "already initialized");
+        }
+
+        try {
+            {
+                // just make sure we can get a write lock before doing anything else.  we'll
+                // reacquire one later.  of course it could be stuck then, but this check lowers the
+                // risk if weird things are up.
+                time_t t = time(0);
+                Lock::GlobalWrite lk(txn->lockState());
+                if( time(0)-t > 10 ) {
+                    return Status(ErrorCodes::ExceededTimeLimit,
+                                  "took a long time to get write lock, so not initiating.  "
+                                          "Initiate when server less busy?");
+                }
+
+                /* check that we don't already have an oplog.  that could cause issues.
+                   it is ok if the initiating member has *other* data than that.
+                   */
+                BSONObj o;
+                if( Helpers::getFirst(txn, rsoplog, o) ) {
+                    return Status(ErrorCodes::AlreadyInitialized,
+                                  rsoplog + string(" is not empty on the initiating member.  "
+                                          "cannot initiate."));
+                }
+            }
+
+            if( ReplSet::startupStatus == ReplSet::BADCONFIG ) {
+                resultObj->append("info", ReplSet::startupStatusMsg.get());
+                return Status(ErrorCodes::InvalidReplicaSetConfig,
+                              "server already in BADCONFIG state (check logs); not initiating");
+            }
+            if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
+                resultObj->append("startupStatus", ReplSet::startupStatus);
+                resultObj->append("info", replSettings.replSet);
+                return Status(ErrorCodes::InvalidReplicaSetConfig,
+                              "all members and seeds must be reachable to initiate set");
+            }
+
+            BSONObj configObj;
+            if (!givenConfig.isEmpty()) {
+                configObj = givenConfig;
+            } else {
+                resultObj->append("info2", "no configuration explicitly specified -- making one");
+                log() << "replSet info initiate : no configuration specified.  "
+                        "Using a default configuration for the set" << rsLog;
+
+                string name;
+                vector<HostAndPort> seeds;
+                set<HostAndPort> seedSet;
+                parseReplSetSeedList(replSettings.replSet, name, seeds, seedSet); // may throw...
+
+                BSONObjBuilder b;
+                b.append("_id", name);
+                BSONObjBuilder members;
+                members.append("0", BSON( "_id" << 0 << "host" << HostAndPort::me().toString() ));
+                resultObj->append("me", HostAndPort::me().toString());
+                for( unsigned i = 0; i < seeds.size(); i++ ) {
+                    members.append(BSONObjBuilder::numStr(i+1),
+                                   BSON( "_id" << i+1 << "host" << seeds[i].toString()));
+                }
+                b.appendArray("members", members.obj());
+                configObj = b.obj();
+                log() << "replSet created this configuration for initiation : " <<
+                        configObj.toString() << rsLog;
+            }
+
+            scoped_ptr<ReplSetConfig> newConfig;
+            try {
+                newConfig.reset(ReplSetConfig::make(configObj));
+            } catch (const DBException& e) {
+                log() << "replSet replSetInitiate exception: " << e.what() << rsLog;
+                return Status(ErrorCodes::InvalidReplicaSetConfig,
+                              mongoutils::str::stream() << "couldn't parse cfg object " << e.what());
+            }
+
+            if( newConfig->version > 1 ) {
+                return Status(ErrorCodes::InvalidReplicaSetConfig,
+                              "can't initiate with a version number greater than 1");
+            }
+
+            log() << "replSet replSetInitiate config object parses ok, " <<
+                    newConfig->members.size() << " members specified" << rsLog;
+
+            checkMembersUpForConfigChange(*newConfig, *resultObj, true);
+
+            log() << "replSet replSetInitiate all members seem up" << rsLog;
+
+            createOplog();
+
+            Lock::GlobalWrite lk(txn->lockState());
+            BSONObj comment = BSON( "msg" << "initiating set");
+            newConfig->saveConfigLocally(comment);
+            log() << "replSet replSetInitiate config now saved locally.  "
+                "Should come online in about a minute." << rsLog;
+            resultObj->append("info",
+                              "Config now saved locally.  Should come online in about a minute.");
+            ReplSet::startupStatus = ReplSet::SOON;
+            ReplSet::startupStatusMsg.set("Received replSetInitiate - "
+                                          "should come online shortly.");
+        }
+        catch(const DBException& e ) {
+            return e.toStatus();
+        }
+
+        return Status::OK();
+    }
+
+    Status LegacyReplicationCoordinator::processReplSetGetRBID(BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+        resultObj->append("rbid", _rbid);
+        return Status::OK();
+    }
+
+namespace {
+    bool _shouldVeto(unsigned id, std::string* errmsg) {
+        const Member* primary = theReplSet->box.getPrimary();
+        const Member* hopeful = theReplSet->findById(id);
+        const Member *highestPriority = theReplSet->getMostElectable();
+
+        if (!hopeful) {
+            *errmsg = str::stream() << "replSet couldn't find member with id " << id;
+            return true;
+        }
+
+        if (theReplSet->isPrimary() &&
+            theReplSet->lastOpTimeWritten >= hopeful->hbinfo().opTime) {
+            // hbinfo is not updated, so we have to check the primary's last optime separately
+            *errmsg = str::stream() << "I am already primary, " << hopeful->fullName() <<
+                " can try again once I've stepped down";
+            return true;
+        }
+
+        if (primary &&
+                (hopeful->hbinfo().id() != primary->hbinfo().id()) &&
+                (primary->hbinfo().opTime >= hopeful->hbinfo().opTime)) {
+            // other members might be aware of more up-to-date nodes
+            *errmsg = str::stream() << hopeful->fullName() <<
+                " is trying to elect itself but " << primary->fullName() <<
+                " is already primary and more up-to-date";
+            return true;
+        }
+
+        if (highestPriority &&
+            highestPriority->config().priority > hopeful->config().priority) {
+            *errmsg = str::stream() << hopeful->fullName() << " has lower priority than " <<
+                highestPriority->fullName();
+            return true;
+        }
+
+        if (!theReplSet->isElectable(id)) {
+            *errmsg = str::stream() << "I don't think " << hopeful->fullName() <<
+                " is electable";
+            return true;
+        }
+
+        return false;
+    }
+} // namespace
+
+    Status LegacyReplicationCoordinator::processReplSetFresh(const StringData& setName,
+                                                             const StringData& who,
+                                                             unsigned id,
+                                                             int cfgver,
+                                                             const OpTime& opTime,
+                                                             BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if( setName != theReplSet->name() ) {
+            return Status(ErrorCodes::ReplicaSetNotFound, "wrong repl set name");
+        }
+
+        bool weAreFresher = false;
+        if( theReplSet->config().version > cfgver ) {
+            log() << "replSet member " << who << " is not yet aware its cfg version " << cfgver <<
+                    " is stale" << rsLog;
+            resultObj->append("info", "config version stale");
+            weAreFresher = true;
+        }
+        // check not only our own optime, but any other member we can reach
+        else if( opTime < theReplSet->lastOpTimeWritten ||
+                 opTime < theReplSet->lastOtherOpTime())  {
+            weAreFresher = true;
+        }
+        resultObj->appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
+        resultObj->append("fresher", weAreFresher);
+
+        std::string errmsg;
+        bool veto = _shouldVeto(id, &errmsg);
+        resultObj->append("veto", veto);
+        if (veto) {
+            resultObj->append("errmsg", errmsg);
+        }
+
+        return Status::OK();
+    }
+
+    Status LegacyReplicationCoordinator::processReplSetElect(const StringData& set,
+                                                             unsigned whoid,
+                                                             int cfgver,
+                                                             const OID& round,
+                                                             BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+        theReplSet->electCmdReceived(set, whoid, cfgver, round, resultObj);
+        return Status::OK();
+    }
+
+    void LegacyReplicationCoordinator::incrementRollbackID() {
+        ++_rbid;
+    }
+
+    Status LegacyReplicationCoordinator::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+        if (theReplSet->freeze(secs)) {
+            if (secs == 0) {
+                resultObj->append("info","unfreezing");
+            }
+        }
+        if (secs == 1) {
+            resultObj->append("warning", "you really want to freeze for only 1 second?");
+        }
+        return Status::OK();
+    }
+
+    Status LegacyReplicationCoordinator::processReplSetMaintenance(bool activate,
+                                                                   BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+        if (!setMaintenanceMode(activate)) {
+            if (theReplSet->isPrimary()) {
+                return Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
+            }
+            else {
+                return Status(ErrorCodes::OperationFailed, "already out of maintenance mode");
+            }
+        }
+
+        return Status::OK();
+    }
+
+    Status LegacyReplicationCoordinator::processReplSetSyncFrom(const std::string& target,
+                                                                BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+        resultObj->append("syncFromRequested", target);
+
+        return theReplSet->forceSyncFrom(target, resultObj);
+    }
+
+    Status LegacyReplicationCoordinator::processReplSetUpdatePosition(const BSONArray& updates,
+                                                                      BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        BSONForEach(elem, updates) {
+            BSONObj entry = elem.Obj();
+            OID id = entry["_id"].OID();
+            OpTime ot = entry["optime"]._opTime();
+            BSONObj config = entry["config"].Obj();
+            Status status = setLastOptime(id, ot, config);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+        return Status::OK();
+    }
+
+    Status LegacyReplicationCoordinator::processReplSetUpdatePositionHandshake(
+            const BSONObj& handshake,
+            BSONObjBuilder* resultObj) {
+        Status status = _checkReplEnabledForCommand(resultObj);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if (!cc().gotHandshake(handshake)) {
+            return Status(ErrorCodes::NodeNotFound,
+                          "node could not be found in replica set config during handshake");
+        }
+
+        // if we aren't primary, pass the handshake along
+        if (!theReplSet->isPrimary()) {
+            theReplSet->syncSourceFeedback.forwardSlaveHandshake();
+        }
         return Status::OK();
     }
 } // namespace repl

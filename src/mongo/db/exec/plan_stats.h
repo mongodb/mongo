@@ -38,6 +38,7 @@
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/platform/cstdint.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -63,6 +64,7 @@ namespace mongo {
                         invalidates(0),
                         advanced(0),
                         needTime(0),
+                        executionTimeMillis(0),
                         isEOF(false) { }
         // String giving the type of the stage. Not owned.
         const char* stageTypeStr;
@@ -81,6 +83,9 @@ namespace mongo {
         // is no filter affixed, then 'filter' should be an empty BSONObj.
         BSONObj filter;
 
+        // Time elapsed while working inside this stage.
+        long long executionTimeMillis;
+
         // TODO: have some way of tracking WSM sizes (or really any series of #s).  We can measure
         // the size of our inputs and the size of our outputs.  We can do a lot with the WS here.
 
@@ -91,6 +96,34 @@ namespace mongo {
     private:
         // Default constructor is illegal.
         CommonStats();
+    };
+
+    /**
+     * This class increments a counter by the time elapsed since its construction when
+     * it goes out of scope.
+     */
+    class ScopedTimer {
+    public:
+        ScopedTimer(long long* counter) : _counter(counter) {
+            _start = curTimeMillis64();
+        }
+
+        ~ScopedTimer() {
+            long long elapsed = curTimeMillis64() - _start;
+            *_counter += elapsed;
+        }
+
+    private:
+        // Default constructor disallowed.
+        ScopedTimer();
+
+        MONGO_DISALLOW_COPYING(ScopedTimer);
+
+        // Reference to the counter that we are incrementing with the elapsed time.
+        long long* _counter;
+
+        // Time at which the timer was constructed.
+        long long _start;
     };
 
     // The universal container for a stage's stats.
@@ -210,6 +243,27 @@ namespace mongo {
         size_t docsTested;
     };
 
+    struct CountStats : public SpecificStats {
+        CountStats() : isMultiKey(false),
+                       keysExamined(0) { }
+
+        virtual ~CountStats() { }
+
+        virtual SpecificStats* clone() const {
+            CountStats* specific = new CountStats(*this);
+            // BSON objects have to be explicitly copied.
+            specific->keyPattern = keyPattern.getOwned();
+            return specific;
+        }
+
+        BSONObj keyPattern;
+
+        bool isMultiKey;
+
+        size_t keysExamined;
+
+    };
+
     struct DistinctScanStats : public SpecificStats {
         DistinctScanStats() : keysExamined(0) { }
 
@@ -224,7 +278,8 @@ namespace mongo {
     struct FetchStats : public SpecificStats {
         FetchStats() : alreadyHasObj(0),
                        forcedFetches(0),
-                       matchTested(0) { }
+                       matchTested(0),
+                       docsExamined(0) { }
 
         virtual ~FetchStats() { }
 
@@ -245,6 +300,28 @@ namespace mongo {
 
         // We know how many passed (it's the # of advanced) and therefore how many failed.
         size_t matchTested;
+
+        // The total number of full documents touched by the fetch stage.
+        size_t docsExamined;
+    };
+
+    struct IDHackStats : public SpecificStats {
+        IDHackStats() : keysExamined(0),
+                        docsExamined(0) { }
+
+        virtual ~IDHackStats() { }
+
+        virtual SpecificStats* clone() const {
+            IDHackStats* specific = new IDHackStats(*this);
+            return specific;
+        }
+
+        // Number of entries retrieved from the index while executing the idhack.
+        size_t keysExamined;
+
+        // Number of documents retrieved from the collection while executing the idhack.
+        size_t docsExamined;
+
     };
 
     struct IndexScanStats : public SpecificStats {

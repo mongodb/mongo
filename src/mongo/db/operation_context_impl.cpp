@@ -42,6 +42,12 @@ namespace mongo {
     OperationContextImpl::OperationContextImpl() {
         invariant( globalStorageEngine );
         _recovery.reset(globalStorageEngine->newRecoveryUnit(this));
+
+        getGlobalEnvironment()->registerOperationContext(this);
+    }
+
+    OperationContextImpl::~OperationContextImpl() {
+        getGlobalEnvironment()->unregisterOperationContext(this);
     }
 
     RecoveryUnit* OperationContextImpl::recoveryUnit() const {
@@ -62,6 +68,10 @@ namespace mongo {
 
     const char* OperationContextImpl::getNS() const {
         return getCurOp()->getNS();
+    }
+
+    Client* OperationContextImpl::getClient() const {
+        return &cc();
     }
 
     CurOp* OperationContextImpl::getCurOp() const {

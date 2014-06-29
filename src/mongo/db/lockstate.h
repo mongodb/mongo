@@ -45,7 +45,7 @@ namespace mongo {
         void dump() const;
 
         BSONObj reportState();
-        void reportState(BSONObjBuilder& b);
+        void reportState(BSONObjBuilder* b);
         
         unsigned recursiveCount() const { return _recursive; }
 

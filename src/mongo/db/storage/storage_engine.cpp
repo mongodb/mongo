@@ -36,32 +36,34 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/util/log.h"
 
-#ifdef MONGO_ROCKSDB
-#include "mongo/db/storage/rocks/rocks_engine.h"
-#endif
-
 namespace mongo {
 
     StorageEngine* globalStorageEngine = 0;
 
-    MONGO_INITIALIZER_GENERAL(StorageEngineInit,
-                              ("EndStartupOptionStorage"),
-                              MONGO_NO_DEPENDENTS )
-        (InitializerContext* context) {
+    namespace {
+        std::map<std::string,const StorageEngine::Factory*> factorys;
+    } // namespace
+
+    void StorageEngine::registerFactory( const std::string& name,
+                                         const StorageEngine::Factory* factory ) {
+        invariant( factorys.count(name) == 0 );
+        factorys[name] = factory;
+    }
+
+    MONGO_INITIALIZER(StorageEngineInit) (InitializerContext* context) {
         if ( storageGlobalParams.engine == "mmapv1" ) {
             globalStorageEngine = new MMAPV1Engine();
         }
         else if ( storageGlobalParams.engine == "heap1" ) {
             globalStorageEngine = new Heap1Engine();
         }
-#ifdef MONGO_ROCKSDB
-        else if ( storageGlobalParams.engine == "rocksExperiment" ) {
-            globalStorageEngine = new RocksEngine( storageGlobalParams.dbpath );
-        }
-#endif
         else {
-            log() << "unknown storage engine: " << storageGlobalParams.engine;
-            return Status( ErrorCodes::BadValue, "unknown storage engine" );
+            const StorageEngine::Factory* factory = factorys[storageGlobalParams.engine];
+            if ( !factory ) {
+                error() << "unknown storage engine: " << storageGlobalParams.engine;
+                return Status( ErrorCodes::BadValue, "unknown storage engine" );
+            }
+            globalStorageEngine = factory->create( storageGlobalParams );
         }
         return Status::OK();
     }

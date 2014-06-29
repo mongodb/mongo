@@ -42,6 +42,7 @@
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/hostandport.h"
@@ -74,7 +75,7 @@ namespace mongo {
 
 #if !defined(_WIN32) && !defined(__sunos__)
 
-    vector<string> getMyAddrs() {
+    static vector<string> getMyAddrs() {
         vector<string> out;
         ifaddrs * addrs;
         
@@ -124,7 +125,7 @@ namespace mongo {
         return out;
     }
 
-    vector<string> getAllIPs(const string& iporhost) {
+    static vector<string> getAllIPs(const string& iporhost) {
         addrinfo* addrs = NULL;
         addrinfo hints;
         memset(&hints, 0, sizeof(addrinfo));
@@ -202,12 +203,11 @@ namespace mongo {
         map<string,bool> _cache;
     } isSelfCommand;
 
-    bool HostAndPort::isSelf() const {
+    bool repl::isSelf(const HostAndPort& hostAndPort) {
 
-        int _p = port();
-        int p = _p == -1 ? ServerGlobalParams::DefaultDBPort : _p;
+        int p = hostAndPort.port();
 
-        string host = str::stream() << this->host() << ":" << p;
+        string host = str::stream() << hostAndPort.host() << ":" << p;
 
         {
             // check cache for this host
@@ -224,7 +224,7 @@ namespace mongo {
         // no need for ip match if the ports do not match
         if (p == serverGlobalParams.port) {
             const vector<string> myaddrs = getMyAddrs();
-            const vector<string> addrs = getAllIPs(_host);
+            const vector<string> addrs = getAllIPs(hostAndPort.host());
 
             for (vector<string>::const_iterator i=myaddrs.begin(), iend=myaddrs.end();
                  i!=iend; ++i) {

@@ -52,6 +52,9 @@ namespace mongo {
     PlanStage::StageState OrStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         if (0 == _specificStats.matchTested.size()) {
@@ -166,6 +169,10 @@ namespace mongo {
                 _seen.erase(dl);
             }
         }
+    }
+
+    vector<PlanStage*> OrStage::getChildren() const {
+        return _children;
     }
 
     PlanStageStats* OrStage::getStats() {

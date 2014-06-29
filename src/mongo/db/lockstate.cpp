@@ -151,7 +151,8 @@ namespace mongo {
 
     BSONObj LockState::reportState() {
         BSONObjBuilder b;
-        reportState( b );
+        reportState(&b);
+
         return b.obj();
     }
     
@@ -159,7 +160,7 @@ namespace mongo {
               thread. So be careful about thread safety here. For example reading 
               this->otherName would not be safe as-is!
     */
-    void LockState::reportState(BSONObjBuilder& res) {
+    void LockState::reportState(BSONObjBuilder* res) {
         BSONObjBuilder b;
         if( _threadState ) {
             char buf[2];
@@ -184,9 +185,10 @@ namespace mongo {
             }
         }
         BSONObj o = b.obj();
-        if( !o.isEmpty() ) 
-            res.append("locks", o);
-        res.append( "waitingForLock" , _lockPending );
+        if (!o.isEmpty()) {
+            res->append("locks", o);
+        }
+        res->append("waitingForLock", _lockPending);
     }
 
     void LockState::dump() const {

@@ -58,6 +58,9 @@ namespace mongo {
     PlanStage::StageState FetchStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         // If we're here, we're not waiting for a DiskLoc to be fetched.  Get another to-be-fetched
@@ -82,6 +85,8 @@ namespace mongo {
                 member->obj = _collection->docFor(member->loc);
                 member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
             }
+
+            ++_specificStats.docsExamined;
 
             return returnIfMatches(member, id, out);
         }
@@ -141,6 +146,12 @@ namespace mongo {
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
+    }
+
+    vector<PlanStage*> FetchStage::getChildren() const {
+        vector<PlanStage*> children;
+        children.push_back(_child.get());
+        return children;
     }
 
     PlanStageStats* FetchStage::getStats() {

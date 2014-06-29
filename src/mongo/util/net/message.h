@@ -34,6 +34,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/goodies.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sock.h"
 

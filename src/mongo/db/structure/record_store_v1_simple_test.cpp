@@ -31,7 +31,7 @@
 #include "mongo/db/structure/record_store_v1_simple.h"
 
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/record.h"
+#include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/structure/record_store_v1_test_help.h"
 #include "mongo/unittest/unittest.h"
 

@@ -40,6 +40,12 @@ namespace mongo {
 
         bool getKillAllOperations();
 
+        void registerOperationContext(OperationContext* txn);
+
+        void unregisterOperationContext(OperationContext* txn);
+
+        void forEachOperationContext(ProcessOperationContext* procOpCtx);
+
         OperationContext* newOpCtx();
     };
 

@@ -31,7 +31,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
-#include "mongo/db/storage/record.h"
 
 namespace mongo {
 
@@ -173,6 +172,11 @@ namespace mongo {
                 i--;
             }
         }
+    }
+
+    vector<PlanStage*> OplogStart::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
     }
 
     int OplogStart::_backwardsScanTime = 5;

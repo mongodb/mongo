@@ -36,9 +36,11 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/d_globals.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/lockstat.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/server.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mapsf.h"
@@ -743,6 +745,40 @@ namespace mongo {
 
     }
 
+    /**
+     * This is passed to the iterator for global environments and aggregates information about the
+     * locks which are currently being held or waited on.
+     */
+    class LockStateAggregator : public GlobalEnvironmentExperiment::ProcessOperationContext {
+    public:
+        LockStateAggregator(bool blockedOnly) 
+            : numWriteLocked(0),
+              numReadLocked(0),
+              _blockedOnly(blockedOnly) {
+
+        }
+
+        virtual void processOpContext(OperationContext* txn) {
+            if (_blockedOnly && !txn->lockState()->hasLockPending()) {
+                return;
+            }
+
+            if (txn->lockState()->isWriteLocked()) {
+                numWriteLocked++;
+            }
+            else {
+                numReadLocked++;
+            }
+        }
+
+        int numWriteLocked;
+        int numReadLocked;
+
+    private:
+        const bool _blockedOnly;
+    };
+
+
     class GlobalLockServerStatusSection : public ServerStatusSection {
     public:
         GlobalLockServerStatusSection() : ServerStatusSection( "globalLock" ){
@@ -757,23 +793,29 @@ namespace mongo {
             t.append( "totalTime" , (long long)(1000 * ( curTimeMillis64() - _started ) ) );
             t.append( "lockTime" , Lock::globalLockStat()->getTimeLocked( 'W' ) );
 
+            // This returns the blocked lock states
             {
                 BSONObjBuilder ttt( t.subobjStart( "currentQueue" ) );
-                int w=0, r=0;
-                Client::recommendedYieldMicros( &w , &r, true );
-                ttt.append( "total" , w + r );
-                ttt.append( "readers" , r );
-                ttt.append( "writers" , w );
+
+                LockStateAggregator blocked(true);
+                getGlobalEnvironment()->forEachOperationContext(&blocked);
+
+                ttt.append("total", blocked.numReadLocked + blocked.numWriteLocked);
+                ttt.append("readers", blocked.numReadLocked);
+                ttt.append("writers", blocked.numWriteLocked);
                 ttt.done();
             }
 
+            // This returns all the active clients (including those holding locks)
             {
                 BSONObjBuilder ttt( t.subobjStart( "activeClients" ) );
-                int w=0, r=0;
-                Client::getActiveClientCount( w , r );
-                ttt.append( "total" , w + r );
-                ttt.append( "readers" , r );
-                ttt.append( "writers" , w );
+
+                LockStateAggregator active(false);
+                getGlobalEnvironment()->forEachOperationContext(&active);
+
+                ttt.append("total", active.numReadLocked + active.numWriteLocked);
+                ttt.append("readers", active.numReadLocked);
+                ttt.append("writers", active.numWriteLocked);
                 ttt.done();
             }
 

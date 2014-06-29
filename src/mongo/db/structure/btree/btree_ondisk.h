@@ -31,7 +31,6 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/db/structure/btree/key.h"
 
 namespace mongo {

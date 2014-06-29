@@ -37,12 +37,15 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"
-#include "mongo/db/storage/extent.h"
-#include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/record.h"
+#include "mongo/db/storage/mmap_v1/record.h"
+#include "mongo/db/storage/mmap_v1/extent.h"
+#include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kStorage);
 
     MmapV1ExtentManager::MmapV1ExtentManager( const StringData& dbname,
                                   const StringData& path,

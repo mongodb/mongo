@@ -38,7 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/extent_manager.h"
 
 namespace mongo {
 

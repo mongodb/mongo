@@ -61,6 +61,11 @@ namespace mongo {
         virtual void prepareToYield() { }
         virtual void recoverFromYield() { }
         virtual void invalidate(const DiskLoc& dl, InvalidationType type) { }
+
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_MOCK; }
+
         virtual PlanStageStats* getStats() { return NULL; }
 
         /**

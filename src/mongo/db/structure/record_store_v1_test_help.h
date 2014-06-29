@@ -32,7 +32,7 @@
 
 #include <vector>
 
-#include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/structure/record_store_v1_base.h"
 
 namespace mongo {

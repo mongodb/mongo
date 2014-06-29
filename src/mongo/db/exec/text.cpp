@@ -63,6 +63,9 @@ namespace mongo {
     PlanStage::StageState TextStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (isEOF()) { return PlanStage::IS_EOF; }
         invariant(_internalState != DONE);
 
@@ -132,6 +135,11 @@ namespace mongo {
             }
             _scores.erase(scoreIt);
         }
+    }
+
+    vector<PlanStage*> TextStage::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
     }
 
     PlanStageStats* TextStage::getStats() {

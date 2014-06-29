@@ -132,10 +132,6 @@ namespace mongo {
         return _tlInfo.get();
     }
 
-    bool ClientBasic::hasCurrent() {
-        return ClientInfo::exists();
-    }
-
     ClientBasic* ClientBasic::getCurrent() {
         return ClientInfo::get();
     }

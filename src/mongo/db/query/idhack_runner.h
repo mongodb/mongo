@@ -76,11 +76,6 @@ namespace mongo {
         virtual Status getInfo(TypeExplain** explain,
                                PlanInfo** planInfo) const;
 
-        /**
-         * ID Hack has a very strict criteria for the queries it supports.
-         */
-        static bool supportsQuery(const CanonicalQuery& query);
-
     private:
         /**
          * ID Hack queries are only covered with the projection {_id: 1}.

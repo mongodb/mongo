@@ -342,6 +342,54 @@ namespace {
         ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
     }
 
+    // SERVER-14366
+    TEST(CanonicalQueryTest, IsValidGeoNearNaturalSort) {
+        // Passes in default values for LiteParsedQuery except for sort order.
+        // Filter inside LiteParsedQuery is not used.
+        LiteParsedQuery* lpqRaw;
+        BSONObj sort = fromjson("{$natural: 1}");
+        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
+                                        sort, fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"),
+                                        false, // snapshot
+                                        false, // explain
+                                        &lpqRaw));
+        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+
+        auto_ptr<MatchExpression> me;
+        StatusWithMatchExpression swme(Status::OK());
+
+        // Invalid: GEO_NEAR and {$natural: 1} sort order.
+        swme = parseNormalize("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+    }
+
+    // SERVER-14366
+    TEST(CanonicalQueryTest, IsValidGeoNearNaturalHint) {
+        // Passes in default values for LiteParsedQuery except for the hint.
+        // Filter inside LiteParsedQuery is not used.
+        LiteParsedQuery* lpqRaw;
+        BSONObj hint = fromjson("{$natural: 1}");
+        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
+                                        fromjson("{}"), hint, fromjson("{}"),
+                                        fromjson("{}"),
+                                        false, // snapshot
+                                        false, // explain
+                                        &lpqRaw));
+        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+
+        auto_ptr<MatchExpression> me;
+        StatusWithMatchExpression swme(Status::OK());
+
+        // Invalid: GEO_NEAR and {$natural: 1} hint.
+        swme = parseNormalize("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
+        ASSERT_OK(swme.getStatus());
+        me.reset(swme.getValue());
+        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+    }
+
     TEST(CanonicalQueryTest, IsValidTextAndSnapshot) {
         // Passes in default values for LiteParsedQuery except for snapshot.
         // Filter inside LiteParsedQuery is not used.

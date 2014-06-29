@@ -83,6 +83,14 @@ namespace repl {
          */
         void msgUpdateHBRecv(unsigned id, time_t newTime);
 
+        void electCmdReceived(const StringData& set,
+                              unsigned whoid,
+                              int cfgver,
+                              const OID& round,
+                              BSONObjBuilder* result) {
+            elect.electCmdReceived(set, whoid, cfgver, round, result);
+        }
+
         StateBox box;
 
         SyncSourceFeedback syncSourceFeedback;
@@ -93,7 +101,7 @@ namespace repl {
         // hash we use to make sure we are reading the right flow of ops and aren't on
         // an out-of-date "fork"
         long long lastH; 
-        bool forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result);
+        Status forceSyncFrom(const string& host, BSONObjBuilder* result);
         // Check if the current sync target is suboptimal. This must be called while holding a mutex
         // that prevents the sync source from changing.
         bool shouldChangeSyncTarget(const OpTime& target) const;
@@ -274,8 +282,7 @@ namespace repl {
         void _getTargets(list<Target>&, int &configVersion);
         void getTargets(list<Target>&, int &configVersion);
         void startThreads();
-        friend class FeedbackThread;
-        friend class CmdReplSetElect;
+        friend class LegacyReplicationCoordinator;
         friend class Member;
         friend class Manager;
         friend class Consensus;

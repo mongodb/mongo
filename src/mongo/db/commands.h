@@ -37,6 +37,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/explain.h"
 
 namespace mongo {
 
@@ -136,6 +137,26 @@ namespace mutablebson {
         virtual bool shouldAffectCommandCounter() const { return true; }
 
         virtual void help( std::stringstream& help ) const;
+
+        /**
+         * Commands which can be explained override this method. Any operation which has a query
+         * part and executes as a tree of execution stages can be explained. A command should
+         * implement explain by:
+         *
+         *   1) Calling its custom parse function in order to parse the command. The output of
+         *   this function should be a CanonicalQuery (representing the query part of the
+         *   operation), and a PlanExecutor which wraps the tree of execution stages.
+         *
+         *   2) Calling Explain::explainStages(...) on the PlanExecutor. This is the function
+         *   which knows how to convert an execution stage tree into explain output.
+         */
+        virtual Status explain(OperationContext* txn,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               Explain::Verbosity verbosity,
+                               BSONObjBuilder* out) const {
+            return Status(ErrorCodes::IllegalOperation, "Cannot explain cmd: " + name);
+        }
 
         /**
          * Checks if the given client is authorized to run this command on database "dbname"

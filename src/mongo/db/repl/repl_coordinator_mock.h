@@ -88,8 +88,50 @@ namespace repl {
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
+        virtual bool setMaintenanceMode(bool activate);
+
+        virtual Status processReplSetMaintenance(bool activate, BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetSyncFrom(const std::string& target,
+                                              BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj);
+
         virtual Status processHeartbeat(const BSONObj& cmdObj, 
                                         BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetReconfig(OperationContext* txn,
+                                              const BSONObj& newConfigObj,
+                                              bool force,
+                                              BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetInitiate(OperationContext* txn,
+                                              const BSONObj& configObj,
+                                              BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj);
+
+        virtual void incrementRollbackID();
+
+        virtual Status processReplSetFresh(const StringData& setName,
+                                           const StringData& who,
+                                           unsigned id,
+                                           int cfgver,
+                                           const OpTime& opTime,
+                                           BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetElect(const StringData& set,
+                                           unsigned whoid,
+                                           int cfgver,
+                                           const OID& round,
+                                           BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetUpdatePosition(const BSONArray& updates,
+                                                    BSONObjBuilder* resultObj);
+
+        virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
+                                                             BSONObjBuilder* resultObj);
+
     };
 
 } // namespace repl

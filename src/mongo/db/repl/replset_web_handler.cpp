@@ -39,8 +39,7 @@ namespace mongo {
 namespace repl {
 
     using namespace bson;
-    using namespace mongoutils;
-    using namespace mongoutils::html;
+    using namespace html;
 
     class ReplSetHandler : public DbWebHandler {
     public:

@@ -126,11 +126,81 @@ namespace repl {
         //TODO
     }
 
+    bool ReplicationCoordinatorMock::setMaintenanceMode(bool activate) {
+        // TODO
+        return false;
+    }
+
+    Status ReplicationCoordinatorMock::processReplSetSyncFrom(const std::string& target,
+                                                              BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorMock::processReplSetMaintenance(bool activate,
+                                                                 BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorMock::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
     Status ReplicationCoordinatorMock::processHeartbeat(const BSONObj& cmdObj, 
                                                       BSONObjBuilder* resultObj) {
         return Status::OK();
     }
 
+    Status ReplicationCoordinatorMock::processReplSetReconfig(OperationContext* txn,
+                                                              const BSONObj& newConfigObj,
+                                                              bool force,
+                                                              BSONObjBuilder* resultObj) {
+        return Status::OK();
+    }
 
+    Status ReplicationCoordinatorMock::processReplSetInitiate(OperationContext* txn,
+                                                              const BSONObj& configObj,
+                                                              BSONObjBuilder* resultObj) {
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorMock::processReplSetGetRBID(BSONObjBuilder* resultObj) {
+        return Status::OK();
+    }
+
+    void ReplicationCoordinatorMock::incrementRollbackID() {}
+
+    Status ReplicationCoordinatorMock::processReplSetFresh(const StringData& setName,
+                                                           const StringData& who,
+                                                           unsigned id,
+                                                           int cfgver,
+                                                           const OpTime& opTime,
+                                                           BSONObjBuilder* resultObj) {
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorMock::processReplSetElect(const StringData& set,
+                                                           unsigned whoid,
+                                                           int cfgver,
+                                                           const OID& round,
+                                                           BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorMock::processReplSetUpdatePosition(const BSONArray& updates,
+                                                                    BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorMock::processReplSetUpdatePositionHandshake(
+            const BSONObj& handshake,
+            BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
 } // namespace repl
 } // namespace mongo

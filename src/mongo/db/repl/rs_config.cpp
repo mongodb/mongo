@@ -34,6 +34,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/heartbeat.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h"
@@ -65,9 +66,10 @@ namespace {
 
     list<HostAndPort> ReplSetConfig::otherMemberHostnames() const {
         list<HostAndPort> L;
-        for( vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); i++ ) {
-            if( !i->h.isSelf() )
+        for (vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); i++) {
+            if (!isSelf(i->h)) {
                 L.push_back(i->h);
+            }
         }
         return L;
     }
@@ -240,21 +242,20 @@ namespace {
         @param n new config
         */
     /*static*/
-    bool ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n, string& errmsg) {
+    Status ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n) {
         verify( theReplSet );
 
         if( o._id != n._id ) {
-            errmsg = "set name may not change";
-            return false;
+            return Status(ErrorCodes::InvalidReplicaSetConfig, "set name may not change");
         }
         /* TODO : wonder if we need to allow o.version < n.version only, which is more lenient.
                   if someone had some intermediate config this node doesnt have, that could be
                   necessary.  but then how did we become primary?  so perhaps we are fine as-is.
                   */
         if( o.version >= n.version ) {
-            errmsg = str::stream() << "version number must increase, old: "
-                                   << o.version << " new: " << n.version;
-            return false;
+            return Status(ErrorCodes::InvalidReplicaSetConfig,
+                          str::stream() << "version number must increase, old: "
+                                   << o.version << " new: " << n.version);
         }
 
         map<HostAndPort,const ReplSetConfig::MemberCfg*> old;
@@ -290,13 +291,14 @@ namespace {
                     uasserted(13510, "arbiterOnly may not change for members");
                 }
             }
-            if( m.h.isSelf() )
+            if (isSelf(m.h)) {
                 me++;
+            }
         }
 
         uassert(13433, "can't find self in new replset config", me == 1);
 
-        return true;
+        return Status::OK();
     }
 
     void ReplSetConfig::clear() {
@@ -430,7 +432,7 @@ namespace {
                          cfg != (*sgs).second->m.end(); 
                          cfg++) 
                     {
-                        if ((*cfg)->h.isSelf()) {
+                        if (isSelf((*cfg)->h)) {
                             node->actualTarget--;
                             foundMe = true;
                         }
@@ -497,13 +499,9 @@ namespace {
                 static const set<string> legals(legal, legal + 10);
                 assertOnlyHas(mobj, legals);
 
-                try {
-                    m._id = (int) mobj["_id"].Number();
-                }
-                catch(...) {
-                    /* TODO: use of string exceptions may be problematic for reconfig case! */
-                    throw "_id must be numeric";
-                }
+                uassert(18519, "_id must be numeric", mobj["_id"].isNumber());
+                m._id = mobj["_id"].numberInt();
+
                 try {
                     string s = mobj["host"].String();
                     boost::trim(s);
@@ -513,8 +511,11 @@ namespace {
                         m.h.setPort(m.h.port());
                     }
                 }
-                catch(...) {
-                    throw string("bad or missing host field? ") + mobj.toString();
+                catch (const DBException& e) {
+                    uasserted(18520,
+                              mongoutils::str::stream() <<
+                                      "bad or missing host field in member config object " <<
+                                      mobj.toString() << causedBy(e));
                 }
                 if( m.h.isLocalHost() )
                     localhosts++;
@@ -658,7 +659,7 @@ namespace {
         BSONObj cfg;
         int v = -5;
         try {
-            if( h.isSelf() ) {
+            if (isSelf(h)) {
                 ;
             }
             else {
@@ -697,7 +698,7 @@ namespace {
                 count = conn.count(rsConfigNs);
             }
             catch ( DBException& ) {
-                if ( !h.isSelf() ) {
+                if (!isSelf(h)) {
                     throw;
                 }
 
@@ -725,7 +726,7 @@ namespace {
         from(cfg);
         checkRsConfig();
         _ok = true;
-        LOG(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
+        LOG(level) << "replSet load config ok from " << (isSelf(h) ? "self" : h.toString()) << rsLog;
     }
 
 } // namespace repl

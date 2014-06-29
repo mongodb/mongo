@@ -68,6 +68,10 @@ namespace mongo {
 
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_MULTI_PLAN; }
+
         virtual PlanStageStats* getStats();
 
         /** Takes ownership of QuerySolution and PlanStage. not of WorkingSet */
@@ -95,29 +99,20 @@ namespace mongo {
          */
         bool hasBackupPlan() const;
 
-        /**
-         * Gathers execution stats for all losing plans.
-         */
-        vector<PlanStageStats*>* generateCandidateStats();
-
         //
         // Used by explain.
         //
 
         /**
-         * Runs the winning plan into it hits EOF or returns DEAD, throwing out the results.
-         * Execution stats are gathered in the process.
-         *
-         * You can call this after calling pickBestPlan(...). It expects that a winning plan
-         * has already been selected.
+         * Gathers execution stats for all losing plans.
          */
-        Status executeWinningPlan();
+        vector<PlanStageStats*> generateCandidateStats();
 
         /**
          * Runs the candidate plans until each has either hit EOF or returned DEAD. Results
          * from the plans are thrown out, but execution stats are gathered.
          *
-         * You can call this after calling pickBestPlan(...). It expects that a winning plan
+         * You should call this after calling pickBestPlan(...). It expects that a winning plan
          * has already been selected.
          */
         Status executeAllPlans();

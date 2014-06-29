@@ -27,15 +27,18 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/net/miniwebserver.h"
 
 #include <pcrecpp.h>
 
 #include "mongo/util/hex.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kNetworking);
 
     MiniWebServer::MiniWebServer(const string& name, const string &ip, int port)
         : Listener(name, ip, port, false)

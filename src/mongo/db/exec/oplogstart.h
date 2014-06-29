@@ -70,8 +70,12 @@ namespace mongo {
         virtual void prepareToYield();
         virtual void recoverFromYield();
 
+        virtual std::vector<PlanStage*> getChildren() const;
+
         // PS. don't call this.
         virtual PlanStageStats* getStats() { return NULL; }
+
+        virtual StageType stageType() const { return STAGE_OPLOG_START; }
 
         // For testing only.
         void setBackwardsScanTime(int newTime) { _backwardsScanTime = newTime; }

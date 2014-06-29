@@ -45,6 +45,7 @@ namespace {
         void run() {
             DBDirectClient client;
             client.insert(_ns, BSON( "test" << "test"));
+
             // Cannot mix fsync + j, will make command fail
             string gleString = client.getLastError(true, true, 10, 10);
             ASSERT_NOT_EQUALS(gleString, "");
@@ -59,6 +60,7 @@ namespace {
         void run() {
             DBDirectClient client;
             client.insert(_ns, BSON( "test" << "test"));
+
             // Make sure there was no error
             string gleString = client.getLastError();
             ASSERT_EQUALS(gleString, "");
@@ -73,6 +75,7 @@ namespace {
         void run() {
             DBDirectClient client;
             client.insert(_ns, BSON( "_id" << 1));
+
             // Make sure there was no error
             string gleString = client.getLastError();
             ASSERT_EQUALS(gleString, "");

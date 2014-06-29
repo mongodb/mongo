@@ -35,7 +35,7 @@
 namespace mongo {
 namespace repl {
 
-    using namespace mongoutils::html;
+    using namespace html;
 
     void Member::summarizeMember(stringstream& s) const {
         s << tr();

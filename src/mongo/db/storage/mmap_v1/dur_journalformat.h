@@ -30,6 +30,11 @@
 
 #pragma once
 
+#include <sstream>
+#include <string>
+
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
     namespace dur {

@@ -27,7 +27,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/file_allocator.h"
 
@@ -52,6 +52,7 @@
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/paths.h"
 #include "mongo/util/processinfo.h"
@@ -65,6 +66,8 @@ using namespace mongoutils;
 #endif
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kStorage);
 
     // unique number for temporary file names
     unsigned long long FileAllocator::_uniqueNumber = 0;

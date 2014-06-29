@@ -1,6 +1,4 @@
-/** @file hash.h */
-
-/*    Copyright 2009 10gen Inc.
+/*    Copyright 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -29,25 +27,46 @@
 
 #pragma once
 
-namespace mongoutils {
+#include <string>
 
-    /** @return hash of a pointer to an unsigned. so you get a 32 bit hash out, regardless of whether
-                pointers are 32 or 64 bit on the particular platform.
+namespace mongo {
+namespace logger {
 
-        is there a faster way to impl this that hashes just as well?
-    */
-    inline unsigned hashPointer(void *v) {
-        unsigned x = 0;
-        unsigned char *p = (unsigned char *) &v;
-        for( unsigned i = 0; i < sizeof(void*); i++ ) {
-            x = x * 131 + p[i];
-        }
-        return x;
-    }
+    /**
+     * Log tags.
+     * Debug messages logged using the LOG() or MONGO_LOG_TAG()
+     * macros may be associated with one or more log tags.
+     */
+    class LogTag {
+    public:
+        enum Value {
+            kDefault = 0,
+            kAccessControl,
+            kCommands,
+            kIndexing,
+            kJournalling,
+            kNetworking,
+            kQuery,
+            kReplication,
+            kSharding,
+            kStorage,
+            kWrites,
+            kNumLogTags
+        };
 
-    inline unsigned hash(unsigned u) {
-        unsigned char *p = (unsigned char *) &u;
-        return (((((p[3] * 131) + p[2]) * 131) + p[1]) * 131) + p[0];
-    }
+        /* implicit */ LogTag(Value value) : _value(value) {}
 
-}
+        operator Value() const { return _value; }
+
+        /**
+         * Returns short name of log tag.
+         * Used to generate server parameter names in the format "logLevel_<tag short name>".
+         */
+        std::string getShortName() const;
+
+    private:
+        Value _value;
+    };
+
+}  // namespace logger
+}  // namespace mongo

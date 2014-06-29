@@ -28,6 +28,7 @@
 #include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
 #include "mongo/platform/cstdint.h"
+#include "mongo/util/net/listen.h"
 #include "mongo/util/net/message_port.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/fail_point_service.h"

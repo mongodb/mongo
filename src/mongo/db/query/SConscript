@@ -34,6 +34,7 @@ env.Library(
         "eof_runner.cpp",
         "explain.cpp",
         "explain_plan.cpp",
+        "get_executor.cpp",
         "get_runner.cpp",
         "idhack_runner.cpp",
         "internal_runner.cpp",

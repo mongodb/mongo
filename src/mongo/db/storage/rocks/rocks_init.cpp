@@ -1,11 +1,12 @@
-// count.h
+// rocks_init.cpp
 
 /**
- *    Copyright (C) 2013 MongoDB Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
+ *
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -28,24 +29,28 @@
  *    it in the license file.
  */
 
-#include "mongo/db/jsobj.h"
+#include "mongo/db/storage/rocks/rocks_engine.h"
+
+#include "mongo/base/init.h"
+#include "mongo/db/storage_options.h"
 
 namespace mongo {
 
-    class OperationContext;
+    namespace {
+        class RocksFactory : public StorageEngine::Factory {
+        public:
+            virtual ~RocksFactory(){}
+            virtual StorageEngine* create( const StorageGlobalParams& params ) const {
+                return new RocksEngine( params.dbpath );
+            }
+        };
+    } // namespace
 
-    /**
-     * 'ns' is the namespace we're counting on.
-     *
-     * { count: "collectionname"[, query: <query>] }
-     *
-     * @return -1 on ns does not exist error and other errors, 0 on other errors, otherwise the
-     * match count.
-     */
-    long long runCount(OperationContext* txn,
-                       const std::string& ns,
-                       const BSONObj& cmd,
-                       std::string& err,
-                       int& errCode);
+    MONGO_INITIALIZER_GENERAL(RocksEngineInit,
+                              MONGO_DEFAULT_PREREQUISITES,
+                              ("StorageEngineInit") )(InitializerContext* context ) {
+        StorageEngine::registerFactory( "rocksExperiment", new RocksFactory() );
+        return Status::OK();
+    }
 
-} // namespace mongo
+}

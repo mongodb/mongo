@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include "mongo/db/jsobj.h"
 #include "mongo/util/concurrency/list.h"
 #include "mongo/util/concurrency/race.h"
 #include "mongo/util/net/hostandport.h"
@@ -172,7 +173,7 @@ namespace repl {
         void checkRsConfig() const;
 
         /** check if modification makes sense */
-        static bool legalChange(const ReplSetConfig& old, const ReplSetConfig& n, std::string& errmsg);
+        static Status legalChange(const ReplSetConfig& old, const ReplSetConfig& n);
 
         /**
          * 1. Checks the validity of member variables. (may uassert)

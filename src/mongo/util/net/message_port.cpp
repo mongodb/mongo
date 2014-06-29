@@ -27,7 +27,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/net/message_port.h"
 
@@ -36,6 +36,7 @@
 
 #include "mongo/util/background.h"
 #include "mongo/util/goodies.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -53,6 +54,7 @@
 
 namespace mongo {
 
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kNetworking);
 
 // if you want trace output:
 #define mmm(x)
@@ -106,13 +108,13 @@ namespace mongo {
     };
 
     class Ports {
-        set<MessagingPort*> ports;
+        std::set<MessagingPort*> ports;
         mongo::mutex m;
     public:
         Ports() : ports(), m("Ports") {}
         void closeAll(unsigned skip_mask) {
             scoped_lock bl(m);
-            for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ ) {
+            for ( std::set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ ) {
                 if( (*i)->tag & skip_mask )
                     continue;
                 (*i)->shutdown();
@@ -179,8 +181,8 @@ again:
             if ( len == 542393671 ) {
                 // an http GET
                 string msg = "It looks like you are trying to access MongoDB over HTTP on the native driver port.\n";
-                LOG( psock->getLogLevel() ) << msg << endl;
-                stringstream ss;
+                LOG( psock->getLogLevel() ) << msg;
+                std::stringstream ss;
                 ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
                 string s = ss.str();
                 send( s.c_str(), s.size(), "http" );
@@ -217,7 +219,7 @@ again:
             if ( static_cast<size_t>(len) < sizeof(MSGHEADER) || 
                  static_cast<size_t>(len) > MaxMessageSizeBytes ) {
                 LOG(0) << "recv(): message len " << len << " is invalid. "
-                       << "Min " << sizeof(MSGHEADER) << " Max: " << MaxMessageSizeBytes << endl;
+                       << "Min " << sizeof(MSGHEADER) << " Max: " << MaxMessageSizeBytes;
                 return false;
             }
 
@@ -242,7 +244,7 @@ again:
             logger::LogSeverity severity = psock->getLogLevel();
             if (!e.shouldPrint())
                 severity = severity.lessSevere();
-            LOG(severity) << "SocketException: remote: " << remote() << " error: " << e << endl;
+            LOG(severity) << "SocketException: remote: " << remote() << " error: " << e;
             m.reset();
             return false;
         }
@@ -272,13 +274,13 @@ again:
             //log() << "got response: " << response.data->responseTo << endl;
             if ( response.header()->responseTo == toSend.header()->id )
                 break;
-            error() << "MessagingPort::call() wrong id got:" << hex << (unsigned)response.header()->responseTo << " expect:" << (unsigned)toSend.header()->id << '\n'
-                    << dec
+            error() << "MessagingPort::call() wrong id got:" << std::hex << (unsigned)response.header()->responseTo << " expect:" << (unsigned)toSend.header()->id << '\n'
+                    << std::dec
                     << "  toSend op: " << (unsigned)toSend.operation() << '\n'
                     << "  response msgid:" << (unsigned)response.header()->id << '\n'
                     << "  response len:  " << (unsigned)response.header()->len << '\n'
                     << "  response op:  " << response.operation() << '\n'
-                    << "  remote: " << psock->remoteString() << endl;
+                    << "  remote: " << psock->remoteString();
             verify(false);
             response.reset();
         }

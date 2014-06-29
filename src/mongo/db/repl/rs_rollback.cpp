@@ -40,6 +40,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context_impl.h"
 
@@ -85,8 +86,6 @@ namespace mongo {
 namespace repl {
 
     using namespace bson;
-
-    void incRBID();
 
     class RSFatalException : public std::exception {
     public:
@@ -752,7 +751,7 @@ namespace repl {
 
         sethbmsg("replSet rollback 3 fixup");
 
-        incRBID();
+        getGlobalReplicationCoordinator()->incrementRollbackID();
         try {
             syncFixUp(txn, how, oplogreader);
         }
@@ -763,10 +762,10 @@ namespace repl {
             return 2;
         }
         catch (...) {
-            incRBID();
+            getGlobalReplicationCoordinator()->incrementRollbackID();
             throw;
         }
-        incRBID();
+        getGlobalReplicationCoordinator()->incrementRollbackID();
 
         // success - leave "ROLLBACK" state
         // can go to SECONDARY once minvalid is achieved

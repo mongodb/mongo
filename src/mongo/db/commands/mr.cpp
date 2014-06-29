@@ -665,6 +665,7 @@ namespace mongo {
 
         State::State(OperationContext* txn, const Config& c) :
                 _config(c),
+                _db(txn),
                 _useIncremental(true),
                 _txn(txn),
                 _size(0),

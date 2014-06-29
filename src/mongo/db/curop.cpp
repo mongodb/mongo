@@ -166,67 +166,55 @@ namespace mongo {
         }
     }
 
-    BSONObj CurOp::info() {
-        BSONObjBuilder b;
-        b.append("opid", _opNum);
+    void CurOp::reportState(BSONObjBuilder* builder) {
+        builder->append("opid", _opNum);
         bool a = _active && _start;
-        b.append("active", a);
+        builder->append("active", a);
 
         if( a ) {
-            b.append("secs_running", elapsedSeconds() );
-            b.append("microsecs_running", static_cast<long long int>(elapsedMicros()) );
+            builder->append("secs_running", elapsedSeconds() );
+            builder->append("microsecs_running", static_cast<long long int>(elapsedMicros()) );
         }
 
-        b.append( "op" , opToString( _op ) );
+        builder->append( "op" , opToString( _op ) );
 
-        b.append("ns", _ns);
+        builder->append("ns", _ns);
 
         if (_op == dbInsert) {
-            _query.append(b, "insert");
+            _query.append(*builder, "insert");
         }
         else {
-            _query.append(b , "query");
+            _query.append(*builder, "query");
         }
 
         if ( !debug().planSummary.empty() ) {
-            b.append( "planSummary" , debug().planSummary.toString() );
+            builder->append( "planSummary" , debug().planSummary.toString() );
         }
 
         if( !_remote.empty() ) {
-            b.append("client", _remote.toString());
-        }
-
-        if ( _client ) {
-            b.append( "desc" , _client->desc() );
-            if ( _client->_threadId.size() )
-                b.append( "threadId" , _client->_threadId );
-            if ( _client->_connectionId )
-                b.appendNumber( "connectionId" , _client->_connectionId );
-            _client->_ls.reportState(b);
+            builder->append("client", _remote.toString());
         }
 
         if ( ! _message.empty() ) {
             if ( _progressMeter.isActive() ) {
                 StringBuilder buf;
                 buf << _message.toString() << " " << _progressMeter.toString();
-                b.append( "msg" , buf.str() );
-                BSONObjBuilder sub( b.subobjStart( "progress" ) );
+                builder->append( "msg" , buf.str() );
+                BSONObjBuilder sub( builder->subobjStart( "progress" ) );
                 sub.appendNumber( "done" , (long long)_progressMeter.done() );
                 sub.appendNumber( "total" , (long long)_progressMeter.total() );
                 sub.done();
             }
             else {
-                b.append( "msg" , _message.toString() );
+                builder->append( "msg" , _message.toString() );
             }
         }
 
         if( killPending() )
-            b.append("killPending", true);
+            builder->append("killPending", true);
 
-        b.append( "numYields" , _numYields );
-        b.append( "lockStats" , _lockStat.report() );
-
-        return b.obj();
+        builder->append( "numYields" , _numYields );
+        builder->append( "lockStats" , _lockStat.report() );
     }
 
     BSONObj CurOp::description() {

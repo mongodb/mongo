@@ -46,6 +46,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/operation_context_impl.h"
@@ -108,7 +109,7 @@ namespace mongo {
 
             {
                 HostAndPort h(fromhost);
-                if( h.isSelf() ) {
+                if (repl::isSelf(h)) {
                     errmsg = "can't cloneCollection from self";
                     return false;
                 }

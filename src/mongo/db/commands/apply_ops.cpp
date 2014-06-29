@@ -85,6 +85,8 @@ namespace mongo {
             // ns used so locking individually requires more analysis
             Lock::GlobalWrite globalWriteLock(txn->lockState());
 
+            DBDirectClient db(txn);
+
             // Preconditions check reads the database state, so needs to be done locked
             if ( cmdObj["preCondition"].type() == Array ) {
                 BSONObjIterator i( cmdObj["preCondition"].Obj() );
@@ -172,7 +174,6 @@ namespace mongo {
 
             return errors == 0;
         }
-
     } applyOpsCmd;
 
 }

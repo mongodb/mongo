@@ -57,6 +57,10 @@ namespace mongo {
         virtual void prepareToYield();
         virtual void recoverFromYield();
 
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_COLLSCAN; }
+
         virtual PlanStageStats* getStats();
 
         static const char* kStageType;

@@ -32,7 +32,7 @@
 
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
-#include "mongo/db/ops/count.h"
+#include "mongo/db/commands/count.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
 

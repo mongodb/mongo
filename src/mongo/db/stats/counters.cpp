@@ -37,8 +37,42 @@
 namespace mongo {
     OpCounters::OpCounters() {}
 
-    void OpCounters::gotOp( int op , bool isCommand ) {
+    void OpCounters::incInsertInWriteLock(int n) {
         RARELY _checkWrap();
+        _insert.x += n;
+    }
+
+    void OpCounters::gotInsert() {
+        RARELY _checkWrap();
+        _insert++;
+    }
+
+    void OpCounters::gotQuery() {
+        RARELY _checkWrap();
+        _query++;
+    }
+
+    void OpCounters::gotUpdate() {
+        RARELY _checkWrap();
+        _update++;
+    }
+
+    void OpCounters::gotDelete() {
+        RARELY _checkWrap();
+        _delete++;
+    }
+
+    void OpCounters::gotGetMore() {
+        RARELY _checkWrap();
+        _getmore++;
+    }
+
+    void OpCounters::gotCommand() {
+        RARELY _checkWrap();
+        _command++;
+    }
+
+    void OpCounters::gotOp( int op , bool isCommand ) {
         switch ( op ) {
         case dbInsert: /*gotInsert();*/ break; // need to handle multi-insert
         case dbQuery:

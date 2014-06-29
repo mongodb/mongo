@@ -39,7 +39,7 @@ namespace mongo {
     public:
         OperationContextImpl();
 
-        virtual ~OperationContextImpl() { }
+        virtual ~OperationContextImpl();
 
         virtual RecoveryUnit* recoveryUnit() const;
 
@@ -51,6 +51,8 @@ namespace mongo {
                                           int secondsBetween);
 
         virtual const char * getNS() const;
+
+        virtual Client* getClient() const;
 
         virtual CurOp* getCurOp() const;
 

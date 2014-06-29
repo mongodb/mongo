@@ -46,8 +46,6 @@ namespace {
 
 }  // namespace
 
-    using namespace mongoutils;
-
     RamLog::RamLog( const std::string& name ) : _name(name), _totalLinesWritten(0), _lastWrite(0) {
         h = 0;
         n = 0;

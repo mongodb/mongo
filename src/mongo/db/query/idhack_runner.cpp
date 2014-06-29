@@ -241,15 +241,6 @@ namespace mongo {
     }
 
     // static
-    bool IDHackRunner::supportsQuery(const CanonicalQuery& query) {
-        return !query.getParsed().showDiskLoc()
-            && query.getParsed().getHint().isEmpty()
-            && 0 == query.getParsed().getSkip()
-            && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())
-            && !query.getParsed().hasOption(QueryOption_CursorTailable);
-    }
-
-    // static
     bool IDHackRunner::hasCoveredProjection() const {
         // Some update operations use the IDHackRunner without creating a
         // canonical query. In this case, _query will be NULL. Just return

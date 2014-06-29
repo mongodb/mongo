@@ -188,6 +188,28 @@ namespace repl {
         // TODO
     }
 
+    bool ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
+        // TODO
+        return false;
+    }
+
+    Status ReplicationCoordinatorImpl::processReplSetSyncFrom(const std::string& target,
+                                                              BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorImpl::processReplSetMaintenance(bool activate,
+                                                                 BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
     Status ReplicationCoordinatorImpl::processHeartbeat(const BSONObj& cmdObj, 
                                                         BSONObjBuilder* resultObj) {
         Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");
@@ -207,6 +229,47 @@ namespace repl {
         return result;
     }
 
+    Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
+                                                              const BSONObj& newConfigObj,
+                                                              bool force,
+                                                              BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
+                                                              const BSONObj& configObj,
+                                                              BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorImpl::processReplSetGetRBID(BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    void ReplicationCoordinatorImpl::incrementRollbackID() { /* TODO */ }
+
+    Status ReplicationCoordinatorImpl::processReplSetFresh(const StringData& setName,
+                                                           const StringData& who,
+                                                           unsigned id,
+                                                           int cfgver,
+                                                           const OpTime& opTime,
+                                                           BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorImpl::processReplSetElect(const StringData& set,
+                                                           unsigned whoid,
+                                                           int cfgver,
+                                                           const OID& round,
+                                                           BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
     void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(
             const TopologyCoordinator::ReplicaSetConfig& newConfig) {
         invariant(getReplicationMode() == modeReplSet);
@@ -214,5 +277,17 @@ namespace repl {
         _rsConfig = newConfig;
     }
 
+    Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const BSONArray& updates,
+                                                                    BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
+
+    Status ReplicationCoordinatorImpl::processReplSetUpdatePositionHandshake(
+            const BSONObj& handshake,
+            BSONObjBuilder* resultObj) {
+        // TODO
+        return Status::OK();
+    }
 } // namespace repl
 } // namespace mongo

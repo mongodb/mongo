@@ -28,13 +28,19 @@
 
 #pragma once
 
+#include <set>
+
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/util/concurrency/mutex.h"
+
 
 namespace mongo {
 
     class GlobalEnvironmentMongoD : public GlobalEnvironmentExperiment {
     public:
         GlobalEnvironmentMongoD();
+
+        ~GlobalEnvironmentMongoD();
 
         void setKillAllOperations();
 
@@ -44,10 +50,21 @@ namespace mongo {
 
         bool killOperation(AtomicUInt opId);
 
+        void registerOperationContext(OperationContext* txn);
+
+        void unregisterOperationContext(OperationContext* txn);
+
+        void forEachOperationContext(ProcessOperationContext* procOpCtx);
+
         OperationContext* newOpCtx();
 
     private:
         bool _globalKill;
+
+        typedef std::set<OperationContext*> OperationContextSet;
+
+        mongo::mutex _registeredOpContextsMutex;
+        OperationContextSet _registeredOpContexts;
     };
 
 }  // namespace mongo

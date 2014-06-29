@@ -59,6 +59,7 @@ namespace mongo {
     class AbstractMessagingPort;
     class LockCollectionForReading;
 
+
     TSP_DECLARE(Client, currentClient)
 
     typedef long long ConnectionId;
@@ -69,11 +70,9 @@ namespace mongo {
         // always be in clientsMutex when manipulating this. killop stuff uses these.
         static std::set<Client*>& clients;
         static mongo::mutex& clientsMutex;
-        static int getActiveClientCount( int& writers , int& readers );
-        class Context;
+
         ~Client();
-        static int recommendedYieldMicros( int * writers = 0 , int * readers = 0,
-                                           bool needExact = false );
+
         /** each thread which does db operations has a Client object in TLS.
          *  call this when your thread starts.
         */
@@ -101,11 +100,11 @@ namespace mongo {
 
         bool isGod() const { return _god; } /* this is for map/reduce writes */
         bool setGod(bool newVal) { const bool prev = _god; _god = newVal; return prev; }
-        std::string toString() const;
         bool gotHandshake( const BSONObj& o );
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }
         ConnectionId getConnectionId() const { return _connectionId; }
+        const std::string& getThreadId() const { return _threadId; }
 
         // XXX(hk): this is per-thread mmapv1 recovery unit stuff, move into that
         // impl of recovery unit
@@ -138,6 +137,8 @@ namespace mongo {
         LockState _ls;
         
     public:
+
+        class Context;
 
         /** "read lock, and set my context, all in one operation" 
          *  This handles (if not recursively locked) opening an unopened database.

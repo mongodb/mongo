@@ -48,7 +48,7 @@ namespace logger {
     /**
      * Gets the global MessageLogDomain associated for the global log manager.
      */
-    inline MessageLogDomain* globalLogDomain() { return globalLogManager()->getGlobalDomain(); }
+    inline TagMessageLogDomain* globalLogDomain() { return globalLogManager()->getGlobalDomain(); }
 
 }  // namespace logger
 }  // namespace mongo

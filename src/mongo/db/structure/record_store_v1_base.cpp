@@ -32,9 +32,9 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/extent.h"
-#include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/record.h"
+#include "mongo/db/storage/mmap_v1/extent.h"
+#include "mongo/db/storage/mmap_v1/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/structure/record_store_v1_repair_iterator.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/timer.h"

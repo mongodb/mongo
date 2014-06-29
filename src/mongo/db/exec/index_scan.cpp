@@ -131,6 +131,9 @@ namespace mongo {
     PlanStage::StageState IndexScan::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (NULL == _indexCursor.get()) {
             // First call to work().  Perform possibly heavy init.
             initIndexScan();
@@ -337,6 +340,11 @@ namespace mongo {
                 // while and relies on a Matcher to make sure the result is ok.
             }
         }
+    }
+
+    vector<PlanStage*> IndexScan::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
     }
 
     PlanStageStats* IndexScan::getStats() {

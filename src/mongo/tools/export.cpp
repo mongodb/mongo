@@ -90,7 +90,7 @@ public:
             binData = object.binDataClean(len);
             return toHex(binData, len);
         case jstOID:
-            return "ObjectID(" + object.OID().toString() + ")"; // OIDs are always 24 bytes
+            return "ObjectId(" + object.OID().toString() + ")"; // OIDs are always 24 bytes
         case Date:
             // We need to check if we can actually format this date.  See SERVER-13760.
             return object.Date().isFormatable() ?

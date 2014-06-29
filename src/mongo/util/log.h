@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/logger/log_tag.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/logger/tee.h"
@@ -85,11 +86,24 @@ namespace logger {
     }
 
 
+// MONGO_LOG uses log tag from MongoLogDefaultTag from current or global namespace.
 #define MONGO_LOG(DLEVEL) \
-    if (!(::mongo::logger::globalLogDomain())->shouldLog(::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
+    if (!(::mongo::logger::globalLogDomain())->shouldLog(MongoLogDefaultTag_tag, ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
     else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))
 
 #define LOG MONGO_LOG
+
+#define MONGO_LOG_TAG(DLEVEL, TAG1) \
+    if (!(::mongo::logger::globalLogDomain())->shouldLog((TAG1), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
+    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))
+
+#define MONGO_LOG_TAG2(DLEVEL, TAG1, TAG2) \
+    if (!(::mongo::logger::globalLogDomain())->shouldLog((TAG1), (TAG2), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
+    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))
+
+#define MONGO_LOG_TAG3(DLEVEL, TAG1, TAG2, TAG3) \
+    if (!(::mongo::logger::globalLogDomain())->shouldLog((TAG1), (TAG2), (TAG3), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
+    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))
 
     /**
      * Rotates the log files.  Returns true if all logs rotate successfully.
@@ -127,3 +141,24 @@ namespace logger {
     void logContext(const char *msg = NULL);
 
 } // namespace mongo
+
+/**
+ * Defines default log tag for MONGO_LOG.
+ * Use this macro inside an implementation namespace or code block where debug messages
+ * are logged using MONGO_LOG().
+ *
+ * Note: Do not use more than once inside any namespace/code block.
+ *       Using static function instead of enum to support use inside function code block.
+ */
+#define MONGO_LOG_DEFAULT_TAG_FILE(TAG) \
+    static const ::mongo::logger::LogTag MongoLogDefaultTag_tag = (TAG);
+
+/**
+ * MONGO_LOG_DEFAULT_TAG for local code block.
+ */
+#define MONGO_LOG_DEFAULT_TAG_LOCAL(TAG) \
+    const ::mongo::logger::LogTag MongoLogDefaultTag_tag = (TAG);
+
+// Provide log tag in global scope so that MONGO_LOG will always have
+// a valid tag.
+const ::mongo::logger::LogTag MongoLogDefaultTag_tag = ::mongo::logger::LogTag::kDefault;

@@ -29,20 +29,16 @@
 
 #pragma once
 
-/* Things in the mongoutils namespace
-   (1) are not database specific, rather, true utilities
-   (2) are cross platform
-   (3) may require boost headers, but not libs
-   (4) are clean and easy to use in any c++ project without pulling in lots of other stuff
-
-   Note: within this module, we use int for all offsets -- there are no unsigned offsets
-   and no size_t's.  If you need 3 gigabyte long strings, don't use this module.
-*/
+/**
+ * String utilities.
+ *
+ * TODO: De-inline.
+ * TODO: Retire the mongoutils namespace, and move str under the mongo namespace.
+ */
 
 #include <string>
 #include <sstream>
 
-// this violates the README rules for mongoutils:
 #include "mongo/bson/util/builder.h"
 
 namespace mongoutils {
@@ -226,6 +222,10 @@ namespace mongoutils {
             }
         }
 
-    }
+    }  // namespace str
 
-}
+}  // namespace mongoutils
+
+namespace mongo {
+    using namespace mongoutils;
+}  // namespace mongo

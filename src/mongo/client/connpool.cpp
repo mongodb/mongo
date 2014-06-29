@@ -30,14 +30,17 @@
 
 // _ todo: reconnect?
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/syncclusterconnection.h"
+#include "mongo/util/log.h"
 #include "mongo/s/shard.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kNetworking);
 
     // ------ PoolForHost ------
 

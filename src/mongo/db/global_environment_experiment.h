@@ -67,6 +67,48 @@ namespace mongo {
          **/
         virtual bool killOperation(AtomicUInt opId) = 0;
 
+        /**
+         * Registers the specified operation context on the global environment, so it is
+         * discoverable by diagnostics tools.
+         *
+         * This function must be thread-safe.
+         */
+        virtual void registerOperationContext(OperationContext* txn) = 0;
+
+        /**
+         * Unregisters a previously-registered operation context. It is an error to unregister the
+         * same context twice or to unregister a context, which has not previously been registered.
+         *
+         * This function must be thread-safe.
+         */
+        virtual void unregisterOperationContext(OperationContext* txn) = 0;
+
+        /**
+         * Notification object to be passed to forEachOperationContext so that certain processing
+         * can be done on all registered contexts.
+         */
+        class ProcessOperationContext {
+        public:
+
+            /**
+             * Invoked for each registered OperationContext. The pointer is guaranteed to be stable
+             * until the call returns.
+             * 
+             * Implementations of this method should not acquire locks or do any operations, which 
+             * might block and should generally do as little work as possible in order to not block
+             * the iteration or the release of the OperationContext.
+             */
+            virtual void processOpContext(OperationContext* txn) = 0;
+
+            virtual ~ProcessOperationContext() { }
+        };
+
+        /**
+         * Iterates over all registered operation contexts and invokes 
+         * ProcessOperationContext::processOpContext for each.
+         */
+        virtual void forEachOperationContext(ProcessOperationContext* procOpCtx) = 0;
+
         //
         // Factories for storage interfaces
         //

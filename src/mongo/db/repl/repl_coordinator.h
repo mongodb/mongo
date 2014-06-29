@@ -224,11 +224,107 @@ namespace repl {
         virtual void processReplSetGetStatus(BSONObjBuilder* result) = 0;
 
         /**
+         * Toggles maintenanceMode to the value expressed by 'activate'
+         * return true, if the change worked and false otherwise
+         */
+        virtual bool setMaintenanceMode(bool activate) = 0;
+
+        /**
+         * Handles an incoming replSetSyncFrom command. Adds BSON to 'result'
+         * returns Status::OK if the sync target could be set and an ErrorCode indicating why it
+         * couldn't otherwise.
+         */
+        virtual Status processReplSetSyncFrom(const std::string& target,
+                                              BSONObjBuilder* resultObj) = 0;
+
+        /**
+         * Handles an incoming replSetMaintenance command. 'activate' indicates whether to activate
+         * or deactivate maintenanceMode.
+         * returns Status::OK() if maintenanceMode is successfully changed, otherwise returns a
+         * Status containing an error message about the failure
+         */
+        virtual Status processReplSetMaintenance(bool activate, BSONObjBuilder* resultObj) = 0;
+
+        /**
+         * Handles an incoming replSetFreeze command. Adds BSON to 'resultObj' 
+         * returns Status::OK() if the node is a member of a replica set with a config and an
+         * error Status otherwise
+         */
+        virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj) = 0;
+
+        /**
          * Handles an incoming heartbeat command. Adds BSON to 'resultObj'; 
          * returns a Status with either OK or an error message.
          */
         virtual Status processHeartbeat(const BSONObj& cmdObj, BSONObjBuilder* resultObj) = 0;
 
+        /**
+         * Handles an incoming replSetReconfig command. Adds BSON to 'resultObj';
+         * returns a Status with either OK or an error message.
+         */
+        virtual Status processReplSetReconfig(OperationContext* txn,
+                                              const BSONObj& newConfigObj,
+                                              bool force,
+                                              BSONObjBuilder* resultObj) = 0;
+
+        /*
+         * Handles an incoming replSetInitiate command. If "configObj" is empty, generates a default
+         * configuration to use.
+         * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
+         */
+        virtual Status processReplSetInitiate(OperationContext* txn,
+                                              const BSONObj& configObj,
+                                              BSONObjBuilder* resultObj) = 0;
+
+        /*
+         * Handles an incoming replSetGetRBID command.
+         * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
+         */
+        virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj) = 0;
+
+        /**
+         * Increments this process's rollback id.  Called every time a rollback occurs.
+         */
+        virtual void incrementRollbackID() = 0;
+
+        /*
+         * Handles an incoming replSetFresh command.
+         * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
+         */
+        virtual Status processReplSetFresh(const StringData& setName,
+                                           const StringData& who,
+                                           unsigned id,
+                                           int cfgver,
+                                           const OpTime& opTime,
+                                           BSONObjBuilder* resultObj) = 0;
+
+        /*
+         * Handles an incoming replSetElect command.
+         * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
+         */
+        virtual Status processReplSetElect(const StringData& set,
+                                           unsigned whoid,
+                                           int cfgver,
+                                           const OID& round,
+                                           BSONObjBuilder* resultObj) = 0;
+
+        /**
+         * Handles an incoming replSetPositionUpdate command, updating each nodes oplog progress.
+         * returns Status::OK() if the all updates are processed correctly, ErrorCodes::NodeNotFound
+         * if any updating node cannot be found in the config, or any of the normal replset
+         * command ErrorCodes.
+         */
+        virtual Status processReplSetUpdatePosition(const BSONArray& updates,
+                                                    BSONObjBuilder* resultObj) = 0;
+
+        /**
+         * Handles an incoming replSetPositionUpdate command that contains a handshake.
+         * returns Status::OK() if the handshake processes properly, ErrorCodes::NodeNotFound
+         * if the handshaking node cannot be found in the config, or any of the normal replset
+         * command ErrorCodes.
+         */
+        virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
+                                                             BSONObjBuilder* resultObj) = 0;
     protected:
 
         ReplicationCoordinator();

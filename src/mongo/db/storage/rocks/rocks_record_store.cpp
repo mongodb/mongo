@@ -29,10 +29,6 @@
  *    it in the license file.
  */
 
-#ifndef MONGO_ROCKSDB
-#error trying to compile rocks_record_store.cpp with MONGO_ROCKSDB defined
-#endif
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"

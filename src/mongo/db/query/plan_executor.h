@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/query/runner.h"
+#include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 
@@ -52,6 +53,8 @@ namespace mongo {
     class PlanExecutor {
     public:
         PlanExecutor(WorkingSet* ws, PlanStage* rt, const Collection* collection);
+        PlanExecutor(WorkingSet* ws, PlanStage* rt, QuerySolution* qs,
+                     const Collection* collection);
         ~PlanExecutor();
 
         //
@@ -94,13 +97,37 @@ namespace mongo {
          */
         void kill();
 
+        /**
+         * If this stage tree ranked plans using a MultiPlanStage, then returns the winning plan.
+         * Otherwise returns NULL.
+         */
+        QuerySolution* bestSolution();
+
+        /**
+         * Transfer ownership of the stage tree wrapped by this executor to the caller.
+         */
+        PlanStage* releaseStages();
+
+        /**
+         * Get the stage tree wrapped by this executor, without transferring ownership.
+         */
+        PlanStage* getStages();
+
+        /**
+         * Execute the plan to completion, throwing out the results.
+         *
+         * Used by explain.
+         */
+        Status executePlan();
+
     private:
         // Collection over which this plan executor runs. Used to resolve record ids retrieved by
         // the plan stages. The collection must not be destroyed while there are active plans.
         const Collection* _collection;
 
         boost::scoped_ptr<WorkingSet> _workingSet;
-        boost::scoped_ptr<PlanStage> _root;
+        std::auto_ptr<PlanStage> _root;
+        boost::scoped_ptr<QuerySolution> _qs;
 
         // Did somebody drop an index we care about or the namespace we're looking at?  If so,
         // we'll be killed.

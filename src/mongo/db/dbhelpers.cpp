@@ -446,14 +446,6 @@ namespace mongo {
                 }
                 millisWaitingForReplication += replStatus.duration.total_milliseconds();
             }
-            
-            if (!txn->lockState()->isLocked()) {
-                int micros = ( 2 * Client::recommendedYieldMicros() ) - secondaryThrottleTime.micros();
-                if ( micros > 0 ) {
-                    LOG(1) << "Helpers::removeRangeUnlocked going to sleep for " << micros << " micros" << endl;
-                    sleepmicros( micros );
-                }
-            }
         }
         
         if ( secondaryThrottle )

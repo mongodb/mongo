@@ -70,9 +70,6 @@ namespace mongo {
 
         bool operator!=(const HostAndPort& r) const { return !(*this == r); }
 
-        /* returns true if the host/port combo identifies this process instance. */
-        bool isSelf() const; // defined in isself.cpp
-
         bool isLocalHost() const;
 
         /**

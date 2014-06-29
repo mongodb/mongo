@@ -39,7 +39,7 @@
 
 
 namespace mongo {
-
+    class Client;
     class CurOp;
     class ProgressMeter;
 
@@ -95,9 +95,10 @@ namespace mongo {
          */
         virtual const char * getNS() const = 0;
 
-        //
-        // CurOp
-        //
+        /**
+         * Returns the client under which this context runs.
+         */
+        virtual Client* getClient() const = 0;
 
         /**
          * Returns CurOp. Caller does not own pointer
