@@ -50,7 +50,7 @@ namespace repl {
         ~SyncSourceFeedback() {}
 
         /// Adds an entry to _members for a secondary that has connected to us.
-        void associateMember(const BSONObj& id, Member* member);
+        void associateMember(const OID& rid, Member* member);
 
         /// Ensures local.me is populated and populates it if not.
         void ensureMe();

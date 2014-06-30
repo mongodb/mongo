@@ -81,7 +81,7 @@ namespace repl {
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptime(const OID& rid, const OpTime& ts, const BSONObj& config);
+        virtual Status setLastOptime(const OID& rid, const OpTime& ts);
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
@@ -120,11 +120,19 @@ namespace repl {
         virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj);
 
+        virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake);
+
     private:
         Status _stepDownHelper(bool force,
                                const Milliseconds& initialWaitTime,
                                const Milliseconds& stepdownTime,
                                const Milliseconds& postStepdownWaitTime);
+
+        // Mutex that protects the _ridConfigMap
+        boost::mutex _ridConfigMapMutex;
+
+        // Map from RID to member config object
+        std::map<OID, BSONObj> _ridConfigMap;
 
         // Rollback id. used to check if a rollback happened during some interval of time
         // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.

@@ -923,7 +923,7 @@ namespace {
         return OpTime();
     }
 
-    bool ReplSetImpl::registerSlave(const BSONObj& rid, const int memberId) {
+    bool ReplSetImpl::registerSlave(const OID& rid, const int memberId) {
         Member* member = NULL;
         {
             lock lk(this);

@@ -84,7 +84,7 @@ namespace repl {
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptime(const OID& rid, const OpTime& ts, const BSONObj& config);
+        virtual Status setLastOptime(const OID& rid, const OpTime& ts);
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
@@ -123,6 +123,8 @@ namespace repl {
 
         virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj);
+
+        virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake);
 
     };
 

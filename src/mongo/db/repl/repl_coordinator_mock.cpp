@@ -116,8 +116,7 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorMock::setLastOptime(const OID& rid,
-                                                     const OpTime& ts,
-                                                     const BSONObj& config) {
+                                                     const OpTime& ts) {
         // TODO
         return Status::OK();
     }
@@ -193,6 +192,12 @@ namespace repl {
             BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();
+    }
+
+    bool ReplicationCoordinatorMock::processHandshake(const OID& remoteID,
+                                                      const BSONObj& handshake) {
+        // TODO
+        return false;
     }
 } // namespace repl
 } // namespace mongo

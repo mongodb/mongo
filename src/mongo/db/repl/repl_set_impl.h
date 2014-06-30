@@ -266,7 +266,7 @@ namespace repl {
         bool setMaintenanceMode(const bool inc);
 
         // Records a new slave's id in the GhostSlave map, at handshake time.
-        bool registerSlave(const BSONObj& rid, const int memberId);
+        bool registerSlave(const OID& rid, const int memberId);
     private:
         Member* head() const { return _members.head(); }
     public:

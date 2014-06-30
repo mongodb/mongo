@@ -207,8 +207,7 @@ namespace repl {
         /**
          * Updates our internal tracking of the last OpTime applied for the given member of the set
          * identified by "rid".  Also updates all bookkeeping related to tracking what the last
-         * OpTime applied by all tag groups that "rid" is a part of.  The config BSONObj is passed
-         * into SlaveTracking, which needs it to update local.slaves.  This is called when
+         * OpTime applied by all tag groups that "rid" is a part of.  This is called when
          * secondaries notify the member they are syncing from of their progress in replication.
          * This information is used by awaitReplication to satisfy write concerns.  It is *not* used
          * in elections, we maintain a separate view of member optimes in the topology coordinator
@@ -217,7 +216,7 @@ namespace repl {
          * @returns ErrorCodes::NodeNotFound if the member cannot be found in sync progress tracking
          * @returns Status::OK() otherwise
          */
-        virtual Status setLastOptime(const OID& rid, const OpTime& ts, const BSONObj& config) = 0;
+        virtual Status setLastOptime(const OID& rid, const OpTime& ts) = 0;
 
         /**
          * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.
@@ -331,7 +330,7 @@ namespace repl {
                                            BSONObjBuilder* resultObj) = 0;
 
         /**
-         * Handles an incoming replSetPositionUpdate command, updating each nodes oplog progress.
+         * Handles an incoming replSetUpdatePosition command, updating each nodes oplog progress.
          * returns Status::OK() if the all updates are processed correctly, ErrorCodes::NodeNotFound
          * if any updating node cannot be found in the config, or any of the normal replset
          * command ErrorCodes.
@@ -340,13 +339,25 @@ namespace repl {
                                                     BSONObjBuilder* resultObj) = 0;
 
         /**
-         * Handles an incoming replSetPositionUpdate command that contains a handshake.
+         * Handles an incoming replSetUpdatePosition command that contains a handshake.
          * returns Status::OK() if the handshake processes properly, ErrorCodes::NodeNotFound
          * if the handshaking node cannot be found in the config, or any of the normal replset
          * command ErrorCodes.
          */
         virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj) = 0;
+
+        /**
+         * Handles an incoming Handshake command (or a handshake from replSetUpdatePosition).
+         * Associates the node's 'remoteID' with its 'handshake' object. This association is used
+         * to update local.slaves and to forward the node's replication progress upstream when this
+         * node is being chainged through.
+         *
+         * Returns true if it was able to associate the 'remoteID' and 'handshake' and false
+         * otherwise.
+         */
+        virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake) = 0;
+
     protected:
 
         ReplicationCoordinator();

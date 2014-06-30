@@ -152,8 +152,7 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorImpl::setLastOptime(const OID& rid,
-                                                     const OpTime& ts,
-                                                     const BSONObj& config) {
+                                                     const OpTime& ts) {
         // TODO(spencer): update slave tracking thread for local.slaves
         // TODO(spencer): pass info upstream if we're not primary
         boost::lock_guard<boost::mutex> lk(_mutex);
@@ -417,6 +416,12 @@ namespace repl {
             BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();
+    }
+
+    bool ReplicationCoordinatorImpl::processHandshake(const OID& remoteID,
+                                                      const BSONObj& handshake) {
+        // TODO
+        return false;
     }
 } // namespace repl
 } // namespace mongo

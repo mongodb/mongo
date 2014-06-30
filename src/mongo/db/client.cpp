@@ -318,23 +318,19 @@ namespace mongo {
         {
             BSONElement id = i.next();
             verify( id.type() );
-            _remoteId = id.wrap( "_id" );
+            _remoteId = id.OID();
         }
 
         BSONObjBuilder b;
-        while ( i.more() )
-            b.append( i.next() );
+        while (i.more()) {
+            b.append(i.next());
+        }
         
-        b.appendElementsUnique( _handshake );
-
-        _handshake = b.obj();
-
-        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
-                repl::ReplicationCoordinator::modeReplSet || !o.hasField("member")) {
-            return false;
+        if (!o.hasField("config")) {
+            b.append("config", BSON("host" << clientAddress(true) << "upgradeNeeded" << true));
         }
 
-        return repl::theReplSet->registerSlave(_remoteId, o["member"].Int());
+        return repl::getGlobalReplicationCoordinator()->processHandshake(_remoteId, b.obj());
     }
 
     ClientBasic* ClientBasic::getCurrent() {

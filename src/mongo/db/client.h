@@ -101,8 +101,7 @@ namespace mongo {
         bool isGod() const { return _god; } /* this is for map/reduce writes */
         bool setGod(bool newVal) { const bool prev = _god; _god = newVal; return prev; }
         bool gotHandshake( const BSONObj& o );
-        BSONObj getRemoteID() const { return _remoteId; }
-        BSONObj getHandshake() const { return _handshake; }
+        OID getRemoteID() const { return _remoteId; }
         ConnectionId getConnectionId() const { return _connectionId; }
         const std::string& getThreadId() const { return _threadId; }
 
@@ -129,8 +128,7 @@ namespace mongo {
         std::string _desc;
         bool _god;
         OpTime _lastOp;
-        BSONObj _handshake;
-        BSONObj _remoteId;
+        OID _remoteId;
 
         bool _hasWrittenSinceCheckpoint;
 
