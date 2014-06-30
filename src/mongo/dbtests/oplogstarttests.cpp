@@ -38,7 +38,8 @@ namespace OplogStartTests {
     class Base {
     public:
         Base() : _lk(_txn.lockState()),
-                 _context(ns()) {
+                 _context(&_txn, ns()),
+                 _client(&_txn) {
 
             Collection* c = _context.db()->getCollection(&_txn, ns());
             if (!c) {

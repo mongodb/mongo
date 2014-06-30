@@ -138,8 +138,7 @@ namespace {
             // we're sometimes inside the lock already
             Lock::DBWrite lk(txn->lockState(), currentOp.getNS() );
             if (dbHolder().get(txn, nsToDatabase(currentOp.getNS())) != NULL) {
-
-                Client::Context cx(currentOp.getNS(), false);
+                Client::Context cx(txn, currentOp.getNS(), false);
                 _profile(txn, c, cx.db(), currentOp, profileBufBuilder);
             }
             else {

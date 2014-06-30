@@ -40,19 +40,23 @@ namespace ClientTests {
     class Base {
     public:
 
-        Base( string coll ) {
+        Base( string coll ) : _ns("test." + coll) {
+            OperationContextImpl txn;
+            DBDirectClient db(&txn);
+
             db.dropDatabase("test");
-            _ns = (string)"test." + coll;
         }
 
         virtual ~Base() {
+            OperationContextImpl txn;
+            DBDirectClient db(&txn);
+
             db.dropCollection( _ns );
         }
 
         const char * ns() { return _ns.c_str(); }
 
-        string _ns;
-        DBDirectClient db;
+        const string _ns;
     };
 
 
@@ -60,6 +64,9 @@ namespace ClientTests {
     public:
         DropIndex() : Base( "dropindex" ) {}
         void run() {
+            OperationContextImpl txn;
+            DBDirectClient db(&txn);
+
             db.insert( ns() , BSON( "x" << 2 ) );
             ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
 
@@ -81,6 +88,8 @@ namespace ClientTests {
     public:
         ReIndex() : Base( "reindex" ) {}
         void run() {
+            OperationContextImpl txn;
+            DBDirectClient db(&txn);
 
             db.insert( ns() , BSON( "x" << 2 ) );
             ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
@@ -98,6 +107,8 @@ namespace ClientTests {
     public:
         ReIndex2() : Base( "reindex2" ) {}
         void run() {
+            OperationContextImpl txn;
+            DBDirectClient db(&txn);
 
             db.insert( ns() , BSON( "x" << 2 ) );
             ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
@@ -123,7 +134,9 @@ namespace ClientTests {
         BuildIndex() : Base("buildIndex") {}
         void run() {
             OperationContextImpl txn;
+
             Client::WriteContext ctx(&txn, ns());
+            DBDirectClient db(&txn);
 
             db.insert(ns(), BSON("x" << 1 << "y" << 2));
             db.insert(ns(), BSON("x" << 2 << "y" << 2));
@@ -158,9 +171,14 @@ namespace ClientTests {
     public:
         CS_10() : Base( "CS_10" ) {}
         void run() {
-            string longs( 770, 'c' );
-            for( int i = 0; i < 1111; ++i )
-                db.insert( ns(), BSON( "a" << i << "b" << longs ) );
+            OperationContextImpl txn;
+            DBDirectClient db(&txn);
+
+            const string longs( 770, 'c' );
+            for (int i = 0; i < 1111; ++i) {
+                db.insert(ns(), BSON("a" << i << "b" << longs));
+            }
+
             db.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ) );
 
             auto_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "a" << 1 << "b" << 1 ) ) );
@@ -172,8 +190,13 @@ namespace ClientTests {
     public:
         PushBack() : Base( "PushBack" ) {}
         void run() {
-            for( int i = 0; i < 10; ++i )
-                db.insert( ns(), BSON( "i" << i ) );
+            OperationContextImpl txn;
+            DBDirectClient db(&txn);
+
+            for (int i = 0; i < 10; ++i) {
+                db.insert(ns(), BSON("i" << i));
+            }
+
             auto_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "i" << 1 ) ) );
 
             BSONObj o = c->next();
@@ -212,7 +235,10 @@ namespace ClientTests {
     public:
         Create() : Base( "Create" ) {}
         void run() {
-            db.createCollection( "unittests.clienttests.create", 4096, true );
+            OperationContextImpl txn;
+            DBDirectClient db(&txn);
+
+            db.createCollection("unittests.clienttests.create", 4096, true);
             BSONObj info;
             ASSERT( db.runCommand( "unittests", BSON( "collstats" << "clienttests.create" ), info ) );
         }
@@ -237,6 +263,7 @@ namespace ClientTests {
     class All : public Suite {
     public:
         All() : Suite( "client" ) {
+
         }
 
         void setupTests() {

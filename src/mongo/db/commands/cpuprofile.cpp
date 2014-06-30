@@ -136,7 +136,7 @@ namespace mongo {
                                            BSONObjBuilder &result,
                                            bool fromRepl ) {
             Lock::DBWrite dbXLock(db);
-            Client::Context ctx(db);
+            Client::Context ctx(txn, db);
 
             std::string profileFilename = cmdObj[commandName]["profileFilename"].String();
             if ( ! ::ProfilerStart( profileFilename.c_str() ) ) {
@@ -154,7 +154,7 @@ namespace mongo {
                                           BSONObjBuilder &result,
                                           bool fromRepl ) {
             Lock::DBWrite dbXLock(db);
-            Client::Context ctx(db);
+            Client::Context ctx(txn, db);
 
             ::ProfilerStop();
             return true;

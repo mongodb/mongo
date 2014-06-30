@@ -61,7 +61,7 @@ namespace mongo {
             {
                 // Remove _id range [_min, _max).
                 Lock::DBWrite lk(txn.lockState(), ns);
-                Client::Context ctx( ns );
+                Client::Context ctx(&txn,  ns );
 
                 KeyRange range( ns,
                                 BSON( "_id" << _min ),
@@ -115,9 +115,8 @@ namespace mongo {
     //
 
     TEST(DBHelperTests, FindDiskLocs) {
-
-        DBDirectClient client;
         OperationContextImpl txn;
+        DBDirectClient client(&txn);
 
         // Some unique tag we can use to make sure we're pulling back the right data
         OID tag = OID::gen();
@@ -170,9 +169,8 @@ namespace mongo {
     //
 
     TEST(DBHelperTests, FindDiskLocsNoIndex) {
-
-        DBDirectClient client;
         OperationContextImpl txn;
+        DBDirectClient client(&txn);
 
         client.remove( ns, BSONObj() );
         client.insert( ns, BSON( "_id" << OID::gen() ) );
@@ -184,7 +182,7 @@ namespace mongo {
         long long estSizeBytes;
         {
             Lock::DBRead lk(txn.lockState(), ns);
-            Client::Context ctx( ns );
+            Client::Context ctx(&txn,  ns );
 
             // search invalid index range
             KeyRange range( ns,
@@ -212,9 +210,8 @@ namespace mongo {
     //
 
     TEST(DBHelperTests, FindDiskLocsTooBig) {
-
-        DBDirectClient client;
         OperationContextImpl txn;
+        DBDirectClient client(&txn);
 
         client.remove( ns, BSONObj() );
 
@@ -231,7 +228,7 @@ namespace mongo {
         long long estSizeBytes;
         {
             Lock::DBRead lk(txn.lockState(), ns);
-            Client::Context ctx( ns );
+            Client::Context ctx(&txn,  ns );
             KeyRange range( ns,
                             BSON( "_id" << 0 ),
                             BSON( "_id" << numDocsInserted ),

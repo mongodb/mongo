@@ -48,7 +48,9 @@ namespace QueryStageCount {
 
     class CountBase {
     public:
-        CountBase() { }
+        CountBase() : _client(&_txn) {
+        
+        }
 
         virtual ~CountBase() {
             Client::WriteContext ctx(&_txn, ns());
