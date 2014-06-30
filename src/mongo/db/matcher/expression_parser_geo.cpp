@@ -44,7 +44,8 @@ namespace mongo {
         if (BSONObj::opWITHIN == type || BSONObj::opGEO_INTERSECTS == type) {
             GeoQuery gq(name);
             if ( !gq.parseFrom( section ) )
-                return StatusWithMatchExpression( ErrorCodes::BadValue, "bad geo query" );
+                return StatusWithMatchExpression(ErrorCodes::BadValue, 
+                                                 string("bad geo query: ") + section.toString());
 
             auto_ptr<GeoMatchExpression> e( new GeoMatchExpression() );
 

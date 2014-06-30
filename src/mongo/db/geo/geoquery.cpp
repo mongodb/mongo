@@ -52,6 +52,7 @@ namespace mongo {
 
                 if ((GeoParser::isPoint(embeddedObj) && GeoParser::parsePoint(embeddedObj, &centroid))
                     || GeoParser::parsePointWithMaxDistance(embeddedObj, &centroid, &maxDistance)) {
+                    uassert(18522, "max distance must be non-negative", maxDistance >= 0.0);
                     hasGeometry = true;
                     isNearSphere = equals(e.fieldName(), "$nearSphere");
                 }
