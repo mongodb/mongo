@@ -158,6 +158,9 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 	jump_slot_offset = 0;
 	last_prefix = 0;
 
+	p = NULL;			/* -Werror=maybe-uninitialized */
+	size = 0;			/* -Werror=maybe-uninitialized */
+
 	direction = BACKWARD;
 	for (slot_offset = 0;;) {
 		if (0) {
