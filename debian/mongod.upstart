@@ -46,6 +46,8 @@ script
 
   if [ "x$ENABLE_MONGOD" = "xyes" ]
   then
-    exec start-stop-daemon --start --chuid $DAEMONUSER --exec $NUMACTL $DAEMON $DAEMON_OPTS
+    exec start-stop-daemon --start \
+        --chuid $DAEMONUSER \
+        --exec $NUMACTL $DAEMON $DAEMON_OPTS
   fi
 end script
