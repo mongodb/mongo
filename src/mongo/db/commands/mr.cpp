@@ -389,6 +389,7 @@ namespace mongo {
                         indexesToInsert.push_back( b.obj() );
                     }
                 }
+                finalCtx.commit();
             }
 
             {
@@ -415,6 +416,7 @@ namespace mongo {
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
                     repl::logOp(_txn, "i", logNs.c_str(), *it);
                 }
+                tempCtx.commit();
             }
 
         }
@@ -565,9 +567,11 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::DBWrite lock(_txn->lockState(), _config.outputOptions.finalNamespace);
+                    WriteUnitOfWork wunit(_txn->recoveryUnit());
                     BSONObj o = cursor->nextSafe();
                     Helpers::upsert( _txn, _config.outputOptions.finalNamespace , o );
                     _txn->recoveryUnit()->commitIfNeeded();
+                    wunit.commit();
                     pm.hit();
                 }
                 _db.dropCollection( _config.tempNamespace );
@@ -583,6 +587,7 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::GlobalWrite lock(txn->lockState()); // TODO(erh) why global?
+                    WriteUnitOfWork wunit(txn->recoveryUnit());
                     BSONObj temp = cursor->nextSafe();
                     BSONObj old;
 
@@ -611,6 +616,7 @@ namespace mongo {
                     else {
                         Helpers::upsert( _txn, _config.outputOptions.finalNamespace , temp );
                     }
+                    wunit.commit();
                     _txn->recoveryUnit()->commitIfNeeded();
                     pm.hit();
                 }
@@ -644,6 +650,7 @@ namespace mongo {
 
             coll->insertDocument( _txn, bo, true );
             repl::logOp(_txn, "i", ns.c_str(), bo);
+            ctx.commit();
         }
 
         /**
@@ -660,6 +667,7 @@ namespace mongo {
                                                   " collection expected: " << _config.incLong );
 
             coll->insertDocument( _txn, o, true );
+            ctx.commit();
             _txn->recoveryUnit()->commitIfNeeded();
         }
 
@@ -944,6 +952,7 @@ namespace mongo {
                         break;
                     }
                 }
+                incCtx.commit();
 
                 verify( foundIndex );
             }
@@ -1069,6 +1078,7 @@ namespace mongo {
                 return;
 
             Lock::DBWrite kl(_txn->lockState(), _config.incLong);
+            WriteUnitOfWork wunit(_txn->recoveryUnit());
 
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ) {
                 BSONList& all = i->second;
@@ -1080,6 +1090,7 @@ namespace mongo {
             }
             _temp->clear();
             _size = 0;
+            wunit.commit();
 
         }
 

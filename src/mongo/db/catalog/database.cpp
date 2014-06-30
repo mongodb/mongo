@@ -503,8 +503,10 @@ namespace mongo {
         log() << "dropAllDatabasesExceptLocal " << n.size() << endl;
         for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
             if( *i != "local" ) {
+                WriteUnitOfWork wunit(txn->recoveryUnit());
                 Client::Context ctx(txn, *i);
                 dropDatabase(txn, ctx.db());
+                wunit.commit();
             }
         }
     }

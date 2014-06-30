@@ -94,6 +94,7 @@ namespace {
                                      false/*logOp=false; local db so would work regardless...*/);
             if( !comment.isEmpty() && (!theReplSet || theReplSet->isPrimary()) )
                 logOpInitiate(&txn, comment);
+            cx.commit();
         }
         log() << "replSet saveConfigLocally done" << rsLog;
     }

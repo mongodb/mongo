@@ -84,6 +84,7 @@ namespace repl {
                 _me = b.obj();
                 Helpers::putSingleton(&txn, "local.me", _me);
             }
+            ctx.commit();
             // _me is used outside of a read lock, so we must copy it out of the mmap
             _me = _me.getOwned();
         }

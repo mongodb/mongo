@@ -115,6 +115,7 @@ namespace repl {
 
             // Make database stable
             Lock::DBWrite dbWrite(txn->lockState(), db);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
 
             if (!cloner.go(txn, db, master, options, NULL, err, &errCode)) {
                 sethbmsg(str::stream() << "initial sync: error while "
@@ -123,6 +124,7 @@ namespace repl {
                                        << "sleeping 5 minutes" ,0);
                 return false;
             }
+            wunit.commit();
         }
 
         return true;
@@ -142,6 +144,7 @@ namespace repl {
 
         LOG(1) << "replSet empty oplog" << rsLog;
         uassertStatusOK( collection->truncate(&txn) );
+        ctx.commit();
     }
 
     const Member* ReplSetImpl::getMemberToSyncTo() {
@@ -477,6 +480,7 @@ namespace repl {
 
             // Clear the initial sync flag.
             theReplSet->clearInitialSyncFlag();
+            cx.commit();
         }
         {
             boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);

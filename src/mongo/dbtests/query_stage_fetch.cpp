@@ -103,6 +103,7 @@ namespace QueryStageFetch {
             set<DiskLoc> locs;
             getLocs(&locs, coll);
             ASSERT_EQUALS(size_t(1), locs.size());
+            ctx.commit();
 
             // Create a mock stage that returns the WSM.
             auto_ptr<MockStage> mockStage(new MockStage(&ws));
@@ -199,6 +200,7 @@ namespace QueryStageFetch {
             // No more data to fetch, so, EOF.
             state = fetchStage->work(&id);
             ASSERT_EQUALS(PlanStage::IS_EOF, state);
+            ctx.commit();
         }
     };
 

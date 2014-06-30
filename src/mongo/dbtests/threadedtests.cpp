@@ -220,6 +220,7 @@ namespace ThreadedTests {
                             }
                             {
                                 Lock::DBWrite x(&lockState, "local");
+                                //  No actual writing here, so no WriteUnitOfWork
                                 if( sometimes ) {
                                     Lock::TempRelease t(&lockState);
                                 }

@@ -423,6 +423,7 @@ namespace mongo {
                 collection->deleteDocument( txn, rloc, false, false, &deletedId );
                 // The above throws on failure, and so is not logged
                 repl::logOp(txn, "d", ns.c_str(), deletedId, 0, 0, fromMigrate);
+                ctx.commit();
                 numDeleted++;
             }
 

@@ -182,6 +182,7 @@ namespace mongo {
                 // and that may need a global lock.
                 Lock::GlobalWrite lk(txn->lockState());
                 Client::Context context(txn, dbname);
+                WriteUnitOfWork wunit(txn->recoveryUnit());
 
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
@@ -192,6 +193,8 @@ namespace mongo {
 
                 if (!fromRepl)
                     repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+
+                wunit.commit();
             }
 
             result.append( "dropped" , dbname );
@@ -331,6 +334,7 @@ namespace mongo {
             // in the local database.
             //
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, dbname);
 
             BSONElement e = cmdObj.firstElement();
@@ -350,6 +354,7 @@ namespace mongo {
             if ( slow.isNumber() )
                 serverGlobalParams.slowMS = slow.numberInt();
 
+            wunit.commit();
             return ok;
         }
     } cmdProfile;
@@ -436,6 +441,7 @@ namespace mongo {
             }
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, nsToDrop);
             Database* db = ctx.db();
 
@@ -455,15 +461,16 @@ namespace mongo {
 
             Status s = db->dropCollection( txn, nsToDrop );
 
-            if ( s.isOK() ) {
-                if (!fromRepl)
-                    repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
-                return true;
+            if ( !s.isOK() ) {
+                return appendCommandStatus( result, s );
             }
             
-            appendCommandStatus( result, s );
+            if ( !fromRepl ) {
+                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+            }
+            wunit.commit();
+            return true;
 
-            return false;
         }
     } cmdDrop;
 
@@ -534,11 +541,17 @@ namespace mongo {
                         options.hasField("$nExtents"));
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, ns);
 
             // Create collection.
-            return appendCommandStatus( result,
-                                        userCreateNS(txn, ctx.db(), ns.c_str(), options, !fromRepl) );
+            status =  userCreateNS(txn, ctx.db(), ns.c_str(), options, !fromRepl);
+            if ( !status.isOK() ) {
+                return appendCommandStatus( result, status );
+            }
+
+            wunit.commit();
+            return true;
         }
     } cmdCreate;
 
@@ -570,6 +583,7 @@ namespace mongo {
 
         bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             Lock::GlobalWrite globalWriteLock(txn->lockState());
+            // No WriteUnitOfWork necessary, as no actual writes happen.
             Client::Context ctx(txn, dbname);
 
             try {
@@ -954,6 +968,7 @@ namespace mongo {
             const string ns = dbname + "." + jsobj.firstElement().valuestr();
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn,  ns );
 
             Collection* coll = ctx.db()->getCollection( txn, ns );
@@ -1035,11 +1050,17 @@ namespace mongo {
                     }
                 }
             }
-            
-            if (ok && !fromRepl)
-                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
 
-            return ok;
+            if (!ok) {
+                return false;
+            }
+            
+            if (!fromRepl) {
+                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+            }
+
+            wunit.commit();
+            return true;
         }
 
     } collectionModCommand;

@@ -145,6 +145,7 @@ namespace mongo {
                 }
 
             }
+            ctx.commit();
         }
     }
 

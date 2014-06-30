@@ -72,6 +72,7 @@ namespace mongo {
         if ( !status.isOK() ) {
             log() << "IndexBuilder could not build index: " << status.toString();
         }
+        ctx.commit();
 
         cc().shutdown();
     }

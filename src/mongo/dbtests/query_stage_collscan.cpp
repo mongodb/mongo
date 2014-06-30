@@ -59,6 +59,7 @@ namespace QueryStageCollectionScan {
 
         virtual ~QueryStageCollectionScanCappedBase() {
             _context.db()->dropCollection( &_txn, ns() );
+            wunit.commit();
         }
 
         void run() {
@@ -175,6 +176,7 @@ namespace QueryStageCollectionScan {
         Lock::GlobalWrite lk_;
         Client::Context _context;
         OperationContextImpl _txn;
+        WriteUnitOfWork wunit(_txn.recoveryUnit());
     };
 
     class QueryStageCollscanEmpty : public QueryStageCollectionScanCappedBase {
@@ -321,11 +323,13 @@ namespace QueryStageCollectionScan {
                 bob.append("foo", i);
                 _client.insert(ns(), bob.obj());
             }
+            ctx.commit();
         }
 
         virtual ~QueryStageCollectionScanBase() {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
+            ctx.commit();
         }
 
         void remove(const BSONObj& obj) {
@@ -552,6 +556,7 @@ namespace QueryStageCollectionScan {
                     ++count;
                 }
             }
+            ctx.commit();
 
             ASSERT_EQUALS(numObj(), count);
         }
@@ -613,6 +618,7 @@ namespace QueryStageCollectionScan {
                     ++count;
                 }
             }
+            ctx.commit();
 
             ASSERT_EQUALS(numObj(), count);
         }

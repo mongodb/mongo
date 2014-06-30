@@ -408,6 +408,7 @@ public:
                 toolError() << "ERROR recovering: " << ns << " " << e.toString() << std::endl;
             }
         }
+        cx.commit();
    
         return 0;
     }

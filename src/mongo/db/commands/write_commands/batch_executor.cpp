@@ -850,12 +850,14 @@ namespace mongo {
         incOpStats( updateItem );
 
         WriteOpResult result;
+
+        WriteUnitOfWork wunit(_txn->recoveryUnit());
         multiUpdate( _txn, updateItem, &result );
+        wunit.commit();
 
         if ( !result.getStats().upsertedID.isEmpty() ) {
             *upsertedId = result.getStats().upsertedID;
         }
-
         // END CURRENT OP
         incWriteStats( updateItem, result.getStats(), result.getError(), currentOp.get() );
         finishCurrentOp( _txn, _client, currentOp.get(), result.getError() );
@@ -925,6 +927,7 @@ namespace mongo {
         dassert(database);
         _collection = database->getCollection(txn, request->getTargetingNS());
         if (!_collection) {
+            WriteUnitOfWork wunit (txn->recoveryUnit());
             // Implicitly create if it doesn't exist
             _collection = database->createCollection(txn, request->getTargetingNS());
             if (!_collection) {
@@ -934,6 +937,7 @@ namespace mongo {
                                             request->getTargetingNS())));
                 return false;
             }
+            wunit.commit();
         }
         return true;
     }
@@ -966,12 +970,14 @@ namespace mongo {
 
         try {
             if (state->lockAndCheck(result)) {
+                WriteUnitOfWork wunit (state->txn->recoveryUnit());
                 if (!state->request->isInsertIndexRequest()) {
                     singleInsert(state->txn, insertDoc, state->getCollection(), result);
                 }
                 else {
                     singleCreateIndex(state->txn, insertDoc, state->getCollection(), result);
                 }
+                wunit.commit();
             }
         }
         catch (const DBException& ex) {
@@ -1096,6 +1102,7 @@ namespace mongo {
         Lock::DBWrite writeLock(txn->lockState(), nsString.ns(), useExperimentalDocLocking);
         ///////////////////////////////////////////
 
+        WriteUnitOfWork wunit(txn->recoveryUnit());
         if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
             return;
 
@@ -1122,6 +1129,7 @@ namespace mongo {
             }
             result->setError(toWriteError(status));
         }
+        wunit.commit();
     }
 
     /**
@@ -1150,6 +1158,7 @@ namespace mongo {
         ///////////////////////////////////////////
         Lock::DBWrite writeLock(txn->lockState(), nss.ns());
         ///////////////////////////////////////////
+        WriteUnitOfWork wunit(txn->recoveryUnit());
 
         // Check version once we're locked
 
@@ -1172,6 +1181,7 @@ namespace mongo {
             }
             result->setError(toWriteError(status));
         }
+        wunit.commit();
     }
 
 } // namespace mongo

@@ -68,6 +68,7 @@ namespace repl {
 
             const std::string ns = parseNs(dbname, cmdObj);
             Lock::GlobalWrite globalWriteLock(txn->lockState());
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, ns);
             if (replSettings.usingReplSets()) {
                 if (!theReplSet) {
@@ -96,6 +97,7 @@ namespace repl {
 
             ReplSource::forceResyncDead( txn, "client" );
             result.append( "info", "triggered resync for all sources" );
+            wunit.commit();
             return true;
         }
 

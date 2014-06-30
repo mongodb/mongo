@@ -37,6 +37,7 @@ namespace IndexCatalogTests {
             _db = ctx.ctx().db();
             _coll = _db->createCollection(&txn, _ns);
             _catalog = _coll->getIndexCatalog();
+            ctx.commit();
         }
 
         ~IndexIteratorTests() {
@@ -44,6 +45,7 @@ namespace IndexCatalogTests {
             Client::WriteContext ctx(&txn, _ns);
 
             _db->dropCollection(&txn, _ns);
+            ctx.commit();
         }
 
         void run() {
@@ -83,6 +85,7 @@ namespace IndexCatalogTests {
                 }
             }
 
+            ctx.commit();
             ASSERT_TRUE(indexesIterated == _catalog->numIndexesReady());
             ASSERT_TRUE(foundIndex);
         }

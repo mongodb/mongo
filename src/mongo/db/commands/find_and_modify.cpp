@@ -134,7 +134,9 @@ namespace mongo {
                                       string& errmsg) {
 
             Lock::DBWrite lk(txn->lockState(), ns);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context cx(txn, ns);
+            
             Collection* collection = cx.db()->getCollection( txn, ns );
 
             const WhereCallbackReal whereCallback = WhereCallbackReal(StringData(ns));
@@ -297,7 +299,7 @@ namespace mongo {
                     
                 }
             }
-            
+            wunit.commit();
             return true;
         }
         
@@ -330,6 +332,7 @@ namespace mongo {
             }
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, ns);
 
             BSONObj out = db.findOne(ns, q, fields);
@@ -423,9 +426,9 @@ namespace mongo {
 
             result.append("value", out);
 
+            wunit.commit();
             return true;
         }
     } cmdFindAndModify;
-
 
 }

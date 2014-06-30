@@ -136,6 +136,7 @@ namespace mongo {
                                            BSONObjBuilder &result,
                                            bool fromRepl ) {
             Lock::DBWrite dbXLock(db);
+            // The lock here is just to prevent concurrency, nothing will write.
             Client::Context ctx(txn, db);
 
             std::string profileFilename = cmdObj[commandName]["profileFilename"].String();
@@ -154,9 +155,11 @@ namespace mongo {
                                           BSONObjBuilder &result,
                                           bool fromRepl ) {
             Lock::DBWrite dbXLock(db);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, db);
 
             ::ProfilerStop();
+            wunit.commit();
             return true;
         }
 

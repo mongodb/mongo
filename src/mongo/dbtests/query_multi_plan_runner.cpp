@@ -164,6 +164,7 @@ namespace QueryMultiPlanRunner {
                 ASSERT_EQUALS(obj["foo"].numberInt(), 7);
                 ++results;
             }
+            ctx.commit();
 
             ASSERT_EQUALS(results, N / 10);
         }

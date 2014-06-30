@@ -94,11 +94,17 @@ namespace mongo {
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
-            if (ok && !fromRepl)
+            if (!ok) {
+                return false;
+            }
+            if (!fromRepl)
                 repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
-            return ok;
+            wunit.commit();
+            return true;
         }
+
         bool wrappedRun(OperationContext* txn,
                         const string& dbname,
                         BSONObj& jsobj,
@@ -222,6 +228,7 @@ namespace mongo {
             LOG(0) << "CMD: reIndex " << toDeleteNs << endl;
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, toDeleteNs);
 
             Collection* collection = ctx.db()->getCollection( txn, toDeleteNs );
@@ -272,6 +279,7 @@ namespace mongo {
             result.appendArray( "indexes" , b.obj() );
 
             IndexBuilder::restoreIndexes(indexesInProg);
+            wunit.commit();
             return true;
         }
     } cmdReIndex;

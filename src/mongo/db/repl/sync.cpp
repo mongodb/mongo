@@ -124,6 +124,7 @@ namespace repl {
             return false;
         }
         else {
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Collection* collection = ctx.db()->getOrCreateCollection(txn, ns);
             invariant(collection != NULL); // should never happen
 
@@ -133,6 +134,7 @@ namespace repl {
                     result.isOK() );
 
             LOG(1) << "replication inserted missing doc: " << missingObj.toString() << endl;
+            wunit.commit();
             return true;
         }
     }

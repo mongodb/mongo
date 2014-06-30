@@ -48,14 +48,15 @@ namespace PdfileTests {
         class Base {
         public:
             Base() : _lk(_txn.lockState()),
+            _wunit(_txn.recoveryUnit()),
                      _context(&_txn, ns()) {
-
             }
 
             virtual ~Base() {
                 if ( !collection() )
                     return;
                 _context.db()->dropCollection( &_txn, ns() );
+                 _wunit.commit();
             }
 
         protected:
@@ -68,7 +69,7 @@ namespace PdfileTests {
 
             OperationContextImpl _txn;
             Lock::GlobalWrite _lk;
-
+            WriteUnitOfWork _wunit;
             Client::Context _context;
         };
 
