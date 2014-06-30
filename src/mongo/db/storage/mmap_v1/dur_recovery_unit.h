@@ -64,9 +64,17 @@ namespace mongo {
     private:
         void recordPreimage(char* data, size_t len);
         void publishChanges();
-        void rollbackChanges();
-        void reset();
-        bool haveUncommitedChanges() { return !_changes.empty(); }
+        void rollbackInnermostChanges();
+
+        bool inAUnitOfWork() const { return !_startOfUncommittedChangesForLevel.empty(); }
+
+        bool inOutermostUnitOfWork() const {
+            return _startOfUncommittedChangesForLevel.size() == 1;
+        }
+
+        bool haveUncommitedChangesAtCurrentLevel() const {
+            return _changes.size() > _startOfUncommittedChangesForLevel.back();
+        }
 
         // The parent operation context. This pointer is not owned and it's lifetime must extend
         // past that of the DurRecoveryUnit
@@ -76,13 +84,9 @@ namespace mongo {
         // nesting.
         enum State {
             NORMAL, // anything is allowed
-            MUST_COMMIT, // can't rollback
-            MUST_ROLLBACK, // can't do anything else
+            MUST_COMMIT, // can't rollback (will go away once we have two-phase locking).
         };
         State _state;
-
-        // How many begins haven't had a matching end. TODO remove the need for this.
-        int _nestingLevel;
 
         struct Change {
             char* base;
@@ -96,9 +100,10 @@ namespace mongo {
         typedef std::vector<Change> Changes;
         Changes _changes;
 
-        // XXX: this will be meaningful once killCurrentOp doesn't examine this bool's evil sibling
-        // in client.h.  This requires killCurrentOp to go through OperationContext...
-        bool _hasWrittenSinceCheckpoint;
+        // Index of the first uncommited change in _changes for each nesting level. Index 0 in this
+        // vector is always the outermost transaction and back() is always the innermost. The size()
+        // is the current nesting level.
+        std::vector<size_t> _startOfUncommittedChangesForLevel;
     };
 
 }  // namespace mongo
