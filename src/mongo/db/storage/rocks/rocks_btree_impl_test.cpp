@@ -53,6 +53,11 @@ namespace mongo {
 
         virtual ~MyOperationContext() { }
 
+        Client* getClient() const {
+            invariant(false);
+            return NULL;
+        }
+
         CurOp* getCurOp() const {
             invariant(false);
             return NULL;
