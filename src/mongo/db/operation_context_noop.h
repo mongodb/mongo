@@ -25,13 +25,13 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
 
+#include "mongo/db/storage/recovery_unit_noop.h"
+#pragma once
 
 namespace mongo {
 

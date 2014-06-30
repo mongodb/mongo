@@ -313,7 +313,7 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollectionScanBase {
     public:
-        QueryStageCollectionScanBase() : _client(&_txn) {
+        QueryStageCollectionScanBase() {
             Client::WriteContext ctx(&_txn, ns());
 
             for (int i = 0; i < numObj(); ++i) {

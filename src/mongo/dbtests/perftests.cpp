@@ -41,7 +41,6 @@
 #include <fstream>
 
 #include "mongo/db/db.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/instance.h"
@@ -72,8 +71,8 @@ namespace PerfTests {
     class ClientBase {
     public:
         // NOTE: Not bothering to backup the old error record.
-        ClientBase() : _client(&_txn) {
-            mongo::lastError.reset(new LastError());
+        ClientBase() {
+            mongo::lastError.reset( new LastError() );
         }
         virtual ~ClientBase() {
 
@@ -92,7 +91,6 @@ namespace PerfTests {
         DBClientBase* client() { return &_client; }
 
     private:
-        OperationContextImpl _txn;
         DBDirectClient _client;
     };
 
@@ -358,9 +356,7 @@ namespace PerfTests {
             static int z;
             srand( ++z ^ (unsigned) time(0));
 #endif
-            OperationContextImpl txn;
-            DBDirectClient c(&txn);
-
+            DBDirectClient c;
             Client::initThreadIfNotAlready("perftestthr");
             const unsigned int Batch = batchSize();
             while( 1 ) {

@@ -228,9 +228,8 @@ namespace repl {
     bool ReplSetImpl::resync(string& errmsg) {
         changeState(MemberState::RS_RECOVERING);
 
+        Client::Context ctx("local");
         OperationContextImpl txn;
-        Client::Context ctx(&txn, "local");
-
         ctx.db()->dropCollection(&txn, "local.oplog.rs");
         {
             boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);

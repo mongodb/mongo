@@ -181,7 +181,7 @@ namespace mongo {
        Returns: true if object exists.
     */
     bool Helpers::getSingleton(OperationContext* txn, const char *ns, BSONObj& result) {
-        Client::Context context(txn, ns);
+        Client::Context context(ns);
         auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,
                                                                 context.db()->getCollection(txn,
                                                                                             ns)));
@@ -191,7 +191,7 @@ namespace mongo {
     }
 
     bool Helpers::getLast(OperationContext* txn, const char *ns, BSONObj& result) {
-        Client::Context ctx(txn, ns);
+        Client::Context ctx(ns);
         Collection* coll = ctx.db()->getCollection( txn, ns );
         auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,
                                                                 coll,
@@ -209,7 +209,7 @@ namespace mongo {
         BSONObj id = e.wrap();
 
         OpDebug debug;
-        Client::Context context(txn, ns);
+        Client::Context context(ns);
 
         const NamespaceString requestNs(ns);
         UpdateRequest request(requestNs);
@@ -227,7 +227,7 @@ namespace mongo {
 
     void Helpers::putSingleton(OperationContext* txn, const char *ns, BSONObj obj) {
         OpDebug debug;
-        Client::Context context(txn, ns);
+        Client::Context context(ns);
 
         const NamespaceString requestNs(ns);
         UpdateRequest request(requestNs);
@@ -245,7 +245,7 @@ namespace mongo {
 
     void Helpers::putSingletonGod(OperationContext* txn, const char *ns, BSONObj obj, bool logTheOp) {
         OpDebug debug;
-        Client::Context context(txn, ns);
+        Client::Context context(ns);
 
         const NamespaceString requestNs(ns);
         UpdateRequest request(requestNs);
@@ -546,7 +546,7 @@ namespace mongo {
 
 
     void Helpers::emptyCollection(OperationContext* txn, const char *ns) {
-        Client::Context context(txn, ns);
+        Client::Context context(ns);
         deleteObjects(txn, context.db(), ns, BSONObj(), false);
     }
 

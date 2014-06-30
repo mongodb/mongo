@@ -247,9 +247,7 @@ namespace mongo {
 
             try {
                 _txn->recoveryUnit()->syncDataAndTruncateJournal();
-
                 globalStorageEngine->flushAllFiles(true); // need both in case journaling is disabled
-
                 MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( _path ) );
             }
             catch ( DBException& e ) {
@@ -337,7 +335,7 @@ namespace mongo {
             map<string,CollectionOptions> namespacesToCopy;
             {
                 string ns = dbName + ".system.namespaces";
-                Client::Context ctx(txn,  ns );
+                Client::Context ctx( ns );
                 Collection* coll = originalDatabase->getCollection( txn, ns );
                 if ( coll ) {
                     scoped_ptr<RecordIterator> it( coll->getIterator( DiskLoc(),
@@ -379,11 +377,11 @@ namespace mongo {
 
                 Collection* tempCollection = NULL;
                 {
-                    Client::Context tempContext(txn, ns, tempDatabase );
+                    Client::Context tempContext( ns, tempDatabase );
                     tempCollection = tempDatabase->createCollection( txn, ns, options, true, false );
                 }
 
-                Client::Context readContext(txn, ns, originalDatabase);
+                Client::Context readContext( ns, originalDatabase );
                 Collection* originalCollection = originalDatabase->getCollection( txn, ns );
                 invariant( originalCollection );
 
@@ -399,7 +397,7 @@ namespace mongo {
                         indexes.push_back( desc->infoObj() );
                     }
 
-                    Client::Context tempContext(txn, ns, tempDatabase);
+                    Client::Context tempContext( ns, tempDatabase );
                     Status status = indexBlock.init( indexes );
                     if ( !status.isOK() )
                         return status;
@@ -415,7 +413,7 @@ namespace mongo {
 
                     BSONObj doc = originalCollection->docFor( loc );
 
-                    Client::Context tempContext(txn, ns, tempDatabase);
+                    Client::Context tempContext( ns, tempDatabase );
                     StatusWith<DiskLoc> result = tempCollection->insertDocument( txn, doc, indexBlock );
                     if ( !result.isOK() )
                         return result.getStatus();
@@ -425,7 +423,7 @@ namespace mongo {
                 }
 
                 {
-                    Client::Context tempContext(txn, ns, tempDatabase);
+                    Client::Context tempContext( ns, tempDatabase );
                     Status status = indexBlock.commit();
                     if ( !status.isOK() )
                         return status;
@@ -437,6 +435,7 @@ namespace mongo {
             globalStorageEngine->flushAllFiles(true); // need both in case journaling is disabled
 
             txn->checkForInterrupt(false);
+
         }
 
         // at this point if we abort, we don't want to delete new files
@@ -445,7 +444,7 @@ namespace mongo {
         if ( repairFileDeleter.get() )
             repairFileDeleter->success();
 
-        Client::Context ctx(txn, dbName);
+        Client::Context ctx( dbName );
         Database::closeDatabase(txn, dbName);
 
         if ( backupOriginalFiles ) {

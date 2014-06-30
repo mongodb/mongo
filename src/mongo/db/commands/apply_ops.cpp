@@ -133,7 +133,7 @@ namespace mongo {
                 Lock::DBWrite lk(txn->lockState(), ns);
                 invariant(txn->lockState()->isRecursive());
 
-                Client::Context ctx(txn, ns);
+                Client::Context ctx(ns);
                 bool failed = repl::applyOperation_inlock(txn,
                                                              ctx.db(),
                                                              temp,

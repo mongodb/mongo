@@ -335,7 +335,7 @@ namespace mongo {
             string dbName = *i;
             LOG(1) << "\t" << dbName << endl;
 
-            Client::Context ctx(&txn,  dbName );
+            Client::Context ctx( dbName );
 
             if (repl::replSettings.usingReplSets()) {
                 // we only care about the _id index if we are in a replset

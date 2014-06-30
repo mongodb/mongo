@@ -308,7 +308,7 @@ namespace mongo {
                 break;
 
             case 'u':
-                Client::Context ctx(txn,  _ns );
+                Client::Context ctx( _ns );
                 if ( ! Helpers::findById( txn, ctx.db(), _ns.c_str(), ide.wrap(), it ) ) {
                     warning() << "logOpForSharding couldn't find: " << ide << " even though should have" << migrateLog;
                     return;

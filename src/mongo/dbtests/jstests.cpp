@@ -29,19 +29,17 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/pch.h"
 
 #include <limits>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/timer.h"
-
 
 namespace mongo {
     bool dbEval(const string& dbName , BSONObj& cmd, BSONObjBuilder& result, string& errmsg);
@@ -918,10 +916,6 @@ namespace JSTests {
             }
             string utf8ObjSpec = "{'_id':'\\u0001\\u007f\\u07ff\\uffff'}";
             BSONObj utf8Obj = fromjson( utf8ObjSpec );
-
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
             client.insert( ns(), utf8Obj );
             client.eval( "unittest", "v = db.jstests.utf8check.findOne(); db.jstests.utf8check.remove( {} ); db.jstests.utf8check.insert( v );" );
             check( utf8Obj, client.findOne( ns(), BSONObj() ) );
@@ -933,15 +927,12 @@ namespace JSTests {
                 FAIL( fail.c_str() );
             }
         }
-
         void reset() {
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
             client.dropCollection( ns() );
         }
-
         static const char *ns() { return "unittest.jstests.utf8check"; }
+
+        DBDirectClient client;
     };
 
     class LongUtf8String {
@@ -951,21 +942,15 @@ namespace JSTests {
         void run() {
             if( !globalScriptEngine->utf8Ok() )
                 return;
-
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
             client.eval( "unittest", "db.jstests.longutf8string.save( {_id:'\\uffff\\uffff\\uffff\\uffff'} )" );
         }
     private:
         void reset() {
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
             client.dropCollection( ns() );
         }
-
         static const char *ns() { return "unittest.jstests.longutf8string"; }
+
+        DBDirectClient client;
     };
 
     class InvalidUTF8Check {
@@ -1036,12 +1021,10 @@ namespace JSTests {
         public:
             virtual ~TestRoundTrip() {}
             void run() {
+
                 // Insert in Javascript -> Find using DBDirectClient
 
                 // Drop the collection
-                OperationContextImpl txn;
-                DBDirectClient client(&txn);
-
                 client.dropCollection( "unittest.testroundtrip" );
 
                 // Insert in Javascript
@@ -1097,6 +1080,8 @@ namespace JSTests {
             virtual string jsonOut() const {
                 return json();
             }
+
+            DBDirectClient client;
         };
 
         class DBRefTest : public TestRoundTrip {
@@ -2008,9 +1993,7 @@ namespace JSTests {
             update.append( "_id" , "invalidstoredjs1" );
             update.appendCode( "value" , "function () { db.test.find().forEach(function(obj) { continue; }); }" );
 
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
+            DBDirectClient client;
             client.update( "test.system.js" , query.obj() , update.obj() , true /* upsert */ );
 
             scoped_ptr<Scope> s( globalScriptEngine->newScope() );

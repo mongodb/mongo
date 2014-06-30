@@ -42,7 +42,7 @@ namespace CountTests {
 
     class Base {
     public:
-        Base() : lk(_txn.lockState(), ns()), _context(&_txn, ns()) {
+        Base() : lk(_txn.lockState(), ns()), _context( ns() ) {
             _database = _context.db();
             _collection = _database->getCollection( &_txn, ns() );
             if ( _collection ) {

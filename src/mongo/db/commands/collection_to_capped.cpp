@@ -60,7 +60,7 @@ namespace mongo {
 
         // create new collection
         {
-            Client::Context ctx(txn,  toNs );
+            Client::Context ctx( toNs );
             BSONObjBuilder spec;
             spec.appendBool( "capped", true );
             spec.append( "size", size );
@@ -153,7 +153,7 @@ namespace mongo {
             }
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context ctx(txn, dbname);
+            Client::Context ctx(dbname);
 
             Status status = cloneCollectionAsCapped( txn, ctx.db(), from, to, size, temp, true );
             return appendCommandStatus( result, status );
@@ -200,7 +200,7 @@ namespace mongo {
             // calls renamecollection which does a global lock, so we must too:
             //
             Lock::GlobalWrite globalWriteLock(txn->lockState());
-            Client::Context ctx(txn, dbname);
+            Client::Context ctx(dbname);
 
             Database* db = ctx.db();
 

@@ -128,16 +128,15 @@ namespace ReplSetTests {
 
 
     class Base {
+    private:
+        DBDirectClient _client;
+
     protected:
         static BackgroundSyncTest* _bgsync;
         static repl::SyncTail* _tailer;
 
-        OperationContextImpl _txn;
-        DBDirectClient _client;
-
     public:
-        Base() : _client(&_txn) {
-
+        Base() {
         }
 
         ~Base() {
@@ -147,22 +146,48 @@ namespace ReplSetTests {
             return "unittests.repltests";
         }
 
-        BSONObj findOne( const BSONObj &query = BSONObj() ) {
-            return _client.findOne( ns(), query );
-        }
+        DBDirectClient *client() { return &_client; }
 
-        void drop() {
-            Client::WriteContext c(&_txn, ns());
+        static void insert( const BSONObj &o, bool god = false ) {
+            OperationContextImpl txn;
+            Lock::DBWrite lk(txn.lockState(), ns());
+            Client::Context ctx(ns());
+            
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection(&txn, ns());
+            if (!coll) {
+                coll = db->createCollection(&txn, ns());
+            }
 
-            Database* db = c.ctx().db();
-
-            if ( db->getCollection( &_txn, ns() ) == NULL ) {
+            if (o.hasField("_id")) {
+                coll->insertDocument(&txn, o, true);
                 return;
             }
 
-            db->dropCollection(&_txn, ns());
+            class BSONObjBuilder b;
+            OID id;
+            id.init();
+            b.appendOID("_id", &id);
+            b.appendElements(o);
+            coll->insertDocument(&txn, b.obj(), true);
         }
 
+        BSONObj findOne( const BSONObj &query = BSONObj() ) {
+            return client()->findOne( ns(), query );
+        }
+
+        void drop() {
+            OperationContextImpl txn;
+            Client::WriteContext c(&txn, ns());
+
+            Database* db = c.ctx().db();
+
+            if ( db->getCollection( &txn, ns() ) == NULL ) {
+                return;
+            }
+
+            db->dropCollection(&txn, ns());
+        }
         static void setup() {
             replSettings.replSet = "foo";
             replSettings.oplogSize = 5 * 1024 * 1024;
@@ -180,29 +205,6 @@ namespace ReplSetTests {
 
             delete repl::theReplSet;
             repl::theReplSet = rst;
-        }
-
-        static void insert(OperationContext* txn, const BSONObj &o, bool god = false) {
-            Lock::DBWrite lk(txn->lockState(), ns());
-            Client::Context ctx(txn, ns());
-
-            Database* db = ctx.db();
-            Collection* coll = db->getCollection(txn, ns());
-            if (!coll) {
-                coll = db->createCollection(txn, ns());
-            }
-
-            if (o.hasField("_id")) {
-                coll->insertDocument(txn, o, true);
-                return;
-            }
-
-            class BSONObjBuilder b;
-            OID id;
-            id.init();
-            b.appendOID("_id", &id);
-            b.appendElements(o);
-            coll->insertDocument(txn, b.obj(), true);
         }
     };
 
@@ -272,7 +274,7 @@ namespace ReplSetTests {
                 return true;
             }
 
-            Base::insert(txn, BSON("_id" << 123));
+            Base::insert(BSON("_id" << 123));
             return true;
         }
     };
@@ -307,6 +309,7 @@ namespace ReplSetTests {
     class CappedInitialSync : public Base {
         string _cappedNs;
 
+        OperationContextImpl _txn;
         Lock::DBWrite _lk;
 
         string spec() const {
@@ -314,15 +317,17 @@ namespace ReplSetTests {
         }
 
         void create() {
-            Client::Context c(&_txn, _cappedNs);
-            ASSERT( userCreateNS( &_txn, c.db(), _cappedNs, fromjson( spec() ), false ).isOK() );
+            Client::Context c(_cappedNs);
+            OperationContextImpl txn;
+            ASSERT( userCreateNS( &txn, c.db(), _cappedNs, fromjson( spec() ), false ).isOK() );
         }
 
         void dropCapped() {
-            Client::Context c(&_txn, _cappedNs);
+            Client::Context c(_cappedNs);
+            OperationContextImpl txn;
             Database* db = c.db();
-            if ( db->getCollection( &_txn, _cappedNs ) ) {
-                db->dropCollection( &_txn, _cappedNs );
+            if ( db->getCollection( &txn, _cappedNs ) ) {
+                db->dropCollection( &txn, _cappedNs );
             }
         }
 
@@ -340,7 +345,6 @@ namespace ReplSetTests {
             verify(!apply(o));
             return o;
         }
-
     public:
         CappedInitialSync() : 
                 _cappedNs("unittests.foo.bar"), _lk(_txn.lockState(), _cappedNs) {
@@ -357,18 +361,20 @@ namespace ReplSetTests {
 
         // returns true on success, false on failure
         bool apply(const BSONObj& op) {
-            Client::Context ctx(&_txn,  _cappedNs );
+            Client::Context ctx( _cappedNs );
+            OperationContextImpl txn;
             // in an annoying twist of api, returns true on failure
-            return !applyOperation_inlock(&_txn, ctx.db(), op, true);
+            return !applyOperation_inlock(&txn, ctx.db(), op, true);
         }
 
         void run() {
-            Lock::DBWrite lk(_txn.lockState(), _cappedNs);
+            OperationContextImpl txn;
+            Lock::DBWrite lk(txn.lockState(), _cappedNs);
 
             BSONObj op = updateFail();
 
             Sync s("");
-            verify(!s.shouldRetry(&_txn, op));
+            verify(!s.shouldRetry(&txn, op));
         }
     };
 
@@ -387,7 +393,7 @@ namespace ReplSetTests {
         }
 
         void insert(OperationContext* txn) {
-            Client::Context ctx(txn, cappedNs());
+            Client::Context ctx(cappedNs());
             Database* db = ctx.db();
             Collection* coll = db->getCollection(txn, cappedNs());
             if (!coll) {
@@ -401,19 +407,21 @@ namespace ReplSetTests {
     public:
         virtual ~CappedUpdate() {}
         void run() {
+            OperationContextImpl txn;
+
             // RARELY shoud be once/128x
             for (int i=0; i<150; i++) {
-                insert(&_txn);
+                insert(&txn);
                 updateSucceed();
             }
 
-            DBDirectClient client(&_txn);
+            DBDirectClient client(&txn);
             int count = (int) client.count(cappedNs(), BSONObj());
             verify(count > 1);
 
             // check _id index created
-            Client::Context ctx(&_txn, cappedNs());
-            Collection* collection = ctx.db()->getCollection( &_txn, cappedNs() );
+            Client::Context ctx(cappedNs());
+            Collection* collection = ctx.db()->getCollection( &txn, cappedNs() );
             verify(collection->getIndexCatalog()->findIdIndex());
         }
     };
@@ -432,6 +440,7 @@ namespace ReplSetTests {
     public:
         virtual ~CappedInsert() {}
         void run() {
+            OperationContextImpl txn;
             // This will succeed, but not insert anything because they are changed to upserts
             for (int i=0; i<150; i++) {
                 insertSucceed();
@@ -439,8 +448,8 @@ namespace ReplSetTests {
 
             // this changed in 2.1.2
             // we now have indexes on capped collections
-            Client::Context ctx(&_txn, cappedNs());
-            Collection* collection = ctx.db()->getCollection( &_txn, cappedNs() );
+            Client::Context ctx(cappedNs());
+            Collection* collection = ctx.db()->getCollection( &txn, cappedNs() );
             verify(collection->getIndexCatalog()->findIdIndex());
         }
     };
@@ -532,13 +541,13 @@ namespace ReplSetTests {
             addInserts(100);
             applyOplog();
 
-            ASSERT_EQUALS(expected, static_cast<int>(_client.count(ns())));
+            ASSERT_EQUALS(expected, static_cast<int>(client()->count(ns())));
 
             drop();
             addVersionedInserts(100);
             applyOplog();
 
-            ASSERT_EQUALS(expected, static_cast<int>(_client.count(ns())));
+            ASSERT_EQUALS(expected, static_cast<int>(client()->count(ns())));
 
             drop();
             addUpdates();

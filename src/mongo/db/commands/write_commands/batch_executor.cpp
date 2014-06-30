@@ -918,9 +918,8 @@ namespace mongo {
         if (!checkIndexConstraints(txn, &shardingState, *request, result)) {
             return false;
         }
-
-        _context.reset(new Client::Context(txn, request->getNS(), false));
-
+        _context.reset(new Client::Context(request->getNS(),
+                                           false /* don't check version */));
         Database* database = _context->db();
         dassert(database);
         _collection = database->getCollection(txn, request->getTargetingNS());
@@ -1099,7 +1098,7 @@ namespace mongo {
         if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
             return;
 
-        Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
+        Client::Context ctx(nsString.ns(), false /* don't check version */);
 
         try {
             UpdateResult res = executor.execute(txn, ctx.db());
@@ -1160,7 +1159,8 @@ namespace mongo {
 
         // Context once we're locked, to set more details in currentOp()
         // TODO: better constructor?
-        Client::Context writeContext(txn, nss.ns(), false /* don't check version */);
+        Client::Context writeContext( nss.ns(),
+                                      false /* don't check version */);
 
         try {
             result->getStats().n = executor.execute(txn, writeContext.db());

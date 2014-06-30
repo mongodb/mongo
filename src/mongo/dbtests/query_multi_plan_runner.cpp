@@ -57,9 +57,7 @@ namespace QueryMultiPlanRunner {
 
     class MultiPlanRunnerBase {
     public:
-        MultiPlanRunnerBase() : _client(&_txn) {
-
-        }
+        MultiPlanRunnerBase() { }
 
         virtual ~MultiPlanRunnerBase() {
             _client.dropCollection(ns());
@@ -84,8 +82,7 @@ namespace QueryMultiPlanRunner {
 
         static const char* ns() { return "unittests.QueryStageMultiPlanRunner"; }
 
-    protected:
-        OperationContextImpl _txn;
+    private:
         DBDirectClient _client;
     };
 
@@ -95,7 +92,8 @@ namespace QueryMultiPlanRunner {
     class MPRCollectionScanVsHighlySelectiveIXScan : public MultiPlanRunnerBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, ns());
 
             const int N = 5000;
             for (int i = 0; i < N; ++i) {
@@ -108,14 +106,14 @@ namespace QueryMultiPlanRunner {
             // Every call to work() returns something so this should clearly win (by current scoring
             // at least).
             IndexScanParams ixparams;
-            ixparams.descriptor = getIndex(&_txn, ctx.ctx().db(), BSON("foo" << 1));
+            ixparams.descriptor = getIndex(&txn, ctx.ctx().db(), BSON("foo" << 1));
             ixparams.bounds.isSimpleRange = true;
             ixparams.bounds.startKey = BSON("" << 7);
             ixparams.bounds.endKey = BSON("" << 7);
             ixparams.bounds.endKeyInclusive = true;
             ixparams.direction = 1;
 
-            const Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
+            const Collection* coll = ctx.ctx().db()->getCollection(&txn, ns());
 
             auto_ptr<WorkingSet> sharedWs(new WorkingSet());
             IndexScan* ix = new IndexScan(ixparams, sharedWs.get(), NULL);
@@ -123,7 +121,7 @@ namespace QueryMultiPlanRunner {
 
             // Plan 1: CollScan with matcher.
             CollectionScanParams csparams;
-            csparams.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
+            csparams.collection = ctx.ctx().db()->getCollection( &txn, ns() );
             csparams.direction = CollectionScanParams::FORWARD;
 
             // Make the filter.
@@ -140,7 +138,7 @@ namespace QueryMultiPlanRunner {
             verify(CanonicalQuery::canonicalize(ns(), BSON("foo" << 7), &cq).isOK());
             verify(NULL != cq);
 
-            MultiPlanStage* mps = new MultiPlanStage(ctx.ctx().db()->getCollection(&_txn, ns()),cq);
+            MultiPlanStage* mps = new MultiPlanStage(ctx.ctx().db()->getCollection(&txn, ns()),cq);
             mps->addPlan(createQuerySolution(), firstRoot.release(), sharedWs.get());
             mps->addPlan(createQuerySolution(), secondRoot.release(), sharedWs.get());
 
@@ -150,7 +148,7 @@ namespace QueryMultiPlanRunner {
             ASSERT_EQUALS(0, mps->bestPlanIdx());
 
             SingleSolutionRunner sr(
-                ctx.ctx().db()->getCollection(&_txn, ns()),
+                ctx.ctx().db()->getCollection(&txn, ns()),
                 cq,
                 mps->bestSolution(),
                 mps,

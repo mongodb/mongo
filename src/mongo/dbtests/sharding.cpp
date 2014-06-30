@@ -28,11 +28,10 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/pch.h"
 
 #include "mongo/client/dbclientmockcursor.h"
 #include "mongo/client/parallel.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/config_server_fixture.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/s/chunk_diff.h"
@@ -82,11 +81,10 @@ namespace ShardingTests {
     class ChunkManagerTest : public ConnectionString::ConnectionHook {
     public:
 
-        OperationContextImpl _txn;
         CustomDirectClient _client;
         Shard _shard;
 
-        ChunkManagerTest() : _client(&_txn) {
+        ChunkManagerTest() {
 
             DBException::traceExceptions = true;
 
@@ -133,7 +131,7 @@ namespace ShardingTests {
                                        double socketTimeout )
         {
             // Note - must be new, since it gets owned elsewhere
-            return new CustomDirectClient(&_txn);
+            return new CustomDirectClient();
         }
     };
 

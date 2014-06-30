@@ -31,7 +31,6 @@
  */
 
 #include "mongo/db/instance.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/unittest/unittest.h"
 
 using mongo::BSONObj;
@@ -39,8 +38,7 @@ using mongo::DBDirectClient;
 
 using std::string;
 
-namespace mongo {
-
+namespace mongo_test {
     class Profiler: public mongo::unittest::Test {
     public:
         static const string PROFILER_TEST_DB;
@@ -50,13 +48,11 @@ namespace mongo {
     protected:
         void setUp() {
             BSONObj ret;
-
-            OperationContextImpl txn;
-            DBDirectClient db(&txn);
-
             db.runCommand(PROFILER_TEST_DB, BSON("dropDatabase" << 1), ret);
             ASSERT(ret["ok"].trueValue());
         }
+
+        DBDirectClient db;
     };
 
     const string Profiler::PROFILER_TEST_DB = "profilerTestDB";
@@ -67,9 +63,6 @@ namespace mongo {
         // Test that update with large document with a long string can be
         // be profiled in a shortened version
         const string bigStr(16 * (1 << 20) - 200, 'a');
-
-        OperationContextImpl txn;
-        DBDirectClient db(&txn);
 
         {
             BSONObj replyObj;
@@ -102,8 +95,7 @@ namespace mongo {
             builder.append(fieldName, x);
         }
 
-        OperationContextImpl txn;
-        DBDirectClient db(&txn);
+        DBDirectClient db;
 
         {
             BSONObj replyObj;

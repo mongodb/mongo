@@ -36,15 +36,9 @@
 
 namespace mongo {
 
-    class OperationContext;
-
     class CustomDirectClient: public DBDirectClient {
     public:
         CustomDirectClient() {
-            setWireVersions(minWireVersion, maxWireVersion);
-        }
-
-        CustomDirectClient(OperationContext* txn) : DBDirectClient(txn) {
             setWireVersions(minWireVersion, maxWireVersion);
         }
 
