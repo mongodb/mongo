@@ -452,16 +452,20 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 	 * An internal page key is in one of two places: if we instantiated the
 	 * key (for example, when reading the page), WT_REF.key.ikey references
 	 * a WT_IKEY structure, otherwise WT_REF.key.ikey references an on-page
-	 * key.
+	 * key offset/length pair.
 	 *
-	 * Now the magic: Any allocated memory will have a low-order bit of 0
-	 * (the return from malloc must be aligned to store any standard type,
-	 * and we assume there's always going to be a standard type requiring
-	 * even-byte alignment).  An on-page key consists of an offset/length
-	 * pair.  We can fit the maximum page size into 31 bits, so we use the
-	 * low-order bit in the on-page value to flag the next 31 bits as a
-	 * page offset and the other 32 bits as the key's length, not a WT_IKEY
-	 * pointer.  This breaks if allocation chunks aren't even-byte aligned.
+	 * Now the magic: allocated memory must be aligned to store any standard
+	 * type, and we expect some standard type to require at least quad-byte
+	 * alignment, so allocated memory should have some clear low-order bits.
+	 * On-page objects consist of an offset/length pair: the maximum page
+	 * size currently fits into 29 bits, so we use the low-order bits of the
+	 * pointer to mark the other bits of the bottom 4B of the pointer as a
+	 * page offset, and the top 4B of the pointer as the offset's length,
+	 * not a real pointer.  This breaks if allocated memory isn't aligned,
+	 * of course.
+	 *
+	 * In this specific case, we use bit 0x01 to mark an on-page key, not a
+	 * WT_IKEY reference.
 	 */
 	v = (uintptr_t)ref->key.ikey;
 	if (v & 0x01) {
@@ -537,44 +541,47 @@ __wt_row_leaf_key_info(WT_PAGE *page, void *copy,
 	/*
 	 * A row-store leaf page key is in one of two places: if instantiated,
 	 * the WT_ROW pointer references a WT_IKEY structure, otherwise, it
-	 * references an on-page location.  However, on-page keys are in one of
+	 * references an on-page offset.  Further, on-page keys are in one of
 	 * two states: if the key is a simple key (not an overflow key, prefix
-	 * compressed or Huffman encoded all of which are likely), the key's
+	 * compressed or Huffman encoded, all of which are likely), the key's
 	 * offset/size is encoded in the pointer.  Otherwise, the offset is to
 	 * the key's on-page cell.
 	 *
-	 * Now the magic: Any allocated memory will have a low-order bit of 0
-	 * (the return from malloc must be aligned to store any standard type,
-	 * and we assume there's always going to be a standard type requiring
-	 * even-byte alignment).  An on-page key consists of an offset/length
-	 * pair.  We can fit the maximum page size into 31 bits, so we use the
-	 * low-order bit in the on-page value to flag the next 31 bits as a
-	 * page offset and the other 32 bits as the key's length, not a WT_IKEY
-	 * pointer.  This breaks if allocation chunks aren't even-byte aligned.
+	 * Now the magic: allocated memory must be aligned to store any standard
+	 * type, and we expect some standard type to require at least quad-byte
+	 * alignment, so allocated memory should have some clear low-order bits.
+	 * On-page objects consist of an offset/length pair: the maximum page
+	 * size currently fits into 29 bits, so we use the low-order bits of the
+	 * pointer to mark the other bits of the bottom 4B of the pointer as a
+	 * page offset, and the top 4B of the pointer as the offset's length,
+	 * not a real pointer.  This breaks if allocated memory isn't aligned,
+	 * of course.
 	 *
-	 * To distinguish between an on-page key and an on-page cell, we set
-	 * the size to 0 in the case on an on-page cell.
+	 * In this specific case, we use bit 0x01 to mark an on-page key, bit
+	 * 0x02 to mark an on-page cell, otherwise it's a WT_IKEY reference.
+	 * We could easily reduce this to a single bit if the maximum page size
+	 * grows by using 0x01 for both on-page cases, and using a length of 0
+	 * to distinguish between an on-page key and an on-page cell.
 	 *
 	 * Perform the tests in the order we think mostly probable, this call is
 	 * all about speed.
 	 *
 	 * This function returns a list of things about the key (instantiation
-	 * reference, cell reference, unpacked cell, and key/length pair).  Our
-	 * callers sometimes want some things, and sometimes others, we fill in
-	 * the information we have based on the arguments we're passed; since
-	 * this is an inlined function, we're depending on the compiler to drop
-	 * code we don't need.
+	 * reference, cell reference and key/length pair).  Our callers know
+	 * the order in which we look things up and return this information;
+	 * for example, the cell will never be returned if we are working with
+	 * an on-page key.
 	 */
 
 	/* On-page key: no instantiated key, no cell. */
-	if (v & 0x01 && (v & 0xFFFFFFFF00000000) != 0) {
+	if (v & 0x01) {
 		if (cellp != NULL)
 			*cellp = NULL;
 		if (ikeyp != NULL)
 			*ikeyp = NULL;
 		if (datap != NULL) {
 			*(void **)datap =
-			    WT_PAGE_REF_OFFSET(page, (v & 0xFFFFFFFF) >> 1);
+			    WT_PAGE_REF_OFFSET(page, (v & 0xFFFFFFFF) >> 2);
 			*sizep = v >> 32;
 			return (1);
 		}
@@ -582,12 +589,12 @@ __wt_row_leaf_key_info(WT_PAGE *page, void *copy,
 	}
 
 	/* On-page cell: no instantiated key. */
-	if (v & 0x01) {
+	if (v & 0x02) {
 		if (ikeyp != NULL)
 			*ikeyp = NULL;
 		if (cellp != NULL)
 			*cellp =
-			    WT_PAGE_REF_OFFSET(page, (v & 0xFFFFFFFF) >> 1);
+			    WT_PAGE_REF_OFFSET(page, (v & 0xFFFFFFFF) >> 2);
 		return (0);
 	}
 
@@ -619,7 +626,7 @@ __wt_row_leaf_key_set(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *unpack)
 	 * magic.
 	 */
 	v = (uintptr_t)unpack->size << 32 |
-	    (uint32_t)WT_PAGE_DISK_OFFSET(page, unpack->data) << 1 | 0x01;
+	    (uint32_t)WT_PAGE_DISK_OFFSET(page, unpack->data) << 2 | 0x01;
 	WT_ROW_KEY_SET(rip, v);
 }
 
@@ -636,7 +643,7 @@ __wt_row_leaf_key_set_cell(WT_PAGE *page, WT_ROW *rip, WT_CELL *cell)
 	 * See the comment in __wt_row_leaf_key_info for an explanation of the
 	 * magic.
 	 */
-	v = (uintptr_t)WT_PAGE_DISK_OFFSET(page, cell) << 1 | 0x01;
+	v = (uintptr_t)WT_PAGE_DISK_OFFSET(page, cell) << 2 | 0x02;
 	WT_ROW_KEY_SET(rip, v);
 }
 
