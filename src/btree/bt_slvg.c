@@ -1891,7 +1891,8 @@ err:		WT_TRET(__wt_page_release(session, ref));
 
 /*
  * __slvg_row_merge_ovfl --
- *	Free file blocks referenced from keys discarded from merged pages.
+ *	Free file blocks referenced from key/value pairs discarded from merged
+ * pages.
  */
 static int
 __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
@@ -1900,20 +1901,17 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 	WT_BM *bm;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_IKEY *ikey;
 	WT_ROW *rip;
+	void *copy;
 
 	bm = S2BT(session)->bm;
 	unpack = &_unpack;
 
 	for (rip = page->pg_row_d + start; start < stop; ++start) {
-		if (!F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY)) {
-			ikey = WT_ROW_KEY_COPY(rip);
-			if (__wt_off_page(page, ikey))
-				cell =
-				    WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-			else
-				cell = (WT_CELL *)ikey;
+		copy = WT_ROW_KEY_COPY(rip);
+		(void)__wt_row_leaf_key_info(
+		    page, copy, NULL, &cell, NULL, NULL);
+		if (cell != NULL) {
 			__wt_cell_unpack(cell, unpack);
 			if (unpack->type == WT_CELL_KEY_OVFL) {
 				WT_RET(__wt_verbose(session, WT_VERB_SALVAGE,
@@ -1924,12 +1922,12 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 				    __wt_addr_string(session, unpack->data,
 				    unpack->size, trk->ss->tmp2)));
 
-			WT_RET(bm->free(
-			    bm, session, unpack->data, unpack->size));
+				WT_RET(bm->free(
+				    bm, session, unpack->data, unpack->size));
 			}
 		}
 
-		if ((cell = __wt_row_leaf_value(page, rip)) == NULL)
+		if ((cell = __wt_row_leaf_value(page, rip, NULL)) == NULL)
 			continue;
 		__wt_cell_unpack(cell, unpack);
 		if (unpack->type == WT_CELL_VALUE_OVFL) {

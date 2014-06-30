@@ -127,6 +127,7 @@ INTL
 INUSE
 ISSET
 ITEMs
+Inline
 Ippokratis
 JPEG
 JSON
@@ -571,6 +572,7 @@ init
 initn
 initsize
 inline
+inlined
 inmem
 insertK
 insertV

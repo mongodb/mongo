@@ -178,7 +178,6 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	WT_ITEM *kb, *vb;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_IKEY *ikey;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	int key_unpacked;
@@ -200,83 +199,75 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	copy = WT_ROW_KEY_COPY(rip);
 
 	/*
-	 * Get a reference to the key, ideally without doing a copy: we could
-	 * call __wt_row_leaf_key, but if a cursor is running through the tree,
-	 * we actually have more information here than that function has, we
-	 * may have the prefix-compressed key that comes immediately before the
-	 * one we want.
+	 * Get a key: we could just call __wt_row_leaf_key, but as a cursor
+	 * is running through the tree, we may have additional information
+	 * here (we may have the fully-built key that's immediately before
+	 * the prefix-compressed key one we want).
 	 *
-	 * If the key can be accessed directly, or has been instantiated (the
-	 * key points off-page), we don't have any work to do.
-	 *
-	 * If the key points on-page, we have a copy of a WT_CELL value that can
-	 * be processed, regardless of what any other thread is doing.
+	 * First, check for an immediately available key.
 	 */
-	if (F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY))
-		__wt_row_leaf_direct(page, copy, kb);
-	else if (__wt_off_page(page, copy)) {
-		ikey = copy;
-		kb->data = WT_IKEY_DATA(ikey);
-		kb->size = ikey->size;
-	} else {
-		/*
-		 * If the key is simple and on-page and not prefix-compressed,
-		 * or we have the previous expanded key in the cursor buffer,
-		 * reference or build it.  Else, call __wt_row_leaf_key_work to
-		 * do it the hard way.
-		 */
-		if (btree->huffman_key != NULL)
-			goto slow;
-		__wt_cell_unpack_with_value(page, copy, unpack);
-		key_unpacked = 1;
-		if (unpack->type == WT_CELL_KEY && unpack->prefix == 0) {
-			cbt->tmp.data = unpack->data;
-			cbt->tmp.size = unpack->size;
-		} else if (unpack->type == WT_CELL_KEY &&
-		    cbt->rip_saved != NULL && cbt->rip_saved == rip - 1) {
-			WT_ASSERT(session, cbt->tmp.size >= unpack->prefix);
+	if (__wt_row_leaf_key_info(
+	    page, copy, NULL, &cell, &kb->data, &kb->size))
+		goto value;
 
-			/*
-			 * Grow the buffer as necessary as well as ensure data
-			 * has been copied into local buffer space, then append
-			 * the suffix to the prefix already in the buffer.
-			 *
-			 * Don't grow the buffer unnecessarily or copy data we
-			 * don't need, truncate the item's data length to the
-			 * prefix bytes.
-			 */
-			cbt->tmp.size = unpack->prefix;
-			WT_RET(__wt_buf_grow(
-			    session, &cbt->tmp, cbt->tmp.size + unpack->size));
-			memcpy((uint8_t *)cbt->tmp.data + cbt->tmp.size,
-			    unpack->data, unpack->size);
-			cbt->tmp.size += unpack->size;
-		} else {
-			/*
-			 * __wt_row_leaf_key_work instead of __wt_row_leaf_key:
-			 * we do __wt_row_leaf_key's fast-path checks inline.
-			 */
-slow:			WT_RET(__wt_row_leaf_key_work(
-			    session, page, rip, &cbt->tmp, 0));
-		}
-		kb->data = cbt->tmp.data;
-		kb->size = cbt->tmp.size;
-		cbt->rip_saved = rip;
-	}
+	/* Huffman encoded keys are a slow path in all cases. */
+	if (btree->huffman_key != NULL)
+		goto slow;
 
 	/*
-	 * If the item was ever modified, use the WT_UPDATE data.  Note that
-	 * the caller passes us the update: it has already resolved which one
+	 * Unpack the cell and deal with overflow and prefix-compressed keys.
+	 * Inline building simple prefix-compressed keys from a previous key,
+	 * otherwise build from scratch.
+	 */
+	__wt_cell_unpack(cell, unpack);
+	key_unpacked = 1;
+	if (unpack->type == WT_CELL_KEY &&
+	    cbt->rip_saved != NULL && cbt->rip_saved == rip - 1) {
+		WT_ASSERT(session, cbt->tmp.size >= unpack->prefix);
+
+		/*
+		 * Grow the buffer as necessary as well as ensure data has been
+		 * copied into local buffer space, then append the suffix to the
+		 * prefix already in the buffer.
+		 *
+		 * Don't grow the buffer unnecessarily or copy data we don't
+		 * need, truncate the item's data length to the prefix bytes.
+		 */
+		cbt->tmp.size = unpack->prefix;
+		WT_RET(__wt_buf_grow(
+		    session, &cbt->tmp, cbt->tmp.size + unpack->size));
+		memcpy((uint8_t *)cbt->tmp.data + cbt->tmp.size,
+		    unpack->data, unpack->size);
+		cbt->tmp.size += unpack->size;
+	} else {
+		/*
+		 * Call __wt_row_leaf_key_work instead of __wt_row_leaf_key: we
+		 * already did __wt_row_leaf_key's fast-path checks inline.
+		 */
+slow:		WT_RET(
+		    __wt_row_leaf_key_work(session, page, rip, &cbt->tmp, 0));
+	}
+	kb->data = cbt->tmp.data;
+	kb->size = cbt->tmp.size;
+	cbt->rip_saved = rip;
+
+value:
+	/*
+	 * If the item was ever modified, use the WT_UPDATE data.  Note the
+	 * caller passes us the update: it has already resolved which one
 	 * (if any) is visible.
-	 * Else, check for empty data.
-	 * Else, use the value from the original disk image.
 	 */
 	if (upd != NULL) {
 		vb->data = WT_UPDATE_DATA(upd);
 		vb->size = upd->size;
 		return (0);
 	}
-	cell = key_unpacked ? unpack->value : __wt_row_leaf_value(page, rip);
+
+	/*
+	 * Else, find the value cell and check for empty data.
+	 * Else, use the value from the original disk image.
+	 */
+	cell = __wt_row_leaf_value(page, rip, key_unpacked ? unpack : NULL);
 	if (cell == NULL) {
 		vb->data = "";
 		vb->size = 0;
