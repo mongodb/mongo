@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <string>
 
 #include "bson/util/builder.h"
@@ -105,5 +106,7 @@ namespace mongo {
         std::string _host;
         int _port; // -1 indicates unspecified
     };
+
+    std::ostream& operator<<(std::ostream& os, const HostAndPort& hp);
 
 }  // namespace mongo

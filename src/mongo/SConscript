@@ -243,6 +243,9 @@ env.Library('hostandport', ['util/net/hostandport.cpp'],
                 'server_options_core',
             ])
 
+env.CppUnitTest('hostandport_test', ['util/net/hostandport_test.cpp'],
+                LIBDEPS=['hostandport'])
+
 env.Library('network', [
             "util/net/sock.cpp",
             "util/net/socket_poll.cpp",

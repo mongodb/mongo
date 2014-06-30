@@ -110,11 +110,14 @@ namespace mongo {
     }
 
     void HostAndPort::init(const char *p) {
-        massert(13110, "HostAndPort: host is empty", *p);
+        uassert(13110, "HostAndPort: host is empty", *p);
         const char *colon = strrchr(p, ':');
         if( colon ) {
+            uassert(18522,
+                    "HostAndPort: no host component in " + std::string(p),
+                    colon != p);
             int port = atoi(colon+1);
-            massert(13095, "HostAndPort: bad port #", port > 0);
+            uassert(13095, "HostAndPort: bad port #", port > 0);
             _host = std::string(p,colon-p);
             _port = port;
         }
@@ -123,6 +126,10 @@ namespace mongo {
             _host = p;
             _port = -1;
         }
+    }
+
+    std::ostream& operator<<(std::ostream& os, const HostAndPort& hp) {
+        return os << hp.toString();
     }
 
 }  // namespace mongo
