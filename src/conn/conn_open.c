@@ -165,9 +165,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/*
-	 * The session's split stash isn't discarded during normal session
-	 * close because it may persists past the life of the session.  Discard
-	 * it now.
+	 * The session's split stash isn't discarded during normal session close
+	 * because it may persist past the life of the session.  Discard it now.
 	 */
 	if ((s = conn->sessions) != NULL)
 		for (i = 0; i < conn->session_size; ++s, ++i)
