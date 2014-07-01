@@ -802,7 +802,7 @@ namespace mongo {
                 CollectionOptions options;
                 if ( entry["options"].isABSONObj() ) {
                     Status status = options.parse( entry["options"].Obj() );
-                    fassert( 18522, status );
+                    fassert( 18523, status );
                 }
                 return options;
             }
