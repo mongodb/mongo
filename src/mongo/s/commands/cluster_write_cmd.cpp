@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+ #include "mongo/platform/basic.h"
+ 
 #include "mongo/base/init.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client_basic.h"
