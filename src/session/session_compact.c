@@ -232,5 +232,5 @@ __wt_session_compact(
 		WT_ERR(__compact_file(session, uri, cfg));
 
 err:	session->compact = NULL;
-	API_END_NOTFOUND_MAP(session, ret);
+	API_END_RET_NOTFOUND_MAP(session, ret);
 }

@@ -39,31 +39,31 @@ struct __wt_stats {
  * Read/write statistics if "fast" statistics are configured.
  */
 #define	WT_STAT_FAST_ATOMIC_DECRV(session, stats, fld, value) do {	\
-	if (S2C(session)->stat_fast)					\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
 		WT_STAT_ATOMIC_DECRV(stats, fld, value);		\
 } while (0)
 #define	WT_STAT_FAST_ATOMIC_DECR(session, stats, fld)			\
 	WT_STAT_FAST_ATOMIC_DECRV(session, stats, fld, 1)
 #define	WT_STAT_FAST_ATOMIC_INCRV(session, stats, fld, value) do {	\
-	if (S2C(session)->stat_fast)					\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
 		WT_STAT_ATOMIC_INCRV(stats, fld, value);		\
 } while (0)
 #define	WT_STAT_FAST_ATOMIC_INCR(session, stats, fld)			\
 	WT_STAT_FAST_ATOMIC_INCRV(session, stats, fld, 1)
 #define	WT_STAT_FAST_DECRV(session, stats, fld, value) do {		\
-	if (S2C(session)->stat_fast)					\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
 		WT_STAT_DECRV(stats, fld, value);			\
 } while (0)
 #define	WT_STAT_FAST_DECR(session, stats, fld)				\
 	WT_STAT_FAST_DECRV(session, stats, fld, 1)
 #define	WT_STAT_FAST_INCRV(session, stats, fld, value) do {		\
-	if (S2C(session)->stat_fast)					\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
 		WT_STAT_INCRV(stats, fld, value);			\
 } while (0)
 #define	WT_STAT_FAST_INCR(session, stats, fld)				\
 	WT_STAT_FAST_INCRV(session, stats, fld, 1)
 #define	WT_STAT_FAST_SET(session, stats, fld, value) do {		\
-	if (S2C(session)->stat_fast)					\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
 		WT_STAT_SET(stats, fld, value);				\
 } while (0)
 

@@ -78,7 +78,11 @@
  * options are appended to existing content, whereas STRING options overwrite.
  */
 DEF_OPT_AS_UINT32(async_threads, 0, "number of async worker threads")
-DEF_OPT_AS_UINT32(checkpoint_interval, 120, "checkpoint every interval seconds")
+DEF_OPT_AS_UINT32(checkpoint_interval, 120,
+    "checkpoint every interval seconds during the workload phase.")
+DEF_OPT_AS_UINT32(checkpoint_stress_rate, 0,
+    "checkpoint every rate operations during the populate phase in the "
+    "populate thread(s), 0 to disable")
 DEF_OPT_AS_UINT32(checkpoint_threads, 0, "number of checkpoint threads")
 DEF_OPT_AS_CONFIG_STRING(conn_config, "create",
     "connection configuration string")
@@ -126,8 +130,6 @@ DEF_OPT_AS_UINT32(sample_rate, 50,
     "how often the latency of operations is measured. One for every operation,"
     "two for every second operation, three for every third operation etc.")
 DEF_OPT_AS_CONFIG_STRING(sess_config, "", "session configuration string")
-DEF_OPT_AS_UINT32(stress_checkpoint_rate, 0,
-    "checkpoint every rate operations during the populate phase, 0 to disable")
 DEF_OPT_AS_CONFIG_STRING(table_config,
     "key_format=S,value_format=S,type=lsm,exclusive=true,"
     "allocation_size=4kb,internal_page_max=64kb,leaf_page_max=4kb,"
