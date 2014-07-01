@@ -42,6 +42,8 @@ namespace mongo {
 
         virtual ~RocksCollectionCatalogEntry(){}
 
+        virtual CollectionOptions getCollectionOptions() const;
+
         // ------- indexes ----------
 
         virtual int getTotalIndexCount() const;

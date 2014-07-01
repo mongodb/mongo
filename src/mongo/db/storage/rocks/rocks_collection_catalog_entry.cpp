@@ -53,6 +53,11 @@ namespace mongo {
         _metaDataKey = string("metadata-") + ns.toString();
     }
 
+    CollectionOptions RocksCollectionCatalogEntry::getCollectionOptions() const {
+        // todo: put more options in here?
+        return CollectionOptions();
+    }
+
     // ------- indexes ----------
 
     int RocksCollectionCatalogEntry::getTotalIndexCount() const {

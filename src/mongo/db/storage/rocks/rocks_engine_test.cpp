@@ -37,9 +37,7 @@
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/db/storage/rocks/rocks_collection_catalog_entry.h"
 #include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
