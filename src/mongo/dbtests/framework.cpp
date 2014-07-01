@@ -40,14 +40,13 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/file_allocator.h"
 #include "mongo/util/version_reporting.h"
 
 namespace moe = mongo::optionenvironment;
@@ -103,31 +102,24 @@ namespace mongo {
             frameworkGlobalParams.runsPerTest = 1;
 
             Client::initThread("testsuite");
-            acquirePathLock();
 
             srand( (unsigned) frameworkGlobalParams.seed );
             printGitVersion();
             printOpenSSLVersion();
             printSysInfo();
 
-            FileAllocator::get()->start();
-
-            dur::startup();
+            initGlobalStorageEngine();
 
             TestWatchDog twd;
             twd.go();
-
 
             int ret = ::mongo::unittest::Suite::run(frameworkGlobalParams.suites,
                                                     frameworkGlobalParams.filter,
                                                     frameworkGlobalParams.runsPerTest);
 
-#if !defined(_WIN32) && !defined(__sunos__)
-            flock( lockFile, LOCK_UN );
-#endif
 
             cc().shutdown();
-            dbexit( (ExitCode)ret ); // so everything shuts down cleanly
+            exitCleanly( (ExitCode)ret ); // so everything shuts down cleanly
             return ret;
         }
     }  // namespace dbtests

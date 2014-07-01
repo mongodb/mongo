@@ -80,7 +80,6 @@
 #include "mongo/db/startup_warnings.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
@@ -93,7 +92,6 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -118,7 +116,6 @@ namespace mongo {
     void (*snmpInit)() = NULL;
 
     extern int diagLogging;
-    extern int lockFile;
 
 #ifdef _WIN32
     ntservice::NtServiceDefaultStrings defaultServiceStrings = {
@@ -350,7 +347,7 @@ namespace mongo {
             if (shouldClearNonLocalTmpCollections || dbName == "local")
                 ctx.db()->clearTmpCollections(&txn);
 
-            if ( mongodGlobalParams.repair ) {
+            if ( storageGlobalParams.repair ) {
                 fassert(18506, globalStorageEngine->repairDatabase(&txn, dbName));
             }
             else if (!ctx.db()->getDatabaseCatalogEntry()->currentFilesCompatible(&txn)) {
@@ -404,17 +401,6 @@ namespace mongo {
         wunit.commit();
 
         LOG(1) << "done repairDatabases" << endl;
-    }
-
-    void clearTmpFiles() {
-        boost::filesystem::path path(storageGlobalParams.dbpath);
-        for ( boost::filesystem::directory_iterator i( path );
-                i != boost::filesystem::directory_iterator(); ++i ) {
-            string fileName = boost::filesystem::path(*i).leaf().string();
-            if ( boost::filesystem::is_directory( *i ) &&
-                    fileName.length() && fileName[ 0 ] == '$' )
-                boost::filesystem::remove_all( *i );
-        }
     }
 
     /**
@@ -548,53 +534,6 @@ namespace mongo {
     }
 #endif
 
-    /// warn if readahead > 256KB (gridfs chunk size)
-    static void checkReadAhead(const string& dir) {
-#ifdef __linux__
-        try {
-            const dev_t dev = getPartition(dir);
-
-            // This path handles the case where the filesystem uses the whole device (including LVM)
-            string path = str::stream() <<
-                "/sys/dev/block/" << major(dev) << ':' << minor(dev) << "/queue/read_ahead_kb";
-
-            if (!boost::filesystem::exists(path)){
-                // This path handles the case where the filesystem is on a partition.
-                path = str::stream()
-                    << "/sys/dev/block/" << major(dev) << ':' << minor(dev) // this is a symlink
-                    << "/.." // parent directory of a partition is for the whole device
-                    << "/queue/read_ahead_kb";
-            }
-
-            if (boost::filesystem::exists(path)) {
-                ifstream file (path.c_str());
-                if (file.is_open()) {
-                    int kb;
-                    file >> kb;
-                    if (kb > 256) {
-                        log() << startupWarningsLog;
-
-                        log() << "** WARNING: Readahead for " << dir << " is set to " << kb << "KB"
-                                << startupWarningsLog;
-
-                        log() << "**          We suggest setting it to 256KB (512 sectors) or less"
-                                << startupWarningsLog;
-
-                        log() << "**          http://dochub.mongodb.org/core/readahead"
-                                << startupWarningsLog;
-                    }
-                }
-            }
-        }
-        catch (const std::exception& e) {
-            log() << "unable to validate readahead settings due to error: " << e.what()
-                  << startupWarningsLog;
-            log() << "for more information, see http://dochub.mongodb.org/core/readahead"
-                  << startupWarningsLog;
-        }
-#endif // __linux__
-    }
-
     static void _initAndListen(int listenPort ) {
         Client::initThread("initandlisten");
 
@@ -635,23 +574,15 @@ namespace mongo {
                     boost::filesystem::exists(storageGlobalParams.repairpath));
         }
 
-        // TODO check non-journal subdirs if using directory-per-db
-        checkReadAhead(storageGlobalParams.dbpath);
-
-        acquirePathLock(mongodGlobalParams.repair);
-        boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
-
-        FileAllocator::get()->start();
-
         // TODO:  This should go into a MONGO_INITIALIZER once we have figured out the correct
         // dependencies.
         if (snmpInit) {
             snmpInit();
         }
 
-        MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( clearTmpFiles(), "clear tmp files" );
+        initGlobalStorageEngine();
 
-        dur::startup();
+        boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
 
         if (storageGlobalParams.durOptions & StorageGlobalParams::DurRecoverOnly)
             return;
@@ -684,7 +615,7 @@ namespace mongo {
                                          || replSettings.slave == repl::SimpleSlave);
         repairDatabasesAndCheckVersion(shouldClearNonLocalTmpCollections);
 
-        if (mongodGlobalParams.upgrade) {
+        if (storageGlobalParams.upgrade) {
             log() << "finished checking dbs" << endl;
             cc().shutdown();
             exitCleanly(EXIT_CLEAN);

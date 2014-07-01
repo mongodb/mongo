@@ -49,11 +49,10 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_coordinator_mock.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/file_allocator.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/password.h"
 #include "mongo/util/net/ssl_options.h"
@@ -131,22 +130,24 @@ namespace mongo {
             verify( lastError.get( true ) );
 
             Client::initThread("tools");
-            _conn = new DBDirectClient();
             storageGlobalParams.dbpath = toolGlobalParams.dbpath;
             try {
-                acquirePathLock();
+                initGlobalStorageEngine();
             }
-            catch ( DBException& ) {
-                toolError() << std::endl << "If you are running a mongod on the same "
-                             "path you should connect to that instead of direct data "
-                              "file access" << std::endl << std::endl;
+            catch (const DBException& ex) {
+                if (ex.getCode() == ErrorCodes::DBPathInUse) {
+                    toolError() << std::endl << "If you are running a mongod on the same "
+                                 "path you should connect to that instead of direct data "
+                                  "file access" << std::endl << std::endl;
+                }
+                else {
+                    toolError() << "Failed to initialize storage engine: " << ex.toString();
+                }
                 dbexit( EXIT_FS );
                 ::_exit(EXIT_FAILURE);
             }
 
-            FileAllocator::get()->start();
-
-            dur::startup();
+            _conn = new DBDirectClient();
         }
 
         int ret = -1;

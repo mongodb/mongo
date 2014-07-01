@@ -144,11 +144,6 @@ namespace mongo {
         OperationContext* _txn; // Points either to _txnOwned or a passed-in transaction.
     };
 
-    extern int lockFile;
-#ifdef _WIN32
-    extern HANDLE lockFileHandle;
-#endif
-    void acquirePathLock(bool doingRepair=false); // if doingRepair=true don't consider unclean shutdown an error
     void maybeCreatePidFile();
 
     void exitCleanly( ExitCode code );

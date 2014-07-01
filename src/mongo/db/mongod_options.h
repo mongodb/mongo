@@ -45,13 +45,9 @@ namespace mongo {
     namespace moe = mongo::optionenvironment;
 
     struct MongodGlobalParams {
-        bool upgrade;
-        bool repair;
         bool scriptingEnabled; // --noscripting
 
         MongodGlobalParams() :
-            upgrade(0),
-            repair(0),
             scriptingEnabled(true)
         { }
     };

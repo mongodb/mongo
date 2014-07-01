@@ -989,12 +989,12 @@ namespace mongo {
         }
 
         if (params.count("repair") && params["repair"].as<bool>() == true) {
-            mongodGlobalParams.upgrade = 1; // --repair implies --upgrade
-            mongodGlobalParams.repair = 1;
+            storageGlobalParams.upgrade = 1; // --repair implies --upgrade
+            storageGlobalParams.repair = 1;
             storageGlobalParams.dur = false;
         }
         if (params.count("upgrade") && params["upgrade"].as<bool>() == true) {
-            mongodGlobalParams.upgrade = 1;
+            storageGlobalParams.upgrade = 1;
         }
         if (params.count("notablescan")) {
             storageGlobalParams.noTableScan = params["notablescan"].as<bool>();
