@@ -3210,9 +3210,9 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_REC_PAGES_EVICTION			1081
 /*! reconciliation failed because an update could not be included */
 #define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1082
-/*! split bytes stashed */
+/*! split bytes currently awaiting free */
 #define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1083
-/*! split objects stashed */
+/*! split objects currently awaiting free */
 #define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1084
 /*! pthread mutex shared lock read-lock calls */
 #define	WT_STAT_CONN_RWLOCK_READ			1085

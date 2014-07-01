@@ -26,6 +26,32 @@ __wt_page_is_modified(WT_PAGE *page)
 }
 
 /*
+ * Manage split generation numbers.  Before a thread enters code that will
+ * examine page indexes (which are swapped out by splits), it publishes a copy
+ * of the current split generation into its session.  It is possible that a
+ * thread could re-enter this code already having a split generation.  If so,
+ * leave it alone: if our caller is examining an index, we don't want the
+ * oldest split generation to move forward and potentially free it.
+ *
+ * Splits walk the list of sessions to check when it is safe to free structures
+ * that have been replaced.
+ */
+#define	WT_ENTER_PAGE_INDEX(session) do {                               \
+	uint64_t prev_split_gen = session->split_gen;                   \
+	if (prev_split_gen == 0)                                        \
+		WT_PUBLISH(session->split_gen, S2C(session)->split_gen)
+
+#define	WT_LEAVE_PAGE_INDEX(session)                                    \
+	if (prev_split_gen == 0)                                        \
+		session->split_gen = 0;                                 \
+	} while (0)
+
+#define	WT_WITH_PAGE_INDEX(session, e)                                  \
+	WT_ENTER_PAGE_INDEX(session);                                   \
+	(e);                                                            \
+	WT_LEAVE_PAGE_INDEX(session)
+
+/*
  * Estimate the per-allocation overhead.  All implementations of malloc / free
  * have some kind of header and pad for alignment.  We can't know for sure what
  * that adds up to, but this is an estimate based on some measurements of heap

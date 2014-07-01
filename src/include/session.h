@@ -117,30 +117,30 @@ struct __wt_session_impl {
 					 * on our behalf */
 
 	/*
-	 * The free-on-transactional generation" memory and hazard information
-	 * persist past session close, because they are accessed by threads of
-	 * control other than the thread owning the session.  They live at the
-	 * end of the structure so it's somewhat easier to clear everything but
-	 * the fields that persist.
+	 * The split stash` memory and hazard information persist past session
+	 * close, because they are accessed by threads of control other than
+	 * the thread owning the session.  They live at the end of the
+	 * structure so it's somewhat easier to clear everything but the fields
+	 * that persist.
 	 */
 #define	WT_SESSION_CLEAR_SIZE(s)					\
 	(WT_PTRDIFF(&(s)->flags, s) + sizeof((s)->flags))
 	uint32_t flags;
 
 	/*
-	 * Sessions can "free" memory that may still be in use, and we use a
+	 * Splits can "free" memory that may still be in use, and we use a
 	 * split generation number to track it, that is, the session stores a
 	 * reference to the memory and allocates a split generation; when no
 	 * session is reading from that split generation, the memory can be
-	 * discarded for real.
+	 * freed for real.
 	 */
-	struct __wt_fotxn {
-		uint64_t    split_gen;	/* Tree generation */
+	struct __wt_split_stash {
+		uint64_t    split_gen;	/* Split generation */
 		void       *p;		/* Memory, length */
 		size_t	    len;
-	} *fotxn;			/* Free-on-transaction array */
-	size_t  fotxn_cnt;		/* Array entries */
-	size_t  fotxn_size;		/* Array size */
+	} *split_stash;			/* Split stash array */
+	size_t  split_stash_cnt;	/* Array entries */
+	size_t  split_stash_alloc;	/* Allocated bytes */
 
 	uint64_t split_gen;		/* Reading split generation */
 

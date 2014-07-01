@@ -20,7 +20,6 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *ref;
 	WT_TXN_STATE *txn_state;
-	uint64_t prev_split_gen;
 	int descending, prev, skip;
 	uint32_t slot;
 
@@ -32,8 +31,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 	 * may want to free.  Publish that the tree is active during this
 	 * window.
 	 */
-	if ((prev_split_gen = session->split_gen) == 0)
-		WT_PUBLISH(session->split_gen, S2C(session)->split_gen);
+	WT_ENTER_PAGE_INDEX(session);
 
 	/*
 	 * !!!
@@ -280,7 +278,7 @@ descend:		couple = ref;
 done:
 err:	if (txn_state != NULL)
 		txn_state->snap_min = WT_TXN_NONE;
-	if (prev_split_gen == 0)
-		session->split_gen = 0;
+
+	WT_LEAVE_PAGE_INDEX(session);
 	return (ret);
 }
