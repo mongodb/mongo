@@ -18,7 +18,7 @@ static u_int __split_deepen_split_child = 100;
 
 /*
  * Track allocation increments, matching the cache calculations, which add an
- * estimate of allocation overhead to every objects.
+ * estimate of allocation overhead to every object.
  */
 #define	WT_INCR_ADD(total, len)	do {					\
 	total += (len) + WT_ALLOC_OVERHEAD;				\
