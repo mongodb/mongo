@@ -1,28 +1,24 @@
 /*!
-@page testing How WiredTiger is Tested
+@page testing WiredTiger testing
 
-WiredTiger uses several different tools for testing WiredTiger - using
-different tools allows us to effectively test different aspects of reliability.
-The testing can be broken into the following categories:
+WiredTiger uses several different tools for testing WiredTiger, allowing
+effective testing of different aspects of reliability.  The testing can
+be separated into the following categories:
 
 - Functionality coverage
-
 - Bug regression testing
-
 - Cross platform testing
-
 - Multi-threading testing
-
 - Stress testing
-
+- Static analysis
 - Performance testing
 
 The above test dimensions are discussed in more detail below.
 
-Our tests are automatically run using the Jenkins (http://www.jenkins.org/)
-continuous integration testing framework. This allows us to be confident
-that we maintain support for all platforms, and aren't introducing performance
-regressions over time.
+Most WiredTiger testing is done automatically using the <a
+href="http://jenkins-ci.org/">Jenkins</a> continuous integration testing
+framework. This allows us to be confident we maintain support for all
+platforms, and don't introduce performance regressions.
 
 @section test_suite Unit Test Suite
 
@@ -147,5 +143,19 @@ several days!)
 
 We test performance using the wtperf tool, running a variety of configurations
 on every push, and tracking any performance regressions.
+
+@section testing_static Static analysis
+
+Static analysis for WiredTiger is done using two tools:
+
+- The <a href="https://www.coverity.com/">Coverity,
+Inc.</a>software analysis tool; current results and historic defect
+reports are available at <a
+href="https://scan.coverity.com/projects/1018">Coverity's WiredTiger
+page</a>.
+
+- The Gimpel Software <a
+href="http://www.gimpel.com/html/flex.htm">FlexeLint</a> implementation
+of the UNIX lint tool.
 
  */
