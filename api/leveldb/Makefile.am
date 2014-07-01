@@ -1,7 +1,6 @@
 AM_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir)/api/leveldb/include
 
 lib_LTLIBRARIES = libwiredtiger_leveldb.la
-LDADD = $(lib_LTLIBRARIES) $(top_builddir)/libwiredtiger.la
 
 noinst_PROGRAMS = leveldb_test
 
@@ -39,6 +38,7 @@ leveldbinclude_HEADERS += \
 endif
 
 libwiredtiger_leveldb_la_LDFLAGS = -release @VERSION@
+libwiredtiger_leveldb_la_LIBADD = $(top_builddir)/libwiredtiger.la
 libwiredtiger_leveldb_la_SOURCES = \
 	leveldb_wt.cc \
 	db/write_batch.cc \
@@ -52,8 +52,21 @@ if HAVE_ROCKSDB
 libwiredtiger_leveldb_la_SOURCES += rocks_wt.cc
 endif
 
+if HAVE_ROCKSDB
+pkglib_LTLIBRARIES = librocksdb.la
+else
+pkglib_LTLIBRARIES = libleveldb.la
+endif
+
+libleveldb_la_LDFLAGS = -release @VERSION@
+libleveldb_la_LIBADD = libwiredtiger_leveldb.la
+libleveldb_la_SOURCES = dummy.cc
+
+librocksdb_la_LDFLAGS = -release @VERSION@
+librocksdb_la_LIBADD = libwiredtiger_leveldb.la
+librocksdb_la_SOURCES = dummy.cc
 
 leveldb_test_SOURCES = leveldb_test.cc
-#leveldb_test_LDADD = $(top_builddir)/libwiredtiger.la
+leveldb_test_LDADD = libwiredtiger_leveldb.la
 
 TESTS = $(noinst_PROGRAMS)
