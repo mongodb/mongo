@@ -219,6 +219,12 @@ namespace repl {
         virtual Status setLastOptime(const OID& rid, const OpTime& ts) = 0;
 
         /**
+         * Retrieves and returns the current election id, which is a unique id which changes after
+         * every election.
+         */
+        virtual OID getElectionId() = 0;
+
+        /**
          * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.
          */
         virtual void processReplSetGetStatus(BSONObjBuilder* result) = 0;

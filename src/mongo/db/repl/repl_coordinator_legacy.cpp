@@ -399,6 +399,10 @@ namespace {
         return Status::OK();
     }
     
+    OID LegacyReplicationCoordinator::getElectionId() {
+        return theReplSet->getElectionId();
+    }
+
     void LegacyReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
         theReplSet->summarizeStatus(*result);
     }

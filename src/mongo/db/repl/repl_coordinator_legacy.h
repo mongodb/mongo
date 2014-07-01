@@ -83,6 +83,8 @@ namespace repl {
 
         virtual Status setLastOptime(const OID& rid, const OpTime& ts);
 
+        virtual OID getElectionId();
+
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
         virtual bool setMaintenanceMode(bool activate);

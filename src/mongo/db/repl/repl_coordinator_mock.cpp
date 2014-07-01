@@ -120,6 +120,11 @@ namespace repl {
         // TODO
         return Status::OK();
     }
+    
+    OID ReplicationCoordinatorMock::getElectionId() {
+        // TODO
+        return OID();
+    }
 
     void ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
         //TODO

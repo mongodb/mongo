@@ -320,6 +320,11 @@ namespace repl {
         return true;
     }
 
+    OID ReplicationCoordinatorImpl::getElectionId() {
+        // TODO
+        return OID();
+    }
+
     void ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* result) {
         // TODO
     }
