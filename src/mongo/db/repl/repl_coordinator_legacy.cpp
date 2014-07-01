@@ -266,7 +266,7 @@ namespace {
     bool LegacyReplicationCoordinator::isMasterForReportingPurposes() {
         // we must check replSet since because getReplicationMode() isn't aware of modeReplSet
         // until theReplSet is initialized
-        if (replSet) {
+        if (replSettings.usingReplSets()) {
             if (theReplSet && getCurrentMemberState().primary()) {
                 return true;
             }
@@ -282,11 +282,6 @@ namespace {
 
         if (replSettings.master) {
             // if running with --master --slave, allow.
-            return true;
-        }
-
-        //TODO: Investigate if this is needed/used, see SERVER-9188
-        if (cc().isGod()) {
             return true;
         }
 
