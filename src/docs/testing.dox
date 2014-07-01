@@ -17,7 +17,7 @@ The testing can be broken into the following categories:
 
 - Performance testing
 
-Details of the above test dimensions are discussed in more detail below.
+The above test dimensions are discussed in more detail below.
 
 Our tests are automatically run using the Jenkins (http://www.jenkins.org/)
 continuous integration testing framework. This allows us to be confident
@@ -51,88 +51,51 @@ facilitated by running multiple test cases in parallel.
 
 The test suite covers the following areas of functionality:
 
-<b>Access Methods</b>
+<b>Schema</b>
 
-- row: (K/V pair)
+- Test different key_format and value_format combinations to WT_SESSION::create.
 
-- var: (like 64 bit recno) with arbitrary length value
+- Test with combinations of column groups.
 
-- fix: (like 64 bit recno) but fixed (0-8 bit) value
+- Test with combinations of named columns.
 
-<b> Datastore Operations</b>
+- Test with btree and LSM tree table types.
 
-- key based operations - create, update, delete
-- cursor based operations - forw/back iteration, search, search near
+<b> Data Access and Manipulation Operations</b>
 
-<b>Secondary Indices</b>
+- Insert
 
-create, update, delete from both primary and or secondary. multiple
-secondaries, cursors, etc.
+- Update
 
-<b>Data Variations</b>
+- Delete
 
-- key/value length
+- Search
 
-- key/value 'values': e.g. english, binary, sparse, unicode, etc.
+- Search near
 
-- data types for 'typed' access (key_format, value_format)
+- Iterator traversal forwards and reverse
 
-The above areas are the 'basics' of the test suite.  We also 'mix in' other
-dimensions:
+<b>Compression Variations</b>
 
-<b>Disk Storage Variations</b>
+- Block compression (WT_SESSION::create block_compressor); off, bzip2, snappy,
+zlib
 
-- block_compressor off vs. bzip2
+- Huffman encoding (WT_SESSION::create huffman_key and huffman_value) for
+key, value, both, and none
 
-- {internal,leaf}_node_{min,max}
+- Prefix compression (WT_SESSION::create prefix_compression)
 
-- column_{internal,leaf}_extend
-
-- huffman encoding for key,value,both,none
-
-- prefix_compression
-
-- cache_size
-
-- allocation_size variations
-
-- btree (there are no other options currently)
-
-- split_min, split_pct
-
-- internal_key_truncate
+- Internal key truncation (WT_SESSION::create internal_key_truncate)
 
 - key_gap
 
-Other than changing configuration options, the tests will be the same, and we
-expect the results to be the same. These tests must be done completely - the
-full combinatorial subset of these options against our basic tests.
-
-Some notes:
-
-- via dump or other stats, we may be able to detect that the desired
- configuration options were indeed used.
-
-- Some combinations may in fact be illegal, some options may only apply to
- a particular access method, etc.
-
-<b>Schema</b>
-
-- column lists
-
-- column groups (colgroups)
-
-<b>Miscellany</b>
-
-- opening with exclusive=true
-
-- variations in file names (current, relative, abs directory)
-
-- cursor types: bulk, dump, statistics, printable, raw
-
 <b>Callbacks</b>
 
-collator, compressor, ..., events
+- Custom collator test
+
+- Custom compressor test
+
+- Error and message event callbacks
 
 <b>Transaction and Isolation</b>
 
@@ -161,17 +124,6 @@ In any of the above functional tests, where appropriate, we should test:
 - wherever there are no limits, run to some reasonable capacity.
 
 - capacity and multiples in combinations
-
-<b>Testing on Multiple Platforms.</b>
-
-Once we have a test suite, it should be straightforward to try it on whatever
-platform we can get WT running on.
-
-<b>Regression Tests.</b>
-
-Individual tests will be made that correspond to bug conditions we've
-encountered. Whether they belong in the basic category or one of the mixins
-will be determined on a case by case basis.
 
 @section testing_threads Multithreading
 
