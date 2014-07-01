@@ -100,7 +100,12 @@ namespace mongo {
         }
 
         if ( _ns.isSystem() ) {
-            return false;
+            StringData shortName = _ns.coll().substr( _ns.coll().find( '.' )  + 1 );
+            if ( shortName == "indexes" ||
+                 shortName == "namespaces" ||
+                 shortName == "profile" ) {
+                return false;
+            }
         }
 
         if ( _ns.db() == "local" ) {
