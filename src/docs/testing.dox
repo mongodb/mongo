@@ -1,0 +1,142 @@
+/*!
+@page testing How WiredTiger is tested
+
+There are several parts to the testing story for Wired Tiger:
+
+* functionality coverage
+* capacity/limits testing
+* bug regression testing
+* multiple platform testing
+* multithreading testing
+* stress testing
+* performance testing
+
+This part of the test plan is for the first four items on the list above. That is, testing each Wired Tiger feature or configuration, and that those features and configurations also work in every combination. In addition some tests of capacity or limits, such that can be accomplished within our test suite. And finally, the ability to add test cases that trigger particular past bugs. All this will be tried on all platforms we are interested in. This testing will use the Python API along with a (currently thin) framework being built on top of Python's unittest facility. We call this our 'test suite'.
+
+Our goal for the test suite is to have an easy to run package of tests that gives good feature and code coverage, and has repeatable errors. It should be runnable (at least in some form) in a short amount of time -- we'll probably eventually have subsets that can be run in various lengths of time, for example, a set of tests under an hour to accommodate a 'smoke test'.
+
+To quickly discuss the other parts of testing mentioned above:
+
+@section testing_threads Multithreading
+
+Multithreaded testing is difficult. For the moment, there is a multithreading test (in test/thread) written in C that is the primary engine for testing this. There will be some simple Python tests for multithreading, though this will not be a primary emphasis. One important issue is that we expect the failures resulting from the python test base to be mostly repeatable. Adding a large multithreading component with uncontrolled interactions is in opposition to this goal. We will be periodically evaluating other ways to repeatably test multithreaded behavior.
+
+@section testing_stress Stress testing
+
+Similarly, stress testing is mostly handled by the test/format tool. Stress tests can take significant time to run, which goes against a goal of having a reasonable amount of time to run the entire suite (that is, less than several days!)
+
+@section testing_performance Performance testing
+
+We test performance using the wtperf tool, running a variety of configurations on every push, and tracking any performance regressions.
+
+@section testing_unit Basic functionality coverage
+
+There are several dimensions to the basic testing.
+
+@subsection testing_unit_access Access methods
+
+* row: (K/V pair)
+* var: (like 64 bit recno) with arbitrary length value
+* fix: (like 64 bit recno) but fixed (0-8 bit) value
+
+@subsection testing_unit_datastore Datastore operations
+
+* key based operations - create, update, delete
+* cursor based operations - forw/back iteration, search, search near
+
+@subsection testing_unit_indices Secondary indices
+create, update, delete from both primary and or secondary. multiple secondaries, cursors, etc.
+
+@subsection testing_unit_types Data variations
+
+* key/value length
+* key/value 'values': e.g. english, binary, sparse, unicode, etc.
+* data types for 'typed' access (key_format, value_format)
+
+The above areas are the 'basics' of the test suite.  We also 'mix in' other dimensions:
+
+@subsection testing_unit_config Disk storage variations
+
+* block_compressor off vs. bzip2
+* {internal,leaf}_node_{min,max}
+* column_{internal,leaf}_extend
+* huffman encoding for key,value,both,none
+* prefix_compression
+* cache_size
+* allocation_size variations
+* btree (there are no other options currently)
+* split_min, split_pct
+* internal_key_truncate
+* key_gap
+
+Other than changing configuration options, the tests will be the same, and we expect the results to be the same. These tests must be done completely - the full combinatorial subset of these options against our basic tests.
+
+Some notes:
+
+* via dump or other stats, we may be able to detect that the desired configuration options were indeed used.
+* Some combinations may in fact be illegal, some options may only apply to a particular access method, etc.
+
+@subsection testing_unit_more More functionality tests
+
+Many of these may rightly belong up in the basic set of tests which get mixed in with the invisible tests. Some may only need to be performed once (do we really need to test variations in file names, or statistics cursors against every block size?) Some qualify as dimensions that we combine with all the other tests.
+
+@subsection testing_unit_columns Columns
+
+* column lists
+* column groups (colgroups)
+
+@subsection testing_unit_misc Miscellany
+
+* opening with exclusive=true
+* variations in file names (current, relative, abs directory)
+* cursor types: bulk, dump, statistics, printable, raw
+
+@subsection testing_unit_callbacks Callbacks
+
+collator, compressor, ..., events
+
+@subsection testing_unit_transactions Transaction and isolation
+
+Cursor isolation levels: snapshot, read-committed, read-uncommitted.
+
+@subsection testing_unit_util Command-line utility
+
+* wt dump
+* wt load
+* wt salvage
+* wt verify
+
+@subsection testing_unit_limits Capacity / Limits testing.
+
+In any of the above functional tests, where appropriate, we should test:
+
+* multiple (connections, sessions, cursors, etc.)
+* capacity testing, e.g. testing 10000 simultaneously opened cursors, etc.
+* wherever there are limits, test them.
+* wherever there are no limits, run to some reasonable capacity.
+* capacity and multiples in combinations
+
+@subsection testing_unit_platforms Testing on multiple platforms.
+
+Once we have a test suite, it should be straightforward to try it on whatever platform we can get WT running on.
+
+@subsection testing_unit_regression Regression tests.
+
+Individual tests will be made that correspond to bug conditions we've encountered. Whether they belong in the basic category or one of the mixins will be determined on a case by case basis.
+
+@subsection testing_unit_strategies Testing strategies
+
+Currently, we have a test suite built with Python's unittest. It has allowed us to write a small number of individual tests, that we will expand to fill out many of the dimensions above.
+
+To test the various configuration options in Python, we'll be able to leverage:
+
+* inheritance
+* setting up suites in unittest
+
+To mixin configurations we modified WiredTigerTestCase to accept configuration strings, using this technique: [[http://eli.thegreenplace.net/2011/08/02/python-unit-testing-parametrized-test-cases/]]
+
+One challenge is how to test a big combinatorial problem. python unittest scenarios let us create a simple test of scenarios to test. We now have a 'multiply_scenarios' function that takes several scenario tests (e.g. 10 different page sizes vs. 10 different cache sizes vs. 15 key combinations vs. 2 (huffman on/off), etc.) and multiplies them out.
+
+The problem with this approach is that we end up with too many tests. So we've enhanced this to allow each entry in to have a 'P' variable. This is treated as a probability (0.0 <= P <= 1.0), and when we multiply scenarios, we produce a resultant P variable that is the product of each multiplicand. Each final scenario (one of the zillions) now has a final probability and based on a random number generator, we decide whether to prune it from the final list. For now the random generator is 'predictable', so we generate the same list on each run. Perhaps in the future we can run many more of the combinations on some test server. For now, it satisfies my desire for trying out combinations in a practical way, as well as codifying the parameters that we'd like tested.
+
+ */

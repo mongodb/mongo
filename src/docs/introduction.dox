@@ -48,6 +48,8 @@ For more information about using WiredTiger, see:
 
 - @subpage admin
 
+- @subpage testing
+
 - @subpage license
 
 To browse the WiredTiger source code or contact us, see:
