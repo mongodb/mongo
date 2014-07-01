@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     class CustomDirectClient: public DBDirectClient {
     public:
         CustomDirectClient() {

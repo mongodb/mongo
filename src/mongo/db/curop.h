@@ -310,7 +310,7 @@ namespace mongo {
         long long getExpectedLatencyMs() const { return _expectedLatencyMs; }
         void setExpectedLatencyMs( long long latency ) { _expectedLatencyMs = latency; }
 
-        void recordGlobalTime( long long micros ) const;
+        void recordGlobalTime(bool isWriteLocked, long long micros) const;
         
         const LockStat& lockStat() const { return _lockStat; }
         LockStat& lockStat() { return _lockStat; }

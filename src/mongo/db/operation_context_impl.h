@@ -25,13 +25,13 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
 #include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/db/operation_context.h"
 
-#pragma once
 
 namespace mongo {
 

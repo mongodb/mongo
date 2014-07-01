@@ -230,7 +230,7 @@ namespace repl {
     int getRBID(DBClientConnection*);
 
     static void syncRollbackFindCommonPoint(OperationContext* txn, DBClientConnection* them, FixUpInfo& fixUpInfo) {
-        Client::Context ctx(rsoplog);
+        Client::Context ctx(txn, rsoplog);
 
         boost::scoped_ptr<Runner> runner(
                 InternalPlanner::collectionScan(rsoplog,
@@ -499,13 +499,13 @@ namespace repl {
         for (set<string>::iterator it = fixUpInfo.toDrop.begin();
                 it != fixUpInfo.toDrop.end();
                 it++) {
-            Client::Context ctx(*it);
+            Client::Context ctx(txn, *it);
             log() << "replSet rollback drop: " << *it << rsLog;
             ctx.db()->dropCollection(txn, *it);
         }
 
         sethbmsg("rollback 4.7");
-        Client::Context ctx(rsoplog);
+        Client::Context ctx(txn, rsoplog);
         Collection* oplogCollection = ctx.db()->getCollection(txn, rsoplog);
         uassert(13423,
                 str::stream() << "replSet error in rollback can't find " << rsoplog,
@@ -543,7 +543,7 @@ namespace repl {
                     removeSaver.reset(new Helpers::RemoveSaver("rollback", "", doc.ns));
 
                 // todo: lots of overhead in context, this can be faster
-                Client::Context ctx(doc.ns);
+                Client::Context ctx(txn, doc.ns);
 
                 // Add the doc to our rollback file
                 BSONObj obj;

@@ -94,7 +94,7 @@ namespace mongo {
             }
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context ctx(ns);
+            Client::Context ctx(txn, ns);
             
             return runNoDirectClient( txn, ns , 
                                       query , fields , update , 
@@ -134,7 +134,7 @@ namespace mongo {
                                       string& errmsg) {
 
             Lock::DBWrite lk(txn->lockState(), ns);
-            Client::Context cx( ns );
+            Client::Context cx(txn, ns);
             Collection* collection = cx.db()->getCollection( txn, ns );
 
             const WhereCallbackReal whereCallback = WhereCallbackReal(StringData(ns));
@@ -330,7 +330,7 @@ namespace mongo {
             }
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context ctx(ns);
+            Client::Context ctx(txn, ns);
 
             BSONObj out = db.findOne(ns, q, fields);
             if (out.isEmpty()) {

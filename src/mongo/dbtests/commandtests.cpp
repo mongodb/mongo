@@ -26,9 +26,10 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/d_concurrency.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 using namespace mongo;
@@ -37,13 +38,14 @@ namespace CommandTests {
     // one namespace per command
     namespace FileMD5 {
         struct Base {
-            Base() {
+            Base() : db(&_txn) {
                 db.dropCollection(ns());
                 db.ensureIndex(ns(), BSON( "files_id" << 1 << "n" << 1 ));
             }
 
             const char* ns() { return "test.fs.chunks"; }
 
+            OperationContextImpl _txn;
             DBDirectClient db;
         };
         struct Type0 : Base {

@@ -702,7 +702,7 @@ namespace Plan {
             lk_.reset( new Lock::GlobalWrite );
         }
         void run() {
-            Client::Context ctx( ns_ );
+            Client::Context ctx(txn,  ns_ );
             for( int i = 0; i < 10000; ++i ) {
                 scoped_ptr<MultiPlanScanner> s
                         ( MultiPlanScanner::make( ns_.c_str(), BSONObj(), BSON( "a" << 1 ) ) );
@@ -723,7 +723,7 @@ namespace Plan {
             lk_.reset( new Lock::GlobalWrite );
         }
         void run() {
-            Client::Context ctx( ns_.c_str() );
+            Client::Context ctx(txn,  ns_.c_str() );
             for( int i = 0; i < 10000; ++i ) {
                 scoped_ptr<MultiPlanScanner>
                         s( MultiPlanScanner::make( ns_.c_str(), BSON( "a" << 1 ), BSONObj() ) );

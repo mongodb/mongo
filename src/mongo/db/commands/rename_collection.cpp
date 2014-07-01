@@ -139,7 +139,7 @@ namespace mongo {
             std::vector<BSONObj> indexesInProg;
 
             {
-                Client::Context srcCtx( source );
+                Client::Context srcCtx(txn, source);
                 Collection* sourceColl = srcCtx.db()->getCollection( txn, source );
 
                 if ( !sourceColl ) {
@@ -182,7 +182,7 @@ namespace mongo {
             }
 
             {
-                Client::Context ctx( target );
+                Client::Context ctx(txn,  target );
 
                 // Check if the target namespace exists and if dropTarget is true.
                 // If target exists and dropTarget is not true, return false.
@@ -245,7 +245,7 @@ namespace mongo {
             Collection* sourceColl = NULL;
 
             {
-                Client::Context srcCtx( source );
+                Client::Context srcCtx(txn, source);
                 sourceColl = srcCtx.db()->getCollection( txn, source );
                 sourceIt.reset( sourceColl->getIterator( DiskLoc(), false, CollectionScanParams::FORWARD ) );
             }
@@ -254,12 +254,12 @@ namespace mongo {
             while ( !sourceIt->isEOF() ) {
                 BSONObj o;
                 {
-                    Client::Context srcCtx( source );
+                    Client::Context srcCtx(txn, source);
                     o = sourceColl->docFor(sourceIt->getNext());
                 }
                 // Insert and check return status of insert.
                 {
-                    Client::Context ctx( target );
+                    Client::Context ctx(txn,  target );
                     if ( !targetColl )
                         targetColl = ctx.db()->getCollection( txn, target );
                     // No logOp necessary because the entire renameCollection command is one logOp.
@@ -275,7 +275,7 @@ namespace mongo {
 
             // If inserts were unsuccessful, drop the target collection and return false.
             if ( !insertSuccessful ) {
-                Client::Context ctx( target );
+                Client::Context ctx(txn,  target );
                 Status s = ctx.db()->dropCollection( txn, target );
                 if ( !s.isOK() )
                     errmsg = s.toString();
@@ -287,7 +287,7 @@ namespace mongo {
             vector<BSONObj> copiedIndexes;
             bool indexSuccessful = true;
             {
-                Client::Context srcCtx( source );
+                Client::Context srcCtx(txn, source);
                 IndexCatalog::IndexIterator sourceIndIt =
                     sourceColl->getIndexCatalog()->getIndexIterator( true );
 
@@ -313,7 +313,7 @@ namespace mongo {
             }
 
             {
-                Client::Context ctx( target );
+                Client::Context ctx(txn,  target );
                 if ( !targetColl )
                     targetColl = ctx.db()->getCollection( txn, target );
 
@@ -339,7 +339,7 @@ namespace mongo {
 
             // Drop the source collection.
             {
-                Client::Context srcCtx( source );
+                Client::Context srcCtx(txn, source);
                 Status s = srcCtx.db()->dropCollection( txn, source );
                 if ( !s.isOK() ) {
                     errmsg = s.toString();

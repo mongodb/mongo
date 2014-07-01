@@ -110,7 +110,7 @@ namespace mongo {
                 LOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
             }
 
-            Client::Context ctx(toDeleteNs);
+            Client::Context ctx(txn, toDeleteNs);
             Database* db = ctx.db();
 
             Collection* collection = db->getCollection( txn, toDeleteNs );
@@ -222,7 +222,7 @@ namespace mongo {
             LOG(0) << "CMD: reIndex " << toDeleteNs << endl;
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context ctx(toDeleteNs);
+            Client::Context ctx(txn, toDeleteNs);
 
             Collection* collection = ctx.db()->getCollection( txn, toDeleteNs );
 
