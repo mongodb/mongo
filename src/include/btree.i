@@ -568,7 +568,7 @@ __wt_row_leaf_key_info(WT_PAGE *page, void *copy,
 	 *
 	 * This function returns a list of things about the key (instantiation
 	 * reference, cell reference and key/length pair).  Our callers know
-	 * the order in which we look things up and return this information;
+	 * the order in which we look things up and the information returned;
 	 * for example, the cell will never be returned if we are working with
 	 * an on-page key.
 	 */
