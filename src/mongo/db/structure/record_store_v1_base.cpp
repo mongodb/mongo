@@ -212,7 +212,7 @@ namespace mongo {
 
     StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( OperationContext* txn,
                                                          const DocWriter* doc,
-                                                         int quotaMax ) {
+                                                         bool enforceQuota ) {
         int docSize = doc->documentSize();
         if ( docSize < 4 ) {
             return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
@@ -222,7 +222,7 @@ namespace mongo {
         if ( doc->addPadding() )
             lenWHdr = getRecordAllocationSize( lenWHdr );
 
-        StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, quotaMax );
+        StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, enforceQuota );
         if ( !loc.isOK() )
             return loc;
 
@@ -245,13 +245,13 @@ namespace mongo {
     StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( OperationContext* txn,
                                                          const char* data,
                                                          int len,
-                                                         int quotaMax ) {
+                                                         bool enforceQuota ) {
         if ( len < 4 ) {
             return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
                                         "record has to be >= 4 bytes" );
         }
 
-        StatusWith<DiskLoc> status = _insertRecord( txn, data, len, quotaMax );
+        StatusWith<DiskLoc> status = _insertRecord( txn, data, len, enforceQuota );
         if ( status.isOK() )
             _paddingFits( txn );
 
@@ -261,12 +261,12 @@ namespace mongo {
     StatusWith<DiskLoc> RecordStoreV1Base::_insertRecord( OperationContext* txn,
                                                           const char* data,
                                                           int len,
-                                                          int quotaMax ) {
+                                                          bool enforceQuota ) {
 
         int lenWHdr = getRecordAllocationSize( len + Record::HeaderSize );
         fassert( 17208, lenWHdr >= ( len + Record::HeaderSize ) );
 
-        StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, quotaMax );
+        StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, enforceQuota );
         if ( !loc.isOK() )
             return loc;
 
@@ -288,7 +288,7 @@ namespace mongo {
                                                          const DiskLoc& oldLocation,
                                                          const char* data,
                                                          int dataSize,
-                                                         int quotaMax,
+                                                         bool enforceQuota,
                                                          UpdateMoveNotifier* notifier ) {
         Record* oldRecord = recordFor( oldLocation );
         if ( oldRecord->netLength() >= dataSize ) {
@@ -307,7 +307,7 @@ namespace mongo {
 
         _paddingTooSmall( txn );
 
-        StatusWith<DiskLoc> newLocation = _insertRecord( txn, data, dataSize, quotaMax );
+        StatusWith<DiskLoc> newLocation = _insertRecord( txn, data, dataSize, enforceQuota );
         if ( !newLocation.isOK() )
             return newLocation;
 
@@ -435,11 +435,11 @@ namespace mongo {
 
     void RecordStoreV1Base::increaseStorageSize( OperationContext* txn,
                                                  int size,
-                                                 int quotaMax ) {
+                                                 bool enforceQuota ) {
         DiskLoc eloc = _extentManager->allocateExtent( txn,
                                                        isCapped(),
                                                        size,
-                                                       quotaMax );
+                                                       enforceQuota );
 
         Extent *e = _extentManager->getExtent( eloc );
         invariant( e );

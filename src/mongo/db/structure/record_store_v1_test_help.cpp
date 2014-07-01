@@ -205,8 +205,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    size_t DummyExtentManager::numFiles() const {
-        return _extents.size();
+    int DummyExtentManager::numFiles() const {
+        return static_cast<int>( _extents.size() );
     }
 
     long long DummyExtentManager::fileSize() const {
@@ -217,7 +217,7 @@ namespace mongo {
     DiskLoc DummyExtentManager::allocateExtent( OperationContext* txn,
                                                 bool capped,
                                                 int size,
-                                                int quotaMax ) {
+                                                bool enforceQuota ) {
         size = quantizeExtentSize( size );
 
         ExtentInfo info;

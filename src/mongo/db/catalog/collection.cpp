@@ -158,9 +158,7 @@ namespace mongo {
 
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
                                                               doc,
-                                                              enforceQuota
-                                                                 ? largestFileNumberInQuota()
-                                                                 : 0 );
+                                                              _enforceQuota( enforceQuota ) );
         if ( !loc.isOK() )
             return loc;
 
@@ -222,7 +220,7 @@ namespace mongo {
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
                                                               docToInsert.objdata(),
                                                               docToInsert.objsize(),
-                                                              enforceQuota ? largestFileNumberInQuota() : 0 );
+                                                              _enforceQuota( enforceQuota ) );
         if ( !loc.isOK() )
             return loc;
 
@@ -345,7 +343,7 @@ namespace mongo {
                                                                       oldLocation,
                                                                       objNew.objdata(),
                                                                       objNew.objsize(),
-                                                                      enforceQuota ? largestFileNumberInQuota() : 0,
+                                                                      _enforceQuota( enforceQuota ),
                                                                       this );
 
         if ( !newLocation.isOK() ) {
@@ -413,17 +411,20 @@ namespace mongo {
         return _recordStore->updateWithDamages( txn, loc, damangeSource, damages );
     }
 
-    int Collection::largestFileNumberInQuota() const {
+    bool Collection::_enforceQuota( bool userEnforeQuota ) const {
+        if ( !userEnforeQuota )
+            return false;
+
         if ( !storageGlobalParams.quota )
-            return 0;
+            return false;
 
         if ( _ns.db() == "local" )
-            return 0;
+            return false;
 
         if ( _ns.isSpecial() )
-            return 0;
+            return false;
 
-        return storageGlobalParams.quotaFiles;
+        return true;
     }
 
     bool Collection::isCapped() const {

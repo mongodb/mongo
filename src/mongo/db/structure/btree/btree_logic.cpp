@@ -1994,7 +1994,7 @@ namespace mongo {
     template <class BtreeLayout>
     DiskLoc BtreeLogic<BtreeLayout>::_addBucket(OperationContext* txn) {
         DummyDocWriter docWriter(BtreeLayout::BucketSize);
-        StatusWith<DiskLoc> loc = _recordStore->insertRecord(txn, &docWriter, 0);
+        StatusWith<DiskLoc> loc = _recordStore->insertRecord(txn, &docWriter, false);
         // XXX: remove this(?) or turn into massert or sanely bubble it back up.
         uassertStatusOK(loc.getStatus());
         BucketType* b = btreemod(txn, getBucket(loc.getValue()));

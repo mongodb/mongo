@@ -75,7 +75,7 @@ namespace mongo {
         // thoughout the tests.
         OperationContextNoop txn;
         StatusWith<DiskLoc> s =
-            recordStore.insertRecord(&txn, randomData.c_str(), randomData.length(), 0);
+            recordStore.insertRecord(&txn, randomData.c_str(), randomData.length(), false);
 
         ASSERT_TRUE(s.isOK());
         ASSERT_EQUALS(1, recordStore.numRecords());

@@ -116,7 +116,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -158,7 +158,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -204,7 +204,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -253,7 +253,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -299,7 +299,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -346,7 +346,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -396,7 +396,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -449,11 +449,11 @@ namespace {
             initializeV1RS(&txn, records, drecs, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 500 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 300 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 400 - Record::HeaderSize, 0); // won't fit at end so wraps
-        rs.insertRecord(&txn, zeros, 120 - Record::HeaderSize, 0); // fits at end
-        rs.insertRecord(&txn, zeros,  60 - Record::HeaderSize, 0); // fits in earlier hole
+        rs.insertRecord(&txn, zeros, 500 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 300 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 400 - Record::HeaderSize, false); // won't fit at end so wraps
+        rs.insertRecord(&txn, zeros, 120 - Record::HeaderSize, false); // fits at end
+        rs.insertRecord(&txn, zeros,  60 - Record::HeaderSize, false); // fits in earlier hole
 
         {
             LocAndSize recs[] = {
@@ -501,34 +501,34 @@ namespace {
 
         // This list of sizes was empirically generated to achieve this outcome. Don't think too
         // much about them.
-        rs.insertRecord(&txn, zeros, 500 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 300 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 304 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 76 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 96 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 76 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 56 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 96 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 104 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 96 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 60 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 60 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 146 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 146 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 40 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 40 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 36 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 96 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 60 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 64 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 500 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 300 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 304 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 76 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 96 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 76 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 56 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 96 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 104 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 96 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 60 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 60 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 146 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 146 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 40 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 40 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 36 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 96 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 60 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 64 - Record::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
