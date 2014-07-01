@@ -89,7 +89,7 @@ namespace mongo {
          * will return NULL if ns does not exist
          */
         CollectionCatalogEntry* getCollectionCatalogEntry( OperationContext* txn,
-                                                           const StringData& ns );
+                                                           const StringData& ns ) const;
 
         RecordStore* getRecordStore( OperationContext* txn,
                                      const StringData& ns );

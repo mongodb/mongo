@@ -2520,6 +2520,28 @@ namespace mongo {
             }
         }
 
+        class CmdListCollections : public PublicGridCommand {
+        public:
+            CmdListCollections() : PublicGridCommand( "listCollections" ) {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::listCollections);
+                out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+            }
+
+            bool run(OperationContext* txn, const string& dbName,
+                     BSONObj& cmdObj,
+                     int,
+                     string&,
+                     BSONObjBuilder& result,
+                     bool) {
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                return passthrough( conf, cmdObj, result );
+            }
+        } cmdListCollections;
+
     } // namespace pub_grid_cmds
 
     void Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder,

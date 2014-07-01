@@ -70,9 +70,9 @@ namespace mongo {
     }
 
     CollectionCatalogEntry* Heap1DatabaseCatalogEntry::getCollectionCatalogEntry( OperationContext* opCtx,
-                                                                                  const StringData& ns ) {
+                                                                                  const StringData& ns ) const {
         boost::mutex::scoped_lock lk( _entryMapLock );
-        EntryMap::iterator i = _entryMap.find( ns.toString() );
+        EntryMap::const_iterator i = _entryMap.find( ns.toString() );
         if ( i == _entryMap.end() )
             return NULL;
         return i->second;

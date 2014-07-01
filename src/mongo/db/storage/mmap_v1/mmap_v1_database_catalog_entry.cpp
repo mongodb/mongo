@@ -595,7 +595,7 @@ namespace mongo {
     }
 
     CollectionCatalogEntry* MMAPV1DatabaseCatalogEntry::getCollectionCatalogEntry( OperationContext* txn,
-                                                                                  const StringData& ns ) {
+                                                                                  const StringData& ns ) const {
         boost::mutex::scoped_lock lk( _collectionsLock );
         CollectionMap::const_iterator i = _collections.find( ns.toString() );
         if ( i == _collections.end() )
