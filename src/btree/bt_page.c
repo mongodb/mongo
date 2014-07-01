@@ -618,8 +618,8 @@ __inmem_row_leaf_entries(
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
-		case WT_CELL_KEY_OVFL:
 		case WT_CELL_KEY:
+		case WT_CELL_KEY_OVFL:
 			++nindx;
 			break;
 		case WT_CELL_VALUE:
