@@ -31,8 +31,11 @@
 #include <string>
 
 #include "bson/util/builder.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 
 namespace mongo {
+    class StringData;
 
     /**
      * Name of a process on the network.
@@ -42,13 +45,23 @@ namespace mongo {
      * path to a unix socket.
      */
     struct HostAndPort {
+
+        /**
+         * Parses "text" to produce a HostAndPort.  Returns either that or an error
+         * status describing the parse failure.
+         */
+        static StatusWith<HostAndPort> parse(const StringData& text);
+
+        /**
+         * Construct an empty/invalid HostAndPort.
+         */
         HostAndPort();
 
         /**
-         * Constructs a HostAndPort by parsing a std::string hostname[:portnumber]
+         * Constructs a HostAndPort by parsing "text" of the form hostname[:portnumber]
          * Throws an AssertionException if bad config std::string or bad port #.
          */
-        explicit HostAndPort(const std::string& s);
+        explicit HostAndPort(const StringData& text);
 
         /**
          * Constructs a HostAndPort with the hostname "h" and port "p".
@@ -102,7 +115,7 @@ namespace mongo {
         }
 
     private:
-        void init(const char *);
+        Status initialize(const StringData& s);
         std::string _host;
         int _port; // -1 indicates unspecified
     };

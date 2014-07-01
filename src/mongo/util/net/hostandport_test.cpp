@@ -72,9 +72,19 @@ namespace {
         ASSERT_THROWS(HostAndPort(":123"), AssertionException);
 
         ASSERT_EQUALS(HostAndPort("abc"), HostAndPort("abc", -1));
-        ASSERT_EQUALS(HostAndPort("abc"), HostAndPort("abc", -1));
-
         ASSERT_EQUALS(HostAndPort("abc.def:3421"), HostAndPort("abc.def", 3421));
+    }
+
+    TEST(HostAndPort, StaticParseFunction) {
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse("").getStatus());
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse("a:").getStatus());
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse("a:0").getStatus());
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse("a:0xa").getStatus());
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse(":123").getStatus());
+
+        ASSERT_EQUALS(unittest::assertGet(HostAndPort::parse("abc")), HostAndPort("abc", -1));
+        ASSERT_EQUALS(unittest::assertGet(HostAndPort::parse("abc.def:3421")),
+                      HostAndPort("abc.def", 3421));
     }
 
 }  // namespace

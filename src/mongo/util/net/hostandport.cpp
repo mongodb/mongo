@@ -29,19 +29,29 @@
 
 #include "mongo/util/net/hostandport.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
+    StatusWith<HostAndPort> HostAndPort::parse(const StringData& text) {
+        HostAndPort result;
+        Status status = result.initialize(text);
+        if (!status.isOK()) {
+            return StatusWith<HostAndPort>(status);
+        }
+        return StatusWith<HostAndPort>(result);
+    }
+
     HostAndPort::HostAndPort() : _port(-1) {}
 
-    HostAndPort::HostAndPort(const std::string& s) {
-        init(s.c_str());
+    HostAndPort::HostAndPort(const StringData& text) {
+        uassertStatusOK(initialize(text));
     }
+
     HostAndPort::HostAndPort(const std::string& h, int p) : _host(h), _port(p) {}
 
     bool HostAndPort::operator<(const HostAndPort& r) const {
@@ -109,23 +119,34 @@ namespace mongo {
         return _host.empty() && _port < 0;
     }
 
-    void HostAndPort::init(const char *p) {
-        uassert(13110, "HostAndPort: host is empty", *p);
-        const char *colon = strrchr(p, ':');
-        if( colon ) {
-            uassert(18522,
-                    "HostAndPort: no host component in " + std::string(p),
-                    colon != p);
-            int port = atoi(colon+1);
-            uassert(13095, "HostAndPort: bad port #", port > 0);
-            _host = std::string(p,colon-p);
-            _port = port;
+    Status HostAndPort::initialize(const StringData& s) {
+        const size_t colonPos = s.rfind(':');
+        const StringData hostPart = s.substr(0, colonPos);
+        if (hostPart.empty()) {
+            return Status(ErrorCodes::FailedToParse, str::stream() <<
+                          "Empty host component parsing HostAndPort from \"" <<
+                          escape(s.toString()) << "\"");
+        }
+
+        int port;
+        if (colonPos != std::string::npos) {
+            const StringData portPart = s.substr(colonPos + 1);
+            Status status = parseNumberFromStringWithBase(portPart, 10, &port);
+            if (!status.isOK()) {
+                return status;
+            }
+            if (port <= 0) {
+                return Status(ErrorCodes::FailedToParse, str::stream() << "Port number " << port <<
+                              " out of range parsing HostAndPort from \"" << escape(s.toString()) <<
+                              "\"");
+            }
         }
         else {
-            // no port specified.
-            _host = p;
-            _port = -1;
+            port = -1;
         }
+        _host = hostPart.toString();
+        _port = port;
+        return Status::OK();
     }
 
     std::ostream& operator<<(std::ostream& os, const HostAndPort& hp) {
