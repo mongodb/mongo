@@ -57,11 +57,14 @@ namespace repl {
 
         virtual void signalDrainComplete();
 
-        virtual bool prepareRequestVoteResponse(const BSONObj& cmdObj, 
+        virtual void prepareRequestVoteResponse(const Date_t now,
+                                                const BSONObj& cmdObj,
                                                 std::string& errmsg, 
                                                 BSONObjBuilder& result);
 
-        virtual void prepareElectCmdResponse(const BSONObj& cmdObj, BSONObjBuilder& result);
+        virtual void prepareElectCmdResponse(const Date_t now,
+                                             const BSONObj& cmdObj,
+                                             BSONObjBuilder& result);
 
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
                                               Date_t now,

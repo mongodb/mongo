@@ -55,13 +55,13 @@ namespace repl {
 
     void TopologyCoordinatorMock::relinquishPrimary(OperationContext* txn) {}
 
-    bool TopologyCoordinatorMock::prepareRequestVoteResponse(const BSONObj& cmdObj,
+    void TopologyCoordinatorMock::prepareRequestVoteResponse(const Date_t now,
+                                                             const BSONObj& cmdObj,
                                                              std::string& errmsg,
-                                                             BSONObjBuilder& result) {
-        return true;
-    }
+                                                             BSONObjBuilder& result) {}
 
-    void TopologyCoordinatorMock::prepareElectCmdResponse(const BSONObj& cmdObj,
+    void TopologyCoordinatorMock::prepareElectCmdResponse(const Date_t now,
+                                                          const BSONObj& cmdObj,
                                                           BSONObjBuilder& result) {}
 
     void TopologyCoordinatorMock::prepareHeartbeatResponse(const ReplicationExecutor::CallbackData&,
