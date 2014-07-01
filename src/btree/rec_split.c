@@ -153,6 +153,7 @@ __wt_split_stash_discard_all(
 
 	__wt_free(session_safe, session->split_stash);
 }
+
 /*
  * __split_safe_free --
  *	Free a buffer if we can be sure no thread is accessing it, or schedule
