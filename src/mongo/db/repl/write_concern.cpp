@@ -37,6 +37,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/background.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -78,7 +79,6 @@ namespace repl {
         void run() {
             Client::initThread( "slaveTracking" );
             cc().getAuthorizationSession()->grantInternalAuthorization();
-            DBDirectClient db;
             while ( ! inShutdown() ) {
                 sleepsecs( 1 );
 
@@ -88,6 +88,8 @@ namespace repl {
                 if ( inShutdown() )
                     return;
                 
+                OperationContextImpl txn;
+
                 if ( lockedForWriting() ) {
                     // note: there is still a race here
                     // since we could call fsyncLock between this and the last lock
@@ -111,7 +113,7 @@ namespace repl {
                 
                 _currentlyUpdatingCache = true;
                 for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ) {
-                    db.update("local.slaves", i->first, i->second, true);
+                    DBDirectClient(&txn).update("local.slaves", i->first, i->second, true);
                 }
                 _currentlyUpdatingCache = false;
 

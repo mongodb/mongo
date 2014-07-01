@@ -306,7 +306,7 @@ namespace repl {
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
             ReplSource tmp(obj);
             if ( tmp.syncedTo.isNull() ) {
-                DBDirectClient c;
+                DBDirectClient c(txn);
                 if ( c.exists( "local.oplog.$main" ) ) {
                     BSONObj op = c.findOne( "local.oplog.$main", QUERY( "op" << NE << "n" ).sort( BSON( "$natural" << -1 ) ) );
                     if ( !op.isEmpty() ) {
