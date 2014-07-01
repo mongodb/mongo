@@ -45,6 +45,7 @@ using std::string;
 using mongoutils::str::stream;
 
 namespace {
+
     const long int NotEmptyTimeoutMillis = 200;
     const long long int MaxCurorCheckIntervalMillis = 500;
 
@@ -73,6 +74,8 @@ namespace mongo {
     struct RangeDeleter::RangeDeleteEntry {
         RangeDeleteEntry():
                 secondaryThrottle(true),
+                queueStartTS(0),
+                lastLoggedTS(0),
                 notifyDone(NULL) {
         }
 
@@ -94,6 +97,11 @@ namespace mongo {
         // Sets of cursors to wait to close until this can be ready
         // for deletion.
         std::set<CursorId> cursorsToWait;
+
+        // Time we started waiting for cursors to disappear
+        Date_t queueStartTS;
+        // Time we last reported the cursors
+        Date_t lastLoggedTS;
 
         // Not owned here.
         // Important invariant: Can only be set and used by one thread.
@@ -193,6 +201,61 @@ namespace mongo {
         }
     }
 
+    /**
+     * Logs a periodic "waiting for cursors" message after a predefined time threshold.
+     * Returns the new time of the last log message.
+     */
+    static Date_t logCursorsWaiting(const std::string& ns,
+                                    const mongo::BSONObj& min,
+                                    const mongo::BSONObj& max,
+                                    const std::set<mongo::CursorId>& cursorsToWait,
+                                    Date_t queueStartTS,
+                                    Date_t lastLoggedTS) {
+
+        // We always log the first cursors waiting message (so we have cursor ids in the logs).
+        // After 15 minutes (the cursor timeout period), we start logging additional messages at
+        // a 1 minute interval.
+        static const long long kLogCursorsThresholdMillis = 15 * 60 * 1000;
+        static const long long kLogCursorsIntervalMillis = 1 * 60 * 1000;
+
+        if (cursorsToWait.empty())
+            return false;
+
+        Date_t currentTime = jsTime();
+        long long elapsedMillisSinceQueued = 0;
+
+        // We always log the first message when lastLoggedTS == 0
+        if (lastLoggedTS != 0) {
+
+            if (currentTime > queueStartTS)
+                elapsedMillisSinceQueued = currentTime - queueStartTS;
+
+            if (elapsedMillisSinceQueued < kLogCursorsThresholdMillis)
+                return lastLoggedTS;
+
+            long long elapsedMillisSinceLog = 0;
+            if (currentTime > lastLoggedTS)
+                elapsedMillisSinceLog = currentTime - lastLoggedTS;
+
+            if (elapsedMillisSinceLog < kLogCursorsIntervalMillis)
+                return lastLoggedTS;
+        }
+
+        mongo::StringBuilder cursorList;
+        for (std::set<mongo::CursorId>::const_iterator it = cursorsToWait.begin();
+        it != cursorsToWait.end(); ++it) {
+            cursorList << *it << " ";
+        }
+
+        mongo::log() << "rangeDeleter waiting for open cursors in: " << ns
+                     << ", min: " << min << ", max: " << max
+                     << (lastLoggedTS == 0 ? string("") :
+                         string(stream() << ", elapsedSecs: " << elapsedMillisSinceQueued / 1000))
+                     << ", cursors: [ " << cursorList.str() << "]";
+
+        return currentTime;
+    }
+
     bool RangeDeleter::queueDelete(const std::string& ns,
                                    const BSONObj& min,
                                    const BSONObj& max,
@@ -229,6 +292,11 @@ namespace mongo {
 
         _env->getCursorIds(ns, &toDelete->cursorsToWait);
 
+        // Log first waiting message (if we have cursors to wait for)
+        toDelete->lastLoggedTS = logCursorsWaiting(toDelete->ns, toDelete->min, toDelete->max,
+                                                   toDelete->cursorsToWait, 0, 0);
+        toDelete->queueStartTS = toDelete->lastLoggedTS;
+
         {
             scoped_lock sl(_queueMutex);
 
@@ -237,9 +305,6 @@ namespace mongo {
                 _taskQueueNotEmptyCV.notify_one();
             }
             else {
-                log() << "rangeDeleter waiting for " << toDelete->cursorsToWait.size()
-                      << " cursors in " << ns << " to finish" << endl;
-
                 _notReadyQueue.push_back(toDelete.release());
             }
         }
@@ -282,12 +347,16 @@ namespace mongo {
 
         long long checkIntervalMillis = 5;
 
-        if (!cursorsToWait.empty()) {
-            log() << "rangeDeleter waiting for " << cursorsToWait.size()
-                  << " cursors in " << ns << " to finish" << endl;
-        }
+        // Log first waiting message (if we have cursors to wait for)
+        Date_t lastLoggedTS = logCursorsWaiting(ns, min, max, cursorsToWait, 0, 0);
+        Date_t queueStartTS = lastLoggedTS;
 
         while (!cursorsToWait.empty()) {
+
+            // Log waiting for cursor messages
+            lastLoggedTS = logCursorsWaiting(ns, min, max, cursorsToWait,
+                                             queueStartTS, lastLoggedTS);
+
             set<CursorId> cursorsNow;
             _env->getCursorIds(ns, &cursorsNow);
 
@@ -450,6 +519,13 @@ namespace mongo {
                                 iter = _notReadyQueue.erase(iter);
                             }
                             else {
+                                // Log waiting for cursor messages
+                                entry->lastLoggedTS = logCursorsWaiting(entry->ns,
+                                                                        entry->min,
+                                                                        entry->max,
+                                                                        entry->cursorsToWait,
+                                                                        entry->queueStartTS,
+                                                                        entry->lastLoggedTS);
                                 ++iter;
                             }
                         }
