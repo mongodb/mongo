@@ -59,12 +59,12 @@ pkglib_LTLIBRARIES = libleveldb.la
 endif
 
 libleveldb_la_LDFLAGS = -release @VERSION@
-libleveldb_la_LIBADD = libwiredtiger_leveldb.la
-libleveldb_la_SOURCES = dummy.cc
+libleveldb_la_LIBADD = $(top_builddir)/libwiredtiger.la
+libleveldb_la_SOURCES = $(libwiredtiger_leveldb_la_SOURCES)
 
 librocksdb_la_LDFLAGS = -release @VERSION@
-librocksdb_la_LIBADD = libwiredtiger_leveldb.la
-librocksdb_la_SOURCES = dummy.cc
+librocksdb_la_LIBADD = $(top_builddir)/libwiredtiger.la
+librocksdb_la_SOURCES = $(libwiredtiger_leveldb_la_SOURCES)
 
 leveldb_test_SOURCES = leveldb_test.cc
 leveldb_test_LDADD = libwiredtiger_leveldb.la
