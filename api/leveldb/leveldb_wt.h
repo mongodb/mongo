@@ -107,11 +107,11 @@ public:
     assert(ret == 0);
   }
 
-  T *get() {
+  T *Get() {
     return (T *)(pthread_getspecific(key_));
   }
 
-  void set(T *value) {
+  void Set(T *value) {
     int ret = pthread_setspecific(key_, value);
     assert(ret == 0);
   }
@@ -141,19 +141,34 @@ public:
 #endif
   }
 
-  WT_CURSOR *getCursor();
-  void releaseCursor(WT_CURSOR *cursor);
+  WT_CURSOR *GetCursor();
+#ifdef HAVE_ROCKSDB
+  WT_CURSOR *GetCursor(int i) {
+    return (i < cursors_.size()) ? cursors_[i] : NULL;
+  }
+  void SetCursor(int i, WT_CURSOR *c) {
+    if (i >= cursors_.size())
+      cursors_.resize(i + 1);
+    cursors_[i] = c;
+  }
+#endif
+  WT_SESSION *GetSession() { return session_; }
+  void ReleaseCursor(WT_CURSOR *cursor);
 
 private:
   WT_CONNECTION *conn_;
   WT_SESSION *session_;
   WT_CURSOR *cursor_;
+#ifdef HAVE_ROCKSDB
+  std::vector<WT_CURSOR *> cursors_;
+#endif
   bool in_use_;
 };
 
 class IteratorImpl : public Iterator {
 public:
   IteratorImpl(DbImpl *db, const ReadOptions &options);
+  IteratorImpl(DbImpl *db, WT_CURSOR *cursor) : db_(db), cursor_(cursor), own_cursor_(true) {}
   virtual ~IteratorImpl();
 
   // An iterator is either positioned at a key/value pair, or
@@ -188,7 +203,7 @@ private:
   Slice key_, value_;
   Status status_;
   bool valid_;
-  bool snapshot_iterator_;
+  bool own_cursor_;
 
   void SetError(int wiredTigerError) {
     valid_ = false;
@@ -204,17 +219,17 @@ class SnapshotImpl : public Snapshot {
 friend class DbImpl;
 friend class IteratorImpl;
 public:
-  SnapshotImpl(DbImpl *db) :
-    Snapshot(), db_(db), cursor_(NULL), status_(Status::OK()) {}
-  virtual ~SnapshotImpl() {}
+  SnapshotImpl(DbImpl *db);
+  virtual ~SnapshotImpl() { delete context_; }
 protected:
-  WT_CURSOR *getCursor() const { return cursor_; }
-  Status getStatus() const { return status_; }
-  Status setupTransaction();
-  Status releaseTransaction();
+  OperationContext *GetContext() const { return context_; }
+  WT_CURSOR *GetCursor() const { return context_->GetCursor(); }
+  Status GetStatus() const { return status_; }
+  Status SetupTransaction();
+  Status ReleaseTransaction();
 private:
   DbImpl *db_;
-  WT_CURSOR *cursor_;
+  OperationContext *context_;
   Status status_;
 };
 
@@ -343,12 +358,19 @@ public:
 private:
   WT_CONNECTION *conn_;
   ThreadLocal<OperationContext> *context_;
+#ifdef HAVE_ROCKSDB
+  int numColumns_;
+#endif
 
-  OperationContext *getContext() {
-    OperationContext *ctx = context_->get();
+  OperationContext *NewContext() {
+    return new OperationContext(conn_);
+  }
+
+  OperationContext *GetContext() {
+    OperationContext *ctx = context_->Get();
     if (ctx == NULL) {
-      ctx = new OperationContext(conn_);
-      context_->set(ctx);
+      ctx = NewContext();
+      context_->Set(ctx);
     }
     return (ctx);
   }
@@ -358,8 +380,8 @@ private:
   void operator=(const DbImpl&);
 
 protected:
-  WT_CURSOR *getCursor() { return getContext()->getCursor(); }
-  void releaseCursor(WT_CURSOR *cursor) { getContext()->releaseCursor(cursor); }
+  WT_CURSOR *GetCursor() { return GetContext()->GetCursor(); }
+  void ReleaseCursor(WT_CURSOR *cursor) { GetContext()->ReleaseCursor(cursor); }
 };
 
 #ifdef HAVE_ROCKSDB
@@ -368,13 +390,17 @@ protected:
 // is done using the column family
 class ColumnFamilyHandleImpl : public ColumnFamilyHandle {
  public:
-  ColumnFamilyHandleImpl(DbImpl* db, uint32_t id) : db_(db), id_(id) {}
+  ColumnFamilyHandleImpl(DbImpl* db, std::string const &name, uint32_t id) : db_(db), id_(id), name_(name) {}
   virtual ~ColumnFamilyHandleImpl() {}
   virtual uint32_t GetID() const { return id_; }
+
+  std::string const &GetName() const { return name_; }
+  std::string const GetURI() const { return "table:" + name_; }
 
  private:
   DbImpl* db_;
   uint32_t id_;
+  std::string const name_;
 };
 #endif
 

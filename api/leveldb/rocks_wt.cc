@@ -32,6 +32,8 @@
 #include <sstream>
 
 using leveldb::Cache;
+using leveldb::DB;
+using leveldb::FlushOptions;
 using leveldb::FilterPolicy;
 using leveldb::Iterator;
 using leveldb::Options;
@@ -44,15 +46,25 @@ using leveldb::Snapshot;
 using leveldb::Status;
 
 Status
-rocksdb::DB::ListColumnFamilies(rocksdb::Options const&, std::string const&, std::vector<std::string, std::allocator<std::string> >*)
+DB::ListColumnFamilies(Options const &, std::string const &, std::vector<std::string> *)
 {
 	return WiredTigerErrorToStatus(ENOTSUP);
 }
 
 Status
-rocksdb::DB::Open(rocksdb::Options const&, std::string const&, std::vector<rocksdb::ColumnFamilyDescriptor, std::allocator<rocksdb::ColumnFamilyDescriptor> > const&, std::vector<rocksdb::ColumnFamilyHandle*, std::allocator<rocksdb::ColumnFamilyHandle*> >*, rocksdb::DB**)
+DB::Open(Options const &options, std::string const &name, const std::vector<ColumnFamilyDescriptor> &column_families, std::vector<ColumnFamilyHandle*> *handles, DB**dbptr)
 {
-	return WiredTigerErrorToStatus(ENOTSUP);
+	Status status = Open(options, name, dbptr);
+	if (!status.ok())
+		return status;
+	DbImpl *db = reinterpret_cast<DbImpl *>(dbptr);
+	std::vector<ColumnFamilyHandle*> cfhandles(
+	    column_families.size());
+	for (size_t i = 0; i < column_families.size(); i++)
+		cfhandles[i] = new ColumnFamilyHandleImpl(
+		    db, column_families[i].name, (int)i);
+	*handles = cfhandles;
+	return Status::OK();
 }
 
 void
@@ -66,49 +78,117 @@ WriteBatch::Handler::LogData(const Slice& blob)
 }
 
 Status
-DbImpl::Merge(rocksdb::WriteOptions const&, rocksdb::ColumnFamilyHandle*, rocksdb::Slice const&, rocksdb::Slice const&)
+DbImpl::Merge(WriteOptions const&, ColumnFamilyHandle*, Slice const&, Slice const&)
 {
 	return WiredTigerErrorToStatus(ENOTSUP);
 }
 
 Status
-DbImpl::CreateColumnFamily(rocksdb::Options const&, std::string const&, rocksdb::ColumnFamilyHandle**)
+DbImpl::CreateColumnFamily(Options const &options, std::string const &name, ColumnFamilyHandle **cfhp)
+{
+	extern int wtleveldb_create(WT_CONNECTION *,
+	    const Options &, std::string const &uri);
+	int ret = wtleveldb_create(conn_, options, "table:" + name);
+	if (ret != 0)
+		return WiredTigerErrorToStatus(ret);
+	*cfhp = new ColumnFamilyHandleImpl(this, name, ++numColumns_);
+	return Status::OK();
+}
+
+Status
+DbImpl::DropColumnFamily(ColumnFamilyHandle *cfhp)
+{
+	ColumnFamilyHandleImpl *cf =
+	    reinterpret_cast<ColumnFamilyHandleImpl *>(cfhp);
+	WT_SESSION *session = GetContext()->GetSession();
+	int ret = session->drop(session, cf->GetURI().c_str(), NULL);
+	return WiredTigerErrorToStatus(ret);
+}
+
+static int
+wtrocks_get_cursor(OperationContext *context, ColumnFamilyHandle *cfhp, WT_CURSOR **cursorp)
+{
+	ColumnFamilyHandleImpl *cf =
+	    reinterpret_cast<ColumnFamilyHandleImpl *>(cfhp);
+	WT_CURSOR *c = context->GetCursor(cf->GetID());
+	if (c == NULL) {
+		WT_SESSION *session = context->GetSession();
+		int ret;
+		if ((ret = session->open_cursor(
+		    session, cf->GetURI().c_str(), NULL, NULL, &c)) != 0)
+			return (ret);
+		context->SetCursor(cf->GetID(), c);
+	}
+	*cursorp = c;
+	return (0);
+}
+
+Status
+DbImpl::Delete(WriteOptions const &write_options, ColumnFamilyHandle *cfhp, Slice const &key)
+{
+	WT_CURSOR *cursor;
+	int ret = wtrocks_get_cursor(GetContext(), cfhp, &cursor);
+	if (ret != 0)
+		return WiredTigerErrorToStatus(ret);
+	WT_ITEM item;
+	item.data = key.data();
+	item.size = key.size();
+	ret = cursor->remove(cursor);
+	// Reset the WiredTiger cursor so it doesn't keep any pages pinned.
+	// Track failures in debug builds since we don't expect failure, but
+	// don't pass failures on - it's not necessary for correct operation.
+	int t_ret = cursor->reset(cursor);
+	assert(t_ret == 0);
+	return WiredTigerErrorToStatus(ret);
+}
+
+Status
+DbImpl::Flush(FlushOptions const&, ColumnFamilyHandle*)
 {
 	return WiredTigerErrorToStatus(ENOTSUP);
 }
 
 Status
-DbImpl::DropColumnFamily(rocksdb::ColumnFamilyHandle*)
+DbImpl::Get(ReadOptions const &options, ColumnFamilyHandle *cfhp, Slice const &key, std::string *value)
 {
-	return WiredTigerErrorToStatus(ENOTSUP);
-}
+	const char *errmsg = NULL;
+	OperationContext *context = NULL;
+	// Read options can contain a snapshot for us to use
+	if (options.snapshot == NULL) {
+		context = GetContext();
+	} else {
+		const SnapshotImpl *si =
+		    reinterpret_cast<const SnapshotImpl *>(options.snapshot);
+		if (!si->GetStatus().ok())
+			return si->GetStatus();
+		context = si->GetContext();
+	}
 
-Status
-DbImpl::Delete(rocksdb::WriteOptions const&, rocksdb::ColumnFamilyHandle*, rocksdb::Slice const&)
-{
-	return WiredTigerErrorToStatus(ENOTSUP);
-}
+	WT_CURSOR *cursor;
+	int ret = wtrocks_get_cursor(context, cfhp, &cursor);
+	if (ret != 0)
+		return WiredTigerErrorToStatus(ret);
 
-Status
-DbImpl::Flush(rocksdb::FlushOptions const&, rocksdb::ColumnFamilyHandle*)
-{
-	return WiredTigerErrorToStatus(ENOTSUP);
-}
-
-Status
-DbImpl::Get(rocksdb::ReadOptions const&, rocksdb::ColumnFamilyHandle*, rocksdb::Slice const&, std::string*)
-{
-	return WiredTigerErrorToStatus(ENOTSUP);
+	WT_ITEM item;
+	item.data = key.data();
+	item.size = key.size();
+	cursor->set_key(cursor, &item);
+	if ((ret = cursor->search(cursor)) == 0 &&
+	    (ret = cursor->get_value(cursor, &item)) == 0)
+		*value = std::string((const char *)item.data, item.size);
+	if (ret == WT_NOTFOUND)
+		errmsg = "DB::Get key not found";
+	return WiredTigerErrorToStatus(ret, errmsg);
 }
 
 bool
-DbImpl::GetProperty(rocksdb::ColumnFamilyHandle*, rocksdb::Slice const&, std::string*)
+DbImpl::GetProperty(ColumnFamilyHandle*, Slice const&, std::string*)
 {
 	return false;
 }
 
 std::vector<Status>
-DbImpl::MultiGet(rocksdb::ReadOptions const&, std::vector<rocksdb::ColumnFamilyHandle*, std::allocator<rocksdb::ColumnFamilyHandle*> > const&, std::vector<rocksdb::Slice, std::allocator<rocksdb::Slice> > const&, std::vector<std::string, std::allocator<std::string> >*)
+DbImpl::MultiGet(ReadOptions const&, std::vector<ColumnFamilyHandle*> const&, std::vector<Slice> const&, std::vector<std::string, std::allocator<std::string> >*)
 {
 	std::vector<Status> ret;
 	ret.push_back(WiredTigerErrorToStatus(ENOTSUP));
@@ -116,13 +196,41 @@ DbImpl::MultiGet(rocksdb::ReadOptions const&, std::vector<rocksdb::ColumnFamilyH
 }
 
 Iterator *
-DbImpl::NewIterator(rocksdb::ReadOptions const&, rocksdb::ColumnFamilyHandle*)
+DbImpl::NewIterator(ReadOptions const &options, ColumnFamilyHandle *cfhp)
 {
-	return NULL;
+	OperationContext *context = NULL;
+	// Read options can contain a snapshot for us to use
+	if (options.snapshot == NULL) {
+		context = GetContext();
+	} else {
+		const SnapshotImpl *si =
+		    reinterpret_cast<const SnapshotImpl *>(options.snapshot);
+		if (!si->GetStatus().ok())
+			return NULL;
+		context = si->GetContext();
+	}
+
+	WT_CURSOR *cursor;
+	int ret = wtrocks_get_cursor(context, cfhp, &cursor);
+	if (ret != 0)
+		return NULL;
+
+	return new IteratorImpl(this, cursor);
 }
 
 Status
-DbImpl::Put(rocksdb::WriteOptions const&, rocksdb::ColumnFamilyHandle*, rocksdb::Slice const&, rocksdb::Slice const&)
+DbImpl::Put(WriteOptions const &options, ColumnFamilyHandle *cfhp, Slice const &key, Slice const &value)
 {
-	return WiredTigerErrorToStatus(ENOTSUP);
+	WT_CURSOR *cursor;
+	int ret = wtrocks_get_cursor(GetContext(), cfhp, &cursor);
+	WT_ITEM item;
+
+	item.data = key.data();
+	item.size = key.size();
+	cursor->set_key(cursor, &item);
+	item.data = value.data();
+	item.size = value.size();
+	cursor->set_value(cursor, &item);
+	ret = cursor->insert(cursor);
+	return WiredTigerErrorToStatus(ret, NULL);
 }

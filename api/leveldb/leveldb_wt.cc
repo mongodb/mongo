@@ -200,7 +200,7 @@ Cache::~Cache() {}
 // If the thread this OperationContext belongs to requires more than one
 // cursor (for example they start a read snapshot while doing updates), we
 // open a new session/cursor for each parallel operation.
-WT_CURSOR *OperationContext::getCursor()
+WT_CURSOR *OperationContext::GetCursor()
 {
   int ret;
   if (!in_use_) {
@@ -219,7 +219,7 @@ WT_CURSOR *OperationContext::getCursor()
   }
 }
 
-void OperationContext::releaseCursor(WT_CURSOR *cursor)
+void OperationContext::ReleaseCursor(WT_CURSOR *cursor)
 {
   if (cursor == cursor_)
     in_use_ = false;
@@ -228,6 +228,38 @@ void OperationContext::releaseCursor(WT_CURSOR *cursor)
     int ret = session->close(session, NULL);
     assert(ret == 0);
   }
+}
+
+int
+wtleveldb_create(
+    WT_CONNECTION *conn, const Options &options, std::string const &uri)
+{
+  int ret;
+  std::stringstream s_table;
+  s_table << WT_TABLE_CONFIG;
+  s_table << "internal_page_max=" << options.block_size << ",";
+  s_table << "leaf_page_max=" << options.block_size << ",";
+  if (options.compression == leveldb::kSnappyCompression)
+    s_table << "block_compressor=snappy,";
+  s_table << "lsm=(";
+  s_table << "chunk_size=" << options.write_buffer_size << ",";
+  if (options.filter_policy) {
+    int bits = ((FilterPolicyImpl *)options.filter_policy)->bits_per_key_;
+    s_table << "bloom_bit_count=" << bits << ",";
+    // Approximate the optimal number of hashes
+    s_table << "bloom_hash_count=" << (int)(0.6 * bits) << ",";
+  }
+  s_table << "),";
+  WT_SESSION *session;
+  std::string table_config = s_table.str();
+  if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+    return (ret);
+  if ((ret = session->create(session, uri.c_str(), table_config.c_str())) != 0)
+    return (ret);
+  if ((ret = session->close(session, NULL)) != 0)
+    return (ret);
+
+  return (0);
 }
 
 Status
@@ -263,31 +295,8 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
   else if (ret != 0)
     return WiredTigerErrorToStatus(ret, NULL);
 
-  if (options.create_if_missing) {
-    std::stringstream s_table;
-    s_table << WT_TABLE_CONFIG;
-    s_table << "internal_page_max=" << options.block_size << ",";
-    s_table << "leaf_page_max=" << options.block_size << ",";
-    if (options.compression == kSnappyCompression)
-      s_table << "block_compressor=snappy,";
-    s_table << "lsm=(";
-    s_table << "chunk_size=" << options.write_buffer_size << ",";
-    if (options.filter_policy) {
-      int bits = ((FilterPolicyImpl *)options.filter_policy)->bits_per_key_;
-      s_table << "bloom_bit_count=" << bits << ",";
-      // Approximate the optimal number of hashes
-      s_table << "bloom_hash_count=" << (int)(0.6 * bits) << ",";
-    }
-    s_table << "),";
-    WT_SESSION *session;
-    std::string table_config = s_table.str();
-    if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-      goto err;
-    if ((ret = session->create(session, WT_URI, table_config.c_str())) != 0)
-      goto err;
-    if ((ret = session->close(session, NULL)) != 0)
-      goto err;
-  }
+  if (options.create_if_missing) 
+    ret = wtleveldb_create(conn, options, WT_URI);
 
   if (ret != 0) {
 err:
@@ -305,7 +314,7 @@ Status
 DbImpl::Put(const WriteOptions& options,
        const Slice& key, const Slice& value)
 {
-  WT_CURSOR *cursor = getCursor();
+  WT_CURSOR *cursor = GetCursor();
   WT_ITEM item;
 
   item.data = key.data();
@@ -315,7 +324,7 @@ DbImpl::Put(const WriteOptions& options,
   item.size = value.size();
   cursor->set_value(cursor, &item);
   int ret = cursor->insert(cursor);
-  releaseCursor(cursor);
+  ReleaseCursor(cursor);
   return WiredTigerErrorToStatus(ret, NULL);
 }
 
@@ -326,7 +335,7 @@ DbImpl::Put(const WriteOptions& options,
 Status
 DbImpl::Delete(const WriteOptions& options, const Slice& key)
 {
-  WT_CURSOR *cursor = getCursor();
+  WT_CURSOR *cursor = GetCursor();
   WT_ITEM item;
 
   item.data = key.data();
@@ -338,7 +347,7 @@ DbImpl::Delete(const WriteOptions& options, const Slice& key)
   // failures on - it's not necessary for correct operation.
   int t_ret = cursor->reset(cursor);
   assert(t_ret == 0);
-  releaseCursor(cursor);
+  ReleaseCursor(cursor);
   return WiredTigerErrorToStatus(ret, NULL);
 }
 
@@ -347,7 +356,7 @@ class WriteBatchHandler : public WriteBatch::Handler {
 public:
   WriteBatchHandler(WT_CURSOR *cursor) : cursor_(cursor), status_(0) {}
   virtual ~WriteBatchHandler() {}
-  int getWiredTigerStatus() { return status_; }
+  int GetWiredTigerStatus() { return status_; }
 
   virtual void Put(const Slice& key, const Slice& value) {
     WT_ITEM item;
@@ -386,7 +395,7 @@ Status
 DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
 {
   Status status = Status::OK();
-  WT_CURSOR *cursor = getCursor();
+  WT_CURSOR *cursor = GetCursor();
   WT_SESSION *session = cursor->session;
   const char *errmsg = NULL;
   int ret, t_ret;
@@ -399,7 +408,7 @@ DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
 
     WriteBatchHandler handler(cursor);
     status = updates->Iterate(&handler);
-    if ((ret = handler.getWiredTigerStatus()) != WT_DEADLOCK)
+    if ((ret = handler.GetWiredTigerStatus()) != WT_DEADLOCK)
       break;
     // Roll back the transaction on deadlock so we can try again
     if ((ret = session->rollback_transaction(session, NULL)) != 0) {
@@ -414,7 +423,7 @@ DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
     ret = session->rollback_transaction(session, NULL);
 
 err:
-  releaseCursor(cursor);
+  ReleaseCursor(cursor);
   if (status.ok() && ret != 0)
     status = WiredTigerErrorToStatus(ret, NULL);
   return status;
@@ -432,20 +441,20 @@ DbImpl::Get(const ReadOptions& options,
        const Slice& key, std::string* value)
 {
   WT_CURSOR *cursor;
-  WT_ITEM item;
   const SnapshotImpl *si = NULL;
   const char *errmsg = NULL;
 
   // Read options can contain a snapshot for us to use
   if (options.snapshot == NULL) {
-    cursor = getCursor();
+    cursor = GetCursor();
   } else {
     si = static_cast<const SnapshotImpl *>(options.snapshot);
-    if (!si->getStatus().ok())
-      return si->getStatus();
-    cursor = si->getCursor();
+    if (!si->GetStatus().ok())
+      return si->GetStatus();
+    cursor = si->GetCursor();
   }
 
+  WT_ITEM item;
   item.data = key.data();
   item.size = key.size();
   cursor->set_key(cursor, &item);
@@ -459,7 +468,7 @@ DbImpl::Get(const ReadOptions& options,
 err:
   // Release the cursor if we are not in a snapshot
   if (si == NULL)
-    releaseCursor(cursor);
+    ReleaseCursor(cursor);
   return WiredTigerErrorToStatus(ret, errmsg);
 }
 
@@ -482,12 +491,12 @@ DbImpl::Get(const ReadOptions& options,
 
   // Read options can contain a snapshot for us to use
   if (options.snapshot == NULL) {
-    cursor = getCursor();
+    cursor = GetCursor();
   } else {
     si = static_cast<const SnapshotImpl *>(options.snapshot);
-    if (!si->getStatus().ok())
-      return si->getStatus();
-    cursor = si->getCursor();
+    if (!si->GetStatus().ok())
+      return si->GetStatus();
+    cursor = si->GetCursor();
   }
 
   item.data = key.data();
@@ -503,7 +512,7 @@ DbImpl::Get(const ReadOptions& options,
 err:
   // Release the cursor if we are not in a snapshot
   if (si == NULL)
-    releaseCursor(cursor);
+    ReleaseCursor(cursor);
   return WiredTigerErrorToStatus(ret, errmsg);
 }
 #endif
@@ -520,6 +529,11 @@ DbImpl::NewIterator(const ReadOptions& options)
   return new IteratorImpl(this, options);
 }
 
+SnapshotImpl::SnapshotImpl(DbImpl *db) :
+    Snapshot(), db_(db), context_(db->NewContext()), status_(Status::OK())
+{
+}
+
 // Return a handle to the current DB state.  Iterators created with
 // this handle will all observe a stable snapshot of the current DB
 // state.  The caller must call ReleaseSnapshot(result) when the
@@ -528,7 +542,7 @@ const Snapshot *
 DbImpl::GetSnapshot()
 {
   SnapshotImpl *snapshot = new SnapshotImpl(this);
-  Status status = snapshot->setupTransaction();
+  Status status = snapshot->SetupTransaction();
   if (!status.ok()) {
     delete snapshot;
     // TODO: Flag an error here?
@@ -545,7 +559,7 @@ DbImpl::ReleaseSnapshot(const Snapshot* snapshot)
   SnapshotImpl *si =
     static_cast<SnapshotImpl *>(const_cast<Snapshot *>(snapshot));
   if (si != NULL) {
-    si->releaseTransaction();
+    si->ReleaseTransaction();
     delete si;
   }
 }
@@ -605,11 +619,11 @@ DbImpl::CompactRange(const Slice* begin, const Slice* end)
 {
   // The compact doesn't need a cursor, but the context always opens a
   // cursor when opening the session - so grab that, and use the session.
-  WT_CURSOR *cursor = getCursor();
+  WT_CURSOR *cursor = GetCursor();
   WT_SESSION *session = cursor->session;
   int ret = session->compact(session, WT_URI, NULL);
   assert(ret == 0);
-  releaseCursor(cursor);
+  ReleaseCursor(cursor);
 }
 
 // Suspends the background compaction thread.  This methods
@@ -631,20 +645,20 @@ IteratorImpl::IteratorImpl(DbImpl *db, const ReadOptions &options) :
     cursor_(NULL), db_(db), status_(Status::OK()), valid_(false)
 {
   if (options.snapshot == NULL) {
-    cursor_ = db_->getCursor();
-    snapshot_iterator_ = false;
+    cursor_ = db_->GetCursor();
+    own_cursor_ = true;
   } else {
     const SnapshotImpl *si =
       static_cast<const SnapshotImpl *>(options.snapshot);
-    cursor_ = si->getCursor();
-    snapshot_iterator_ = true;
+    cursor_ = si->GetCursor();
+    own_cursor_ = false;
   }
 }
 
 IteratorImpl::~IteratorImpl()
 {
-  if (!snapshot_iterator_)
-    db_->releaseCursor(cursor_);
+  if (own_cursor_)
+    db_->ReleaseCursor(cursor_);
 }
 
 // Position at the first key in the source.  The iterator is Valid()
@@ -829,19 +843,17 @@ IteratorImpl::Prev()
 }
 
 // Implementation for WiredTiger specific read snapshot
-Status SnapshotImpl::setupTransaction()
+Status SnapshotImpl::SetupTransaction()
 {
-  cursor_ = db_->getCursor();
-  WT_SESSION *session = cursor_->session;
+  WT_SESSION *session = context_->GetSession();
   int ret = session->begin_transaction(session, NULL);
   return WiredTigerErrorToStatus(ret, NULL);
 }
 
-Status SnapshotImpl::releaseTransaction()
+Status SnapshotImpl::ReleaseTransaction()
 {
-  WT_SESSION *session = cursor_->session;
+  WT_SESSION *session = context_->GetSession();
   int ret = session->commit_transaction(session, NULL);
-  db_->releaseCursor(cursor_);
 
   return WiredTigerErrorToStatus(ret, NULL);
 }
