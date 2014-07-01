@@ -180,15 +180,13 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
-	int key_unpacked;
 	void *copy;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = S2BT(session);
 	page = cbt->ref->page;
 
-	unpack = &_unpack;
-	key_unpacked = 0;
+	unpack = NULL;
 
 	kb = &cbt->iface.key;
 	vb = &cbt->iface.value;
@@ -202,7 +200,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	 * Get a key: we could just call __wt_row_leaf_key, but as a cursor
 	 * is running through the tree, we may have additional information
 	 * here (we may have the fully-built key that's immediately before
-	 * the prefix-compressed key one we want).
+	 * the prefix-compressed key we want, so it's a faster construction).
 	 *
 	 * First, check for an immediately available key.
 	 */
@@ -219,8 +217,8 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	 * Inline building simple prefix-compressed keys from a previous key,
 	 * otherwise build from scratch.
 	 */
+	unpack = &_unpack;
 	__wt_cell_unpack(cell, unpack);
-	key_unpacked = 1;
 	if (unpack->type == WT_CELL_KEY &&
 	    cbt->rip_saved != NULL && cbt->rip_saved == rip - 1) {
 		WT_ASSERT(session, cbt->tmp.size >= unpack->prefix);
@@ -267,11 +265,11 @@ value:
 	 * Else, find the value cell and check for empty data.
 	 * Else, use the value from the original disk image.
 	 */
-	cell = __wt_row_leaf_value(page, rip, key_unpacked ? unpack : NULL);
-	if (cell == NULL) {
+	if ((cell = __wt_row_leaf_value(page, rip, unpack)) == NULL) {
 		vb->data = "";
 		vb->size = 0;
 	} else {
+		unpack = &_unpack;
 		__wt_cell_unpack(cell, unpack);
 		WT_RET(__wt_page_cell_data_ref(
 		    session, cbt->ref->page, unpack, vb));
