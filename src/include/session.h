@@ -118,7 +118,7 @@ struct __wt_session_impl {
 					 * on our behalf */
 
 	/*
-	 * The split stash` memory and hazard information persist past session
+	 * The split stash memory and hazard information persist past session
 	 * close, because they are accessed by threads of control other than
 	 * the thread owning the session.  They live at the end of the
 	 * structure so it's somewhat easier to clear everything but the fields
