@@ -33,7 +33,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/util/touch_pages.h"
 
 namespace mongo {
 
@@ -62,7 +61,6 @@ namespace mongo {
 
                 invariant( _extents.size() > 0 );
 
-                _touchExtent( 0 );
                 _currentExtent = 0;
                 _currentRecord = _getExtent( _currentExtent )->firstRecord;
                 if ( _currentRecord.isNull() )
@@ -126,7 +124,6 @@ namespace mongo {
                     if ( _currentExtent + 1 >= _extents.size() )
                         return false;
                     _currentExtent++;
-                    _touchExtent( _currentExtent );
                     _currentRecord = _getExtent( _currentExtent )->firstRecord;
                     if ( !_currentRecord.isNull() )
                         return true;
@@ -145,11 +142,6 @@ namespace mongo {
             Extent* _getExtent( size_t offset ) {
                 DiskLoc dl = _extents[offset].diskLoc;
                 return _extentManager.getExtent( dl );
-            }
-
-            void _touchExtent( size_t offset ) {
-                Extent* e = _getExtent( offset );
-                touch_pages( reinterpret_cast<const char*>(e), e->length );
             }
 
             string _ns;
