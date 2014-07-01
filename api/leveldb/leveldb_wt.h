@@ -126,7 +126,7 @@ class DbImpl;
 /* Context for operations (including snapshots, write batches, transactions) */
 class OperationContext {
 public:
-  OperationContext(WT_CONNECTION *conn) : conn_(conn), in_use_(false) {
+  OperationContext(WT_CONNECTION *conn) {
     int ret = conn->open_session(conn, NULL, "isolation=snapshot", &session_);
     assert(ret == 0);
     ret = session_->open_cursor(
@@ -136,12 +136,20 @@ public:
 
   ~OperationContext() {
 #ifdef WANT_SHUTDOWN_RACES
-    int ret = session_->close(session_, NULL);
+    int ret = Close();
     assert(ret == 0);
 #endif
   }
 
-  WT_CURSOR *GetCursor();
+  int Close() {
+    int ret = 0;
+    if (session_ != NULL)
+      ret = session_->close(session_, NULL);
+    session_ = NULL;
+    return (ret);
+  }
+
+  WT_CURSOR *GetCursor() { return cursor_; }
 #ifdef HAVE_ROCKSDB
   WT_CURSOR *GetCursor(int i) {
     return (i < cursors_.size()) ? cursors_[i] : NULL;
@@ -153,21 +161,17 @@ public:
   }
 #endif
   WT_SESSION *GetSession() { return session_; }
-  void ReleaseCursor(WT_CURSOR *cursor);
 
 private:
-  WT_CONNECTION *conn_;
   WT_SESSION *session_;
   WT_CURSOR *cursor_;
 #ifdef HAVE_ROCKSDB
   std::vector<WT_CURSOR *> cursors_;
 #endif
-  bool in_use_;
 };
 
 class IteratorImpl : public Iterator {
 public:
-  IteratorImpl(DbImpl *db, const ReadOptions &options);
   IteratorImpl(DbImpl *db, WT_CURSOR *cursor) : db_(db), cursor_(cursor), own_cursor_(true) {}
   virtual ~IteratorImpl();
 
@@ -223,10 +227,8 @@ public:
   virtual ~SnapshotImpl() { delete context_; }
 protected:
   OperationContext *GetContext() const { return context_; }
-  WT_CURSOR *GetCursor() const { return context_->GetCursor(); }
   Status GetStatus() const { return status_; }
   Status SetupTransaction();
-  Status ReleaseTransaction();
 private:
   DbImpl *db_;
   OperationContext *context_;
@@ -375,13 +377,20 @@ private:
     return (ctx);
   }
 
+  OperationContext *GetContext(const ReadOptions &options) {
+    if (options.snapshot == NULL)
+      return GetContext();
+    else {
+      const SnapshotImpl *si =
+          static_cast<const SnapshotImpl *>(options.snapshot);
+      assert(si->GetStatus().ok());
+      return si->GetContext();
+    }
+  }
+
   // No copying allowed
   DbImpl(const DbImpl&);
   void operator=(const DbImpl&);
-
-protected:
-  WT_CURSOR *GetCursor() { return GetContext()->GetCursor(); }
-  void ReleaseCursor(WT_CURSOR *cursor) { GetContext()->ReleaseCursor(cursor); }
 };
 
 #ifdef HAVE_ROCKSDB

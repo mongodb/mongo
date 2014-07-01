@@ -152,17 +152,7 @@ Status
 DbImpl::Get(ReadOptions const &options, ColumnFamilyHandle *cfhp, Slice const &key, std::string *value)
 {
 	const char *errmsg = NULL;
-	OperationContext *context = NULL;
-	// Read options can contain a snapshot for us to use
-	if (options.snapshot == NULL) {
-		context = GetContext();
-	} else {
-		const SnapshotImpl *si =
-		    reinterpret_cast<const SnapshotImpl *>(options.snapshot);
-		if (!si->GetStatus().ok())
-			return si->GetStatus();
-		context = si->GetContext();
-	}
+	OperationContext *context = GetContext(options);
 
 	WT_CURSOR *cursor;
 	int ret = wtrocks_get_cursor(context, cfhp, &cursor);
@@ -198,24 +188,16 @@ DbImpl::MultiGet(ReadOptions const&, std::vector<ColumnFamilyHandle*> const&, st
 Iterator *
 DbImpl::NewIterator(ReadOptions const &options, ColumnFamilyHandle *cfhp)
 {
-	OperationContext *context = NULL;
-	// Read options can contain a snapshot for us to use
-	if (options.snapshot == NULL) {
-		context = GetContext();
-	} else {
-		const SnapshotImpl *si =
-		    reinterpret_cast<const SnapshotImpl *>(options.snapshot);
-		if (!si->GetStatus().ok())
-			return NULL;
-		context = si->GetContext();
-	}
+	OperationContext *context = GetContext(options);
 
-	WT_CURSOR *cursor;
-	int ret = wtrocks_get_cursor(context, cfhp, &cursor);
-	if (ret != 0)
-		return NULL;
-
-	return new IteratorImpl(this, cursor);
+	/* Duplicate the normal cursor for the iterator. */
+	WT_SESSION *session = context->GetSession();
+	WT_CURSOR *c, *iterc;
+	int ret = wtrocks_get_cursor(context, cfhp, &c);
+	assert(ret == 0);
+	ret = session->open_cursor(session, NULL, c, NULL, &iterc);
+	assert(ret == 0);
+	return new IteratorImpl(this, iterc);
 }
 
 Status
