@@ -85,7 +85,9 @@ namespace repl {
     }
 
     void LegacyReplicationCoordinator::shutdown() {
-        // TODO
+        if (getReplicationMode() == modeReplSet) {
+            theReplSet->shutdown();
+        }
     }
 
     bool LegacyReplicationCoordinator::isShutdownOkay() const {

@@ -1095,10 +1095,8 @@ namespace {
 
     void exitCleanly( ExitCode code ) {
         getGlobalEnvironment()->setKillAllOperations();
-        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
-                repl::ReplicationCoordinator::modeReplSet) {
-            repl::theReplSet->shutdown();
-        }
+
+        repl::getGlobalReplicationCoordinator()->shutdown();
 
         OperationContextImpl txn;
         Lock::GlobalWrite lk(txn.lockState());
