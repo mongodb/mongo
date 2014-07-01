@@ -128,6 +128,8 @@ namespace repl {
 
         virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake);
 
+        virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
+
     };
 
 } // namespace repl

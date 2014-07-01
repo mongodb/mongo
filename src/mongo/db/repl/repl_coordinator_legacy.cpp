@@ -903,5 +903,9 @@ namespace {
 
         return theReplSet->registerSlave(remoteID, handshake["member"].Int());
     }
+
+    void LegacyReplicationCoordinator::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
+        repl::waitUpToOneSecondForOptimeChange(ot);
+    }
 } // namespace repl
 } // namespace mongo

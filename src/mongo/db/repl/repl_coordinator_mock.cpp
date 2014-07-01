@@ -204,5 +204,10 @@ namespace repl {
         // TODO
         return false;
     }
+
+    void ReplicationCoordinatorMock::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
+        // TODO
+    }
+
 } // namespace repl
 } // namespace mongo

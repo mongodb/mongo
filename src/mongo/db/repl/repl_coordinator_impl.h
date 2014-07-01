@@ -135,6 +135,8 @@ namespace repl {
 
         virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake);
 
+        virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions

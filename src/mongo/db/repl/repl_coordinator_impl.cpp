@@ -428,5 +428,9 @@ namespace repl {
         // TODO
         return false;
     }
+
+    void ReplicationCoordinatorImpl::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
+        //TODO
+    }
 } // namespace repl
 } // namespace mongo

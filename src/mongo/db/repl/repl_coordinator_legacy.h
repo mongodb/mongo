@@ -124,6 +124,8 @@ namespace repl {
 
         virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake);
 
+        virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
+
     private:
         Status _stepDownHelper(bool force,
                                const Milliseconds& initialWaitTime,

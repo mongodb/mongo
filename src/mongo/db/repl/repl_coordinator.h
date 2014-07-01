@@ -364,6 +364,11 @@ namespace repl {
          */
         virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake) = 0;
 
+        /**
+         * Returns once the oplog's most recent entry changes or after one second, whichever
+         * occurs first.
+         */
+        virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot) = 0;
     protected:
 
         ReplicationCoordinator();

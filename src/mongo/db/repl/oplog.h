@@ -110,10 +110,9 @@ namespace repl {
                                bool convertUpdateToUpsert = false);
 
     /**
-     * Waits until the given timeout for the OpTime from the oplog to change.
-     * Returns true if the OpTime changed occured before the timeout.
+     * Waits one second for the OpTime from the oplog to change.
      */
-    bool waitForOptimeChange(const OpTime& referenceTime, unsigned timeoutMillis);
+    void waitUpToOneSecondForOptimeChange(const OpTime& referenceTime);
 
     /**
      * Initializes the global OpTime with the value from the timestamp of the last oplog entry.
