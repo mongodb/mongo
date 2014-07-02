@@ -244,7 +244,6 @@ __evict_worker(void *arg)
 	worker = arg;
 	conn = worker->conn;
 	cache = conn->cache;
-	ret = 0;
 
 	/*
 	 * We need a session handle because we're reading/writing pages.
