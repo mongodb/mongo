@@ -291,6 +291,7 @@ __evict_has_work(WT_SESSION_IMPL *session, uint32_t *flagsp)
 
 	conn = S2C(session);
 	cache = conn->cache;
+	flags = 0;
 	*flagsp = 0;
 
 	/*
