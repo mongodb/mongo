@@ -49,7 +49,8 @@ namespace mongo {
 
     IndexScan::IndexScan(const IndexScanParams& params, WorkingSet* workingSet,
                          const MatchExpression* filter)
-        : _workingSet(workingSet),
+        : _checkEndKeys(0),
+          _workingSet(workingSet),
           _hitEnd(false),
           _filter(filter), 
           _shouldDedup(true),
@@ -127,10 +128,21 @@ namespace mongo {
     PlanStage::StageState IndexScan::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // If we examined multiple keys in a prior work cycle, make up for it here by returning
+        // NEED_TIME. This is done for plan ranking. Refer to the comment for '_checkEndKeys'
+        // in the .h for details.
+        if (_checkEndKeys > 0) {
+            --_checkEndKeys;
+            ++_commonStats.needTime;
+            return PlanStage::NEED_TIME;
+        }
+
         if (NULL == _indexCursor.get()) {
             // First call to work().  Perform possibly heavy init.
             initIndexScan();
             checkEnd();
+            ++_commonStats.needTime;
+            return PlanStage::NEED_TIME;
         }
         else if (_yieldMovedCursor) {
             _yieldMovedCursor = false;
@@ -207,13 +219,20 @@ namespace mongo {
             }
         }
 
+        if (_checkEndKeys != 0) {
+            return false;
+        }
+
         return _hitEnd || _indexCursor->isEOF();
     }
 
     void IndexScan::prepareToYield() {
         ++_commonStats.yields;
 
-        if (isEOF() || (NULL == _indexCursor.get())) { return; }
+        if (NULL == _indexCursor.get() || _hitEnd || _indexCursor->isEOF()) {
+            return;
+        }
+
         _savedKey = _indexCursor->getKey().getOwned();
         _savedLoc = _indexCursor->getValue();
         _indexCursor->savePosition();
@@ -222,7 +241,9 @@ namespace mongo {
     void IndexScan::recoverFromYield() {
         ++_commonStats.unyields;
 
-        if (isEOF() || (NULL == _indexCursor.get())) { return; }
+        if (NULL == _indexCursor.get() || _hitEnd || _indexCursor->isEOF()) {
+            return;
+        }
 
         // We can have a valid position before we check isEOF(), restore the position, and then be
         // EOF upon restore.
@@ -327,8 +348,7 @@ namespace mongo {
                     break;
                 }
 
-                // TODO: Can we do too much scanning here?  Old BtreeCursor stops scanning after a
-                // while and relies on a Matcher to make sure the result is ok.
+                ++_checkEndKeys;
             }
         }
     }
