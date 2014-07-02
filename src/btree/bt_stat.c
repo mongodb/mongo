@@ -38,7 +38,7 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	WT_STAT_SET(stats, btree_maxleafpage, btree->maxleafpage);
 
 	/* Everything else is really, really expensive. */
-	if (!cst->stat_all)
+	if (!F_ISSET(cst, WT_CONN_STAT_ALL))
 		return (0);
 
 	next_walk = NULL;

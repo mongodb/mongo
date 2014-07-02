@@ -762,8 +762,7 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	    session, alsm->lsm_tree->collator, &a->key, &b->key, cmp));
 	*cmpp = cmp;
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -988,8 +987,7 @@ __clsm_reset(WT_CURSOR *cursor)
 	/* In case we were somehow left positioned, clear that. */
 	WT_TRET(__clsm_leave(clsm));
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -1427,8 +1425,7 @@ __clsm_close(WT_CURSOR *cursor)
 		__wt_lsm_tree_release(session, clsm->lsm_tree);
 	WT_TRET(__wt_cursor_close(cursor));
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*

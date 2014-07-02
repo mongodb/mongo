@@ -34,12 +34,13 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
 
 	/* Propagate all, fast and/or clear to the cursors we open. */
-	if (cst->stat_clear || cst->stat_all || cst->stat_fast) {
+	if (!F_ISSET(cst, WT_CONN_STAT_NONE)) {
 		(void)snprintf(config, sizeof(config),
 		    "statistics=(%s%s%s)",
-		    cst->stat_clear ? "clear," : "",
-		    cst->stat_all ? "all," : "",
-		    !cst->stat_all && cst->stat_fast ? "fast," : "");
+		    F_ISSET(cst, WT_CONN_STAT_CLEAR) ? "clear," : "",
+		    F_ISSET(cst, WT_CONN_STAT_ALL) ? "all," : "",
+		    !F_ISSET(cst, WT_CONN_STAT_ALL) &&
+		    F_ISSET(cst, WT_CONN_STAT_FAST) ? "fast," : "");
 		cfg[1] = disk_cfg[1] = config;
 	}
 
@@ -132,7 +133,7 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 
 	/* Aggregate, and optionally clear, LSM-level specific information. */
 	__wt_stat_aggregate_dsrc_stats(&lsm_tree->stats, stats);
-	if (cst->stat_clear)
+	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
 		__wt_stat_refresh_dsrc_stats(&lsm_tree->stats);
 
 	__wt_curstat_dsrc_final(cst);

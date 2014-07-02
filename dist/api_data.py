@@ -379,6 +379,8 @@ connection_runtime_config = [
 	    log any statistics the database is configured to maintain,
 	    to a file.  See @ref statistics for more information''',
 	    type='category', subconfig=[
+	    Config('on_close', 'false', r'''log statistics on database close''',
+	        type='boolean'),
 	    Config('path', '"WiredTigerStat.%d.%H"', r'''
 	        the pathname to a file into which the log records are written,
 	        may contain ISO C standard strftime conversion specifications.
