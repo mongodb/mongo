@@ -241,7 +241,6 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 
 	asyncop = (WT_ASYNC_OP *)op;
 
-	ret = 0;
 	cb_ret = 0;
 
 	wt_session = &session->iface;
