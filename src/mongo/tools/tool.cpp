@@ -33,6 +33,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 #include <iostream>
+#include <limits>
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/init.h"
@@ -295,28 +296,27 @@ namespace mongo {
 
     long long BSONTool::processFile( const boost::filesystem::path& root ) {
         bool isFifoFile = boost::filesystem::status(root).type() == boost::filesystem::fifo_file;
+        bool isStdin = root == "-";
 
         std::string fileName = root.string();
 
-        unsigned long long fileLength = 0;
-        if (!isFifoFile) {
-            fileLength = file_size( root );
+        unsigned long long fileLength = (isFifoFile || isStdin) ?
+            std::numeric_limits<unsigned long long>::max() : file_size(root);
 
-            if ( fileLength == 0 ) {
-                toolInfoOutput() << "file " << fileName << " empty, skipping" << std::endl;
-                return 0;
-            }
+        if ( fileLength == 0 ) {
+            toolInfoOutput() << "file " << fileName << " empty, skipping" << std::endl;
+            return 0;
         }
 
 
-        FILE* file = fopen( fileName.c_str() , "rb" );
+        FILE* file = isStdin ? stdin : fopen( fileName.c_str() , "rb" );
         if ( ! file ) {
             toolError() << "error opening file: " << fileName << " " << errnoWithDescription()
                       << std::endl;
             return 0;
         }
 
-        if (!isFifoFile) {
+        if (!isFifoFile && !isStdin) {
 #ifdef POSIX_FADV_SEQUENTIAL
             posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
@@ -326,6 +326,7 @@ namespace mongo {
             }
         }
 
+        unsigned long long read = 0;
         unsigned long long num = 0;
         unsigned long long processed = 0;
 
@@ -336,16 +337,15 @@ namespace mongo {
         // no progress is available for FIFO
         // only for regular files
         boost::scoped_ptr<ProgressMeter> m;
-        if (!toolGlobalParams.quiet && !isFifoFile) {
+        if (!toolGlobalParams.quiet && !isFifoFile && !isStdin) {
             m.reset(new ProgressMeter( fileLength ));
-            // boost::scoped_ptr<ProgressMeter> m( fileLength );
             m->setUnits( "bytes" );
         }
 
-        while ( true ) {
+        while ( read < fileLength ) {
             size_t amt = fread(buf, 1, 4, file);
-            // end of fifo/file
-            if ( feof(file) ) {
+            // end of fifo
+            if ((isFifoFile || isStdin) && ::feof(file)) {
                 break;
             }
             verify( amt == 4 );
@@ -382,6 +382,7 @@ namespace mongo {
                 processed++;
             }
 
+            read += o.objsize();
             num++;
 
             if (m.get()) {
@@ -389,10 +390,12 @@ namespace mongo {
             }
         }
 
-        fclose( file );
+        if (!isStdin) {
+            fclose(file);
+        }
 
-        if (m.get()) {
-            uassert(10265, "counts don't match", m->done() == fileLength);
+        if (!isFifoFile && !isStdin) {
+            uassert(10265, "counts don't match", read == fileLength);
         }
         toolInfoOutput() << num << ((num == 1) ? " document" : " documents")
                          << " found" << std::endl;
