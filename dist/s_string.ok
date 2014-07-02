@@ -343,6 +343,7 @@ buf
 bufs
 bufsz
 builtin
+builtins
 bytelock
 bytestring
 bzCompressEnd
