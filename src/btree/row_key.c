@@ -25,8 +25,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	btree = S2BT(session);
 
-	if (page->pg_row_entries == 0 ||		/* Just checking... */
-	    F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY)) {
+	if (page->pg_row_entries == 0) {		/* Just checking... */
 		F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 		return (0);
 	}
@@ -132,6 +131,7 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 {
 	enum { FORWARD, BACKWARD } direction;
 	WT_BTREE *btree;
+	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
@@ -140,7 +140,7 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 	size_t size;
 	u_int last_prefix;
 	int jump_slot_offset, slot_offset;
-	void *key;
+	void *copy;
 	const void *p;
 
 	/*
@@ -149,7 +149,6 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 	 * front-end, __wt_row_leaf_key, be careful if you're calling this code
 	 * directly.
 	 */
-	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY));
 
 	btree = S2BT(session);
 	unpack = &_unpack;
@@ -159,53 +158,73 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 	jump_slot_offset = 0;
 	last_prefix = 0;
 
+	p = NULL;			/* -Werror=maybe-uninitialized */
+	size = 0;			/* -Werror=maybe-uninitialized */
+
 	direction = BACKWARD;
 	for (slot_offset = 0;;) {
-jump_slot:	key = WT_ROW_KEY_COPY(rip);
+		if (0) {
+switch_and_jump:	/* Switching to a forward roll. */
+			WT_ASSERT(session, direction == BACKWARD);
+			direction = FORWARD;
+
+			/* Skip list of keys with compatible prefixes. */
+			rip = jump_rip;
+			slot_offset = jump_slot_offset;
+		}
+		copy = WT_ROW_KEY_COPY(rip);
 
 		/*
-		 * Key copied.
-		 *
-		 * If another thread instantiated the key while we were doing
-		 * that, we don't have any work to do.  Figure this out using
-		 * the key's value:
-		 *
-		 * If the key points off-page, another thread updated the key,
-		 * we can just use it.
-		 *
-		 * If the key points on-page, we have a copy of a WT_CELL value
-		 * that can be processed, regardless of what any other thread is
-		 * doing.
-		 *
-		 * Overflow keys are not prefix-compressed, we don't want to
-		 * read/write them during reconciliation simply because their
-		 * prefix might change.  That means we can't use instantiated
-		 * overflow keys to figure out the prefix for other keys,
-		 * specifically, in this code when we're looking for a key we
-		 * can roll-forward to figure out the target key's prefix,
-		 * instantiated overflow keys aren't useful.
-		 *
-		 * 1: the test for an on/off page reference.
+		 * Figure out what the key looks like.
 		 */
-		if (__wt_off_page(page, key)) {
-off_page:		ikey = key;
+		(void)__wt_row_leaf_key_info(
+		    page, copy, &ikey, &cell, &p, &size);
+
+		/* 1: the test for a directly referenced on-page key. */
+		if (cell == NULL) {
+			keyb->data = p;
+			keyb->size = size;
 
 			/*
 			 * If this is the key we originally wanted, we don't
 			 * care if we're rolling forward or backward, or if
 			 * it's an overflow key or not, it's what we wanted.
+			 * This shouldn't normally happen, the fast-path code
+			 * that front-ends this function will have figured it
+			 * out before we were called.
+			 *
+			 * The key doesn't need to be instantiated, skip past
+			 * that test.
+			 */
+			if (slot_offset == 0)
+				goto done;
+
+			/*
+			 * This key is not an overflow key by definition and
+			 * isn't compressed in any way, we can use it to roll
+			 * forward.
+			 *	If rolling backward, switch directions.
+			 *	If rolling forward: there's a bug somewhere,
+			 * we should have hit this key when rolling backward.
+			 */
+			goto switch_and_jump;
+		}
+
+		/* 2: the test for an instantiated off-page key. */
+		if (ikey != NULL) {
+			/*
+			 * If this is the key we originally wanted, we don't
+			 * care if we're rolling forward or backward, or if
+			 * it's an overflow key or not, it's what we wanted.
 			 * Take a copy and wrap up.
+			 *
+			 * The key doesn't need to be instantiated, skip past
+			 * that test.
 			 */
 			if (slot_offset == 0) {
-				keyb->data = WT_IKEY_DATA(ikey);
-				keyb->size = ikey->size;
-
-				/*
-				 * The key is already instantiated, ignore the
-				 * caller's suggestion.
-				 */
-				instantiate = 0;
-				break;
+				keyb->data = p;
+				keyb->size = size;
+				goto done;
 			}
 
 			/*
@@ -218,8 +237,7 @@ off_page:		ikey = key;
 			 * done because prefixes skip overflow keys: keep
 			 * rolling forward.
 			 */
-			if (__wt_cell_type(WT_PAGE_REF_OFFSET(
-			    page, ikey->cell_offset)) == WT_CELL_KEY_OVFL)
+			if (__wt_cell_type(cell) == WT_CELL_KEY_OVFL)
 				goto next;
 
 			/*
@@ -233,16 +251,18 @@ off_page:		ikey = key;
 			 * In short: if it's not an overflow key, take a copy
 			 * and roll forward.
 			 */
-			keyb->data = WT_IKEY_DATA(ikey);
-			keyb->size = ikey->size;
+			keyb->data = p;
+			keyb->size = size;
 			direction = FORWARD;
 			goto next;
 		}
 
-		/* Unpack the key's cell. */
-		__wt_cell_unpack(key, unpack);
+		/*
+		 * It must be an on-page cell, unpack it.
+		 */
+		__wt_cell_unpack(cell, unpack);
 
-		/* 2: the test for an on-page reference to an overflow key. */
+		/* 3: the test for an on-page reference to an overflow key. */
 		if (unpack->type == WT_CELL_KEY_OVFL) {
 			/*
 			 * If this is the key we wanted from the start, we don't
@@ -260,25 +280,23 @@ off_page:		ikey = key;
 			 * the tracking cache.
 			 */
 			if (slot_offset == 0) {
-				WT_ERR(__wt_readlock(
-				    session, btree->ovfl_lock));
-				key = WT_ROW_KEY_COPY(rip);
-				if (__wt_off_page(page, key)) {
-					WT_ERR(__wt_rwunlock(
-					    session, btree->ovfl_lock));
-					goto off_page;
+				WT_ERR(
+				    __wt_readlock(session, btree->ovfl_lock));
+				copy = WT_ROW_KEY_COPY(rip);
+				if (!__wt_row_leaf_key_info(page, copy,
+				    NULL, &cell, &keyb->data, &keyb->size)) {
+					__wt_cell_unpack(cell, unpack);
+					ret = __wt_dsk_cell_data_ref(session,
+					    WT_PAGE_ROW_LEAF, unpack, keyb);
 				}
-				ret = __wt_dsk_cell_data_ref(
-				    session, WT_PAGE_ROW_LEAF, unpack, keyb);
-				WT_TRET(__wt_rwunlock(
-				    session, btree->ovfl_lock));
+				WT_TRET(
+				    __wt_rwunlock(session, btree->ovfl_lock));
 				WT_ERR(ret);
 				break;
 			}
 
 			/*
-			 * If we wanted a different key and this key is an
-			 * overflow key:
+			 * If we wanted a different key:
 			 *	If we're rolling backward, this key is useless
 			 * to us because it doesn't have a valid prefix: keep
 			 * rolling backward.
@@ -290,10 +308,18 @@ off_page:		ikey = key;
 		}
 
 		/*
-		 * 3: the test for an on-page reference to a key that isn't
+		 * 4: the test for an on-page reference to a key that isn't
 		 * prefix compressed.
 		 */
 		if (unpack->prefix == 0) {
+			/*
+			 * The only reason to be here is a Huffman encoded key,
+			 * a non-encoded key with no prefix compression should
+			 * have been directly referenced, and we should not have
+			 * needed to unpack its cell.
+			 */
+			WT_ASSERT(session, btree->huffman_key != NULL);
+
 			/*
 			 * If this is the key we originally wanted, we don't
 			 * care if we're rolling forward or backward, it's
@@ -306,47 +332,19 @@ off_page:		ikey = key;
 			 *	If rolling forward there's a bug, we should have
 			 * found this key while rolling backwards and switched
 			 * directions then.
+			 *
+			 * The key doesn't need to be instantiated, skip past
+			 * that test.
 			 */
-			if (btree->huffman_key == NULL) {
-				keyb->data = unpack->data;
-				keyb->size = unpack->size;
-			} else
-				WT_ERR(__wt_dsk_cell_data_ref(
-				    session, WT_PAGE_ROW_LEAF, unpack, keyb));
-
-			if (slot_offset == 0) {
-				/*
-				 * If we have an uncompressed, on-page key with
-				 * no prefix, don't bother instantiating it,
-				 * regardless of what our caller thought.  The
-				 * memory cost is greater than the performance
-				 * cost of finding the key each time we need it.
-				 */
-				if (btree->huffman_key == NULL)
-					instantiate = 0;
-				break;
-			}
-
-			WT_ASSERT(session, direction == BACKWARD);
-			direction = FORWARD;
-
-			/*
-			 * Switching to the forward roll; skip over any list of
-			 * keys with compatible prefixes.
-			 */
-			rip = jump_rip;
-			slot_offset = jump_slot_offset;
-
-			/*
-			 * I'm using an explicit branch instead of a continue,
-			 * it needs to be obvious that new code at the top of
-			 * this loop is problematical.
-			 */
-			goto jump_slot;
+			WT_ERR(__wt_dsk_cell_data_ref(
+			    session, WT_PAGE_ROW_LEAF, unpack, keyb));
+			if (slot_offset == 0)
+				goto done;
+			goto switch_and_jump;
 		}
 
 		/*
-		 * 4: an on-page reference to a key that's prefix compressed.
+		 * 5: an on-page reference to a key that's prefix compressed.
 		 *	If rolling backward, keep looking for something we can
 		 * use.
 		 *	If rolling forward, build the full key and keep rolling
@@ -436,10 +434,12 @@ next:		switch (direction) {
 	 * that half of the page).
 	 */
 	if (instantiate) {
-		key = WT_ROW_KEY_COPY(rip_arg);
-		if (!__wt_off_page(page, key)) {
+		copy = WT_ROW_KEY_COPY(rip_arg);
+		(void)__wt_row_leaf_key_info(
+		    page, copy, &ikey, &cell, NULL, NULL);
+		if (ikey == NULL) {
 			WT_ERR(__wt_row_ikey(session,
-			    WT_PAGE_DISK_OFFSET(page, key),
+			    WT_PAGE_DISK_OFFSET(page, cell),
 			    keyb->data, keyb->size, &ikey));
 
 			/*
@@ -447,7 +447,7 @@ next:		switch (direction) {
 			 * update the page's memory footprint, on failure, free
 			 * the allocated memory.
 			 */
-			if (WT_ATOMIC_CAS(WT_ROW_KEY_COPY(rip), key, ikey))
+			if (WT_ATOMIC_CAS(WT_ROW_KEY_COPY(rip), copy, ikey))
 				__wt_cache_page_inmem_incr(session,
 				    page, sizeof(WT_IKEY) + ikey->size);
 			else
@@ -455,6 +455,7 @@ next:		switch (direction) {
 		}
 	}
 
+done:
 err:	__wt_scr_free(&tmp);
 	return (ret);
 }

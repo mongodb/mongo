@@ -200,7 +200,7 @@ __verify_dsk_row(
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(NULL, cell, unpack, end) != 0) {
+		if (__wt_cell_unpack_safe(cell, unpack, end) != 0) {
 			ret = __err_cell_corrupted(session, cell_num, addr);
 			goto err;
 		}
@@ -467,7 +467,7 @@ __verify_dsk_col_int(
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(NULL, cell, unpack, end) != 0)
+		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
 			return (__err_cell_corrupted(session, cell_num, addr));
 
 		/* Check the raw and collapsed cell types. */
@@ -534,7 +534,7 @@ __verify_dsk_col_var(
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(NULL, cell, unpack, end) != 0)
+		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
 			return (__err_cell_corrupted(session, cell_num, addr));
 
 		/* Check the raw and collapsed cell types. */

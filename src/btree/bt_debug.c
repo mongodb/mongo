@@ -779,15 +779,17 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_IKEY *ikey;
+	WT_DECL_ITEM(key);
+	WT_DECL_RET;
 	WT_INSERT_HEAD *insert;
-	WT_ITEM key;
 	WT_ROW *rip;
+	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 	uint32_t i;
-	void *copy;
 
+	session = ds->session;
 	unpack = &_unpack;
+	WT_RET(__wt_scr_alloc(session, 256, &key));
 
 	/*
 	 * Dump any K/V pairs inserted into the page before the first from-disk
@@ -798,24 +800,14 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 
 	/* Dump the page's K/V pairs. */
 	WT_ROW_FOREACH(page, rip, i) {
-		copy = WT_ROW_KEY_COPY(rip);
-		if (F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY)) {
-			__wt_row_leaf_direct(page, copy, &key);
-			__debug_item(ds, "K", key.data, key.size);
-		} else if (__wt_off_page(page, copy)) {
-			ikey = copy;
-			__debug_item(ds, "K", WT_IKEY_DATA(ikey), ikey->size);
-		} else {
-			__wt_cell_unpack(copy, unpack);
-			WT_RET(__debug_cell_data(
-			    ds, page, WT_PAGE_ROW_LEAF, "K", unpack));
-		}
+		WT_RET(__wt_row_leaf_key(session, page, rip, key, 0));
+		__debug_item(ds, "K", key->data, key->size);
 
-		if ((cell = __wt_row_leaf_value(page, rip)) == NULL)
+		if ((cell = __wt_row_leaf_value(page, rip, NULL)) == NULL)
 			__dmsg(ds, "\tV {}\n");
 		else {
 			__wt_cell_unpack(cell, unpack);
-			WT_RET(__debug_cell_data(
+			WT_ERR(__debug_cell_data(
 			    ds, page, WT_PAGE_ROW_LEAF, "V", unpack));
 		}
 
@@ -826,7 +818,8 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 			__debug_row_skip(ds, insert);
 	}
 
-	return (0);
+err:	__wt_scr_free(&key);
+	return (ret);
 }
 
 /*

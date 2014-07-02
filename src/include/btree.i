@@ -446,27 +446,32 @@ __wt_off_page(WT_PAGE *page, const void *p)
 static inline void
 __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 {
+	uintptr_t v;
+
 	/*
 	 * An internal page key is in one of two places: if we instantiated the
 	 * key (for example, when reading the page), WT_REF.key.ikey references
-	 * a WT_IKEY structure, otherwise, WT_REF.key.pkey references an on-page
-	 * key.
+	 * a WT_IKEY structure, otherwise WT_REF.key.ikey references an on-page
+	 * key offset/length pair.
 	 *
-	 * Now the magic: Any allocated memory will have a low-order bit of 0
-	 * (the return from malloc must be aligned to store any standard type,
-	 * and we assume there's always going to be a standard type requiring
-	 * even-byte alignment).  An on-page key consists of an offset/length
-	 * pair.  We can fit the maximum page size into 31 bits, so we use the
-	 * low-order bit in the on-page value to flag the next 31 bits as a
-	 * page offset and the other 32 bits as the key's length, not a WT_IKEY
-	 * pointer.  This breaks if allocation chunks aren't even-byte aligned
-	 * or pointers and uint64_t's don't always map their low-order bits to
-	 * the same location.
+	 * Now the magic: allocated memory must be aligned to store any standard
+	 * type, and we expect some standard type to require at least quad-byte
+	 * alignment, so allocated memory should have some clear low-order bits.
+	 * On-page objects consist of an offset/length pair: the maximum page
+	 * size currently fits into 29 bits, so we use the low-order bits of the
+	 * pointer to mark the other bits of the bottom 4B of the pointer as a
+	 * page offset, and the top 4B of the pointer as the offset's length,
+	 * not a real pointer.  This breaks if allocated memory isn't aligned,
+	 * of course.
+	 *
+	 * In this specific case, we use bit 0x01 to mark an on-page key, not a
+	 * WT_IKEY reference.
 	 */
-	if (ref->key.pkey & 0x01) {
+	v = (uintptr_t)ref->key.ikey;
+	if (v & 0x01) {
 		*(void **)keyp =
-		    WT_PAGE_REF_OFFSET(page, (ref->key.pkey & 0xFFFFFFFF) >> 1);
-		*sizep = ref->key.pkey >> 32;
+		    WT_PAGE_REF_OFFSET(page, (v & 0xFFFFFFFF) >> 1);
+		*sizep = v >> 32;
 	} else {
 		*(void **)keyp = WT_IKEY_DATA(ref->key.ikey);
 		*sizep = ((WT_IKEY *)ref->key.ikey)->size;
@@ -480,26 +485,31 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 static inline void
 __wt_ref_key_onpage_set(WT_PAGE *page, WT_REF *ref, WT_CELL_UNPACK *unpack)
 {
+	uintptr_t v;
+
 	/*
 	 * See the comment in __wt_ref_key for an explanation of the magic.
 	 */
-	ref->key.pkey =
-	    (uint64_t)unpack->size << 32 |
+	v = (uintptr_t)unpack->size << 32 |
 	    (uint32_t)WT_PAGE_DISK_OFFSET(page, unpack->data) << 1 |
 	    0x01;
+	ref->key.ikey = (void *)v;
 }
 
 /*
  * __wt_ref_key_instantiated --
- *	Return an instantiated key from a WT_REF.
+ *	Return if a WT_REF key is instantiated.
  */
 static inline WT_IKEY *
 __wt_ref_key_instantiated(WT_REF *ref)
 {
+	uintptr_t v;
+
 	/*
 	 * See the comment in __wt_ref_key for an explanation of the magic.
 	 */
-	return (ref->key.pkey & 0x01 ? NULL : ref->key.ikey);
+	v = (uintptr_t)ref->key.ikey;
+	return (v & 0x01 ? NULL : ref->key.ikey);
 }
 
 /*
@@ -509,72 +519,132 @@ __wt_ref_key_instantiated(WT_REF *ref)
 static inline void
 __wt_ref_key_clear(WT_REF *ref)
 {
-	/* The key union has 3 fields, all of which are 8B. */
+	/* The key union has 2 fields, both of which are 8B. */
 	ref->key.recno = 0;
 }
 
 /*
- * __wt_row_leaf_direct --
- *	Return an encoded row-store leaf page key.
+ * __wt_row_leaf_key_info --
+ *	Return a row-store leaf page key referenced by a WT_ROW if it can be
+ * had without unpacking a cell, and information about the cell, if the key
+ * isn't cheaply available.
  */
-static inline void
-__wt_row_leaf_direct(WT_PAGE *page, void *ripkey, WT_ITEM *key)
+static inline int
+__wt_row_leaf_key_info(WT_PAGE *page, void *copy,
+    WT_IKEY **ikeyp, WT_CELL **cellp, void *datap, size_t *sizep)
 {
+	WT_IKEY *ikey;
 	uintptr_t v;
+
+	v = (uintptr_t)copy;
 
 	/*
 	 * A row-store leaf page key is in one of two places: if instantiated,
 	 * the WT_ROW pointer references a WT_IKEY structure, otherwise, it
-	 * references an on-page location.  However, on-page keys are in one of
-	 * two states and the reference is in one of two forms: if a row-store
-	 * doesn't configure prefix compression or Huffman encoding, and there
-	 * were no overflow keys found when reading the page into memory (all
-	 * of which is likely, those are the default configurations), the key's
-	 * location and size was encoded in the pointer and a page flag was set.
-	 * If we found overflow keys or one of those features is configured, the
-	 * reference is to the key's on-page cell, which we'll unpack (we're
-	 * trying to avoid that cell unpack per key read in the fast path).
-	 * The test is if the page flag is set, we're done, it's an encoding;
-	 * otherwise, if the pointer is off-page it's an instantiated key, else
-	 * an on-page cell.
+	 * references an on-page offset.  Further, on-page keys are in one of
+	 * two states: if the key is a simple key (not an overflow key, prefix
+	 * compressed or Huffman encoded, all of which are likely), the key's
+	 * offset/size is encoded in the pointer.  Otherwise, the offset is to
+	 * the key's on-page cell.
 	 *
-	 * This function cracks an encoded key and returns a real pointer.  The
-	 * encoding magic is simpler than internal page key encoding because we
-	 * are using the page's flag rather than per-key information to decide
-	 * if the key is encoded.  The key's page offset is the bottom 4B, and
-	 * the key size is the top 4B.
+	 * Now the magic: allocated memory must be aligned to store any standard
+	 * type, and we expect some standard type to require at least quad-byte
+	 * alignment, so allocated memory should have some clear low-order bits.
+	 * On-page objects consist of an offset/length pair: the maximum page
+	 * size currently fits into 29 bits, so we use the low-order bits of the
+	 * pointer to mark the other bits of the bottom 4B of the pointer as a
+	 * page offset, and the top 4B of the pointer as the offset's length,
+	 * not a real pointer.  This breaks if allocated memory isn't aligned,
+	 * of course.
+	 *
+	 * In this specific case, we use bit 0x01 to mark an on-page key, bit
+	 * 0x02 to mark an on-page cell, otherwise it's a WT_IKEY reference.
+	 * We could easily reduce this to a single bit if the maximum page size
+	 * grows by using 0x01 for both on-page cases, and using a length of 0
+	 * to distinguish between an on-page key and an on-page cell.
+	 *
+	 * Perform the tests in the order we think mostly probable, this call is
+	 * all about speed.
+	 *
+	 * This function returns a list of things about the key (instantiation
+	 * reference, cell reference and key/length pair).  Our callers know
+	 * the order in which we look things up and the information returned;
+	 * for example, the cell will never be returned if we are working with
+	 * an on-page key.
 	 */
-	v = (uintptr_t)ripkey;
-	key->data = WT_PAGE_REF_OFFSET(page, (v & 0xFFFFFFFF));
-	key->size = v >> 32;
+
+	/* On-page key: no instantiated key, no cell. */
+	if (v & 0x01) {
+		if (cellp != NULL)
+			*cellp = NULL;
+		if (ikeyp != NULL)
+			*ikeyp = NULL;
+		if (datap != NULL) {
+			*(void **)datap =
+			    WT_PAGE_REF_OFFSET(page, (v & 0xFFFFFFFF) >> 2);
+			*sizep = v >> 32;
+			return (1);
+		}
+		return (0);
+	}
+
+	/* On-page cell: no instantiated key. */
+	if (v & 0x02) {
+		if (ikeyp != NULL)
+			*ikeyp = NULL;
+		if (cellp != NULL)
+			*cellp =
+			    WT_PAGE_REF_OFFSET(page, (v & 0xFFFFFFFF) >> 2);
+		return (0);
+	}
+
+	/* Instantiated key. */
+	ikey = copy;
+	if (ikeyp != NULL)
+		*ikeyp = copy;
+	if (cellp != NULL)
+		*cellp = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
+	if (datap != NULL) {
+		*(void **)datap = WT_IKEY_DATA(ikey);
+		*sizep = ikey->size;
+		return (1);
+	}
+	return (0);
 }
 
 /*
- * __wt_row_leaf_key_onpage_set --
- *	Set a WT_ROW to reference an on-page key.
+ * __wt_row_leaf_key_set --
+ *	Set a WT_ROW to reference an on-page row-store leaf key.
  */
 static inline void
-__wt_row_leaf_key_onpage_set(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *unpack)
+__wt_row_leaf_key_set(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *unpack)
 {
 	uintptr_t v;
 
 	/*
-	 * See the comment in __wt_row_leaf_direct for an explanation of the
+	 * See the comment in __wt_row_leaf_key_info for an explanation of the
 	 * magic.
 	 */
 	v = (uintptr_t)unpack->size << 32 |
-	    (uint32_t)WT_PAGE_DISK_OFFSET(page, unpack->data);
+	    (uint32_t)WT_PAGE_DISK_OFFSET(page, unpack->data) << 2 | 0x01;
 	WT_ROW_KEY_SET(rip, v);
 }
 
 /*
- * __wt_row_leaf_key_onpage_set_cell --
- *	Set a WT_ROW to reference an on-page key's cell.
+ * __wt_row_leaf_key_set_cell --
+ *	Set a WT_ROW to reference an on-page row-store leaf cell.
  */
 static inline void
-__wt_row_leaf_key_onpage_set_cell(WT_ROW *rip, WT_CELL *cell)
+__wt_row_leaf_key_set_cell(WT_PAGE *page, WT_ROW *rip, WT_CELL *cell)
 {
-	WT_ROW_KEY_SET(rip, cell);
+	uintptr_t v;
+
+	/*
+	 * See the comment in __wt_row_leaf_key_info for an explanation of the
+	 * magic.
+	 */
+	v = (uintptr_t)WT_PAGE_DISK_OFFSET(page, cell) << 2 | 0x02;
+	WT_ROW_KEY_SET(rip, v);
 }
 
 /*
@@ -586,12 +656,7 @@ static inline int
 __wt_row_leaf_key(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, int instantiate)
 {
-	WT_BTREE *btree;
-	WT_CELL_UNPACK unpack;
-	WT_IKEY *ikey;
 	void *copy;
-
-	btree = S2BT(session);
 
 	/*
 	 * A front-end for __wt_row_leaf_key_work, here to inline fast paths.
@@ -600,36 +665,19 @@ __wt_row_leaf_key(WT_SESSION_IMPL *session,
 	 */
 	copy = WT_ROW_KEY_COPY(rip);
 
-	/* First, check for an encoded key. */
-	if (F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY)) {
-		__wt_row_leaf_direct(page, copy, key);
-		return (0);
-	}
-
-	/* Second, check for an instantiated key. */
-	if (__wt_off_page(page, copy)) {
-		ikey = copy;
-		key->data = WT_IKEY_DATA(ikey);
-		key->size = ikey->size;
-		return (0);
-	}
-
 	/*
-	 * Third, if the key isn't compressed or an overflow, unpack the cell
-	 * and take it from the page.
+	 * All we handle here are on-page keys (which should be a common case),
+	 * and instantiated keys (which start out rare, but become more common
+	 * as a leaf page is searched, instantiating prefix-compressed keys).
 	 */
-	if (btree->huffman_key == NULL) {
-		__wt_cell_unpack(copy, &unpack);
-		if (unpack.type == WT_CELL_KEY && unpack.prefix == 0) {
-			key->data = unpack.data;
-			key->size = unpack.size;
-			return (0);
-		}
-	}
+	if (__wt_row_leaf_key_info(
+	    page, copy, NULL, NULL, &key->data, &key->size))
+		return (0);
 
 	/*
-	 * We have to build the key (it's never been instantiated, and it's some
-	 * kind of compressed or overflow key).
+	 * The alternative is an on-page cell with some kind of compressed or
+	 * overflow key that's never been instantiated.  Call the underlying
+	 * worker function to figure it out.
 	 */
 	return (__wt_row_leaf_key_work(session, page, rip, key, instantiate));
 }
@@ -667,48 +715,42 @@ __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
  * NULL if there isn't one.
  */
 static inline WT_CELL *
-__wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip)
+__wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *kpack)
 {
-	WT_CELL *cell;
+	WT_CELL *kcell, *vcell;
 	WT_CELL_UNPACK unpack;
-	WT_IKEY *ikey;
-	void *copy;
-	uintptr_t v;
+	void *copy, *key;
+	size_t size;
 
-	/*
-	 * The row-store key can change underfoot; explicitly take a copy.
-	 */
-	copy = WT_ROW_KEY_COPY(rip);
+	/* If we already have an unpacked key cell, use it. */
+	if (kpack != NULL)
+		vcell = (WT_CELL *)
+		    ((uint8_t *)kpack->cell + __wt_cell_total_len(kpack));
+	else {
+		/*
+		 * The row-store key can change underfoot; explicitly take a
+		 * copy.
+		 */
+		copy = WT_ROW_KEY_COPY(rip);
 
-	/*
-	 * See the comment in __wt_row_leaf_direct for an explanation of the
-	 * magic; we know where the key is, step past it to the value's cell.
-	 */
-	if (F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY)) {
-		v = (uintptr_t)copy;
-		cell = (WT_CELL *)
-		    ((uint8_t *)WT_PAGE_REF_OFFSET(page, (v & 0xFFFFFFFF)) +
-		    (v >> 32));
-		return (__wt_cell_leaf_value_parse(page, cell));
+		/*
+		 * Figure out where the key is, step past it to the value cell.
+		 * The test for a cell not being set tells us that we have an
+		 * on-page key, otherwise we're looking at an instantiated key
+		 * or on-page cell, both of which require an unpack of the key's
+		 * cell to find the value cell that follows.
+		 */
+		if (__wt_row_leaf_key_info(
+		    page, copy, NULL, &kcell, &key, &size) && kcell == NULL)
+			vcell = (WT_CELL *)((uint8_t *)key + size);
+		else {
+			__wt_cell_unpack(kcell, &unpack);
+			vcell = (WT_CELL *)((uint8_t *)
+			    unpack.cell + __wt_cell_total_len(&unpack));
+		}
 	}
 
-	/*
-	 * Cell now either references a WT_IKEY structure with a cell offset, or
-	 * references the on-page key WT_CELL.  Both can be processed no matter
-	 * what other threads are doing.  If it's the former, use it to get the
-	 * latter.
-	 */
-	if (__wt_off_page(page, copy)) {
-		ikey = copy;
-		cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-	} else
-		cell = copy;
-
-	/* Unpack the key cell, then return its associated value cell. */
-	__wt_cell_unpack(cell, &unpack);
-	cell = (WT_CELL *)((uint8_t *)cell + __wt_cell_total_len(&unpack));
-
-	return (__wt_cell_leaf_value_parse(page, cell));
+	return (__wt_cell_leaf_value_parse(page, vcell));
 }
 
 /*
