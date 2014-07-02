@@ -8,10 +8,10 @@ be separated into the following categories:
 - Functionality coverage
 - Bug regression testing
 - Cross platform testing
-- Multi-threading testing
-- Stress testing
 - Static analysis
+- Stress testing
 - Performance testing
+- Multi-threading testing
 
 The above test dimensions are discussed in more detail below.
 
@@ -36,101 +36,12 @@ it simple to diagnose errors based on the test suite.
 
 The WiredTiger test suite includes tests that cover:
 - Functionality exposed via the WiredTiger API.
-
 - Combinations of configuration settings for WiredTiger APIs. Including both
 valid and invalid combinations.
-
 - Bug regression tests that cover previous bugs, and avoid their reintroduction.
 
 The WiredTiger Python test suite can be run in a short period of time
 facilitated by running multiple test cases in parallel.
-
-The test suite covers the following areas of functionality:
-
-<b>Schema</b>
-
-- Test different key_format and value_format combinations to WT_SESSION::create.
-
-- Test with combinations of column groups.
-
-- Test with combinations of named columns.
-
-- Test with btree and LSM tree table types.
-
-<b> Data Access and Manipulation Operations</b>
-
-- Insert
-
-- Update
-
-- Delete
-
-- Search
-
-- Search near
-
-- Iterator traversal forwards and reverse
-
-<b>Compression Variations</b>
-
-- Block compression (WT_SESSION::create block_compressor); off, bzip2, snappy,
-zlib
-
-- Huffman encoding (WT_SESSION::create huffman_key and huffman_value) for
-key, value, both, and none
-
-- Prefix compression (WT_SESSION::create prefix_compression)
-
-- Internal key truncation (WT_SESSION::create internal_key_truncate)
-
-- key_gap
-
-<b>Callbacks</b>
-
-- Custom collator test
-
-- Custom compressor test
-
-- Error and message event callbacks
-
-<b>Transaction and Isolation</b>
-
-Cursor isolation levels: snapshot, read-committed, read-uncommitted.
-
-<b>Command-line Utility</b>
-
-- wt dump
-
-- wt load
-
-- wt salvage
-
-- wt verify
-
-<b>Capacity / Limits Testing.</b>
-
-In any of the above functional tests, where appropriate, we should test:
-
-- multiple (connections, sessions, cursors, etc.)
-
-- capacity testing, e.g. testing 10000 simultaneously opened cursors, etc.
-
-- wherever there are limits, test them.
-
-- wherever there are no limits, run to some reasonable capacity.
-
-- capacity and multiples in combinations
-
-@section testing_threads Multithreading
-
-Multithreaded testing is difficult. For the moment, there is a multithreading
-test (in test/thread) written in C that is the primary engine for testing
-this. There will be some simple Python tests for multithreading, though this
-will not be a primary emphasis. One important issue is that we expect the
-failures resulting from the python test base to be mostly repeatable. Adding
-a large multithreading component with uncontrolled interactions is in
-opposition to this goal. We will be periodically evaluating other ways to
-repeatably test multithreaded behavior.
 
 @section testing_stress Stress Testing
 
@@ -143,6 +54,17 @@ several days!)
 
 We test performance using the wtperf tool, running a variety of configurations
 on every push, and tracking any performance regressions.
+
+@section testing_threads Concurrency testing
+
+Concurrency testing is essential for WiredTiger since we implement a number of
+cutting edge, high concurrency algorithms. A number of our test tools run with
+multiple threads. Three tools in particular are designed to detect potential
+race conditions:
+
+* The WiredTiger thread tester called test/thread.
+* The WiredTiger stress tester called test/format.
+* The WiredTiger performance tester called bench/wtperf.
 
 @section testing_static Static analysis
 
