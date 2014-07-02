@@ -723,6 +723,37 @@ namespace PlanRankingTests {
         }
     };
 
+    /**
+     * Suppose we have two plans which are roughly equivalent, other than that
+     * one uses an index which involves doing a lot more skipping of index keys.
+     * Prefer the plan which does not have to do this index key skipping.
+     */
+    class PlanRankingAccountForKeySkips : public PlanRankingTestBase {
+    public:
+        void run() {
+            for (int i = 0; i < 4; ++i) {
+                insert(BSON("a" << 1 << "b" << 1));
+            }
+
+            // Second index has intervening fields which leads to more
+            // skipping of keys. We should pick a plan that uses the first.
+            addIndex(BSON("a" << 1 << "b" << 1));
+            addIndex(BSON("a" << 1 << "x" << 1 << "y" << 1 << "z" << 1 << "b" << 1));
+
+            CanonicalQuery* cq;
+            ASSERT(CanonicalQuery::canonicalize(ns,
+                                                fromjson("{a: 1, b: 1}"),
+                                                &cq).isOK());
+            ASSERT(NULL != cq);
+
+            // Expect to use index {a: 1, b: 1}.
+            QuerySolution* soln = pickBestPlan(cq);
+            ASSERT(QueryPlannerTestLib::solutionMatches(
+                        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}}}}}",
+                        soln->root.get()));
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "query_plan_ranking" ) {}
@@ -744,6 +775,7 @@ namespace PlanRankingTests {
             // add<PlanRankingChooseBetweenIxisectPlans>();
             add<PlanRankingAvoidBlockingSort>();
             add<PlanRankingWorkPlansLongEnough>();
+            add<PlanRankingAccountForKeySkips>();
         }
     } planRankingAll;
 
