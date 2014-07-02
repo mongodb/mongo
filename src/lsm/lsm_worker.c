@@ -659,7 +659,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			    session, chunk->bloom_uri)) == EBUSY) {
 				ret = 0;
 				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-				    "LSM worker bloom drop busy: %s.",
+				    "LSM worker bloom drop busy: %s",
 				    chunk->bloom_uri));
 				++skipped;
 				continue;
@@ -673,12 +673,10 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			 * An EBUSY return is acceptable - a cursor may still
 			 * be positioned on this old chunk.
 			 */
-			if ((ret = __lsm_drop_file(
-			    session, chunk->uri)) == EBUSY) {
-				ret = 0;
+			if ((ret =
+			    __lsm_drop_file(session, chunk->uri)) == EBUSY) {
 				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-				    "LSM worker drop busy: %s.",
-				    chunk->uri));
+				    "LSM worker drop busy: %s", chunk->uri));
 				++skipped;
 				continue;
 			} else
