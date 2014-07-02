@@ -28,13 +28,7 @@ struct __wt_hazard {
 #endif
 };
 
-typedef	enum {
-	WT_SERIAL_NONE=0,		/* No request */
-	WT_SERIAL_FUNC=1,		/* Function, then return */
-	WT_SERIAL_EVICT=2,		/* Function, then schedule evict */
-} wq_state_t;
-
-/* Get the connection for a session */
+/* Get the connection implementation for a session */
 #define	S2C(session)	  ((WT_CONNECTION_IMPL *)(session)->iface.connection)
 #define	S2C_SAFE(session) ((session) == NULL ? NULL : S2C(session))
 

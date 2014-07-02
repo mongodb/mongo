@@ -161,6 +161,10 @@ struct __wt_connection_stats {
 	WT_STATS cache_eviction_force_fail;
 	WT_STATS cache_eviction_hazard;
 	WT_STATS cache_eviction_internal;
+	WT_STATS cache_eviction_queue_empty;
+	WT_STATS cache_eviction_queue_not_empty;
+	WT_STATS cache_eviction_server_evicting;
+	WT_STATS cache_eviction_server_not_evicting;
 	WT_STATS cache_eviction_slow;
 	WT_STATS cache_eviction_split;
 	WT_STATS cache_eviction_walk;
