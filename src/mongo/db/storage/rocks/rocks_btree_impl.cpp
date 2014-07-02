@@ -42,8 +42,8 @@ namespace mongo {
 
     namespace {
 
-        rocksdb::Slice singleByteSlice( "a" );
-        rocksdb::SliceParts singleByteSliceParts( &singleByteSlice, 1 );
+        rocksdb::Slice emptyByteSlice( "" );
+        rocksdb::SliceParts emptyByteSliceParts( &emptyByteSlice, 1 );
 
         struct IndexKey {
             IndexKey( const BSONObj& _obj, const DiskLoc& _loc )
@@ -89,8 +89,23 @@ namespace mongo {
 
         class RocksCursor : public BtreeInterface::Cursor {
         public:
-            RocksCursor( rocksdb::Iterator* iterator, bool direction )
-                : _iterator( iterator ), _direction( direction ), _cached( false ) {
+            // constructor that doesn't take a snapshot
+            RocksCursor( rocksdb::Iterator* iterator, bool direction ):
+                RocksCursor( iterator, direction, nullptr, nullptr ) { }
+
+            // constructor that takes a snapshot
+            RocksCursor( rocksdb::Iterator* iterator,
+                    bool direction,
+                    const rocksdb::Snapshot* snapshot,
+                    rocksdb::DB* db )
+                : _iterator( iterator ),
+                _direction( direction ),
+                _cached( false ),
+                _snapshot( snapshot ),
+                _db( db ) {
+
+                invariant( ( snapshot == nullptr && db == nullptr )
+                        || ( snapshot != nullptr && db != nullptr ));
 
                 // todo: maybe don't seek until we know we need to?
                 if ( _forward() )
@@ -100,7 +115,11 @@ namespace mongo {
                 _checkStatus();
             }
 
-            virtual ~RocksCursor() {}
+            virtual ~RocksCursor() { 
+                if (_snapshot) {
+                    _db->ReleaseSnapshot(_snapshot);
+                }
+            }
 
             int getDirection() const { return _direction; }
 
@@ -125,8 +144,8 @@ namespace mongo {
             bool locate(const BSONObj& key, const DiskLoc& loc) {
                 _cached = false;
                 IndexKey indexKey( key, loc );
-                string buf = indexKey.asString();
-                _iterator->Seek( buf );
+                string keyData = indexKey.asString();
+                _iterator->Seek( keyData );
                 _checkStatus();
                 if ( !_iterator->Valid() )
                     return false;
@@ -177,11 +196,11 @@ namespace mongo {
             }
 
             void savePosition() {
-                invariant( !"rocksdb cursor doesn't do saving yet" );
+                _savedKey = _iterator->key();
             }
 
             void restorePosition() {
-                invariant( !"rocksdb cursor doesn't do saving yet" );
+                _iterator->Seek( _savedKey );
             }
 
         private:
@@ -207,9 +226,51 @@ namespace mongo {
             mutable bool _cached;
             mutable BSONObj _cachedKey;
             mutable DiskLoc _cachedLoc;
+
+            // not for caching, but for savePosition() and restorePosition()
+            mutable rocksdb::Slice _savedKey;
+
+            // we store the snapshot and database so that we can free the snapshot when we're done
+            // using the cursor
+            const rocksdb::Snapshot* _snapshot; // not owned
+            rocksdb::DB* _db; // not owned
         };
 
     }
+
+
+    //RocksBtreeImpl::IndexKey::IndexKey ( const BSONObj& obj, const DiskLoc& loc ) {
+        //// get rid of key names 
+        //string objData = stripFieldNames( obj ).objdata();
+
+        //_keyData = string( objData.size() + sizeof( RecordId ), 1);
+
+        //// copy the BSON, without key names, into the string
+        //memcpy( const_cast<char*>( _keyData.c_str() ), objData.c_str(), objData.size() );
+
+        //// copy the Record ID into the string, to serve as a tie-breaker for keys with the
+        //// same value
+        //memcpy( const_cast<char*>( _keyData.c_str() + objData.size() ), 
+                //reinterpret_cast<const char*>( &loc ),
+                //sizeof( RecordId ) );
+    //}
+
+    //BSONObj RocksBtreeImpl::IndexKey::stripFieldNames( const BSONObj& obj ) {
+        //if ( obj.firstElement().fieldName()[0] ) {
+            //// XXX move this to comparator
+            //// need to strip
+            //BSONObjBuilder b;
+            //BSONObjIterator i( obj );
+            //while ( i.more() ) {
+                //BSONElement e = i.next();
+                //b.appendAs( e, "" );
+            //}
+
+            //return b.obj();
+        //} else {
+            //return obj;
+        //}
+    //}
 
     RocksBtreeImpl::RocksBtreeImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf )
         : _db( db ), _columnFamily( cf ) {
@@ -237,11 +298,10 @@ namespace mongo {
         }
 
         IndexKey indexKey( key, loc );
-        string buf = indexKey.asString();
 
         ru->writeBatch()->Put( _columnFamily,
-                               indexKey.sliceParts(),
-                               singleByteSliceParts );
+                               indexKey.asString(),
+                               emptyByteSlice );
 
         return Status::OK();
     }
@@ -252,20 +312,32 @@ namespace mongo {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         IndexKey indexKey( key, loc );
-        string buf = indexKey.asString();
+        string keyData = indexKey.asString();
 
         string dummy;
-        if ( !_db->KeyMayExist( rocksdb::ReadOptions(), _columnFamily, buf, &dummy ) )
+        if ( !_db->KeyMayExist( rocksdb::ReadOptions(), _columnFamily, keyData, &dummy ) )
             return 0;
 
-        ru->writeBatch()->Delete( _columnFamily,
-                                  buf );
+        ru->writeBatch()->Delete( _columnFamily, keyData );
         return 1; // XXX: fix? does it matter since its so slow to check?
     }
 
+    string RocksBtreeImpl::dupKeyError(const BSONObj& key) const {
+        stringstream ss;
+        ss << "E11000 duplicate key error ";
+        // TODO figure out how to include index name without dangerous casts
+        ss << "dup key: " << key.toString();
+        return ss.str();
+    }
+
     Status RocksBtreeImpl::dupKeyCheck(const BSONObj& key, const DiskLoc& loc) {
-        // XXX: not done yet!
-        return Status::OK();
+        IndexKey indexKey( key, loc );
+        string keyData = indexKey.asString();
+        string dummy;
+
+        rocksdb::Status s =_db->Get( rocksdb::ReadOptions(), _columnFamily, keyData, &dummy );
+
+        return s.ok() ? Status::OK() : Status(ErrorCodes::DuplicateKey, dupKeyError(key));
     }
 
     void RocksBtreeImpl::fullValidate(long long* numKeysOut) {
@@ -275,8 +347,14 @@ namespace mongo {
     }
 
     bool RocksBtreeImpl::isEmpty() {
-        // XXX: todo
-        return false;
+        rocksdb::Iterator* it = _db->NewIterator( rocksdb::ReadOptions(), _columnFamily );
+
+        it->SeekToFirst();
+        bool toRet = it->Valid();
+
+        delete it;
+
+        return toRet;
     }
 
     Status RocksBtreeImpl::touch(OperationContext* txn) const {
@@ -285,9 +363,12 @@ namespace mongo {
     }
 
     BtreeInterface::Cursor* RocksBtreeImpl::newCursor(int direction) const {
-        return new RocksCursor( _db->NewIterator( rocksdb::ReadOptions(),
-                                                  _columnFamily ),
-                                direction );
+        rocksdb::ReadOptions options = rocksdb::ReadOptions();
+        options.snapshot = _db->GetSnapshot();
+        return new RocksCursor( _db->NewIterator( options, _columnFamily ),
+                                                  direction,
+                                                  options.snapshot,
+                                                  _db );
     }
 
     Status RocksBtreeImpl::initAsEmpty(OperationContext* txn) {

@@ -225,4 +225,43 @@ namespace mongo {
         }
     }
 
+    TEST( RocksRecordStoreTest, Snapshots ) {
+        scoped_ptr<rocksdb::DB> db( getDB() );
+
+        {
+            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                }
+            }
+
+            {
+                // get a cursor
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+
+                // insert some more stuff
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                }
+
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+                cursor->advance();
+
+                // make sure that the cursor can't "see" anything added after it was created.
+                ASSERT_TRUE( cursor-> isEOF() );
+            }
+        }
+    }
+
+
 }

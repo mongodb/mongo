@@ -104,6 +104,7 @@ namespace mongo {
                     collection = ns.substr( 0, ns.find( '$' ) );
                 }
 
+                // TODO is this the best way of doing this?
                 boost::shared_ptr<Entry> entry = _map[collection];
                 if ( !entry ) {
                     _map[collection] = boost::shared_ptr<Entry>( new Entry() );
