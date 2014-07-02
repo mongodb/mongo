@@ -970,3 +970,31 @@ struct __wt_insert_head {
 	    (i) < (dsk)->u.entries; ++(i),				\
 	    (v) = __bit_getv(						\
 	    WT_PAGE_HEADER_BYTE(btree, dsk), i, (btree)->bitcnt))
+
+/*
+ * Manage split generation numbers.  Splits walk the list of sessions to check
+ * when it is safe to free structures that have been replaced.  We also check
+ * that list periodically (e.g., when wrapping up a transaction) to free any
+ * memory we can.
+ *
+ * Before a thread enters code that will examine page indexes (which are
+ * swapped out by splits), it publishes a copy of the current split generation
+ * into its session.  Don't assume that threads never re-enter this code: if we
+ * already have a split generation, leave it alone.  If our caller is examining
+ * an index, we don't want the oldest split generation to move forward and
+ * potentially free it.
+ */
+#define	WT_ENTER_PAGE_INDEX(session) do {                               \
+	uint64_t prev_split_gen = session->split_gen;                   \
+	if (prev_split_gen == 0)                                        \
+		WT_PUBLISH(session->split_gen, S2C(session)->split_gen)
+
+#define	WT_LEAVE_PAGE_INDEX(session)                                    \
+	if (prev_split_gen == 0)                                        \
+		session->split_gen = 0;                                 \
+	} while (0)
+
+#define	WT_WITH_PAGE_INDEX(session, e)                                  \
+	WT_ENTER_PAGE_INDEX(session);                                   \
+	(e);                                                            \
+	WT_LEAVE_PAGE_INDEX(session)
