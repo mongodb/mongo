@@ -838,8 +838,8 @@ populate_thread(void *arg)
 		}
 		++thread->insert.ops;	/* Same as trk->ops */
 
-		if (cfg->stress_checkpoint_rate != 0 &&
-		    (op % cfg->stress_checkpoint_rate) == 0)
+		if (cfg->checkpoint_stress_rate != 0 &&
+		    (op % cfg->checkpoint_stress_rate) == 0)
 			stress_checkpoint_due = 1;
 
 		if (cfg->populate_ops_per_txn != 0) {
@@ -1338,6 +1338,13 @@ retry:			 if ((ret = cfg->conn->async_new_op(cfg->conn,
 		lprintf(cfg, 0, 1, "Compact completed in %.2f seconds", secs);
 		assert(tables == 0);
 	}
+	return (0);
+}
+
+static int
+close_reopen(CONFIG *cfg)
+{
+	int ret;
 
 	/*
 	 * Reopen the connection.  We do this so that the workload phase always
@@ -1345,7 +1352,10 @@ retry:			 if ((ret = cfg->conn->async_new_op(cfg->conn,
 	 * be identified.  This is particularly important for LSM, where the
 	 * merge algorithm is more aggressive for read-only trees.
 	 */
-	if ((ret = cfg->conn->close(cfg->conn, NULL)) != 0) {
+	/* cfg->conn is released no matter the return value from close(). */
+	ret = cfg->conn->close(cfg->conn, NULL);
+	cfg->conn = NULL;
+	if (ret != 0) {
 		lprintf(cfg, ret, 0, "Closing the connection failed");
 		return (ret);
 	}
@@ -1367,7 +1377,6 @@ retry:			 if ((ret = cfg->conn->async_new_op(cfg->conn,
 			return (ret);
 		}
 	}
-
 	return (0);
 }
 
@@ -1796,6 +1805,13 @@ start_run(CONFIG *cfg)
 	/* Optional workload. */
 	if (cfg->workers_cnt != 0 &&
 	    (cfg->run_time != 0 || cfg->run_ops != 0)) {
+		/*
+		 * If we have a workload, close and reopen the connection so
+		 * that LSM can detect read-only workloads.
+		 */
+		if (close_reopen(cfg) != 0)
+			goto err;
+
 		/* Didn't create, set insert count. */
 		if (cfg->create == 0 && find_table_count(cfg) != 0)
 			goto err;
@@ -1975,7 +1991,7 @@ main(int argc, char *argv[])
 				goto einval;
 			break;
 		}
-	
+
 	cfg->async_config = NULL;
 	/*
 	 * If the user specified async_threads we use async for all ops.

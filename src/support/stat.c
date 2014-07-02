@@ -353,6 +353,14 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_hazard.desc =
 	    "cache: hazard pointer blocked page eviction";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
+	stats->cache_eviction_queue_empty.desc =
+	    "cache: eviction server candidate queue empty when topping up";
+	stats->cache_eviction_queue_not_empty.desc =
+	    "cache: eviction server candidate queue not empty when topping up";
+	stats->cache_eviction_server_evicting.desc =
+	    "cache: eviction server evicting pages";
+	stats->cache_eviction_server_not_evicting.desc =
+	    "cache: eviction server populating queue, but not evicting pages";
 	stats->cache_eviction_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
 	stats->cache_eviction_split.desc =
@@ -413,6 +421,10 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "page reconciliation calls for eviction";
 	stats->rec_skipped_update.desc =
 	    "reconciliation failed because an update could not be included";
+	stats->rec_split_stashed_bytes.desc =
+	    "split bytes currently awaiting free";
+	stats->rec_split_stashed_objects.desc =
+	    "split objects currently awaiting free";
 	stats->rwlock_read.desc = "pthread mutex shared lock read-lock calls";
 	stats->rwlock_write.desc =
 	    "pthread mutex shared lock write-lock calls";
@@ -466,6 +478,10 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_force_fail.v = 0;
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_eviction_internal.v = 0;
+	stats->cache_eviction_queue_empty.v = 0;
+	stats->cache_eviction_queue_not_empty.v = 0;
+	stats->cache_eviction_server_evicting.v = 0;
+	stats->cache_eviction_server_not_evicting.v = 0;
 	stats->cache_eviction_slow.v = 0;
 	stats->cache_eviction_split.v = 0;
 	stats->cache_eviction_walk.v = 0;

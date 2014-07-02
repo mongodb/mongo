@@ -4046,28 +4046,21 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		}
 
 		/*
-		 * Set the WT_IKEY reference (if the key was instantiated), and
-		 * the key cell reference, unpack the key cell.
+		 * Figure out the key: set any cell reference (and unpack it),
+		 * set any instantiated key reference.
 		 */
 		copy = WT_ROW_KEY_COPY(rip);
-		if (F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY)) {
-			ikey = NULL;
-			cell = NULL;
+		(void)__wt_row_leaf_key_info(
+		    page, copy, &ikey, &cell, NULL, NULL);
+		if (cell == NULL)
 			kpack = NULL;
-		} else if (__wt_off_page(page, copy)) {
-			ikey = copy;
-			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-			kpack = &_kpack;
-			__wt_cell_unpack(cell, kpack);
-		} else {
-			ikey = NULL;
-			cell = (WT_CELL *)copy;
+		else {
 			kpack = &_kpack;
 			__wt_cell_unpack(cell, kpack);
 		}
 
 		/* Unpack the on-page value cell, and look for an update. */
-		if ((val_cell = __wt_row_leaf_value(page, rip)) == NULL)
+		if ((val_cell = __wt_row_leaf_value(page, rip, NULL)) == NULL)
 			vpack = NULL;
 		else {
 			vpack = &_vpack;
@@ -4256,22 +4249,17 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			r->ovfl_items = 1;
 		} else {
 			/*
-			 * Use a direct-key from the page, or
-			 * Use an already instantiated key, or
-			 * Use the key from the disk image, or
-			 * Build a key from a previous key, or
-			 * Instantiate the key from scratch.
+			 * Get the key from the page or an instantiated key, or
+			 * inline building the key from a previous key (it's a
+			 * fast path for simple, prefix-compressed keys), or by
+			 * by building the key from scratch.
 			 */
-			if (kpack == NULL)
-				__wt_row_leaf_direct(page, copy, tmpkey);
-			else if (ikey != NULL) {
-				tmpkey->data = WT_IKEY_DATA(ikey);
-				tmpkey->size = ikey->size;
-			} else if (btree->huffman_key == NULL &&
-			    kpack->type == WT_CELL_KEY && kpack->prefix == 0) {
-				tmpkey->data = kpack->data;
-				tmpkey->size = kpack->size;
-			} else if (btree->huffman_key == NULL &&
+			if (__wt_row_leaf_key_info(page, copy,
+			    NULL, &cell, &tmpkey->data, &tmpkey->size))
+				goto build;
+
+			__wt_cell_unpack(cell, kpack);
+			if (btree->huffman_key == NULL &&
 			    kpack->type == WT_CELL_KEY &&
 			    tmpkey->size >= kpack->prefix) {
 				/*
@@ -4283,10 +4271,10 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				WT_ASSERT(session, tmpkey->size != 0);
 
 				/*
-				 * Grow the buffer as necessary as well as
-				 * ensure data has been copied into local buffer
-				 * space, then append the suffix to the prefix
-				 * already in the buffer.
+				 * Grow the buffer as necessary, ensuring data
+				 * data has been copied into local buffer space,
+				 * then append the suffix to the prefix already
+				 * in the buffer.
 				 *
 				 * Don't grow the buffer unnecessarily or copy
 				 * data we don't need, truncate the item's data
@@ -4301,7 +4289,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			} else
 				WT_ERR(__wt_row_leaf_key_copy(
 				    session, page, rip, tmpkey));
-
+build:
 			WT_ERR(__rec_cell_build_leaf_key(session, r,
 			    tmpkey->data, tmpkey->size, &ovfl_key));
 		}

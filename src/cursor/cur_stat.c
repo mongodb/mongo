@@ -72,8 +72,7 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 		*va_arg(ap, int *) = cst->key;
 
 err:	va_end(ap);
-	API_END(session, ret);
-	return (ret);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -125,8 +124,7 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	}
 
 err:	va_end(ap);
-	API_END(session, ret);
-	return (ret);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -200,8 +198,7 @@ __curstat_next(WT_CURSOR *cursor)
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -233,8 +230,7 @@ __curstat_prev(WT_CURSOR *cursor)
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -254,8 +250,7 @@ __curstat_reset(WT_CURSOR *cursor)
 	cst->notpositioned = 1;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -282,8 +277,7 @@ __curstat_search(WT_CURSOR *cursor)
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -304,8 +298,7 @@ __curstat_close(WT_CURSOR *cursor)
 
 	WT_ERR(__wt_cursor_close(cursor));
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -325,7 +318,7 @@ __curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	 */
 	__wt_conn_stat_init(session);
 	cst->u.conn_stats = conn->stats;
-	if (cst->stat_clear)
+	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
 		__wt_stat_refresh_connection_stats(&conn->stats);
 
 	cst->stats_first = cst->stats = (WT_STATS *)&cst->u.conn_stats;
@@ -391,7 +384,7 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	 */
 	if ((ret = __wt_btree_stat_init(session, cst)) == 0) {
 		cst->u.dsrc_stats = dhandle->stats;
-		if (cst->stat_clear)
+		if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
 			__wt_stat_refresh_dsrc_stats(&dhandle->stats);
 		__wt_curstat_dsrc_final(cst);
 	}
@@ -407,7 +400,7 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	if (dhandle->checkpoint == NULL) {
 		args.name = dhandle->name;
 		args.stats = &cst->u.dsrc_stats;
-		args.clear = cst->stat_clear;
+		args.clear = F_ISSET(cst, WT_CONN_STAT_CLEAR);
 		cfg_arg[0] = (char *)&args;
 
 		/*
@@ -518,39 +511,41 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	 * Statistics cursor configuration: must match (and defaults to), the
 	 * database configuration.
 	 */
-	if (conn->stat_all == 0 && conn->stat_fast == 0)
+	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_NONE))
 		goto config_err;
 	if ((ret = __wt_config_gets(session, cfg, "statistics", &cval)) == 0) {
 		if ((ret = __wt_config_subgets(
 		    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
-			if (!conn->stat_all)
+			if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ALL))
 				goto config_err;
-			cst->stat_all = 1;
+			F_SET(cst, WT_CONN_STAT_ALL | WT_CONN_STAT_FAST);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 		if ((ret = __wt_config_subgets(
 		    session, &cval, "fast", &sval)) == 0 && sval.val != 0) {
-			if (cst->stat_all)
+			if (F_ISSET(cst, WT_CONN_STAT_ALL))
 				WT_ERR_MSG(session, EINVAL,
 				    "only one statistics configuration value "
 				    "may be specified");
-			cst->stat_fast = 1;
+			F_SET(cst, WT_CONN_STAT_FAST);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 		if ((ret = __wt_config_subgets(
 		    session, &cval, "clear", &sval)) == 0 && sval.val != 0)
-			cst->stat_clear = 1;
+			F_SET(cst, WT_CONN_STAT_CLEAR);
 		WT_ERR_NOTFOUND_OK(ret);
 
 		/* If no configuration, use the connection's configuration. */
-		if (cst->stat_all == 0 && cst->stat_fast == 0) {
-			cst->stat_all = conn->stat_all;
-			cst->stat_fast = conn->stat_fast;
+		if (cst->flags == 0) {
+			if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ALL))
+				F_SET(cst, WT_CONN_STAT_ALL);
+			if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_FAST))
+				F_SET(cst, WT_CONN_STAT_FAST);
 		}
 
 		/* If the connection configures clear, so do we. */
-		if (conn->stat_clear)
-			cst->stat_clear = 1;
+		if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR))
+			F_SET(cst, WT_CONN_STAT_CLEAR);
 	}
 
 	/*

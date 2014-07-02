@@ -290,6 +290,7 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_IKEY *ikey;
 	WT_ROW *rip;
 	uint32_t i;
+	void *copy;
 
 	/*
 	 * Free the in-memory index array.
@@ -298,12 +299,13 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * points somewhere other than the original page), and if so, free
 	 * the memory.
 	 */
-	if (!F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY))
-		WT_ROW_FOREACH(page, rip, i) {
-			ikey = WT_ROW_KEY_COPY(rip);
-			if (ikey != NULL && __wt_off_page(page, ikey))
-				__wt_free(session, ikey);
-		}
+	WT_ROW_FOREACH(page, rip, i) {
+		copy = WT_ROW_KEY_COPY(rip);
+		(void)__wt_row_leaf_key_info(
+		    page, copy, &ikey, NULL, NULL, NULL);
+		if (ikey != NULL)
+			__wt_free(session, ikey);
+	}
 
 	/*
 	 * Free the insert array.

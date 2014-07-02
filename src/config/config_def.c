@@ -58,6 +58,7 @@ static const WT_CONFIG_CHECK confchk_shared_cache_subconfigs[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_statistics_log_subconfigs[] = {
+	{ "on_close", "boolean", NULL, NULL },
 	{ "path", "string", NULL, NULL },
 	{ "sources", "list", NULL, NULL },
 	{ "timestamp", "string", NULL, NULL },
@@ -370,8 +371,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),error_prefix=,"
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
 	  "eviction_workers=0,shared_cache=(chunk=10MB,name=,reserve=0,"
-	  "size=500MB),statistics=none,"
-	  "statistics_log=(path=\"WiredTigerStat.%d.%H\",sources=,"
+	  "size=500MB),statistics=none,statistics_log=(on_close=0,"
+	  "path=\"WiredTigerStat.%d.%H\",sources=,"
 	  "timestamp=\"%b %d %H:%M:%S\",wait=0),verbose=",
 	  confchk_connection_reconfigure
 	},
@@ -483,10 +484,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "hazard_max=1000,log=(archive=,enabled=0,file_max=100MB,"
 	  "path=\"\"),lsm_merge=,mmap=,multiprocess=0,session_max=100,"
 	  "shared_cache=(chunk=10MB,name=,reserve=0,size=500MB),"
-	  "statistics=none,statistics_log=(path=\"WiredTigerStat.%d.%H\","
-	  "sources=,timestamp=\"%b %d %H:%M:%S\",wait=0),"
-	  "transaction_sync=(enabled=0,method=fsync),use_environment_priv=0"
-	  ",verbose=",
+	  "statistics=none,statistics_log=(on_close=0,"
+	  "path=\"WiredTigerStat.%d.%H\",sources=,"
+	  "timestamp=\"%b %d %H:%M:%S\",wait=0),transaction_sync=(enabled=0"
+	  ",method=fsync),use_environment_priv=0,verbose=",
 	  confchk_wiredtiger_open
 	},
 	{ NULL, NULL, NULL }

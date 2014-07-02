@@ -109,6 +109,8 @@ struct __wt_connection_impl {
 	pthread_t cache_evict_tid;	/* Eviction server thread ID */
 	int	  cache_evict_tid_set;	/* Eviction server thread ID set */
 
+	uint64_t  split_gen;		/* Generation number for splits */
+
 	WT_SPINLOCK dhandle_lock;	/* Locked: dhandle sweep */
 					/* Locked: data handle list */
 	SLIST_HEAD(__wt_dhandle_lh, __wt_data_handle) dhlh;
@@ -163,14 +165,12 @@ struct __wt_connection_impl {
 
 	int compact_in_memory_pass;	/* Compaction serialization */
 
-	/*
-	 * There are only three statistics states so far: "none", "fast" and
-	 * "all".  Keep it simple, "all" sets both variables, "fast" sets one
-	 * of them.
-	 */
-	int stat_all;			/* "all" statistics configured */
-	int stat_fast;			/* "fast" statistics configured */
-	int stat_clear;			/* "clear" statistics configured */
+#define	WT_CONN_STAT_ALL	0x01	/* "all" statistics configured */
+#define	WT_CONN_STAT_CLEAR	0x02	/* clear after gathering */
+#define	WT_CONN_STAT_FAST	0x04	/* "fast" statistics configured */
+#define	WT_CONN_STAT_NONE	0x08	/* don't gather statistics */
+#define	WT_CONN_STAT_ON_CLOSE	0x10	/* output statistics on close */
+	uint32_t stat_flags;
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
 

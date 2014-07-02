@@ -419,6 +419,9 @@ extern int __wt_col_search(WT_SESSION_IMPL *session,
     WT_REF *leaf,
     WT_CURSOR_BTREE *cbt);
 extern int __wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
+extern void __wt_split_stash_discard(WT_SESSION_IMPL *session);
+extern void __wt_split_stash_discard_all( WT_SESSION_IMPL *session_safe,
+    WT_SESSION_IMPL *session);
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_MULTI *multi,
@@ -644,8 +647,9 @@ extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_conn_stat_init(WT_SESSION_IMPL *session);
+extern int __wt_statlog_log_one(WT_SESSION_IMPL *session);
 extern int __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
-extern int __wt_statlog_destroy(WT_CONNECTION_IMPL *conn);
+extern int __wt_statlog_destroy(WT_CONNECTION_IMPL *conn, int is_close);
 extern int __wt_sweep_create(WT_CONNECTION_IMPL *conn);
 extern int __wt_sweep_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_curbackup_open(WT_SESSION_IMPL *session,
@@ -1133,6 +1137,7 @@ extern int __wt_cond_alloc(WT_SESSION_IMPL *session,
 extern int __wt_cond_wait(WT_SESSION_IMPL *session,
     WT_CONDVAR *cond,
     long usecs);
+extern int __wt_cond_has_waiters(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp);
 extern int __wt_rwlock_alloc( WT_SESSION_IMPL *session,
@@ -1387,12 +1392,6 @@ extern int __wt_session_lock_checkpoint(WT_SESSION_IMPL *session,
     const char *checkpoint);
 extern void __wt_session_discard_btree( WT_SESSION_IMPL *session,
     WT_DATA_HANDLE_CACHE *dhandle_cache);
-extern int __wt_session_fotxn_add(WT_SESSION_IMPL *session,
-    void *p,
-    size_t len);
-extern void __wt_session_fotxn_discard(WT_SESSION_IMPL *session_safe,
-    WT_SESSION_IMPL *session,
-    int connection_close);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern void __wt_cksum_init(void);

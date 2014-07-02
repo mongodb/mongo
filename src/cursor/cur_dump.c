@@ -109,8 +109,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 	}
 
 err:	va_end(ap);
-	API_END(session, ret);
-	return (ret);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -235,8 +234,7 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 	}
 
 err:	va_end(ap);
-	API_END(session, ret);
-	return (ret);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -336,8 +334,7 @@ __curdump_close(WT_CURSOR *cursor)
 	__wt_json_close(session, cursor);
 	WT_TRET(__wt_cursor_close(cursor));
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*

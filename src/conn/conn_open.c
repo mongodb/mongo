@@ -82,7 +82,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	F_CLR(conn, WT_CONN_SERVER_RUN);
 	WT_TRET(__wt_async_destroy(conn));
 	WT_TRET(__wt_checkpoint_server_destroy(conn));
-	WT_TRET(__wt_statlog_destroy(conn));
+	WT_TRET(__wt_statlog_destroy(conn, 1));
 	WT_TRET(__wt_sweep_destroy(conn));
 
 	/* Clean up open LSM handles. */
@@ -165,13 +165,12 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/*
-	 * The session's "free-on-transaction generation" memory isn't discarded
-	 * during normal session close because it persists past the life of the
-	 * session.  Discard it now.
+	 * The session's split stash isn't discarded during normal session close
+	 * because it may persist past the life of the session.  Discard it now.
 	 */
 	if ((s = conn->sessions) != NULL)
 		for (i = 0; i < conn->session_size; ++s, ++i)
-			__wt_session_fotxn_discard(session, s, 1);
+			__wt_split_stash_discard_all(session, s);
 
 	/*
 	 * The session's hazard pointer memory isn't discarded during normal

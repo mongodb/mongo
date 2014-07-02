@@ -531,12 +531,11 @@ struct __wt_page {
 	uint8_t type;			/* Page type */
 
 #define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
-#define	WT_PAGE_DIRECT_KEY	0x02	/* Row-store leaf keys direct access */
-#define	WT_PAGE_DISK_ALLOC	0x04	/* Disk image in allocated memory */
-#define	WT_PAGE_DISK_MAPPED	0x08	/* Disk image in mapped memory */
-#define	WT_PAGE_EVICT_LRU	0x10	/* Page is on the LRU queue */
-#define	WT_PAGE_SCANNING	0x20	/* Obsolete updates are being scanned */
-#define	WT_PAGE_SPLITTING	0x40	/* An internal page is growing. */
+#define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
+#define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
+#define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
+#define	WT_PAGE_SCANNING	0x10	/* Obsolete updates are being scanned */
+#define	WT_PAGE_SPLITTING	0x20	/* An internal page is growing. */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 
@@ -654,8 +653,7 @@ struct __wt_ref {
 	 */
 	union {
 		uint64_t recno;		/* Column-store: starting recno */
-		void	*ikey;		/* Row-store: instantiated key */
-		uint64_t pkey;		/* Row-store: on-page key */
+		void	*ikey;		/* Row-store: key */
 	} key;
 
 	WT_PAGE_DELETED	*page_del;	/* Deleted on-disk page information */
@@ -970,3 +968,31 @@ struct __wt_insert_head {
 	    (i) < (dsk)->u.entries; ++(i),				\
 	    (v) = __bit_getv(						\
 	    WT_PAGE_HEADER_BYTE(btree, dsk), i, (btree)->bitcnt))
+
+/*
+ * Manage split generation numbers.  Splits walk the list of sessions to check
+ * when it is safe to free structures that have been replaced.  We also check
+ * that list periodically (e.g., when wrapping up a transaction) to free any
+ * memory we can.
+ *
+ * Before a thread enters code that will examine page indexes (which are
+ * swapped out by splits), it publishes a copy of the current split generation
+ * into its session.  Don't assume that threads never re-enter this code: if we
+ * already have a split generation, leave it alone.  If our caller is examining
+ * an index, we don't want the oldest split generation to move forward and
+ * potentially free it.
+ */
+#define	WT_ENTER_PAGE_INDEX(session) do {                               \
+	uint64_t prev_split_gen = session->split_gen;                   \
+	if (prev_split_gen == 0)                                        \
+		WT_PUBLISH(session->split_gen, S2C(session)->split_gen)
+
+#define	WT_LEAVE_PAGE_INDEX(session)                                    \
+	if (prev_split_gen == 0)                                        \
+		session->split_gen = 0;                                 \
+	} while (0)
+
+#define	WT_WITH_PAGE_INDEX(session, e)                                  \
+	WT_ENTER_PAGE_INDEX(session);                                   \
+	(e);                                                            \
+	WT_LEAVE_PAGE_INDEX(session)
