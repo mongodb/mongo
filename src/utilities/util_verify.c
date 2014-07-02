@@ -74,7 +74,7 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 		    strlen("dump_offsets[],") +
 		    (dump_offsets == NULL ? 0 : strlen(dump_offsets)) + 20;
 		if ((config = malloc(size)) == NULL) {
-			ret = util_err(errno, NULL);
+			(void)util_err(errno, NULL);
 			goto err;
 		}
 		snprintf(config, size,
