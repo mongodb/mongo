@@ -182,13 +182,13 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 		 */
 		if (strcmp(spin->name, "block manager") == 0) {
 			block_manager += spin->counter;
-			if (conn->stat_clear)
+			if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR))
 				spin->counter = 0;
 			continue;
 		}
 		if (strcmp(spin->name, "btree page") == 0) {
 			btree_page += spin->counter;
-			if (conn->stat_clear)
+			if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR))
 				spin->counter = 0;
 			continue;
 		}
@@ -199,7 +199,7 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 		    spin->counter <= ignore ? 0 : spin->counter,
 		    tag, spin->name) < 0),
 		    __wt_errno());
-		if (conn->stat_clear)
+		if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR))
 			spin->counter = 0;
 	}
 	WT_RET_TEST((fprintf(conn->stat_fp,
@@ -230,7 +230,7 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 		    p->total <= ignore ? 0 : p->total,
 		    tag,
 		    p->name, p->file, p->line) < 0), __wt_errno());
-		if (conn->stat_clear)
+		if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR))
 			p->total = 0;
 
 		for (j = 0; j < WT_ELEMENTS(conn->spinlock_block); ++j) {
@@ -245,7 +245,7 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 			    tag,
 			    p->name, p->file, p->line,
 			    t->file, t->line) < 0), __wt_errno());
-			if (conn->stat_clear)
+			if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR))
 				p->blocked[j] = 0;
 		}
 	}

@@ -139,6 +139,8 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int fault)
 		WT_RET(__wt_eviction_check(session, &full, 0));
 		if (full < 100)
 			return (0);
+		else if (ret == 0)
+			continue;
 
 		/*
 		 * The cache is still full and no pages were found in the queue

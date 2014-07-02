@@ -244,8 +244,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 			    cursor->key.data, cursor->key.size, fmt, ap);
 	}
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -366,8 +365,7 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
 		ret = __wt_struct_unpackv(session,
 		    cursor->value.data, cursor->value.size, fmt, ap);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*

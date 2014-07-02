@@ -81,11 +81,15 @@
 #define	TXN_API_END(s, ret)	TXN_API_END_RETRY(s, ret, 1)
 
 /*
+ * In almost all cases, API_END is returning immediately, make it simple.
  * If a session or connection method is about to return WT_NOTFOUND (some
  * underlying object was not found), map it to ENOENT, only cursor methods
  * return WT_NOTFOUND.
  */
-#define	API_END_NOTFOUND_MAP(s, ret)					\
+#define	API_END_RET(s, ret)						\
+	API_END(s, ret);						\
+	return (ret)
+#define	API_END_RET_NOTFOUND_MAP(s, ret)				\
 	API_END(s, ret);						\
 	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
 

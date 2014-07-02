@@ -184,7 +184,7 @@ err:	if (dlh != NULL)
 	__wt_free(session, init_name);
 	__wt_free(session, terminate_name);
 
-	API_END_NOTFOUND_MAP(session, ret);
+	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -260,7 +260,7 @@ err:	if (ncoll != NULL) {
 		__wt_free(session, ncoll);
 	}
 
-	API_END_NOTFOUND_MAP(session, ret);
+	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -324,7 +324,7 @@ err:	if (ncomp != NULL) {
 		__wt_free(session, ncomp);
 	}
 
-	API_END_NOTFOUND_MAP(session, ret);
+	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -388,7 +388,7 @@ err:	if (ndsrc != NULL) {
 		__wt_free(session, ndsrc);
 	}
 
-	API_END_NOTFOUND_MAP(session, ret);
+	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -437,7 +437,7 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, add_extractor, config, cfg);
 	WT_UNUSED(cfg);
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -455,7 +455,7 @@ __conn_async_flush(WT_CONNECTION *wt_conn)
 	CONNECTION_API_CALL_NOCONF(conn, session, async_flush);
 	WT_ERR(__wt_async_flush(conn));
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -477,7 +477,7 @@ __conn_async_new_op(WT_CONNECTION *wt_conn, const char *uri, const char *config,
 
 	*asyncopp = &op->iface;
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -507,7 +507,7 @@ __conn_configure_method(WT_CONNECTION *wt_conn, const char *method,
 
 	ret = __wt_configure_method(session, method, uri, config, type, check);
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -538,11 +538,11 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
 
-	WT_ERR(__wt_config_gets(session, cfg, "leak_memory", &cval));
+	WT_TRET(__wt_config_gets(session, cfg, "leak_memory", &cval));
 	if (cval.val != 0)
 		F_SET(conn, WT_CONN_LEAK_MEMORY);
 
-	/*
+err:	/*
 	 * Rollback all running transactions.
 	 * We do this as a separate pass because an active transaction in one
 	 * session could cause trouble when closing a file, even if that
@@ -575,7 +575,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	/* We no longer have a session, don't try to update it. */
 	session = NULL;
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -615,8 +615,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 		WT_ERR(__wt_cond_signal(
 		    session, __wt_process.cache_pool->cache_pool_cond));
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -644,7 +643,7 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 
 	*wt_sessionp = &session_ret->iface;
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -965,31 +964,33 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 		return (ret == WT_NOTFOUND ? 0 : ret);
 
 	/* Configuring statistics clears any existing values. */
-	conn->stat_all = conn->stat_fast = conn->stat_clear = 0;
+	conn->stat_flags = 0;
 
 	set = 0;
 	if ((ret = __wt_config_subgets(
-	    session, &cval, "none", &sval)) == 0 && sval.val != 0)
+	    session, &cval, "none", &sval)) == 0 && sval.val != 0) {
+		FLD_SET(conn->stat_flags, WT_CONN_STAT_NONE);
 		++set;
+	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "fast", &sval)) == 0 && sval.val != 0) {
+		FLD_SET(conn->stat_flags, WT_CONN_STAT_FAST);
 		++set;
-		conn->stat_fast = 1;
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
+		FLD_SET(conn->stat_flags, WT_CONN_STAT_ALL | WT_CONN_STAT_FAST);
 		++set;
-		conn->stat_all = conn->stat_fast = 1;
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "clear", &sval)) == 0 && sval.val != 0)
-		conn->stat_clear = 1;
+		FLD_SET(conn->stat_flags, WT_CONN_STAT_CLEAR);
 	WT_RET_NOTFOUND_OK(ret);
 
 	if (set > 1)

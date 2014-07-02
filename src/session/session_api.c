@@ -154,7 +154,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	__wt_spin_unlock(session, &conn->api_lock);
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -184,7 +184,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
 		    TXN_ISO_READ_UNCOMMITTED : TXN_ISO_READ_COMMITTED;
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -278,7 +278,7 @@ err:		if (cursor != NULL)
 			WT_TRET(cursor->close(cursor));
 	}
 
-	API_END_NOTFOUND_MAP(session, ret);
+	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -342,7 +342,7 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_create(session, uri, config));
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -364,8 +364,7 @@ __session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
 	ret = __wt_log_vprintf(session, fmt, ap);
 	va_end(ap);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -389,7 +388,7 @@ __session_rename(WT_SESSION *wt_session,
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_rename(session, uri, newuri, cfg));
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -436,7 +435,7 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 	    ret = __wt_schema_drop(session, uri, cfg));
 
 err:	/* Note: drop operations cannot be unrolled (yet?). */
-	API_END_NOTFOUND_MAP(session, ret);
+	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -456,7 +455,7 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 	    ret = __wt_schema_worker(session, uri, __wt_salvage,
 		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE));
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -578,7 +577,7 @@ __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 	    ret = __wt_schema_worker(session, uri, __wt_upgrade,
 		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_UPGRADE));
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -598,7 +597,7 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 	    ret = __wt_schema_worker(session, uri, __wt_verify,
 		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY));
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -629,8 +628,7 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 
 	ret = __wt_txn_begin(session, cfg);
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -661,8 +659,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	else
 		WT_TRET(__wt_txn_rollback(session, cfg));
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -683,8 +680,7 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 
 	WT_TRET(__wt_txn_rollback(session, cfg));
 
-err:	API_END(session, ret);
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -734,7 +730,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_txn_checkpoint(session, cfg));
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
