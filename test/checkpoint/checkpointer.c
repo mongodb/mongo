@@ -345,12 +345,11 @@ diagnose_key_error(
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
 		(void)log_print_err("1st cursor didn't find 2nd key\n", ret, 0);
-	if ((ret = c->close(c)) != 0)
+	if (c->close(c) != 0)
 		return (1);
 
 	snprintf(next_uri, 128, "table:__wt%04d", index2);
-	if ((ret =
-	    session->open_cursor(session, next_uri, NULL, ckpt, &c)) != 0)
+	if (session->open_cursor(session, next_uri, NULL, ckpt, &c) != 0)
 		return (1);
 	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
@@ -358,7 +357,7 @@ diagnose_key_error(
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
 		(void)log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
-	if ((ret = c->close(c)) != 0)
+	if (c->close(c) != 0)
 		return (1);
 
 live_check:
@@ -372,17 +371,16 @@ live_check:
 	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
 		(void)log_print_err("1st cursor didn't find 1st key\n", ret, 0);
-	if ((ret = c->close(c)) != 0)
+	if (c->close(c) != 0)
 		return (1);
 
 	snprintf(next_uri, 128, "table:__wt%04d", index2);
-	if ((ret =
-	    session->open_cursor(session, next_uri, NULL, NULL, &c)) != 0)
+	if (session->open_cursor(session, next_uri, NULL, NULL, &c) != 0)
 		return (1);
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
 		(void)log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
-	if ((ret = c->close(c)) != 0)
+	if (c->close(c) != 0)
 		return (1);
 
 	return (0);
