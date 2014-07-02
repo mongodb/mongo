@@ -432,7 +432,7 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 	int force, grew;
 
 	cp = __wt_process.cache_pool;
-	reserved = read_pressure = 0;
+	read_pressure = 0;
 	grew = 0;
 	force = (cp->currently_used > cp->size);
 	if (WT_VERBOSE_ISSET(cp->session, WT_VERB_SHARED_CACHE)) {
