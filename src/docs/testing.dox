@@ -59,7 +59,7 @@ is run continuously on the WiredTiger GitHub \c develop branch.
 
 @section testing_static Static analysis
 
-WiredTiger static analysis is done using two tools:
+WiredTiger static analysis is done using three tools:
 
 - The <a href="https://www.coverity.com/">Coverity,
 Inc.</a>software analysis tool; current results and historic defect
@@ -70,5 +70,8 @@ page</a>.
 - The Gimpel Software <a
 href="http://www.gimpel.com/html/flex.htm">FlexeLint</a> implementation
 of the UNIX lint tool.
+
+- The University of Illinois LLVM project's <a
+href="http://clang-analyzer.llvm.org/">Clang Static Analyzer</a>.
 
  */

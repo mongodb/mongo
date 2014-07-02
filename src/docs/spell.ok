@@ -185,6 +185,7 @@ libkvs
 LIBS
 libtool
 libwiredtiger
+LLVM
 lmin
 ln
 loadtext
