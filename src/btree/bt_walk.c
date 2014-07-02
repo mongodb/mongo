@@ -27,6 +27,13 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 	descending = 0;
 
 	/*
+	 * Tree walks are special: they look inside page structures that splits
+	 * may want to free.  Publish that the tree is active during this
+	 * window.
+	 */
+	WT_ENTER_PAGE_INDEX(session);
+
+	/*
 	 * !!!
 	 * Fast-truncate currently only works on row-store trees.
 	 */
@@ -271,5 +278,7 @@ descend:		couple = ref;
 done:
 err:	if (txn_state != NULL)
 		txn_state->snap_min = WT_TXN_NONE;
+
+	WT_LEAVE_PAGE_INDEX(session);
 	return (ret);
 }

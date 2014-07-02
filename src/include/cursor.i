@@ -125,7 +125,6 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 	 */
 	WT_RET(__wt_page_release(session, cbt->ref));
 	cbt->ref = NULL;
-
 	return (0);
 }
 

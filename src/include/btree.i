@@ -31,7 +31,7 @@ __wt_page_is_modified(WT_PAGE *page)
  * that adds up to, but this is an estimate based on some measurements of heap
  * size versus bytes in use.
  */
-#define	WT_ALLOC_OVERHEAD	32
+#define	WT_ALLOC_OVERHEAD	32U
 
 /*
  * __wt_cache_page_inmem_incr --

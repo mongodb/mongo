@@ -17,6 +17,166 @@ static u_int __split_deepen_per_child = 100;
 static u_int __split_deepen_split_child = 100;
 
 /*
+ * Track allocation increments, matching the cache calculations, which add an
+ * estimate of allocation overhead to every object.
+ */
+#define	WT_MEMSIZE_ADD(total, len)	do {				\
+	total += (len) + WT_ALLOC_OVERHEAD;				\
+} while (0)
+#define	WT_MEMSIZE_TRANSFER(from_decr, to_incr, len) do {		\
+	WT_MEMSIZE_ADD(from_decr, len);					\
+	WT_MEMSIZE_ADD(to_incr, len);					\
+} while (0)
+
+/*
+ * __split_oldest_gen --
+ *	Calculate the oldest active split generation.
+ */
+static uint64_t
+__split_oldest_gen(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *s;
+	uint64_t gen, oldest;
+	u_int i, session_cnt;
+
+	conn = S2C(session);
+	WT_ORDERED_READ(session_cnt, conn->session_cnt);
+	for (i = 0, s = conn->sessions, oldest = conn->split_gen + 1;
+	    i < session_cnt;
+	    i++, s++)
+		if (((gen = s->split_gen) != 0) && gen < oldest)
+			oldest = gen;
+
+	return (oldest);
+}
+
+/*
+ * __split_stash_add --
+ *	Add a new entry into the session's split stash list.
+ */
+static int
+__split_stash_add(WT_SESSION_IMPL *session, void *p, size_t len)
+{
+	WT_SPLIT_STASH *stash;
+
+	WT_ASSERT(session, p != NULL);
+
+	/* Grow the list as necessary. */
+	WT_RET(__wt_realloc_def(session, &session->split_stash_alloc,
+	    session->split_stash_cnt + 1, &session->split_stash));
+
+	stash = session->split_stash + session->split_stash_cnt++;
+	stash->split_gen = WT_ATOMIC_ADD(S2C(session)->split_gen, 1);
+	stash->p = p;
+	stash->len = len;
+
+	WT_STAT_FAST_CONN_ATOMIC_INCRV(session, rec_split_stashed_bytes, len);
+	WT_STAT_FAST_CONN_ATOMIC_INCR(session, rec_split_stashed_objects);
+
+	/* See if we can free any previous entries. */
+	if (session->split_stash_cnt > 1)
+		__wt_split_stash_discard(session);
+
+	return (0);
+}
+
+/*
+ * __wt_split_stash_discard --
+ *	Discard any memory from a session's split stash that we can.
+ */
+void
+__wt_split_stash_discard(WT_SESSION_IMPL *session)
+{
+	WT_SPLIT_STASH *stash;
+	uint64_t oldest;
+	size_t i;
+
+	/* Get the oldest split generation. */
+	oldest = __split_oldest_gen(session);
+
+	for (i = 0, stash = session->split_stash;
+	    i < session->split_stash_cnt;
+	    ++i, ++stash) {
+		if (stash->p == NULL)
+			continue;
+		else if (stash->split_gen >= oldest)
+			break;
+		/*
+		 * It's a bad thing if another thread is in this memory
+		 * after we free it, make sure nothing good happens to
+		 * that thread.
+		 */
+		WT_STAT_FAST_CONN_ATOMIC_DECRV(
+		    session, rec_split_stashed_bytes, stash->len);
+		WT_STAT_FAST_CONN_ATOMIC_DECR(
+		    session, rec_split_stashed_objects);
+		__wt_overwrite_and_free_len(session, stash->p, stash->len);
+	}
+
+	/*
+	 * If there are enough free slots at the beginning of the list, shuffle
+	 * everything down.
+	 */
+	if (i > 100 || i == session->split_stash_cnt)
+		if ((session->split_stash_cnt -= i) > 0)
+			memmove(session->split_stash, stash,
+			    session->split_stash_cnt * sizeof(*stash));
+}
+
+/*
+ * __wt_split_stash_discard_all --
+ *	Discard all memory from a session's split stash.
+ */
+void
+__wt_split_stash_discard_all(
+    WT_SESSION_IMPL *session_safe, WT_SESSION_IMPL *session)
+{
+	WT_SPLIT_STASH *stash;
+	size_t i;
+
+	/*
+	 * This function is called during WT_CONNECTION.close to discard any
+	 * memory that remains.  For that reason, we take two WT_SESSION_IMPL
+	 * arguments: session_safe is still linked to the WT_CONNECTION and
+	 * can be safely used for calls to other WiredTiger functions, while
+	 * session is the WT_SESSION_IMPL we're cleaning up.
+	 */
+	for (i = 0, stash = session->split_stash;
+	    i < session->split_stash_cnt;
+	    ++i, ++stash)
+		if (stash->p != NULL)
+			__wt_free(session_safe, stash->p);
+
+	__wt_free(session_safe, session->split_stash);
+	session->split_stash_cnt = session->split_stash_alloc = 0;
+}
+
+/*
+ * __split_safe_free --
+ *	Free a buffer if we can be sure no thread is accessing it, or schedule
+ *	it to be freed otherwise.
+ */
+static int
+__split_safe_free(WT_SESSION_IMPL *session, int exclusive, void *p, size_t s)
+{
+	/*
+	 * We have swapped something in a page: if we don't have exclusive
+	 * access, check whether there are other threads in the same tree.
+	 */
+	if (!exclusive &&
+	    __split_oldest_gen(session) == S2C(session)->split_gen + 1)
+		exclusive = 1;
+
+	if (exclusive) {
+		__wt_free(session, p);
+		return (0);
+	}
+
+	return (__split_stash_add(session, p, s));
+}
+
+/*
  * __split_should_deepen --
  *	Return if we should deepen the tree.
  */
@@ -133,10 +293,10 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 			ref->key.ikey = ikey;
 		} else {
 			WT_RET(__split_ovfl_key_cleanup(session, page, ref));
-
-			*parent_decrp += sizeof(WT_IKEY) + ikey->size;
+			WT_MEMSIZE_ADD(*parent_decrp,
+			    sizeof(WT_IKEY) + ikey->size);
 		}
-		*child_incrp += sizeof(WT_IKEY) + ikey->size;
+		WT_MEMSIZE_ADD(*child_incrp, sizeof(WT_IKEY) + ikey->size);
 	}
 
 	/*
@@ -146,10 +306,10 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 	 */
 	if ((addr = ref->addr) == NULL)
 		return (0);
-	if (__wt_off_page(page, addr)) {
-		*child_incrp += sizeof(WT_ADDR) + addr->size;
-		*parent_decrp += sizeof(WT_ADDR) + addr->size;
-	} else {
+	if (__wt_off_page(page, addr))
+		WT_MEMSIZE_TRANSFER(*parent_decrp, *child_incrp,
+		    sizeof(WT_ADDR) + addr->size);
+	else {
 		__wt_cell_unpack((WT_CELL *)ref->addr, &unpack);
 		WT_RET(__wt_calloc_def(session, 1, &addr));
 		if ((ret = __wt_strndup(
@@ -161,7 +321,7 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 		addr->type =
 		    unpack.raw == WT_CELL_ADDR_INT ? WT_ADDR_INT : WT_ADDR_LEAF;
 		ref->addr = addr;
-		*child_incrp += sizeof(WT_ADDR) + addr->size;
+		WT_MEMSIZE_ADD(*child_incrp, sizeof(WT_ADDR) + addr->size);
 	}
 	return (0);
 }
@@ -275,8 +435,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 */
 	size = sizeof(WT_PAGE_INDEX) +
 	    (children + SPLIT_CORRECT_2) * sizeof(WT_REF *);
-	parent_incr += size;
 	WT_ERR(__wt_calloc(session, 1, size, &alloc_index));
+	WT_MEMSIZE_ADD(parent_incr, size);
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = children + SPLIT_CORRECT_2;
 	alloc_index->index[0] = pindex->index[0];
@@ -284,8 +444,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	    pindex->index[pindex->entries - 1];
 	for (alloc_refp = alloc_index->index + SPLIT_CORRECT_1,
 	    i = 0; i < children; ++alloc_refp, ++i) {
-		parent_incr += sizeof(WT_REF);
 		WT_ERR(__wt_calloc_def(session, 1, alloc_refp));
+		WT_MEMSIZE_ADD(parent_incr, sizeof(WT_REF));
 	}
 
 	/* Allocate child pages, and connect them into the new page index. */
@@ -310,7 +470,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			__wt_ref_key(parent, *parent_refp, &p, &size);
 			WT_ERR(
 			    __wt_row_ikey(session, 0, p, size, &ref->key.ikey));
-			parent_incr += sizeof(WT_IKEY) + size;
+			WT_MEMSIZE_ADD(parent_incr, sizeof(WT_IKEY) + size);
 		} else
 			ref->key.recno = (*parent_refp)->key.recno;
 		ref->state = WT_REF_MEM;
@@ -352,8 +512,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			    parent, *parent_refp, &parent_decr, &child_incr));
 			*child_refp++ = *parent_refp++;
 
-			child_incr += sizeof(WT_REF);
-			parent_decr += sizeof(WT_REF);
+			WT_MEMSIZE_TRANSFER(parent_decr, child_incr,
+			    sizeof(WT_REF));
 		}
 		__wt_cache_page_inmem_incr(session, child, child_incr);
 	}
@@ -361,32 +521,6 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	    alloc_index->index == alloc_index->entries - SPLIT_CORRECT_1);
 	WT_ASSERT(session,
 	    parent_refp - pindex->index == pindex->entries - SPLIT_CORRECT_1);
-
-	/*
-	 * We can't free the previous parent's index, there may be threads using
-	 * it.  Add to the session's discard list, to be freed once we know no
-	 * threads can still be using it.
-	 *
-	 * This change affects error handling, we'd have to unwind this change
-	 * in order to revert to the previous parent page's state.
-	 */
-	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	parent_decr += size;
-	WT_ERR(__wt_session_fotxn_add(session, pindex, size));
-
-	/* Adjust the parent's memory footprint. */
-	if (parent_incr >= parent_decr) {
-		parent_incr -= parent_decr;
-		parent_decr = 0;
-	}
-	if (parent_decr >= parent_incr) {
-		parent_decr -= parent_incr;
-		parent_incr = 0;
-	}
-	if (parent_incr != 0)
-		__wt_cache_page_inmem_incr(session, parent, parent_incr);
-	if (parent_decr != 0)
-		__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
 	/*
 	 * Update the parent's index; this is the update which splits the page,
@@ -403,7 +537,6 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * needs to be paid.
 	 */
 	WT_INTL_INDEX_SET(parent, alloc_index);
-	alloc_index = NULL;
 	panic = 1;
 
 #ifdef HAVE_DIAGNOSTIC
@@ -419,9 +552,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * page to be updated, which we do here: walk the children and fix them
 	 * up.
 	 */
-	pindex = WT_INTL_INDEX_COPY(parent);
-	for (parent_refp = pindex->index,
-	    i = pindex->entries; i > 0; ++parent_refp, --i) {
+	for (parent_refp = alloc_index->index,
+	    i = alloc_index->entries; i > 0; ++parent_refp, --i) {
 		parent_ref = *parent_refp;
 		WT_ASSERT(session, parent_ref->home == parent);
 		if (parent_ref->state != WT_REF_MEM)
@@ -458,6 +590,30 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * threads spin on incorrect page references longer than necessary.
 	 */
 	WT_FULL_BARRIER();
+	alloc_index = NULL;
+
+	/*
+	 * We can't free the previous parent's index, there may be threads using
+	 * it.  Add to the session's discard list, to be freed once we know no
+	 * threads can still be using it.
+	 *
+	 * This change requires care with error handling: we have already
+	 * updated the page with a new index.  Even if stashing the old value
+	 * fails, we don't roll back that change, because threads may already
+	 * be using the new index.
+	 */
+	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
+	WT_MEMSIZE_ADD(parent_decr, size);
+	WT_ERR(__split_safe_free(session, 0, pindex, size));
+
+	/*
+	 * Adjust the parent's memory footprint.  This may look odd, but we
+	 * have already taken the allocation overhead into account, and an
+	 * increment followed by a decrement will cancel out the normal
+	 * adjustment.
+	 */
+	__wt_cache_page_inmem_incr(session, parent, parent_incr);
+	__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
 	if (0) {
 err:		__wt_free_ref_index(session, parent, alloc_index, 1);
@@ -597,8 +753,8 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 
 	/* In some cases, the underlying WT_REF has not yet been allocated. */
 	if (*refp == NULL) {
-		incr += sizeof(WT_REF);
 		WT_RET(__wt_calloc_def(session, 1, refp));
+		WT_MEMSIZE_ADD(incr, sizeof(WT_REF));
 	}
 	ref = *refp;
 
@@ -619,12 +775,14 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		 * the confusion.
 		 */
 		WT_RET(__wt_calloc_def(session, 1, &addr));
+		WT_MEMSIZE_ADD(incr, sizeof(WT_ADDR));
 		ref->addr = addr;
 		addr->size = multi->addr.size;
 		addr->type = multi->addr.type;
 		WT_RET(__wt_strndup(session,
 		    multi->addr.addr, addr->size, &addr->addr));
-		incr += sizeof(WT_ADDR) + addr->size;
+		/* Need a cast to avoid an implicit conversion warning. */
+		WT_MEMSIZE_ADD(incr, addr->size);
 	} else
 		WT_RET(__split_inmem_build(session, page, ref, multi));
 
@@ -634,7 +792,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		ikey = multi->key.ikey;
 		WT_RET(__wt_row_ikey(session, 0,
 		    WT_IKEY_DATA(ikey), ikey->size, &ref->key.ikey));
-		incr += sizeof(WT_IKEY) + ikey->size;
+		WT_MEMSIZE_ADD(incr, sizeof(WT_IKEY) + ikey->size);
 		break;
 	default:
 		ref->key.recno = multi->key.recno;
@@ -664,7 +822,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PAGE *parent, *child;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_PAGE_MODIFY *mod;
-	WT_REF **alloc_refp, *parent_ref, **ref_tmp;
+	WT_REF **alloc_refp, *parent_ref, ref_copy, **ref_tmp;
 	size_t parent_decr, parent_incr, size;
 	uint32_t i, j, parent_entries, result_entries, split_entries;
 	int complete, hazard, locked;
@@ -716,11 +874,11 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	locked = 1;
 
 	/*
-	 * We have exclusive access to the parent, and at this point, the child
-	 * prevents the parent from being evicted.  However, once we update the
-	 * parent's index, it will no longer refer to the child, and could
-	 * conceivably be evicted.  Get a hazard pointer on the parent now, so
-	 * that we can safely access it after updating the index.
+	 * We have exclusive access to split the parent, and at this point, the
+	 * child prevents the parent from being evicted.  However, once we
+	 * update the parent's index, it will no longer refer to the child, and
+	 * could conceivably be evicted.  Get a hazard pointer on the parent
+	 * now, so that we can safely access it after updating the index.
 	 */
 	if (!__wt_ref_is_root(parent_ref = parent->pg_intl_parent_ref)) {
 		WT_ERR(__wt_page_in(session, parent_ref, WT_READ_NO_GEN));
@@ -737,8 +895,8 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * the newly created split array, into place.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + result_entries * sizeof(WT_REF *);
-	parent_incr += size;
 	WT_ERR(__wt_calloc(session, 1, size, &alloc_index));
+	WT_MEMSIZE_ADD(parent_incr, size);
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = result_entries;
 	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i)
@@ -809,30 +967,30 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * them to the session discard list, to be freed once we know it's safe.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	parent_decr += size;
-	WT_TRET(__wt_session_fotxn_add(session, pindex, size));
+	WT_TRET(__split_safe_free(session, exclusive, pindex, size));
+	WT_MEMSIZE_ADD(parent_decr, size);
 	if (parent->type == WT_PAGE_ROW_INT &&
 	    (ikey = __wt_ref_key_instantiated(ref)) != NULL) {
 		size = sizeof(WT_IKEY) + ikey->size;
-		parent_decr += size;
-		WT_TRET(__wt_session_fotxn_add(session, ikey, size));
+		WT_TRET(__split_safe_free(session, exclusive, ikey, size));
+		WT_MEMSIZE_ADD(parent_decr, size);
 	}
-	WT_TRET(__wt_session_fotxn_add(session, ref, sizeof(WT_REF)));
-	parent_decr += sizeof(WT_REF);
+	/*
+	 * Take a copy of the ref in case we can free it immediately: we still
+	 * need to discard the page.
+	 */
+	ref_copy = *ref;
+	WT_TRET(__split_safe_free(session, exclusive, ref, sizeof(WT_REF)));
+	WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
 
-	/* Adjust the parent's memory footprint. */
-	if (parent_incr >= parent_decr) {
-		parent_incr -= parent_decr;
-		parent_decr = 0;
-	}
-	if (parent_decr > parent_incr) {
-		parent_decr -= parent_incr;
-		parent_incr = 0;
-	}
-	if (parent_incr != 0)
-		__wt_cache_page_inmem_incr(session, parent, parent_incr);
-	if (parent_decr != 0)
-		__wt_cache_page_inmem_decr(session, parent, parent_decr);
+	/*
+	 * Adjust the parent's memory footprint.  This may look odd, but we
+	 * have already taken the allocation overhead into account, and an
+	 * increment followed by a decrement will cancel out the normal
+	 * adjustment.
+	 */
+	__wt_cache_page_inmem_incr(session, parent, parent_incr);
+	__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
@@ -880,7 +1038,7 @@ err:	if (locked)
 			 mod->write_gen = 0;
 			 __wt_cache_dirty_decr(session, child);
 		}
-		__wt_ref_out(session, ref);
+		__wt_ref_out(session, &ref_copy);
 	}
 
 	/*
