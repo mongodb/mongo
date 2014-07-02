@@ -42,7 +42,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 * The page isn't in memory, attempt to read it.
 			 * Make sure there is space in the cache.
 			 */
-			WT_RET(__wt_cache_full_check(session, 1));
+			WT_RET(__wt_cache_full_check(session));
 			WT_RET(__wt_cache_read(session, ref));
 			oldgen = LF_ISSET(WT_READ_WONT_NEED) ||
 			    F_ISSET(session, WT_SESSION_NO_CACHE);

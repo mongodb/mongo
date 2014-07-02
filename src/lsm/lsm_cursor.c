@@ -164,7 +164,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 		if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
 			goto open;
 
-		WT_RET(__wt_cache_full_check(session, 0));
+		WT_RET(__wt_cache_full_check(session));
 
 		if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
 			goto open;

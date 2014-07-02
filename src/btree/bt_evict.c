@@ -8,6 +8,7 @@
 #include "wt_internal.h"
 
 static int   __evict_clear_walks(WT_SESSION_IMPL *);
+static int   __evict_has_work(WT_SESSION_IMPL *, uint32_t *);
 static int   __evict_lru(WT_SESSION_IMPL *, uint32_t);
 static int   __evict_lru_cmp(const void *, const void *);
 static int   __evict_lru_pages(WT_SESSION_IMPL *, int);
@@ -238,6 +239,7 @@ __evict_worker(void *arg)
 	WT_DECL_RET;
 	WT_EVICTION_WORKER *worker;
 	WT_SESSION_IMPL *session;
+	uint32_t flags;
 
 	worker = arg;
 	conn = worker->conn;
@@ -252,16 +254,15 @@ __evict_worker(void *arg)
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &session));
 
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
-		WT_ERR(__wt_verbose(
-		    session, WT_VERB_EVICTSERVER, "worker sleeping"));
-		WT_ERR(
-		    __wt_cond_wait(session, cache->evict_waiter_cond, 100000));
-		if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
-			break;
-		WT_ERR(__wt_verbose(
-		    session, WT_VERB_EVICTSERVER, "worker waking"));
-
-		WT_ERR(__evict_lru_pages(session, 1));
+		/* Don't spin in a busy loop if there is no work to do */
+		WT_ERR(__evict_has_work(session, &flags));
+		if (flags == 0) {
+			WT_ERR(__wt_cond_wait(
+			    session, cache->evict_waiter_cond, 10000));
+			if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
+				break;
+		} else
+			WT_ERR(__evict_lru_pages(session, 1));
 	}
 
 	if (0) {
@@ -277,6 +278,46 @@ err:		__wt_err(session, ret, "cache eviction helper error");
 }
 
 /*
+ * __evict_has_work --
+ *	Find out if there is eviction work to be done.
+ */
+static int
+__evict_has_work(WT_SESSION_IMPL *session, uint32_t *flagsp)
+{
+	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
+	uint32_t flags;
+	uint64_t bytes_inuse, bytes_max, dirty_inuse;
+
+	conn = S2C(session);
+	cache = conn->cache;
+	flags = 0;
+	*flagsp = 0;
+
+	/*
+	 * Figure out whether the cache usage exceeds either the eviction
+	 * target or the dirty target.
+	 */
+	bytes_inuse = __wt_cache_bytes_inuse(cache);
+	dirty_inuse = cache->bytes_dirty;
+	bytes_max = conn->cache_size;
+
+	/* Check to see if the eviction server should run. */
+	if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
+		LF_SET(WT_EVICT_PASS_ALL);
+	else if (dirty_inuse >
+	    (cache->eviction_dirty_target * bytes_max) / 100)
+		/* Ignore clean pages unless the cache is too large */
+		LF_SET(WT_EVICT_PASS_DIRTY);
+
+	if (F_ISSET(cache, WT_EVICT_STUCK))
+		LF_SET(WT_EVICT_PASS_AGGRESSIVE);
+
+	*flagsp = flags;
+	return (0);
+}
+
+/*
  * __evict_pass --
  *	Evict pages from memory.
  */
@@ -286,8 +327,8 @@ __evict_pass(WT_SESSION_IMPL *session)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	int loop;
-	uint64_t bytes_inuse, bytes_max, dirty_inuse;
 	uint32_t flags;
+	uint64_t bytes_inuse;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -305,40 +346,29 @@ __evict_pass(WT_SESSION_IMPL *session)
 			    session, cache->evict_waiter_cond));
 		}
 
-		/*
-		 * Keep evicting until we hit the target cache usage and the
-		 * target dirty percentage.
-		 */
-		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		dirty_inuse = cache->bytes_dirty;
-		bytes_max = conn->cache_size;
-
-		/* Check to see if the eviction server should run. */
-		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
-			flags = (F_ISSET(cache, WT_EVICT_STUCK) || loop > 10) ?
-			    WT_EVICT_PASS_AGGRESSIVE : WT_EVICT_PASS_ALL;
-		else if (dirty_inuse >
-		    (cache->eviction_dirty_target * bytes_max) / 100)
-			/* Ignore clean pages unless the cache is too large */
-			flags = WT_EVICT_PASS_DIRTY;
-		else
+		WT_RET(__evict_has_work(session, &flags));
+		if (flags == 0)
 			break;
 
-		F_SET(cache, WT_EVICT_ACTIVE);
-		WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
-		    "Eviction pass with: Max: %" PRIu64
-		    " In use: %" PRIu64 " Dirty: %" PRIu64,
-		    bytes_max, bytes_inuse, dirty_inuse));
+		if (loop > 10)
+			LF_SET(WT_EVICT_PASS_AGGRESSIVE);
 
+		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		/*
 		 * When the cache is full, track whether pages are being
 		 * evicted.  This will be cleared by the next thread to
 		 * successfully evict a page.
 		 */
-		if (bytes_inuse > bytes_max)
+		if (bytes_inuse > conn->cache_size)
 			F_SET(cache, WT_EVICT_NO_PROGRESS);
 		else
 			F_CLR(cache, WT_EVICT_NO_PROGRESS);
+
+		F_SET(cache, WT_EVICT_ACTIVE);
+		WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
+		    "Eviction pass with: Max: %" PRIu64
+		    " In use: %" PRIu64 " Dirty: %" PRIu64,
+		    conn->cache_size, bytes_inuse, cache->bytes_dirty));
 
 		WT_RET(__evict_lru(session, flags));
 
@@ -634,17 +664,24 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 	__wt_spin_unlock(session, &cache->evict_lock);
 
 	/*
-	 * If threads are waiting to do eviction, signal them, then look for
-	 * more pages to evict.  Otherwise, evict some pages in the server
-	 * thread.
+	 * The eviction server thread doesn't do any actual eviction if there
+	 * are eviction workers running or application threads are waiting
+	 * for candidates to evict.
 	 */
-	if (__wt_cond_has_waiters(session, cache->evict_waiter_cond)) {
-		F_CLR(cache, WT_EVICT_NO_PROGRESS);
+	if (cache->eviction_workers > 0 ||
+	    __wt_cond_has_waiters(session, cache->evict_waiter_cond)) {
+		WT_STAT_FAST_CONN_INCR(
+		    session, cache_eviction_server_not_evicting);
 		WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
+		/*
+		 * Give other threads a chance to access the queue before
+		 * gathering more candidates.
+		 */
 		__wt_yield();
-	} else
+	} else {
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_server_evicting);
 		WT_RET(__evict_lru_pages(session, 0));
-
+	}
 	return (0);
 }
 
@@ -683,6 +720,10 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	 */
 	slot = cache->evict_entries;
 	max_entries = slot + WT_EVICT_WALK_INCR;
+	if (cache->evict_current == NULL)
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_empty);
+	else
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_not_empty);
 
 	/*
 	 * Lock the dhandle list so sweeping cannot change the pointers out
@@ -985,8 +1026,6 @@ __evict_get_ref(
 			return (WT_NOTFOUND);
 		if (__wt_spin_trylock(session, &cache->evict_lock, &id) == 0)
 			break;
-		if (!is_app)
-			return (WT_NOTFOUND);
 		__wt_yield();
 	}
 
@@ -1075,8 +1114,10 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 
 	(void)WT_ATOMIC_SUB(btree->evict_busy, 1);
 
+	WT_RET(ret);
+
 	cache = S2C(session)->cache;
-	if (ret == 0 && F_ISSET(cache, WT_EVICT_NO_PROGRESS | WT_EVICT_STUCK))
+	if (F_ISSET(cache, WT_EVICT_NO_PROGRESS | WT_EVICT_STUCK))
 		F_CLR(cache, WT_EVICT_NO_PROGRESS | WT_EVICT_STUCK);
 
 	return (ret);
