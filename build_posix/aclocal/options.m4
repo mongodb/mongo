@@ -13,6 +13,34 @@ no)	wt_cv_enable_attach=no;;
 esac
 AC_MSG_RESULT($wt_cv_enable_attach)
 
+AH_TEMPLATE(HAVE_BUILTIN_EXTENSION_SNAPPY,
+	    [Snappy support automatically loaded.])
+AH_TEMPLATE(HAVE_BUILTIN_EXTENSION_ZLIB,
+	    [Zlib support automatically loaded.])
+AC_MSG_CHECKING(if --with-builtins option specified)
+AC_ARG_WITH(builtins,
+	[AS_HELP_STRING([--with-builtins],
+	    [builtin extension names (snappy, zlib).])],
+	    [with_builtins=$withval],
+	    [with_builtins=])
+
+# Validate and setup each builtin extension library.
+builtin_list=`echo "$with_builtins"|tr -s , ' '`
+for builtin_i in $builtin_list; do
+	case "$builtin_i" in
+	snappy)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_SNAPPY)
+		wt_cv_with_builtin_extension_snappy=yes;;
+	zlib)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_ZLIB)
+		wt_cv_with_builtin_extension_zlib=yes;;
+	*)	AC_MSG_ERROR([Unknown builtin extension "$builtin_i"]);;
+	esac
+done
+AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_SNAPPY],
+    [test "$wt_cv_with_builtin_extension_snappy" = "yes"])
+AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_ZLIB],
+    [test "$wt_cv_with_builtin_extension_zlib" = "yes"])
+AC_MSG_RESULT($with_builtins)
+
 AC_MSG_CHECKING(if --enable-bzip2 option specified)
 AC_ARG_ENABLE(bzip2,
 	[AS_HELP_STRING([--enable-bzip2],
@@ -81,8 +109,17 @@ AC_ARG_ENABLE(snappy,
 	[AS_HELP_STRING([--enable-snappy],
 	    [Build the snappy compressor extension.])], r=$enableval, r=no)
 case "$r" in
-no)	wt_cv_enable_snappy=no;;
-*)	wt_cv_enable_snappy=yes;;
+no)	if test "$wt_cv_with_builtin_extension_snappy" = "yes"; then
+		wt_cv_enable_snappy=yes
+	else
+		wt_cv_enable_snappy=no
+	fi
+	;;
+*)	if test "$wt_cv_with_builtin_extension_snappy" = "yes"; then
+		AC_MSG_ERROR(
+		   [Only one of --enable-snappy --with-builtins=snappy allowed])
+	fi
+	wt_cv_enable_snappy=yes;;
 esac
 AC_MSG_RESULT($wt_cv_enable_snappy)
 if test "$wt_cv_enable_snappy" = "yes"; then
@@ -129,8 +166,17 @@ AC_ARG_ENABLE(zlib,
 	[AS_HELP_STRING([--enable-zlib],
 	    [Build the zlib compressor extension.])], r=$enableval, r=no)
 case "$r" in
-no)	wt_cv_enable_zlib=no;;
-*)	wt_cv_enable_zlib=yes;;
+no)	if test "$wt_cv_with_builtin_extension_zlib" = "yes"; then
+		wt_cv_enable_zlib=yes
+	else
+		wt_cv_enable_zlib=no
+	fi
+	;;
+*)	if test "$wt_cv_with_builtin_extension_zlib" = "yes"; then
+		AC_MSG_ERROR(
+		   [Only one of --enable-zlib --with-builtins=zlib allowed])
+	fi
+	wt_cv_enable_zlib=yes;;
 esac
 AC_MSG_RESULT($wt_cv_enable_zlib)
 if test "$wt_cv_enable_zlib" = "yes"; then
