@@ -359,15 +359,31 @@ namespace mongo {
         }
         massert( 10289 ,  "useReplAuth is not written to replication log", !opts.useReplAuth || !opts.logForRepl );
 
+        const ConnectionString cs = ConnectionString::parse(masterHost, errmsg);
+        if (!cs.isValid()) {
+            if (errCode)
+                *errCode = ErrorCodes::FailedToParse;
+            return false;
+        }
+
+        bool masterSameProcess = false;
+        std::vector<HostAndPort> csServers = cs.getServers();
+        for (std::vector<HostAndPort>::const_iterator iter = csServers.begin();
+             iter != csServers.end(); ++iter) {
+
 #if !defined(_WIN32) && !defined(__sunos__)
-        // isSelf() only does the necessary comparisons on os x and linux (SERVER-14165)
-        bool masterSameProcess = repl::isSelf(HostAndPort(masterHost));
+            // isSelf() only does the necessary comparisons on os x and linux (SERVER-14165)
+            if (!repl::isSelf(*iter))
+                continue;
 #else
-        stringstream a,b;
-        a << "localhost:" << serverGlobalParams.port;
-        b << "127.0.0.1:" << serverGlobalParams.port;
-        bool masterSameProcess = (a.str() == masterHost || b.str() == masterHost);
+            if (iter->port() != serverGlobalParams.port)
+                continue;
+            if (iter->host() != "localhost" && iter->host() != "127.0.0.1")
+                continue;
 #endif
+            masterSameProcess = true;
+            break;
+        }
 
         if (masterSameProcess) {
             if (opts.fromDB == toDBName) {
@@ -384,7 +400,6 @@ namespace mongo {
                 // nothing to do
             }
             else if ( !masterSameProcess ) {
-                ConnectionString cs = ConnectionString::parse( masterHost, errmsg );
                 auto_ptr<DBClientBase> con( cs.connect( errmsg ));
                 if ( !con.get() )
                     return false;
