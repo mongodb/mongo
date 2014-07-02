@@ -119,7 +119,6 @@ namespace mongo {
 
     private:
         void badOfs(int) const;
-        void badOfs2(int) const;
         int defaultSize( const char *filename ) const;
 
         void grow(DiskLoc dl, int size);

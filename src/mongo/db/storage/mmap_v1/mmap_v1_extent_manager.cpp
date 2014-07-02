@@ -223,7 +223,7 @@ namespace mongo {
 
         int ofs = loc.getOfs();
         if ( ofs < DataFileHeader::HeaderSize ) {
-            df->badOfs(ofs); // will uassert - external call to keep out of the normal code path
+            df->badOfs(ofs); // will msgassert - external call to keep out of the normal code path
         }
 
         return reinterpret_cast<Record*>( df->p() + ofs );
