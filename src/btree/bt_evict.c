@@ -293,6 +293,9 @@ __evict_has_work(WT_SESSION_IMPL *session, uint32_t *flagsp)
 	flags = 0;
 	*flagsp = 0;
 
+	if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
+		return (0);
+
 	/*
 	 * Figure out whether the cache usage exceeds either the eviction
 	 * target or the dirty target.
