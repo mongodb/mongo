@@ -3222,26 +3222,30 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_REC_PAGES_EVICTION			1085
 /*! reconciliation failed because an update could not be included */
 #define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1086
+/*! split bytes currently awaiting free */
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1087
+/*! split objects currently awaiting free */
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1088
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1087
+#define	WT_STAT_CONN_RWLOCK_READ			1089
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1088
+#define	WT_STAT_CONN_RWLOCK_WRITE			1090
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1089
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1091
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				1090
+#define	WT_STAT_CONN_TXN_BEGIN				1092
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1091
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1093
 /*! transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1092
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1094
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1093
+#define	WT_STAT_CONN_TXN_COMMIT				1095
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1094
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1096
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1095
+#define	WT_STAT_CONN_TXN_ROLLBACK			1097
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1096
+#define	WT_STAT_CONN_WRITE_IO				1098
 
 /*!
  * @}

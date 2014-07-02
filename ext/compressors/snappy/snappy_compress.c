@@ -33,6 +33,12 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
+/*
+ * We need to include the configuration file to detect whether this extension
+ * is being built into the WiredTiger library.
+ */
+#include "wiredtiger_config.h"
+
 /* Local compressor structure. */
 typedef struct {
 	WT_COMPRESSOR compressor;		/* Must come first */
@@ -188,12 +194,16 @@ wt_snappy_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 	return (0);
 }
 
+int snappy_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+
 /*
- * wiredtiger_extension_init --
- *	WiredTiger snappy compression extension.
+ * snappy_extension_init --
+ *	WiredTiger snappy compression extension - called directly when
+ *	Snappy support is built in, or via wiredtiger_extension_init when
+ *	snappy support is included via extension loading.
  */
 int
-wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+snappy_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	SNAPPY_COMPRESSOR *snappy_compressor;
 
@@ -213,3 +223,19 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	return (connection->add_compressor(
 	    connection, "snappy", (WT_COMPRESSOR *)snappy_compressor, NULL));
 }
+
+/*
+ * We have to remove this symbol when building as a builtin extension otherwise
+ * it will conflict with other builtin libraries.
+ */
+#ifndef	HAVE_BUILTIN_EXTENSION_SNAPPY
+/*
+ * wiredtiger_extension_init --
+ *	WiredTiger snappy compression extension.
+ */
+int
+wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+{
+	return snappy_extension_init(connection, config);
+}
+#endif

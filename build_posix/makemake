@@ -6,7 +6,7 @@
 # (in release trees, some of the subdirs might be excluded).
 (sed -n '1,/BEGIN SUBDIRS/p' Make.base
 
-echo "SUBDIRS = ."
+echo "SUBDIRS ="
 sed -e 's/#.*$//' -e '/^$/d' Make.subdirs | (while read dir cond ; do
 	test -d ../$dir || continue
 	if test -n "$cond" ; then

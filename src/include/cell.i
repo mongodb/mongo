@@ -555,8 +555,7 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
  *	Unpack a WT_CELL into a structure during verification.
  */
 static inline int
-__wt_cell_unpack_safe(
-    WT_PAGE *page, WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
+__wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
 	uint64_t saved_v, v;
 	uint32_t saved_len;
@@ -706,20 +705,6 @@ done:	WT_CELL_LEN_CHK(cell, unpack->__len);
 		unpack->v = saved_v;
 	}
 
-	/*
-	 * If we just unpacked a key cell for an in-memory page, set the value
-	 * field to the next cell, interpreting it as a value cell, so cursors
-	 * can return a key/value pair without unpacking the key cell multiple
-	 * times.
-	 *
-	 * !!!
-	 * This function is only called with a non-NULL page when unpacking a
-	 * row-store leaf page key, which is why we don't check further.
-	 */
-	if (page != NULL) {
-		cell = (WT_CELL *)((uint8_t *)cell + unpack->__len);
-		unpack->value = __wt_cell_leaf_value_parse(page, cell);
-	}
 	return (0);
 }
 
@@ -730,23 +715,7 @@ done:	WT_CELL_LEN_CHK(cell, unpack->__len);
 static inline void
 __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 {
-	(void)__wt_cell_unpack_safe(NULL, cell, unpack, NULL);
-}
-
-/*
- * __wt_cell_unpack_with_value --
- *	Unpack a WT_CELL into a structure, and check for an associated value.
- */
-static inline void
-__wt_cell_unpack_with_value(
-    WT_PAGE *page, WT_CELL *cell, WT_CELL_UNPACK *unpack)
-{
-	/*
-	 * This routine exists so we don't have pass in a NULL page reference
-	 * whenever we're unpacking cells from disk images (rather than from
-	 * in-memory pages).
-	 */
-	(void)__wt_cell_unpack_safe(page, cell, unpack, NULL);
+	(void)__wt_cell_unpack_safe(cell, unpack, NULL);
 }
 
 /*

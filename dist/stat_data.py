@@ -156,6 +156,10 @@ connection_stats = [
 	Stat('rec_pages_eviction', 'page reconciliation calls for eviction'),
 	Stat('rec_skipped_update',
 	    'reconciliation failed because an update could not be included'),
+	Stat('rec_split_stashed_bytes',
+	    'split bytes currently awaiting free', 'no_clear,no_scale'),
+	Stat('rec_split_stashed_objects',
+	    'split objects currently awaiting free', 'no_clear,no_scale'),
 
 	##########################################
 	# Transaction statistics

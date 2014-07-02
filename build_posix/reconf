@@ -54,7 +54,8 @@ echo "# This file is built automatically from build_posix/configure.ac.in."
 
 sed -n '1,/BEGIN check existence/p' configure.ac.in
 
-sed -e 's/#.*$//' -e '/^$/d' Make.subdirs | while read dir cond ; do
+sed -e 's/#.*$//' -e '/^$/d' -e '/^\.$/d' Make.subdirs | \
+while read dir cond ; do
 	test -d ../$dir || continue
 	echo 'AC_CONFIG_FILES(['$dir/Makefile'])'
 done

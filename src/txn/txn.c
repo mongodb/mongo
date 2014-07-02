@@ -297,12 +297,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	/* Free the scratch buffer allocated for logging. */
 	__wt_logrec_free(session, &txn->logrec);
 
-	/*
-	 * Discard any memory from the session's free-on-transaction generation
-	 * list that we can.
-	 */
-	if (session->fotxn_cnt > 0)
-		__wt_session_fotxn_discard(session, session, 0);
+	/* Discard any memory from the session's split stash that we can. */
+	if (session->split_stash_cnt > 0)
+		__wt_split_stash_discard(session);
 
 	/*
 	 * Reset the transaction state to not running.

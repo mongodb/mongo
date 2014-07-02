@@ -419,6 +419,9 @@ extern int __wt_col_search(WT_SESSION_IMPL *session,
     WT_REF *leaf,
     WT_CURSOR_BTREE *cbt);
 extern int __wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
+extern void __wt_split_stash_discard(WT_SESSION_IMPL *session);
+extern void __wt_split_stash_discard_all( WT_SESSION_IMPL *session_safe,
+    WT_SESSION_IMPL *session);
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_MULTI *multi,
@@ -1389,12 +1392,6 @@ extern int __wt_session_lock_checkpoint(WT_SESSION_IMPL *session,
     const char *checkpoint);
 extern void __wt_session_discard_btree( WT_SESSION_IMPL *session,
     WT_DATA_HANDLE_CACHE *dhandle_cache);
-extern int __wt_session_fotxn_add(WT_SESSION_IMPL *session,
-    void *p,
-    size_t len);
-extern void __wt_session_fotxn_discard(WT_SESSION_IMPL *session_safe,
-    WT_SESSION_IMPL *session,
-    int connection_close);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern void __wt_cksum_init(void);
