@@ -45,8 +45,8 @@ __rename_file(
 	switch (ret = __wt_metadata_search(session, newuri, &newvalue)) {
 	case 0:
 		WT_ERR_MSG(session, EEXIST, "%s", newuri);
+		/* NOTREACHED */
 	case WT_NOTFOUND:
-		ret = 0;
 		break;
 	default:
 		WT_ERR(ret);
