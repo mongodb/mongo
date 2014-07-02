@@ -375,6 +375,12 @@ namespace repl {
          */
         virtual bool buildsIndexes() = 0;
 
+        /**
+         * Returns a vector containing BSONObjs describing each member that has applied operation
+         * at OpTime 'op'.
+         */
+        virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op) = 0;
+
     protected:
 
         ReplicationCoordinator();

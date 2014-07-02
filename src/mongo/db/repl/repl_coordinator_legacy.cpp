@@ -913,5 +913,10 @@ namespace {
     bool LegacyReplicationCoordinator::buildsIndexes() {
         return theReplSet->buildIndexes();
     }
+
+    vector<BSONObj> LegacyReplicationCoordinator::getHostsWrittenTo(const OpTime& op) {
+        return repl::getHostsWrittenTo(op);
+    }
+
 } // namespace repl
 } // namespace mongo

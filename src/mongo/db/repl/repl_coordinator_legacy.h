@@ -128,6 +128,8 @@ namespace repl {
 
         virtual bool buildsIndexes();
 
+        virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
+
     private:
         Status _stepDownHelper(bool force,
                                const Milliseconds& initialWaitTime,

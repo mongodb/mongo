@@ -138,6 +138,9 @@ namespace repl {
         virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
 
         virtual bool buildsIndexes();
+
+        virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions

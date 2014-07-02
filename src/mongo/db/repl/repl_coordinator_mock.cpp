@@ -213,5 +213,10 @@ namespace repl {
         // TODO
         return false;
     }
+
+    std::vector<BSONObj> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op) {
+        // TODO
+        return std::vector<BSONObj>();
+    }
 } // namespace repl
 } // namespace mongo
