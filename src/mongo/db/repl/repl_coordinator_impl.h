@@ -137,6 +137,7 @@ namespace repl {
 
         virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
 
+        virtual bool buildsIndexes();
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions

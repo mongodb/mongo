@@ -130,6 +130,8 @@ namespace repl {
 
         virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
 
+        virtual bool buildsIndexes();
+
     };
 
 } // namespace repl

@@ -369,6 +369,12 @@ namespace repl {
          * occurs first.
          */
         virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot) = 0;
+
+        /**
+         * Returns a bool indicating whether or not this node builds indexes.
+         */
+        virtual bool buildsIndexes() = 0;
+
     protected:
 
         ReplicationCoordinator();

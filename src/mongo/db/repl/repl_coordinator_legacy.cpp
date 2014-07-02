@@ -909,5 +909,9 @@ namespace {
     void LegacyReplicationCoordinator::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
         repl::waitUpToOneSecondForOptimeChange(ot);
     }
+
+    bool LegacyReplicationCoordinator::buildsIndexes() {
+        return theReplSet->buildIndexes();
+    }
 } // namespace repl
 } // namespace mongo

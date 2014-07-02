@@ -432,5 +432,10 @@ namespace repl {
     void ReplicationCoordinatorImpl::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
         //TODO
     }
+
+    bool ReplicationCoordinatorImpl::buildsIndexes() {
+        // TODO
+        return false;
+    }
 } // namespace repl
 } // namespace mongo

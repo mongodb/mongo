@@ -126,6 +126,8 @@ namespace repl {
 
         virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
 
+        virtual bool buildsIndexes();
+
     private:
         Status _stepDownHelper(bool force,
                                const Milliseconds& initialWaitTime,

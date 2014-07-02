@@ -209,5 +209,9 @@ namespace repl {
         // TODO
     }
 
+    bool ReplicationCoordinatorMock::buildsIndexes() {
+        // TODO
+        return false;
+    }
 } // namespace repl
 } // namespace mongo

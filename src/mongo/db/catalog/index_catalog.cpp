@@ -530,7 +530,7 @@ namespace mongo {
             // we _always_ created _id index
             repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
             if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-                    !repl::theReplSet->buildIndexes()) {
+                    !repl::getGlobalReplicationCoordinator()->buildsIndexes()) {
                 // this is not exactly the right error code, but I think will make the most sense
                 return Status( ErrorCodes::IndexAlreadyExists, "no indexes per repl" );
             }
