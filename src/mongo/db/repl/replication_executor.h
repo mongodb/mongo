@@ -111,6 +111,9 @@ namespace repl {
         struct RemoteCommandCallbackData;
         struct RemoteCommandRequest;
 
+        static const Milliseconds kNoTimeout;
+        static const Date_t kNoExpirationDate;
+
         /**
          * Type of a regular callback function.
          *
@@ -411,11 +414,13 @@ namespace repl {
         RemoteCommandRequest();
         RemoteCommandRequest(const HostAndPort& theTarget,
                              const std::string& theDbName,
-                             const BSONObj& theCmdObj);
+                             const BSONObj& theCmdObj,
+                             const Milliseconds timeoutMillis = kNoTimeout);
 
         HostAndPort target;
         std::string dbname;
         BSONObj cmdObj;
+        Date_t expirationDate;
     };
 
     struct ReplicationExecutor::RemoteCommandCallbackData {

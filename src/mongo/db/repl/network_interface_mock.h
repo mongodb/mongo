@@ -37,7 +37,7 @@ namespace repl {
 
     class NetworkInterfaceMock : public ReplicationExecutor::NetworkInterface {
     public:
-        NetworkInterfaceMock() {}
+        NetworkInterfaceMock() : _simulatedNetworkLatencyMillis(0) {}
         virtual ~NetworkInterfaceMock() {}
         virtual Date_t now();
         virtual StatusWith<BSONObj> runCommand(
@@ -45,13 +45,23 @@ namespace repl {
         virtual void runCallbackWithGlobalExclusiveLock(
                 const stdx::function<void ()>& callback);
 
+        /**
+         * Add a response (StatusWith<BSONObj>) for this mock to return for a given request.
+         * For each request, the mock will return the corresponding response for all future calls.
+         */
         bool addResponse(const ReplicationExecutor::RemoteCommandRequest& request,
                          const StatusWith<BSONObj>& response);
+
+        /**
+         * Network latency added for each remote command, defaults to 0.
+         */
+        void simulatedNetworkLatency(int millis);
 
     private:
         typedef std::map<ReplicationExecutor::RemoteCommandRequest,
                          StatusWith<BSONObj> > RequestResponseMap;
         RequestResponseMap _responses;
+        int _simulatedNetworkLatencyMillis;
     };
 
 }  // namespace repl

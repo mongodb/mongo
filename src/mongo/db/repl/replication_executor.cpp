@@ -42,6 +42,9 @@ namespace {
     stdx::function<void ()> makeNoExcept(const stdx::function<void ()> &fn);
 }  // namespace
 
+    const ReplicationExecutor::Milliseconds ReplicationExecutor::kNoTimeout(-1);
+    const Date_t ReplicationExecutor::kNoExpirationDate(-1);
+
     ReplicationExecutor::ReplicationExecutor(NetworkInterface* netInterface) :
         _networkInterface(netInterface),
         _totalEventWaiters(0),
@@ -441,10 +444,14 @@ namespace {
     ReplicationExecutor::RemoteCommandRequest::RemoteCommandRequest(
             const HostAndPort& theTarget,
             const std::string& theDbName,
-            const BSONObj& theCmdObj) :
+            const BSONObj& theCmdObj,
+            const Milliseconds timeoutMillis) :
         target(theTarget),
         dbname(theDbName),
         cmdObj(theCmdObj) {
+        expirationDate = timeoutMillis == kNoTimeout ? kNoExpirationDate :
+                                                       Date_t(curTimeMillis64() +
+                                                              timeoutMillis.total_milliseconds());
     }
 
     ReplicationExecutor::RemoteCommandCallbackData::RemoteCommandCallbackData(
