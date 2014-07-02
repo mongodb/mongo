@@ -45,10 +45,69 @@ using leveldb::Slice;
 using leveldb::Snapshot;
 using leveldb::Status;
 
-Status
-DB::ListColumnFamilies(Options const &, std::string const &, std::vector<std::string> *)
+static int
+wtrocks_get_cursor(OperationContext *context, ColumnFamilyHandle *cfhp, WT_CURSOR **cursorp)
 {
-	return WiredTigerErrorToStatus(ENOTSUP);
+	ColumnFamilyHandleImpl *cf =
+	    reinterpret_cast<ColumnFamilyHandleImpl *>(cfhp);
+	WT_CURSOR *c = context->GetCursor(cf->GetID());
+	if (c == NULL) {
+		WT_SESSION *session = context->GetSession();
+		int ret;
+		if ((ret = session->open_cursor(
+		    session, cf->GetURI().c_str(), NULL, NULL, &c)) != 0) {
+			fprintf(stderr, "Failed to open cursor on %s: %s\n", cf->GetURI().c_str(), wiredtiger_strerror(ret));
+			return (ret);
+		}
+		context->SetCursor(cf->GetID(), c);
+	}
+	*cursorp = c;
+	return (0);
+}
+
+Status
+DB::ListColumnFamilies(
+	Options const &options, std::string const &name,
+	std::vector<std::string> *column_families)
+{
+	std::vector<std::string> cf;
+	DB *dbptr;
+	Status status = DB::Open(options, name, &dbptr);
+	if (!status.ok())
+		return status;
+	DbImpl *db = reinterpret_cast<DbImpl *>(dbptr);
+	OperationContext *context = db->GetContext();
+	WT_SESSION *session = context->GetSession();
+	WT_CURSOR *c;
+	int ret = session->open_cursor(session, "metadata:", NULL, NULL, &c);
+	if (ret != 0)
+		goto err;
+	c->set_key(c, "table:");
+	/* Position on the first table entry */
+	int cmp;
+	ret = c->search_near(c, &cmp);
+	if (ret != 0 || (cmp < 0 && (ret = c->next(c)) != 0))
+		goto err;
+	/* Add entries while we are getting "table" URIs. */
+	for (; ret == 0; ret = c->next(c)) {
+		const char *key;
+		if ((ret = c->get_key(c, &key)) != 0)
+			goto err;
+		if (strncmp(key, "table:", strlen("table:")) != 0)
+			break;
+		cf.push_back(std::string(key + strlen("table:")));
+	}
+
+err:	delete db;
+	/*
+	 * WT_NOTFOUND is not an error: it just means we got to the end of the
+	 * list of tables.
+	 */
+	if (ret == 0 || ret == WT_NOTFOUND) {
+		*column_families = cf;
+		ret = 0;
+	}
+	return WiredTigerErrorToStatus(ret);
 }
 
 Status
@@ -63,7 +122,7 @@ DB::Open(Options const &options, std::string const &name, const std::vector<Colu
 	for (size_t i = 0; i < column_families.size(); i++)
 		cfhandles[i] = new ColumnFamilyHandleImpl(
 		    db, column_families[i].name, (int)i);
-	*handles = cfhandles;
+	db->SetColumns(*handles = cfhandles);
 	return Status::OK();
 }
 
@@ -75,6 +134,40 @@ WriteBatch::Handler::Merge(const Slice& key, const Slice& value)
 void
 WriteBatch::Handler::LogData(const Slice& blob)
 {
+}
+
+Status
+WriteBatchHandler::PutCF(
+    uint32_t column_family_id, const Slice& key, const Slice& value)
+{
+	WT_CURSOR *cursor;
+	int ret = wtrocks_get_cursor(context_, db_->GetCF(column_family_id), &cursor);
+	if (ret != 0)
+		return WiredTigerErrorToStatus(ret);
+	WT_ITEM item;
+	item.data = key.data();
+	item.size = key.size();
+	cursor->set_key(cursor, &item);
+	item.data = value.data();
+	item.size = value.size();
+	cursor->set_value(cursor, &item);
+	ret = cursor->insert(cursor);
+	return WiredTigerErrorToStatus(ret);
+}
+
+Status
+WriteBatchHandler::DeleteCF(uint32_t column_family_id, const Slice& key)
+{
+	WT_CURSOR *cursor;
+	int ret = wtrocks_get_cursor(context_, db_->GetCF(column_family_id), &cursor);
+	if (ret != 0)
+		return WiredTigerErrorToStatus(ret);
+	WT_ITEM item;
+	item.data = key.data();
+	item.size = key.size();
+	cursor->set_key(cursor, &item);
+	ret = cursor->remove(cursor);
+	return WiredTigerErrorToStatus(ret);
 }
 
 Status
@@ -91,7 +184,8 @@ DbImpl::CreateColumnFamily(Options const &options, std::string const &name, Colu
 	int ret = wtleveldb_create(conn_, options, "table:" + name);
 	if (ret != 0)
 		return WiredTigerErrorToStatus(ret);
-	*cfhp = new ColumnFamilyHandleImpl(this, name, ++numColumns_);
+	*cfhp = new ColumnFamilyHandleImpl(this, name, columns_.size());
+	columns_.push_back(*cfhp);
 	return Status::OK();
 }
 
@@ -103,24 +197,6 @@ DbImpl::DropColumnFamily(ColumnFamilyHandle *cfhp)
 	WT_SESSION *session = GetContext()->GetSession();
 	int ret = session->drop(session, cf->GetURI().c_str(), NULL);
 	return WiredTigerErrorToStatus(ret);
-}
-
-static int
-wtrocks_get_cursor(OperationContext *context, ColumnFamilyHandle *cfhp, WT_CURSOR **cursorp)
-{
-	ColumnFamilyHandleImpl *cf =
-	    reinterpret_cast<ColumnFamilyHandleImpl *>(cfhp);
-	WT_CURSOR *c = context->GetCursor(cf->GetID());
-	if (c == NULL) {
-		WT_SESSION *session = context->GetSession();
-		int ret;
-		if ((ret = session->open_cursor(
-		    session, cf->GetURI().c_str(), NULL, NULL, &c)) != 0)
-			return (ret);
-		context->SetCursor(cf->GetID(), c);
-	}
-	*cursorp = c;
-	return (0);
 }
 
 Status
@@ -195,7 +271,8 @@ DbImpl::NewIterator(ReadOptions const &options, ColumnFamilyHandle *cfhp)
 	WT_CURSOR *c, *iterc;
 	int ret = wtrocks_get_cursor(context, cfhp, &c);
 	assert(ret == 0);
-	ret = session->open_cursor(session, NULL, c, NULL, &iterc);
+	/* XXX would like a fast duplicate for LSM cursors without position. */
+	ret = session->open_cursor(session, c->uri, NULL, NULL, &iterc);
 	assert(ret == 0);
 	return new IteratorImpl(this, iterc);
 }

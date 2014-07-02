@@ -74,21 +74,6 @@ using leveldb::ColumnFamilyHandle;
 
 extern Status WiredTigerErrorToStatus(int wiredTigerError, const char *msg = "");
 
-class CacheImpl : public Cache {
-public:
-  CacheImpl(size_t capacity) : Cache(), capacity_(capacity) {}
-
-  virtual Handle* Insert(const Slice& key, void* value, size_t charge,
-      void (*deleter)(const Slice& key, void* value)) { return 0; }
-  virtual Handle* Lookup(const Slice& key) { return 0; }
-  virtual void Release(Handle* handle) {}
-  virtual void* Value(Handle* handle) { return 0; }
-  virtual void Erase(const Slice& key) {}
-  virtual uint64_t NewId() { return 0; }
-
-  size_t capacity_;
-};
-
 /* POSIX thread-local storage */
 template <class T>
 class ThreadLocal {
@@ -169,6 +154,42 @@ private:
   std::vector<WT_CURSOR *> cursors_;
 #endif
 };
+
+class CacheImpl : public Cache {
+public:
+  CacheImpl(size_t capacity) : Cache(), capacity_(capacity) {}
+
+  virtual Handle* Insert(const Slice& key, void* value, size_t charge,
+      void (*deleter)(const Slice& key, void* value)) { return 0; }
+  virtual Handle* Lookup(const Slice& key) { return 0; }
+  virtual void Release(Handle* handle) {}
+  virtual void* Value(Handle* handle) { return 0; }
+  virtual void Erase(const Slice& key) {}
+  virtual uint64_t NewId() { return 0; }
+
+  size_t capacity_;
+};
+
+#ifdef HAVE_ROCKSDB
+// ColumnFamilyHandleImpl is the class that clients use to access different
+// column families. It has non-trivial destructor, which gets called when client
+// is done using the column family
+class ColumnFamilyHandleImpl : public ColumnFamilyHandle {
+ public:
+  ColumnFamilyHandleImpl(DbImpl* db, std::string const &name, uint32_t id) : db_(db), id_(id), name_(name) {}
+  ColumnFamilyHandleImpl(const ColumnFamilyHandleImpl &copyfrom) : db_(copyfrom.db_), id_(copyfrom.id_), name_(copyfrom.name_) {}
+  virtual ~ColumnFamilyHandleImpl() {}
+  virtual uint32_t GetID() const { return id_; }
+
+  std::string const &GetName() const { return name_; }
+  std::string const GetURI() const { return "table:" + name_; }
+
+ private:
+  DbImpl* db_;
+  uint32_t id_;
+  std::string const name_;
+};
+#endif
 
 class IteratorImpl : public Iterator {
 public:
@@ -338,6 +359,13 @@ public:
   // Flush all mem-table data.
   virtual Status Flush(const FlushOptions& options,
                        ColumnFamilyHandle* column_family);
+
+  ColumnFamilyHandleImpl *GetCF(uint32_t column_family_id) {
+    return reinterpret_cast<ColumnFamilyHandleImpl *>(columns_.at(column_family_id));
+  }
+  void SetColumns(std::vector<ColumnFamilyHandle *> &cols) {
+    columns_ = cols;
+  }
 #endif
 
   virtual Iterator* NewIterator(const ReadOptions& options);
@@ -357,17 +385,6 @@ public:
   
   virtual void ResumeCompactions();
 
-private:
-  WT_CONNECTION *conn_;
-  ThreadLocal<OperationContext> *context_;
-#ifdef HAVE_ROCKSDB
-  int numColumns_;
-#endif
-
-  OperationContext *NewContext() {
-    return new OperationContext(conn_);
-  }
-
   OperationContext *GetContext() {
     OperationContext *ctx = context_->Get();
     if (ctx == NULL) {
@@ -375,6 +392,17 @@ private:
       context_->Set(ctx);
     }
     return (ctx);
+  }
+
+private:
+  WT_CONNECTION *conn_;
+  ThreadLocal<OperationContext> *context_;
+#ifdef HAVE_ROCKSDB
+  std::vector<ColumnFamilyHandle*> columns_;
+#endif
+
+  OperationContext *NewContext() {
+    return new OperationContext(conn_);
   }
 
   OperationContext *GetContext(const ReadOptions &options) {
@@ -393,24 +421,28 @@ private:
   void operator=(const DbImpl&);
 };
 
+// Implemention of WriteBatch::Handler
+class WriteBatchHandler : public WriteBatch::Handler {
+public:
+  WriteBatchHandler(DbImpl *db, OperationContext *context) : db_(db), context_(context), status_(0) {}
+  virtual ~WriteBatchHandler() {}
+  int GetWiredTigerStatus() { return status_; }
+
+  virtual void Put(const Slice& key, const Slice& value); 
+
+  virtual void Delete(const Slice& key);
+
 #ifdef HAVE_ROCKSDB
-// ColumnFamilyHandleImpl is the class that clients use to access different
-// column families. It has non-trivial destructor, which gets called when client
-// is done using the column family
-class ColumnFamilyHandleImpl : public ColumnFamilyHandle {
- public:
-  ColumnFamilyHandleImpl(DbImpl* db, std::string const &name, uint32_t id) : db_(db), id_(id), name_(name) {}
-  virtual ~ColumnFamilyHandleImpl() {}
-  virtual uint32_t GetID() const { return id_; }
-
-  std::string const &GetName() const { return name_; }
-  std::string const GetURI() const { return "table:" + name_; }
-
- private:
-  DbImpl* db_;
-  uint32_t id_;
-  std::string const name_;
-};
+  // Implementations are in rocksdb_wt.cc
+  virtual Status PutCF(uint32_t column_family_id, const Slice& key,
+                       const Slice& value);
+  virtual Status DeleteCF(uint32_t column_family_id, const Slice& key);
 #endif
+
+private:
+  DbImpl *db_;
+  OperationContext *context_;
+  int status_;
+};
 
 #endif
