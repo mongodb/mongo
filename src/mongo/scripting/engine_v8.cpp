@@ -1386,7 +1386,7 @@ namespace mongo {
 
         switch (elem.type()) {
         case mongo::Code:
-            return newFunction(StringData(elem.valuestr(), elem.valuestrsize() - 1));
+            return newFunction(elem.valueStringData());
         case CodeWScope:
             if (!elem.codeWScopeObject().isEmpty())
                 log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;

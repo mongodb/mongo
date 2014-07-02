@@ -1456,14 +1456,14 @@ namespace mongo {
 
         switch (elem.type()) {
         case mongo::Code:
-            return newFunction(StringData(elem.valuestr(), elem.valuestrsize() - 1));
+            return newFunction(elem.valueStringData());
         case CodeWScope:
             if (!elem.codeWScopeObject().isEmpty())
                 log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
             return newFunction(StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1));
         case mongo::Symbol:
         case mongo::String: {
-            return v8StringData(StringData(elem.valuestr(), elem.valuestrsize() - 1));
+            return v8StringData(elem.valueStringData());
         }
         case mongo::jstOID:
             return newId(elem.__oid());
