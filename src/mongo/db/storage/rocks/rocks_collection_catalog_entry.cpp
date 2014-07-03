@@ -303,7 +303,7 @@ namespace mongo {
             for ( unsigned i = 0; i < entries.size(); i++ ) {
                 BSONObj idx = entries[i].Obj();
                 IndexMetaData imd;
-                imd.spec = BSONObj(idx["spec"].Obj());
+                imd.spec = idx["spec"].Obj().getOwned();
                 imd.ready = idx["ready"].trueValue();
                 imd.head = DiskLoc( idx["head_a"].Int(),
                                     idx["head_b"].Int() );

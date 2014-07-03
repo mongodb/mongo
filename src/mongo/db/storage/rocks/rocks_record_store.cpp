@@ -42,7 +42,9 @@ namespace mongo {
     RocksRecordStore::RocksRecordStore( const StringData& ns,
                                         rocksdb::DB* db, // not owned here
                                         rocksdb::ColumnFamilyHandle* columnFamily,
-                                        rocksdb::ColumnFamilyHandle* metadataColumnFamily )
+                                        rocksdb::ColumnFamilyHandle* metadataColumnFamily 
+                                        // TODO capped 
+                                        )
         : RecordStore( ns ),
           _db( db ),
           _columnFamily( columnFamily ),
@@ -64,6 +66,7 @@ namespace mongo {
         else
             _nextIdNum = 1;
 
+        // TODO make this use default column family instead
         // load metadata
         std::string value;
         if (!_db->Get( rocksdb::ReadOptions(),
@@ -208,6 +211,7 @@ namespace mongo {
         return StatusWith<DiskLoc>( loc );
     }
 
+    // AFB: will merge operators be compatible with backward iterators?
     // Wrote this whole implementation of updateWithDamages, only to find out merge_operator
     // is not compatible with backward_iterator in rocks. Since we need backward_iterators we
     // can't use the rocks merge_operator functionality... :(
@@ -351,6 +355,7 @@ namespace mongo {
                                        bool full, bool scanData,
                                        ValidateAdaptor* adaptor,
                                        ValidateResults* results, BSONObjBuilder* output ) const {
+        // TODO check all bson
         output->append( "rocks", "no validate yet" );
         return Status::OK();
     }
@@ -362,8 +367,9 @@ namespace mongo {
         result->append( "stats", statsString );
     }
 
+
+    // AFB: is there a way to force column families to be cached in rocks?
     Status RocksRecordStore::touch( OperationContext* txn, BSONObjBuilder* output ) const {
-        // should we do something for this?
         return Status::OK();
     }
 
@@ -434,7 +440,6 @@ namespace mongo {
     }
 
     void RocksRecordStore::Iterator::_checkStatus() {
-        // todo: Fix me
         invariant( _iterator->status().ok() );
     }
 
@@ -465,16 +470,16 @@ namespace mongo {
         _iterator.reset( NULL );
     }
 
-    // XXX mmapv1 just leaves these 2 blank... so is it ok to also leave them like this?
     void RocksRecordStore::Iterator::prepareToYield() {
+        // TODO delete iterator, store information
     }
 
     bool RocksRecordStore::Iterator::recoverFromYield() {
+        // TODO set iterator to same place as before, but with new snapshot
         return true;
     }
 
     RecordData RocksRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
-        // XXX is this actually an optimization?
         if (_iterator->Valid() && 
                 *reinterpret_cast<const DiskLoc*>( _iterator->key().data() ) == loc) {
             rocksdb::Slice data_slice = _iterator->value();
