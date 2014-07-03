@@ -61,6 +61,7 @@ namespace mongo {
             {
                 // Remove _id range [_min, _max).
                 Lock::DBWrite lk(txn.lockState(), ns);
+                WriteUnitOfWork wunit(txn.recoveryUnit());
                 Client::Context ctx(&txn,  ns );
 
                 KeyRange range( ns,
@@ -68,6 +69,7 @@ namespace mongo {
                                 BSON( "_id" << _max ),
                                 BSON( "_id" << 1 ) );
                 Helpers::removeRange( &txn, range );
+                wunit.commit();
             }
 
             // Check that the expected documents remain.

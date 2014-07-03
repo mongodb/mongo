@@ -127,6 +127,7 @@ namespace QueryStageKeep {
                 member->obj = BSON("x" << 2);
                 ws.flagForReview(id);
             }
+            ctx.commit();
 
             // Create a collscan to provide the 10 objects in the collection.
             CollectionScanParams params;

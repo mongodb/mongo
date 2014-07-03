@@ -206,6 +206,7 @@ namespace mongo {
 
             result.append( "numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal() );
 
+            writeContext.commit();
             return true;
         }
 

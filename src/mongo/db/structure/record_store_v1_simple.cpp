@@ -48,7 +48,7 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kStorage);
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     static Counter64 freelistAllocs;
     static Counter64 freelistBucketExhausted;
@@ -227,7 +227,7 @@ namespace mongo {
 
     StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord( OperationContext* txn,
                                                           int lengthWithHeaders,
-                                                          int quotaMax ) {
+                                                          bool enforceQuota ) {
         DiskLoc loc = _allocFromExistingExtents( txn, lengthWithHeaders );
         if ( !loc.isNull() )
             return StatusWith<DiskLoc>( loc );
@@ -237,7 +237,7 @@ namespace mongo {
         increaseStorageSize( txn,
                              _extentManager->followupSize( lengthWithHeaders,
                                                            _details->lastExtentSize()),
-                             quotaMax );
+                             enforceQuota );
 
         loc = _allocFromExistingExtents( txn, lengthWithHeaders );
         if ( !loc.isNull() ) {
@@ -255,7 +255,7 @@ namespace mongo {
             increaseStorageSize( txn,
                                  _extentManager->followupSize( lengthWithHeaders,
                                                                _details->lastExtentSize()),
-                                 quotaMax );
+                                 enforceQuota );
 
             loc = _allocFromExistingExtents( txn, lengthWithHeaders );
             if ( ! loc.isNull() )
@@ -406,7 +406,7 @@ namespace mongo {
                         }
 
                         CompactDocWriter writer( recOld, dataSize, lenWPadding );
-                        StatusWith<DiskLoc> status = insertRecord( txn, &writer, 0 );
+                        StatusWith<DiskLoc> status = insertRecord( txn, &writer, false );
                         uassertStatusOK( status.getStatus() );
                         datasize += recordFor( status.getValue() )->netLength();
 

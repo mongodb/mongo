@@ -135,6 +135,7 @@ namespace mongo {
                     // can this be GlobalRead? and if it can, it should be nongreedy.
                     Lock::GlobalWrite w(txn->lockState());
                     getDur().commitNow(txn);
+                    //  No WriteUnitOfWork needed, as this does no writes of its own.
                 }
                 result.append( "numFiles" , globalStorageEngine->flushAllFiles( sync ) );
             }
@@ -148,7 +149,7 @@ namespace mongo {
         SimpleMutex::scoped_lock lkf(filesLockedFsync);
 
         OperationContextImpl txn;   // XXX?
-        Lock::GlobalWrite global(txn.lockState());
+        Lock::GlobalWrite global(txn.lockState()); // No WriteUnitOfWork needed
 
         SimpleMutex::scoped_lock lk(fsyncCmd.m);
         

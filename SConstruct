@@ -1659,7 +1659,7 @@ def doConfigure(myenv):
         conf.FindSysLibDep("stemmer", ["stemmer"])
 
     if use_system_version_of_library("yaml"):
-        conf.FindSysLibDep("yaml", ["yaml"])
+        conf.FindSysLibDep("yaml", ["yaml-cpp"])
 
     if use_system_version_of_library("boost"):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):

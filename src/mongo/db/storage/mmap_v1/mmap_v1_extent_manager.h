@@ -85,7 +85,7 @@ namespace mongo {
          */
         Status init(OperationContext* txn);
 
-        size_t numFiles() const;
+        int numFiles() const;
         long long fileSize() const;
 
         // TODO: make private
@@ -98,7 +98,7 @@ namespace mongo {
         DiskLoc allocateExtent( OperationContext* txn,
                                 bool capped,
                                 int size,
-                                int quotaMax );
+                                bool enforceQuota );
 
         /**
          * firstExt has to be == lastExt or a chain
@@ -158,9 +158,8 @@ namespace mongo {
         DiskLoc _allocFromFreeList( OperationContext* txn, int approxSize, bool capped );
 
         /* allocate a new Extent, does not check free list
-         * @param maxFileNoForQuota - 0 for unlimited
         */
-        DiskLoc _createExtent( OperationContext* txn, int approxSize, int maxFileNoForQuota );
+        DiskLoc _createExtent( OperationContext* txn, int approxSize, bool enforceQuota );
 
         DataFile* _addAFile( OperationContext* txn, int sizeNeeded, bool preallocateNextFile );
 
@@ -175,7 +174,7 @@ namespace mongo {
                                      int fileNo,
                                      DataFile* f,
                                      int size,
-                                     int maxFileNoForQuota );
+                                     bool enforceQuota );
 
         boost::filesystem::path fileName( int n ) const;
 

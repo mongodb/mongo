@@ -50,8 +50,12 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
 namespace repl {
 
     LegacyReplicationCoordinator::LegacyReplicationCoordinator() {
@@ -317,9 +321,29 @@ namespace {
         return dbName == "local";
     }
 
-    bool LegacyReplicationCoordinator::canServeReadsFor(const NamespaceString& collection) {
-        // TODO
-        return false;
+    Status LegacyReplicationCoordinator::canServeReadsFor(const NamespaceString& ns, bool slaveOk) {
+        if (cc().isGod()) {
+            return Status::OK();
+        }
+        if (canAcceptWritesForDatabase(ns.db())) {
+            return Status::OK();
+        }
+        if (getReplicationMode() == modeMasterSlave && replSettings.slave == SimpleSlave) {
+            return Status::OK();
+        }
+        if (slaveOk) {
+            if (getReplicationMode() == modeMasterSlave || getReplicationMode() == modeNone) {
+                return Status::OK();
+            }
+            if (getCurrentMemberState().secondary()) {
+                return Status::OK();
+            }
+            return Status(ErrorCodes::NotMasterOrSecondaryCode,
+                         "not master or secondary; cannot currently read from this replSet member");
+        }
+        return Status(ErrorCodes::NotMasterNoSlaveOkCode,
+                      "not master and slaveOk=false");
+
     }
 
     bool LegacyReplicationCoordinator::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {
@@ -480,12 +504,11 @@ namespace {
 } // namespace
 
     Status LegacyReplicationCoordinator::processReplSetReconfig(OperationContext* txn,
-                                                                const BSONObj& newConfigObj,
-                                                                bool force,
+                                                                const ReplSetReconfigArgs& args,
                                                                 BSONObjBuilder* resultObj) {
 
-        if( force && !theReplSet ) {
-            replSettings.reconfig = newConfigObj.getOwned();
+        if( args.force && !theReplSet ) {
+            replSettings.reconfig = args.newConfigObj.getOwned();
             resultObj->append("msg",
                               "will try this config momentarily, try running rs.conf() again in a "
                                       "few seconds");
@@ -497,7 +520,7 @@ namespace {
             return status;
         }
 
-        if( !force && !theReplSet->box.getState().primary() ) {
+        if( !args.force && !theReplSet->box.getState().primary() ) {
             return Status(ErrorCodes::NotMaster,
                           "replSetReconfig command must be sent to the current replica set "
                                   "primary.");
@@ -519,7 +542,7 @@ namespace {
             }
 
 
-            scoped_ptr<ReplSetConfig> newConfig(ReplSetConfig::make(newConfigObj, force));
+            scoped_ptr<ReplSetConfig> newConfig(ReplSetConfig::make(args.newConfigObj, args.force));
 
             log() << "replSet replSetReconfig config object parses ok, " <<
                     newConfig->members.size() << " members specified" << rsLog;
@@ -721,38 +744,36 @@ namespace {
     }
 } // namespace
 
-    Status LegacyReplicationCoordinator::processReplSetFresh(const StringData& setName,
-                                                             const StringData& who,
-                                                             unsigned id,
-                                                             int cfgver,
-                                                             const OpTime& opTime,
+    Status LegacyReplicationCoordinator::processReplSetFresh(const ReplSetFreshArgs& args,
                                                              BSONObjBuilder* resultObj) {
         Status status = _checkReplEnabledForCommand(resultObj);
         if (!status.isOK()) {
             return status;
         }
 
-        if( setName != theReplSet->name() ) {
-            return Status(ErrorCodes::ReplicaSetNotFound, "wrong repl set name");
+        if( args.setName != theReplSet->name() ) {
+            return Status(ErrorCodes::ReplicaSetNotFound,
+                          str::stream() << "wrong repl set name. Expected: " <<
+                                  theReplSet->name() << ", received: " << args.setName);
         }
 
         bool weAreFresher = false;
-        if( theReplSet->config().version > cfgver ) {
-            log() << "replSet member " << who << " is not yet aware its cfg version " << cfgver <<
-                    " is stale" << rsLog;
+        if( theReplSet->config().version > args.cfgver ) {
+            log() << "replSet member " << args.who << " is not yet aware its cfg version " <<
+                    args.cfgver << " is stale" << rsLog;
             resultObj->append("info", "config version stale");
             weAreFresher = true;
         }
         // check not only our own optime, but any other member we can reach
-        else if( opTime < theReplSet->lastOpTimeWritten ||
-                 opTime < theReplSet->lastOtherOpTime())  {
+        else if( args.opTime < theReplSet->lastOpTimeWritten ||
+                 args.opTime < theReplSet->lastOtherOpTime())  {
             weAreFresher = true;
         }
         resultObj->appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
         resultObj->append("fresher", weAreFresher);
 
         std::string errmsg;
-        bool veto = _shouldVeto(id, &errmsg);
+        bool veto = _shouldVeto(args.id, &errmsg);
         resultObj->append("veto", veto);
         if (veto) {
             resultObj->append("errmsg", errmsg);
@@ -761,16 +782,13 @@ namespace {
         return Status::OK();
     }
 
-    Status LegacyReplicationCoordinator::processReplSetElect(const StringData& set,
-                                                             unsigned whoid,
-                                                             int cfgver,
-                                                             const OID& round,
+    Status LegacyReplicationCoordinator::processReplSetElect(const ReplSetElectArgs& args,
                                                              BSONObjBuilder* resultObj) {
         Status status = _checkReplEnabledForCommand(resultObj);
         if (!status.isOK()) {
             return status;
         }
-        theReplSet->electCmdReceived(set, whoid, cfgver, round, resultObj);
+        theReplSet->electCmdReceived(args.set, args.whoid, args.cfgver, args.round, resultObj);
         return Status::OK();
     }
 

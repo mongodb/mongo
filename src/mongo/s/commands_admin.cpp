@@ -26,7 +26,7 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
 
@@ -63,6 +63,7 @@
 #include "mongo/s/write_ops/batch_downconvert.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/processinfo.h"
@@ -72,6 +73,8 @@
 #include "mongo/util/version.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     namespace dbgrid_cmds {
 
@@ -1221,7 +1224,8 @@ namespace mongo {
 
                     // it's fine if mongods of a set all use default port
                     if ( ! serverAddrs[i].hasPort() ) {
-                        serverAddrs[i].setPort(ServerGlobalParams::ShardServerPort);
+                        serverAddrs[i] = HostAndPort(serverAddrs[i].host(),
+                                                     ServerGlobalParams::ShardServerPort);
                     }
                 }
 
@@ -1495,7 +1499,7 @@ namespace mongo {
                 help << "{whatsmyuri:1}";
             }
             virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                result << "you" << ClientInfo::get()->getRemote();
+                result << "you" << ClientInfo::get()->getRemote().toString();
                 return true;
             }
         } cmdWhatsMyUri;

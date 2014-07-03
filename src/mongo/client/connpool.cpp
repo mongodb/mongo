@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kNetworking);
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
 
     // ------ PoolForHost ------
 
@@ -273,7 +273,19 @@ namespace mongo {
         return _finishCreate( host , socketTimeout , c );
     }
 
+    void DBConnectionPool::onRelease(DBClientBase* conn) {
+        if (_hooks->empty()) {
+            return;
+        }
+
+        for (list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); i++) {
+            (*i)->onRelease( conn );
+        }
+    }
+
     void DBConnectionPool::release(const string& host, DBClientBase *c) {
+        onRelease(c);
+
         scoped_lock L(_mutex);
         _pools[PoolKey(host,c->getSoTimeout())].done(this,c);
     }

@@ -28,16 +28,19 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/chunk.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/util/log.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     ShardKeyPattern::ShardKeyPattern( BSONObj p ) : pattern( p.getOwned() ) {
         pattern.toBSON().getFieldNames( patternfields );

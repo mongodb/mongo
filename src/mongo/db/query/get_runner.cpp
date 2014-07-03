@@ -28,6 +28,8 @@
 
 // THIS FILE IS DEPRECATED -- replaced by get_executor.cpp
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/query/get_runner.h"
 
 #include <limits>
@@ -61,8 +63,11 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
     Status getRunner(Collection* collection,
                      const std::string& ns,

@@ -27,14 +27,14 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/logger/log_tag.h"
+#include "mongo/logger/log_component.h"
 
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace logger {
 
-    std::string LogTag::getShortName() const {
+    std::string LogComponent::getShortName() const {
         switch (_value) {
         case kDefault: return "Default";
         case kAccessControl: return "AccessControl";
@@ -47,8 +47,8 @@ namespace logger {
         case kSharding: return "Sharding";
         case kStorage: return "Storage";
         case kWrites: return "Writes";
-        case kNumLogTags: return "Total";
-        // No default. Compiler should complain if there's a tag that's not handled.
+        case kNumLogComponents: return "Total";
+        // No default. Compiler should complain if there's a log component that's not handled.
         }
         invariant(0);
     }

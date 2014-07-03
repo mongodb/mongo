@@ -321,7 +321,7 @@ namespace mongo {
         static ConnectionString mock( const HostAndPort& server ) {
             ConnectionString connStr;
             connStr._servers.push_back( server );
-            connStr._string = server.toString( true );
+            connStr._string = server.toString();
             return connStr;
         }
 
@@ -1189,6 +1189,8 @@ namespace mongo {
         virtual uint64_t getSockCreationMicroSec() const {
             return INVALID_SOCK_CREATION_TIME;
         }
+
+        virtual void reset() {}
 
     }; // DBClientBase
 

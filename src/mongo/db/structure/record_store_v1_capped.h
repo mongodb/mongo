@@ -89,7 +89,7 @@ namespace mongo {
 
         virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
                                                  int lengthWithHeaders,
-                                                 int quotaMax );
+                                                 bool enforceQuota );
 
         virtual void addDeletedRec(OperationContext* txn, const DiskLoc& dloc);
 

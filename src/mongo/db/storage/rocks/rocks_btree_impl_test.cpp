@@ -35,7 +35,7 @@
 #include <rocksdb/slice.h>
 #include <rocksdb/options.h>
 
-#include "mongo/db/operation_context.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/rocks/rocks_btree_impl.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
@@ -45,61 +45,11 @@ using namespace mongo;
 
 namespace mongo {
 
-    class MyOperationContext : public OperationContext {
+    class MyOperationContext : public OperationContextNoop {
     public:
-        MyOperationContext( rocksdb::DB* db ) {
-            _recoveryUnit.reset( new RocksRecoveryUnit( db, false ) );
+        MyOperationContext( rocksdb::DB* db )
+            : OperationContextNoop( new RocksRecoveryUnit( db, false ) ) {
         }
-
-        virtual ~MyOperationContext() { }
-
-        Client* getClient() const {
-            invariant(false);
-            return NULL;
-        }
-
-        CurOp* getCurOp() const {
-            invariant(false);
-            return NULL;
-        }
-
-        virtual RecoveryUnit* recoveryUnit() const {
-            return _recoveryUnit.get();
-        }
-
-        virtual LockState* lockState() const {
-            return NULL;
-        }
-
-        virtual ProgressMeter* setMessage( const char * msg,
-                                           const std::string &name,
-                                           unsigned long long progressMeterTotal,
-                                           int secondsBetween ) {
-            invariant(false);
-            return NULL;
-        }
-
-        virtual void checkForInterrupt( bool heedMutex ) const { }
-
-        virtual Status checkForInterruptNoAssert() const {
-            return Status::OK();
-        }
-
-        virtual bool isPrimaryFor( const StringData& ns ) {
-            return true;
-        }
-
-        virtual const char* getNS() const {
-            return NULL;
-        };
-
-        virtual Transaction* getTransaction() {
-            return NULL;
-        }
-
-    private:
-        boost::scoped_ptr<RocksRecoveryUnit> _recoveryUnit;
-
     };
 
     rocksdb::DB* getDB() {
@@ -218,6 +168,109 @@ namespace mongo {
             {
                 scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
                 ASSERT( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+            }
+        }
+    }
+
+    TEST( RocksRecordStoreTest, Snapshots ) {
+        scoped_ptr<rocksdb::DB> db( getDB() );
+
+        {
+            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                }
+            }
+
+            {
+                // get a cursor
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+
+                // insert some more stuff
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                }
+
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+                cursor->advance();
+
+                // make sure that the cursor can't "see" anything added after it was created.
+                ASSERT( cursor-> isEOF() );
+                ASSERT_FALSE( cursor->locate( BSON( "" << 3 ), DiskLoc(1,3) ) );
+                ASSERT( cursor->isEOF() );
+            }
+        }
+    }
+
+    TEST( RocksRecordStoreTest, SaveAndRestorePosition ) {
+        scoped_ptr<rocksdb::DB> db( getDB() );
+
+        {
+            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                }
+            }
+
+            {
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+                ASSERT( cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
+
+                // save the position
+                cursor->savePosition();
+
+                // advance to the end
+                while ( !cursor->isEOF() ) {
+                    cursor->advance();
+                }
+
+                ASSERT( cursor->isEOF() );
+
+                // restore position
+                cursor->restorePosition();
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
+
+                // repeat, with a different value
+                ASSERT( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+
+                // save the position
+                cursor->savePosition();
+
+                // advance to the end
+                while ( !cursor->isEOF() ) {
+                    cursor->advance();
+                }
+
+                // restore position
+                cursor->restorePosition();
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );

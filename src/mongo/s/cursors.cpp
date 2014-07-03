@@ -27,8 +27,7 @@
  *    then also delete it in the license file.
  */
 
-
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/cursors.h"
 
@@ -46,9 +45,13 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/max_time.h"
 #include "mongo/util/concurrency/task.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
+
     const int ShardedClientCursor::INIT_REPLY_BUFFER_SIZE = 32768;
 
     // --------  ShardedCursor -----------

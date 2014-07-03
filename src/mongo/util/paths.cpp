@@ -25,12 +25,15 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/util/paths.h"
 
-#include "mongo/platform/basic.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     void flushMyDirectory(const boost::filesystem::path& file) {
 #ifdef __linux__ // this isn't needed elsewhere

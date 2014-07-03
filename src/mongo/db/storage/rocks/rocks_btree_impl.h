@@ -30,6 +30,8 @@
 
 #include "mongo/db/structure/btree/btree_interface.h"
 
+#include <rocksdb/db.h>
+
 #pragma once
 
 namespace rocksdb {
@@ -77,10 +79,35 @@ namespace mongo {
         virtual Status initAsEmpty(OperationContext* txn);
 
     private:
+        typedef DiskLoc RecordId;
+
         RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx ) const;
 
         rocksdb::DB* _db;
         rocksdb::ColumnFamilyHandle* _columnFamily;
+
+        /**
+         * Creates an error code message out of a key
+         */
+        string dupKeyError(const BSONObj& key) const;
+
+/*    public:*/
+        //class IndexKey {
+            //MONGO_DISALLOW_COPYING(IndexKey);
+        //public:
+            //IndexKey ( const BSONObj& obj, const RecordId& recId );
+
+            //string keyData() { return _keyData; }
+
+        //private:
+            //string _keyData;
+
+            /**
+             * Returns a BSON object that is identical to the input obj, but with all field names
+             * changed to the empty string
+             */
+            //static BSONObj stripFieldNames( const BSONObj& obj);
+        /*};*/
 
     };
 }

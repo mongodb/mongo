@@ -29,14 +29,18 @@
 *    it in the license file.
 */
 
-#include "mongo/db/repl/manager.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/client.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
 namespace repl {
 
     /* check members OTHER THAN US to see if they think they are primary */

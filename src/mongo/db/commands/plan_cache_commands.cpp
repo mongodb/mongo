@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include <string>
 #include <sstream>
 
@@ -39,6 +41,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/explain_plan.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/util/log.h"
 
 namespace {
 
@@ -102,6 +105,8 @@ namespace {
 } // namespace
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     using std::string;
     using std::stringstream;

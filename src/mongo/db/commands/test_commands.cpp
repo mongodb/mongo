@@ -62,6 +62,7 @@ namespace mongo {
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
 
             Lock::DBWrite lk(txn->lockState(), ns);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn,  ns );
             Database* db = ctx.db();
             Collection* collection = db->getCollection( txn, ns );
@@ -73,6 +74,10 @@ namespace mongo {
                 }
             }
             StatusWith<DiskLoc> res = collection->insertDocument( txn, obj, false );
+            Status status = res.getStatus();
+            if (status.isOK()) {
+                wunit.commit();
+            }
             return appendCommandStatus( result, res.getStatus() );
         }
     };
@@ -153,6 +158,7 @@ namespace mongo {
                 massert( 13418, "captrunc invalid n", Runner::RUNNER_ADVANCED == state);
             }
             collection->temp_cappedTruncateAfter( txn, end, inc );
+            ctx.commit();
             return true;
         }
     };
@@ -200,6 +206,7 @@ namespace mongo {
 
             if (!fromRepl)
                 repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+            ctx.commit();
             return true;
         }
     };

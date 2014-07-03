@@ -28,7 +28,7 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "writeback_listener.h"
 
@@ -42,9 +42,12 @@
 #include "mongo/s/server.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/version_manager.h"
+#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     unordered_map<string,WriteBackListener*> WriteBackListener::_cache;
     unordered_set<string> WriteBackListener::_seenSets;

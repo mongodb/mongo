@@ -67,7 +67,7 @@ namespace mongo {
 
         // The DatabaseCatalogEntry owns this, do not delete
         virtual CollectionCatalogEntry* getCollectionCatalogEntry( OperationContext* txn,
-                                                                   const StringData& ns );
+                                                                   const StringData& ns ) const;
 
         // The DatabaseCatalogEntry owns this, do not delete
         virtual RecordStore* getRecordStore( OperationContext* txn,

@@ -71,7 +71,7 @@ namespace mongo {
             massert(17027, string("Expected an Object, but got a ") + typeName(cursor.type()),
                     cursor.type() == Object);
 
-            cursorIds.push_back(make_pair(ConnectionString(cursor["host"].String()),
+            cursorIds.push_back(make_pair(ConnectionString(HostAndPort(cursor["host"].String())),
                                           cursor["id"].Long()));
         }
         

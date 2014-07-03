@@ -235,7 +235,7 @@ namespace mongo {
                 DBClientConnection conn( true );
                 conn._logLevel = logger::LogSeverity::Debug(1);
                 string errmsg;
-                if ( ! conn.connect( state->host , errmsg ) )
+                if ( ! conn.connect( HostAndPort(state->host) , errmsg ) )
                     state->error = errmsg;
                 long long cycleNumber = 0;
 

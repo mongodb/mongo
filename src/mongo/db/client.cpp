@@ -205,14 +205,18 @@ namespace mongo {
             DEV log() << "_DEBUG ReadContext db wasn't open, will try to open " << ns << endl;
             if (txn->lockState()->isW()) {
                 // write locked already
+                WriteUnitOfWork wunit(txn->recoveryUnit());
                 DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
                 _c.reset(new Context(txn, ns, doVersion));
+                wunit.commit();
             }
             else if (!txn->lockState()->isRecursive()) {
                 _lk.reset(0);
                 {
                     Lock::GlobalWrite w(txn->lockState());
+                    WriteUnitOfWork wunit(txn->recoveryUnit());
                     Context c(txn, ns, doVersion);
+                    wunit.commit();
                 }
 
                 // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
@@ -232,10 +236,13 @@ namespace mongo {
     Client::WriteContext::WriteContext(
                 OperationContext* opCtx, const std::string& ns, bool doVersion)
         : _lk(opCtx->lockState(), ns),
+          _wunit(opCtx->recoveryUnit()),
           _c(opCtx, ns, doVersion) {
-
     }
 
+    void Client::WriteContext::commit() {
+        _wunit.commit();
+    }
 
     void Client::Context::checkNotStale() const { 
         switch ( _client->_curOp->getOp() ) {

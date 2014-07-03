@@ -207,10 +207,15 @@ namespace mongo {
         class WriteContext : boost::noncopyable {
         public:
             WriteContext(OperationContext* opCtx, const std::string& ns, bool doVersion = true);
+
+            /** Commit any writes done so far in this context. */
+            void commit();
+
             Context& ctx() { return _c; }
 
         private:
             Lock::DBWrite _lk;
+            WriteUnitOfWork _wunit;
             Context _c;
         };
 

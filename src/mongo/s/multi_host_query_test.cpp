@@ -287,7 +287,7 @@ namespace {
                 // Need to do a connect failure so that we get an empty MessagingPort on the conn and
                 // the host name is set.
                 string errMsg;
-                ASSERT(!info.conn->connect(host.toString(), errMsg));
+                ASSERT(!info.conn->connect(HostAndPort(host.toString()), errMsg));
             }
             
             return StatusWith<DBClientCursor*>(new DBClientCursor(info.conn.get(),

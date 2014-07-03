@@ -144,7 +144,7 @@ namespace mongo {
     StatusWith<DiskLoc> RocksRecordStore::insertRecord( OperationContext* txn,
                                                         const char* data,
                                                         int len,
-                                                        int quotaMax ) {
+                                                        bool enforceQuota ) {
 
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
@@ -162,7 +162,8 @@ namespace mongo {
 
     StatusWith<DiskLoc> RocksRecordStore::insertRecord( OperationContext* txn,
                                                         const DocWriter* doc,
-                                                        int quotaMax ) {
+                                                        int quotaMax,
+                                                        bool enforceQuota ) {
 
         const int len = doc->documentSize();
 
@@ -181,14 +182,14 @@ namespace mongo {
         _increaseDataSize(txn, len);
 
         return StatusWith<DiskLoc>( loc );
-
+                                                        
     }
 
     StatusWith<DiskLoc> RocksRecordStore::updateRecord( OperationContext* txn,
                                                         const DiskLoc& loc,
                                                         const char* data,
                                                         int len,
-                                                        int quotaMax,
+                                                        bool enforceQuota,
                                                         UpdateMoveNotifier* notifier ) {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 

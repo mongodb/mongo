@@ -25,7 +25,9 @@ env.CppUnitTest('replication_executor_test',
 
 env.Library('repl_coordinator_impl',
             'repl_coordinator_impl.cpp',
-            LIBDEPS=['$BUILD_DIR/mongo/foundation',
+            LIBDEPS=['$BUILD_DIR/mongo/db/common',
+                     '$BUILD_DIR/mongo/foundation',
+                     '$BUILD_DIR/mongo/server_options_core',
                      'replication_executor',
                      'repl_settings'])
 

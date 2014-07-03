@@ -86,7 +86,7 @@ namespace ShardingTests {
         CustomDirectClient _client;
         Shard _shard;
 
-        ChunkManagerTest() : _client(&_txn) {
+        ChunkManagerTest() {
 
             DBException::traceExceptions = true;
 
@@ -94,13 +94,13 @@ namespace ShardingTests {
             ConnectionString::setConnectionHook( this );
 
             // Create the default config database before querying, necessary for direct connections
-            client().dropDatabase( "config" );
-            client().insert( "config.test", BSON( "hello" << "world" ) );
-            client().dropCollection( "config.test" );
+            _client.dropDatabase( "config" );
+            _client.insert( "config.test", BSON( "hello" << "world" ) );
+            _client.dropCollection( "config.test" );
 
-            client().dropDatabase( nsGetDB( collName() ) );
-            client().insert( collName(), BSON( "hello" << "world" ) );
-            client().dropCollection( collName() );
+            _client.dropDatabase( nsGetDB( collName() ) );
+            _client.insert( collName(), BSON( "hello" << "world" ) );
+            _client.dropCollection( collName() );
 
             // Since we've redirected the conns, the host doesn't matter here so long as it's
             // prefixed with a "$"
@@ -109,7 +109,7 @@ namespace ShardingTests {
             _shard.setAddress( _shard.getAddress() );
 
             // Create an index so that diffing works correctly, otherwise no cursors from S&O
-            client().ensureIndex( ChunkType::ConfigNS, // br
+            _client.ensureIndex( ChunkType::ConfigNS, // br
                                   BSON( ChunkType::ns() << 1 << // br
                                           ChunkType::DEPRECATED_lastmod() << 1 ) );
             configServer.init("$dummy:1000");
@@ -124,16 +124,12 @@ namespace ShardingTests {
 
         Shard& shard(){ return _shard; }
 
-        DBDirectClient& client(){
-            return _client;
-        }
-
         virtual DBClientBase* connect( const ConnectionString& connStr,
                                        string& errmsg,
                                        double socketTimeout )
         {
             // Note - must be new, since it gets owned elsewhere
-            return new CustomDirectClient(&_txn);
+            return new CustomDirectClient();
         }
     };
 
@@ -148,7 +144,7 @@ namespace ShardingTests {
             ChunkManager manager( collName(), ShardKeyPattern( BSON( "_id" << 1 ) ), false );
             manager.createFirstChunks( shard().getConnString(), shard(), NULL, NULL );
 
-            BSONObj firstChunk = client().findOne(ChunkType::ConfigNS, BSONObj()).getOwned();
+            BSONObj firstChunk = _client.findOne(ChunkType::ConfigNS, BSONObj()).getOwned();
 
             ASSERT(firstChunk[ChunkType::min()].Obj()[ "_id" ].type() == MinKey );
             ASSERT(firstChunk[ChunkType::max()].Obj()[ "_id" ].type() == MaxKey );
@@ -206,7 +202,7 @@ namespace ShardingTests {
             createChunks( keyName );
 
             auto_ptr<DBClientCursor> cursor =
-                client().query(ChunkType::ConfigNS, QUERY(ChunkType::ns(collName())));
+                _client.query(ChunkType::ConfigNS, QUERY(ChunkType::ns(collName())));
 
             set<int> minorVersions;
             OID epoch;
@@ -245,10 +241,10 @@ namespace ShardingTests {
 
             string keyName = "_id";
             createChunks( keyName );
-            int numChunks = static_cast<int>(client().count(ChunkType::ConfigNS,
+            int numChunks = static_cast<int>(_client.count(ChunkType::ConfigNS,
                                                             BSON(ChunkType::ns(collName()))));
 
-            BSONObj firstChunk = client().findOne(ChunkType::ConfigNS, BSONObj()).getOwned();
+            BSONObj firstChunk = _client.findOne(ChunkType::ConfigNS, BSONObj()).getOwned();
 
             ChunkVersion version = ChunkVersion::fromBSON(firstChunk,
                                                           ChunkType::DEPRECATED_lastmod());
@@ -276,7 +272,7 @@ namespace ShardingTests {
             ChunkVersion laterVersion = ChunkVersion( 2, 1, version.epoch() );
             laterVersion.addToBSON(b, ChunkType::DEPRECATED_lastmod());
 
-            client().update(ChunkType::ConfigNS, BSONObj(), BSON( "$set" << b.obj()));
+            _client.update(ChunkType::ConfigNS, BSONObj(), BSON( "$set" << b.obj()));
 
             // Make new manager load chunk diff
             ChunkManager newManager( manager );

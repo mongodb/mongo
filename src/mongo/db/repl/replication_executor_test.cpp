@@ -43,12 +43,6 @@ namespace repl {
 
 namespace {
 
-    template <typename T>
-    const T& ASSERT_GET(const StatusWith<T>& v) {
-        ASSERT_OK(v.getStatus());
-        return v.getValue();
-    }
-
     bool operator==(const ReplicationExecutor::RemoteCommandRequest lhs,
                     const ReplicationExecutor::RemoteCommandRequest rhs) {
         return lhs.target == rhs.target &&
@@ -118,7 +112,7 @@ namespace {
         ReplicationExecutor executor(new NetworkInterfaceMock);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         Status status2(ErrorCodes::InternalError, "Not mutated");
-        ReplicationExecutor::CallbackHandle cb = ASSERT_GET(
+        ReplicationExecutor::CallbackHandle cb = unittest::assertGet(
             executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                              stdx::placeholders::_1,
                                              &status1)));
@@ -175,9 +169,9 @@ namespace {
     EventChainAndWaitingTest::EventChainAndWaitingTest() :
         executor(new NetworkInterfaceMock),
         executorThread(stdx::bind(&ReplicationExecutor::run, &executor)),
-        goEvent(ASSERT_GET(executor.makeEvent())),
-        event2(ASSERT_GET(executor.makeEvent())),
-        event3(ASSERT_GET(executor.makeEvent())),
+        goEvent(unittest::assertGet(executor.makeEvent())),
+        event2(unittest::assertGet(executor.makeEvent())),
+        event3(unittest::assertGet(executor.makeEvent())),
         status1(ErrorCodes::InternalError, "Not mutated"),
         status2(ErrorCodes::InternalError, "Not mutated"),
         status3(ErrorCodes::InternalError, "Not mutated"),
@@ -204,11 +198,12 @@ namespace {
         executor.waitForEvent(event2);
         executor.waitForEvent(event3);
 
-        ReplicationExecutor::EventHandle neverSignaledEvent = ASSERT_GET(executor.makeEvent());
+        ReplicationExecutor::EventHandle neverSignaledEvent =
+            unittest::assertGet(executor.makeEvent());
         boost::thread neverSignaledWaiter(stdx::bind(&ReplicationExecutor::waitForEvent,
                                                      &executor,
                                                      neverSignaledEvent));
-        ReplicationExecutor::CallbackHandle shutdownCallback = ASSERT_GET(
+        ReplicationExecutor::CallbackHandle shutdownCallback = unittest::assertGet(
                 executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                                  stdx::placeholders::_1,
                                                  &status5)));
@@ -278,18 +273,18 @@ namespace {
         Status status2(ErrorCodes::InternalError, "Not mutated");
         Status status3(ErrorCodes::InternalError, "Not mutated");
         const Date_t now = net->now();
-        ASSERT_GET(executor.scheduleWorkAt(Date_t(now.millis + 100),
-                                           stdx::bind(setStatus,
-                                                      stdx::placeholders::_1,
-                                                      &status1)));
-        ASSERT_GET(executor.scheduleWorkAt(Date_t(now.millis + 5000),
-                                           stdx::bind(setStatus,
-                                                      stdx::placeholders::_1,
-                                                      &status3)));
-        ASSERT_GET(executor.scheduleWorkAt(Date_t(now.millis + 200),
-                                           stdx::bind(setStatusAndShutdown,
-                                                      stdx::placeholders::_1,
-                                                      &status2)));
+        unittest::assertGet(executor.scheduleWorkAt(Date_t(now.millis + 100),
+                                                    stdx::bind(setStatus,
+                                                               stdx::placeholders::_1,
+                                                               &status1)));
+        unittest::assertGet(executor.scheduleWorkAt(Date_t(now.millis + 5000),
+                                                    stdx::bind(setStatus,
+                                                               stdx::placeholders::_1,
+                                                               &status3)));
+        unittest::assertGet(executor.scheduleWorkAt(Date_t(now.millis + 200),
+                                                    stdx::bind(setStatusAndShutdown,
+                                                               stdx::placeholders::_1,
+                                                               &status2)));
         executor.run();
         ASSERT_OK(status1);
         ASSERT_OK(status2);
@@ -325,7 +320,7 @@ namespace {
                 HostAndPort("localhost", 27017),
                 "mydb",
                 BSON("whatsUp" << "doc"));
-        ReplicationExecutor::CallbackHandle cbHandle = ASSERT_GET(
+        ReplicationExecutor::CallbackHandle cbHandle = unittest::assertGet(
                 executor.scheduleRemoteCommand(
                         request,
                         stdx::bind(setStatusOnRemoteCommandCompletion,
@@ -347,7 +342,7 @@ namespace {
                 HostAndPort("localhost", 27017),
                 "mydb",
                 BSON("whatsUp" << "doc"));
-        ReplicationExecutor::CallbackHandle cbHandle = ASSERT_GET(
+        ReplicationExecutor::CallbackHandle cbHandle = unittest::assertGet(
                 executor.scheduleRemoteCommand(
                         request,
                         stdx::bind(setStatusOnRemoteCommandCompletion,

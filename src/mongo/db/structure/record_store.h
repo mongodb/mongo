@@ -144,11 +144,11 @@ namespace mongo {
         virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                                   const char* data,
                                                   int len,
-                                                  int quotaMax ) = 0;
+                                                  bool enforceQuota ) = 0;
 
         virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                                   const DocWriter* doc,
-                                                  int quotaMax ) = 0;
+                                                  bool enforceQuota ) = 0;
 
         /**
          * @param notifier - this is called if the document is moved
@@ -160,7 +160,7 @@ namespace mongo {
                                                   const DiskLoc& oldLocation,
                                                   const char* data,
                                                   int len,
-                                                  int quotaMax,
+                                                  bool enforceQuota,
                                                   UpdateMoveNotifier* notifier ) = 0;
 
         virtual Status updateWithDamages( OperationContext* txn,

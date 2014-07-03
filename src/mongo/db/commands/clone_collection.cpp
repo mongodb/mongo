@@ -133,7 +133,7 @@ namespace mongo {
             Cloner cloner;
             auto_ptr<DBClientConnection> myconn;
             myconn.reset( new DBClientConnection() );
-            if ( ! myconn->connect( fromhost , errmsg ) )
+            if ( ! myconn->connect( HostAndPort(fromhost) , errmsg ) )
                 return false;
 
             cloner.setConnection( myconn.release() );

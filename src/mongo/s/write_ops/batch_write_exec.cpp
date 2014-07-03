@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/write_ops/batch_write_exec.h"
 
 #include "mongo/base/error_codes.h"
@@ -35,8 +37,11 @@
 #include "mongo/client/dbclientinterface.h" // ConnectionString (header-only)
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_error_detail.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     BatchWriteExec::BatchWriteExec( NSTargeter* targeter,
                                     ShardResolver* resolver,

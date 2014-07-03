@@ -84,7 +84,7 @@ namespace mongo {
 
     StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord( OperationContext* txn,
                                                           int lenToAlloc,
-                                                          int quotaMax ) {
+                                                          bool enforceQuota ) {
         {
             // align very slightly.
             lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;

@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/connections.h"
 #include "mongo/util/background.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
@@ -61,6 +62,8 @@ namespace repl {
     private:
         std::string name() const { return "MultiCommandJob"; }
         void run() {
+            MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kReplication);
+
             try {
                 ScopedConn c(d.toHost);
                 LOG(1) << "multiCommand running on host " << d.toHost;

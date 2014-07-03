@@ -61,7 +61,7 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_TAG_FILE(::mongo::logger::LogTag::kStorage);
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     class AlignedBuilder;
 

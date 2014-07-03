@@ -26,15 +26,19 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/structure/btree/btree_logic.h"
 #include "mongo/db/structure/btree/key.h"
 #include "mongo/db/structure/record_store.h"
-
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
 
     //
     // Public Builder logic
@@ -1990,7 +1994,7 @@ namespace mongo {
     template <class BtreeLayout>
     DiskLoc BtreeLogic<BtreeLayout>::_addBucket(OperationContext* txn) {
         DummyDocWriter docWriter(BtreeLayout::BucketSize);
-        StatusWith<DiskLoc> loc = _recordStore->insertRecord(txn, &docWriter, 0);
+        StatusWith<DiskLoc> loc = _recordStore->insertRecord(txn, &docWriter, false);
         // XXX: remove this(?) or turn into massert or sanely bubble it back up.
         uassertStatusOK(loc.getStatus());
         BucketType* b = btreemod(txn, getBucket(loc.getValue()));

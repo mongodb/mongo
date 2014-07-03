@@ -107,7 +107,7 @@ namespace mongo {
     StatusWith<DiskLoc> HeapRecordStore::insertRecord(OperationContext* txn,
                                                       const char* data,
                                                       int len,
-                                                      int quotaMax) {
+                                                      bool enforceQuota) {
         if (_isCapped && len > _cappedMaxSize) {
             // We use dataSize for capped rollover and we don't want to delete everything if we know
             // this won't fit.
@@ -133,7 +133,7 @@ namespace mongo {
 
     StatusWith<DiskLoc> HeapRecordStore::insertRecord(OperationContext* txn,
                                                       const DocWriter* doc,
-                                                      int quotaMax) {
+                                                      bool enforceQuota) {
         const int len = doc->documentSize();
         if (_isCapped && len > _cappedMaxSize) {
             // We use dataSize for capped rollover and we don't want to delete everything if we know
@@ -162,7 +162,7 @@ namespace mongo {
                                                       const DiskLoc& oldLocation,
                                                       const char* data,
                                                       int len,
-                                                      int quotaMax,
+                                                      bool enforceQuota,
                                                       UpdateMoveNotifier* notifier ) {
         HeapRecord* oldRecord = recordFor( oldLocation );
         int oldLen = oldRecord->netLength();
@@ -314,7 +314,7 @@ namespace mongo {
         invariant(!"setCustomOption not yet implemented");
     }
 
-    void HeapRecordStore::increaseStorageSize(OperationContext* txn,  int size, int quotaMax) {
+    void HeapRecordStore::increaseStorageSize(OperationContext* txn,  int size, bool enforceQuota) {
         // unclear what this would mean for this class. For now, just error if called.
         invariant(!"increaseStorageSize not yet implemented");
     }
