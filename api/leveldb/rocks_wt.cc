@@ -46,7 +46,7 @@ using leveldb::Snapshot;
 using leveldb::Status;
 
 static int
-wtrocks_get_cursor(OperationContext *context, ColumnFamilyHandle *cfhp, WT_CURSOR **cursorp)
+wtrocks_get_cursor(OperationContext *context, ColumnFamilyHandle *cfhp, WT_CURSOR **cursorp, int acquire=0)
 {
 	ColumnFamilyHandleImpl *cf =
 	    static_cast<ColumnFamilyHandleImpl *>(cfhp);
@@ -63,8 +63,10 @@ wtrocks_get_cursor(OperationContext *context, ColumnFamilyHandle *cfhp, WT_CURSO
 			fprintf(stderr, "Failed to open cursor on %s: %s\n", cf->GetURI().c_str(), wiredtiger_strerror(ret));
 			return (ret);
 		}
-		context->SetCursor(cf->GetID(), c);
-	}
+		if (!acquire)
+			context->SetCursor(cf->GetID(), c);
+	} else if (acquire)
+		context->SetCursor(cf->GetID(), NULL);
 	*cursorp = c;
 	return (0);
 }
@@ -277,15 +279,12 @@ DbImpl::NewIterator(ReadOptions const &options, ColumnFamilyHandle *cfhp)
 {
 	OperationContext *context = GetContext(options);
 
-	/* Duplicate the normal cursor for the iterator. */
 	WT_SESSION *session = context->GetSession();
-	WT_CURSOR *c, *iterc;
-	int ret = wtrocks_get_cursor(context, cfhp, &c);
+	WT_CURSOR *c;
+	int ret = wtrocks_get_cursor(context, cfhp, &c, 1);
 	assert(ret == 0);
-	/* XXX would like a fast duplicate for LSM cursors without position. */
-	ret = session->open_cursor(session, c->uri, NULL, NULL, &iterc);
-	assert(ret == 0);
-	return new IteratorImpl(this, iterc);
+	return new IteratorImpl(this, c,
+	    static_cast<ColumnFamilyHandleImpl *>(cfhp)->GetID());
 }
 
 Status
@@ -295,8 +294,8 @@ DbImpl::Put(WriteOptions const &options, ColumnFamilyHandle *cfhp, Slice const &
 	int ret = wtrocks_get_cursor(GetContext(), cfhp, &cursor);
 	if (ret != 0)
 		return WiredTigerErrorToStatus(ret);
-	WT_ITEM item;
 
+	WT_ITEM item;
 	item.data = key.data();
 	item.size = key.size();
 	cursor->set_key(cursor, &item);

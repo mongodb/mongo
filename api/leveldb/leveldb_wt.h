@@ -135,6 +135,7 @@ public:
   }
 
   WT_CURSOR *GetCursor() { return cursor_; }
+  void SetCursor(WT_CURSOR *c) { cursor_ = c; }
 #ifdef HAVE_ROCKSDB
   WT_CURSOR *GetCursor(u_int i) {
     return (i < cursors_.size()) ? cursors_[i] : NULL;
@@ -193,7 +194,7 @@ class ColumnFamilyHandleImpl : public ColumnFamilyHandle {
 
 class IteratorImpl : public Iterator {
 public:
-  IteratorImpl(DbImpl *db, WT_CURSOR *cursor) : db_(db), cursor_(cursor), own_cursor_(true) {}
+  IteratorImpl(DbImpl *db, WT_CURSOR *cursor, uint32_t id=0) : db_(db), cursor_(cursor), id_(id) {}
   virtual ~IteratorImpl();
 
   // An iterator is either positioned at a key/value pair, or
@@ -228,7 +229,7 @@ private:
   Slice key_, value_;
   Status status_;
   bool valid_;
-  bool own_cursor_;
+  uint32_t id_;
 
   void SetError(int wiredTigerError) {
     valid_ = false;

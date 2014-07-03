@@ -471,16 +471,11 @@ err:
 Iterator *
 DbImpl::NewIterator(const ReadOptions& options)
 {
+  /* Iterators own the cursor until they are closed. */
   OperationContext *context = GetContext(options);
-
-  /* Duplicate the normal cursor for the iterator. */
-  WT_SESSION *session = context->GetSession();
   WT_CURSOR *c = context->GetCursor();
-  WT_CURSOR *iterc;
-  /* XXX would like a fast duplicate for LSM cursors without position. */
-  int ret = session->open_cursor(session, c->uri, NULL, NULL, &iterc);
-  assert(ret == 0);
-  return new IteratorImpl(this, iterc);
+  context->SetCursor(NULL);
+  return new IteratorImpl(this, c);
 }
 
 SnapshotImpl::SnapshotImpl(DbImpl *db) :
@@ -597,8 +592,28 @@ DbImpl::ResumeCompactions()
 IteratorImpl::~IteratorImpl()
 {
   if (cursor_ != NULL) {
-    int ret = cursor_->close(cursor_);
-    assert(ret == 0);
+    OperationContext *context = db_->GetContext();
+    /*
+     * If we are in the same thread where the iterator was opened, and there is
+     * no cursor stashed there, return it.
+     */
+    if (cursor_->session == context->GetSession()) {
+#ifdef HAVE_ROCKSDB
+      if (context->GetCursor(id_) == NULL) {
+        context->SetCursor(id_, cursor_);
+        cursor_ = NULL;
+      }
+#else
+      if (context->GetCursor() == NULL) {
+        context->SetCursor(cursor_);
+        cursor_ = NULL;
+      }
+#endif
+    }
+    if (cursor_ != NULL) {
+      int ret = cursor_->close(cursor_);
+      assert(ret == 0);
+    }
   }
 }
 
