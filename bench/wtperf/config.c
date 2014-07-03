@@ -569,17 +569,17 @@ config_sanity(CONFIG *cfg)
 	    cfg->report_interval > cfg->run_time ||
 	    cfg->sample_interval > cfg->run_time)) {
 		fprintf(stderr, "interval value longer than the run-time\n");
-		return (1);
+		return (EINVAL);
 	}
 	if (cfg->table_count < 1 || cfg->table_count > 99) {
 		fprintf(stderr,
 		    "invalid table count, less than 1 or greater than 99\n");
-		return (1);
+		return (EINVAL);
 	}
 	if (cfg->database_count < 1 || cfg->database_count > 99) {
 		fprintf(stderr,
 		    "invalid database count, less than 1 or greater than 99\n");
-		return (1);
+		return (EINVAL);
 	}
 	return (0);
 }

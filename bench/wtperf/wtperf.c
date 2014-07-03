@@ -2087,7 +2087,7 @@ main(int argc, char *argv[])
 	}
 
 	/* Sanity-check the configuration. */
-	if (config_sanity(cfg) != 0)
+	if ((ret = config_sanity(cfg)) != 0)
 		goto err;
 
 	/* Display the configuration. */
@@ -2097,8 +2097,10 @@ main(int argc, char *argv[])
 	if ((ret = start_all_runs(cfg)) != 0)
 		goto err;
 
-	if (0)
+	if (0) {
 einval:		ret = EINVAL;
+	}
+
 err:	config_free(cfg);
 	free(cc_buf);
 	free(tc_buf);
