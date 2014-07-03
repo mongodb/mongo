@@ -16,6 +16,8 @@ func main() {
 
 	outputOpts := &options.OutputFormatOptions{}
 	opts.AddOptions(outputOpts)
+	inputOpts := &options.InputOptions{}
+	opts.AddOptions(inputOpts)
 
 	_, err := opts.Parse()
 	if err != nil {
@@ -41,6 +43,7 @@ func main() {
 	exporter := mongoexport.MongoExport{
 		ToolOptions:     opts,
 		OutputOpts:      outputOpts,
+		InputOpts:       inputOpts,
 		SessionProvider: sessionProvider,
 	}
 

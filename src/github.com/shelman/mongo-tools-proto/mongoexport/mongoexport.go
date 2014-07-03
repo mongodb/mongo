@@ -1,7 +1,9 @@
 package mongoexport
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/shelman/mongo-tools-proto/common/bson_ext"
 	"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/mongoexport/options"
@@ -42,6 +44,13 @@ func (exp *MongoExport) ValidateSettings() error {
 	if exp.ToolOptions.Namespace.DB == "" || exp.ToolOptions.Namespace.Collection == "" {
 		return fmt.Errorf("must specify a database and collection.")
 	}
+
+	if exp.InputOpts != nil && exp.InputOpts.Query != "" {
+		_, err := getQueryFromArg(exp.InputOpts.Query)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -78,8 +87,15 @@ func (exp *MongoExport) Export() (int64, error) {
 
 	collection := session.DB(exp.ToolOptions.Namespace.DB).C(exp.ToolOptions.Namespace.Collection)
 
-	//TODO get a real query
-	query := bson.M{}
+	query := map[string]interface{}{}
+	if exp.InputOpts != nil && exp.InputOpts.Query != "" {
+		var err error
+		query, err = getQueryFromArg(exp.InputOpts.Query)
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	cursor := collection.Find(query).Iter()
 	defer cursor.Close()
 
@@ -96,6 +112,7 @@ func (exp *MongoExport) Export() (int64, error) {
 	for cursor.Next(&result) {
 		err := exportOutput.ExportDocument(result)
 		if err != nil {
+			fmt.Println(err)
 			return docsCount, err
 		}
 		docsCount++
@@ -152,4 +169,26 @@ type ExportOutput interface {
 
 	//Flush writes any pending data to the underlying I/O stream.
 	Flush() error
+}
+
+//getQueryFromArg takes a query in extended JSON, and convert is to an object that
+//can be passed straight to db.collection.find(...). Returns an error if the
+//string is not valid JSON, or extended JSON.
+func getQueryFromArg(queryRaw string) (map[string]interface{}, error) {
+	parsedJSON := map[string]interface{}{}
+	err := json.Unmarshal([]byte(queryRaw), &parsedJSON)
+	if err != nil {
+		return nil, fmt.Errorf("Query is not valid JSON: %v", err)
+	}
+
+	for key, val := range parsedJSON {
+		if valSubDoc, ok := val.(map[string]interface{}); ok {
+			newVal, err := bson_ext.ParseExtendedJSON(valSubDoc)
+			if err != nil {
+				return nil, fmt.Errorf("Error in query: %v", err)
+			}
+			parsedJSON[key] = newVal
+		}
+	}
+	return parsedJSON, nil
 }

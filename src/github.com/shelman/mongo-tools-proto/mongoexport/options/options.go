@@ -26,3 +26,7 @@ type InputOptions struct {
 	//SlaveOk
 	//ForceTableScan
 }
+
+func (self *InputOptions) Name() string {
+	return "querying options"
+}

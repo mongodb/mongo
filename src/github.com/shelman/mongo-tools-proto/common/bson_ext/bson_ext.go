@@ -3,6 +3,7 @@ package bson_ext
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -113,7 +114,8 @@ func (m RegExExt) MarshalJSON() ([]byte, error) {
 }
 
 func (m JavascriptExt) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + m.Code + "\""), nil
+	return json.Marshal(m.Code)
+	//return []byte("\"" + m.Code + "\""), nil
 }
 
 func convertSubdocsFromJSON(doc map[string]interface{}) error {
