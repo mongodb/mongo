@@ -117,6 +117,8 @@ namespace mongo {
             set<string> clonedColls;
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            //  SERVER-14085: This unit of work should go away and be put in the individual ops
+            WriteUnitOfWork wunit(txn->recoveryUnit());
 
             Cloner cloner;
             bool rval = cloner.go(txn, dbname, from, opts, &clonedColls, errmsg);
@@ -125,6 +127,7 @@ namespace mongo {
             barr.append( clonedColls );
 
             result.append( "clonedColls", barr.arr() );
+            wunit.commit();
 
             return rval;
 

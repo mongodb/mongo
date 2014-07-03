@@ -1554,7 +1554,7 @@ namespace mongo_test {
             ReadPreferenceSetting(mongo::ReadPreference_SecondaryOnly, TagSet()));
 
         ASSERT_FALSE(monitor->isPrimary(node));
-        ASSERT_EQUALS(secHost, node.toString(true));
+        ASSERT_EQUALS(secHost, node.toString());
     }
 
     // Tests the case where the connection to secondary went bad and the replica set
@@ -1581,6 +1581,6 @@ namespace mongo_test {
             ReadPreferenceSetting(mongo::ReadPreference_SecondaryOnly, tags));
 
         ASSERT_FALSE(monitor->isPrimary(node));
-        ASSERT_EQUALS(secHost, node.toString(true));
+        ASSERT_EQUALS(secHost, node.toString());
     }
 }

@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "mongo/logger/log_tag_settings.h"
+#include "mongo/logger/log_component_settings.h"
 #include "mongo/logger/message_log_domain.h"
 
 namespace mongo {
@@ -36,48 +36,50 @@ namespace logger {
     /**
      * Logging domain for ephemeral messages with minimum severity.
      */
-    class TagMessageLogDomain : public MessageLogDomain {
-        MONGO_DISALLOW_COPYING(TagMessageLogDomain);
+    class ComponentMessageLogDomain : public MessageLogDomain {
+        MONGO_DISALLOW_COPYING(ComponentMessageLogDomain);
     public:
-        TagMessageLogDomain();
+        ComponentMessageLogDomain();
 
-        ~TagMessageLogDomain();
+        ~ComponentMessageLogDomain();
 
         /**
          * Predicate that answers the question, "Should I, the caller, append to you, the log
          * domain, messages of the given severity?"  True means yes.
          */
         bool shouldLog(LogSeverity severity) const;
-        bool shouldLog(LogTag tag, LogSeverity severity) const;
-        bool shouldLog(LogTag tag1, LogTag tag2, LogSeverity severity) const;
-        bool shouldLog(LogTag tag1, LogTag tag2, LogTag tag3, LogSeverity severity) const;
+        bool shouldLog(LogComponent component, LogSeverity severity) const;
+        bool shouldLog(LogComponent component1, LogComponent component2,
+                       LogSeverity severity) const;
+        bool shouldLog(LogComponent component1, LogComponent component2, LogComponent component3,
+                       LogSeverity severity) const;
 
         /**
-         * Returns true if a minimum log severity has been set for this tag.
-         * Called by log level commands to query tag severity configuration.
+         * Returns true if a minimum log severity has been set for this component.
+         * Called by log level commands to query component severity configuration.
          */
-        bool hasMinimumLogSeverity(LogTag tag) const;
+        bool hasMinimumLogSeverity(LogComponent component) const;
 
         /**
          * Gets the minimum severity of messages that should be sent to this LogDomain.
          */
         LogSeverity getMinimumLogSeverity() const;
-        LogSeverity getMinimumLogSeverity(LogTag tag) const;
+        LogSeverity getMinimumLogSeverity(LogComponent component) const;
 
         /**
          * Sets the minimum severity of messages that should be sent to this LogDomain.
          */
         void setMinimumLoggedSeverity(LogSeverity severity);
-        void setMinimumLoggedSeverity(LogTag, LogSeverity severity);
+        void setMinimumLoggedSeverity(LogComponent, LogSeverity severity);
 
         /**
-         * Clears the minimum log severity for tag.
+         * Clears the minimum log severity for component.
          * For kDefault, severity level is initialized to default value.
          */
-        void clearMinimumLoggedSeverity(LogTag tag);
+        void clearMinimumLoggedSeverity(LogComponent component);
 
     private:
-        LogTagSettings _settings;
+        LogComponentSettings _settings;
     };
 
 }  // namespace logger

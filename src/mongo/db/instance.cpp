@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/thread/thread.hpp>
@@ -88,11 +88,14 @@
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/gcov.h"
 #include "mongo/util/goodies.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
     
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
+
     // for diaglog
     inline void opread(Message& m) { if( _diaglog.getLevel() & 2 ) _diaglog.readop((char *) m.singleData(), m.header()->len); }
     inline void opwrite(Message& m) { if( _diaglog.getLevel() & 1 ) _diaglog.writeop((char *) m.singleData(), m.header()->len); }
@@ -609,6 +612,7 @@ namespace mongo {
         uassertStatusOK(executor.prepare());
 
         Lock::DBWrite lk(txn->lockState(), ns.ns(), useExperimentalDocLocking);
+        WriteUnitOfWork wunit(txn->recoveryUnit());
 
         // if this ever moves to outside of lock, need to adjust check
         // Client::Context::_finishInit
@@ -621,6 +625,7 @@ namespace mongo {
 
         // for getlasterror
         lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
+        wunit.commit();
     }
 
     void receivedDelete(OperationContext* txn, Message& m, CurOp& op) {
@@ -649,6 +654,7 @@ namespace mongo {
         DeleteExecutor executor(&request);
         uassertStatusOK(executor.prepare());
         Lock::DBWrite lk(txn->lockState(), ns.ns());
+        WriteUnitOfWork wunit(txn->recoveryUnit());
 
         // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
         if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
@@ -659,6 +665,7 @@ namespace mongo {
         long long n = executor.execute(txn, ctx.db());
         lastError.getSafe()->recordDelete( n );
         op.debug().ndeleted = n;
+        wunit.commit();
     }
 
     QueryResult* emptyMoreResult(long long);
@@ -895,6 +902,7 @@ namespace mongo {
         if ( handlePossibleShardedMessage( m , 0 ) )
             return;
 
+        WriteUnitOfWork wunit(txn->recoveryUnit());
         Client::Context ctx(txn, ns);
 
         if (multi.size() > 1) {
@@ -905,6 +913,7 @@ namespace mongo {
             globalOpCounters.incInsertInWriteLock(1);
             op.debug().ninserted = 1;
         }
+        wunit.commit();
     }
 
     /* returns true if there is data on this server.  useful when starting replication.

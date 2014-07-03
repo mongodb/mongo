@@ -47,6 +47,10 @@ namespace mongo {
           _db( db ) {
     }
 
+    CollectionOptions NamespaceDetailsCollectionCatalogEntry::getCollectionOptions() const {
+        return _db->getCollectionOptions( ns().ns() );
+    }
+
     int NamespaceDetailsCollectionCatalogEntry::getTotalIndexCount() const {
         return _details->nIndexes + _details->indexBuildsInProgress;
     }

@@ -28,6 +28,8 @@
 *    then also delete it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/version_manager.h"
 
 #include "mongo/s/chunk.h"
@@ -37,8 +39,11 @@
 #include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
 #include "mongo/s/writeback_listener.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     // Global version manager
     VersionManager versionManager;

@@ -249,24 +249,24 @@ namespace mongo {
         } logLevelSetting;
 
         /**
-         * Tag log levels.
-         * Non-negative value means this tag is configured with a debug level.
-         * Negative value means log messages with this tag will use the default log level.
+         * Component log levels.
+         * Non-negative value means this component is configured with a debug level.
+         * Negative value means log messages with this component will use the default log level.
          */
-        class TagLogLevelSetting : public ServerParameter {
-            MONGO_DISALLOW_COPYING(TagLogLevelSetting);
+        class ComponentLogLevelSetting : public ServerParameter {
+            MONGO_DISALLOW_COPYING(ComponentLogLevelSetting);
         public:
-            explicit TagLogLevelSetting(logger::LogTag tag)
+            explicit ComponentLogLevelSetting(logger::LogComponent component)
                 : ServerParameter(ServerParameterSet::getGlobal(),
-                                  "logLevel_" + tag.getShortName()),
-                  _tag(tag) {}
+                                  "logLevel_" + component.getShortName()),
+                  _component(component) {}
 
             virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
-                if (!logger::globalLogDomain()->hasMinimumLogSeverity(_tag)) {
+                if (!logger::globalLogDomain()->hasMinimumLogSeverity(_component)) {
                     b << name << -1;
                     return;
                 }
-                b << name << logger::globalLogDomain()->getMinimumLogSeverity(_tag).toInt();
+                b << name << logger::globalLogDomain()->getMinimumLogSeverity(_component).toInt();
             }
 
             virtual Status set(const BSONElement& newValueElement) {
@@ -290,16 +290,16 @@ namespace mongo {
         private:
             Status _setLogLevel(int newValue) {
                 if (newValue < 0) {
-                    logger::globalLogDomain()->clearMinimumLoggedSeverity(_tag);
+                    logger::globalLogDomain()->clearMinimumLoggedSeverity(_component);
                     return Status::OK();
                 }
                 typedef logger::LogSeverity LogSeverity;
                 LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) :
                     LogSeverity::Log();
-                logger::globalLogDomain()->setMinimumLoggedSeverity(_tag, newSeverity);
+                logger::globalLogDomain()->setMinimumLoggedSeverity(_component, newSeverity);
                 return Status::OK();
             }
-            logger::LogTag _tag;
+            logger::LogComponent _component;
         };
 
         class SSLModeSetting : public ServerParameter {
@@ -483,12 +483,12 @@ namespace mongo {
         // available to the client.
         //
 
-        MONGO_INITIALIZER_WITH_PREREQUISITES(SetupTagLogLevelSettings,
+        MONGO_INITIALIZER_WITH_PREREQUISITES(SetupComponentLogLevelSettings,
                                              MONGO_NO_PREREQUISITES)(InitializerContext* context) {
-            for (int i = 0; i < int(logger::LogTag::kNumLogTags); ++i) {
-                logger::LogTag tag = static_cast<logger::LogTag::Value>(i);
-                if (tag == logger::LogTag::kDefault) { continue; }
-                new TagLogLevelSetting(tag);
+            for (int i = 0; i < int(logger::LogComponent::kNumLogComponents); ++i) {
+                logger::LogComponent component = static_cast<logger::LogComponent::Value>(i);
+                if (component == logger::LogComponent::kDefault) { continue; }
+                new ComponentLogLevelSetting(component);
             }
 
             return Status::OK();

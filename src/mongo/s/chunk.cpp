@@ -28,7 +28,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/chunk.h"
 
@@ -49,6 +49,7 @@
 #include "mongo/s/type_collection.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/log.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/timer.h"
 #include "mongo/db/query/canonical_query.h"
@@ -57,6 +58,8 @@
 #include "mongo/db/query/index_bounds_builder.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     inline bool allOfType(BSONType type, const BSONObj& o) {
         BSONObjIterator it(o);

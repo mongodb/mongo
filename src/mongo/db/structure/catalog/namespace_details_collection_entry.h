@@ -52,6 +52,8 @@ namespace mongo {
 
         virtual ~NamespaceDetailsCollectionCatalogEntry(){}
 
+        virtual CollectionOptions getCollectionOptions() const;
+
         virtual int getTotalIndexCount() const;
 
         virtual int getCompletedIndexCount() const;

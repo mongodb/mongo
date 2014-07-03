@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/index/haystack_access_method.h"
 
 #include "mongo/base/status.h"
@@ -35,8 +37,11 @@
 #include "mongo/db/index/haystack_access_method_internal.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
     HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState, BtreeInterface* btree)
         : BtreeBasedAccessMethod(btreeState, btree) {

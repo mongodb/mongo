@@ -63,6 +63,11 @@
         return;
     }
 
+    if (_isAddressSanitizerActive()) {
+        print("SKIPPING TEST ON ADDRESS SANITIZER BUILD");
+        return;
+    }
+
     (function testMongod() {
         print("********************\nTesting exit logging in mongod\n********************");
 

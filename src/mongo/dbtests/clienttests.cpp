@@ -160,6 +160,7 @@ namespace ClientTests {
             ASSERT_EQUALS(3U, db.count("test.system.namespaces"));
 
             db.ensureIndex(ns(), BSON("x" << 1), true);
+            ctx.commit();
 
             ASSERT_EQUALS(2, indexCatalog->numIndexesReady());
             ASSERT_EQUALS(2U, db.count("test.system.indexes"));

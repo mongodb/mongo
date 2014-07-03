@@ -25,18 +25,19 @@
  *    then also delete it in the license file.
  */
 
-#ifdef MONGO_SSL
-
 #pragma once
 
 #include <string>
+
+#ifdef MONGO_SSL
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/util/net/sock.h"
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
-#endif
+#endif // #ifdef MONGO_SSL
 
 namespace mongo {
     /*

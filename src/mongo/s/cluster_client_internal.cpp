@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/cluster_client_internal.h"
 
 #include <string>
@@ -38,9 +40,12 @@
 #include "mongo/s/type_changelog.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_shard.h"
+#include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     using std::string;
     using std::vector;

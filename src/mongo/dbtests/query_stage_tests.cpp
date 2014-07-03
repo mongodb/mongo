@@ -59,16 +59,19 @@ namespace QueryStageTests {
 
             addIndex(BSON("foo" << 1));
             addIndex(BSON("foo" << 1 << "baz" << 1));
+            ctx.commit();
         }
 
         virtual ~IndexScanBase() {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
+            ctx.commit();
         }
 
         void addIndex(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns());
             _client.ensureIndex(ns(), obj);
+            ctx.commit();
         }
 
         int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
@@ -99,6 +102,7 @@ namespace QueryStageTests {
                 double lng = double(rand()) / RAND_MAX;
                 _client.insert(ns(), BSON("geo" << BSON_ARRAY(lng << lat)));
             }
+            ctx.commit();
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj) {

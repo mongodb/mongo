@@ -89,7 +89,7 @@ namespace mongo {
         try {
             // This can throw when we don't find a master!
             HostAndPort masterHostAndPort = replMonitor->getMasterOrUassert();
-            *resolvedHost = ConnectionString::parse( masterHostAndPort.toString( true ), errMsg );
+            *resolvedHost = ConnectionString::parse( masterHostAndPort.toString(), errMsg );
             dassert( errMsg == "" );
             return Status::OK();
         }

@@ -288,7 +288,12 @@ namespace mongo {
         // Fetches less information than "info()"; used to search for ops with certain criteria
         BSONObj description();
 
-        std::string getRemoteString( bool includePort = true ) { return _remote.toString(includePort); }
+        std::string getRemoteString( bool includePort = true ) {
+            if (includePort)
+                return _remote.toString();
+            return _remote.host();
+        }
+
         ProgressMeter& setMessage(const char * msg,
                                   std::string name = "Progress",
                                   unsigned long long progressMeterTotal = 0,

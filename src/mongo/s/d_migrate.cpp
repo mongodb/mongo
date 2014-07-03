@@ -34,7 +34,7 @@
    mostly around shard management and checking
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <algorithm>
 #include <boost/thread/thread.hpp>
@@ -78,6 +78,7 @@
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/startup_test.h"
@@ -88,6 +89,8 @@
 using namespace std;
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     MONGO_FP_DECLARE(failMigrationCommit);
     MONGO_FP_DECLARE(failMigrationConfigWritePrepare);
@@ -1671,6 +1674,7 @@ namespace mongo {
                         db->createCollection( txn, ns );
                     }
                 }
+                ctx.commit();
             }
 
             {                
@@ -1710,6 +1714,7 @@ namespace mongo {
                     // make sure to create index on secondaries as well
                     repl::logOp(txn, "i", db->getSystemIndexesName().c_str(), idx,
                                    NULL, NULL, true /* fromMigrate */);
+                    ctx.commit();
                 }
 
                 timing.done(1);
@@ -1809,6 +1814,7 @@ namespace mongo {
                             }
 
                             Helpers::upsert( txn, ns, o, true );
+                            cx.commit();
                         }
                         thisTime++;
                         numCloned++;
@@ -2046,6 +2052,7 @@ namespace mongo {
                                           true ); /*fromMigrate*/
 
                     *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();
+                    cx.commit();
                     didAnything = true;
                 }
             }
@@ -2075,6 +2082,7 @@ namespace mongo {
                     Helpers::upsert( txn, ns , it , true );
 
                     *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();
+                    cx.commit();
                     didAnything = true;
                 }
             }

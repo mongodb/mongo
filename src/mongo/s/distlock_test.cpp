@@ -27,7 +27,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/distlock.h"
 
@@ -43,6 +43,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/util/bson_util.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 // Modify some config options for the RNG, since they cause MSVC to fail
@@ -71,6 +72,8 @@
 #define number_field(obj, name, def) ( obj.hasField(name) ? obj[name].Number() : def )
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     class TestDistLockWithSync: public Command {
     public:

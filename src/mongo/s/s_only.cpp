@@ -96,7 +96,7 @@ namespace mongo {
     string Client::clientAddress(bool includePort) const {
         ClientInfo * ci = ClientInfo::get();
         if ( ci )
-            return ci->getRemote();
+            return ci->getRemote().toString();
         return "";
     }
 

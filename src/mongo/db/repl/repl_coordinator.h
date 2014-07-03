@@ -35,12 +35,12 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
     class BSONObj;
     class BSONObjBuilder;
-    struct HostAndPort;
     class IndexDescriptor;
     class NamespaceString;
     class OperationContext;
@@ -193,9 +193,10 @@ namespace repl {
         virtual bool canAcceptWritesForDatabase(const StringData& dbName) = 0;
 
         /**
-         * Returns true if it is valid for this node to serve reads on the given collection.
+         * Returns Status::OK() if it is valid for this node to serve reads on the given collection
+         * and an errorcode indicating why the node cannot if it cannot.
          */
-        virtual bool canServeReadsFor(const NamespaceString& collection) = 0;
+        virtual Status canServeReadsFor(const NamespaceString& ns, bool slaveOk) = 0;
 
         /**
          * Returns true if this node should ignore unique index constraints on new documents.
@@ -259,12 +260,19 @@ namespace repl {
         virtual Status processHeartbeat(const BSONObj& cmdObj, BSONObjBuilder* resultObj) = 0;
 
         /**
+         * Arguments for the replSetReconfig command.
+         */
+        struct ReplSetReconfigArgs {
+            BSONObj newConfigObj;
+            bool force;
+        };
+
+        /**
          * Handles an incoming replSetReconfig command. Adds BSON to 'resultObj';
          * returns a Status with either OK or an error message.
          */
         virtual Status processReplSetReconfig(OperationContext* txn,
-                                              const BSONObj& newConfigObj,
-                                              bool force,
+                                              const ReplSetReconfigArgs& args,
                                               BSONObjBuilder* resultObj) = 0;
 
         /*
@@ -287,25 +295,39 @@ namespace repl {
          */
         virtual void incrementRollbackID() = 0;
 
+        /**
+         * Arguments to the replSetFresh command.
+         */
+        struct ReplSetFreshArgs {
+            StringData setName;  // Name of the replset
+            HostAndPort who;  // host and port of the member that sent the replSetFresh command
+            unsigned id;  // replSet id of the member that sent the replSetFresh command
+            int cfgver;  // replSet config version that the member who sent the command thinks it has
+            OpTime opTime;  // last optime seen by the member who sent the replSetFresh command
+        };
+
         /*
          * Handles an incoming replSetFresh command.
          * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
          */
-        virtual Status processReplSetFresh(const StringData& setName,
-                                           const StringData& who,
-                                           unsigned id,
-                                           int cfgver,
-                                           const OpTime& opTime,
+        virtual Status processReplSetFresh(const ReplSetFreshArgs& args,
                                            BSONObjBuilder* resultObj) = 0;
+
+        /**
+         * Arguments to the replSetElect command.
+         */
+        struct ReplSetElectArgs {
+            StringData set;  // Name of the replset
+            unsigned whoid;  // replSet id of the member that sent the replSetFresh command
+            int cfgver;  // replSet config version that the member who sent the command thinks it has
+            OID round;  // unique ID for this election
+        };
 
         /*
          * Handles an incoming replSetElect command.
          * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
          */
-        virtual Status processReplSetElect(const StringData& set,
-                                           unsigned whoid,
-                                           int cfgver,
-                                           const OID& round,
+        virtual Status processReplSetElect(const ReplSetElectArgs& args,
                                            BSONObjBuilder* resultObj) = 0;
 
         /**

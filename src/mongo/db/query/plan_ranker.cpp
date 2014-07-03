@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include <algorithm>
 #include <math.h>
 #include <vector>
@@ -41,6 +43,7 @@
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/util/log.h"
 
 namespace {
 
@@ -57,6 +60,8 @@ namespace {
 } // namespace
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
     using std::vector;
 

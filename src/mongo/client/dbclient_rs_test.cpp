@@ -89,7 +89,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -173,7 +172,7 @@ namespace {
             vector<HostAndPort> hostList(_replSet->getHosts());
             for (vector<HostAndPort>::const_iterator iter = hostList.begin();
                     iter != hostList.end(); ++iter) {
-                _replSet->kill(iter->toString(true));
+                _replSet->kill(iter->toString());
             }
         }
 
@@ -181,7 +180,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -255,7 +253,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -344,7 +341,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -503,7 +499,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -565,7 +560,7 @@ namespace {
         // This is the only difference from ConnShouldPinIfSameSettings which tests that we *do* pin
         // in if the host is still marked as up. Note that this only notifies the RSM, and does not
         // directly effect the DBClientRS.
-        ReplicaSetMonitor::get(replSet->getSetName())->failedHost(dest);
+        ReplicaSetMonitor::get(replSet->getSetName())->failedHost(HostAndPort(dest));
 
         {
             Query query;

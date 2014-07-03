@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/index/btree_based_bulk_access_method.h"
 
 #include "mongo/db/curop.h"
@@ -33,9 +35,12 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
 
     //
     // Comparison for external sorter interface

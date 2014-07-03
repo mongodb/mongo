@@ -28,7 +28,7 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
@@ -58,10 +58,13 @@
 #include "mongo/s/strategy.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     namespace dbgrid_pub_cmds {
 
@@ -2519,6 +2522,28 @@ namespace mongo {
                 }
             }
         }
+
+        class CmdListCollections : public PublicGridCommand {
+        public:
+            CmdListCollections() : PublicGridCommand( "listCollections" ) {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::listCollections);
+                out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+            }
+
+            bool run(OperationContext* txn, const string& dbName,
+                     BSONObj& cmdObj,
+                     int,
+                     string&,
+                     BSONObjBuilder& result,
+                     bool) {
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                return passthrough( conf, cmdObj, result );
+            }
+        } cmdListCollections;
 
     } // namespace pub_grid_cmds
 

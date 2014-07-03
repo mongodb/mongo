@@ -138,8 +138,11 @@ namespace {
             // we're sometimes inside the lock already
             Lock::DBWrite lk(txn->lockState(), currentOp.getNS() );
             if (dbHolder().get(txn, nsToDatabase(currentOp.getNS())) != NULL) {
+                // We are ok with the profiling happening in a different WUOW from the actual op.
+                WriteUnitOfWork wunit(txn->recoveryUnit());
                 Client::Context cx(txn, currentOp.getNS(), false);
                 _profile(txn, c, cx.db(), currentOp, profileBufBuilder);
+                wunit.commit();
             }
             else {
                 mongo::log() << "note: not profiling because db went away - probably a close on: "

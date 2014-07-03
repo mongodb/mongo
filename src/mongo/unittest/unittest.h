@@ -43,6 +43,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include "mongo/base/status_with.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
@@ -458,6 +459,15 @@ namespace mongo {
             TestAssertion(file, line).fail(mongoutils::str::stream()
                     << "Expected " << aexp << " and " << bexp << " to be within " << absoluteErr
                     << " of each other ((" << a << ") - (" << b << ") = " << (a - b) << ")");
+        }
+
+        /**
+         * Get the value out of a StatusWith<T>, or throw an exception if it is not OK.
+         */
+        template <typename T>
+        const T& assertGet(const StatusWith<T>& swt) {
+            ASSERT_OK(swt.getStatus());
+            return swt.getValue();
         }
 
         /**

@@ -143,8 +143,11 @@ namespace mongo {
             if (limits::is_signed) {
                 for (size_t i = 0; i < str.size(); ++i) {
                     NumberType digitValue = NumberType(_digitValue(str[i]));
-                    if (int(digitValue) >= base)
-                        return Status(ErrorCodes::FailedToParse, "Bad digit");
+                    if (int(digitValue) >= base) {
+                        return Status(ErrorCodes::FailedToParse,
+                                      "Bad digit \"" + str.substr(i, 1).toString() +
+                                      "\" while parsing " + stringValue.toString());
+                    }
 
 // MSVC: warning C4146: unary minus operator applied to unsigned type, result still unsigned
 // This code is statically known to be dead when NumberType is unsigned, so the warning is not real
@@ -168,8 +171,11 @@ namespace mongo {
         else {
             for (size_t i = 0; i < str.size(); ++i) {
                 NumberType digitValue = NumberType(_digitValue(str[i]));
-                if (int(digitValue) >= base)
-                    return Status(ErrorCodes::FailedToParse, "Bad digit");
+                if (int(digitValue) >= base) {
+                    return Status(ErrorCodes::FailedToParse,
+                                  "Bad digit \"" + str.substr(i, 1).toString() +
+                                  "\" while parsing " + stringValue.toString());
+                }
                 if ((NumberType(limits::max() / base) < n) ||
                     (NumberType(limits::max() - n * base) < digitValue)) {
 

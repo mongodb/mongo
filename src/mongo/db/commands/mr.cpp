@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/mr.h"
 
@@ -55,9 +55,12 @@
 #include "mongo/s/d_logic.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     namespace mr {
 
@@ -389,6 +392,7 @@ namespace mongo {
                         indexesToInsert.push_back( b.obj() );
                     }
                 }
+                finalCtx.commit();
             }
 
             {
@@ -415,6 +419,7 @@ namespace mongo {
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
                     repl::logOp(_txn, "i", logNs.c_str(), *it);
                 }
+                tempCtx.commit();
             }
 
         }
@@ -565,9 +570,11 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::DBWrite lock(_txn->lockState(), _config.outputOptions.finalNamespace);
+                    WriteUnitOfWork wunit(_txn->recoveryUnit());
                     BSONObj o = cursor->nextSafe();
                     Helpers::upsert( _txn, _config.outputOptions.finalNamespace , o );
                     _txn->recoveryUnit()->commitIfNeeded();
+                    wunit.commit();
                     pm.hit();
                 }
                 _db.dropCollection( _config.tempNamespace );
@@ -583,6 +590,7 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::GlobalWrite lock(txn->lockState()); // TODO(erh) why global?
+                    WriteUnitOfWork wunit(txn->recoveryUnit());
                     BSONObj temp = cursor->nextSafe();
                     BSONObj old;
 
@@ -611,6 +619,7 @@ namespace mongo {
                     else {
                         Helpers::upsert( _txn, _config.outputOptions.finalNamespace , temp );
                     }
+                    wunit.commit();
                     _txn->recoveryUnit()->commitIfNeeded();
                     pm.hit();
                 }
@@ -644,6 +653,7 @@ namespace mongo {
 
             coll->insertDocument( _txn, bo, true );
             repl::logOp(_txn, "i", ns.c_str(), bo);
+            ctx.commit();
         }
 
         /**
@@ -660,6 +670,7 @@ namespace mongo {
                                                   " collection expected: " << _config.incLong );
 
             coll->insertDocument( _txn, o, true );
+            ctx.commit();
             _txn->recoveryUnit()->commitIfNeeded();
         }
 
@@ -944,6 +955,7 @@ namespace mongo {
                         break;
                     }
                 }
+                incCtx.commit();
 
                 verify( foundIndex );
             }
@@ -1069,6 +1081,7 @@ namespace mongo {
                 return;
 
             Lock::DBWrite kl(_txn->lockState(), _config.incLong);
+            WriteUnitOfWork wunit(_txn->recoveryUnit());
 
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ) {
                 BSONList& all = i->second;
@@ -1080,6 +1093,7 @@ namespace mongo {
             }
             _temp->clear();
             _size = 0;
+            wunit.commit();
 
         }
 
@@ -1121,7 +1135,9 @@ namespace mongo {
                     // reduce now to lower mem usage
                     Timer t;
                     _scope->invoke(_reduceAll, 0, 0, 0, true);
-                    LOG(1) << "  MR - did reduceAll: keys=" << keyCt << " dups=" << dupCt << " newKeys=" << _scope->getNumberInt("_keyCt") << " time=" << t.millis() << "ms" << endl;
+                    LOG(3) << "  MR - did reduceAll: keys=" << keyCt << " dups=" << dupCt
+                           << " newKeys=" << _scope->getNumberInt("_keyCt") << " time="
+                           << t.millis() << "ms" << endl;
                     return;
                 }
             }
@@ -1134,12 +1150,13 @@ namespace mongo {
                 long oldSize = _size;
                 Timer t;
                 reduceInMemory();
-                LOG(1) << "  MR - did reduceInMemory: size=" << oldSize << " dups=" << _dupCount << " newSize=" << _size << " time=" << t.millis() << "ms" << endl;
+                LOG(3) << "  MR - did reduceInMemory: size=" << oldSize << " dups=" << _dupCount
+                       << " newSize=" << _size << " time=" << t.millis() << "ms" << endl;
 
                 // if size is still high, or values are not reducing well, dump
                 if ( _onDisk && (_size > _config.maxInMemSize || _size > oldSize / 2) ) {
                     dumpToInc();
-                    LOG(1) << "  MR - dumping to db" << endl;
+                    LOG(3) << "  MR - dumping to db" << endl;
                 }
             }
         }

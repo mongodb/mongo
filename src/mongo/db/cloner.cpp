@@ -51,9 +51,11 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/storage_options.h"
-
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     BSONElement getErrField(const BSONObj& o);
 
@@ -119,9 +121,11 @@ namespace mongo {
                              << "collection dropped during clone ["
                              << to_collection << "]",
                              !createdCollection );
+                    WriteUnitOfWork wunit(txn->recoveryUnit());
                     createdCollection = true;
                     collection = db->createCollection( txn, to_collection );
                     verify( collection );
+                    wunit.commit();
                 }
             }
 
@@ -147,6 +151,7 @@ namespace mongo {
                 }
 
                 ++numSeen;
+                WriteUnitOfWork wunit(txn->recoveryUnit());
 
                 BSONObj js = tmp;
                 if ( isindex ) {
@@ -167,6 +172,7 @@ namespace mongo {
                 if (logForRepl)
                     repl::logOp(txn, "i", to_collection, js);
 
+                wunit.commit();
                 txn->recoveryUnit()->commitIfNeeded();
 
                 RARELY if ( time( 0 ) - saveLast > 60 ) {
@@ -300,6 +306,7 @@ namespace mongo {
 
         const NamespaceString nss(ns);
         Lock::DBWrite dbWrite(txn->lockState(), nss.db());
+        WriteUnitOfWork wunit(txn->recoveryUnit());
 
         const string dbName = nss.db().toString();
 
@@ -332,6 +339,7 @@ namespace mongo {
         copy(txn, dbName, temp.c_str(), temp.c_str(), true, logForRepl, false, true, mayYield,
              mayBeInterrupted, BSON( "ns" << ns ));
 
+        wunit.commit();
         txn->recoveryUnit()->commitIfNeeded();
         return true;
     }
@@ -351,15 +359,31 @@ namespace mongo {
         }
         massert( 10289 ,  "useReplAuth is not written to replication log", !opts.useReplAuth || !opts.logForRepl );
 
+        const ConnectionString cs = ConnectionString::parse(masterHost, errmsg);
+        if (!cs.isValid()) {
+            if (errCode)
+                *errCode = ErrorCodes::FailedToParse;
+            return false;
+        }
+
+        bool masterSameProcess = false;
+        std::vector<HostAndPort> csServers = cs.getServers();
+        for (std::vector<HostAndPort>::const_iterator iter = csServers.begin();
+             iter != csServers.end(); ++iter) {
+
 #if !defined(_WIN32) && !defined(__sunos__)
-        // isSelf() only does the necessary comparisons on os x and linux (SERVER-14165)
-        bool masterSameProcess = repl::isSelf(HostAndPort(masterHost));
+            // isSelf() only does the necessary comparisons on os x and linux (SERVER-14165)
+            if (!repl::isSelf(*iter))
+                continue;
 #else
-        stringstream a,b;
-        a << "localhost:" << serverGlobalParams.port;
-        b << "127.0.0.1:" << serverGlobalParams.port;
-        bool masterSameProcess = (a.str() == masterHost || b.str() == masterHost);
+            if (iter->port() != serverGlobalParams.port)
+                continue;
+            if (iter->host() != "localhost" && iter->host() != "127.0.0.1")
+                continue;
 #endif
+            masterSameProcess = true;
+            break;
+        }
 
         if (masterSameProcess) {
             if (opts.fromDB == toDBName) {
@@ -376,7 +400,6 @@ namespace mongo {
                 // nothing to do
             }
             else if ( !masterSameProcess ) {
-                ConnectionString cs = ConnectionString::parse( masterHost, errmsg );
                 auto_ptr<DBClientBase> con( cs.connect( errmsg ));
                 if ( !con.get() )
                     return false;

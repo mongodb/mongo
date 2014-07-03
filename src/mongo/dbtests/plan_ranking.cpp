@@ -66,6 +66,7 @@ namespace PlanRankingTests {
 
             Client::WriteContext ctx(&_txn, ns);
             _client.dropCollection(ns);
+            ctx.commit();
         }
 
         virtual ~PlanRankingTestBase() {
@@ -76,11 +77,13 @@ namespace PlanRankingTests {
         void insert(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns);
             _client.insert(ns, obj);
+            ctx.commit();
         }
 
         void addIndex(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns);
             _client.ensureIndex(ns, obj);
+            ctx.commit();
         }
 
         /**
