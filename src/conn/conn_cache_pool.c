@@ -42,7 +42,7 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	created = reconfiguring = 0;
 	pool_name = NULL;
 	cp = NULL;
-	reserve = size = 0;
+	size = 0;
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		reconfiguring = 1;
