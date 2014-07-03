@@ -208,6 +208,7 @@ env.CppUnitTest('expression_parser_test',
 
 
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
+env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
 
 env.CppUnitTest('descriptive_stats_test',
                 ['util/descriptive_stats_test.cpp'],
