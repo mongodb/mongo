@@ -293,6 +293,8 @@ DbImpl::Put(WriteOptions const &options, ColumnFamilyHandle *cfhp, Slice const &
 {
 	WT_CURSOR *cursor;
 	int ret = wtrocks_get_cursor(GetContext(), cfhp, &cursor);
+	if (ret != 0)
+		return WiredTigerErrorToStatus(ret);
 	WT_ITEM item;
 
 	item.data = key.data();
