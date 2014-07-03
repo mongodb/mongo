@@ -119,10 +119,9 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		wt_session = &lsm_tree->ckpt_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
 	}
-	if (ret != 0) {
-		__wt_err(session, ret, "shutdown error while cleaning up LSM");
-		(void)__wt_panic(session);
-	}
+	if (ret != 0)
+		WT_PANIC_RET(
+		    session, ret, "shutdown error while cleaning up LSM");
 
 	return (ret);
 }
@@ -781,8 +780,13 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	lsm_tree->modified = 1;
 
-err:	/* TODO: mark lsm_tree bad on error(?) */
-	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+err:	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+	/*
+	 * Errors that happen during a tree switch leave the tree in a state
+	 * where we can't make progress. Error out of WiredTiger.
+	 */
+	if (ret != 0)
+		WT_PANIC_RET(session, ret, "Failed doing LSM switch");
 	return (ret);
 }
 
@@ -1002,8 +1006,12 @@ int
 __wt_lsm_tree_unlock(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
+	WT_DECL_RET;
+
 	F_CLR(session, WT_SESSION_NO_CACHE_CHECK | WT_SESSION_NO_SCHEMA_LOCK);
-	return (__wt_rwunlock(session, lsm_tree->rwlock));
+	if ((ret = __wt_rwunlock(session, lsm_tree->rwlock)) != 0)
+		WT_PANIC_RET(session, ret, "Unlocking an LSM tree");
+	return (0);
 }
 
 /*

@@ -433,7 +433,7 @@ err:	__lsm_unpin_chunks(session, &cookie);
 	 * after such a failure - ensure WiredTiger shuts down.
 	 */
 	if (ret != 0 && ret != WT_NOTFOUND)
-		WT_PANIC_ERR(session, ret,
+		WT_PANIC_MSG(session, ret,
 		    "Shutting down LSM checkpoint utility thread");
 	return (NULL);
 }
