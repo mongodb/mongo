@@ -41,26 +41,58 @@ namespace mongo {
 
     RocksRecordStore::RocksRecordStore( const StringData& ns,
                                         rocksdb::DB* db, // not owned here
-                                        rocksdb::ColumnFamilyHandle* columnFamily )
+                                        rocksdb::ColumnFamilyHandle* columnFamily,
+                                        rocksdb::ColumnFamilyHandle* metadataColumnFamily )
         : RecordStore( ns ),
           _db( db ),
-          _columnFamily( columnFamily ) {
+          _columnFamily( columnFamily ),
+          _metadataColumnFamily( metadataColumnFamily ) {
         invariant( _db );
         invariant( _columnFamily );
-        _tempIncrement = 1;
+        invariant( _metadataColumnFamily );
+
+        // Get next id
+        boost::scoped_ptr<rocksdb::Iterator> iter( db->NewIterator( rocksdb::ReadOptions(),
+                                            columnFamily ) );
+        iter->SeekToLast();
+        if (iter->Valid()) {
+            rocksdb::Slice last_slice = iter->key();
+            DiskLoc last_loc = reinterpret_cast<DiskLoc*>( const_cast<char*>( 
+                                                            last_slice.data() ) )[0];
+            _nextIdNum = last_loc.a() + ( (uint64_t) last_loc.getOfs() << 32 );
+        }
+        else
+            _nextIdNum = 1;
+
+        // load metadata
+        std::string value;
+        if (!_db->Get( rocksdb::ReadOptions(),
+                           _metadataColumnFamily,
+                           rocksdb::Slice("numRecords"),
+                           &value ).ok()) {
+            _numRecords = 0;
+        }
+        else
+            _numRecords = *((long long *) value.data());
+        if (!_db->Get( rocksdb::ReadOptions(),
+                           _metadataColumnFamily,
+                           rocksdb::Slice("dataSize"),
+                           &value ).ok()) {
+            _dataSize = 0;
+        }
+        else
+            _dataSize = *((long long *) value.data());
     }
 
     RocksRecordStore::~RocksRecordStore() {
     }
 
     long long RocksRecordStore::dataSize() const {
-        // TODO(XXX)
-        return -1;
+        return _dataSize;
     }
 
     long long RocksRecordStore::numRecords() const {
-        // TODO(XXX)
-        return -1;
+        return _numRecords;
     }
 
     bool RocksRecordStore::isCapped() const {
@@ -72,12 +104,12 @@ namespace mongo {
     }
 
     RecordData RocksRecordStore::dataFor( const DiskLoc& loc) const {
-        std::string value;
+        std::string* value = new std::string();
         rocksdb::Status status;
         status = _db->Get( rocksdb::ReadOptions(),
                            _columnFamily,
                            _makeKey( loc ),
-                           &value );
+                           value );
 
         if ( !status.ok() ) {
             if ( status.IsNotFound() )
@@ -87,18 +119,26 @@ namespace mongo {
             invariant( false );
         }
 
-        // TODO(XXX) this is a double copy :(
+        boost::shared_array<char> data( reinterpret_cast<char*>(value) );
 
-        boost::shared_array<char> data( new char[value.size()] );
-        memcpy( data.get(), value.c_str(), value.size() );
-
-        return RecordData( data.get(), value.size(), data );
+        return RecordData( value->data(), value->size(), data );
     }
 
     void RocksRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& dl ) {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
+
+        std::string old_value;
+        _db->Get(rocksdb::ReadOptions(),
+                           _columnFamily,
+                           _makeKey( dl ),
+                           &old_value );
+        int old_length = old_value.size();
+
         ru->writeBatch()->Delete( _columnFamily,
                                   _makeKey( dl ) );
+
+        _changeNumRecords(txn, false);
+        _increaseDataSize(txn, -old_length);
     }
 
     StatusWith<DiskLoc> RocksRecordStore::insertRecord( OperationContext* txn,
@@ -114,13 +154,35 @@ namespace mongo {
                                _makeKey( loc ),
                                rocksdb::Slice( data, len ) );
 
+        _changeNumRecords(txn, true);
+        _increaseDataSize(txn, len);
+
         return StatusWith<DiskLoc>( loc );
     }
 
     StatusWith<DiskLoc> RocksRecordStore::insertRecord( OperationContext* txn,
                                                         const DocWriter* doc,
+                                                        int quotaMax,
                                                         bool enforceQuota ) {
-        invariant( false );
+
+        const int len = doc->documentSize();
+
+        boost::shared_array<char> buf(new char[len]);
+        doc->writeDocument(buf.get());
+
+        RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
+
+        DiskLoc loc = _nextId();
+
+        ru->writeBatch()->Put( _columnFamily,
+                               _makeKey( loc ),
+                               rocksdb::Slice( buf.get(), len ) );
+
+        _changeNumRecords(txn, true);
+        _increaseDataSize(txn, len);
+
+        return StatusWith<DiskLoc>( loc );
+                                                        
     }
 
     StatusWith<DiskLoc> RocksRecordStore::updateRecord( OperationContext* txn,
@@ -131,18 +193,83 @@ namespace mongo {
                                                         UpdateMoveNotifier* notifier ) {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
+        std::string old_value;
+        _db->Get(rocksdb::ReadOptions(),
+                           _columnFamily,
+                           _makeKey( loc ),
+                           &old_value );
+        int old_length = old_value.size();
+
         ru->writeBatch()->Put( _columnFamily,
                                _makeKey( loc ),
                                rocksdb::Slice( data, len ) );
 
+        _increaseDataSize(txn, len - old_length);
+
         return StatusWith<DiskLoc>( loc );
     }
+
+    // Wrote this whole implementation of updateWithDamages, only to find out merge_operator
+    // is not compatible with backward_iterator in rocks. Since we need backward_iterators we
+    // can't use the rocks merge_operator functionality... :(
+    /* 
+    // expects the first sizeof(char*) bytes of value to be damageSource, and the following
+    // bytes to be damages
+    class UpdateWithDamagesOperator : public AssociativeMergeOperator {
+     public:
+      virtual bool Merge(
+        const Slice& key,
+        const Slice* existing_value,
+        const Slice& value,
+        std::string* new_value,
+        Logger* logger) const override {
+        const mutablebson::DamageVector* damages = 
+            reinterpret_cast<const mutablebson::DamageVector*>( value.data() 
+                                            + sizeof(char) * sizeof(char*) );
+        const char* damageSource = *reinterpret_cast<char**>( value.data() );
+
+        std::string valueCopy(existing_value.get(), existing_value.size());
+       
+        char* root = const_cast<char*>( valueCopy.data() );
+        for( size_t i = 0; i < damages.size(); i++ ) {
+            mutablebson::DamageEvent event = damages[i];
+            const char* sourcePtr = damageSource + event.sourceOffset;
+            char* targetPtr = root + event.targetOffset;
+            std::memcpy(targetPtr, sourcePtr, event.size);
+        }
+
+        *new_value = valueCopy;
+        return true;
+      }
+
+      virtual const char* Name() const override {
+        return "UpdateWithDamagesOperator";
+       }
+    };
+
+    Status RocksRecordStore::updateWithDamages( OperationContext* txn,
+                                                const DiskLoc& loc,
+                                                const char* damageSource,
+                                                const mutablebson::DamageVector& damages ) {
+        std::string damages_value(reinterpret_cast<char *>( &damageSource ), sizeof(char*));
+        const char* damages_ptr = reinterpret_cast<const char*>( &damages );
+        damages_value.append(damages_ptr, sizeof(damages));
+        rocksdb::Slice value(damages_value);
+
+        rocksdb::Status status = _db->Merge( rocksdb::WriteOptions(),
+                           _columnFamily,
+                           _makeKey( loc ),
+                           value );
+        invariant( status.ok() );
+        return Status::OK();
+    }
+    */
 
     Status RocksRecordStore::updateWithDamages( OperationContext* txn,
                                                 const DiskLoc& loc,
                                                 const char* damangeSource,
                                                 const mutablebson::DamageVector& damages ) {
-        // todo: this should use the merge functionality in rocks
+        RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         rocksdb::Slice key = _makeKey( loc );
 
@@ -172,11 +299,10 @@ namespace mongo {
         }
 
         // write back
-        status = _db->Put( rocksdb::WriteOptions(),
-                           _columnFamily,
+        ru->writeBatch()->Put(_columnFamily,
                            key,
                            value );
-        invariant( status.ok() );
+
         return Status::OK();
     }
 
@@ -196,18 +322,30 @@ namespace mongo {
     }
 
     std::vector<RecordIterator*> RocksRecordStore::getManyIterators() const {
-        invariant( false );
+        // XXX do we want this to actually return a set of iterators?
+
+        std::vector<RecordIterator*> iterators;
+        iterators.push_back(getIterator());
+        return iterators;
     }
 
     Status RocksRecordStore::truncate( OperationContext* txn ) {
-        return Status( ErrorCodes::InternalError, "RocksRecordStore::truncate not supported yet" );
+        RecordIterator* iter = getIterator();
+        while(!iter->isEOF()) {
+            DiskLoc loc = iter->getNext();
+            deleteRecord(txn, loc);
+        }
+
+        return Status::OK();
     }
 
     Status RocksRecordStore::compact( OperationContext* txn,
                                       RecordStoreCompactAdaptor* adaptor,
                                       const CompactOptions* options,
                                       CompactStats* stats ) {
-        return Status(ErrorCodes::InternalError, "no compact support in RocksRecordStore" );
+        rocksdb::Status status = _db->CompactRange(_columnFamily, nullptr, nullptr);
+        invariant (status.ok());
+        return Status::OK();
     }
 
     Status RocksRecordStore::validate( OperationContext* txn,
@@ -237,7 +375,12 @@ namespace mongo {
     }
 
     DiskLoc RocksRecordStore::_nextId() {
-        return DiskLoc( 1, _tempIncrement++ );
+        boost::mutex::scoped_lock lk( _idLock );
+        int ofs = _nextIdNum >> 32;
+        int a = (_nextIdNum << 32) >> 32;
+        DiskLoc loc( ofs, a );
+        _nextIdNum++;
+        return loc;
     }
 
     rocksdb::Slice RocksRecordStore::_makeKey( const DiskLoc& loc ) const {
@@ -246,6 +389,34 @@ namespace mongo {
 
     RocksRecoveryUnit* RocksRecordStore::_getRecoveryUnit( OperationContext* opCtx ) const {
         return dynamic_cast<RocksRecoveryUnit*>( opCtx->recoveryUnit() );
+    }
+
+    void RocksRecordStore::_changeNumRecords(OperationContext* txn, bool insert) {
+        if (insert) {
+            _numRecords++;
+        }
+        else {
+            _numRecords--;
+        }
+        RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
+        char* nr_ptr = reinterpret_cast<char*>( &_numRecords );
+        std::string nr_key_string = "numRecords";
+
+        ru->writeBatch()->Put( _metadataColumnFamily,
+                               rocksdb::Slice( nr_key_string ),
+                               rocksdb::Slice( nr_ptr, sizeof(long long) ) );
+    }
+
+
+    void RocksRecordStore::_increaseDataSize(OperationContext* txn, int amount) {
+        _dataSize += amount;
+        RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
+        char* ds_ptr = reinterpret_cast<char*>( &_dataSize );
+        std::string ds_key_string = "dataSize";
+
+        ru->writeBatch()->Put( _metadataColumnFamily,
+                               rocksdb::Slice( ds_key_string ),
+                               rocksdb::Slice( ds_ptr, sizeof(long long) ) );
     }
 
     // --------
@@ -295,17 +466,25 @@ namespace mongo {
         _iterator.reset( NULL );
     }
 
+    // XXX mmapv1 just leaves these 2 blank... so is it ok to also leave them like this?
     void RocksRecordStore::Iterator::prepareToYield() {
-        // XXX: ???
     }
 
     bool RocksRecordStore::Iterator::recoverFromYield() {
-        // XXX: ???
         return true;
     }
 
     RecordData RocksRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
-        // XXX: use the iterator value
+        // XXX is this actually an optimization?
+        if (*reinterpret_cast<const DiskLoc*>( _iterator->key().data() ) == loc) {
+            rocksdb::Slice data_slice = _iterator->value();
+
+            boost::shared_array<char> data( new char[data_slice.size()] );
+            memcpy(data.get(), data_slice.data(), data_slice.size());
+
+            return RecordData( data.get(), data_slice.size(), data );
+        }
+
         return _rs->dataFor( loc );
     }
 

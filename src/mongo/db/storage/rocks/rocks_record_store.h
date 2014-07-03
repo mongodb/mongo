@@ -48,7 +48,8 @@ namespace mongo {
     public:
         RocksRecordStore( const StringData& ns,
                           rocksdb::DB* db,
-                          rocksdb::ColumnFamilyHandle* columnFamily );
+                          rocksdb::ColumnFamilyHandle* columnFamily,
+                          rocksdb::ColumnFamilyHandle* metadataColumnFamily );
 
         virtual ~RocksRecordStore();
 
@@ -102,7 +103,7 @@ namespace mongo {
 
         virtual Status truncate( OperationContext* txn );
 
-        virtual bool compactSupported() const { return false; }
+        virtual bool compactSupported() const { return true; }
 
         virtual Status compact( OperationContext* txn,
                                 RecordStoreCompactAdaptor* adaptor,
@@ -152,10 +153,16 @@ namespace mongo {
 
         DiskLoc _nextId();
         rocksdb::Slice _makeKey( const DiskLoc& loc ) const;
+        void _changeNumRecords(OperationContext* txn, bool insert);
+        void _increaseDataSize(OperationContext* txn, int amount);
 
         rocksdb::DB* _db; // not owned
         rocksdb::ColumnFamilyHandle* _columnFamily; // not owned
+        rocksdb::ColumnFamilyHandle* _metadataColumnFamily; // not owned
 
-        int _tempIncrement;
+        uint64_t _nextIdNum;
+        long long _dataSize;
+        long long _numRecords;
+        mutable boost::mutex _idLock;
     };
 }
