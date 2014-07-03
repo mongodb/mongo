@@ -424,8 +424,7 @@ worker(void *arg)
 		lprintf(cfg, ret, 0, "worker: WT_CONNECTION.open_session");
 		goto err;
 	}
-	cursors = (WT_CURSOR **)calloc(
-	    cfg->table_count, sizeof(WT_CURSOR *));
+	cursors = calloc(cfg->table_count, sizeof(WT_CURSOR *));
 	if (cursors == NULL) {
 		lprintf(cfg, ENOMEM, 0,
 		    "worker: couldn't allocate cursor array");
@@ -767,8 +766,7 @@ populate_thread(void *arg)
 	/* Do bulk loads if populate is single-threaded. */
 	cursor_config = cfg->populate_threads == 1 ? "bulk" : NULL;
 	/* Create the cursors. */
-	cursors = (WT_CURSOR **)calloc(
-	    cfg->table_count, sizeof(WT_CURSOR *));
+	cursors = calloc(cfg->table_count, sizeof(WT_CURSOR *));
 	if (cursors == NULL) {
 		lprintf(cfg, ENOMEM, 0,
 		    "worker: couldn't allocate cursor array");
@@ -1578,13 +1576,13 @@ create_uris(CONFIG *cfg)
 
 	ret = 0;
 	base_uri_len = strlen(cfg->base_uri);
-	cfg->uris = (char **)calloc(cfg->table_count, sizeof(char *));
+	cfg->uris = calloc(cfg->table_count, sizeof(char *));
 	if (cfg->uris == NULL) {
 		ret = ENOMEM;
 		goto err;
 	}
 	for (i = 0; i < cfg->table_count; i++) {
-		uri = cfg->uris[i] = (char *)calloc(base_uri_len + 3, 1);
+		uri = cfg->uris[i] = calloc(base_uri_len + 3, 1);
 		if (uri == NULL) {
 			ret = ENOMEM;
 			goto err;

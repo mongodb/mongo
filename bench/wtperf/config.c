@@ -61,7 +61,7 @@ config_assign(CONFIG *dest, const CONFIG *src)
 	memcpy(dest, src, sizeof(CONFIG));
 
 	if (src->uris != NULL) {
-		dest->uris = (char **)calloc(src->table_count, sizeof(char *));
+		dest->uris = calloc(src->table_count, sizeof(char *));
 		if (dest->uris == NULL)
 			return (enomem(dest));
 		for (i = 0; i < src->table_count; i++)
@@ -417,7 +417,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		goto err;
 	}
 	buf_size = (size_t)sb.st_size;
-	file_buf = (char *)calloc(buf_size + 2, 1);
+	file_buf = calloc(buf_size + 2, 1);
 	if (file_buf == NULL) {
 		ret = ENOMEM;
 		goto err;
