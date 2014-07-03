@@ -781,8 +781,13 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	lsm_tree->modified = 1;
 
-err:	/* TODO: mark lsm_tree bad on error(?) */
-	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+err:	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+	/*
+	 * Errors that happen during a tree switch leave the tree in a state
+	 * where we can't make progress. Error out of WiredTiger.
+	 */
+	if (ret != 0)
+		WT_PANIC_RETX(session, "Failed doing LSM switch");
 	return (ret);
 }
 
