@@ -674,6 +674,7 @@ config_opt_usage(void)
 	nopt = sizeof(config_opts)/sizeof(config_opts[0]);
 	for (i = 0; i < nopt; i++) {
 		defaultval = config_opts[i].defaultval;
+		typestr = "string";
 		switch (config_opts[i].type) {
 		case BOOL_TYPE:
 			typestr = "boolean";
@@ -684,7 +685,6 @@ config_opt_usage(void)
 			break;
 		case CONFIG_STRING_TYPE:
 		case STRING_TYPE:
-			typestr = "string";
 			break;
 		case INT_TYPE:
 			typestr = "int";
