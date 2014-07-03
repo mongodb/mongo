@@ -101,6 +101,11 @@ namespace mongo {
         rocksdb::ColumnFamilyHandle* getIndexColumnFamily( const StringData& ns,
                                                            const StringData& indexName );
 
+        /**
+         * Completely removes a column family. Input pointer is invalid after calling
+         */
+        void removeColumnFamily( rocksdb::ColumnFamilyHandle*& cfh );
+
         struct Entry {
             boost::scoped_ptr<rocksdb::ColumnFamilyHandle> cfHandle;
             boost::scoped_ptr<RocksCollectionCatalogEntry> collectionEntry;

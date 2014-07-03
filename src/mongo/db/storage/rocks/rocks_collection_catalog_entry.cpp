@@ -165,9 +165,24 @@ namespace mongo {
 
     Status RocksCollectionCatalogEntry::removeIndex( OperationContext* txn,
                                                      const StringData& indexName ) {
-        // remove column faily from Engine
+        boost::mutex::scoped_lock lc( _metaDataLock );
+
+        MetaData md;
+        _getMetaData_inlock( &md );
+
         // remove info from meta data
-        invariant( !"can't remove index in rocks yet" );
+        invariant( md.eraseIndex( indexName ) );
+        _putMetaData_inlock( md );
+
+        // drop the actual index in rocksdb
+        rocksdb::ColumnFamilyHandle* cfh = _engine->getIndexColumnFamily(
+                                                     ns().ns(), // CollectionCatalogEntry::ns().ns()
+                                                     indexName );
+
+        // Note: this invalidates cfh. Do not use after this call
+        _engine->removeColumnFamily( cfh );
+
+        return Status::OK();
     }
 
     Status RocksCollectionCatalogEntry::prepareForIndexBuild( OperationContext* txn,
@@ -233,6 +248,7 @@ namespace mongo {
 
     void RocksCollectionCatalogEntry::_putMetaData_inlock( const MetaData& in ) {
         // XXX: this should probably be done via the RocksRecoveryUnit.
+        // TODO move into recovery unit
         BSONObj obj = in.toBSON();
         rocksdb::Status status = _engine->getDB()->Put( rocksdb::WriteOptions(),
                                                         _metaDataKey,
@@ -246,6 +262,17 @@ namespace mongo {
             if ( indexes[i].spec["name"].String() == name )
                 return i;
         return -1;
+    }
+
+    bool RocksCollectionCatalogEntry::MetaData::eraseIndex( const StringData& name ) {
+        int indexOffset = findIndexOffset( name );
+
+        if( indexOffset < 0 ) {
+            return false;
+        }
+
+        indexes.erase( indexes.begin() + indexOffset );
+        return true;
     }
 
     BSONObj RocksCollectionCatalogEntry::MetaData::toBSON() const {

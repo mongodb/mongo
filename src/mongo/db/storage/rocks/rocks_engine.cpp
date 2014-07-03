@@ -228,6 +228,13 @@ namespace mongo {
 
     }
 
+    void RocksEngine::removeColumnFamily( rocksdb::ColumnFamilyHandle*& cfh ) {
+        rocksdb::Status s = _db->DropColumnFamily( cfh );
+        invariant( s.ok() );
+        delete cfh;
+        cfh = nullptr;
+    }
+
     void RocksEngine::getCollectionNamespaces( const StringData& dbName,
                                                std::list<std::string>* out ) const {
         string prefix = dbName.toString() + ".";

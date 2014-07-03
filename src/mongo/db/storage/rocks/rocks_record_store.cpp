@@ -162,7 +162,6 @@ namespace mongo {
 
     StatusWith<DiskLoc> RocksRecordStore::insertRecord( OperationContext* txn,
                                                         const DocWriter* doc,
-                                                        int quotaMax,
                                                         bool enforceQuota ) {
 
         const int len = doc->documentSize();

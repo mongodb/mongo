@@ -113,6 +113,12 @@ namespace mongo {
 
             int findIndexOffset( const StringData& name ) const;
 
+            /**
+             * Removes information about an index from the MetaData. Returns true if an index
+             * called name existed and was deleted, and false otherwise
+             */
+            bool eraseIndex ( const StringData& name );
+
             std::string ns;
             std::vector<IndexMetaData> indexes;
         };
