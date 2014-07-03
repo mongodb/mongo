@@ -385,8 +385,7 @@ __curmetadata_close(WT_CURSOR *cursor)
 	    close, ((WT_CURSOR_BTREE *)file_cursor)->btree);
 
 	ret = file_cursor->close(file_cursor);
-
-	WT_ERR(__wt_cursor_close(cursor));
+	WT_TRET(__wt_cursor_close(cursor));
 
 err:	API_END_RET(session, ret);
 }
