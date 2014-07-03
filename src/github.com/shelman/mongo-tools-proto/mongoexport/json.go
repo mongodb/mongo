@@ -2,10 +2,13 @@ package mongoexport
 
 import (
 	"encoding/json"
+	"github.com/shelman/mongo-tools-proto/common/bson_ext"
 	"io"
 	"labix.org/v2/mgo/bson"
 )
 
+//JSONExportOutput is an implementation of ExportOutput that writes documents
+//to the output in JSON format.
 type JSONExportOutput struct {
 	//ArrayOutput when set to true indicates that the output should be written
 	//as a JSON array, where each document is an element in the array.
@@ -15,6 +18,8 @@ type JSONExportOutput struct {
 	NumExported int64
 }
 
+//NewJSONExportOutput creates a new JSONExportOutput in array mode if specified,
+//configured to write data to the given io.Writer
 func NewJSONExportOutput(arrayOutput bool, out io.Writer) *JSONExportOutput {
 	return &JSONExportOutput{
 		arrayOutput,
@@ -24,6 +29,8 @@ func NewJSONExportOutput(arrayOutput bool, out io.Writer) *JSONExportOutput {
 	}
 }
 
+//WriteHeader writes the opening square bracket if in array mode, otherwise it
+//behaves as a no-op.
 func (jsonExporter *JSONExportOutput) WriteHeader() error {
 	if jsonExporter.ArrayOutput {
 		//TODO check # bytes written?
@@ -35,6 +42,8 @@ func (jsonExporter *JSONExportOutput) WriteHeader() error {
 	return nil
 }
 
+//WriteFooter writes the closing square bracket if in array mode, otherwise it
+//behaves as a no-op.
 func (jsonExporter *JSONExportOutput) WriteFooter() error {
 	if jsonExporter.ArrayOutput {
 		_, err := jsonExporter.Out.Write([]byte(JSON_ARRAY_END + "\n"))
@@ -46,19 +55,25 @@ func (jsonExporter *JSONExportOutput) WriteFooter() error {
 	return nil
 }
 
+func (jsonExporter *JSONExportOutput) Flush() error {
+	return nil
+}
+
+//ExportDocument converts the given document to extended json, and writes it
+//to the output.
 func (jsonExporter *JSONExportOutput) ExportDocument(document bson.M) error {
 	if jsonExporter.ArrayOutput {
 		if jsonExporter.NumExported >= 1 {
 			jsonExporter.Out.Write([]byte(","))
 		}
-		jsonOut, err := json.Marshal(getExtendedJsonRepr(document))
+		jsonOut, err := json.Marshal(bson_ext.GetExtendedBSON(document))
 		if err != nil {
 			return nil
 		} else {
 			jsonExporter.Out.Write(jsonOut)
 		}
 	} else {
-		err := jsonExporter.Encoder.Encode(getExtendedJsonRepr(document))
+		err := jsonExporter.Encoder.Encode(bson_ext.GetExtendedBSON(document))
 		if err != nil {
 			return err
 		}

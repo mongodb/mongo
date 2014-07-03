@@ -3,6 +3,7 @@ package mongoexport
 import (
 	"bufio"
 	"encoding/csv"
+	"github.com/shelman/mongo-tools-proto/common/bson_ext"
 	//"encoding/json"
 	"fmt"
 	"io"
@@ -15,9 +16,15 @@ import (
 )
 
 type CSVExportOutput struct {
-	Fields      []string
+	//Fields is a list of field names in the bson documents to be exported.
+	//A field can also use dot-delimited modifiers to address nested structures,
+	//for example "location.city" or "addresses.0"
+	Fields []string
+
+	//NumExported maintains a running total of the number of documents written
 	NumExported int64
-	csvWriter   *csv.Writer
+
+	csvWriter *csv.Writer
 }
 
 func getFieldsFromFile(path string) ([]string, error) {
@@ -25,6 +32,7 @@ func getFieldsFromFile(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer fieldFileReader.Close()
 
 	var fields []string
 	fieldScanner := bufio.NewScanner(fieldFileReader)
@@ -37,6 +45,8 @@ func getFieldsFromFile(path string) ([]string, error) {
 	return fields, nil
 }
 
+//NewCSVExportOutput returns a CSVExportOutput configured to write output to the
+//given io.Writer, extracting the specified fields only.
 func NewCSVExportOutput(fields []string, out io.Writer) *CSVExportOutput {
 	return &CSVExportOutput{
 		fields,
@@ -45,18 +55,25 @@ func NewCSVExportOutput(fields []string, out io.Writer) *CSVExportOutput {
 	}
 }
 
+//WriteHeader writes a comma-delimited list of fields as the output header row
 func (csvExporter *CSVExportOutput) WriteHeader() error {
 	return csvExporter.csvWriter.Write(csvExporter.Fields)
 }
 
 func (csvExporter *CSVExportOutput) WriteFooter() error {
+	//no csv footer
+	return nil
+}
+
+func (csvExporter *CSVExportOutput) Flush() error {
 	csvExporter.csvWriter.Flush()
 	return csvExporter.csvWriter.Error()
 }
 
+//ExportDocument writes a line to output with the CSV representation of a doc.
 func (csvExporter *CSVExportOutput) ExportDocument(document bson.M) error {
 	rowOut := make([]string, 0, len(csvExporter.Fields))
-	extendedDoc := getExtendedJsonRepr(document)
+	extendedDoc := bson_ext.GetExtendedBSON(document)
 	for _, fieldName := range csvExporter.Fields {
 		fieldVal, err := extractFieldByName(fieldName, extendedDoc)
 		if err != nil {
@@ -72,6 +89,9 @@ func (csvExporter *CSVExportOutput) ExportDocument(document bson.M) error {
 	return nil
 }
 
+//extractFieldByName takes a field name and document, and returns a value representing
+//the value of that field in the document in a format that can be printed as a string.
+//It will also handle dot-delimited field names for nested arrays or documents.
 func extractFieldByName(fieldName string, document interface{}) (interface{}, error) {
 	dotParts := strings.Split(fieldName, ".")
 	var subdoc interface{} = document

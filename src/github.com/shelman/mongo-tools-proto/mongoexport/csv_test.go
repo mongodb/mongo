@@ -24,6 +24,7 @@ func TestWriteCSV(t *testing.T) {
 			csvExporter := NewCSVExportOutput(fields, out)
 			csvExporter.ExportDocument(bson.M{"_id": "12345"})
 			csvExporter.WriteFooter()
+			csvExporter.Flush()
 			So(out.String(), ShouldEqual, `12345,"","",""`+"\n")
 		})
 
@@ -31,6 +32,7 @@ func TestWriteCSV(t *testing.T) {
 			csvExporter := NewCSVExportOutput(fields, out)
 			csvExporter.ExportDocument(bson.M{"z": []interface{}{"x", bson.M{"a": "T", "B": 1}}})
 			csvExporter.WriteFooter()
+			csvExporter.Flush()
 			So(out.String(), ShouldEqual, `"","","",T`+"\n")
 		})
 
