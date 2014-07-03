@@ -128,6 +128,8 @@ namespace mongo {
 
         mutable boost::mutex _metaDataLock;
 
+        static const int _maxAllowedIndexes = 64; // for compatability for now, could be higher
+
     };
 
 }

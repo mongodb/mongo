@@ -54,7 +54,7 @@ namespace mongo {
     }
 
     CollectionOptions RocksCollectionCatalogEntry::getCollectionOptions() const {
-        // todo: put more options in here?
+        // TODO: put more options in here?
         return CollectionOptions();
     }
 
@@ -80,7 +80,7 @@ namespace mongo {
     }
 
     int RocksCollectionCatalogEntry::getMaxAllowedIndexes() const {
-        return 64; // for compatability for now, could be higher
+        return _maxAllowedIndexes;
     }
 
     void RocksCollectionCatalogEntry::getAllIndexes( std::vector<std::string>* names ) const {
