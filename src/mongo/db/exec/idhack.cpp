@@ -149,4 +149,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* IDHackStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* IDHackStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

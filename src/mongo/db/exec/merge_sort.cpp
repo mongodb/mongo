@@ -266,4 +266,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* MergeSortStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* MergeSortStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

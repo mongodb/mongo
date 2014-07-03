@@ -152,6 +152,14 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* CachedPlanStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* CachedPlanStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
     void CachedPlanStage::updateCache() {
         _updatedCache = true;
 

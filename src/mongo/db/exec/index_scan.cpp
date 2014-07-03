@@ -66,6 +66,7 @@ namespace mongo {
           _commonStats(kStageType) {
         _iam = _params.descriptor->getIndexCatalog()->getIndex(_params.descriptor);
         _keyPattern = _params.descriptor->keyPattern().getOwned();
+        _specificStats.keyPattern = _keyPattern;
     }
 
     void IndexScan::initIndexScan() {
@@ -377,12 +378,19 @@ namespace mongo {
 
             _specificStats.indexBoundsVerbose = _params.bounds.toString();
             _specificStats.direction = _params.direction;
-            _specificStats.keyPattern = _keyPattern;
         }
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IXSCAN));
         ret->specific.reset(new IndexScanStats(_specificStats));
         return ret.release();
+    }
+
+    const CommonStats* IndexScan::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* IndexScan::getSpecificStats() {
+        return &_specificStats;
     }
 
 }  // namespace mongo

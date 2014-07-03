@@ -181,4 +181,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* CollectionScan::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* CollectionScan::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

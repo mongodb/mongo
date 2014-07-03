@@ -34,7 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/query/type_explain.h"
 
 namespace mongo {
@@ -75,6 +75,7 @@ namespace mongo {
         // Lock 'ns'.
         Client::Context cx(txn, ns);
         Collection* collection = cx.db()->getCollection(txn, ns);
+        const string& dbname = cx.db()->name();
 
         if (NULL == collection) {
             err = "ns missing";
@@ -90,7 +91,6 @@ namespace mongo {
             return applySkipLimit(collection->numRecords(), cmd);
         }
 
-        Runner* rawRunner;
         long long skip = cmd["skip"].numberLong();
         long long limit = cmd["limit"].numberLong();
 
@@ -98,27 +98,28 @@ namespace mongo {
             limit = -limit;
         }
 
-        uassertStatusOK(getRunnerCount(txn, collection, query, hintObj, &rawRunner));
-        auto_ptr<Runner> runner(rawRunner);
+        // Get an executor for the command.
+        CanonicalQuery* rawCq;
+        PlanExecutor* rawExec;
+        uassertStatusOK(CmdCount::parseCountToExecutor(txn, cmd, dbname, ns, collection,
+                                                       &rawCq, &rawExec));
+
+        scoped_ptr<CanonicalQuery> cq(rawCq);
+        scoped_ptr<PlanExecutor> exec(rawExec);
 
         // Store the plan summary string in CurOp.
         Client& client = cc();
         CurOp* currentOp = client.curop();
         if (NULL != currentOp) {
-            PlanInfo* rawInfo;
-            Status s = runner->getInfo(NULL, &rawInfo);
-            if (s.isOK()) {
-                scoped_ptr<PlanInfo> planInfo(rawInfo);
-                currentOp->debug().planSummary = planInfo->planSummary.c_str();
-            }
+            PlanSummaryStats stats;
+            Explain::getSummaryStats(exec.get(), &stats);
+            currentOp->debug().planSummary = stats.summaryStr.c_str();
         }
 
         try {
-            const ScopedRunnerRegistration safety(runner.get());
-
             long long count = 0;
             Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, NULL))) {
+            while (Runner::RUNNER_ADVANCED == (state = exec->getNext(NULL, NULL))) {
                 if (skip > 0) {
                     --skip;
                 }
@@ -189,13 +190,14 @@ namespace mongo {
         return Explain::explainStages(exec.get(), cq.get(), verbosity, out);
     }
 
+    // static
     Status CmdCount::parseCountToExecutor(OperationContext* txn,
                                           const BSONObj& cmdObj,
                                           const std::string& dbname,
                                           const std::string& ns,
                                           Collection* collection,
                                           CanonicalQuery** queryOut,
-                                          PlanExecutor** execOut) const {
+                                          PlanExecutor** execOut) {
 
         long long skip = 0;
         if (cmdObj["skip"].isNumber()) {

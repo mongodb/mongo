@@ -47,7 +47,9 @@ namespace mongo {
           _btreeCursor(NULL),
           _hitEnd(false),
           _params(params),
-          _commonStats(kStageType) { }
+          _commonStats(kStageType) {
+        _specificStats.keyPattern = _params.descriptor->keyPattern();
+    }
 
     void DistinctScan::initIndexCursor() {
         // Create an IndexCursor over the btree we're distinct-ing over.
@@ -227,6 +229,14 @@ namespace mongo {
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_DISTINCT));
         ret->specific.reset(new DistinctScanStats(_specificStats));
         return ret.release();
+    }
+
+    const CommonStats* DistinctScan::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* DistinctScan::getSpecificStats() {
+        return &_specificStats;
     }
 
 }  // namespace mongo

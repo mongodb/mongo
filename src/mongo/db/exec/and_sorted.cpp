@@ -323,4 +323,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* AndSortedStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* AndSortedStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

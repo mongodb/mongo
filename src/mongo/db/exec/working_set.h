@@ -101,6 +101,11 @@ namespace mongo {
          */
         const unordered_set<WorkingSetID>& getFlagged() const;
 
+        /**
+         * Removes and deallocates all members of this working set.
+         */
+        void clear();
+
     private:
         struct MemberHolder {
             MemberHolder();

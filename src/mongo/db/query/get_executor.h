@@ -61,6 +61,9 @@ namespace mongo {
      *
      * If the query cannot be executed, returns a Status indicating why.  Deletes
      * rawCanonicalQuery.
+     *
+     * TODO: can we change this function to take ownership of 'canonicalQuery'? We
+     * could transfer the ownership of the CQ to the PlanExecutor being returned.
      */
     Status getExecutor(OperationContext* txn,
                        Collection* collection,

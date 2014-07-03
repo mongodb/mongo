@@ -113,4 +113,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* LimitStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* LimitStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

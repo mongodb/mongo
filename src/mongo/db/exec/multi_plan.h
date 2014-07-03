@@ -74,6 +74,10 @@ namespace mongo {
 
         virtual PlanStageStats* getStats();
 
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
         /** Takes ownership of QuerySolution and PlanStage. not of WorkingSet */
         void addPlan(QuerySolution* solution, PlanStage* root, WorkingSet* sharedWs);
 

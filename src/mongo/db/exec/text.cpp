@@ -54,6 +54,7 @@ namespace mongo {
           _internalState(INIT_SCANS),
           _currentIndexScanner(0) {
         _scoreIterator = _scores.end();
+        _specificStats.indexPrefix = _params.indexPrefix;
     }
 
     TextStage::~TextStage() { }
@@ -154,11 +155,17 @@ namespace mongo {
             _commonStats.filter = bob.obj();
         }
 
-        _specificStats.indexPrefix = _params.indexPrefix;
-
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_TEXT));
         ret->specific.reset(new TextStats(_specificStats));
         return ret.release();
+    }
+
+    const CommonStats* TextStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* TextStage::getSpecificStats() {
+        return &_specificStats;
     }
 
     PlanStage::StageState TextStage::initScans(WorkingSetID* out) {

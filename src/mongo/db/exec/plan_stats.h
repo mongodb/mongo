@@ -268,11 +268,15 @@ namespace mongo {
         DistinctScanStats() : keysExamined(0) { }
 
         virtual SpecificStats* clone() const {
-            return new DistinctScanStats(*this);
+            DistinctScanStats* specific = new DistinctScanStats(*this);
+            specific->keyPattern = keyPattern.getOwned();
+            return specific;
         }
 
         // How many keys did we look at while distinct-ing?
         size_t keysExamined;
+
+        BSONObj keyPattern;
     };
 
     struct FetchStats : public SpecificStats {
@@ -479,6 +483,17 @@ namespace mongo {
 
         // The pattern according to which we are sorting.
         BSONObj sortPattern;
+    };
+
+    struct S2NearStats : public SpecificStats {
+
+        virtual SpecificStats* clone() const {
+            S2NearStats* specific = new S2NearStats(*this);
+            specific->keyPattern = keyPattern.getOwned();
+            return specific;
+        }
+
+        BSONObj keyPattern;
     };
 
     struct ShardingFilterStats : public SpecificStats {

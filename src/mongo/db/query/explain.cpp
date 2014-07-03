@@ -47,13 +47,23 @@ namespace {
     using namespace mongo;
 
     /**
-     * Do a depth-first traversal of the tree rooted at 'root', and flatten the tree nodes
-     * into the list 'flattened'.
+     * Traverse the tree rooted at 'root', and add all tree nodes into the list 'flattened'.
      */
     void flattenStatsTree(PlanStageStats* root, vector<PlanStageStats*>* flattened) {
         flattened->push_back(root);
         for (size_t i = 0; i < root->children.size(); ++i) {
             flattenStatsTree(root->children[i], flattened);
+        }
+    }
+
+    /**
+     * Traverse the tree rooted at 'root', and add all nodes into the list 'flattened'.
+     */
+    void flattenExecTree(PlanStage* root, vector<PlanStage*>* flattened) {
+        flattened->push_back(root);
+        vector<PlanStage*> children = root->getChildren();
+        for (size_t i = 0; i < children.size(); ++i) {
+            flattenExecTree(children[i], flattened);
         }
     }
 
@@ -76,6 +86,110 @@ namespace {
         }
 
         return NULL;
+    }
+
+    /**
+     * Given the SpecificStats object for a stage and the type of the stage, returns the
+     * number of index keys examined by the stage.
+     *
+     * This is used for getting the total number of keys examined by a plan. We need
+     * to collect a 'totalKeysExamined' metric for a regular explain (in which case this
+     * gets called from Explain::generateExecStats()) or for the slow query log / profiler
+     * (in which case this gets called from Explain::getSummaryStats()).
+     */
+     size_t getKeysExamined(StageType type, const SpecificStats* specific) {
+        if (STAGE_IXSCAN == type) {
+            const IndexScanStats* spec = static_cast<const IndexScanStats*>(specific);
+            return spec->keysExamined;
+        }
+        else if (STAGE_GEO_NEAR_2D == type) {
+            const TwoDNearStats* spec = static_cast<const TwoDNearStats*>(specific);
+            return spec->nscanned;
+        }
+        else if (STAGE_IDHACK == type) {
+            const IDHackStats* spec = static_cast<const IDHackStats*>(specific);
+            return spec->keysExamined;
+        }
+        else if (STAGE_TEXT == type) {
+            const TextStats* spec = static_cast<const TextStats*>(specific);
+            return spec->keysExamined;
+        }
+        else if (STAGE_COUNT == type) {
+            const CountStats* spec = static_cast<const CountStats*>(specific);
+            return spec->keysExamined;
+        }
+
+        return 0;
+     }
+
+    /**
+     * Given the SpecificStats object for a stage and the type of the stage, returns the
+     * number of documents examined by the stage.
+     *
+     * This is used for getting the total number of documents examined by a plan. We need
+     * to collect a 'totalDocsExamined' metric for a regular explain (in which case this
+     * gets called from Explain::generateExecStats()) or for the slow query log / profiler
+     * (in which case this gets called from Explain::getSummaryStats()).
+     */
+    size_t getDocsExamined(StageType type, const SpecificStats* specific) {
+        if (STAGE_GEO_NEAR_2D == type) {
+            const TwoDNearStats* spec = static_cast<const TwoDNearStats*>(specific);
+            return spec->objectsLoaded;
+        }
+        else if (STAGE_IDHACK == type) {
+            const IDHackStats* spec = static_cast<const IDHackStats*>(specific);
+            return spec->docsExamined;
+        }
+        else if (STAGE_TEXT == type) {
+            const TextStats* spec = static_cast<const TextStats*>(specific);
+            return spec->fetches;
+        }
+        else if (STAGE_FETCH == type) {
+            const FetchStats* spec = static_cast<const FetchStats*>(specific);
+            return spec->docsExamined;
+        }
+        else if (STAGE_COLLSCAN == type) {
+            const CollectionScanStats* spec = static_cast<const CollectionScanStats*>(specific);
+            return spec->docsTested;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Adds to the plan summary string being built by 'ss' for the execution stage 'stage'.
+     */
+    void addStageSummaryStr(PlanStage* stage, mongoutils::str::stream& ss) {
+        // First add the stage type string.
+        const CommonStats* common = stage->getCommonStats();
+        ss << common->stageTypeStr;
+
+        // Some leaf nodes also provide info about the index they used.
+        const SpecificStats* specific = stage->getSpecificStats();
+        if (STAGE_COUNT == stage->stageType()) {
+            const CountStats* spec = static_cast<const CountStats*>(specific);
+            ss << " " << spec->keyPattern;
+        }
+        else if (STAGE_DISTINCT == stage->stageType()) {
+            const DistinctScanStats* spec = static_cast<const DistinctScanStats*>(specific);
+            ss << " " << spec->keyPattern;
+        }
+        else if (STAGE_GEO_NEAR_2D == stage->stageType()) {
+            const TwoDNearStats* spec = static_cast<const TwoDNearStats*>(specific);
+            ss << " " << spec->keyPattern;
+        }
+        else if (STAGE_GEO_NEAR_2DSPHERE == stage->stageType()) {
+            const S2NearStats* spec = static_cast<const S2NearStats*>(specific);
+            ss << " " << spec->keyPattern;
+        }
+        else if (STAGE_IXSCAN == stage->stageType()) {
+            const IndexScanStats* spec = static_cast<const IndexScanStats*>(specific);
+            ss << " " << spec->keyPattern;
+        }
+        else if (STAGE_TEXT == stage->stageType()) {
+            const TextStats* spec = static_cast<const TextStats*>(specific);
+            ss << " " << spec->indexPrefix;
+        }
     }
 
 } // namespace
@@ -267,38 +381,10 @@ namespace mongo {
         size_t totalKeysExamined = 0;
         size_t totalDocsExamined = 0;
         for (size_t i = 0; i < statsNodes.size(); ++i) {
-            if (STAGE_IXSCAN == statsNodes[i]->stageType) {
-                IndexScanStats* spec = static_cast<IndexScanStats*>(statsNodes[i]->specific.get());
-                totalKeysExamined += spec->keysExamined;
-            }
-            else if (STAGE_GEO_NEAR_2D == statsNodes[i]->stageType) {
-                TwoDNearStats* spec = static_cast<TwoDNearStats*>(statsNodes[i]->specific.get());
-                totalKeysExamined += spec->nscanned;
-                totalDocsExamined += spec->objectsLoaded;
-            }
-            else if (STAGE_IDHACK == statsNodes[i]->stageType) {
-                IDHackStats* spec = static_cast<IDHackStats*>(statsNodes[i]->specific.get());
-                totalKeysExamined += spec->keysExamined;
-                totalDocsExamined += spec->docsExamined;
-            }
-            else if (STAGE_TEXT == statsNodes[i]->stageType) {
-                TextStats* spec = static_cast<TextStats*>(statsNodes[i]->specific.get());
-                totalKeysExamined += spec->keysExamined;
-                totalDocsExamined += spec->fetches;
-            }
-            else if (STAGE_FETCH == statsNodes[i]->stageType) {
-                FetchStats* spec = static_cast<FetchStats*>(statsNodes[i]->specific.get());
-                totalDocsExamined += spec->docsExamined;
-            }
-            else if (STAGE_COLLSCAN == statsNodes[i]->stageType) {
-                CollectionScanStats* spec =
-                    static_cast<CollectionScanStats*>(statsNodes[i]->specific.get());
-                totalDocsExamined += spec->docsTested;
-            }
-            else if (STAGE_COUNT == statsNodes[i]->stageType) {
-                CountStats* spec = static_cast<CountStats*>(statsNodes[i]->specific.get());
-                totalKeysExamined += spec->keysExamined;
-            }
+            totalKeysExamined += getKeysExamined(statsNodes[i]->stageType,
+                                                 statsNodes[i]->specific.get());
+            totalDocsExamined += getDocsExamined(statsNodes[i]->stageType,
+                                                 statsNodes[i]->specific.get());
         }
 
         out->appendNumber("totalKeysExamined", totalKeysExamined);
@@ -356,12 +442,6 @@ namespace mongo {
 
         // Inspect the tree to see if there is a MultiPlanStage.
         MultiPlanStage* mps = getMultiPlanStage(exec->getStages());
-
-        // The queryPlanner verbosity level requires that we know the winning plan,
-        // if there are multiple. There are multiple candidates iff we have a MultiPlanStage.
-        if (verbosity >= Explain::QUERY_PLANNER && NULL != mps) {
-            mps->pickBestPlan();
-        }
 
         // The executionStats verbosity level requires that we run the winning plan
         // until if finishes.
@@ -427,6 +507,55 @@ namespace mongo {
         generateServerInfo(out);
 
         return Status::OK();
+    }
+
+    void Explain::getSummaryStats(PlanExecutor* exec, PlanSummaryStats* statsOut) {
+        invariant(NULL != statsOut);
+
+        PlanStage* root = exec->getStages();
+
+        // We can get some of the fields we need from the common stats stored in the
+        // root stage of the plan tree.
+        const CommonStats* common = root->getCommonStats();
+        statsOut->nReturned = common->advanced;
+        statsOut->executionTimeMillis = common->executionTimeMillis;
+
+        // The other fields are aggregations over the stages in the plan tree. We flatten
+        // the tree into a list and then compute these aggregations.
+        vector<PlanStage*> stages;
+        flattenExecTree(root, &stages);
+
+        // Use this stream to build the plan summary string.
+        mongoutils::str::stream ss;
+        bool seenLeaf = false;
+
+        for (size_t i = 0; i < stages.size(); i++) {
+            statsOut->totalKeysExamined += getKeysExamined(stages[i]->stageType(),
+                                                           stages[i]->getSpecificStats());
+            statsOut->totalDocsExamined += getDocsExamined(stages[i]->stageType(),
+                                                           stages[i]->getSpecificStats());
+
+            if (STAGE_IDHACK == stages[i]->stageType()) {
+                statsOut->isIdhack = true;
+            }
+            if (STAGE_SORT == stages[i]->stageType()) {
+                statsOut->hasSortStage = true;
+            }
+
+            if (stages[i]->getChildren().empty()) {
+                // This is a leaf node. Add to the plan summary string accordingly. Unless
+                // this is the first leaf we've seen, add a delimiting string first.
+                if (seenLeaf) {
+                    ss << ", ";
+                }
+                else {
+                    seenLeaf = true;
+                }
+                addStageSummaryStr(stages[i], ss);
+            }
+        }
+
+        statsOut->summaryStr = ss;
     }
 
 } // namespace mongo

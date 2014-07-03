@@ -155,10 +155,6 @@ namespace mongo {
         _killed = true;
     }
 
-    PlanStage* PlanExecutor::releaseStages() {
-        return _root.release();
-    }
-
     PlanStage* PlanExecutor::getStages() {
         return _root.get();
     }

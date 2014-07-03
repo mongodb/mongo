@@ -84,7 +84,6 @@ namespace mongo {
                          int, string& errmsg,
                          BSONObjBuilder& result, bool);
 
-    private:
         /**
          * Converts the command object 'cmdObj' for a count into a PlanExecutor capable
          * of running the count and a CanonicalQuery.
@@ -94,17 +93,14 @@ namespace mongo {
          *
          * On failure, returns a non-OK status, and the caller should not delete either
          * 'queryOut' or 'execOut'.
-         *
-         * TODO: the regular run() command for count should call this instead of getting
-         * a runner.
          */
-        Status parseCountToExecutor(OperationContext* txn,
-                                    const BSONObj& cmdObj,
-                                    const std::string& dbname,
-                                    const std::string& ns,
-                                    Collection* collection,
-                                    CanonicalQuery** queryOut,
-                                    PlanExecutor** execOut) const;
+        static Status parseCountToExecutor(OperationContext* txn,
+                                           const BSONObj& cmdObj,
+                                           const std::string& dbname,
+                                           const std::string& ns,
+                                           Collection* collection,
+                                           CanonicalQuery** queryOut,
+                                           PlanExecutor** execOut);
 
     };
 

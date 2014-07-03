@@ -295,19 +295,20 @@ namespace mongo {
             && SubplanStage::canUseSubplanning(*canonicalQuery)) {
 
             QLOG() << "Running query as sub-queries: " << canonicalQuery->toStringShort();
-            LOG(2) << "Running query as sub-queries: " << canonicalQuery->toStringShort();
 
             auto_ptr<WorkingSet> ws(new WorkingSet());
 
             SubplanStage* subplan;
-            Status runnerStatus = SubplanStage::make(txn, collection, ws.get(), plannerParams,
-                                                     canonicalQuery, &subplan);
-            if (!runnerStatus.isOK()) {
-                return runnerStatus;
+            Status subplanStatus = SubplanStage::make(txn, collection, ws.get(), plannerParams,
+                                                      canonicalQuery, &subplan);
+            if (subplanStatus.isOK()) {
+                LOG(2) << "Running query as sub-queries: " << canonicalQuery->toStringShort();
+                *out = new PlanExecutor(ws.release(), subplan, collection);
+                return Status::OK();
             }
-
-            *out = new PlanExecutor(ws.release(), subplan, collection);
-            return Status::OK();
+            else {
+                QLOG() << "Subplanner: " << subplanStatus.reason();
+            }
         }
 
         return getExecutorAlwaysPlan(txn, collection, canonicalQuery, plannerParams, out);
@@ -402,6 +403,9 @@ namespace mongo {
                 // Owns none of the arguments
                 multiPlanStage->addPlan(solutions[ix], nextPlanRoot, sharedWorkingSet);
             }
+
+            // Do the plan selection up front.
+            multiPlanStage->pickBestPlan();
 
             PlanExecutor* exec = new PlanExecutor(sharedWorkingSet, multiPlanStage, collection);
 

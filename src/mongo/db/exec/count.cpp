@@ -230,4 +230,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* Count::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* Count::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

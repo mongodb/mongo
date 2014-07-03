@@ -104,11 +104,6 @@ namespace mongo {
         QuerySolution* bestSolution();
 
         /**
-         * Transfer ownership of the stage tree wrapped by this executor to the caller.
-         */
-        PlanStage* releaseStages();
-
-        /**
          * Get the stage tree wrapped by this executor, without transferring ownership.
          */
         PlanStage* getStages();

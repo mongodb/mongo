@@ -82,6 +82,10 @@ namespace mongo {
 
         PlanStageStats* getStats();
 
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
         static const char* kStageType;
 
     private:
@@ -165,6 +169,7 @@ namespace mongo {
         IndexDescriptor* _descriptor;
 
         CommonStats _commonStats;
+        S2NearStats _specificStats;
     };
 
 }  // namespace mongo

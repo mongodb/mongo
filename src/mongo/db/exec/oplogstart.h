@@ -75,8 +75,15 @@ namespace mongo {
 
         virtual std::vector<PlanStage*> getChildren() const;
 
-        // PS. don't call this.
+        //
+        // Exec stats -- do not call these for the oplog start stage.
+        //
+
         virtual PlanStageStats* getStats() { return NULL; }
+
+        virtual const CommonStats* getCommonStats() { return NULL; }
+
+        virtual const SpecificStats* getSpecificStats() { return NULL; }
 
         virtual StageType stageType() const { return STAGE_OPLOG_START; }
 

@@ -194,4 +194,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* OrStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* OrStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

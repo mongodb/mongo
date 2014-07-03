@@ -81,7 +81,18 @@ namespace mongo {
 
         PlanStageStats* getStats();
 
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
         static const char* kStageType;
+
+    private:
+        SubplanStage(OperationContext* txn,
+                     Collection* collection,
+                     WorkingSet* ws,
+                     const QueryPlannerParams& params,
+                     CanonicalQuery* cq);
 
         /**
          * Plan each branch of the $or independently, and store the resulting
@@ -93,24 +104,14 @@ namespace mongo {
          */
         Status planSubqueries();
 
-    private:
-        SubplanStage(OperationContext* txn,
-                     Collection* collection,
-                     WorkingSet* ws,
-                     const QueryPlannerParams& params,
-                     CanonicalQuery* cq);
-
-        bool runSubplans();
-
-        enum SubplanningState {
-            PLANNING,
-            RUNNING,
-        };
+        /**
+         * Uses the query planning results from planSubqueries() and the multi plan stage
+         * to select the best plan for each branch.
+         */
+        Status pickBestPlan();
 
         // transactional context for read locks. Not owned by us
         OperationContext* _txn;
-
-        SubplanningState _state;
 
         Collection* _collection;
 

@@ -471,6 +471,14 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* SortStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* SortStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
     /**
      * addToBuffer() and sortBuffer() work differently based on the
      * configured limit. addToBuffer() is also responsible for

@@ -52,7 +52,6 @@ namespace mongo {
                                const QueryPlannerParams& params,
                                CanonicalQuery* cq)
         : _txn(txn),
-          _state(SubplanStage::PLANNING),
           _collection(collection),
           _ws(ws),
           _plannerParams(params),
@@ -84,9 +83,17 @@ namespace mongo {
                               CanonicalQuery* cq,
                               SubplanStage** out) {
         auto_ptr<SubplanStage> autoStage(new SubplanStage(txn, collection, ws, params, cq));
+        // Plan each branch of the $or.
         Status planningStatus = autoStage->planSubqueries();
         if (!planningStatus.isOK()) {
             return planningStatus;
+        }
+
+        // Use the multi plan stage to select a winning plan for each branch, and then
+        // construct the overall winning plan from the resulting index tags.
+        Status multiPlanStatus = autoStage->pickBestPlan();
+        if (!multiPlanStatus.isOK()) {
+            return multiPlanStatus;
         }
 
         *out = autoStage.release();
@@ -161,7 +168,7 @@ namespace mongo {
                                                                 whereCallback);
             if (!childCQStatus.isOK()) {
                 mongoutils::str::stream ss;
-                ss << "Subplanner: Can't canonicalize subchild " << orChild->toString()
+                ss << "Can't canonicalize subchild " << orChild->toString()
                    << " " << childCQStatus.reason();
                 return Status(ErrorCodes::BadValue, ss);
             }
@@ -179,7 +186,7 @@ namespace mongo {
 
             if (!status.isOK()) {
                 mongoutils::str::stream ss;
-                ss << "Subplanner: Can't plan for subchild " << orChildCQ->toString()
+                ss << "Can't plan for subchild " << orChildCQ->toString()
                    << " " << status.reason();
                 return Status(ErrorCodes::BadValue, ss);
             }
@@ -188,7 +195,7 @@ namespace mongo {
             if (0 == solutions.size()) {
                 // If one child doesn't have an indexed solution, bail out.
                 mongoutils::str::stream ss;
-                ss << "Subplanner: No solutions for subchild " << orChildCQ->toString();
+                ss << "No solutions for subchild " << orChildCQ->toString();
                 return Status(ErrorCodes::BadValue, ss);
             }
 
@@ -201,7 +208,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool SubplanStage::runSubplans() {
+    Status SubplanStage::pickBestPlan() {
         // This is what we annotate with the index selections and then turn into a solution.
         auto_ptr<OrMatchExpression> theOr(
             static_cast<OrMatchExpression*>(_query->root()->shallowClone()));
@@ -230,14 +237,16 @@ namespace mongo {
                 // We want a well-formed *indexed* solution.
                 if (NULL == autoSoln->cacheData.get()) {
                     // For example, we don't cache things for 2d indices.
-                    QLOG() << "Subplanner: No cache data for subchild " << orChild->toString();
-                    return false;
+                    mongoutils::str::stream ss;
+                    ss << "No cache data for subchild " << orChild->toString();
+                    return Status(ErrorCodes::BadValue, ss);
                 }
 
                 if (SolutionCacheData::USE_INDEX_TAGS_SOLN != autoSoln->cacheData->solnType) {
-                    QLOG() << "Subplanner: No indexed cache data for subchild "
-                           << orChild->toString();
-                    return false;
+                    mongoutils::str::stream ss;
+                    ss << "No indexed cache data for subchild "
+                       << orChild->toString();
+                    return Status(ErrorCodes::BadValue, ss);
                 }
 
                 // Add the index assignments to our original query.
@@ -245,9 +254,10 @@ namespace mongo {
                     orChild, autoSoln->cacheData->tree.get(), _indexMap);
 
                 if (!tagStatus.isOK()) {
-                    QLOG() << "Subplanner: Failed to extract indices from subchild "
-                           << orChild->toString();
-                    return false;
+                    mongoutils::str::stream ss;
+                    ss << "Failed to extract indices from subchild "
+                       << orChild->toString();
+                    return Status(ErrorCodes::BadValue, ss);
                 }
 
                 // Add the child's cache data to the cache data we're creating for the main query.
@@ -256,8 +266,7 @@ namespace mongo {
             else {
                 // N solutions, rank them.  Takes ownership of orChildCQ.
 
-                // the working set will be shared by the candidate plans and owned by the runner
-                WorkingSet* sharedWorkingSet = new WorkingSet();
+                _ws->clear();
 
                 auto_ptr<MultiPlanStage> multiPlanStage(new MultiPlanStage(_collection,
                                                                            orChildCQ.get()));
@@ -268,38 +277,29 @@ namespace mongo {
                     verify(StageBuilder::build(_txn,
                                                _collection,
                                                *solutions[ix],
-                                               sharedWorkingSet,
+                                               _ws,
                                                &nextPlanRoot));
 
                     // Owns first two arguments
-                    multiPlanStage->addPlan(solutions[ix], nextPlanRoot, sharedWorkingSet);
+                    multiPlanStage->addPlan(solutions[ix], nextPlanRoot, _ws);
                 }
 
                 multiPlanStage->pickBestPlan();
                 if (!multiPlanStage->bestPlanChosen()) {
-                    QLOG() << "Subplanner: Failed to pick best plan for subchild "
-                           << orChildCQ->toString();
-                    return false;
-                }
-
-                scoped_ptr<PlanExecutor> exec(new PlanExecutor(sharedWorkingSet,
-                                                               multiPlanStage.release(),
-                                                               _collection));
-
-                _child.reset(exec->releaseStages());
-
-                if (_killed) {
-                    QLOG() << "Subplanner: Killed while picking best plan for subchild "
-                           << orChild->toString();
-                    return false;
+                    mongoutils::str::stream ss;
+                    ss << "Failed to pick best plan for subchild "
+                       << orChildCQ->toString();
+                    return Status(ErrorCodes::BadValue, ss);
                 }
 
                 QuerySolution* bestSoln = multiPlanStage->bestSolution();
+                _child.reset(multiPlanStage.release());
 
                 if (SolutionCacheData::USE_INDEX_TAGS_SOLN != bestSoln->cacheData->solnType) {
-                    QLOG() << "Subplanner: No indexed cache data for subchild "
-                           << orChild->toString();
-                    return false;
+                    mongoutils::str::stream ss;
+                    ss << "No indexed cache data for subchild "
+                       << orChild->toString();
+                    return Status(ErrorCodes::BadValue, ss);
                 }
 
                 // Add the index assignments to our original query.
@@ -307,9 +307,10 @@ namespace mongo {
                     orChild, bestSoln->cacheData->tree.get(), _indexMap);
 
                 if (!tagStatus.isOK()) {
-                    QLOG() << "Subplanner: Failed to extract indices from subchild "
-                           << orChild->toString();
-                    return false;
+                    mongoutils::str::stream ss;
+                    ss << "Failed to extract indices from subchild "
+                       << orChild->toString();
+                    return Status(ErrorCodes::BadValue, ss);
                 }
 
                 cacheData->children.push_back(bestSoln->cacheData->tree->clone());
@@ -324,8 +325,9 @@ namespace mongo {
             *_query, theOr.release(), false, _plannerParams.indices);
 
         if (NULL == solnRoot) {
-            QLOG() << "Subplanner: Failed to build indexed data path for subplanned query\n";
-            return false;
+            mongoutils::str::stream ss;
+            ss << "Failed to build indexed data path for subplanned query\n";
+            return Status(ErrorCodes::BadValue, ss);
         }
 
         QLOG() << "Subplanner: fully tagged tree is " << solnRoot->toString();
@@ -336,8 +338,9 @@ namespace mongo {
                                                                       solnRoot);
 
         if (NULL == soln) {
-            QLOG() << "Subplanner: Failed to analyze subplanned query";
-            return false;
+            mongoutils::str::stream ss;
+            ss << "Failed to analyze subplanned query";
+            return Status(ErrorCodes::BadValue, ss);
         }
 
         // We want our franken-solution to be cached.
@@ -350,34 +353,28 @@ namespace mongo {
         // We use one of these even if there is one plan.  We do this so that the entry is cached
         // with stats obtained in the same fashion as a competitive ranking would have obtained
         // them.
+        _ws->clear();
         auto_ptr<MultiPlanStage> multiPlanStage(new MultiPlanStage(_collection, _query));
-        WorkingSet* ws = new WorkingSet();
         PlanStage* root;
-        verify(StageBuilder::build(_txn, _collection, *soln, ws, &root));
-        multiPlanStage->addPlan(soln, root, ws); // Takes ownership first two arguments.
+        verify(StageBuilder::build(_txn, _collection, *soln, _ws, &root));
+        multiPlanStage->addPlan(soln, root, _ws); // Takes ownership first two arguments.
 
         multiPlanStage->pickBestPlan();
         if (! multiPlanStage->bestPlanChosen()) {
-            QLOG() << "Subplanner: Failed to pick best plan for subchild "
-                   << _query->toString();
-            return false;
+            mongoutils::str::stream ss;
+            ss << "Failed to pick best plan for subchild "
+               << _query->toString();
+            return Status(ErrorCodes::BadValue, ss);
         }
 
-        scoped_ptr<PlanExecutor> exec(new PlanExecutor(ws, multiPlanStage.release(), _collection));
+        _child.reset(multiPlanStage.release());
 
-        _child.reset(exec->releaseStages());
-
-        return true;
+        return Status::OK();
     }
 
     bool SubplanStage::isEOF() {
         if (_killed) {
             return true;
-        }
-
-        // If we're still planning we're not done yet.
-        if (SubplanStage::PLANNING == _state) {
-            return false;
         }
 
         // If we're running we best have a runner.
@@ -397,60 +394,6 @@ namespace mongo {
 
         if (isEOF()) { return PlanStage::IS_EOF; }
 
-        if (SubplanStage::PLANNING == _state) {
-            // Try to run as sub-plans.
-            if (runSubplans()) {
-                // If runSubplans returns true we expect something here.
-                invariant(_child.get());
-            }
-            else if (!_killed) {
-                // Couldn't run as subplans so we'll just call normal getExecutor.
-                PlanExecutor* exec;
-
-                Status status = getExecutorAlwaysPlan(
-                    _txn, _collection, _query, _plannerParams, &exec);
-
-                if (!status.isOK()) {
-                    // We utterly failed.
-                    _killed = true;
-
-                    // Propagate the error to the user wrapped in a BSONObj
-                    WorkingSetID id = _ws->allocate();
-                    WorkingSetMember* member = _ws->get(id);
-                    member->state = WorkingSetMember::OWNED_OBJ;
-                    member->keyData.clear();
-                    member->loc = DiskLoc();
-
-                    BSONObjBuilder bob;
-                    bob.append("ok", status.isOK() ? 1.0 : 0.0);
-                    bob.append("code", status.code());
-                    bob.append("errmsg", status.reason());
-                    member->obj = bob.obj();
-
-                    *out = id;
-                    return PlanStage::FAILURE;
-                }
-                else {
-                    scoped_ptr<PlanExecutor> cleanupExec(exec);
-                    _child.reset(exec->releaseStages());
-                }
-            }
-
-            // We can change state when we're either killed or we have an underlying runner.
-            invariant(_killed || NULL != _child.get());
-            _state = SubplanStage::RUNNING;
-        }
-
-        if (_killed) {
-            return PlanStage::DEAD;
-        }
-
-        if (isEOF()) {
-            return PlanStage::IS_EOF;
-        }
-
-        // If we're here we should have planned already.
-        invariant(SubplanStage::RUNNING == _state);
         invariant(_child.get());
         return _child->work(out);
     }
@@ -505,6 +448,14 @@ namespace mongo {
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SUBPLAN));
         ret->children.push_back(_child->getStats());
         return ret.release();
+    }
+
+    const CommonStats* SubplanStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* SubplanStage::getSpecificStats() {
+        return NULL;
     }
 
 }  // namespace mongo

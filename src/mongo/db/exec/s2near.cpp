@@ -50,6 +50,7 @@ namespace mongo {
         _ws = ws;
         _worked = false;
         _failed = false;
+        _specificStats.keyPattern = _params.indexKeyPattern;
     }
 
     void S2NearStage::init() {
@@ -439,6 +440,14 @@ namespace mongo {
         // TODO: we can do better than this, need own common stats.
         _commonStats.isEOF = isEOF();
         return new PlanStageStats(_commonStats, STAGE_GEO_NEAR_2DSPHERE);
+    }
+
+    const CommonStats* S2NearStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* S2NearStage::getSpecificStats() {
+        return &_specificStats;
     }
 
 }  // namespace mongo
