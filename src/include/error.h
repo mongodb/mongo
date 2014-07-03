@@ -17,19 +17,6 @@
 #define	WT_HAVE_DIAGNOSTIC_YIELD
 #endif
 
-/* Return and branch-to-err-label cases for switch statements. */
-#define	WT_ILLEGAL_VALUE(session)					\
-	default:							\
-		return (__wt_illegal_value(session, NULL))
-#define	WT_ILLEGAL_VALUE_ERR(session)					\
-	default:							\
-		ret = __wt_illegal_value(session, NULL);		\
-		goto err
-#define	WT_ILLEGAL_VALUE_SET(session)					\
-	default:							\
-		ret = __wt_illegal_value(session, NULL);		\
-		break
-
 /* Set "ret" and branch-to-err-label tests. */
 #define	WT_ERR(a) do {							\
 	if ((ret = (a)) != 0)						\
@@ -105,14 +92,30 @@
 		ret = __ret;						\
 } while (0)
 
-#define	WT_PANIC_ERR(session, v, ...) do {				\
+/* Return and branch-to-err-label cases for switch statements. */
+#define	WT_ILLEGAL_VALUE(session)					\
+	default:							\
+		return (__wt_illegal_value(session, NULL))
+#define	WT_ILLEGAL_VALUE_ERR(session)					\
+	default:							\
+		WT_ERR(__wt_illegal_value(session, NULL))
+#define	WT_ILLEGAL_VALUE_SET(session)					\
+	default:							\
+		ret = __wt_illegal_value(session, NULL);		\
+		break
+
+#define	WT_PANIC_MSG(session, v, ...) do {				\
 	__wt_err(session, v, __VA_ARGS__);				\
 	(void)__wt_panic(session);					\
 } while (0)
-#define	WT_PANIC_RETX(session, ...) do {				\
-	__wt_errx(session, __VA_ARGS__);				\
+#define	WT_PANIC_ERR(session, v, ...) do {				\
+	WT_PANIC_MSG(session, v, __VA_ARGS__);				\
+	WT_ERR(WT_PANIC);						\
+} while (0)
+#define	WT_PANIC_RET(session, v, ...) do {				\
+	WT_PANIC_MSG(session, v, __VA_ARGS__);				\
 	/* Return WT_PANIC regardless of earlier return codes. */	\
-	return (__wt_panic(session));					\
+	return (WT_PANIC);						\
 } while (0)
 
 /*

@@ -872,7 +872,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 	/* In some cases, there had better not be any updates we can't write. */
 	if (F_ISSET(r, WT_SKIP_UPDATE_ERR))
-		WT_PANIC_RETX(session,
+		WT_PANIC_RET(session, EINVAL,
 		    "reconciliation illegally skipped an update");
 
 	/*
@@ -1166,7 +1166,7 @@ __rec_child_deleted(
 		 * write.
 		 */
 		if (F_ISSET(r, WT_SKIP_UPDATE_ERR))
-			WT_PANIC_RETX(session,
+			WT_PANIC_RET(session, EINVAL,
 			    "reconciliation illegally skipped an update");
 
 		/* If this page cannot be evicted, quit now. */
@@ -2455,7 +2455,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 */
 	len = WT_PTRDIFF32(r->first_free, bnd->start);
 	if (len >= r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree))
-		WT_PANIC_ERR(session, ret = WT_PANIC,
+		WT_PANIC_ERR(session, EINVAL,
 		    "Reconciliation remnant too large for the split buffer");
 
 	dsk = r->dsk.mem;

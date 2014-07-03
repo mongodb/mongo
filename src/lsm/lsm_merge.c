@@ -402,27 +402,22 @@ __wt_lsm_merge(
 
 	/*
 	 * We have no current way of continuing if the metadata update fails,
-	 * panic in that case, but put some effort into cleaning up after
-	 * ourselves here - so things have a chance of shutting down.
+	 * so we will panic in that case.  Put some effort into cleaning up
+	 * after ourselves here - so things have a chance of shutting down.
+	 *
+	 * Any errors that happened after the tree was locked are
+	 * fatal - we can't guarantee the state of the tree.
 	 */
-	ret = __wt_lsm_meta_write(session, lsm_tree);
-	if (ret != 0)
-		WT_ERR(WT_PANIC);
-
+	if ((ret = __wt_lsm_meta_write(session, lsm_tree)) != 0)
+		WT_PANIC_ERR(session, ret, "Failed finalizing LSM merge");
+	
 	lsm_tree->dsk_gen++;
 
 	/* Update the throttling while holding the tree lock. */
 	__wt_lsm_tree_throttle(session, lsm_tree, 1);
 
-err:	if (locked) {
+err:	if (locked)
 		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
-		/*
-		 * Any errors that happened after the tree was locked are
-		 * fatal - we can't guarantee the state of the tree.
-		 */
-		if (ret != 0)
-			WT_PANIC_RETX(session, "Failed finalizing LSM merge");
-	}
 	if (src != NULL)
 		WT_TRET(src->close(src));
 	if (dest != NULL)
