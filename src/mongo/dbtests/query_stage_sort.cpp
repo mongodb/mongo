@@ -193,6 +193,7 @@ namespace QueryStageSortTests {
 
             fillData();
             sortAndCheck(1, coll);
+            ctx.commit();
         }
     };
 
@@ -212,6 +213,7 @@ namespace QueryStageSortTests {
 
             fillData();
             sortAndCheck(-1, coll);
+            ctx.commit();
         }
     };
 
@@ -240,6 +242,7 @@ namespace QueryStageSortTests {
 
             fillData();
             sortAndCheck(-1, coll);
+            ctx.commit();
         }
     };
 
@@ -315,6 +318,7 @@ namespace QueryStageSortTests {
                 ASSERT(!member->hasLoc());
                 ++count;
             }
+            ctx.commit();
 
             // Returns all docs.
             ASSERT_EQUALS(limit() ? limit() : numObj(), count);
@@ -371,6 +375,7 @@ namespace QueryStageSortTests {
                     ws, new FetchStage(ws, new SortStage(params, ws, ms), NULL, coll), coll);
             Runner::RunnerState runnerState = runner.getNext(NULL, NULL);
             ASSERT_EQUALS(Runner::RUNNER_ERROR, runnerState);
+            ctx.commit();
         }
     };
 

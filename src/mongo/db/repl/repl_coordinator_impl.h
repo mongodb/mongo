@@ -32,6 +32,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <map>
+#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/optime.h"
@@ -86,11 +87,11 @@ namespace repl {
 
         virtual bool canAcceptWritesForDatabase(const StringData& database);
 
-        virtual bool canServeReadsFor(const NamespaceString& collection);
+        virtual Status canServeReadsFor(const NamespaceString& ns, bool slaveOk);
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptime(const OID& rid, const OpTime& ts, const BSONObj& config);
+        virtual Status setLastOptime(const OID& rid, const OpTime& opTime, const BSONObj& config);
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
@@ -107,8 +108,7 @@ namespace repl {
                                         BSONObjBuilder* resultObj);
 
         virtual Status processReplSetReconfig(OperationContext* txn,
-                                              const BSONObj& newConfigObj,
-                                              bool force,
+                                              const ReplSetReconfigArgs& args,
                                               BSONObjBuilder* resultObj);
 
         virtual Status processReplSetInitiate(OperationContext* txn,
@@ -119,17 +119,10 @@ namespace repl {
 
         virtual void incrementRollbackID();
 
-        virtual Status processReplSetFresh(const StringData& setName,
-                                           const StringData& who,
-                                           unsigned id,
-                                           int cfgver,
-                                           const OpTime& opTime,
+        virtual Status processReplSetFresh(const ReplSetFreshArgs& args,
                                            BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetElect(const StringData& set,
-                                           unsigned whoid,
-                                           int cfgver,
-                                           const OID& round,
+        virtual Status processReplSetElect(const ReplSetElectArgs& args,
                                            BSONObjBuilder* resultObj);
 
         virtual Status processReplSetUpdatePosition(const BSONArray& updates,
@@ -148,12 +141,25 @@ namespace repl {
 
     private:
 
+        // Struct that holds information about clients waiting for replication
+        struct WaiterInfo;
+
+        /*
+         * Returns true if the given writeConcern is satisfied up to "optime"
+         */
+        bool _opReplicatedEnough_inlock(const OpTime& opTime,
+                                        const WriteConcernOptions& writeConcern);
+
+
         // Protects all member data of this ReplicationCoordinator
         mutable boost::mutex _mutex;
 
-        // Condition variable that is signaled by setLastOptime to wake up any threads waiting
-        // in awaitReplication for their write concern to be satisfied.
-        boost::condition_variable _optimeUpdatedCondition;
+        // list of information about clients waiting on replication.  Does *not* own the
+        // WaiterInfos.
+        std::vector<WaiterInfo*> _replicationWaiterList;
+
+        // Set to true when we are in the process of shutting down replication
+        bool _inShutdown;
 
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator
         boost::scoped_ptr<TopologyCoordinator> _topCoord;
@@ -165,7 +171,9 @@ namespace repl {
         boost::scoped_ptr<boost::thread> _topCoordDriverThread;
 
         // Maps nodes in this replication group to the last oplog operation they have committed
-        std::map<HostAndPort, OpTime> _hostOptimeMap;
+        // TODO(spencer): change to unordered_map
+        typedef std::map<OID, OpTime> SlaveOpTimeMap;
+        SlaveOpTimeMap _slaveOpTimeMap;
 
         // Current ReplicaSet state
         MemberState _currentState;

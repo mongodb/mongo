@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/find_and_modify.h"
 
@@ -42,8 +42,11 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     /* Find and Modify an object returning either the old (default) or new value*/
     class CmdFindAndModify : public Command {
@@ -134,7 +137,9 @@ namespace mongo {
                                       string& errmsg) {
 
             Lock::DBWrite lk(txn->lockState(), ns);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context cx(txn, ns);
+            
             Collection* collection = cx.db()->getCollection( txn, ns );
 
             const WhereCallbackReal whereCallback = WhereCallbackReal(StringData(ns));
@@ -297,7 +302,7 @@ namespace mongo {
                     
                 }
             }
-            
+            wunit.commit();
             return true;
         }
         
@@ -330,6 +335,7 @@ namespace mongo {
             }
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, ns);
 
             BSONObj out = db.findOne(ns, q, fields);
@@ -423,9 +429,9 @@ namespace mongo {
 
             result.append("value", out);
 
+            wunit.commit();
             return true;
         }
     } cmdFindAndModify;
-
 
 }

@@ -132,7 +132,7 @@ namespace repl {
         // we should already be locked...
         bool connect() {
           std::string err;
-          if (!connInfo->cc->connect(_hostport, err)) {
+          if (!connInfo->cc->connect(HostAndPort(_hostport), err)) {
             log() << "couldn't connect to " << _hostport << ": " << err << rsLog;
             return false;
           }

@@ -73,7 +73,7 @@ namespace {
     using std::vector;
 
     const std::string CONFIG_HOST_PORT = "$dummy_config:27017";
-    const ConnectionString CONFIG_LOC( CONFIG_HOST_PORT );
+    const ConnectionString CONFIG_LOC((HostAndPort(CONFIG_HOST_PORT)));
 
     // TODO: Test config server down
     // TODO: Test read of chunks with new epoch
@@ -285,7 +285,7 @@ namespace {
     };
 
     TEST_F(NoChunkHereFixture, CheckNumChunk) {
-        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
         ConnectionString configLoc( confServerStr );
         MetadataLoader loader( configLoc );
 
@@ -388,7 +388,7 @@ namespace {
 
     TEST_F(ConfigServerFixture, SingleChunkCheckNumChunk) {
         // Load from mock server.
-        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
         ConnectionString configLoc( confServerStr );
         MetadataLoader loader( configLoc );
         CollectionMetadata metadata;
@@ -401,7 +401,7 @@ namespace {
     }
 
     TEST_F(ConfigServerFixture, SingleChunkGetNext) {
-        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
         ConnectionString configLoc( confServerStr );
         MetadataLoader loader( configLoc );
         CollectionMetadata metadata;
@@ -412,7 +412,7 @@ namespace {
     }
 
     TEST_F(ConfigServerFixture, SingleChunkGetShardKey) {
-        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
         ConnectionString configLoc( confServerStr );
         MetadataLoader loader( configLoc );
         CollectionMetadata metadata;
@@ -422,7 +422,7 @@ namespace {
     }
 
     TEST_F(ConfigServerFixture, SingleChunkGetMaxCollVersion) {
-        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
         ConnectionString configLoc( confServerStr );
         MetadataLoader loader( configLoc );
         CollectionMetadata metadata;
@@ -433,7 +433,7 @@ namespace {
     }
 
     TEST_F(ConfigServerFixture, SingleChunkGetMaxShardVersion) {
-        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
         ConnectionString configLoc( confServerStr );
         MetadataLoader loader( configLoc );
         CollectionMetadata metadata;
@@ -446,7 +446,7 @@ namespace {
     TEST_F(ConfigServerFixture, NoChunks) {
         getConfigServer()->remove( ChunkType::ConfigNS, BSONObj() );
 
-        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
         ConnectionString configLoc( confServerStr );
         MetadataLoader loader( configLoc );
         CollectionMetadata metadata;
@@ -466,7 +466,7 @@ namespace {
             mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
             MockConnRegistry::get()->addServer( _dummyConfig.get() );
 
-            ConnectionString confServerStr( CONFIG_HOST_PORT );
+            ConnectionString confServerStr((HostAndPort(CONFIG_HOST_PORT)));
             ConnectionString configLoc( confServerStr );
             _loader.reset( new MetadataLoader( configLoc ) );
         }
@@ -738,7 +738,7 @@ namespace {
     // TODO: MockServer functionality does not support selective query - consider
     // inserting nothing at all to chunk/collections collection
     TEST_F(ConfigServerFixture, EmptyDataForNS) {
-        ConnectionString confServerStr( CONFIG_HOST_PORT );
+        ConnectionString confServerStr(HostAndPort(CONFIG_HOST_PORT));
         ConnectionString configLoc( confServerStr );
         MetadataLoader loader( configLoc );
         CollectionMetadata metadata;
@@ -778,7 +778,7 @@ namespace {
                     ChunkType::shard("shard0000"));
             _dummyConfig->insert( ChunkType::ConfigNS, fooSingle );
 
-            ConnectionString confServerStr( CONFIG_HOST_PORT );
+            ConnectionString confServerStr(HostAndPort(CONFIG_HOST_PORT));
             ConnectionString configLoc( confServerStr );
             MetadataLoader loader( configLoc );
             Status status = loader.makeCollectionMetadata( "not.sharded", // br
@@ -874,7 +874,7 @@ namespace {
                     ChunkType::shard("shard0000"));
             _dummyConfig->insert( ChunkType::ConfigNS, fooSingle );
 
-            ConnectionString confServerStr( CONFIG_HOST_PORT );
+            ConnectionString confServerStr(HostAndPort(CONFIG_HOST_PORT));
             ConnectionString configLoc( confServerStr );
             MetadataLoader loader( configLoc );
             CollectionMetadata metadata;

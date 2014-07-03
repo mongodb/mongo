@@ -1,4 +1,4 @@
-// commands.cpp
+// dbeval.cpp
 
 /**
 *    Copyright (C) 2012 10gen Inc.
@@ -143,6 +143,7 @@ namespace mongo {
             }
 
             Lock::GlobalWrite lk(txn->lockState());
+            // No WriteUnitOfWork necessary, as dbEval will create its own, see "nolock" case above
             Client::Context ctx(txn,  dbname );
 
             return dbEval(dbname, cmdObj, result, errmsg);

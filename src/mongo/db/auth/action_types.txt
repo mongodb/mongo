@@ -65,6 +65,7 @@
 "invalidateUserCache",
 "killCursors",
 "killop",
+"listCollections",
 "listDatabases",
 "listShards",
 "logRotate",

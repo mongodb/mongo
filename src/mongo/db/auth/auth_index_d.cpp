@@ -95,6 +95,7 @@ namespace {
             while ((oldIndex = indexCatalog->findIndexByKeyPattern(v1SystemUsersKeyPattern))) {
                 indexCatalog->dropIndex(txn, oldIndex);
             }
+            wctx.commit();
         }
     }
 

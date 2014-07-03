@@ -55,7 +55,7 @@ public:
         string errmsg;
 
         Timer connectTimer;
-        while (!dest.connect(mongoBridgeGlobalParams.destUri, errmsg)) {
+        while (!dest.connect(HostAndPort(mongoBridgeGlobalParams.destUri), errmsg)) {
             // If we can't connect for the configured timeout, give up
             //
             if (connectTimer.seconds() >= mongoBridgeGlobalParams.connectTimeoutSec) {

@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/auth/authorization_session.h"
 
 #include <string>
@@ -46,6 +48,8 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kAccessControl);
 
 namespace {
     const std::string ADMIN_DBNAME = "admin";

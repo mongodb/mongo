@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/query/new_find.h"
 
 #include "mongo/client/dbclientinterface.h"
@@ -44,7 +46,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/query/type_explain.h"
-#include "mongo/db/repl/repl_reads_ok.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
@@ -52,6 +54,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -109,6 +112,8 @@ namespace {
 
 namespace mongo {
 
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
+
     // TODO: Move this and the other command stuff in newRunQuery outta here and up a level.
     static bool runCommands(OperationContext* txn,
                             const char *ns,
@@ -163,7 +168,10 @@ namespace mongo {
         // passing in a query object (necessary to check SlaveOK query option), the only state where
         // reads are allowed is PRIMARY (or master in master/slave).  This function uasserts if
         // reads are not okay.
-        repl::replVerifyReadsOk(ns, NULL);
+        Status status = repl::getGlobalReplicationCoordinator()->canServeReadsFor(
+                NamespaceString(ns),
+                true);
+        uassertStatusOK(status);
 
         // A pin performs a CC lookup and if there is a CC, increments the CC's pin value so it
         // doesn't time out.  Also informs ClientCursor that there is somebody actively holding the
@@ -581,7 +589,11 @@ namespace mongo {
         txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
-        repl::replVerifyReadsOk(cq->ns(), &pq);
+        bool slaveOK = pq.hasOption(QueryOption_SlaveOk) || pq.hasReadPref();
+        status = repl::getGlobalReplicationCoordinator()->canServeReadsFor(
+                NamespaceString(cq->ns()),
+                slaveOK);
+        uassertStatusOK(status);
 
         // If this exists, the collection is sharded.
         // If it doesn't exist, we can assume we're not sharded.

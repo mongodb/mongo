@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/client/replica_set_monitor.h"
 
 #include <algorithm>
@@ -36,6 +38,7 @@
 #include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/util/concurrency/mutex.h" // for StaticObserver
 #include "mongo/util/background.h"
+#include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
 
@@ -48,6 +51,9 @@
 #endif
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
+
 namespace {
     // Pull nested types to top-level scope
     typedef ReplicaSetMonitor::IsMasterReply IsMasterReply;

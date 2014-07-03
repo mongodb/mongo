@@ -145,6 +145,7 @@ namespace mongo {
         virtual ~DBConnectionHook() {}
         virtual void onCreate( DBClientBase * conn ) {}
         virtual void onHandedOut( DBClientBase * conn ) {}
+        virtual void onRelease(DBClientBase* conn) {}
         virtual void onDestroy( DBClientBase * conn ) {}
     };
 
@@ -192,6 +193,7 @@ namespace mongo {
         void onCreate( DBClientBase * conn );
         void onHandedOut( DBClientBase * conn );
         void onDestroy( DBClientBase * conn );
+        void onRelease(DBClientBase* conn);
 
         void flush();
 

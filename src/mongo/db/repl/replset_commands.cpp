@@ -187,11 +187,11 @@ namespace repl {
                 return false;
             }
 
-            BSONObj newConfigObj =  cmdObj["replSetReconfig"].Obj();
-            bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
+            ReplicationCoordinator::ReplSetReconfigArgs parsedArgs;
+            parsedArgs.newConfigObj =  cmdObj["replSetReconfig"].Obj();
+            parsedArgs.force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
             Status status = getGlobalReplicationCoordinator()->processReplSetReconfig(txn,
-                                                                                      newConfigObj,
-                                                                                      force,
+                                                                                      parsedArgs,
                                                                                       &result);
             return appendCommandStatus(result, status);
         }

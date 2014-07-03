@@ -69,7 +69,7 @@ namespace mongo {
     }
 
     CollectionCatalogEntry* RocksDatabaseCatalogEntry::getCollectionCatalogEntry( OperationContext* txn,
-                                                                                  const StringData& ns ) {
+                                                                                  const StringData& ns ) const {
         RocksEngine::Entry* entry = _engine->getEntry( ns );
         if ( !entry )
             return NULL;

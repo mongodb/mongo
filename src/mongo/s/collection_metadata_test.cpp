@@ -103,7 +103,7 @@ namespace {
 
             _dummyConfig->insert( ChunkType::ConfigNS, chunkType.toBSON() );
 
-            ConnectionString configLoc( CONFIG_HOST_PORT );
+            ConnectionString configLoc = ConnectionString( HostAndPort(CONFIG_HOST_PORT) );
             MetadataLoader loader( configLoc );
 
             Status status = loader.makeCollectionMetadata( "test.foo",
@@ -497,7 +497,7 @@ namespace {
                     ChunkType::shard("shard0000"));
             _dummyConfig->insert( ChunkType::ConfigNS, fooSingle );
 
-            ConnectionString configLoc( CONFIG_HOST_PORT );
+            ConnectionString configLoc( (HostAndPort(CONFIG_HOST_PORT)) );
             MetadataLoader loader( configLoc );
 
             Status status = loader.makeCollectionMetadata( "test.foo",
@@ -838,7 +838,7 @@ namespace {
                     ChunkType::shard("shard0000"));
             _dummyConfig->insert( ChunkType::ConfigNS, fooSingle );
 
-            ConnectionString configLoc( CONFIG_HOST_PORT );
+            ConnectionString configLoc((HostAndPort(CONFIG_HOST_PORT)));
             MetadataLoader loader( configLoc );
 
             Status status = loader.makeCollectionMetadata( "test.foo",
@@ -908,7 +908,7 @@ namespace {
                     ChunkType::DEPRECATED_epoch(epoch) <<
                     ChunkType::shard("shard0000")) );
 
-            ConnectionString configLoc( CONFIG_HOST_PORT );
+            ConnectionString configLoc((HostAndPort(CONFIG_HOST_PORT)));
             MetadataLoader loader( configLoc );
 
             Status status = loader.makeCollectionMetadata( "test.foo",
@@ -1186,7 +1186,7 @@ namespace {
                         ChunkType::shard("shard0000")) );
             }
 
-            ConnectionString configLoc( CONFIG_HOST_PORT );
+            ConnectionString configLoc((HostAndPort(CONFIG_HOST_PORT)));
             MetadataLoader loader( configLoc );
 
             Status status = loader.makeCollectionMetadata( "test.foo",

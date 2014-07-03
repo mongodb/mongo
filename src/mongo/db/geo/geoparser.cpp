@@ -600,6 +600,8 @@ namespace mongo {
             if (!parseLegacyPoint(center.Obj(), &out->circle.center)) { return false; }
             BSONElement radius = objIt.next();
             out->circle.radius = radius.number();
+            if (out->circle.radius < 0)
+                return false;
             out->crs = FLAT;
         } else {
             verify(isLegacyCenterSphere(obj));
@@ -615,6 +617,8 @@ namespace mongo {
             centerPoint = coordToPoint(x.Number(), y.Number());
             BSONElement radiusElt = objIt.next();
             double radius = radiusElt.number();
+            if (radius < 0)
+                return false;
             out->cap = S2Cap::FromAxisAngle(centerPoint, S1Angle::Radians(radius));
             out->circle.radius = radius;
             out->circle.center = Point(x.Number(), y.Number());

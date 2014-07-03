@@ -44,10 +44,6 @@ namespace mongo {
             setWireVersions(minWireVersion, maxWireVersion);
         }
 
-        CustomDirectClient(OperationContext* txn) : DBDirectClient(txn) {
-            setWireVersions(minWireVersion, maxWireVersion);
-        }
-
         virtual ConnectionString::ConnectionType type() const {
             return ConnectionString::CUSTOM;
         }
@@ -107,7 +103,7 @@ namespace mongo {
          * Returns a connection std::string to the virtual config server.
          */
         ConnectionString configSvr() const {
-            return ConnectionString(std::string("$dummy:10000"));
+            return ConnectionString(HostAndPort("$dummy:10000"));
         }
 
         /**

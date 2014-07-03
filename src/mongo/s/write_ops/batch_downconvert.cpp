@@ -26,13 +26,18 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/write_ops/batch_downconvert.h"
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     Status BatchSafeWriter::extractGLEErrors( const BSONObj& gleResponse, GLEErrors* errors ) {
 

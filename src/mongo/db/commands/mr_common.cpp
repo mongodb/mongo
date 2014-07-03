@@ -53,27 +53,29 @@ namespace mongo {
             else if (cmdObj["out"].type() == Object) {
                 BSONObj o = cmdObj["out"].embeddedObject();
 
-                BSONElement e = o.firstElement();
-                string t = e.fieldName();
-
-                if (t == "normal" || t == "replace") {
+                if (o.hasElement("normal")) {
                     outputOptions.outType = REPLACE;
-                    outputOptions.collectionName = e.String();
+                    outputOptions.collectionName = o["normal"].String();
                 }
-                else if (t == "merge") {
+                else if (o.hasElement("replace")) {
+                    outputOptions.outType = REPLACE;
+                    outputOptions.collectionName = o["replace"].String();
+                }
+                else if (o.hasElement("merge")) {
                     outputOptions.outType = MERGE;
-                    outputOptions.collectionName = e.String();
+                    outputOptions.collectionName = o["merge"].String();
                 }
-                else if (t == "reduce") {
+                else if (o.hasElement("reduce")) {
                     outputOptions.outType = REDUCE;
-                    outputOptions.collectionName = e.String();
+                    outputOptions.collectionName = o["reduce"].String();
                 }
-                else if (t == "inline") {
+                else if (o.hasElement("inline")) {
                     outputOptions.outType = INMEMORY;
                 }
                 else {
                     uasserted(13522,
-                              mongoutils::str::stream() << "unknown out specifier [" << t << "]");
+                              str::stream() << "please specify one of "
+                                            << "[replace|merge|reduce|inline] in 'out' object");
                 }
 
                 if (o.hasElement("db")) {

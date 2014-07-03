@@ -79,6 +79,9 @@ namespace mongo {
             std::string foo = obj["foo"].String(); // std::exception if not a std::string type or DNE
         */
         std::string String()        const { return chk(mongo::String).str(); }
+        const StringData checkAndGetStringData() const {
+            return chk(mongo::String).valueStringData();
+        }
         Date_t Date()               const { return chk(mongo::Date).date(); }
         double Number()             const { return chk(isNumber()).number(); }
         double Double()             const { return chk(NumberDouble)._numberDouble(); }
@@ -275,6 +278,14 @@ namespace mongo {
         /** Get the std::string value of the element.  If not a std::string returns "". */
         std::string str() const {
             return type() == mongo::String ? std::string(valuestr(), valuestrsize()-1) : std::string();
+        }
+
+        /**
+         * Returns a StringData pointing into this element's data.  Does not validate that the
+         * element is actually of type String.
+         */
+        const StringData valueStringData() const {
+            return StringData(valuestr(), valuestrsize() - 1);
         }
 
         /** Get javascript code of a CodeWScope data element. */

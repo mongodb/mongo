@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/repl/sync.h"
 
 #include <string>
@@ -40,6 +42,9 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
 namespace repl {
 
     void Sync::setHostname(const string& hostname) {
@@ -124,6 +129,7 @@ namespace repl {
             return false;
         }
         else {
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Collection* collection = ctx.db()->getOrCreateCollection(txn, ns);
             invariant(collection != NULL); // should never happen
 
@@ -133,6 +139,7 @@ namespace repl {
                     result.isOK() );
 
             LOG(1) << "replication inserted missing doc: " << missingObj.toString() << endl;
+            wunit.commit();
             return true;
         }
     }

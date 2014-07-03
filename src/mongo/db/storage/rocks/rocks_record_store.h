@@ -72,17 +72,17 @@ namespace mongo {
         virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                                   const char* data,
                                                   int len,
-                                                  int quotaMax );
+                                                  bool enforceQuota );
 
         virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                                   const DocWriter* doc,
-                                                  int quotaMax );
+                                                  bool enforceQuota );
 
         virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
                                                   const DiskLoc& oldLocation,
                                                   const char* data,
                                                   int len,
-                                                  int quotaMax,
+                                                  bool enforceQuota,
                                                   UpdateMoveNotifier* notifier );
 
         virtual Status updateWithDamages( OperationContext* txn,

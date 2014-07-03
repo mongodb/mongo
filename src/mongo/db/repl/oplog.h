@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include <cstddef>
+#include <string>
+
 namespace mongo {
     class BSONObj;
     class Database;

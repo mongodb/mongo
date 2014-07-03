@@ -116,13 +116,13 @@ namespace mongo {
 
         virtual Status init(OperationContext* txn);
 
-        virtual size_t numFiles() const;
+        virtual int numFiles() const;
         virtual long long fileSize() const;
 
         virtual DiskLoc allocateExtent( OperationContext* txn,
                                         bool capped,
                                         int size,
-                                        int quotaMax );
+                                        bool enforceQuota );
 
         virtual void freeExtents( OperationContext* txn,
                                   DiskLoc firstExt, DiskLoc lastExt );

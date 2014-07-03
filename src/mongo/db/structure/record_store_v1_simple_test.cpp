@@ -160,7 +160,7 @@ namespace {
         SimpleRecordStoreV1 rs( &txn, myns, md, &em, false );
 
         BSONObj obj = docForRecordSize( 300 );
-        StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), 0 );
+        StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), false);
         ASSERT( result.isOK() );
 
         // The length of the allocated record is quantized.
@@ -180,7 +180,7 @@ namespace {
         SimpleRecordStoreV1 rs( &txn, myns + "$x", md, &em, false );
 
         BSONObj obj = docForRecordSize( 300 );
-        StatusWith<DiskLoc> result = rs.insertRecord(&txn,  obj.objdata(), obj.objsize(), 0 );
+        StatusWith<DiskLoc> result = rs.insertRecord(&txn,  obj.objdata(), obj.objsize(), false);
         ASSERT( result.isOK() );
 
         // The length of the allocated record is not quantized.
@@ -198,7 +198,7 @@ namespace {
         SimpleRecordStoreV1 rs( &txn, myns + "$x", md, &em, false );
 
         BSONObj obj = docForRecordSize( 298 );
-        StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), 0 );
+        StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), false);
         ASSERT( result.isOK() );
 
         ASSERT_EQUALS( 300, rs.dataFor( result.getValue() ).size() + Record::HeaderSize );
@@ -220,7 +220,7 @@ namespace {
         }
 
         BSONObj obj = docForRecordSize( 300 );
-        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), false);
         ASSERT_OK( actualLocation.getStatus() );
 
         {
@@ -251,7 +251,7 @@ namespace {
         }
 
         BSONObj obj = docForRecordSize( 300 );
-        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), false);
         ASSERT_OK( actualLocation.getStatus() );
 
         {
@@ -285,7 +285,7 @@ namespace {
         }
 
         BSONObj obj = docForRecordSize( 300 );
-        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), false);
         ASSERT_OK( actualLocation.getStatus() );
 
         {
@@ -320,7 +320,7 @@ namespace {
 
 
         BSONObj obj = docForRecordSize( 300 );
-        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), false);
         ASSERT_OK( actualLocation.getStatus() );
 
         {
@@ -357,7 +357,7 @@ namespace {
         }
 
         BSONObj obj = docForRecordSize( 319 );
-        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), false);
         ASSERT_OK( actualLocation.getStatus() );
 
         // Even though 319 would be quantized to 320 and 344 - 320 == 24 could become a new
@@ -481,7 +481,7 @@ namespace {
             initializeV1RS(&txn, recs, drecs, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -531,9 +531,9 @@ namespace {
             initializeV1RS(&txn, recs, drecs, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -611,9 +611,9 @@ namespace {
             initializeV1RS(&txn, recs, drecs, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0); // takes from bigger bucket
-        rs.insertRecord(&txn, zeros, 70 - Record::HeaderSize, 0); // removes a 75-sized drec
-        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0); // now sees big-enough drec
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, false); // takes from bigger bucket
+        rs.insertRecord(&txn, zeros, 70 - Record::HeaderSize, false); // removes a 75-sized drec
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, false); // now sees big-enough drec
 
         {
             LocAndSize recs[] = {
@@ -724,9 +724,9 @@ namespace {
             initializeV1RS(&txn, recs, drecs, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0);
-        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, false);
 
         {
             LocAndSize recs[] = {

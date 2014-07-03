@@ -31,6 +31,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/namespace_string.h"
 
@@ -49,6 +50,8 @@ namespace mongo {
         const NamespaceString& ns() const { return _ns; }
 
         // ------- indexes ----------
+
+        virtual CollectionOptions getCollectionOptions() const = 0;
 
         virtual int getTotalIndexCount() const = 0;
 

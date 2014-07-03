@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/structure/catalog/namespace_index.h"
 
 #include <boost/filesystem/operations.hpp>
@@ -36,8 +38,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
 
     NamespaceDetails* NamespaceIndex::details(const StringData& ns) {
         Namespace n(ns);

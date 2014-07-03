@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/background.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index_builder.h"
@@ -39,8 +41,11 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     /* "dropIndexes" is now the preferred form - "deleteIndexes" deprecated */
     class CmdDropIndexes : public Command {
@@ -94,11 +99,17 @@ namespace mongo {
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
-            if (ok && !fromRepl)
+            if (!ok) {
+                return false;
+            }
+            if (!fromRepl)
                 repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
-            return ok;
+            wunit.commit();
+            return true;
         }
+
         bool wrappedRun(OperationContext* txn,
                         const string& dbname,
                         BSONObj& jsobj,
@@ -222,6 +233,7 @@ namespace mongo {
             LOG(0) << "CMD: reIndex " << toDeleteNs << endl;
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, toDeleteNs);
 
             Collection* collection = ctx.db()->getCollection( txn, toDeleteNs );
@@ -272,6 +284,7 @@ namespace mongo {
             result.appendArray( "indexes" , b.obj() );
 
             IndexBuilder::restoreIndexes(indexesInProg);
+            wunit.commit();
             return true;
         }
     } cmdReIndex;

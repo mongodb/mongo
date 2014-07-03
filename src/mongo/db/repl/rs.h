@@ -73,8 +73,6 @@ namespace repl {
     // Main entry point for replica sets
     void startReplSets(ReplSetSeedList *replSetSeedList);
 
-    bool isCurrentlyAReplSetPrimary();
-
     /**
      * does local authentication
      * directly authorizes against AuthenticationInfo

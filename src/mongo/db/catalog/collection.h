@@ -275,8 +275,7 @@ namespace mongo {
                                              const BSONObj& doc,
                                              bool enforceQuota );
 
-        // @return 0 for inf., otherwise a number of files
-        int largestFileNumberInQuota() const;
+        bool _enforceQuota( bool userEnforeQuota ) const;
 
         int _magic;
 

@@ -30,7 +30,6 @@
  */
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 
@@ -105,7 +104,7 @@ namespace mongo {
     StatusWith<DiskLoc> RocksRecordStore::insertRecord( OperationContext* txn,
                                                         const char* data,
                                                         int len,
-                                                        int quotaMax ) {
+                                                        bool enforceQuota ) {
 
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
@@ -120,7 +119,7 @@ namespace mongo {
 
     StatusWith<DiskLoc> RocksRecordStore::insertRecord( OperationContext* txn,
                                                         const DocWriter* doc,
-                                                        int quotaMax ) {
+                                                        bool enforceQuota ) {
         invariant( false );
     }
 
@@ -128,7 +127,7 @@ namespace mongo {
                                                         const DiskLoc& loc,
                                                         const char* data,
                                                         int len,
-                                                        int quotaMax,
+                                                        bool enforceQuota,
                                                         UpdateMoveNotifier* notifier ) {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 

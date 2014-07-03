@@ -28,70 +28,71 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/logger/log_tag.h"
+#include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity.h"
 
 namespace mongo {
 namespace logger {
 
     /**
-     * Contains log severities for a list of log tags.
+     * Contains log severities for a list of log components.
      * kDefault always has a log severity defined but it is not necessary to
-     * provide log severities for the other tags (up to but not including kNumLogTags).
+     * provide log severities for the other components (up to but not including kNumLogComponents).
      */
-    class LogTagSettings {
-        MONGO_DISALLOW_COPYING(LogTagSettings);
+    class LogComponentSettings {
+        MONGO_DISALLOW_COPYING(LogComponentSettings);
     public:
-        LogTagSettings();
-        ~LogTagSettings();
+        LogComponentSettings();
+        ~LogComponentSettings();
 
         /**
-         * Returns true if a minimum log severity has been set for this tag.
-         * Used by log level commands to query tag severity configuration.
+         * Returns true if a minimum log severity has been set for this component.
+         * Used by log level commands to query component severity configuration.
          */
-        bool hasMinimumLogSeverity(LogTag tag) const;
+        bool hasMinimumLogSeverity(LogComponent component) const;
 
         /**
-         * Gets the minimum log severity for tag.
-         * Result is defined only if hasMinimumLogSeverity() returns true for tag.
+         * Gets the minimum log severity for component.
+         * Result is defined only if hasMinimumLogSeverity() returns true for component.
          */
-        LogSeverity getMinimumLogSeverity(LogTag tag) const;
+        LogSeverity getMinimumLogSeverity(LogComponent component) const;
 
         /**
-         * Sets the minimum log severity for tag.
+         * Sets the minimum log severity for component.
          */
-        void setMinimumLoggedSeverity(LogTag tag, LogSeverity severity);
+        void setMinimumLoggedSeverity(LogComponent component, LogSeverity severity);
 
         /**
-         * Clears the minimum log severity for tag.
+         * Clears the minimum log severity for component.
          * For kDefault, severity level is initialized to default value.
          */
-        void clearMinimumLoggedSeverity(LogTag tag);
+        void clearMinimumLoggedSeverity(LogComponent component);
 
         /**
          * Predicate that answers the question, "Should I, the caller, append to you, the log
-         * domain, tagged messages of the given severity?"  True means yes.
+         * domain, componentged messages of the given severity?"  True means yes.
          *
-         * No tags provided means to check against kDefault only.
+         * No components provided means to check against kDefault only.
          *
-         * If a tag is specified but minimum severity levels are not configured,
+         * If a component is specified but minimum severity levels are not configured,
          * compare 'severity' against the configured level for kDefault.
          */
         bool shouldLog(LogSeverity severity) const;
-        bool shouldLog(LogTag tag, LogSeverity severity) const;
+        bool shouldLog(LogComponent component, LogSeverity severity) const;
 
     private:
-        // True if a log severity is explicitly set for a tag.
-        // This differentiates between unconfigured tags and tags that happen to have the same
-        // severity as kDefault.
-        // This is also used to update the severities of unconfigured tags when the severity for
-        // kDefault is modified.
-        bool _hasMinimumLoggedSeverity[LogTag::kNumLogTags];
+        // True if a log severity is explicitly set for a component.
+        // This differentiates between unconfigured components and components that happen to have
+        // the same severity as kDefault.
+        // This is also used to update the severities of unconfigured components when the severity
+        // for kDefault is modified.
+        bool _hasMinimumLoggedSeverity[LogComponent::kNumLogComponents];
 
-        // Log severities for tags.
+        // Log severities for components.
         // Store numerical values of severities to be cache-line friendly.
         // Set to kDefault minimum logged severity if _hasMinimumLoggedSeverity[i] is false.
-        char _minimumLoggedSeverity[LogTag::kNumLogTags];
+        char _minimumLoggedSeverity[LogComponent::kNumLogComponents];
     };
+
 }  // namespace logger
 }  // namespace mongo

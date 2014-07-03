@@ -53,16 +53,19 @@ namespace QueryStageDistinct {
         virtual ~DistinctBase() {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
+            ctx.commit();
         }
 
         void addIndex(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns());
             _client.ensureIndex(ns(), obj);
+            ctx.commit();
         }
 
         void insert(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns());
             _client.insert(ns(), obj);
+            ctx.commit();
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj) {

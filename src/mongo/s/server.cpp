@@ -28,7 +28,7 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/server.h"
 
@@ -88,6 +88,8 @@
 #include "mongo/util/version.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
 #if defined(_WIN32)
     ntservice::NtServiceDefaultStrings defaultServiceStrings = {
@@ -222,6 +224,10 @@ static bool runMongosServer( bool doUpgrade ) {
 
     ReplicaSetMonitor::setConfigChangeHook(
         stdx::bind(&ConfigServer::replicaSetChange, &configServer, stdx::placeholders::_1 , stdx::placeholders::_2));
+
+    // Mongos connection pools already takes care of authenticating new connections so the
+    // replica set connection shouldn't need to.
+    DBClientReplicaSet::setAuthPooledSecondaryConn(false);
 
     if (getHostName().empty()) {
         dbexit(EXIT_BADOPTIONS);

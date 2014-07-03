@@ -237,6 +237,15 @@ env.Library('spin_lock', ["util/concurrency/spin_lock.cpp"])
 env.CppUnitTest('spin_lock_test', ['util/concurrency/spin_lock_test.cpp'],
                 LIBDEPS=['spin_lock', '$BUILD_DIR/third_party/shim_boost'])
 
+env.Library('hostandport', ['util/net/hostandport.cpp'],
+            LIBDEPS=[
+                'foundation',
+                'server_options_core',
+            ])
+
+env.CppUnitTest('hostandport_test', ['util/net/hostandport_test.cpp'],
+                LIBDEPS=['hostandport'])
+
 env.Library('network', [
             "util/net/sock.cpp",
             "util/net/socket_poll.cpp",
@@ -250,6 +259,7 @@ env.Library('network', [
                      'background_job',
                      'fail_point',
                      'foundation',
+                     'hostandport',
                      'server_options_core',
             ])
 
@@ -594,7 +604,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/repl/sync_tail.cpp",
                     "db/repl/sync_source_feedback.cpp",
                     "db/repl/oplogreader.cpp",
-                    "db/repl/repl_reads_ok.cpp",
                     "db/repl/resync.cpp",
                     "db/repl/oplog.cpp",
                     "db/repl/topology_coordinator_impl.cpp",
@@ -661,6 +670,8 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/commands/auth_schema_upgrade_d.cpp",
                     "db/commands/create_indexes.cpp",
                     "db/commands/dbhash.cpp",
+                    "db/commands/list_collections.cpp",
+                    "db/commands/list_databases.cpp",
                     "db/commands/merge_chunks_cmd.cpp",
                     "db/commands/cleanup_orphaned_cmd.cpp",
                     "db/commands/collection_to_capped.cpp",
@@ -856,6 +867,19 @@ env.CppUnitTest(
     target="index_filter_commands_test",
     source=[
         "db/commands/index_filter_commands_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/coredb",
+    ],
+    NO_CRUTCH = True,
+)
+
+env.CppUnitTest(
+    target="mr_test",
+    source=[
+        "db/commands/mr_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/serveronly",

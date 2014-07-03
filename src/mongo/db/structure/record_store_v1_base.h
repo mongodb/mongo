@@ -137,17 +137,17 @@ namespace mongo {
         StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                           const char* data,
                                           int len,
-                                          int quotaMax );
+                                          bool enforceQuota );
 
         StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                           const DocWriter* doc,
-                                          int quotaMax );
+                                          bool enforceQuota );
 
         virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
                                                   const DiskLoc& oldLocation,
                                                   const char* data,
                                                   int len,
-                                                  int quotaMax,
+                                                  bool enforceQuota,
                                                   UpdateMoveNotifier* notifier );
 
         virtual Status updateWithDamages( OperationContext* txn,
@@ -157,7 +157,7 @@ namespace mongo {
 
         virtual RecordIterator* getIteratorForRepair() const;
 
-        void increaseStorageSize( OperationContext* txn, int size, int quotaMax );
+        void increaseStorageSize( OperationContext* txn, int size, bool enforceQuota );
 
         virtual Status validate( OperationContext* txn,
                                  bool full, bool scanData,
@@ -212,7 +212,7 @@ namespace mongo {
 
         virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
                                                  int lengthWithHeaders,
-                                                 int quotaMax ) = 0;
+                                                 bool enforceQuota ) = 0;
 
         // TODO: document, remove, what have you
         virtual void addDeletedRec( OperationContext* txn, const DiskLoc& dloc) = 0;
@@ -252,7 +252,7 @@ namespace mongo {
         StatusWith<DiskLoc> _insertRecord( OperationContext* txn,
                                            const char* data,
                                            int len,
-                                           int quotaMax );
+                                           bool enforceQuota );
 
         scoped_ptr<RecordStoreV1MetaData> _details;
         ExtentManager* _extentManager;

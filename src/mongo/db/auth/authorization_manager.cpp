@@ -760,8 +760,7 @@ namespace {
             return false;
         const StringData cmdName(cmdObj.firstElement().fieldNameStringData());
         if (cmdName == "drop") {
-            return isAuthzCollection(StringData(cmdObj.firstElement().valuestr(),
-                                                cmdObj.firstElement().valuestrsize() - 1));
+            return isAuthzCollection(cmdObj.firstElement().valueStringData());
         }
         else if (cmdName == "dropDatabase") {
             return true;

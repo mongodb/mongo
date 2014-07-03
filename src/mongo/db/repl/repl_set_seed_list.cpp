@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/repl/repl_set_seed_list.h"
 
 #include <boost/thread.hpp>
@@ -41,6 +43,9 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
 namespace repl {
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */

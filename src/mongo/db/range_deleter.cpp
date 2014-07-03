@@ -38,6 +38,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/range_arithmetic.h"
 #include "mongo/util/concurrency/synchronization.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
@@ -93,6 +94,8 @@ namespace {
 }
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     namespace duration = boost::posix_time;
 

@@ -33,11 +33,11 @@ namespace mongo {
 namespace logger {
 
     /**
-     * Log tags.
-     * Debug messages logged using the LOG() or MONGO_LOG_TAG()
-     * macros may be associated with one or more log tags.
+     * Log components.
+     * Debug messages logged using the LOG() or MONGO_LOG_COMPONENT().
+     * Macros may be associated with one or more log components.
      */
-    class LogTag {
+    class LogComponent {
     public:
         enum Value {
             kDefault = 0,
@@ -51,16 +51,16 @@ namespace logger {
             kSharding,
             kStorage,
             kWrites,
-            kNumLogTags
+            kNumLogComponents
         };
 
-        /* implicit */ LogTag(Value value) : _value(value) {}
+        /* implicit */ LogComponent(Value value) : _value(value) {}
 
         operator Value() const { return _value; }
 
         /**
-         * Returns short name of log tag.
-         * Used to generate server parameter names in the format "logLevel_<tag short name>".
+         * Returns short name of log component.
+         * Used to generate server parameter names in the format "logLevel_<component short name>".
          */
         std::string getShortName() const;
 

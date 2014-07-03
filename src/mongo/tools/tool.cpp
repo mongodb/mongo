@@ -33,6 +33,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 #include <iostream>
+#include <limits>
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/init.h"
@@ -294,9 +295,13 @@ namespace mongo {
     }
 
     long long BSONTool::processFile( const boost::filesystem::path& root ) {
+        bool isFifoFile = boost::filesystem::status(root).type() == boost::filesystem::fifo_file;
+        bool isStdin = root == "-";
+
         std::string fileName = root.string();
 
-        unsigned long long fileLength = file_size( root );
+        unsigned long long fileLength = (isFifoFile || isStdin) ?
+            std::numeric_limits<unsigned long long>::max() : file_size(root);
 
         if ( fileLength == 0 ) {
             toolInfoOutput() << "file " << fileName << " empty, skipping" << std::endl;
@@ -304,19 +309,21 @@ namespace mongo {
         }
 
 
-        FILE* file = fopen( fileName.c_str() , "rb" );
+        FILE* file = isStdin ? stdin : fopen( fileName.c_str() , "rb" );
         if ( ! file ) {
             toolError() << "error opening file: " << fileName << " " << errnoWithDescription()
                       << std::endl;
             return 0;
         }
 
+        if (!isFifoFile && !isStdin) {
 #ifdef POSIX_FADV_SEQUENTIAL
-        posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
+            posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
 
-        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
-            toolInfoOutput() << "\t file size: " << fileLength << std::endl;
+            if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
+                toolInfoOutput() << "\t file size: " << fileLength << std::endl;
+            }
         }
 
         unsigned long long read = 0;
@@ -327,13 +334,20 @@ namespace mongo {
         boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
         char * buf = buf_holder.get();
 
-        ProgressMeter m(fileLength);
-        if (!toolGlobalParams.quiet) {
-            m.setUnits( "bytes" );
+        // no progress is available for FIFO
+        // only for regular files
+        boost::scoped_ptr<ProgressMeter> m;
+        if (!toolGlobalParams.quiet && !isFifoFile && !isStdin) {
+            m.reset(new ProgressMeter( fileLength ));
+            m->setUnits( "bytes" );
         }
 
         while ( read < fileLength ) {
             size_t amt = fread(buf, 1, 4, file);
+            // end of fifo
+            if ((isFifoFile || isStdin) && ::feof(file)) {
+                break;
+            }
             verify( amt == 4 );
 
             int size = ((int*)buf)[0];
@@ -371,14 +385,18 @@ namespace mongo {
             read += o.objsize();
             num++;
 
-            if (!toolGlobalParams.quiet) {
-                m.hit(o.objsize());
+            if (m.get()) {
+                m->hit(o.objsize());
             }
         }
 
-        fclose( file );
+        if (!isStdin) {
+            fclose(file);
+        }
 
-        uassert(10265, "counts don't match", read == fileLength);
+        if (!isFifoFile && !isStdin) {
+            uassert(10265, "counts don't match", read == fileLength);
+        }
         toolInfoOutput() << num << ((num == 1) ? " document" : " documents")
                          << " found" << std::endl;
         if (bsonToolGlobalParams.hasFilter) {

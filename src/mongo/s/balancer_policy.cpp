@@ -27,17 +27,20 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <algorithm>
 
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/config.h"
+#include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"
 
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     string TagRange::toString() const {
         return str::stream() << min << " -->> " << max << "  on  " << tag;

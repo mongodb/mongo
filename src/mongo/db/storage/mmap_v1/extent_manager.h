@@ -70,14 +70,14 @@ namespace mongo {
          */
         virtual Status init(OperationContext* txn) = 0;
 
-        virtual size_t numFiles() const = 0;
+        virtual int numFiles() const = 0;
         virtual long long fileSize() const = 0;
 
         // must call Extent::reuse on the returned extent
         virtual DiskLoc allocateExtent( OperationContext* txn,
                                         bool capped,
                                         int size,
-                                        int quotaMax ) = 0;
+                                        bool enforceQuota ) = 0;
 
         /**
          * firstExt has to be == lastExt or a chain

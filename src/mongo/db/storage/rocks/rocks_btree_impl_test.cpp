@@ -35,7 +35,7 @@
 #include <rocksdb/slice.h>
 #include <rocksdb/options.h>
 
-#include "mongo/db/operation_context.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/rocks/rocks_btree_impl.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
@@ -45,56 +45,11 @@ using namespace mongo;
 
 namespace mongo {
 
-    class MyOperationContext : public OperationContext {
+    class MyOperationContext : public OperationContextNoop {
     public:
-        MyOperationContext( rocksdb::DB* db ) {
-            _recoveryUnit.reset( new RocksRecoveryUnit( db, false ) );
+        MyOperationContext( rocksdb::DB* db )
+            : OperationContextNoop( new RocksRecoveryUnit( db, false ) ) {
         }
-
-        virtual ~MyOperationContext() { }
-
-        CurOp* getCurOp() const {
-            invariant(false);
-            return NULL;
-        }
-
-        virtual RecoveryUnit* recoveryUnit() const {
-            return _recoveryUnit.get();
-        }
-
-        virtual LockState* lockState() const {
-            return NULL;
-        }
-
-        virtual ProgressMeter* setMessage( const char * msg,
-                                           const std::string &name,
-                                           unsigned long long progressMeterTotal,
-                                           int secondsBetween ) {
-            invariant(false);
-            return NULL;
-        }
-
-        virtual void checkForInterrupt( bool heedMutex ) const { }
-
-        virtual Status checkForInterruptNoAssert() const {
-            return Status::OK();
-        }
-
-        virtual bool isPrimaryFor( const StringData& ns ) {
-            return true;
-        }
-
-        virtual const char* getNS() const {
-            return NULL;
-        };
-
-        virtual Transaction* getTransaction() {
-            return NULL;
-        }
-
-    private:
-        boost::scoped_ptr<RocksRecoveryUnit> _recoveryUnit;
-
     };
 
     rocksdb::DB* getDB() {

@@ -31,6 +31,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -48,6 +49,7 @@ namespace mongo {
             , modifiers(modifiers_)
             , numDocsModified(numDocsModified_)
             , numMatched(numMatched_) {
+            MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kQuery);
 
             BSONElement id = upsertedObject_["_id"];
             if ( ! existing && numMatched == 1 && !id.eoo() ) {

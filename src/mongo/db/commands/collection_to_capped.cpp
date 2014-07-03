@@ -153,9 +153,13 @@ namespace mongo {
             }
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, dbname);
 
             Status status = cloneCollectionAsCapped( txn, ctx.db(), from, to, size, temp, true );
+            if (status.isOK()) {
+                wunit.commit();
+            }
             return appendCommandStatus( result, status );
         }
     } cmdCloneCollectionAsCapped;
@@ -196,10 +200,17 @@ namespace mongo {
             return std::vector<BSONObj>();
         }
 
-        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& jsobj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl ) {
             // calls renamecollection which does a global lock, so we must too:
             //
             Lock::GlobalWrite globalWriteLock(txn->lockState());
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, dbname);
 
             Database* db = ctx.db();
@@ -242,6 +253,8 @@ namespace mongo {
 
             if (!fromRepl)
                 repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+
+            wunit.commit();
             return true;
         }
     } cmdConvertToCapped;

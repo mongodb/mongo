@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include <boost/algorithm/string.hpp>
 
 #include "mongo/db/dbhelpers.h"
@@ -39,12 +41,16 @@
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/text.h"
 
 using namespace bson;
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
 namespace repl {
 
     mongo::mutex ReplSetConfig::groupMx("RS tag group");
@@ -94,6 +100,7 @@ namespace {
                                      false/*logOp=false; local db so would work regardless...*/);
             if( !comment.isEmpty() && (!theReplSet || theReplSet->isPrimary()) )
                 logOpInitiate(&txn, comment);
+            cx.commit();
         }
         log() << "replSet saveConfigLocally done" << rsLog;
     }
@@ -508,7 +515,7 @@ namespace {
                     m.h = HostAndPort(s);
                     if ( !m.h.hasPort() ) {
                         // make port explicit even if default 
-                        m.h.setPort(m.h.port());
+                        m.h = HostAndPort(m.h.host(), m.h.port());
                     }
                 }
                 catch (const DBException& e) {
