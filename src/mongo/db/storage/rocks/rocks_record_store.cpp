@@ -162,7 +162,6 @@ namespace mongo {
 
     StatusWith<DiskLoc> RocksRecordStore::insertRecord( OperationContext* txn,
                                                         const DocWriter* doc,
-                                                        int quotaMax,
                                                         bool enforceQuota ) {
 
         const int len = doc->documentSize();
@@ -378,7 +377,7 @@ namespace mongo {
         boost::mutex::scoped_lock lk( _idLock );
         int ofs = _nextIdNum >> 32;
         int a = (_nextIdNum << 32) >> 32;
-        DiskLoc loc( ofs, a );
+        DiskLoc loc( a, ofs );
         _nextIdNum++;
         return loc;
     }
@@ -476,7 +475,8 @@ namespace mongo {
 
     RecordData RocksRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
         // XXX is this actually an optimization?
-        if (*reinterpret_cast<const DiskLoc*>( _iterator->key().data() ) == loc) {
+        if (_iterator->Valid() && 
+                *reinterpret_cast<const DiskLoc*>( _iterator->key().data() ) == loc) {
             rocksdb::Slice data_slice = _iterator->value();
 
             boost::shared_array<char> data( new char[data_slice.size()] );

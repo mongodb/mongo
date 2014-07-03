@@ -70,6 +70,23 @@ namespace mongo {
 
         return db;
     }
+    rocksdb::DB* getDBPersist() {
+        string path = "/tmp/mongo-rocks-test";
+
+        rocksdb::Options options;
+        // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
+        options.IncreaseParallelism();
+        options.OptimizeLevelStyleCompaction();
+        // create the DB if it's not already present
+        options.create_if_missing = true;
+
+        // open DB
+        rocksdb::DB* db;
+        rocksdb::Status s = rocksdb::DB::Open(options, path, &db);
+        ASSERT(s.ok());
+
+        return db;
+    }
 
     TEST( RocksRecoveryUnitTest, Simple1 ) {
         scoped_ptr<rocksdb::DB> db( getDB() );
@@ -330,7 +347,8 @@ namespace mongo {
     TEST( RocksRecordStoreTest, Stats1 ) {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
-        RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), db->DefaultColumnFamily() );
+        RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), 
+                                                    db->DefaultColumnFamily() );
         string s = "eliot was here";
 
         {
@@ -354,4 +372,206 @@ namespace mongo {
         }
     }
 
+    TEST( RocksRecordStoreTest, Persistence1 ) {
+        DiskLoc loc;
+        string s = "eliot was here";
+        string s1 = "antonio was here";
+
+        {
+            scoped_ptr<rocksdb::DB> db( getDB() );
+
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), 
+                                                      db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc = res.getValue();
+                }
+
+                ASSERT_EQUALS( s, rs.dataFor( loc ).data() );
+            }
+        }
+
+        {
+            scoped_ptr<rocksdb::DB> db( getDBPersist() );
+
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), 
+                                                      db->DefaultColumnFamily() );
+
+            ASSERT_EQUALS( (long long) s.size() + 1, rs.dataSize() );
+            ASSERT_EQUALS( 1, rs.numRecords() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    StatusWith<DiskLoc> res = rs.updateRecord( &opCtx, loc, s1.c_str(), 
+                                                                        s1.size() + 1, -1, NULL );
+                    ASSERT_OK( res.getStatus() );
+                }
+
+                ASSERT_EQUALS( s1, rs.dataFor( loc ).data() );
+            }
+        }
+
+        {
+            scoped_ptr<rocksdb::DB> db( getDBPersist() );
+
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), 
+                                                      db->DefaultColumnFamily() );
+
+            ASSERT_EQUALS( (long long) s1.size() + 1, rs.dataSize() );
+            ASSERT_EQUALS( 1, rs.numRecords() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    rs.deleteRecord( &opCtx, loc );
+                }
+            }
+
+            ASSERT_EQUALS( 0, rs.dataSize() );
+            ASSERT_EQUALS( 0, rs.numRecords() );
+        }
+    }
+
+    TEST( RocksRecordStoreTest, ForwardIterator ) {
+        {
+            scoped_ptr<rocksdb::DB> db( getDB() );
+
+            rocksdb::ColumnFamilyHandle* cf1;
+            rocksdb::ColumnFamilyHandle* cf1_m;
+
+            rocksdb::Status status;
+
+            status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1", &cf1 );
+            ASSERT( status.ok() );
+            status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
+            ASSERT( status.ok() );
+
+            RocksRecordStore rs( "foo.bar", db.get(), cf1, cf1_m );
+            string s = "eliot was here";
+            string s1 = "antonio was here";
+            string s2 = "eliot and antonio were here";
+            DiskLoc loc1, loc2, loc3;
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc1 = res.getValue();
+                    res = rs.insertRecord( &opCtx, s1.c_str(), s1.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc2 = res.getValue();
+                    res = rs.insertRecord( &opCtx, s2.c_str(), s2.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc3 = res.getValue();
+                }
+            }
+
+            scoped_ptr<RecordIterator> iter(rs.getIterator());
+            ASSERT_EQUALS( false, iter->isEOF() );
+            ASSERT_EQUALS( s, iter->dataFor(loc1).data() );
+            ASSERT_EQUALS( loc1, iter->getNext() );
+            ASSERT_EQUALS( s1, iter->dataFor(loc2).data() );
+            ASSERT_EQUALS( loc2, iter->getNext() );
+            ASSERT_EQUALS( s2, iter->dataFor(loc3).data() );
+            ASSERT_EQUALS( loc3, iter->getNext() );
+            ASSERT_EQUALS( true, iter->isEOF() );
+        }
+    }
+
+    TEST( RocksRecordStoreTest, BackwardIterator ) {
+        {
+            scoped_ptr<rocksdb::DB> db( getDB() );
+
+            rocksdb::ColumnFamilyHandle* cf1;
+            rocksdb::ColumnFamilyHandle* cf1_m;
+
+            rocksdb::Status status;
+
+            status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1", &cf1 );
+            ASSERT( status.ok() );
+            status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
+            ASSERT( status.ok() );
+
+            RocksRecordStore rs( "foo.bar", db.get(), cf1, cf1_m );
+            string s = "eliot was here";
+            string s1 = "antonio was here";
+            string s2 = "eliot and antonio were here";
+            DiskLoc loc1, loc2, loc3;
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc1 = res.getValue();
+                    res = rs.insertRecord( &opCtx, s1.c_str(), s1.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc2 = res.getValue();
+                    res = rs.insertRecord( &opCtx, s2.c_str(), s2.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc3 = res.getValue();
+                }
+            }
+
+            scoped_ptr<RecordIterator> iter(rs.getIterator(DiskLoc(), false, 
+                                             CollectionScanParams::BACKWARD));
+            ASSERT_EQUALS( false, iter->isEOF() );
+            ASSERT_EQUALS( s2, iter->dataFor(loc3).data() );
+            ASSERT_EQUALS( loc3, iter->getNext() );
+            ASSERT_EQUALS( s1, iter->dataFor(loc2).data() );
+            ASSERT_EQUALS( loc2, iter->getNext() );
+            ASSERT_EQUALS( s, iter->dataFor(loc1).data() );
+            ASSERT_EQUALS( loc1, iter->getNext() );
+            ASSERT_EQUALS( true, iter->isEOF() );
+        }
+    }
+
+    TEST( RocksRecordStoreTest, Truncate1 ) {
+        scoped_ptr<rocksdb::DB> db( getDB() );
+
+        {
+            rocksdb::ColumnFamilyHandle* cf1;
+            rocksdb::ColumnFamilyHandle* cf1_m;
+
+            rocksdb::Status status;
+
+            status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1", &cf1 );
+            ASSERT( status.ok() );
+            status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
+            ASSERT( status.ok() );
+
+            RocksRecordStore rs( "foo.bar", db.get(), cf1, cf1_m );
+            string s = "eliot was here";
+
+            {
+                MyOperationContext opCtx( db.get() );
+                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
+                ASSERT_OK( res.getStatus() );
+                res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
+                ASSERT_OK( res.getStatus() );
+            }
+
+            {
+                MyOperationContext opCtx( db.get() );
+                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                Status stat = rs.truncate( &opCtx );
+                ASSERT_OK( stat );
+
+                ASSERT_EQUALS( 0, rs.numRecords() );
+                ASSERT_EQUALS( 0, rs.dataSize() );
+            }
+        }
+    }
 }
