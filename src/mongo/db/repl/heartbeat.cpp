@@ -75,7 +75,7 @@ namespace repl {
 
             /* we don't call ReplSetCommand::check() here because heartbeat
                checks many things that are pre-initialization. */
-            if( !replSet ) {
+            if (!replSettings.usingReplSets()) {
                 errmsg = "not running with --replSet";
                 return false;
             }

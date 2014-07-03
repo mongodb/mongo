@@ -48,8 +48,10 @@ namespace mongo {
 namespace repl {
 
     void appendReplicationInfo(OperationContext* txn, BSONObjBuilder& result, int level) {
-        if ( replSet ) {
-            if( theReplSet == 0 || theReplSet->state().shunned() ) {
+        if (replSettings.usingReplSets()) {
+            ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+            if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet
+                    || replCoord->getCurrentMemberState().shunned()) {
                 result.append("ismaster", false);
                 result.append("secondary", false);
                 result.append("info", ReplSet::startupStatusMsg.get());
@@ -71,7 +73,7 @@ namespace repl {
                               getGlobalReplicationCoordinator()->isMasterForReportingPurposes());
         }
         
-        if ( level && replSet ) {
+        if (level && replSettings.usingReplSets()) {
             result.append( "info" , "is replica set" );
         }
         else if ( level ) {

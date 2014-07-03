@@ -46,7 +46,6 @@ namespace repl {
     
     using namespace bson;
 
-    bool replSet = false;
     ReplSet *theReplSet = 0;
 
     // This is a bitmask with the first bit set. It's used to mark connections that should be kept
@@ -120,7 +119,6 @@ namespace repl {
         try {
             verify( theReplSet == 0 );
             if( replSetSeedList == 0 ) {
-                verify(!replSet);
                 return;
             }
             replLocalAuth();

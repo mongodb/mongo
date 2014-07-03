@@ -32,7 +32,8 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/repl/rs.h" // replSet bool
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/rs.h"
 
 namespace mongo {
 namespace repl {
@@ -54,7 +55,7 @@ namespace repl {
 
         // TODO(spencer): Remove this once all command processing happens in the repl coordinator
         bool check(string& errmsg, BSONObjBuilder& result) {
-            if( !replSet ) {
+            if (!replSettings.usingReplSets()) {
                 errmsg = "not running with --replSet";
                 if (serverGlobalParams.configsvr) {
                     result.append("info", "configsvr"); // for shell prompt

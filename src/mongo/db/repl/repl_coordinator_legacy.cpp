@@ -76,7 +76,6 @@ namespace repl {
             }
             newRepl();
 
-            replSet = true;
             ReplSetSeedList *replSetSeedList = new ReplSetSeedList(replSettings.replSet);
             boost::thread t(stdx::bind(&startReplSets, replSetSeedList));
         } else {
@@ -291,7 +290,7 @@ namespace {
     bool LegacyReplicationCoordinator::canAcceptWritesForDatabase(const StringData& dbName) {
         // we must check replSet since because getReplicationMode() isn't aware of modeReplSet
         // until theReplSet is initialized
-        if (replSet) {
+        if (replSettings.usingReplSets()) {
             if (theReplSet && getCurrentMemberState().primary()) {
                 return true;
             }
@@ -490,7 +489,7 @@ namespace {
 
 namespace {
     Status _checkReplEnabledForCommand(BSONObjBuilder* result) {
-        if( !replSet ) {
+        if (!replSettings.usingReplSets()) {
             if (serverGlobalParams.configsvr) {
                 result->append("info", "configsvr"); // for shell prompt
             }
@@ -580,7 +579,7 @@ namespace {
 
         log() << "replSet replSetInitiate admin command received from client" << rsLog;
 
-        if( !replSet ) {
+        if (!replSettings.usingReplSets()) {
             return Status(ErrorCodes::NoReplicationEnabled, "server is not running with --replSet");
         }
 
