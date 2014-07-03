@@ -432,9 +432,8 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 	int force, grew;
 
 	cp = __wt_process.cache_pool;
-	read_pressure = 0;
-	grew = 0;
 	force = (cp->currently_used > cp->size);
+	grew = 0;
 	if (WT_VERBOSE_ISSET(cp->session, WT_VERB_SHARED_CACHE)) {
 		WT_RET(__wt_verbose(cp->session,
 		    WT_VERB_SHARED_CACHE, "Cache pool distribution: "));
