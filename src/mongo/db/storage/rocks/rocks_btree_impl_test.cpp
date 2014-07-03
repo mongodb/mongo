@@ -208,10 +208,74 @@ namespace mongo {
                 cursor->advance();
 
                 // make sure that the cursor can't "see" anything added after it was created.
-                ASSERT_TRUE( cursor-> isEOF() );
+                ASSERT( cursor-> isEOF() );
+                ASSERT_FALSE( cursor->locate( BSON( "" << 3 ), DiskLoc(1,3) ) );
+                ASSERT( cursor->isEOF() );
             }
         }
     }
 
+    TEST( RocksRecordStoreTest, SaveAndRestorePosition ) {
+        scoped_ptr<rocksdb::DB> db( getDB() );
+
+        {
+            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                }
+            }
+
+            {
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+                ASSERT( cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
+
+                // save the position
+                cursor->savePosition();
+
+                // advance to the end
+                while ( !cursor->isEOF() ) {
+                    cursor->advance();
+                }
+
+                ASSERT( cursor->isEOF() );
+
+                // restore position
+                cursor->restorePosition();
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
+
+                // repeat, with a different value
+                ASSERT( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+
+                // save the position
+                cursor->savePosition();
+
+                // advance to the end
+                while ( !cursor->isEOF() ) {
+                    cursor->advance();
+                }
+
+                // restore position
+                cursor->restorePosition();
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+            }
+        }
+    }
 
 }

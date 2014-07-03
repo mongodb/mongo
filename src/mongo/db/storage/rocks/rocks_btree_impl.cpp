@@ -196,11 +196,14 @@ namespace mongo {
             }
 
             void savePosition() {
-                _savedKey = _iterator->key();
+                _savePositionObj = getKey();
+                _savePositionLoc = getDiskLoc();
             }
 
             void restorePosition() {
-                _iterator->Seek( _savedKey );
+                _iterator->SeekToFirst();
+                _cached = false;
+                invariant( locate( _savePositionObj, _savePositionLoc ) );
             }
 
         private:
@@ -228,7 +231,8 @@ namespace mongo {
             mutable DiskLoc _cachedLoc;
 
             // not for caching, but for savePosition() and restorePosition()
-            mutable rocksdb::Slice _savedKey;
+            mutable BSONObj _savePositionObj;
+            mutable DiskLoc _savePositionLoc;
 
             // we store the snapshot and database so that we can free the snapshot when we're done
             // using the cursor
