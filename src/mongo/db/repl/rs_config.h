@@ -135,30 +135,6 @@ namespace repl {
         std::string _id;
         int version;
 
-        struct HealthOptions {
-        HealthOptions() :  heartbeatSleepMillis(2000), 
-                heartbeatTimeoutMillis( 10000 ),
-                heartbeatConnRetries(2) 
-            { }
-            
-            unsigned heartbeatSleepMillis;
-            unsigned heartbeatTimeoutMillis;
-            unsigned heartbeatConnRetries ;
-
-            void check() {
-                uassert(13112, "bad replset heartbeat option", heartbeatSleepMillis >= 10);
-                uassert(13113, "bad replset heartbeat option", heartbeatTimeoutMillis >= 10);
-            }
-
-            bool operator==(const HealthOptions& r) const {
-                return (heartbeatSleepMillis==r.heartbeatSleepMillis && 
-                        heartbeatTimeoutMillis==r.heartbeatTimeoutMillis &&
-                        heartbeatConnRetries==r.heartbeatConnRetries);
-            }
-        };
-
-        HealthOptions ho;
-
         BSONObj getLastErrorDefaults;
         std::map<std::string,TagRule*> rules;
 
