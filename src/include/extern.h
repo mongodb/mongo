@@ -1137,7 +1137,6 @@ extern int __wt_cond_alloc(WT_SESSION_IMPL *session,
 extern int __wt_cond_wait(WT_SESSION_IMPL *session,
     WT_CONDVAR *cond,
     long usecs);
-extern int __wt_cond_has_waiters(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp);
 extern int __wt_rwlock_alloc( WT_SESSION_IMPL *session,
