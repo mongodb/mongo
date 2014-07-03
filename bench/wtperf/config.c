@@ -405,7 +405,6 @@ config_opt_file(CONFIG *cfg, const char *filename)
 	char *comment, *file_buf, *line, *ltrim, *rtrim;
 
 	file_buf = NULL;
-	fd = -1;
 
 	if ((fd = open(filename, O_RDONLY)) == -1) {
 		fprintf(stderr, "wtperf: %s: %s\n", filename, strerror(errno));
