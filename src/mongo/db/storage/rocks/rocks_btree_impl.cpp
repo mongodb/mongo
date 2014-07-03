@@ -158,6 +158,7 @@ namespace mongo {
                            bool afterKey,
                            const vector<const BSONElement*>& keyEnd,
                            const vector<bool>& keyEndInclusive) {
+                // first keyBeginLen of keyBegin, the rest from keyEnd (starting at keyBeginLen + 1'th index 
                 invariant( !"rocksdb has no advanceTo" );
             }
 
