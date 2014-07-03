@@ -126,10 +126,12 @@ namespace mongo {
 
     TEST( RocksRecordStoreTest, Insert1 ) {
         scoped_ptr<rocksdb::DB> db( getDB() );
+        int size;
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), db->DefaultColumnFamily() );
             string s = "eliot was here";
+            size = s.length() + 1;
 
             MyOperationContext opCtx( db.get() );
             DiskLoc loc;
@@ -142,13 +144,19 @@ namespace mongo {
 
             ASSERT_EQUALS( s, rs.dataFor( loc ).data() );
         }
+
+        {
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), db->DefaultColumnFamily() );
+            ASSERT_EQUALS( 1, rs.numRecords() );
+            ASSERT_EQUALS( size, rs.dataSize() );
+        }
     }
 
     TEST( RocksRecordStoreTest, Delete1 ) {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), db->DefaultColumnFamily() );
             string s = "eliot was here";
 
             DiskLoc loc;
@@ -162,6 +170,8 @@ namespace mongo {
                 }
 
                 ASSERT_EQUALS( s, rs.dataFor( loc ).data() );
+                ASSERT_EQUALS( 1, rs.numRecords() );
+                ASSERT_EQUALS( (long long) s.length() + 1, rs.dataSize() );
             }
 
             ASSERT( rs.dataFor( loc ).data() != NULL );
@@ -181,7 +191,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), db->DefaultColumnFamily() );
             string s1 = "eliot1";
             string s2 = "eliot2 and more";
 
@@ -225,7 +235,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), db->DefaultColumnFamily() );
             string s1 = "aaa111bbb";
             string s2 = "aaa222bbb";
 
@@ -272,6 +282,8 @@ namespace mongo {
 
         rocksdb::ColumnFamilyHandle* cf1;
         rocksdb::ColumnFamilyHandle* cf2;
+        rocksdb::ColumnFamilyHandle* cf1_m;
+        rocksdb::ColumnFamilyHandle* cf2_m;
 
         rocksdb::Status status;
 
@@ -280,8 +292,13 @@ namespace mongo {
         status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar2", &cf2 );
         ASSERT( status.ok() );
 
-        RocksRecordStore rs1( "foo.bar1", db, cf1 );
-        RocksRecordStore rs2( "foo.bar2", db, cf2 );
+        status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
+        ASSERT( status.ok() );
+        status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar2&", &cf2_m );
+        ASSERT( status.ok() );
+
+        RocksRecordStore rs1( "foo.bar1", db, cf1, cf1_m );
+        RocksRecordStore rs2( "foo.bar2", db, cf2, cf2_m );
 
         DiskLoc a;
         DiskLoc b;
@@ -313,7 +330,7 @@ namespace mongo {
     TEST( RocksRecordStoreTest, Stats1 ) {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
-        RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily() );
+        RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), db->DefaultColumnFamily() );
         string s = "eliot was here";
 
         {

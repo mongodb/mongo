@@ -76,6 +76,12 @@ namespace mongo {
         return entry->collectionEntry.get();
     }
 
+    IndexAccessMethod* getIndex( OperationContext* txn,
+                                             const CollectionCatalogEntry* collection,
+                                             IndexCatalogEntry* index ) {
+        invariant(!"getIndex nyi");
+    }
+
     RecordStore* RocksDatabaseCatalogEntry::getRecordStore( OperationContext* txn,
                                                             const StringData& ns ) {
         RocksEngine::Entry* entry = _engine->getEntry( ns );

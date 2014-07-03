@@ -95,10 +95,23 @@ namespace mongo {
 
             invariant( handles.size() == families.size() );
 
+            std::map<string, int> metadataMap;
+            for ( unsigned i = 0; i < families.size(); i++ ) {
+                string ns = families[i].name;
+                if ( ns.find( '&' ) == string::npos ) {
+                    continue;
+                }
+                string collection = ns.substr( 0, ns.find( '&' ) );
+                metadataMap.emplace(collection, i);
+            }
+
             for ( unsigned i = 0; i < families.size(); i++ ) {
                 string ns = families[i].name;
                 ROCKS_TRACE << "RocksEngine found ns: " << ns;
                 string collection = ns;
+                if ( ns.find( '&' ) != string::npos ) {
+                    continue;
+                }
                 bool isIndex = ns.find( '$' ) != string::npos;
                 if ( isIndex ) {
                     collection = ns.substr( 0, ns.find( '$' ) );
@@ -118,7 +131,8 @@ namespace mongo {
                 }
                 else {
                     entry->cfHandle.reset( handles[i] );
-                    entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i] ) );
+                    entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i], 
+                                                                    handles[metadataMap[ns]]) );
                     entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
                 }
             }
@@ -240,16 +254,28 @@ namespace mongo {
             warning() << "RocksEngine doesn't support capped collections yet, using normal";
         }
 
+        if (ns.toString().find('$') != string::npos ||
+            ns.toString().find('&') != string::npos ) {
+            return Status( ErrorCodes::NamespaceExists, "invalid character in namespace" );
+        }
+
         boost::shared_ptr<Entry> entry( new Entry() );
 
         rocksdb::ColumnFamilyHandle* cf;
         rocksdb::Status status = _db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(),
                                                           ns.toString(),
                                                           &cf );
+
+        ROCK_STATUS_OK( status );
+        rocksdb::ColumnFamilyHandle* cf_meta;
+        string metadataName = ns.toString() + "&";
+        status = _db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(),
+                                                          metadataName,
+                                                          &cf_meta );
         ROCK_STATUS_OK( status );
 
         entry->cfHandle.reset( cf );
-        entry->recordStore.reset( new RocksRecordStore( ns, _db, entry->cfHandle.get() ) );
+        entry->recordStore.reset( new RocksRecordStore( ns, _db, entry->cfHandle.get(), cf_meta ));
         entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
         entry->collectionEntry->createMetaData();
 
