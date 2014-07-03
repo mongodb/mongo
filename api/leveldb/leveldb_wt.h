@@ -361,7 +361,7 @@ public:
                        ColumnFamilyHandle* column_family);
 
   ColumnFamilyHandleImpl *GetCF(uint32_t id) {
-    return (id < columns_.size()) ? reinterpret_cast<ColumnFamilyHandleImpl *>(columns_[id]) : NULL;
+    return (id < columns_.size()) ? static_cast<ColumnFamilyHandleImpl *>(columns_[id]) : NULL;
   }
   void SetColumns(std::vector<ColumnFamilyHandle *> &cols) {
     columns_ = cols;

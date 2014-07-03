@@ -49,7 +49,7 @@ static int
 wtrocks_get_cursor(OperationContext *context, ColumnFamilyHandle *cfhp, WT_CURSOR **cursorp)
 {
 	ColumnFamilyHandleImpl *cf =
-	    reinterpret_cast<ColumnFamilyHandleImpl *>(cfhp);
+	    static_cast<ColumnFamilyHandleImpl *>(cfhp);
 	if (cf == NULL) {
 		fprintf(stderr, "Missing column!\n");
 		assert(0);
@@ -79,7 +79,7 @@ DB::ListColumnFamilies(
 	Status status = DB::Open(options, name, &dbptr);
 	if (!status.ok())
 		return status;
-	DbImpl *db = reinterpret_cast<DbImpl *>(dbptr);
+	DbImpl *db = static_cast<DbImpl *>(dbptr);
 	OperationContext *context = db->GetContext();
 	WT_SESSION *session = context->GetSession();
 	WT_CURSOR *c;
@@ -121,7 +121,7 @@ DB::Open(Options const &options, std::string const &name, const std::vector<Colu
 	Status status = Open(options, name, dbptr);
 	if (!status.ok())
 		return status;
-	DbImpl *db = reinterpret_cast<DbImpl *>(dbptr);
+	DbImpl *db = static_cast<DbImpl *>(*dbptr);
 	std::vector<ColumnFamilyHandle*> cfhandles(
 	    column_families.size());
 	for (size_t i = 0; i < column_families.size(); i++) {
@@ -202,7 +202,7 @@ Status
 DbImpl::DropColumnFamily(ColumnFamilyHandle *cfhp)
 {
 	ColumnFamilyHandleImpl *cf =
-	    reinterpret_cast<ColumnFamilyHandleImpl *>(cfhp);
+	    static_cast<ColumnFamilyHandleImpl *>(cfhp);
 	WT_SESSION *session = GetContext()->GetSession();
 	int ret = session->drop(session, cf->GetURI().c_str(), NULL);
 	return WiredTigerErrorToStatus(ret);
