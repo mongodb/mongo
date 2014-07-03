@@ -571,12 +571,14 @@ config_sanity(CONFIG *cfg)
 		fprintf(stderr, "interval value longer than the run-time\n");
 		return (1);
 	}
-	if (cfg->table_count > 99) {
-		fprintf(stderr, "table count greater than 99\n");
+	if (cfg->table_count < 1 || cfg->table_count > 99) {
+		fprintf(stderr,
+		    "invalid table count, less than 1 or greater than 99\n");
 		return (1);
 	}
-	if (cfg->database_count > 99) {
-		fprintf(stderr, "database count greater than 99\n");
+	if (cfg->database_count < 1 || cfg->database_count > 99) {
+		fprintf(stderr,
+		    "invalid database count, less than 1 or greater than 99\n");
 		return (1);
 	}
 	return (0);
