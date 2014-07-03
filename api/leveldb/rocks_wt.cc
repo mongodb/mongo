@@ -50,6 +50,10 @@ wtrocks_get_cursor(OperationContext *context, ColumnFamilyHandle *cfhp, WT_CURSO
 {
 	ColumnFamilyHandleImpl *cf =
 	    reinterpret_cast<ColumnFamilyHandleImpl *>(cfhp);
+	if (cf == NULL) {
+		fprintf(stderr, "Missing column!\n");
+		assert(0);
+	}
 	WT_CURSOR *c = context->GetCursor(cf->GetID());
 	if (c == NULL) {
 		WT_SESSION *session = context->GetSession();
@@ -95,6 +99,7 @@ DB::ListColumnFamilies(
 			goto err;
 		if (strncmp(key, "table:", strlen("table:")) != 0)
 			break;
+		printf("List column families: [%d] = %s\n", (int)cf.size(), key);
 		cf.push_back(std::string(key + strlen("table:")));
 	}
 
@@ -119,9 +124,11 @@ DB::Open(Options const &options, std::string const &name, const std::vector<Colu
 	DbImpl *db = reinterpret_cast<DbImpl *>(dbptr);
 	std::vector<ColumnFamilyHandle*> cfhandles(
 	    column_families.size());
-	for (size_t i = 0; i < column_families.size(); i++)
+	for (size_t i = 0; i < column_families.size(); i++) {
+		printf("Open column families: [%d] = %s\n", (int)i, column_families[i].name.c_str());
 		cfhandles[i] = new ColumnFamilyHandleImpl(
 		    db, column_families[i].name, (int)i);
+	}
 	db->SetColumns(*handles = cfhandles);
 	return Status::OK();
 }
@@ -184,7 +191,9 @@ DbImpl::CreateColumnFamily(Options const &options, std::string const &name, Colu
 	int ret = wtleveldb_create(conn_, options, "table:" + name);
 	if (ret != 0)
 		return WiredTigerErrorToStatus(ret);
-	*cfhp = new ColumnFamilyHandleImpl(this, name, columns_.size());
+	int id = (int)columns_.size();
+	*cfhp = new ColumnFamilyHandleImpl(this, name, id);
+	printf("Create column family: [%d] = %s\n", id, name.c_str());
 	columns_.push_back(*cfhp);
 	return Status::OK();
 }
@@ -209,6 +218,7 @@ DbImpl::Delete(WriteOptions const &write_options, ColumnFamilyHandle *cfhp, Slic
 	WT_ITEM item;
 	item.data = key.data();
 	item.size = key.size();
+	cursor->set_key(cursor, &item);
 	ret = cursor->remove(cursor);
 	// Reset the WiredTiger cursor so it doesn't keep any pages pinned.
 	// Track failures in debug builds since we don't expect failure, but
@@ -221,7 +231,8 @@ DbImpl::Delete(WriteOptions const &write_options, ColumnFamilyHandle *cfhp, Slic
 Status
 DbImpl::Flush(FlushOptions const&, ColumnFamilyHandle*)
 {
-	return WiredTigerErrorToStatus(ENOTSUP);
+	WT_SESSION *session = GetContext()->GetSession();
+	return WiredTigerErrorToStatus(session->checkpoint(session, NULL));
 }
 
 Status

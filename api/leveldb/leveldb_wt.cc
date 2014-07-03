@@ -90,6 +90,8 @@ Status WiredTigerErrorToStatus(int wiredTigerError, const char *msg) {
   if (msg == NULL)
     msg = wiredtiger_strerror(wiredTigerError);
 
+  printf("Failing status: %d -> %s\n", wiredTigerError, msg);
+
   if (wiredTigerError == WT_NOTFOUND)
     return Status::NotFound(Slice(msg));
   else if (wiredTigerError == WT_ERROR || wiredTigerError == WT_PANIC)
@@ -174,7 +176,7 @@ public:
   ~FilterPolicyImpl() {}
   virtual const char *Name() const { return "FilterPolicyImpl"; }
   virtual void CreateFilter(const Slice *keys, int n, std::string *dst) const {}
-  virtual bool KeyMayMatch(const Slice &key, const Slice &filter) const {}
+  virtual bool KeyMayMatch(const Slice &key, const Slice &filter) const { return true; }
 
   int bits_per_key_;
 };
@@ -266,7 +268,6 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
     ret = wtleveldb_create(conn, options, WT_URI);
 
   if (ret != 0) {
-err:
     conn->close(conn, NULL);
     return WiredTigerErrorToStatus(ret, NULL);
   }
@@ -350,10 +351,10 @@ void WriteBatchHandler::Delete(const Slice& key) {
 Status
 DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
 {
+  const char *errmsg = NULL;
   Status status = Status::OK();
   OperationContext *context = GetContext();
   WT_SESSION *session = context->GetSession();
-  const char *errmsg = NULL;
   int ret, t_ret;
 
   for (;;) {
@@ -363,12 +364,16 @@ DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
     }
 
     WriteBatchHandler handler(this, context);
+#if 0
+    status = updates->Iterate(&handler);
+#else
     try {
       status = updates->Iterate(&handler);
     } catch(...) {
       (void)session->rollback_transaction(session, NULL);
       throw;
     }
+#endif
     if (!status.ok() || (ret = handler.GetWiredTigerStatus()) != WT_DEADLOCK)
       break;
     // Roll back the transaction on deadlock so we can try again
@@ -388,7 +393,7 @@ DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
 
 err:
   if (status.ok() && ret != 0)
-    status = WiredTigerErrorToStatus(ret, NULL);
+    status = WiredTigerErrorToStatus(ret, errmsg);
   return status;
 }
 
@@ -404,7 +409,6 @@ DbImpl::Get(const ReadOptions& options,
        const Slice& key, std::string* value)
 {
   WT_CURSOR *cursor = GetContext(options)->GetCursor();
-  const SnapshotImpl *si = NULL;
   const char *errmsg = NULL;
 
   WT_ITEM item;
@@ -421,7 +425,6 @@ DbImpl::Get(const ReadOptions& options,
     }
   } else if (ret == WT_NOTFOUND)
     errmsg = "DB::Get key not found";
-err:
   return WiredTigerErrorToStatus(ret, errmsg);
 }
 
@@ -507,7 +510,6 @@ DbImpl::ReleaseSnapshot(const Snapshot* snapshot)
   SnapshotImpl *si =
     static_cast<SnapshotImpl *>(const_cast<Snapshot *>(snapshot));
   if (si != NULL) {
-    WT_SESSION *session = si->GetContext()->GetSession();
     // We started a transaction: we could commit it here, but it will be rolled
     // back automatically by closing the session, which we have to do anyway.
     int ret = si->GetContext()->Close();

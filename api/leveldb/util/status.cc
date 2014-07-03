@@ -15,14 +15,14 @@ const char* Status::CopyState(const char* state) {
   return result;
 }
 
-Status::Status(Code code, const Slice& msg, const Slice& msg2) {
-  assert(code != kOk);
+Status::Status(Code code_arg, const Slice& msg, const Slice& msg2) {
+  assert(code_arg != kOk);
   const uint32_t len1 = msg.size();
   const uint32_t len2 = msg2.size();
   const uint32_t size = len1 + (len2 ? (2 + len2) : 0);
   char* result = new char[size + 5];
   memcpy(result, &size, sizeof(size));
-  result[4] = static_cast<char>(code);
+  result[4] = static_cast<char>(code_arg);
   memcpy(result + 5, msg.data(), len1);
   if (len2) {
     result[5 + len1] = ':';

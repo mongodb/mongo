@@ -180,9 +180,9 @@ class DB {
   // This check is potentially lighter-weight than invoking DB::Get(). One way
   // to make this lighter weight is to avoid doing any IOs.
   // Default implementation here returns true and sets 'value_found' to false
-  virtual bool KeyMayExist(const ReadOptions& options,
-                           ColumnFamilyHandle* column_family, const Slice& key,
-                           std::string* value, bool* value_found = NULL) {
+  virtual bool KeyMayExist(const ReadOptions&,
+                           ColumnFamilyHandle*, const Slice&,
+                           std::string*, bool* value_found = NULL) {
     if (value_found != NULL) {
       *value_found = false;
     }

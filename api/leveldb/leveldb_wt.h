@@ -136,10 +136,10 @@ public:
 
   WT_CURSOR *GetCursor() { return cursor_; }
 #ifdef HAVE_ROCKSDB
-  WT_CURSOR *GetCursor(int i) {
+  WT_CURSOR *GetCursor(u_int i) {
     return (i < cursors_.size()) ? cursors_[i] : NULL;
   }
-  void SetCursor(int i, WT_CURSOR *c) {
+  void SetCursor(u_int i, WT_CURSOR *c) {
     if (i >= cursors_.size())
       cursors_.resize(i + 1);
     cursors_[i] = c;
@@ -159,12 +159,12 @@ class CacheImpl : public Cache {
 public:
   CacheImpl(size_t capacity) : Cache(), capacity_(capacity) {}
 
-  virtual Handle* Insert(const Slice& key, void* value, size_t charge,
-      void (*deleter)(const Slice& key, void* value)) { return 0; }
-  virtual Handle* Lookup(const Slice& key) { return 0; }
-  virtual void Release(Handle* handle) {}
-  virtual void* Value(Handle* handle) { return 0; }
-  virtual void Erase(const Slice& key) {}
+  virtual Handle* Insert(const Slice&, void*, size_t,
+      void (*)(const Slice&, void*)) { return 0; }
+  virtual Handle* Lookup(const Slice&) { return 0; }
+  virtual void Release(Handle*) {}
+  virtual void* Value(Handle*) { return 0; }
+  virtual void Erase(const Slice&) {}
   virtual uint64_t NewId() { return 0; }
 
   size_t capacity_;
@@ -360,8 +360,8 @@ public:
   virtual Status Flush(const FlushOptions& options,
                        ColumnFamilyHandle* column_family);
 
-  ColumnFamilyHandleImpl *GetCF(uint32_t column_family_id) {
-    return reinterpret_cast<ColumnFamilyHandleImpl *>(columns_.at(column_family_id));
+  ColumnFamilyHandleImpl *GetCF(uint32_t id) {
+    return (id < columns_.size()) ? reinterpret_cast<ColumnFamilyHandleImpl *>(columns_[id]) : NULL;
   }
   void SetColumns(std::vector<ColumnFamilyHandle *> &cols) {
     columns_ = cols;

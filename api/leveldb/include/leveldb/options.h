@@ -68,7 +68,7 @@ struct Options {
   // `total_threads` is used. Good value for `total_threads` is the number of
   // cores. You almost definitely want to call this function if your system is
   // bottlenecked by RocksDB.
-  Options* IncreaseParallelism(int total_threads = 16) { return this; }
+  Options* IncreaseParallelism(int = 16) { return this; }
   Options* OptimizeLevelStyleCompaction() { return this; }
 #endif
 
