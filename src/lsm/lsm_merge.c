@@ -410,7 +410,7 @@ __wt_lsm_merge(
 	 */
 	if ((ret = __wt_lsm_meta_write(session, lsm_tree)) != 0)
 		WT_PANIC_ERR(session, ret, "Failed finalizing LSM merge");
-	
+
 	lsm_tree->dsk_gen++;
 
 	/* Update the throttling while holding the tree lock. */
