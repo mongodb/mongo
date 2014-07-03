@@ -1614,34 +1614,31 @@ create_tables(CONFIG *cfg)
 	WT_SESSION *session;
 	size_t i;
 	int ret;
-	char *uri;
 
-	session = NULL;
 	if (cfg->create == 0)
 		return (0);
 
-	uri = cfg->base_uri;
 	if ((ret = cfg->conn->open_session(
 	    cfg->conn, NULL, cfg->sess_config, &session)) != 0) {
 		lprintf(cfg, ret, 0,
 		    "Error opening a session on %s", cfg->home);
 		return (ret);
 	}
-	for (i = 0; i < cfg->table_count; i++) {
-		uri = cfg->uris[i];
+
+	for (i = 0; i < cfg->table_count; i++)
 		if ((ret = session->create(
-		    session, uri, cfg->table_config)) != 0) {
+		    session, cfg->uris[i], cfg->table_config)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "Error creating table %s", cfg->uris[i]);
 			return (ret);
 		}
-	}
+
 	if ((ret = session->close(session, NULL)) != 0) {
-		lprintf(cfg,
-		    ret, 0, "Error closing session");
+		lprintf(cfg, ret, 0, "Error closing session");
 		return (ret);
 	}
-	return (ret);
+
+	return (0);
 }
 
 static int
