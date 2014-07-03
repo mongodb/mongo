@@ -1006,8 +1006,12 @@ int
 __wt_lsm_tree_unlock(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
+	WT_DECL_RET;
+
 	F_CLR(session, WT_SESSION_NO_CACHE_CHECK | WT_SESSION_NO_SCHEMA_LOCK);
-	return (__wt_rwunlock(session, lsm_tree->rwlock));
+	if ((ret = __wt_rwunlock(session, lsm_tree->rwlock)) != 0)
+		WT_PANIC_RET(session, ret, "Unlocking an LSM tree");
+	return (0);
 }
 
 /*
