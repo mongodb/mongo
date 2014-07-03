@@ -51,3 +51,18 @@ env.Library('replmocks',
                 'repl_coordinator_interface',
                 'replication_executor',
             ])
+
+env.Library('replica_set_config',
+            [
+                'member_config.cpp',
+                'replica_set_tag.cpp'
+            ],
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/bson',
+            ])
+
+env.CppUnitTest('replica_set_config_test',
+                [
+                    'member_config_test.cpp',
+                ],
+                LIBDEPS=['replica_set_config'])
