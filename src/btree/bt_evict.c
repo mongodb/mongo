@@ -667,14 +667,13 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 
 	/*
 	 * The eviction server thread doesn't do any actual eviction if there
-	 * are eviction workers running or application threads are waiting
-	 * for candidates to evict.
+	 * are eviction workers running.
 	 */
-	if (cache->eviction_workers > 0 ||
-	    __wt_cond_has_waiters(session, cache->evict_waiter_cond)) {
+	WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
+
+	if (cache->eviction_workers > 0) {
 		WT_STAT_FAST_CONN_INCR(
 		    session, cache_eviction_server_not_evicting);
-		WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
 		/*
 		 * Give other threads a chance to access the queue before
 		 * gathering more candidates.
@@ -684,6 +683,7 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_server_evicting);
 		WT_RET(__evict_lru_pages(session, 0));
 	}
+
 	return (0);
 }
 
