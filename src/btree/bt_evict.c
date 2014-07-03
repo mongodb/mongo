@@ -244,7 +244,6 @@ __evict_worker(void *arg)
 	worker = arg;
 	conn = worker->conn;
 	cache = conn->cache;
-	ret = 0;
 
 	/*
 	 * We need a session handle because we're reading/writing pages.
@@ -293,6 +292,9 @@ __evict_has_work(WT_SESSION_IMPL *session, uint32_t *flagsp)
 	cache = conn->cache;
 	flags = 0;
 	*flagsp = 0;
+
+	if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
+		return (0);
 
 	/*
 	 * Figure out whether the cache usage exceeds either the eviction

@@ -4008,9 +4008,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	slvg_skip = salvage == NULL ? 0 : salvage->skip;
 
 	key = &r->k;
-	kpack = &_kpack;
 	val = &r->v;
-	vpack = &_vpack;
 
 	WT_RET(__rec_split_init(session, r, page, 0ULL, btree->maxleafpage));
 
