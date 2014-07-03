@@ -672,7 +672,6 @@ config_opt_usage(void)
 
 	nopt = sizeof(config_opts)/sizeof(config_opts[0]);
 	for (i = 0; i < nopt; i++) {
-		typestr = "?";
 		defaultval = config_opts[i].defaultval;
 		switch (config_opts[i].type) {
 		case BOOL_TYPE:
