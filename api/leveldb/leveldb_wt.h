@@ -45,13 +45,12 @@
 #include "wiredtiger.h"
 
 #define WT_URI          "table:data"
-#define WT_CONN_CONFIG  "log=(enabled),checkpoint_sync=false,session_max=8192,"\
-    "mmap=false,transaction_sync=(enabled=true,method=none),"
-#define WT_TABLE_CONFIG "type=lsm,leaf_page_max=4KB,leaf_item_max=1KB," \
-    "internal_page_max=128K,lsm=(chunk_size=100MB," \
-    "bloom_config=(leaf_page_max=8MB)," \
-    "bloom_bit_count=28,bloom_hash_count=19," \
-    "bloom_oldest=true),"
+#define WT_CONN_CONFIG  "log=(enabled),checkpoint_sync=false,"		\
+    "session_max=8192,mmap=false,eviction_workers=4,"			\
+    "transaction_sync=(enabled=true,method=none),"
+// Note: LSM doesn't split, build full pages from the start
+#define WT_TABLE_CONFIG "type=lsm,split_pct=100,leaf_item_max=1KB," \
+    "lsm=(chunk_size=100MB,bloom_config=(leaf_page_max=8MB)),"
 
 using leveldb::Cache;
 using leveldb::FilterPolicy;

@@ -206,8 +206,7 @@ wtleveldb_create(
   s_table << WT_TABLE_CONFIG;
   s_table << "internal_page_max=" << options.block_size << ",";
   s_table << "leaf_page_max=" << options.block_size << ",";
-  // LSM doesn't split, build full pages from the start
-  s_table << "split_pct=100,";
+  s_table << "leaf_item_max=" << options.block_size / 4 << ",";
   if (options.compression == leveldb::kSnappyCompression)
     s_table << "block_compressor=snappy,";
   s_table << "lsm=(";
@@ -254,7 +253,6 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
   else
     cache_size += 100 << 20;
   s_conn << "cache_size=" << cache_size << ",";
-  s_conn << "eviction_workers=4,";
   std::string conn_config = s_conn.str();
 
   WT_CONNECTION *conn;
