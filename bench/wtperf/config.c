@@ -61,7 +61,7 @@ config_assign(CONFIG *dest, const CONFIG *src)
 	memcpy(dest, src, sizeof(CONFIG));
 
 	if (src->uris != NULL) {
-		dest->uris = (char **)calloc(src->table_count, sizeof(char *));
+		dest->uris = calloc(src->table_count, sizeof(char *));
 		if (dest->uris == NULL)
 			return (enomem(dest));
 		for (i = 0; i < src->table_count; i++)
@@ -405,7 +405,6 @@ config_opt_file(CONFIG *cfg, const char *filename)
 	char *comment, *file_buf, *line, *ltrim, *rtrim;
 
 	file_buf = NULL;
-	fd = -1;
 
 	if ((fd = open(filename, O_RDONLY)) == -1) {
 		fprintf(stderr, "wtperf: %s: %s\n", filename, strerror(errno));
@@ -418,7 +417,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		goto err;
 	}
 	buf_size = (size_t)sb.st_size;
-	file_buf = (char *)calloc(buf_size + 2, 1);
+	file_buf = calloc(buf_size + 2, 1);
 	if (file_buf == NULL) {
 		ret = ENOMEM;
 		goto err;
@@ -570,15 +569,17 @@ config_sanity(CONFIG *cfg)
 	    cfg->report_interval > cfg->run_time ||
 	    cfg->sample_interval > cfg->run_time)) {
 		fprintf(stderr, "interval value longer than the run-time\n");
-		return (1);
+		return (EINVAL);
 	}
-	if (cfg->table_count > 99) {
-		fprintf(stderr, "table count greater than 99\n");
-		return (1);
+	if (cfg->table_count < 1 || cfg->table_count > 99) {
+		fprintf(stderr,
+		    "invalid table count, less than 1 or greater than 99\n");
+		return (EINVAL);
 	}
-	if (cfg->database_count > 99) {
-		fprintf(stderr, "database count greater than 99\n");
-		return (1);
+	if (cfg->database_count < 1 || cfg->database_count > 99) {
+		fprintf(stderr,
+		    "invalid database count, less than 1 or greater than 99\n");
+		return (EINVAL);
 	}
 	return (0);
 }
@@ -672,8 +673,8 @@ config_opt_usage(void)
 
 	nopt = sizeof(config_opts)/sizeof(config_opts[0]);
 	for (i = 0; i < nopt; i++) {
-		typestr = "?";
 		defaultval = config_opts[i].defaultval;
+		typestr = "string";
 		switch (config_opts[i].type) {
 		case BOOL_TYPE:
 			typestr = "boolean";
@@ -684,7 +685,6 @@ config_opt_usage(void)
 			break;
 		case CONFIG_STRING_TYPE:
 		case STRING_TYPE:
-			typestr = "string";
 			break;
 		case INT_TYPE:
 			typestr = "int";

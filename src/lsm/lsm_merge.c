@@ -61,7 +61,7 @@ __wt_lsm_merge(
 	uint32_t generation, max_gap, max_gen, max_level, start_id;
 	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_max, merge_min, nchunks, start_chunk;
-	int create_bloom, tret;
+	int create_bloom, locked, tret;
 	const char *cfg[3];
 	const char *drop_cfg[] =
 	    { WT_CONFIG_BASE(session, session_drop), "force", NULL };
@@ -70,6 +70,7 @@ __wt_lsm_merge(
 	chunk_size = 0;
 	create_bloom = 0;
 	dest = src = NULL;
+	locked = 0;
 	start_id = 0;
 
 	/*
@@ -372,6 +373,7 @@ __wt_lsm_merge(
 
 	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
 	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
+	locked = 1;
 
 	/*
 	 * Check whether we raced with another merge, and adjust the chunk
@@ -385,8 +387,12 @@ __wt_lsm_merge(
 			if (lsm_tree->chunk[start_chunk]->id == start_id)
 				break;
 
-	ret = __wt_lsm_merge_update_tree(
-	    session, lsm_tree, start_chunk, nchunks, chunk);
+	/*
+	 * It is safe to error out here - since the update can only fail
+	 * prior to making updates to the tree.
+	 */
+	WT_ERR(__wt_lsm_merge_update_tree(
+	    session, lsm_tree, start_chunk, nchunks, chunk));
 
 	if (create_bloom)
 		F_SET(chunk, WT_LSM_CHUNK_BLOOM);
@@ -394,14 +400,25 @@ __wt_lsm_merge(
 	chunk->generation = generation;
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 
-	ret = __wt_lsm_meta_write(session, lsm_tree);
+	/*
+	 * We have no current way of continuing if the metadata update fails,
+	 * so we will panic in that case.  Put some effort into cleaning up
+	 * after ourselves here - so things have a chance of shutting down.
+	 *
+	 * Any errors that happened after the tree was locked are
+	 * fatal - we can't guarantee the state of the tree.
+	 */
+	if ((ret = __wt_lsm_meta_write(session, lsm_tree)) != 0)
+		WT_PANIC_ERR(session, ret, "Failed finalizing LSM merge");
+
 	lsm_tree->dsk_gen++;
 
 	/* Update the throttling while holding the tree lock. */
 	__wt_lsm_tree_throttle(session, lsm_tree, 1);
 
-	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
-err:	if (src != NULL)
+err:	if (locked)
+		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+	if (src != NULL)
 		WT_TRET(src->close(src));
 	if (dest != NULL)
 		WT_TRET(dest->close(dest));

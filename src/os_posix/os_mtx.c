@@ -111,22 +111,6 @@ err:	if (locked)
 }
 
 /*
- * __wt_cond_has_waiters --
- *	Indicates if threads are waiting.
- */
-int
-__wt_cond_has_waiters(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
-{
-	WT_UNUSED(session);
-
-	/* Fast path if already signalled. */
-	if (cond->waiters == -1)
-		return (0);
-
-	return (1);
-}
-
-/*
  * __wt_cond_signal --
  *	Signal a waiting thread.
  */

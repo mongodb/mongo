@@ -424,8 +424,7 @@ worker(void *arg)
 		lprintf(cfg, ret, 0, "worker: WT_CONNECTION.open_session");
 		goto err;
 	}
-	cursors = (WT_CURSOR **)calloc(
-	    cfg->table_count, sizeof(WT_CURSOR *));
+	cursors = calloc(cfg->table_count, sizeof(WT_CURSOR *));
 	if (cursors == NULL) {
 		lprintf(cfg, ENOMEM, 0,
 		    "worker: couldn't allocate cursor array");
@@ -767,8 +766,7 @@ populate_thread(void *arg)
 	/* Do bulk loads if populate is single-threaded. */
 	cursor_config = cfg->populate_threads == 1 ? "bulk" : NULL;
 	/* Create the cursors. */
-	cursors = (WT_CURSOR **)calloc(
-	    cfg->table_count, sizeof(WT_CURSOR *));
+	cursors = calloc(cfg->table_count, sizeof(WT_CURSOR *));
 	if (cursors == NULL) {
 		lprintf(cfg, ENOMEM, 0,
 		    "worker: couldn't allocate cursor array");
@@ -1578,13 +1576,13 @@ create_uris(CONFIG *cfg)
 
 	ret = 0;
 	base_uri_len = strlen(cfg->base_uri);
-	cfg->uris = (char **)calloc(cfg->table_count, sizeof(char *));
+	cfg->uris = calloc(cfg->table_count, sizeof(char *));
 	if (cfg->uris == NULL) {
 		ret = ENOMEM;
 		goto err;
 	}
 	for (i = 0; i < cfg->table_count; i++) {
-		uri = cfg->uris[i] = (char *)calloc(base_uri_len + 3, 1);
+		uri = cfg->uris[i] = calloc(base_uri_len + 3, 1);
 		if (uri == NULL) {
 			ret = ENOMEM;
 			goto err;
@@ -1614,34 +1612,31 @@ create_tables(CONFIG *cfg)
 	WT_SESSION *session;
 	size_t i;
 	int ret;
-	char *uri;
 
-	session = NULL;
 	if (cfg->create == 0)
 		return (0);
 
-	uri = cfg->base_uri;
 	if ((ret = cfg->conn->open_session(
 	    cfg->conn, NULL, cfg->sess_config, &session)) != 0) {
 		lprintf(cfg, ret, 0,
 		    "Error opening a session on %s", cfg->home);
 		return (ret);
 	}
-	for (i = 0; i < cfg->table_count; i++) {
-		uri = cfg->uris[i];
+
+	for (i = 0; i < cfg->table_count; i++)
 		if ((ret = session->create(
-		    session, uri, cfg->table_config)) != 0) {
+		    session, cfg->uris[i], cfg->table_config)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "Error creating table %s", cfg->uris[i]);
 			return (ret);
 		}
-	}
+
 	if ((ret = session->close(session, NULL)) != 0) {
-		lprintf(cfg,
-		    ret, 0, "Error closing session");
+		lprintf(cfg, ret, 0, "Error closing session");
 		return (ret);
 	}
-	return (ret);
+
+	return (0);
 }
 
 static int
@@ -2092,7 +2087,7 @@ main(int argc, char *argv[])
 	}
 
 	/* Sanity-check the configuration. */
-	if (config_sanity(cfg) != 0)
+	if ((ret = config_sanity(cfg)) != 0)
 		goto err;
 
 	/* Display the configuration. */
@@ -2102,8 +2097,10 @@ main(int argc, char *argv[])
 	if ((ret = start_all_runs(cfg)) != 0)
 		goto err;
 
-	if (0)
+	if (0) {
 einval:		ret = EINVAL;
+	}
+
 err:	config_free(cfg);
 	free(cc_buf);
 	free(tc_buf);

@@ -42,7 +42,7 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	created = reconfiguring = 0;
 	pool_name = NULL;
 	cp = NULL;
-	reserve = size = 0;
+	size = 0;
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		reconfiguring = 1;
@@ -432,9 +432,8 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 	int force, grew;
 
 	cp = __wt_process.cache_pool;
-	read_pressure = 0;
-	grew = 0;
 	force = (cp->currently_used > cp->size);
+	grew = 0;
 	if (WT_VERBOSE_ISSET(cp->session, WT_VERB_SHARED_CACHE)) {
 		WT_RET(__wt_verbose(cp->session,
 		    WT_VERB_SHARED_CACHE, "Cache pool distribution: "));
