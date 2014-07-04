@@ -279,7 +279,6 @@ DbImpl::NewIterator(ReadOptions const &options, ColumnFamilyHandle *cfhp)
 {
 	OperationContext *context = GetContext(options);
 
-	WT_SESSION *session = context->GetSession();
 	WT_CURSOR *c;
 	int ret = wtrocks_get_cursor(context, cfhp, &c, 1);
 	assert(ret == 0);
