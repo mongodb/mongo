@@ -162,9 +162,12 @@ namespace {
     } b;
 
     // Constants for log component test cases.
+    const LogComponent componentDefault = LogComponent::kDefault;
     const LogComponent componentA = LogComponent::kCommands;
     const LogComponent componentB = LogComponent::kAccessControl;
     const LogComponent componentC = LogComponent::kNetworking;
+    const LogComponent componentD = LogComponent::kStorage;
+    const LogComponent componentE = LogComponent::kJournaling;
 
     // No log component declared at file scope.
     // Component severity configuration:
@@ -436,6 +439,44 @@ namespace {
         // shouldLog() falls back on LogComponent::kDefault.
         ASSERT_TRUE(settings.shouldLog(componentC, LogSeverity::Debug(1)));
         ASSERT_FALSE(settings.shouldLog(componentC, LogSeverity::Debug(2)));
+    }
+
+    // Log component hierarchy.
+    TEST_F(LogTest, LogComponentHierarchy) {
+        // Parent component is not meaningful for kDefault and kNumLogComponents.
+        ASSERT_EQUALS(LogComponent::kNumLogComponents,
+                      LogComponent(LogComponent::kDefault).parent());
+        ASSERT_EQUALS(LogComponent::kNumLogComponents,
+                      LogComponent(LogComponent::kNumLogComponents).parent());
+
+        // Default -> ComponentD -> ComponentE
+        ASSERT_EQUALS(LogComponent::kDefault, LogComponent(componentD).parent());
+        ASSERT_EQUALS(componentD, LogComponent(componentE).parent());
+        ASSERT_NOT_EQUALS(LogComponent::kDefault, LogComponent(componentE).parent());
+
+        // Log components should inherit parent's log severity in settings.
+        LogComponentSettings settings;
+        settings.setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Debug(1));
+        settings.setMinimumLoggedSeverity(componentD, LogSeverity::Debug(2));
+
+        // componentE should inherit componentD's log severity.
+        ASSERT_TRUE(settings.shouldLog(componentE, LogSeverity::Debug(2)));
+        ASSERT_FALSE(settings.shouldLog(componentE, LogSeverity::Debug(3)));
+
+        // Clearing parent's log severity - componentE should inherit from Default.
+        settings.clearMinimumLoggedSeverity(componentD);
+        ASSERT_TRUE(settings.shouldLog(componentE, LogSeverity::Debug(1)));
+        ASSERT_FALSE(settings.shouldLog(componentE, LogSeverity::Debug(2)));
+    }
+
+    // Dotted name of component includes names of ancestors.
+    TEST_F(LogTest, LogComponentDottedName) {
+        // Default -> ComponentD -> ComponentE
+        ASSERT_EQUALS(componentDefault.getShortName(),
+                      LogComponent(LogComponent::kDefault).getDottedName());
+        ASSERT_EQUALS(componentD.getShortName(), componentD.getDottedName());
+        ASSERT_EQUALS(componentD.getShortName() + "." + componentE.getShortName(),
+                      componentE.getDottedName());
     }
 
 }  // namespace
