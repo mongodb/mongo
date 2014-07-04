@@ -937,10 +937,10 @@ __wt_lsm_tree_truncate(
 	WT_RET(__wt_lsm_tree_get(session, name, 1, &lsm_tree));
 
 	/* Shut down the LSM worker. */
-	WT_RET(__lsm_tree_close(session, lsm_tree));
+	WT_ERR(__lsm_tree_close(session, lsm_tree));
 
 	/* Prevent any new opens. */
-	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
+	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
 	locked = 1;
 
 	/* Create the new chunk. */
