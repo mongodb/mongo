@@ -4256,6 +4256,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			    NULL, &cell, &tmpkey->data, &tmpkey->size))
 				goto build;
 
+			kpack = &_kpack;
 			__wt_cell_unpack(cell, kpack);
 			if (btree->huffman_key == NULL &&
 			    kpack->type == WT_CELL_KEY &&
