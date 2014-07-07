@@ -45,7 +45,7 @@ namespace {
 
     Status checkReplicaMemberVersions() {
 
-//        TODO(spencer): SERVER-14460 Resurrect or remove this function.
+        // TODO(spencer): SERVER-14460 Resurrect or remove this function.
 //        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
 //                repl::ReplicationCoordinator::modeReplSet)
 //            return Status::OK();
