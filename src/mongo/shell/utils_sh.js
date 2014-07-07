@@ -47,6 +47,7 @@ sh.help = function() {
     print( "\tsh.addShardTag(shard,tag)                 adds the tag to the shard" );
     print( "\tsh.removeShardTag(shard,tag)              removes the tag from the shard" );
     print( "\tsh.addTagRange(fullName,min,max,tag)      tags the specified range of the given collection" );
+    print( "\tsh.removeTagRange(fullName,min,max,tag)   removes the tagged range of the given collection" );
 
     print( "\tsh.status()                               prints a general overview of the cluster" )
 }
@@ -350,4 +351,20 @@ sh.addTagRange = function( ns, min, max, tag ) {
             {_id: { ns : ns , min : min }, ns : ns , min : min , max : max , tag : tag } , 
             true );
     sh._checkLastError( config );    
+}
+
+sh.removeTagRange = function( ns, min, max, tag ) {
+    var config = db.getSisterDB( "config" );
+    // warn if the namespace does not exist, even dropped
+    if ( config.collections.findOne( { _id : ns } ) == null ) {
+        print( "Warning: can't find the namespace: " + ns + " - collection likely never sharded" );
+    }
+    // warn if the tag being removed is still in use
+    if ( config.shards.findOne( { tags : tag } ) ) {
+        print( "Warning: tag still in use by at least one shard" );
+    }
+    // max and tag criteria not really needed, but including them avoids potentially unexpected
+    // behavior.
+    config.tags.remove( { _id : { ns : ns , min : min } , max : max , tag : tag } );
+    sh._checkLastError( config );
 }
