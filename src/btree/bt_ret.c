@@ -83,17 +83,24 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 		} else
 			WT_RET(__wt_row_leaf_key(
 			    session, page, rip, &cursor->key, 0));
+
+		/* If the cursor references a WT_UPDATE item, return it. */
 		if (upd != NULL) {
 			cursor->value.data = WT_UPDATE_DATA(upd);
 			cursor->value.size = upd->size;
 			return (0);
 		}
 
+		/* Simple values have their location encoded in the WT_ROW. */
+		if (__wt_row_leaf_value(page, rip, &cursor->value))
+			return (0);
+
 		/*
 		 * Take the value from the original page cell (which may be
 		 * empty).
 		 */
-		if ((cell = __wt_row_leaf_value(page, rip, NULL)) == NULL) {
+		if ((cell =
+		    __wt_row_leaf_value_cell(page, rip, NULL)) == NULL) {
 			cursor->value.size = 0;
 			return (0);
 		}
