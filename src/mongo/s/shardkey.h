@@ -32,6 +32,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 
@@ -168,7 +169,7 @@ namespace mongo {
 
     inline BSONObj ShardKeyPattern::extractKey(const BSONObj& from) const {
         BSONObj k = pattern.extractSingleKey( from );
-        uassert(13334, "Shard Key must be less than 512 bytes", k.objsize() < 512);
+        uassert(13334, "Shard Key must be less than 512 bytes", k.objsize() < kMaxShardKeySize);
         return k;
     }
 

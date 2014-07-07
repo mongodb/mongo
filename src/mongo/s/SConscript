@@ -8,7 +8,6 @@ Import("env")
 
 env.Library('base', ['mongo_version_range.cpp',
                      'range_arithmetic.cpp',
-                     'shard_key_pattern.cpp',
                      'type_changelog.cpp',
                      'type_chunk.cpp',
                      'type_collection.cpp',
