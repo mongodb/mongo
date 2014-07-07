@@ -69,7 +69,6 @@ namespace repl {
 
     ReplSetImpl::StartupStatus ReplSetImpl::startupStatus = PRESTART;
     DiagStr ReplSetImpl::startupStatusMsg;
-    ReplicationStartSynchronizer ReplSetImpl::rss;
 
     void ReplSet::haveNewConfig(ReplSetConfig& newConfig, bool addComment) {
         bo comment;

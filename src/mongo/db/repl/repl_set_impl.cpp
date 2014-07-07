@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/commands/get_last_error.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index_rebuilder.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
@@ -469,12 +470,7 @@ namespace {
 
     // call after constructing to start - returns fairly quickly after launching its threads
     void ReplSetImpl::_go() {
-        {
-            boost::unique_lock<boost::mutex> lk(rss.mtx);
-            while (!rss.indexRebuildDone) {
-                rss.cond.wait(lk);
-            }
-        }
+        indexRebuilder.wait();
         try {
             loadLastOpTimeWritten();
         }
