@@ -782,17 +782,14 @@ namespace repl {
         return failedUpdate;
     }
 
-    bool waitForOptimeChange(const OpTime& referenceTime, unsigned timeoutMillis) {
+    void waitUpToOneSecondForOptimeChange(const OpTime& referenceTime) {
         mutex::scoped_lock lk(newOpMutex);
 
         while (referenceTime == getLastSetOptime()) {
             if (!newOptimeNotifier.timed_wait(lk.boost(),
-                                              boost::posix_time::milliseconds(timeoutMillis)))
-                return false;
+                                              boost::posix_time::seconds(1)))
+                return;
         }
-
-        return true;
-
     }
 
     void initOpTimeFromOplog(OperationContext* txn, const std::string& oplogNS) {

@@ -188,7 +188,7 @@ namespace mongo {
             result->wTimedOut = true;
         }
         // Add stats
-        result->writtenTo = repl::getHostsWrittenTo(replOpTime);
+        result->writtenTo = repl::getGlobalReplicationCoordinator()->getHostsWrittenTo(replOpTime);
         gleWtimeStats.recordMillis(replStatus.duration.total_milliseconds());
         result->wTime = replStatus.duration.total_milliseconds();
 

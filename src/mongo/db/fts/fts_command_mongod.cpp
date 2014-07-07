@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include <string>
 
 #include "mongo/db/client.h"

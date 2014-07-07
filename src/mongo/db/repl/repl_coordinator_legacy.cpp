@@ -85,7 +85,9 @@ namespace repl {
     }
 
     void LegacyReplicationCoordinator::shutdown() {
-        // TODO
+        if (getReplicationMode() == modeReplSet) {
+            theReplSet->shutdown();
+        }
     }
 
     bool LegacyReplicationCoordinator::isShutdownOkay() const {
@@ -264,7 +266,7 @@ namespace {
     bool LegacyReplicationCoordinator::isMasterForReportingPurposes() {
         // we must check replSet since because getReplicationMode() isn't aware of modeReplSet
         // until theReplSet is initialized
-        if (replSet) {
+        if (replSettings.usingReplSets()) {
             if (theReplSet && getCurrentMemberState().primary()) {
                 return true;
             }
@@ -280,11 +282,6 @@ namespace {
 
         if (replSettings.master) {
             // if running with --master --slave, allow.
-            return true;
-        }
-
-        //TODO: Investigate if this is needed/used, see SERVER-9188
-        if (cc().isGod()) {
             return true;
         }
 
@@ -374,8 +371,13 @@ namespace {
     }
 
     Status LegacyReplicationCoordinator::setLastOptime(const OID& rid,
-                                                       const OpTime& ts,
-                                                       const BSONObj& config) {
+                                                       const OpTime& ts) {
+        BSONObj config;
+        {
+            boost::lock_guard<boost::mutex> lock(_ridConfigMapMutex);
+            config = _ridConfigMap[rid];
+        }
+        invariant(!config.isEmpty());
         std::string oplogNs = getReplicationMode() == modeReplSet?
                 "local.oplog.rs" : "local.oplog.$main";
         if (!updateSlaveTracking(BSON("_id" << rid), config, oplogNs, ts)) {
@@ -394,6 +396,10 @@ namespace {
         return Status::OK();
     }
     
+    OID LegacyReplicationCoordinator::getElectionId() {
+        return theReplSet->getElectionId();
+    }
+
     void LegacyReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
         theReplSet->summarizeStatus(*result);
     }
@@ -852,8 +858,7 @@ namespace {
             BSONObj entry = elem.Obj();
             OID id = entry["_id"].OID();
             OpTime ot = entry["optime"]._opTime();
-            BSONObj config = entry["config"].Obj();
-            Status status = setLastOptime(id, ot, config);
+            Status status = setLastOptime(id, ot);
             if (!status.isOK()) {
                 return status;
             }
@@ -880,5 +885,33 @@ namespace {
         }
         return Status::OK();
     }
+
+    bool LegacyReplicationCoordinator::processHandshake(const OID& remoteID,
+                                                        const BSONObj& handshake) {
+
+        {
+            boost::lock_guard<boost::mutex> lock(_ridConfigMapMutex);
+            _ridConfigMap[remoteID] = handshake["config"].Obj().getOwned();
+        }
+
+        if (getReplicationMode() != modeReplSet || !handshake.hasField("member")) {
+            return false;
+        }
+
+        return theReplSet->registerSlave(remoteID, handshake["member"].Int());
+    }
+
+    void LegacyReplicationCoordinator::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
+        repl::waitUpToOneSecondForOptimeChange(ot);
+    }
+
+    bool LegacyReplicationCoordinator::buildsIndexes() {
+        return theReplSet->buildIndexes();
+    }
+
+    vector<BSONObj> LegacyReplicationCoordinator::getHostsWrittenTo(const OpTime& op) {
+        return repl::getHostsWrittenTo(op);
+    }
+
 } // namespace repl
 } // namespace mongo
