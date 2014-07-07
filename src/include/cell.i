@@ -140,15 +140,6 @@ struct __wt_cell {
 struct __wt_cell_unpack {
 	WT_CELL *cell;			/* Cell's disk image address */
 
-	/*
-	 * Row-store leaf pages contain pairs of key/value cells, and it's a
-	 * common operation to return both.  When unpacking a key cell on a
-	 * row-store in-memory leaf page, set the value field to reference the
-	 * next cell if there's an associated value for this key, and NULL if
-	 * there is not.
-	 */
-	WT_CELL *value;
-
 	uint64_t v;			/* RLE count or recno */
 
 	/*
