@@ -1715,17 +1715,25 @@ namespace JsobjTests {
             objb.appendUndefined(objb.numStr(i++));
             arrb.appendUndefined();
 
+            objb.appendRegex(objb.numStr(i++), "test", "imx");
+            arrb.appendRegex("test", "imx");
+
+            objb.append(objb.numStr(i++), BSONRegEx("test2", "s"));
+            arrb.append(BSONRegEx("test2", "s"));
+
             BSONObj obj = objb.obj();
             BSONArray arr = arrb.arr();
 
             ASSERT_EQUALS(obj, arr);
 
-            BSONObj o = BSON( "obj" << obj << "arr" << arr << "arr2" << BSONArray(obj) );
+            BSONObj o = BSON( "obj" << obj << "arr" << arr << "arr2" << BSONArray(obj)
+                    << "regex" << BSONRegEx("reg", "x"));
             keyTest(o);
 
             ASSERT_EQUALS(o["obj"].type(), Object);
             ASSERT_EQUALS(o["arr"].type(), Array);
             ASSERT_EQUALS(o["arr2"].type(), Array);
+            ASSERT_EQUALS(o["regex"].type(), RegEx);
         }
     };
 
