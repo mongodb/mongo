@@ -135,7 +135,7 @@ __wt_log_extract_lognum(
 	WT_UNUSED(session);
 
 	if (id == NULL || name == NULL)
-		return (0);
+		return (WT_ERROR);
 	if ((p = strrchr(name, '.')) == NULL ||
 	    sscanf(++p, "%" PRIu32, id) != 1)
 		WT_RET_MSG(session, WT_ERROR, "Bad log file name '%s'", name);
