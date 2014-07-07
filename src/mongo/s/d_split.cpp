@@ -53,6 +53,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/distlock.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -742,6 +743,12 @@ namespace mongo {
                                            << "[" << min << ", " << max << ")"
                                            << " is not allowed";
 
+                    warning() << errmsg << endl;
+                    return false;
+                }
+
+                CollectionMetadataPtr metadata(shardingState.getCollectionMetadata(ns));
+                if (!isShardDocSizeValid(metadata->getKeyPattern(), endKey, &errmsg)) {
                     warning() << errmsg << endl;
                     return false;
                 }

@@ -28,10 +28,13 @@
 
 #include "mongo/s/shard_key_pattern.h"
 
+#include "mongo/db/keypattern.h"
+#include "mongo/util/mongoutils/str.h"
+
 namespace mongo {
 
-    bool isUniqueIndexCompatible( const BSONObj shardKeyPattern,
-                                     const BSONObj uIndexKeyPattern ) {
+    bool isUniqueIndexCompatible(const BSONObj& shardKeyPattern,
+                                 const BSONObj& uIndexKeyPattern) {
 
         if ( !uIndexKeyPattern.isEmpty()
              && string( "_id" ) == uIndexKeyPattern.firstElementFieldName() ) {
@@ -39,5 +42,23 @@ namespace mongo {
         }
 
         return shardKeyPattern.isFieldNamePrefixOf( uIndexKeyPattern );
+    }
+
+    bool isShardDocSizeValid(const BSONObj& shardKey, const BSONObj& doc, string* errMsg) {
+        string dummy;
+        if (errMsg == NULL) {
+            errMsg = &dummy;
+        }
+
+        const KeyPattern shardKeyPattern(shardKey);
+        BSONObj key = shardKeyPattern.extractSingleKey(doc);
+
+        if (key.objsize() > kMaxShardKeySize) {
+            *errMsg = str::stream() << "key is larger than " << kMaxShardKeySize
+                                    << " bytes: " << key.objsize();
+            return false;
+        }
+
+        return true;
     }
 }
