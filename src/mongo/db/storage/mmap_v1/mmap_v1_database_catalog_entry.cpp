@@ -206,7 +206,7 @@ namespace mongo {
                 systemIndexRecordStore->insertRecord( txn,
                                                       newIndexSpec.objdata(),
                                                       newIndexSpec.objsize(),
-                                                      -1 );
+                                                      false );
             if ( !newIndexSpecLoc.isOK() )
                 return newIndexSpecLoc.getStatus();
 
@@ -482,7 +482,7 @@ namespace mongo {
                                                                  false ) );
 
             if ( nsEntry->recordStore->storageSize( txn ) == 0 )
-                nsEntry->recordStore->increaseStorageSize( txn, _extentManager.initialSize( 128 ), -1 );
+                nsEntry->recordStore->increaseStorageSize( txn, _extentManager.initialSize( 128 ), false );
         }
 
         if ( !indexEntry ) {
@@ -498,7 +498,7 @@ namespace mongo {
                                                                     true ) );
 
             if ( indexEntry->recordStore->storageSize( txn ) == 0 )
-                indexEntry->recordStore->increaseStorageSize( txn, _extentManager.initialSize( 128 ), -1 );
+                indexEntry->recordStore->increaseStorageSize( txn, _extentManager.initialSize( 128 ), false );
         }
 
         if ( isSystemIndexesGoingToBeNew ) {
@@ -565,14 +565,14 @@ namespace mongo {
             if ( options.initialNumExtents > 0 ) {
                 int size = _massageExtentSize( &_extentManager, options.cappedSize );
                 for ( int i = 0; i < options.initialNumExtents; i++ ) {
-                    rs->increaseStorageSize( txn, size, -1 );
+                    rs->increaseStorageSize( txn, size, false );
                 }
             }
             else if ( !options.initialExtentSizes.empty() ) {
                 for ( size_t i = 0; i < options.initialExtentSizes.size(); i++ ) {
                     int size = options.initialExtentSizes[i];
                     size = _massageExtentSize( &_extentManager, size );
-                    rs->increaseStorageSize( txn, size, -1 );
+                    rs->increaseStorageSize( txn, size, false );
                 }
             }
             else if ( options.capped ) {
@@ -583,11 +583,11 @@ namespace mongo {
                     int sz = _massageExtentSize( &_extentManager,
                                                  options.cappedSize - rs->storageSize(txn) );
                     sz &= 0xffffff00;
-                    rs->increaseStorageSize( txn, sz, -1 );
+                    rs->increaseStorageSize( txn, sz, false );
                 } while( rs->storageSize(txn) < options.cappedSize );
             }
             else {
-                rs->increaseStorageSize( txn, _extentManager.initialSize( 128 ), -1 );
+                rs->increaseStorageSize( txn, _extentManager.initialSize( 128 ), false );
             }
         }
 
@@ -759,7 +759,7 @@ namespace mongo {
 
         RecordStoreV1Base* rs = _getNamespaceRecordStore_inlock();
         invariant( rs );
-        StatusWith<DiskLoc> loc = rs->insertRecord( txn, obj.objdata(), obj.objsize(), -1 );
+        StatusWith<DiskLoc> loc = rs->insertRecord( txn, obj.objdata(), obj.objsize(), false );
         massertStatusOK( loc.getStatus() );
     }
 
