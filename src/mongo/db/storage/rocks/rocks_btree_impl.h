@@ -32,6 +32,8 @@
 
 #include <rocksdb/db.h>
 
+#include "mongo/db/storage/index_entry_comparison.h"
+
 #pragma once
 
 namespace rocksdb {
@@ -90,24 +92,40 @@ namespace mongo {
          * Creates an error code message out of a key
          */
         string dupKeyError(const BSONObj& key) const;
+    };
 
-/*    public:*/
-        //class IndexKey {
-            //MONGO_DISALLOW_COPYING(IndexKey);
-        //public:
-            //IndexKey ( const BSONObj& obj, const RecordId& recId );
+    /**
+     * Extends the functionality of IndexKeyEntry to better interact with the rocksdb api.
+     * Namely, it is necessary to support conversion from and to a rocksdb::Slice and 
+     * rocksdb::SliceParts.
+     */
+    struct RocksIndexEntry: public IndexKeyEntry {
 
-            //string keyData() { return _keyData; }
+        /**
+         * Constructs a RocksIndexEntry. Currently (7/7/14), strips field names from key,
+         * but this may change
+         */
+        RocksIndexEntry( const BSONObj& key, const DiskLoc loc );
 
-        //private:
-            //string _keyData;
+        /**
+         * Constructs a RocksIndexEntry from a Slice. This is intented to be used to deserialize
+         * a RocksIndexEntry that has just been retreived from a rocksdb instance via a call to 
+         * Get(). Therefore, slice must contain the bytes for a RocksIndexEntry where the BSONObj
+         * has already been stripped of its field names.
+         */
+        RocksIndexEntry( const rocksdb::Slice& slice );
 
-            /**
-             * Returns a BSON object that is identical to the input obj, but with all field names
-             * changed to the empty string
-             */
-            //static BSONObj stripFieldNames( const BSONObj& obj);
-        /*};*/
+        ~RocksIndexEntry() { }
 
+        /**
+         * Returns a string representation of _sliced
+         */
+        string asString() const;
+
+        rocksdb::SliceParts sliceParts() const { return rocksdb::SliceParts( _sliced, 2 ); }
+
+        int size() const { return _key.objsize() + sizeof( DiskLoc ); }
+
+        rocksdb::Slice _sliced[2];
     };
 }

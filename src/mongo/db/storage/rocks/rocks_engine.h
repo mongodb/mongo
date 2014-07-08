@@ -34,10 +34,12 @@
 #include <list>
 #include <string>
 
+#include <boost/optional.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
+#include "bson/ordering.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/string_map.h"
@@ -98,9 +100,10 @@ namespace mongo {
 
         // will create if doesn't exist
         // collection has to exist first though
-        rocksdb::ColumnFamilyHandle* getIndexColumnFamily( const StringData& ns,
-                                                           const StringData& indexName );
-
+        rocksdb::ColumnFamilyHandle* getIndexColumnFamily(
+                              const StringData& ns,
+                              const StringData& indexName,
+                              const boost::optional<Ordering> order = boost::optional<Ordering>() );
         /**
          * Completely removes a column family. Input pointer is invalid after calling
          */

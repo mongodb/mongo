@@ -33,134 +33,11 @@
 #include <set>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
-
+#include "mongo/db/storage/index_entry_comparison.h"
 
 namespace mongo {
 namespace {
     
-    struct IndexEntry {
-        IndexEntry(const BSONObj& key, DiskLoc loc) :key(key), loc(loc) {}
-
-        BSONObj key;
-        DiskLoc loc;
-    };
-
-    struct IndexEntryComparison {
-        IndexEntryComparison(Ordering order) : order(order) {}
-
-        bool operator() (const IndexEntry& lhs, const IndexEntry& rhs) const {
-            // implementing in memcmp style to ease reuse of this code.
-            return comparison(lhs, rhs) < 0;
-        }
-
-        // Due to the limitations in the std::set API we need to use the same type (IndexEntry) for
-        // both the stored data and the "query". We cheat and encode extra information in the first
-        // byte of the field names in the query. This works because all stored objects should have
-        // all field names empty, so their first bytes are '\0'.
-
-        enum BehaviorIfFieldIsEqual {
-            normal = '\0',
-            less = 'l',
-            greater = 'g',
-        };
-
-        // This should behave the same as customBSONCmp from btree_logic.cpp.
-        int comparison(const IndexEntry& lhs, const IndexEntry& rhs) const {
-            BSONObjIterator lhsIt(lhs.key);
-            BSONObjIterator rhsIt(rhs.key);
-            
-            for (unsigned mask = 1; lhsIt.more(); mask <<= 1) {
-                invariant(rhsIt.more());
-
-                const BSONElement l = lhsIt.next();
-                const BSONElement r = rhsIt.next();
-
-                if (int cmp = l.woCompare(r, /*compareFieldNames=*/false)) {
-                    invariant(cmp != std::numeric_limits<int>::min()); // can't be negated
-                    return order.descending(mask)
-                             ? -cmp
-                             : cmp;
-                }
-
-                // Here is where the weirdness begins. We sometimes want to fudge the comparison
-                // when a key == the query to implement exclusive ranges.
-                BehaviorIfFieldIsEqual lEqBehavior = BehaviorIfFieldIsEqual(l.fieldName()[0]);
-                BehaviorIfFieldIsEqual rEqBehavior = BehaviorIfFieldIsEqual(r.fieldName()[0]);
-
-                if (lEqBehavior) {
-                    // lhs is the query, rhs is the stored data
-                    invariant(rEqBehavior == normal);
-                    return lEqBehavior == less ? -1 : 1;
-                }
-
-                if (rEqBehavior) {
-                    // rhs is the query, lhs is the stored data, so reverse the returns
-                    invariant(lEqBehavior == normal);
-                    return lEqBehavior == less ? 1 : -1;
-                }
-                
-            }
-            invariant(!rhsIt.more());
-
-            // This means just look at the key, not the loc.
-            if (lhs.loc.isNull() || rhs.loc.isNull())
-                return 0;
-
-            return lhs.loc.compare(rhs.loc); // is supposed to ignore ordering
-        }
-        
-        /**
-         * Preps a query for compare(). Strips fieldNames if there are any.
-         */
-        static BSONObj makeQueryObject(const BSONObj& keyPrefix,
-                                       int prefixLen,
-                                       bool prefixExclusive,
-                                       const vector<const BSONElement*>& keySuffix,
-                                       const vector<bool>& suffixInclusive,
-                                       const int cursorDirection) {
-
-            // See comment above for why this is done.
-            const char exclusiveByte = (cursorDirection == 1
-                                            ? IndexEntryComparison::greater
-                                            : IndexEntryComparison::less);
-            const StringData exclusiveFieldName(&exclusiveByte, 1);
-
-            BSONObjBuilder bb;
-
-            // handle the prefix
-            if (prefixLen > 0) {
-                BSONObjIterator it(keyPrefix);
-                for (int i = 0; i < prefixLen; i++) {
-                    invariant(it.more());
-                    const BSONElement e = it.next();
-
-                    if (prefixExclusive && i == prefixLen - 1) {
-                        bb.appendAs(e, exclusiveFieldName);
-                    }
-                    else {
-                        bb.appendAs(e, StringData());
-                    }
-                }
-            }
-
-            // Handle the suffix. Note that the useful parts of the suffix start at index prefixLen
-            // rather than at 0.
-            invariant(keySuffix.size() == suffixInclusive.size());
-            for (size_t i = prefixLen; i < keySuffix.size(); i++) {
-                if (suffixInclusive[i]) {
-                    bb.appendAs(*keySuffix[i], StringData());
-                }
-                else {
-                    bb.appendAs(*keySuffix[i], exclusiveFieldName);
-                }
-            }
-
-            return bb.obj();
-        }
-
-        const Ordering order;
-    };
-
     bool hasFieldNames(const BSONObj& obj) {
         BSONForEach(e, obj) {
             if (e.fieldName()[0])
@@ -180,7 +57,7 @@ namespace {
         return bb.obj();
     }
 
-    typedef std::set<IndexEntry, IndexEntryComparison> IndexSet;
+    typedef std::set<IndexKeyEntry, IndexEntryComparison> IndexSet;
 
     // taken from btree_logic.cpp
     Status dupKeyError(const BSONObj& key) {
@@ -192,12 +69,12 @@ namespace {
     }
     
     bool isDup(const IndexSet& data, const BSONObj& key, DiskLoc loc) {
-        const IndexSet::const_iterator it = data.find(IndexEntry(key, DiskLoc()));
+        const IndexSet::const_iterator it = data.find(IndexKeyEntry(key, DiskLoc()));
         if (it == data.end())
             return false;
 
         // Not a dup if the entry is for the same loc.
-        return it->loc != loc;
+        return it->loc() != loc;
     }
 
     class Heap1BtreeBuilderImpl : public BtreeBuilderInterface {
@@ -226,7 +103,7 @@ namespace {
             if (!_dupsAllowed && isDup(*_data, key, loc))
                 return dupKeyError(key);
 
-            _data->insert(_data->end(), IndexEntry(key.getOwned(), loc));
+            _data->insert(_data->end(), IndexKeyEntry(key.getOwned(), loc));
             return Status::OK();
         }
 
@@ -264,7 +141,7 @@ namespace {
             if (!dupsAllowed && isDup(*_data, key, loc))
                 return dupKeyError(key);
 
-            _data->insert(IndexEntry(key.getOwned(), loc));
+            _data->insert(IndexKeyEntry(key.getOwned(), loc));
             return Status::OK();
         }
 
@@ -273,7 +150,7 @@ namespace {
             invariant(loc.isValid());
             invariant(!hasFieldNames(key));
 
-            const size_t numDeleted = _data->erase(IndexEntry(key, loc));
+            const size_t numDeleted = _data->erase(IndexKeyEntry(key, loc));
             invariant(numDeleted <= 1);
             return numDeleted == 1;
             
@@ -325,8 +202,8 @@ namespace {
 
             virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
                 const BSONObj key = stripFieldNames(keyRaw);
-                _it = _data.lower_bound(IndexEntry(key, loc)); // lower_bound is >= key
-                return _it != _data.end() && (_it->key == key); // intentionally not comparing loc
+                _it = _data.lower_bound(IndexKeyEntry(key, loc)); // lower_bound is >= key
+                return _it != _data.end() && (_it->key() == key); // intentionally not comparing loc
             }
 
             virtual void customLocate(const BSONObj& keyBegin,
@@ -335,7 +212,7 @@ namespace {
                                       const vector<const BSONElement*>& keyEnd,
                                       const vector<bool>& keyEndInclusive) {
                 // makeQueryObject handles stripping of fieldnames for us.
-                _it = _data.lower_bound(IndexEntry(IndexEntryComparison::makeQueryObject(
+                _it = _data.lower_bound(IndexKeyEntry(IndexEntryComparison::makeQueryObject(
                                                         keyBegin,
                                                         keyBeginLen,
                                                         afterKey,
@@ -355,11 +232,11 @@ namespace {
             }
 
             virtual BSONObj getKey() const {
-                return _it->key;
+                return _it->key();
             }
 
             virtual DiskLoc getDiskLoc() const {
-                return _it->loc;
+                return _it->loc();
             }
 
             virtual void advance() {
@@ -373,8 +250,8 @@ namespace {
                     return;
                 }
 
-                _savedKey = _it->key;
-                _savedLoc = _it->loc;
+                _savedKey = _it->key();
+                _savedLoc = _it->loc();
             }
 
             virtual void restorePosition() {
@@ -422,8 +299,8 @@ namespace {
 
             virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
                 const BSONObj key = stripFieldNames(keyRaw);
-                _it = lower_bound(IndexEntry(key, loc)); // lower_bound is <= query
-                return _it != _data.rend() && (_it->key == key); // intentionally not comparing loc
+                _it = lower_bound(IndexKeyEntry(key, loc)); // lower_bound is <= query
+                return _it != _data.rend() && (_it->key() == key); // intentionally not comparing loc
             }
 
             virtual void customLocate(const BSONObj& keyBegin,
@@ -432,7 +309,7 @@ namespace {
                                       const vector<const BSONElement*>& keyEnd,
                                       const vector<bool>& keyEndInclusive) {
                 // makeQueryObject handles stripping of fieldnames for us.
-                _it = lower_bound(IndexEntry(IndexEntryComparison::makeQueryObject(
+                _it = lower_bound(IndexKeyEntry(IndexEntryComparison::makeQueryObject(
                                                   keyBegin,
                                                   keyBeginLen,
                                                   afterKey,
@@ -452,11 +329,11 @@ namespace {
             }
 
             virtual BSONObj getKey() const {
-                return _it->key;
+                return _it->key();
             }
 
             virtual DiskLoc getDiskLoc() const {
-                return _it->loc;
+                return _it->loc();
             }
 
             virtual void advance() {
@@ -470,8 +347,8 @@ namespace {
                     return;
                 }
 
-                _savedKey = _it->key;
-                _savedLoc = _it->loc;
+                _savedKey = _it->key();
+                _savedLoc = _it->loc();
             }
 
             virtual void restorePosition() {
@@ -488,7 +365,7 @@ namespace {
              * Returns the first entry <= query. This is equivalent to ForwardCursors use of
              * _data.lower_bound which returns the first entry >= query.
              */
-            IndexSet::const_reverse_iterator lower_bound(const IndexEntry& query) const {
+            IndexSet::const_reverse_iterator lower_bound(const IndexKeyEntry& query) const {
                 // using upper_bound since we want to the right-most entry matching the query.
                 IndexSet::const_iterator it = _data.upper_bound(query);
 

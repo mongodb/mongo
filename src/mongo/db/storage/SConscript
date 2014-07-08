@@ -1,0 +1,11 @@
+# -*- mode: python; -*-
+
+Import("env")
+
+env.Library(
+    target= 'index_entry',
+    source= [
+        'index_entry_comparison.cpp',
+        ],
+    LIBDEPS= []
+    )
