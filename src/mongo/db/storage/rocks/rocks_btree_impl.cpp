@@ -108,7 +108,7 @@ namespace mongo {
                     return false;
                 _load();
 
-                bool compareResult = key.woCompare( _cachedKey, BSONObj(), false );
+                bool compareResult = ( key.woCompare( _cachedKey, BSONObj(), false ) == 0 );
 
                 // if we can't find the result and we have a reverse iterator, we need to move
                 // forward by one so we're at the first value greater than the what we were
@@ -190,10 +190,14 @@ namespace mongo {
                 _cached = false;
 
                 if ( _savedAtEnd ) {
-                    _iterator->SeekToLast();
-                    
+                    if ( _forward() ) {
+                        _iterator->SeekToLast();
+                    } else {
+                        _iterator->SeekToFirst();
+                    }
+
                     if ( _iterator->Valid() ) {
-                        _iterator->Next();
+                        advance();
                     }
 
                     invariant( !_iterator->Valid() );
