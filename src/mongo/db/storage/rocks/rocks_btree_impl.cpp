@@ -110,11 +110,16 @@ namespace mongo {
 
                 bool compareResult = key.woCompare( _cachedKey, BSONObj(), false );
 
-                // 
+                // if we can't find the result and we have a reverse iterator, we need to move
+                // forward by one so we're at the first value greater than the what we were
+                // searching for, rather than the first value less than the value we were searching
+                // for
                 if ( !compareResult && !_forward() ) {
                     _iterator->Next();
                     _cached = false;
                 }
+
+                return compareResult;
             }
 
             void advanceTo(const BSONObj &keyBegin,
