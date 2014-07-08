@@ -77,7 +77,8 @@ namespace mongo {
     MONGO_INITIALIZER(ToolMocks)(InitializerContext*) {
         setGlobalAuthorizationManager(new AuthorizationManager(
                 new AuthzManagerExternalStateMock()));
-        repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock());
+        repl::ReplSettings replSettings;
+        repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
         setGlobalEnvironment(new GlobalEnvironmentNoop());
         return Status::OK();
     }

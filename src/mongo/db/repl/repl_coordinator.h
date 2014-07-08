@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -96,6 +97,13 @@ namespace repl {
          * of our optime.
          */
         virtual bool isShutdownOkay() const = 0;
+
+        /**
+         * Returns a reference to the parsed command line arguments that are related to replication.
+         * TODO(spencer): Change this to a const ref once we are no longer using it for mutable
+         * global state.
+         */
+        virtual ReplSettings& getSettings() = 0;
 
         enum Mode {
             modeNone = 0,

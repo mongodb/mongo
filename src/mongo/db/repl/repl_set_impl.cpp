@@ -41,7 +41,7 @@
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
-#include "mongo/db/repl/repl_settings.h"  // replSettings
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/util/background.h"
@@ -418,7 +418,7 @@ namespace {
         }
 
         // Figure out indexPrefetch setting
-        std::string& prefetch = replSettings.rsIndexPrefetch;
+        std::string& prefetch = getGlobalReplicationCoordinator()->getSettings().rsIndexPrefetch;
         if (!prefetch.empty()) {
             IndexPrefetchConfig prefetchConfig = PREFETCH_ALL;
             if (prefetch == "none")
@@ -771,6 +771,7 @@ namespace {
                               << " : " << e.toString() << rsLog;
                     }
                 }
+                ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
                 {
                     scoped_lock lck(replSettings.discoveredSeeds_mx);
                     if (replSettings.discoveredSeeds.size() > 0) {

@@ -53,7 +53,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_settings.h"  // replSettings
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h" // replLocalAuth()
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/operation_context_impl.h"
@@ -246,6 +246,7 @@ namespace repl {
         SourceVector old = v;
         v.clear();
 
+        const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         if (!replSettings.source.empty()) {
             // --source <host> specified.
             // check that no items are in sources other than that
@@ -588,6 +589,7 @@ namespace repl {
         if ( !only.empty() && only != clientName )
             return;
 
+        const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         if (replSettings.pretouch &&
             !alreadyLocked/*doesn't make sense if in write lock already*/) {
             if (replSettings.pretouch > 1) {
@@ -723,6 +725,7 @@ namespace repl {
                                "replApplyBatchSize has to be >= 1 and < 1024" );
             }
 
+            const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
             if ( replSettings.slavedelay != 0 && b > 1 ) {
                 return Status( ErrorCodes::BadValue,
                                "can't use a batch size > 1 with slavedelay" );
@@ -959,6 +962,8 @@ namespace repl {
                         replInfo = replAllDead = "sync error last >= nextOpTime";
                         uassert( 10123 , "replication error last applied optime at slave >= nextOpTime from master", false);
                     }
+                    const ReplSettings& replSettings =
+                            getGlobalReplicationCoordinator()->getSettings();
                     if ( replSettings.slavedelay && ( unsigned( time( 0 ) ) < nextOpTime.getSecs() + replSettings.slavedelay ) ) {
                         verify( justOne );
                         oplogReader.putBack( op );
@@ -1048,7 +1053,8 @@ namespace repl {
             Lock::GlobalWrite lk(txn.lockState());
             ReplSource::loadAll(&txn, sources);
 
-            replSettings.fastsync = false; // only need this param for initial reset
+            // only need this param for initial reset
+            getGlobalReplicationCoordinator()->getSettings().fastsync = false;
         }
 
         if ( sources.empty() ) {
@@ -1119,7 +1125,8 @@ namespace repl {
                 Lock::GlobalWrite lk(txn.lockState());
                 if ( replAllDead ) {
                     // throttledForceResyncDead can throw
-                    if ( !replSettings.autoresync || !ReplSource::throttledForceResyncDead( &txn, "auto" ) ) {
+                    if ( !getGlobalReplicationCoordinator()->getSettings().autoresync ||
+                            !ReplSource::throttledForceResyncDead( &txn, "auto" ) ) {
                         log() << "all sources dead: " << replAllDead << ", sleeping for 5 seconds" << endl;
                         break;
                     }
@@ -1239,6 +1246,7 @@ namespace repl {
 
         oldRepl();
 
+        ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         if( !replSettings.slave && !replSettings.master )
             return;
 

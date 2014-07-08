@@ -36,7 +36,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/write_concern.h"
@@ -50,6 +49,28 @@ namespace repl {
          replSetHeartbeat - health.cpp
          replSetInitiate  - rs_mod.cpp
     */
+
+    bool ReplSetCommand::check(string& errmsg, BSONObjBuilder& result) {
+        if (!getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
+            errmsg = "not running with --replSet";
+            if (serverGlobalParams.configsvr) {
+                result.append("info", "configsvr"); // for shell prompt
+            }
+            return false;
+        }
+
+        if( theReplSet == 0 ) {
+            result.append("startupStatus", ReplSet::startupStatus);
+            string s;
+            errmsg = ReplSet::startupStatusMsg.empty() ?
+                        "replset unknown error 2" : ReplSet::startupStatusMsg.get();
+            if( ReplSet::startupStatus == 3 )
+                result.append("info", "run rs.initiate(...) if not yet done for the set");
+            return false;
+        }
+
+        return true;
+    }
 
     bool replSetBlind = false;
     unsigned replSetForceInitialSyncFailure = 0;

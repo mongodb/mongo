@@ -58,7 +58,8 @@ namespace mongo {
 
 namespace repl {
 
-    LegacyReplicationCoordinator::LegacyReplicationCoordinator() {
+    LegacyReplicationCoordinator::LegacyReplicationCoordinator(const ReplSettings& settings) :
+            _settings(settings) {
         // this is ok but micros or combo with some rand() and/or 64 bits might be better --
         // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
         _rbid = (int) curTimeMillis64();
@@ -68,15 +69,15 @@ namespace repl {
     void LegacyReplicationCoordinator::startReplication(TopologyCoordinator*,
                                                         ReplicationExecutor::NetworkInterface*) {
         // if we are going to be a replica set, we aren't doing other forms of replication.
-        if (!replSettings.replSet.empty()) {
-            if (replSettings.slave || replSettings.master) {
+        if (!_settings.replSet.empty()) {
+            if (_settings.slave || _settings.master) {
                 log() << "***" << endl;
                 log() << "ERROR: can't use --slave or --master replication options with --replSet";
                 log() << "***" << endl;
             }
             newRepl();
 
-            ReplSetSeedList *replSetSeedList = new ReplSetSeedList(replSettings.replSet);
+            ReplSetSeedList *replSetSeedList = new ReplSetSeedList(_settings.replSet);
             boost::thread t(stdx::bind(&startReplSets, replSetSeedList));
         } else {
             startMasterSlave();
@@ -94,10 +95,14 @@ namespace repl {
         return false;
     }
 
+    ReplSettings& LegacyReplicationCoordinator::getSettings() {
+        return _settings;
+    }
+
     ReplicationCoordinator::Mode LegacyReplicationCoordinator::getReplicationMode() const {
         if (theReplSet) {
             return modeReplSet;
-        } else if (replSettings.slave || replSettings.master) {
+        } else if (_settings.slave || _settings.master) {
             return modeMasterSlave;
         }
         return modeNone;
@@ -265,21 +270,21 @@ namespace {
     bool LegacyReplicationCoordinator::isMasterForReportingPurposes() {
         // we must check replSet since because getReplicationMode() isn't aware of modeReplSet
         // until theReplSet is initialized
-        if (replSettings.usingReplSets()) {
+        if (_settings.usingReplSets()) {
             if (theReplSet && getCurrentMemberState().primary()) {
                 return true;
             }
             return false;
         }
 
-        if (!replSettings.slave)
+        if (!_settings.slave)
             return true;
 
         if (replAllDead) {
             return false;
         }
 
-        if (replSettings.master) {
+        if (_settings.master) {
             // if running with --master --slave, allow.
             return true;
         }
@@ -290,21 +295,21 @@ namespace {
     bool LegacyReplicationCoordinator::canAcceptWritesForDatabase(const StringData& dbName) {
         // we must check replSet since because getReplicationMode() isn't aware of modeReplSet
         // until theReplSet is initialized
-        if (replSettings.usingReplSets()) {
+        if (_settings.usingReplSets()) {
             if (theReplSet && getCurrentMemberState().primary()) {
                 return true;
             }
             return dbName == "local";
         }
 
-        if (!replSettings.slave)
+        if (!_settings.slave)
             return true;
 
         if (replAllDead) {
             return dbName == "local";
         }
 
-        if (replSettings.master) {
+        if (_settings.master) {
             // if running with --master --slave, allow.
             return true;
         }
@@ -324,7 +329,7 @@ namespace {
         if (canAcceptWritesForDatabase(ns.db())) {
             return Status::OK();
         }
-        if (getReplicationMode() == modeMasterSlave && replSettings.slave == SimpleSlave) {
+        if (getReplicationMode() == modeMasterSlave && _settings.slave == SimpleSlave) {
             return Status::OK();
         }
         if (slaveOk) {
@@ -415,8 +420,8 @@ namespace {
 
         {
             string s = string(cmdObj.getStringField("replSetHeartbeat"));
-            if (replSettings.ourSetName() != s) {
-                log() << "replSet set names do not match, our cmdline: " << replSettings.replSet
+            if (_settings.ourSetName() != s) {
+                log() << "replSet set names do not match, our cmdline: " << _settings.replSet
                       << rsLog;
                 log() << "replSet s: " << s << rsLog;
                 resultObj->append("mismatch", true);
@@ -428,8 +433,8 @@ namespace {
         if( (theReplSet == 0) || (theReplSet->startupStatus == ReplSetImpl::LOADINGCONFIG) ) {
             string from( cmdObj.getStringField("from") );
             if( !from.empty() ) {
-                scoped_lock lck( replSettings.discoveredSeeds_mx );
-                replSettings.discoveredSeeds.insert(from);
+                scoped_lock lck( _settings.discoveredSeeds_mx );
+                _settings.discoveredSeeds.insert(from);
             }
             resultObj->append("hbmsg", "still initializing");
             return Status::OK();
@@ -487,9 +492,8 @@ namespace {
         return Status::OK();
     }
 
-namespace {
-    Status _checkReplEnabledForCommand(BSONObjBuilder* result) {
-        if (!replSettings.usingReplSets()) {
+    Status LegacyReplicationCoordinator::_checkReplEnabledForCommand(BSONObjBuilder* result) {
+        if (!_settings.usingReplSets()) {
             if (serverGlobalParams.configsvr) {
                 result->append("info", "configsvr"); // for shell prompt
             }
@@ -506,14 +510,13 @@ namespace {
 
         return Status::OK();
     }
-} // namespace
 
     Status LegacyReplicationCoordinator::processReplSetReconfig(OperationContext* txn,
                                                                 const ReplSetReconfigArgs& args,
                                                                 BSONObjBuilder* resultObj) {
 
         if( args.force && !theReplSet ) {
-            replSettings.reconfig = args.newConfigObj.getOwned();
+            _settings.reconfig = args.newConfigObj.getOwned();
             resultObj->append("msg",
                               "will try this config momentarily, try running rs.conf() again in a "
                                       "few seconds");
@@ -579,7 +582,7 @@ namespace {
 
         log() << "replSet replSetInitiate admin command received from client" << rsLog;
 
-        if (!replSettings.usingReplSets()) {
+        if (!_settings.usingReplSets()) {
             return Status(ErrorCodes::NoReplicationEnabled, "server is not running with --replSet");
         }
 
@@ -620,7 +623,7 @@ namespace {
             }
             if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
                 resultObj->append("startupStatus", ReplSet::startupStatus);
-                resultObj->append("info", replSettings.replSet);
+                resultObj->append("info", _settings.replSet);
                 return Status(ErrorCodes::InvalidReplicaSetConfig,
                               "all members and seeds must be reachable to initiate set");
             }
@@ -636,7 +639,7 @@ namespace {
                 string name;
                 vector<HostAndPort> seeds;
                 set<HostAndPort> seedSet;
-                parseReplSetSeedList(replSettings.replSet, name, seeds, seedSet); // may throw...
+                parseReplSetSeedList(_settings.replSet, name, seeds, seedSet); // may throw...
 
                 BSONObjBuilder b;
                 b.append("_id", name);

@@ -31,7 +31,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 
 namespace mongo {
 
@@ -58,7 +58,7 @@ namespace mongo {
         CmdCount() : Command("count") { }
         virtual bool slaveOk() const {
             // ok on --slave setups
-            return repl::replSettings.slave == repl::SimpleSlave;
+            return repl::getGlobalReplicationCoordinator()->getSettings().slave == repl::SimpleSlave;
         }
         virtual bool slaveOverrideOk() const { return true; }
         virtual bool maintenanceOk() const { return false; }

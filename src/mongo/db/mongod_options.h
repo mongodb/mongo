@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/options_parser/environment.h"
@@ -83,6 +84,9 @@ namespace mongo {
      * "storage.journaling.enabled" should all be merged into "storage.journaling.enabled".
      */
     Status canonicalizeMongodOptions(moe::Environment* params);
+
+    // Must be called after "storeMongodOptions"
+    StatusWith<repl::ReplSettings> parseMongodReplicationOptions(const moe::Environment& params);
 
     Status storeMongodOptions(const moe::Environment& params, const std::vector<std::string>& args);
 }

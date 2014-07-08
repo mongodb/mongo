@@ -32,7 +32,6 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 
 namespace mongo {
@@ -54,27 +53,7 @@ namespace repl {
         virtual void help( stringstream &help ) const { help << "internal"; }
 
         // TODO(spencer): Remove this once all command processing happens in the repl coordinator
-        bool check(string& errmsg, BSONObjBuilder& result) {
-            if (!replSettings.usingReplSets()) {
-                errmsg = "not running with --replSet";
-                if (serverGlobalParams.configsvr) {
-                    result.append("info", "configsvr"); // for shell prompt
-                }
-                return false;
-            }
-
-            if( theReplSet == 0 ) {
-                result.append("startupStatus", ReplSet::startupStatus);
-                string s;
-                errmsg = ReplSet::startupStatusMsg.empty() ?
-                            "replset unknown error 2" : ReplSet::startupStatusMsg.get();
-                if( ReplSet::startupStatus == 3 )
-                    result.append("info", "run rs.initiate(...) if not yet done for the set");
-                return false;
-            }
-
-            return true;
-        }
+        bool check(string& errmsg, BSONObjBuilder& result);
     };
 
 } // namespace repl

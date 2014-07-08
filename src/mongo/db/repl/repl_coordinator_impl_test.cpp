@@ -46,13 +46,17 @@ namespace repl {
 namespace {
 
     TEST(ReplicationCoordinator, StartupShutdown) {
-        ReplicationCoordinatorImpl coordinator;
+        ReplSettings settings;
+        // Make sure we think we're a replSet
+        settings.replSet = "mySet/node1:12345,node2:54321";
+        ReplicationCoordinatorImpl coordinator(settings);
         coordinator.startReplication(new TopologyCoordinatorMock, new NetworkInterfaceMock);
         coordinator.shutdown();
     }
 
     TEST(ReplicationCoordinator, AwaitReplicationNumberBaseCases) {
-        ReplicationCoordinatorImpl coordinator;
+        ReplSettings settings;
+        ReplicationCoordinatorImpl coordinator(settings);
         OperationContextNoop txn;
         OpTime time(1, 1);
 
@@ -60,14 +64,14 @@ namespace {
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
         writeConcern.wNumNodes = 2;
 
-        // Because we didn't set replSettings.replSet, it will think we're a standalone so
+        // Because we didn't set ReplSettings.replSet, it will think we're a standalone so
         // awaitReplication will always work.
         ReplicationCoordinator::StatusAndDuration statusAndDur = coordinator.awaitReplication(
                 &txn, time, writeConcern);
         ASSERT_OK(statusAndDur.status);
 
         // Now make us a master in master/slave
-        replSettings.master = true;
+        coordinator.getSettings().master = true;
 
         writeConcern.wNumNodes = 0;
         writeConcern.wMode = "majority";
@@ -76,7 +80,7 @@ namespace {
         ASSERT_OK(statusAndDur.status);
 
         // Now make us a replica set
-        replSettings.replSet = "mySet/node1:12345,node2:54321";
+        coordinator.getSettings().replSet = "mySet/node1:12345,node2:54321";
 
         // Waiting for 1 nodes always works
         writeConcern.wNumNodes = 1;
@@ -86,10 +90,11 @@ namespace {
     }
 
     TEST(ReplicationCoordinator, AwaitReplicationNumberOfNodesNonBlocking) {
-        ReplicationCoordinatorImpl coordinator;
-        OperationContextNoop txn;
+        ReplSettings settings;
         // Make sure we think we're a replSet
-        replSettings.replSet = "mySet/node1:12345,node2:54321";
+        settings.replSet = "mySet/node1:12345,node2:54321";
+        ReplicationCoordinatorImpl coordinator(settings);
+        OperationContextNoop txn;
 
         OID client1 = OID::gen();
         OID client2 = OID::gen();
@@ -192,11 +197,12 @@ namespace {
     };
 
     TEST(ReplicationCoordinator, AwaitReplicationNumberOfNodesBlocking) {
-        ReplicationCoordinatorImpl coordinator;
+        ReplSettings settings;
+        // Make sure we think we're a replSet
+        settings.replSet = "mySet/node1:12345,node2:54321";
+        ReplicationCoordinatorImpl coordinator(settings);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
-        // Make sure we think we're a replSet
-        replSettings.replSet = "mySet/node1:12345,node2:54321";
 
         OID client1 = OID::gen();
         OID client2 = OID::gen();
@@ -238,11 +244,12 @@ namespace {
     }
 
     TEST(ReplicationCoordinator, AwaitReplicationTimeout) {
-        ReplicationCoordinatorImpl coordinator;
+        ReplSettings settings;
+        // Make sure we think we're a replSet
+        settings.replSet = "mySet/node1:12345,node2:54321";
+        ReplicationCoordinatorImpl coordinator(settings);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
-        // Make sure we think we're a replSet
-        replSettings.replSet = "mySet/node1:12345,node2:54321";
 
         OID client1 = OID::gen();
         OID client2 = OID::gen();
@@ -265,12 +272,13 @@ namespace {
     }
 
     TEST(ReplicationCoordinator, AwaitReplicationShutdown) {
-        ReplicationCoordinatorImpl coordinator;
+        ReplSettings settings;
+        // Make sure we think we're a replSet
+        settings.replSet = "mySet/node1:12345,node2:54321";
+        ReplicationCoordinatorImpl coordinator(settings);
         coordinator.startReplication(new TopologyCoordinatorMock, new NetworkInterfaceMock);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
-        // Make sure we think we're a replSet
-        replSettings.replSet = "mySet/node1:12345,node2:54321";
 
         OID client1 = OID::gen();
         OID client2 = OID::gen();

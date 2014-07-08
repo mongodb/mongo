@@ -38,7 +38,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/catalog/collection.h"
@@ -70,6 +70,7 @@ namespace ReplTests {
                  _context(&_txn, ns()) {
 
             oldRepl();
+            ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
             replSettings.replSet = "";
             replSettings.oplogSize = 5 * 1024 * 1024;
             replSettings.master = true;
@@ -84,7 +85,7 @@ namespace ReplTests {
         }
         ~Base() {
             try {
-                replSettings.master = false;
+                getGlobalReplicationCoordinator()->getSettings().master = false;
                 deleteAll( ns() );
                 deleteAll( cllNS() );
                 _wunit.commit();

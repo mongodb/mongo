@@ -10,10 +10,6 @@ env.Library(
         '$BUILD_DIR/mongo/clientdriver'
         ])
 
-env.Library('repl_settings',
-            'repl_settings.cpp',
-            LIBDEPS=['$BUILD_DIR/mongo/foundation'])
-
 env.Library('replication_executor',
             'replication_executor.cpp',
             LIBDEPS=['$BUILD_DIR/mongo/foundation'])
@@ -28,8 +24,7 @@ env.Library('repl_coordinator_impl',
             LIBDEPS=['$BUILD_DIR/mongo/db/common',
                      '$BUILD_DIR/mongo/foundation',
                      '$BUILD_DIR/mongo/server_options_core',
-                     'replication_executor',
-                     'repl_settings'])
+                     'replication_executor'])
 
 env.CppUnitTest('repl_coordinator_impl_test',
                 'repl_coordinator_impl_test.cpp',

@@ -50,7 +50,7 @@ namespace repl {
 
     public:
 
-        ReplicationCoordinatorImpl();
+        ReplicationCoordinatorImpl(const ReplSettings& settings);
         virtual ~ReplicationCoordinatorImpl();
 
         // ================== Members of public ReplicationCoordinator API ===================
@@ -61,6 +61,8 @@ namespace repl {
         virtual void shutdown();
 
         virtual bool isShutdownOkay() const;
+
+        virtual ReplSettings& getSettings();
 
         virtual Mode getReplicationMode() const;
 
@@ -170,6 +172,9 @@ namespace repl {
 
         // Set to true when we are in the process of shutting down replication
         bool _inShutdown;
+
+        // Parsed command line arguments related to replication
+        ReplSettings _settings;
 
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator
         boost::scoped_ptr<TopologyCoordinator> _topCoord;

@@ -58,7 +58,9 @@ int dbtestsMain( int argc, char** argv, char** envp ) {
     setWindowsUnhandledExceptionFilter();
     setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMock()));
     setGlobalEnvironment(new GlobalEnvironmentMongoD());
-    repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock());
+    repl::ReplSettings replSettings;
+    replSettings.oplogSize = 10 * 1024 * 1024;
+    repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
     Command::testCommandsEnabled = 1;
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     StartupTest::runTests();

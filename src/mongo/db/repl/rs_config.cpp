@@ -38,7 +38,7 @@
 #include "mongo/db/repl/heartbeat.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_settings.h"  // replSettings
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/log.h"
@@ -334,6 +334,7 @@ namespace {
     }
 
     void ReplSetConfig::checkRsConfig() const {
+        const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         uassert(13132,
                 str::stream() << "nonmatching repl set name in _id field: " << _id << " vs. "
                               << replSettings.ourSetName(),
@@ -670,7 +671,7 @@ namespace {
             }
             else {
                 /* first, make sure other node is configured to be a replset. just to be safe. */
-                string setname = replSettings.ourSetName();
+                string setname = getGlobalReplicationCoordinator()->getSettings().ourSetName();
                 BSONObj cmd = BSON( "replSetHeartbeat" << setname );
                 int theirVersion;
                 BSONObj info;

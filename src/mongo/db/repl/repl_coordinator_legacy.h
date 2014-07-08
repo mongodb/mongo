@@ -42,7 +42,7 @@ namespace repl {
 
     public:
 
-        LegacyReplicationCoordinator();
+        LegacyReplicationCoordinator(const ReplSettings& settings);
         virtual ~LegacyReplicationCoordinator();
 
         virtual void startReplication(TopologyCoordinator*,
@@ -51,6 +51,8 @@ namespace repl {
         virtual void shutdown();
 
         virtual bool isShutdownOkay() const;
+
+        virtual ReplSettings& getSettings();
 
         virtual Mode getReplicationMode() const;
 
@@ -136,6 +138,8 @@ namespace repl {
                                const Milliseconds& stepdownTime,
                                const Milliseconds& postStepdownWaitTime);
 
+        Status _checkReplEnabledForCommand(BSONObjBuilder* result);
+
         // Mutex that protects the _ridConfigMap
         boost::mutex _ridConfigMapMutex;
 
@@ -145,6 +149,8 @@ namespace repl {
         // Rollback id. used to check if a rollback happened during some interval of time
         // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.
         int _rbid;
+
+        ReplSettings _settings;
     };
 
 } // namespace repl

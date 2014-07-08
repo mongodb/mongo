@@ -37,7 +37,6 @@
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
@@ -48,8 +47,8 @@ namespace mongo {
 namespace repl {
 
     void appendReplicationInfo(OperationContext* txn, BSONObjBuilder& result, int level) {
-        if (replSettings.usingReplSets()) {
-            ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        if (replCoord->getSettings().usingReplSets()) {
             if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet
                     || replCoord->getCurrentMemberState().shunned()) {
                 result.append("ismaster", false);
@@ -73,7 +72,7 @@ namespace repl {
                               getGlobalReplicationCoordinator()->isMasterForReportingPurposes());
         }
         
-        if (level && replSettings.usingReplSets()) {
+        if (level && replCoord->getSettings().usingReplSets()) {
             result.append( "info" , "is replica set" );
         }
         else if ( level ) {

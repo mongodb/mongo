@@ -51,7 +51,7 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/counters.h"
@@ -397,11 +397,13 @@ namespace repl {
                           bool *bb,
                           bool fromMigrate ) = _logOpOld;
     void newReplUp() {
-        replSettings.master = true;
+        getGlobalReplicationCoordinator()->getSettings().master = true;
         _logOp = _logOpRS;
     }
     void newRepl() {
-        replSettings.master = true; // TODO(spencer): is this necessary even when a replset?
+        // TODO(spencer): We shouldn't be changing the ReplicationCoordinator's settings after
+        // startup
+        getGlobalReplicationCoordinator()->getSettings().master = true;
         _logOp = _logOpUninitialized;
     }
     void oldRepl() { _logOp = _logOpOld; }
@@ -431,7 +433,7 @@ namespace repl {
                bool* b,
                bool fromMigrate) {
         try {
-            if ( replSettings.master ) {
+            if ( getGlobalReplicationCoordinator()->getSettings().master ) {
                 _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
             }
 
@@ -463,6 +465,7 @@ namespace repl {
 
         const char * ns = "local.oplog.$main";
 
+        const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         bool rs = !replSettings.replSet.empty();
         if( rs )
             ns = rsoplog;

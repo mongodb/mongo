@@ -36,7 +36,8 @@
 namespace mongo {
 namespace repl {
 
-    ReplicationCoordinatorMock::ReplicationCoordinatorMock() {}
+    ReplicationCoordinatorMock::ReplicationCoordinatorMock(const ReplSettings& settings) :
+            _settings(settings) {}
     ReplicationCoordinatorMock::~ReplicationCoordinatorMock() {}
 
     void ReplicationCoordinatorMock::startReplication(
@@ -52,6 +53,10 @@ namespace repl {
     bool ReplicationCoordinatorMock::isShutdownOkay() const {
         // TODO
         return false;
+    }
+
+    ReplSettings& ReplicationCoordinatorMock::getSettings() {
+        return _settings;
     }
 
     bool ReplicationCoordinatorMock::isReplEnabled() const {

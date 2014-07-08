@@ -37,7 +37,6 @@
 #include "mongo/db/repl/heartbeat_info.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_set_health_poll_task.h"
-#include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/server.h"
@@ -75,7 +74,7 @@ namespace repl {
 
             /* we don't call ReplSetCommand::check() here because heartbeat
                checks many things that are pre-initialization. */
-            if (!replSettings.usingReplSets()) {
+            if (!getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
                 errmsg = "not running with --replSet";
                 return false;
             }
