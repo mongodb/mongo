@@ -74,55 +74,54 @@ namespace mongo {
 
         if (isEOF()) { return PlanStage::IS_EOF; }
 
-	StageState childStatus = getActiveChild()->work(out);
+        StageState childStatus = getActiveChild()->work(out);
 
         if (PlanStage::ADVANCED == childStatus) {
             // we'll skip backupPlan processing now
-	    _alreadyProduced = true;
+            _alreadyProduced = true;
         }
         else if (PlanStage::IS_EOF == childStatus) {
             updateCache();
         }
-	else if (PlanStage::FAILURE == childStatus
-		 && !_alreadyProduced
-		 && !_usingBackupChild
-		 && NULL != _backupChildPlan.get()) {
-	    _usingBackupChild = true;
-	    childStatus = _backupChildPlan->work(out);
-	}
-	return childStatus;
+        else if (PlanStage::FAILURE == childStatus
+             && !_alreadyProduced
+             && !_usingBackupChild
+             && NULL != _backupChildPlan.get()) {
+            _usingBackupChild = true;
+            childStatus = _backupChildPlan->work(out);
+        }
+        return childStatus;
     }
 
     void CachedPlanStage::prepareToYield() {
-	if (! _usingBackupChild) {
+        if (! _usingBackupChild) {
             _mainChildPlan->prepareToYield();
-	}
+        }
 
-	if (NULL != _backupChildPlan.get()) {
-	  _backupChildPlan->prepareToYield();
-	}
+        if (NULL != _backupChildPlan.get()) {
+            _backupChildPlan->prepareToYield();
+        }
         ++_commonStats.yields;
     }
 
     void CachedPlanStage::recoverFromYield() {
+        if (NULL != _backupChildPlan.get()) {
+            _backupChildPlan->recoverFromYield();
+        }
 
-	if (NULL != _backupChildPlan.get()) {
-	    _backupChildPlan->recoverFromYield();
-	}
-
-	if (! _usingBackupChild) {
+        if (! _usingBackupChild) {
             _mainChildPlan->recoverFromYield();
-	}
+        }
         ++_commonStats.unyields;
     }
 
     void CachedPlanStage::invalidate(const DiskLoc& dl, InvalidationType type) {
-	if (! _usingBackupChild) {
+        if (! _usingBackupChild) {
             _mainChildPlan->invalidate(dl, type);
-	}
-	if (NULL != _backupChildPlan.get()) {
-	    _backupChildPlan->invalidate(dl, type);
-	}
+        }
+        if (NULL != _backupChildPlan.get()) {
+            _backupChildPlan->invalidate(dl, type);
+        }
         ++_commonStats.invalidates;
     }
 
@@ -143,8 +142,8 @@ namespace mongo {
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_CACHED_PLAN));
         ret->specific.reset(new CachedPlanStats(_specificStats));
 
-	if (_usingBackupChild) {
-	    ret->children.push_back(_backupChildPlan->getStats());
+        if (_usingBackupChild) {
+            ret->children.push_back(_backupChildPlan->getStats());
         }
         else {
             ret->children.push_back(_mainChildPlan->getStats());
