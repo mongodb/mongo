@@ -107,7 +107,14 @@ namespace mongo {
                 if ( !_iterator->Valid() )
                     return false;
                 _load();
-                return key.woCompare( _cachedKey, BSONObj(), false ) == 0;
+
+                bool compareResult = key.woCompare( _cachedKey, BSONObj(), false );
+
+                // 
+                if ( !compareResult && !_forward() ) {
+                    _iterator->Next();
+                    _cached = false;
+                }
             }
 
             void advanceTo(const BSONObj &keyBegin,
@@ -164,14 +171,32 @@ namespace mongo {
             }
 
             void savePosition() {
+                if ( isEOF() ) {
+                    _savedAtEnd = true;
+                    return;
+                }
+
+                _savedAtEnd = false;
                 _savePositionObj = getKey();
                 _savePositionLoc = getDiskLoc();
             }
 
             void restorePosition() {
-                _iterator->SeekToFirst();
                 _cached = false;
-                invariant( locate( _savePositionObj, _savePositionLoc ) );
+
+                if ( _savedAtEnd ) {
+                    _iterator->SeekToLast();
+                    
+                    if ( _iterator->Valid() ) {
+                        _iterator->Next();
+                    }
+
+                    invariant( !_iterator->Valid() );
+                    return;
+                }
+
+                _iterator->SeekToFirst();
+                locate( _savePositionObj, _savePositionLoc );
             }
 
         private:
@@ -199,6 +224,7 @@ namespace mongo {
             mutable DiskLoc _cachedLoc;
 
             // not for caching, but rather for savePosition() and restorePosition()
+            mutable bool _savedAtEnd;
             mutable BSONObj _savePositionObj;
             mutable DiskLoc _savePositionLoc;
 
