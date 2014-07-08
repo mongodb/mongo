@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/client_basic.h"
 
 #include "mongo/db/auth/authentication_session.h"

@@ -1,4 +1,4 @@
-// rocks_database_catalog_entry_real.cpp
+// rocks_index_entry_comparator.h
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -6,6 +6,7 @@
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
+ *
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -28,33 +29,39 @@
  *    it in the license file.
  */
 
+#pragma once
 
-#include "mongo/db/storage/rocks/rocks_database_catalog_entry.h"
+#include <rocksdb/comparator.h>
 
-#include <boost/optional.hpp>
-#include <rocksdb/db.h>
-
-#include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/storage/rocks/rocks_btree_impl.h"
-#include "mongo/db/storage/rocks/rocks_collection_catalog_entry.h"
-#include "mongo/db/storage/rocks/rocks_engine.h"
-
 
 namespace mongo {
 
-    IndexAccessMethod* RocksDatabaseCatalogEntry::getIndex( OperationContext* txn,
-                                                            const CollectionCatalogEntry* collection,
-                                                            IndexCatalogEntry* index ) {
-        const IndexDescriptor* desc = index->descriptor();
-        const string& type = desc->getAccessMethodName();
-        const boost::optional<Ordering> order( Ordering::make( desc->keyPattern() ) );
+    class RocksIndexEntryComparator : public rocksdb::Comparator {
+    public:
+        RocksIndexEntryComparator(Ordering order): _indexComparator(order) { }
+        virtual ~RocksIndexEntryComparator() { } 
 
-        invariant( type == "" ); // temp
+        virtual int Compare(const rocksdb::Slice& a, const rocksdb::Slice& b) const;
 
-        rocksdb::ColumnFamilyHandle* cf = _engine->getIndexColumnFamily( collection->ns().ns(),
-                                                                         desc->indexName(),
-                                                                         order );
-        std::auto_ptr<RocksBtreeImpl> raw( new RocksBtreeImpl( _engine->getDB(), cf ) );
-        return new BtreeAccessMethod( index, raw.release() );
-    }
-}
+        virtual const char* Name() const { return "mongodb.RocksIndexEntryComparator"; }
+
+        /**
+         * If *start < limit, changes *start to a short string in [start,limit).
+         * Simple comparator implementations may return with *start unchanged,
+         * i.e., an implementation of this method that does nothing is correct.
+         */
+        virtual void FindShortestSeparator( std::string* start, const rocksdb::Slice& limit) const{}
+
+        /**
+         * Changes *key to a short string >= *key.
+         * Simple comparator implementations may return with *key unchanged,
+         * i.e., an implementation of this method that does nothing is correct.
+         */
+        virtual void FindShortSuccessor(std::string* key) const { }
+
+    private:
+        IndexEntryComparison _indexComparator;
+    };
+
+} // namespace mongo

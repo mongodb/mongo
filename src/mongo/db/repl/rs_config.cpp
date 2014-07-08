@@ -583,7 +583,6 @@ namespace {
             if( settings["getLastErrorModes"].ok() ) {
                 parseRules(settings["getLastErrorModes"].Obj());
             }
-            ho.check();
             try { getLastErrorDefaults = settings["getLastErrorDefaults"].Obj().copy(); }
             catch(...) { }
 

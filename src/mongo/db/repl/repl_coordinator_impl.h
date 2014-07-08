@@ -91,7 +91,9 @@ namespace repl {
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptime(const OID& rid, const OpTime& opTime, const BSONObj& config);
+        virtual Status setLastOptime(const OID& rid, const OpTime& ts);
+
+        virtual OID getElectionId();
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
@@ -130,6 +132,14 @@ namespace repl {
 
         virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj);
+
+        virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake);
+
+        virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
+
+        virtual bool buildsIndexes();
+
+        virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
 
         // ================== Members of replication code internal API ===================
 

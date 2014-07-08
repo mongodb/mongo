@@ -125,12 +125,16 @@ namespace mongo {
 
         docCount = 0;
 
-        // Send more if ntoreturn is 0, or any value > 1
-        // (one is assumed to be a single doc return, with no cursor)
-        bool sendMore = ntoreturn == 0 || ntoreturn > 1;
+        // If ntoreturn is negative, it means that we should send up to -ntoreturn results
+        // back to the client, and that we should only send a *single batch*. An ntoreturn of
+        // 1 is also a special case which means "return up to 1 result in a single batch" (so
+        // that +1 actually has the same meaning of -1). For all other values of ntoreturn, we
+        // may have to return multiple batches.
+        const bool sendMoreBatches = ntoreturn == 0 || ntoreturn > 1;
         ntoreturn = abs( ntoreturn );
 
-        while ( _cursor->more() ) {
+        bool cursorHasMore = true;
+        while ( ( cursorHasMore = _cursor->more() ) ) {
             BSONObj o = _cursor->next();
 
             buffer.appendBuf( (void*)o.objdata() , o.objsize() );
@@ -151,21 +155,37 @@ namespace mongo {
             }
         }
 
-        bool hasMore = sendMore && _cursor->more();
+        // We need to request another batch if the following two conditions hold:
+        //
+        //  1. ntoreturn is positive and not equal to 1 (see the comment above). This condition
+        //  is stored in 'sendMoreBatches'.
+        //
+        //  2. The last call to _cursor->more() was true (i.e. we never explicitly got a false
+        //  value from _cursor->more()). This condition is stored in 'cursorHasMore'. If the server
+        //  hits EOF while executing a query or a getmore, it will pass a cursorId of 0 in the
+        //  query response to indicate that there are no more results. In this case, _cursor->more()
+        //  will be explicitly false, and we know for sure that we do not have to send more batches.
+        //
+        //  On the other hand, if _cursor->more() is true there may or may not be more results.
+        //  Suppose that the mongod generates enough results to fill this batch. In this case it
+        //  does not know whether not there are more, because doing so would require requesting an
+        //  extra result and seeing whether we get EOF. The mongod sends a valid cursorId to
+        //  indicate that there may be more. We do the same here: we indicate that there may be
+        //  more results to retrieve by setting 'hasMoreBatches' to true.
+        bool hasMoreBatches = sendMoreBatches && cursorHasMore;
 
-        LOG(5) << "\t hasMore: " << hasMore
-               << " sendMore: " << sendMore
-               << " cursorMore: " << _cursor->more()
+        LOG(5) << "\t hasMoreBatches: " << hasMoreBatches
+               << " sendMoreBatches: " << sendMoreBatches
+               << " cursorHasMore: " << cursorHasMore
                << " ntoreturn: " << ntoreturn
                << " num: " << docCount
-               << " wouldSendMoreIfHad: " << sendMore
                << " id:" << getId()
                << " totalSent: " << _totalSent << endl;
 
         _totalSent += docCount;
-        _done = ! hasMore;
+        _done = ! hasMoreBatches;
 
-        return hasMore;
+        return hasMoreBatches;
     }
 
     // ---- CursorCache -----

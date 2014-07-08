@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/storage/rocks/rocks_collection_catalog_entry.h"
 #include "mongo/db/storage/rocks/rocks_database_catalog_entry.h"
+#include "mongo/db/storage/rocks/rocks_index_entry_comparator.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 #include "mongo/util/log.h"
@@ -202,7 +203,8 @@ namespace mongo {
     }
 
     rocksdb::ColumnFamilyHandle* RocksEngine::getIndexColumnFamily( const StringData& ns,
-                                                                    const StringData& indexName ) {
+                                                           const StringData& indexName,
+                                                           const boost::optional<Ordering> order ) {
         ROCKS_TRACE << "getIndexColumnFamily " << ns << "$" << indexName;
 
         boost::mutex::scoped_lock lk( _mapLock );
@@ -217,16 +219,22 @@ namespace mongo {
                 return handle;
         }
 
+        // if we get here, then the column family doesn't exist, so we need to create it
+
+        invariant( order && "need an ordering to create a comparator for the index" );
+
         string fullName = ns.toString() + string("$") + indexName.toString();
         rocksdb::ColumnFamilyHandle* cf;
-        rocksdb::Status status = _db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(),
-                                                          fullName,
-                                                          &cf );
+
+        rocksdb::ColumnFamilyOptions options = rocksdb::ColumnFamilyOptions();
+
+        options.comparator = new RocksIndexEntryComparator( order.get() );
+
+        rocksdb::Status status = _db->CreateColumnFamily( options, fullName, &cf );
         ROCK_STATUS_OK( status );
         invariant( cf != NULL);
         entry->indexNameToCF[indexName] = cf;
         return cf;
-
     }
 
     void RocksEngine::removeColumnFamily( rocksdb::ColumnFamilyHandle*& cfh ) {

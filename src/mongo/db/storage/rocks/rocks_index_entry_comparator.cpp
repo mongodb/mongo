@@ -1,4 +1,4 @@
-// rocks_database_catalog_entry_real.cpp
+// rocks_index_entry_comparator.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -6,6 +6,7 @@
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
+ *
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -28,33 +29,17 @@
  *    it in the license file.
  */
 
+#include "mongo/db/storage/rocks/rocks_index_entry_comparator.h"
 
-#include "mongo/db/storage/rocks/rocks_database_catalog_entry.h"
-
-#include <boost/optional.hpp>
-#include <rocksdb/db.h>
-
-#include "mongo/db/index/btree_access_method.h"
+#include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/rocks/rocks_btree_impl.h"
-#include "mongo/db/storage/rocks/rocks_collection_catalog_entry.h"
-#include "mongo/db/storage/rocks/rocks_engine.h"
-
 
 namespace mongo {
 
-    IndexAccessMethod* RocksDatabaseCatalogEntry::getIndex( OperationContext* txn,
-                                                            const CollectionCatalogEntry* collection,
-                                                            IndexCatalogEntry* index ) {
-        const IndexDescriptor* desc = index->descriptor();
-        const string& type = desc->getAccessMethodName();
-        const boost::optional<Ordering> order( Ordering::make( desc->keyPattern() ) );
-
-        invariant( type == "" ); // temp
-
-        rocksdb::ColumnFamilyHandle* cf = _engine->getIndexColumnFamily( collection->ns().ns(),
-                                                                         desc->indexName(),
-                                                                         order );
-        std::auto_ptr<RocksBtreeImpl> raw( new RocksBtreeImpl( _engine->getDB(), cf ) );
-        return new BtreeAccessMethod( index, raw.release() );
+    int RocksIndexEntryComparator::Compare(const rocksdb::Slice& a, const rocksdb::Slice& b) const {
+        RocksIndexEntry lhs(a);
+        RocksIndexEntry rhs(b);
+        return _indexComparator.comparison(lhs, rhs);
     }
-}
+
+} // namespace mongo

@@ -228,9 +228,10 @@ namespace mongo {
                     }
                 } 
                 else {
-                    if (electionId != repl::theReplSet->getElectionId()) {
+                    if (electionId != repl::getGlobalReplicationCoordinator()->getElectionId()) {
                         LOG(3) << "oid passed in is " << electionId
-                               << ", but our id is " << repl::theReplSet->getElectionId();
+                               << ", but our id is "
+                               << repl::getGlobalReplicationCoordinator()->getElectionId();
                         errmsg = "election occurred after write";
                         result.append("code", ErrorCodes::WriteConcernFailed);
                         return false;
