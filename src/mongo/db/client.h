@@ -36,12 +36,9 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-
 #include "mongo/db/client_basic.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/lockstate.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage_options.h"
@@ -49,15 +46,14 @@
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/paths.h"
 
+
 namespace mongo {
 
     class AuthenticationInfo;
     class Database;
     class CurOp;
-    class Command;
     class Client;
     class AbstractMessagingPort;
-    class LockCollectionForReading;
 
 
     TSP_DECLARE(Client, currentClient)
@@ -116,8 +112,6 @@ namespace mongo {
             _hasWrittenSinceCheckpoint = false;
         }
 
-        LockState& lockState() { return _ls; }
-
     private:
         Client(const std::string& desc, AbstractMessagingPort *p = 0);
         friend class CurOp;
@@ -131,8 +125,6 @@ namespace mongo {
         OID _remoteId; // Only used by master-slave
 
         bool _hasWrittenSinceCheckpoint;
-
-        LockState _ls;
         
     public:
 

@@ -67,6 +67,7 @@ namespace mongo {
     private:
         boost::scoped_ptr<RecoveryUnit> _recovery;
         Transaction _tx;
+        LockState _lockState;
     };
 
 }  // namespace mongo

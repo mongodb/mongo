@@ -26,9 +26,12 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/global_environment_experiment.h"
 
 #include "mongo/db/operation_context.h"
+
 
 namespace mongo {
 

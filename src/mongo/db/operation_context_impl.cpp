@@ -56,8 +56,7 @@ namespace mongo {
     }
 
     LockState* OperationContextImpl::lockState() const {
-        // TODO: This will eventually become member of OperationContextImpl
-        return &cc().lockState();
+        return const_cast<LockState*>(&_lockState);
     }
 
     ProgressMeter* OperationContextImpl::setMessage(const char * msg,
