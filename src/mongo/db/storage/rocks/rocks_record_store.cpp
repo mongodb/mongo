@@ -48,7 +48,9 @@ namespace mongo {
         : RecordStore( ns ),
           _db( db ),
           _columnFamily( columnFamily ),
-          _metadataColumnFamily( metadataColumnFamily ) {
+          _metadataColumnFamily( metadataColumnFamily ),
+          // Set default options (XXX should custom options be persistent?)
+          _readOptions( ) {
         invariant( _db );
         invariant( _columnFamily );
         invariant( _metadataColumnFamily );
@@ -61,12 +63,11 @@ namespace mongo {
             rocksdb::Slice last_slice = iter->key();
             DiskLoc last_loc = reinterpret_cast<DiskLoc*>( const_cast<char*>( 
                                                             last_slice.data() ) )[0];
-            _nextIdNum = last_loc.a() + ( (uint64_t) last_loc.getOfs() << 32 );
+            _nextIdNum = last_loc.a() + ( (uint64_t) last_loc.getOfs() << 32 ) + 1;
         }
         else
             _nextIdNum = 1;
 
-        // TODO make this use default column family instead
         // load metadata
         std::string value;
         if (!_db->Get( rocksdb::ReadOptions(),
@@ -109,7 +110,7 @@ namespace mongo {
     RecordData RocksRecordStore::dataFor( const DiskLoc& loc) const {
         std::string* value = new std::string();
         rocksdb::Status status;
-        status = _db->Get( rocksdb::ReadOptions(),
+        status = _db->Get( _readOptions,
                            _columnFamily,
                            _makeKey( loc ),
                            value );
@@ -131,7 +132,7 @@ namespace mongo {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         std::string old_value;
-        _db->Get(rocksdb::ReadOptions(),
+        _db->Get(_readOptions,
                            _columnFamily,
                            _makeKey( dl ),
                            &old_value );
@@ -196,10 +197,17 @@ namespace mongo {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         std::string old_value;
-        _db->Get(rocksdb::ReadOptions(),
+        rocksdb::Status status = _db->Get(_readOptions,
                            _columnFamily,
                            _makeKey( loc ),
                            &old_value );
+
+        if ( !status.ok() ) {
+
+            log() << "rocks Get failed, blowing up: " << status.ToString();
+            invariant( false );
+        }
+
         int old_length = old_value.size();
 
         ru->writeBatch()->Put( _columnFamily,
@@ -259,7 +267,7 @@ namespace mongo {
         damages_value.append(damages_ptr, sizeof(damages));
         rocksdb::Slice value(damages_value);
 
-        rocksdb::Status status = _db->Merge( rocksdb::WriteOptions(),
+        rocksdb::Status status = _db->Merge( _writeOptions,
                            _columnFamily,
                            _makeKey( loc ),
                            value );
@@ -279,7 +287,7 @@ namespace mongo {
         // get original value
         std::string value;
         rocksdb::Status status;
-        status = _db->Get( rocksdb::ReadOptions(),
+        status = _db->Get( _readOptions,
                            _columnFamily,
                            key,
                            &value );
@@ -338,6 +346,11 @@ namespace mongo {
             DiskLoc loc = iter->getNext();
             deleteRecord(txn, loc);
         }
+        // also clear current write batch
+        RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
+        rocksdb::WriteBatch* wb = ru->writeBatch();
+        if (wb != NULL)
+            wb->Clear();
 
         return Status::OK();
     }
@@ -355,8 +368,18 @@ namespace mongo {
                                        bool full, bool scanData,
                                        ValidateAdaptor* adaptor,
                                        ValidateResults* results, BSONObjBuilder* output ) const {
-        // TODO check all bson
-        output->append( "rocks", "no validate yet" );
+        RecordIterator* iter = getIterator();
+        while(!iter->isEOF()) {
+            RecordData data = dataFor(iter->curr());
+            if (scanData) {
+                BSONObj b(data.data());
+                if (!b.valid()) {
+                    DiskLoc l = iter->curr();
+                    results->errors.push_back(l.toString() + " is corrupted");
+                }
+            }
+            iter->getNext();
+        }
         return Status::OK();
     }
 
@@ -376,7 +399,25 @@ namespace mongo {
     Status RocksRecordStore::setCustomOption( OperationContext* txn,
                                               const BSONElement& option,
                                               BSONObjBuilder* info ) {
-        return Status( ErrorCodes::BadValue, "no custom option for RocksRecordStore" );
+        // XXX can't do write options here as writes are dont in a write batch which is held in
+        // a recovery unit
+        string optionName = option.fieldName();
+        if (!option.isBoolean()) {
+            return Status( ErrorCodes::BadValue, "Invalid Value" );
+        }
+        if (optionName.compare("verify_checksums") == 0) {
+            _readOptions.verify_checksums = option.boolean();
+        }
+        else if (optionName.compare("fill_cache") == 0) {
+            _readOptions.fill_cache = option.boolean();
+        }
+        else if (optionName.compare("tailing") == 0) {
+            _readOptions.tailing = option.boolean();
+        }
+        else
+            return Status( ErrorCodes::BadValue, "Invalid Option" );
+
+        return Status::OK();
     }
 
     DiskLoc RocksRecordStore::_nextId() {
@@ -396,6 +437,7 @@ namespace mongo {
         return dynamic_cast<RocksRecoveryUnit*>( opCtx->recoveryUnit() );
     }
 
+    // XXX make sure these work with rollbacks (I don't think they will)
     void RocksRecordStore::_changeNumRecords(OperationContext* txn, bool insert) {
         if (insert) {
             _numRecords++;
@@ -430,7 +472,7 @@ namespace mongo {
                                           const CollectionScanParams::Direction& dir )
         : _rs( rs ),
           _dir( dir ),
-          _iterator( _rs->_db->NewIterator( rocksdb::ReadOptions(),
+          _iterator( _rs->_db->NewIterator( rs->_readOptions,
                                             rs->_columnFamily ) ) {
         if ( _forward() )
             _iterator->SeekToFirst();

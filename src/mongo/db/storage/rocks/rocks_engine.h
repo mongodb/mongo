@@ -108,9 +108,11 @@ namespace mongo {
 
         struct Entry {
             boost::scoped_ptr<rocksdb::ColumnFamilyHandle> cfHandle;
+            boost::scoped_ptr<rocksdb::ColumnFamilyHandle> metaCfHandle;
             boost::scoped_ptr<RocksCollectionCatalogEntry> collectionEntry;
             boost::scoped_ptr<RocksRecordStore> recordStore;
-            StringMap< boost::shared_ptr<rocksdb::ColumnFamilyHandle> > indexNameToCF;
+            // These ColumnFamilyHandle must be deleted by removeIndex
+            StringMap< rocksdb::ColumnFamilyHandle* > indexNameToCF;
         };
 
         Entry* getEntry( const StringData& ns );

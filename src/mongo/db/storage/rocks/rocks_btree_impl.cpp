@@ -341,7 +341,7 @@ namespace mongo {
 
         rocksdb::Status s =_db->Get( rocksdb::ReadOptions(), _columnFamily, keyData, &dummy );
 
-        return s.ok() ? Status::OK() : Status(ErrorCodes::DuplicateKey, dupKeyError(key));
+        return s.ok() ? Status(ErrorCodes::DuplicateKey, dupKeyError(key)) : Status::OK();
     }
 
     void RocksBtreeImpl::fullValidate(long long* numKeysOut) {
