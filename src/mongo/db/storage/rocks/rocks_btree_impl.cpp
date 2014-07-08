@@ -128,7 +128,7 @@ namespace mongo {
                            const vector<const BSONElement*>& keyEnd,
                            const vector<bool>& keyEndInclusive) {
                 // XXX does this work with reverse iterators?
-                RocksIndexEntry ike( IndexEntryComparison::makeQueryObject (
+                locate( IndexEntryComparison::makeQueryObject (
                                          keyBegin,
                                          keyBeginLen,
                                          afterKey,
@@ -136,8 +136,6 @@ namespace mongo {
                                          keyEndInclusive,
                                          _forward() ),
                                      DiskLoc() );
-
-                _iterator->Seek( ike.asString() );
             }
 
             /**
@@ -150,7 +148,7 @@ namespace mongo {
                               const vector<const BSONElement*>& keyEnd,
                               const vector<bool>& keyEndInclusive) {
                 // XXX I think these do the same thing????
-                customLocate(keyBegin, keyBeginLen, afterVersion, keyEnd, keyEndInclusive);
+                advanceTo( keyBegin, keyBeginLen, afterVersion, keyEnd, keyEndInclusive );
             }
 
             /**
