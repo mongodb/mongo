@@ -31,6 +31,8 @@
 
 #include <string>
 
+#include <rocksdb/options.h>
+
 #include "mongo/db/structure/record_store.h"
 
 namespace rocksdb {
@@ -163,6 +165,7 @@ namespace mongo {
         uint64_t _nextIdNum;
         long long _dataSize;
         long long _numRecords;
+        rocksdb::ReadOptions _readOptions;
         mutable boost::mutex _idLock;
     };
 }

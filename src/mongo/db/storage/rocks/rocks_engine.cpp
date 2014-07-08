@@ -128,11 +128,11 @@ namespace mongo {
                 if ( isIndex ) {
                     string indexName = ns.substr( ns.find( '$' ) + 1 );
                     ROCKS_TRACE << " got index " << indexName << " for " << collection;
-                    entry->indexNameToCF[indexName] =
-                        boost::shared_ptr<rocksdb::ColumnFamilyHandle>( handles[i] );
+                    entry->indexNameToCF[indexName] = handles[i];
                 }
                 else {
                     entry->cfHandle.reset( handles[i] );
+                    entry->metaCfHandle.reset( handles[metadataMap[ns]] );
                     entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i], 
                                                                     handles[metadataMap[ns]]) );
                     entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
@@ -214,9 +214,9 @@ namespace mongo {
         shared_ptr<Entry> entry = i->second;
 
         {
-            boost::shared_ptr<rocksdb::ColumnFamilyHandle> handle = entry->indexNameToCF[indexName];
-            if ( handle )
-                return handle.get();
+            rocksdb::ColumnFamilyHandle* handle = entry->indexNameToCF[indexName];
+            if ( handle != NULL )
+                return handle;
         }
 
         // if we get here, then the column family doesn't exist, so we need to create it
@@ -232,7 +232,8 @@ namespace mongo {
 
         rocksdb::Status status = _db->CreateColumnFamily( options, fullName, &cf );
         ROCK_STATUS_OK( status );
-        entry->indexNameToCF[indexName] = boost::shared_ptr<rocksdb::ColumnFamilyHandle>( cf );
+        invariant( cf != NULL);
+        entry->indexNameToCF[indexName] = cf;
         return cf;
     }
 
@@ -291,6 +292,7 @@ namespace mongo {
         ROCK_STATUS_OK( status );
 
         entry->cfHandle.reset( cf );
+        entry->metaCfHandle.reset( cf_meta );
         entry->recordStore.reset( new RocksRecordStore( ns, _db, entry->cfHandle.get(), cf_meta ));
         entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
         entry->collectionEntry->createMetaData();
@@ -301,10 +303,11 @@ namespace mongo {
 
     Status RocksEngine::dropCollection( OperationContext* opCtx,
                                         const StringData& ns ) {
+        // TODO delete metadata CF, indexes??
         boost::mutex::scoped_lock lk( _mapLock );
         if ( _map.find( ns ) == _map.end() )
             return Status( ErrorCodes::NamespaceNotFound, "can't find collection to drop" );
-        boost::shared_ptr<Entry> entry = _map[ns];
+        Entry* entry = _map[ns].get();
 
         entry->recordStore.reset( NULL );
         entry->collectionEntry->dropMetaData();
@@ -312,8 +315,11 @@ namespace mongo {
 
         rocksdb::Status status = _db->DropColumnFamily( entry->cfHandle.get() );
         ROCK_STATUS_OK( status );
+        status = _db->DropColumnFamily( entry->metaCfHandle.get() );
+        ROCK_STATUS_OK( status );
 
         entry->cfHandle.reset( NULL );
+        entry->metaCfHandle.reset( NULL );
 
         _map.erase( ns );
 
