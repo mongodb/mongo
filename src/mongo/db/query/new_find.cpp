@@ -54,6 +54,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -114,6 +115,9 @@ namespace mongo {
 
     MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
+    // Failpoint for checking whether we've received a getmore.
+    MONGO_FP_DECLARE(failReceivedGetmore);
+
     // TODO: Move this and the other command stuff in newRunQuery outta here and up a level.
     static bool runCommands(OperationContext* txn,
                             const char *ns,
@@ -155,6 +159,12 @@ namespace mongo {
                             int pass,
                             bool& exhaust,
                             bool* isCursorAuthorized) {
+
+        // For testing, we may want to fail if we receive a getmore.
+        if (MONGO_FAIL_POINT(failReceivedGetmore)) {
+            invariant(0);
+        }
+
         exhaust = false;
 
         // This is a read lock.
@@ -264,6 +274,15 @@ namespace mongo {
                 return 0;
             }
 
+            // We save the client cursor when there might be more results, and hence we may receive
+            // another getmore. If we receive a EOF or an error, or the runner is dead, then we know
+            // that we will not be producing more results. We indicate that the cursor is closed by
+            // sending a cursorId of 0 back to the client.
+            //
+            // On the other hand, if we retrieve all results necessary for this batch, then
+            // 'saveClientCursor' is true and we send a valid cursorId back to the client. In
+            // this case, there may or may not actually be more results (for example, the next call
+            // to getNext(...) might just return EOF).
             bool saveClientCursor = false;
 
             if (Runner::RUNNER_DEAD == state || Runner::RUNNER_ERROR == state) {
