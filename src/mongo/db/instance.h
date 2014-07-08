@@ -73,11 +73,6 @@ namespace mongo {
                            DbResponse& dbresponse,
                            const HostAndPort &client );
 
-    /* returns true if there is no data on this server.  useful when starting replication.
-       local database does NOT count.
-    */
-    bool replHasDatabases(OperationContext* txn);
-
     /**
      * Embedded calls to the local server using the DBClientBase API without going over the network.
      *

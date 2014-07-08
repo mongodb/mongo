@@ -903,29 +903,6 @@ namespace mongo {
         wunit.commit();
     }
 
-    /* returns true if there is data on this server.  useful when starting replication.
-       local database does NOT count except for rsoplog collection.
-       used to set the hasData field on replset heartbeat command response
-    */
-    bool replHasDatabases(OperationContext* txn) {
-        vector<string> names;
-        globalStorageEngine->listDatabases( &names );
-
-        if( names.size() >= 2 ) return true;
-        if( names.size() == 1 ) {
-            if( names[0] != "local" )
-                return true;
-            // we have a local database.  return true if oplog isn't empty
-            {
-                Lock::DBRead lk(txn->lockState(), repl::rsoplog);
-                BSONObj o;
-                if( Helpers::getFirst(txn, repl::rsoplog, o) )
-                    return true;
-            }
-        }
-        return false;
-    }
-
     DBDirectClient::DBDirectClient() 
         : _txnOwned(new OperationContextImpl),
           _txn(_txnOwned.get())

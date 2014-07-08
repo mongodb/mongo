@@ -31,15 +31,17 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/commands.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/heartbeat_info.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_set_health_poll_task.h"
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/server.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/fail_point_service.h"
@@ -52,6 +54,32 @@ namespace repl {
     MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
 
     using namespace bson;
+
+namespace {
+    /**
+     * Returns true if there is no data on this server. Useful when starting replication.
+     * The "local" database does NOT count except for "rs.oplog" collection.
+     * Used to set the hasData field on replset heartbeat command response.
+     */
+    bool replHasDatabases(OperationContext* txn) {
+        vector<string> names;
+        globalStorageEngine->listDatabases( &names );
+
+        if( names.size() >= 2 ) return true;
+        if( names.size() == 1 ) {
+            if( names[0] != "local" )
+                return true;
+            // we have a local database.  return true if oplog isn't empty
+            {
+                Lock::DBRead lk(txn->lockState(), repl::rsoplog);
+                BSONObj o;
+                if( Helpers::getFirst(txn, repl::rsoplog, o) )
+                    return true;
+            }
+        }
+        return false;
+    }
+} // namespace
 
     /* { replSetHeartbeat : <setname> } */
     class CmdReplSetHeartbeat : public ReplSetCommand {
