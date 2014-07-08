@@ -27,7 +27,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/shell/shell_utils.h"
 
@@ -35,6 +35,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/index/external_key_generator.h"
+#include "mongo/shell/bench.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils_extended.h"
@@ -245,7 +246,11 @@ namespace mongo {
             scope.execSetup(JSFiles::servers_misc);
             scope.execSetup(JSFiles::replsettest);
             scope.execSetup(JSFiles::replsetbridge);
-            scope.installBenchRun();
+
+            scope.injectNative("benchRun", BenchRunner::benchRunSync);
+            scope.injectNative("benchRunSync", BenchRunner::benchRunSync);
+            scope.injectNative("benchStart", BenchRunner::benchStart);
+            scope.injectNative("benchFinish", BenchRunner::benchFinish);
 
             if ( !_dbConnect.empty() ) {
                 uassert( 12513, "connect failed", scope.exec( _dbConnect , "(connect)" , false , true , false ) );

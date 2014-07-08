@@ -514,7 +514,6 @@ if windows:
 
 scripting_common_files = [ "scripting/engine.cpp",
                            "scripting/utils.cpp",
-                           "scripting/bench.cpp",
                            ]
 
 env.Library('bson_template_evaluator', ["scripting/bson_template_evaluator.cpp"],
@@ -1186,7 +1185,8 @@ env.JSHeader(
                 "shell/replsetbridge.js"
              ])
 
-coreShellFiles = [ "shell/shell_utils.cpp",
+coreShellFiles = [ "shell/bench.cpp",
+                   "shell/shell_utils.cpp",
                    "shell/shell_utils_extended.cpp",
                    "shell/shell_utils_launcher.cpp",
                    "shell/mongo-server.cpp",
