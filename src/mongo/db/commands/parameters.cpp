@@ -32,7 +32,6 @@
 
 #include <set>
 
-#include "mongo/base/init.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
@@ -250,60 +249,6 @@ namespace mongo {
                 return Status::OK();
             }
         } logLevelSetting;
-
-        /**
-         * Component log levels.
-         * Non-negative value means this component is configured with a debug level.
-         * Negative value means log messages with this component will use the default log level.
-         */
-        class ComponentLogLevelSetting : public ServerParameter {
-            MONGO_DISALLOW_COPYING(ComponentLogLevelSetting);
-        public:
-            explicit ComponentLogLevelSetting(logger::LogComponent component)
-                : ServerParameter(ServerParameterSet::getGlobal(),
-                                  "logLevel_" + component.getShortName()),
-                  _component(component) {}
-
-            virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
-                if (!logger::globalLogDomain()->hasMinimumLogSeverity(_component)) {
-                    b << name << -1;
-                    return;
-                }
-                b << name << logger::globalLogDomain()->getMinimumLogSeverity(_component).toInt();
-            }
-
-            virtual Status set(const BSONElement& newValueElement) {
-                typedef logger::LogSeverity LogSeverity;
-                int newValue;
-                if (!newValueElement.coerce(&newValue))
-                    return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
-                                  "Invalid value for logLevel: " << newValueElement);
-                return _setLogLevel(newValue);
-            }
-
-            virtual Status setFromString(const std::string& str) {
-                typedef logger::LogSeverity LogSeverity;
-                int newValue;
-                Status status = parseNumberFromString(str, &newValue);
-                if (!status.isOK())
-                    return status;
-                return _setLogLevel(newValue);
-                return Status::OK();
-            }
-        private:
-            Status _setLogLevel(int newValue) {
-                if (newValue < 0) {
-                    logger::globalLogDomain()->clearMinimumLoggedSeverity(_component);
-                    return Status::OK();
-                }
-                typedef logger::LogSeverity LogSeverity;
-                LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) :
-                    LogSeverity::Log();
-                logger::globalLogDomain()->setMinimumLoggedSeverity(_component, newSeverity);
-                return Status::OK();
-            }
-            logger::LogComponent _component;
-        };
 
         /**
          * Log component verbosity.
@@ -596,24 +541,5 @@ namespace mongo {
                                                              true); // allowedToChangeAtRuntime
     }
 
-    namespace {
-        //
-        // Command instances.
-        // Registers commands with the command system and make commands
-        // available to the client.
-        //
-
-        MONGO_INITIALIZER_WITH_PREREQUISITES(SetupComponentLogLevelSettings,
-                                             MONGO_NO_PREREQUISITES)(InitializerContext* context) {
-            for (int i = 0; i < int(logger::LogComponent::kNumLogComponents); ++i) {
-                logger::LogComponent component = static_cast<logger::LogComponent::Value>(i);
-                if (component == logger::LogComponent::kDefault) { continue; }
-                new ComponentLogLevelSetting(component);
-            }
-
-            return Status::OK();
-        }
-
-    } // namespace
 }
 
