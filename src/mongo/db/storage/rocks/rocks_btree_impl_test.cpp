@@ -29,6 +29,9 @@
 *    it in the license file.
 */
 
+#include <memory>
+
+#include <boost/shared_ptr.hpp>
 #include <boost/filesystem/operations.hpp>
 
 #include <rocksdb/db.h>
@@ -37,6 +40,7 @@
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/rocks/rocks_btree_impl.h"
+#include "mongo/db/storage/rocks/rocks_index_entry_comparator.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 #include "mongo/unittest/unittest.h"
@@ -51,6 +55,10 @@ namespace mongo {
             : OperationContextNoop( new RocksRecoveryUnit( db, false ) ) {
         }
     };
+
+    // to be used in testing
+    static std::unique_ptr<RocksIndexEntryComparator> _rocksComparator(
+            new RocksIndexEntryComparator( Ordering::make( BSON( "a" << 1 ) ) ) );
 
     rocksdb::DB* getDB() {
         string path = "/tmp/mongo-rocks-test";
@@ -357,27 +365,56 @@ namespace mongo {
         }
     }
 
+    boost::shared_ptr<rocksdb::ColumnFamilyHandle> makeColumnFamily( rocksdb::DB* db ) {
+        rocksdb::ColumnFamilyOptions options;
+        options.comparator = _rocksComparator.get();
+
+        rocksdb::ColumnFamilyHandle* cfh;
+        rocksdb::Status s = db->CreateColumnFamily( options, "simpleColumnFamily", &cfh );
+        ASSERT( s.ok() );
+
+        return boost::shared_ptr<rocksdb::ColumnFamilyHandle>( cfh );
+    }
+
+    //TEST ( RocksRecordStoreTest, DirectLocate ) {
+        //scoped_ptr<rocksdb::DB> db( getDB() );
+
+        //boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = makeColumnFamily( db.get() );
+
+        //db->Put( rocksdb::WriteOptions(), cfh.get(), BSON( "a" << 1 ).objdata(), "" );
+        //db->Put( rocksdb::WriteOptions(), cfh.get(), BSON( "a" << 3 ).objdata(), "" );
+
+        //rocksdb::Iterator* it = db->NewIterator( rocksdb::ReadOptions(), cfh.get() );
+
+        //it->Seek( BSON( "a" << 1 ).objdata() );
+        //ASSERT( it->Valid() );
+
+        //it->Seek( BSON( "a" << 2 ).objdata() );
+        //ASSERT( it->Valid() );
+    //}
+
     TEST( RocksRecordStoreTest, ComplexReverseLocate ) {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = makeColumnFamily( db.get() );
+
         {
-            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+            RocksBtreeImpl btree( db.get(), cfh.get() );
 
             {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "a" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "a" << 3 ), DiskLoc(1,1), true ) );
                 }
             }
 
             {
                 scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 0 ) );
-                ASSERT_FALSE( cursor->locate( BSON( "a" << 1.5 ), DiskLoc(1,1) ) );
-                ASSERT( !cursor->isEOF()  );
+                ASSERT_FALSE( cursor->locate( BSON( "" << 2 ), DiskLoc(1,1) ) );
+                ASSERT_FALSE( cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
             }
