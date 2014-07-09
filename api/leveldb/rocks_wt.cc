@@ -176,6 +176,11 @@ WriteBatchHandler::DeleteCF(uint32_t column_family_id, const Slice& key)
 	item.size = key.size();
 	cursor->set_key(cursor, &item);
 	ret = cursor->remove(cursor);
+	if (ret == 0) {
+		int t_ret = cursor->reset(cursor);
+		assert(t_ret == 0);
+	} else if (ret == WT_NOTFOUND)
+		ret = 0;
 	return WiredTigerErrorToStatus(ret);
 }
 
@@ -255,8 +260,10 @@ DbImpl::Get(ReadOptions const &options, ColumnFamilyHandle *cfhp, Slice const &k
 	item.size = key.size();
 	cursor->set_key(cursor, &item);
 	if ((ret = cursor->search(cursor)) == 0 &&
-	    (ret = cursor->get_value(cursor, &item)) == 0)
+	    (ret = cursor->get_value(cursor, &item)) == 0) {
 		*value = std::string((const char *)item.data, item.size);
+		ret = cursor->reset(cursor);
+	}
 	if (ret == WT_NOTFOUND)
 		errmsg = "DB::Get key not found";
 	return WiredTigerErrorToStatus(ret, errmsg);

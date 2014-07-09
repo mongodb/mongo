@@ -322,8 +322,11 @@ DbImpl::Delete(const WriteOptions& options, const Slice& key)
   // Reset the WiredTiger cursor so it doesn't keep any pages pinned. Track
   // failures in debug builds since we don't expect failure, but don't pass
   // failures on - it's not necessary for correct operation.
-  int t_ret = cursor->reset(cursor);
-  assert(t_ret == 0);
+  if (ret == 0) {
+    int t_ret = cursor->reset(cursor);
+    assert(t_ret == 0);
+  } else if (ret == WT_NOTFOUND)
+    ret = 0;
   return WiredTigerErrorToStatus(ret, NULL);
 }
 
@@ -351,7 +354,7 @@ void WriteBatchHandler::Delete(const Slice& key) {
   item.size = key.size();
   cursor->set_key(cursor, &item);
   int ret = cursor->remove(cursor);
-  if (ret != 0 && status_ == 0)
+  if (ret != 0 && ret != WT_NOTFOUND && status_ == 0)
     status_ = ret;
 }
 
