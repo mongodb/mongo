@@ -1088,7 +1088,7 @@ namespace mongo {
                              WriteOpResult* result ) {
 
         const NamespaceString nsString(updateItem.getRequest()->getNS());
-        UpdateRequest request(nsString);
+        UpdateRequest request(txn, nsString);
         request.setQuery(updateItem.getUpdate()->getQuery());
         request.setUpdates(updateItem.getUpdate()->getUpdateExpr());
         request.setMulti(updateItem.getUpdate()->getMulti());
@@ -1115,7 +1115,7 @@ namespace mongo {
         Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
 
         try {
-            UpdateResult res = executor.execute(txn, ctx.db());
+            UpdateResult res = executor.execute(ctx.db());
 
             const long long numDocsModified = res.numDocsModified;
             const long long numMatched = res.numMatched;
@@ -1149,7 +1149,7 @@ namespace mongo {
                              WriteOpResult* result ) {
 
         const NamespaceString nss( removeItem.getRequest()->getNS() );
-        DeleteRequest request( nss );
+        DeleteRequest request(txn, nss);
         request.setQuery( removeItem.getDelete()->getQuery() );
         request.setMulti( removeItem.getDelete()->getLimit() != 1 );
         request.setUpdateOpLog(true);
@@ -1178,7 +1178,7 @@ namespace mongo {
         Client::Context writeContext(txn, nss.ns(), false /* don't check version */);
 
         try {
-            result->getStats().n = executor.execute(txn, writeContext.db());
+            result->getStats().n = executor.execute(writeContext.db());
         }
         catch ( const DBException& ex ) {
             status = ex.toStatus();

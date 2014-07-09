@@ -619,7 +619,7 @@ namespace repl {
                     Timer t;
 
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(requestNs);
+                    UpdateRequest request(txn, requestNs);
 
                     request.setQuery(o);
                     request.setUpdates(o);
@@ -628,7 +628,7 @@ namespace repl {
                     UpdateLifecycleImpl updateLifecycle(true, requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(txn, db, request, &debug);
+                    update(db, request, &debug);
 
                     if( t.millis() >= 2 ) {
                         RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
@@ -648,7 +648,7 @@ namespace repl {
                     b.append(_id);
 
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(requestNs);
+                    UpdateRequest request(txn, requestNs);
 
                     request.setQuery(b.done());
                     request.setUpdates(o);
@@ -657,7 +657,7 @@ namespace repl {
                     UpdateLifecycleImpl updateLifecycle(true, requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(txn, db, request, &debug);
+                    update(db, request, &debug);
                 }
             }
         }
@@ -675,7 +675,7 @@ namespace repl {
             const bool upsert = valueB || convertUpdateToUpsert;
 
             const NamespaceString requestNs(ns);
-            UpdateRequest request(requestNs);
+            UpdateRequest request(txn, requestNs);
 
             request.setQuery(updateCriteria);
             request.setUpdates(o);
@@ -684,7 +684,7 @@ namespace repl {
             UpdateLifecycleImpl updateLifecycle(true, requestNs);
             request.setLifecycle(&updateLifecycle);
 
-            UpdateResult ur = update(txn, db, request, &debug);
+            UpdateResult ur = update(db, request, &debug);
 
             if( ur.numMatched == 0 ) {
                 if( ur.modifiers ) {

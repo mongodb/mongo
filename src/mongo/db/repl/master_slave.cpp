@@ -207,13 +207,13 @@ namespace repl {
             Client::Context ctx(txn, "local.sources");
 
             const NamespaceString requestNs("local.sources");
-            UpdateRequest request(requestNs);
+            UpdateRequest request(txn, requestNs);
 
             request.setQuery(pattern);
             request.setUpdates(o);
             request.setUpsert();
 
-            UpdateResult res = update(txn, ctx.db(), request, &debug);
+            UpdateResult res = update(ctx.db(), request, &debug);
 
             verify( ! res.modifiers );
             verify( res.numMatched == 1 );

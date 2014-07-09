@@ -39,7 +39,8 @@ namespace mongo {
     class DeleteRequest {
         MONGO_DISALLOW_COPYING(DeleteRequest);
     public:
-        explicit DeleteRequest(const NamespaceString& nsString) :
+        explicit DeleteRequest(OperationContext* txn, const NamespaceString& nsString) :
+            _txn(txn),
             _nsString(nsString),
             _multi(false),
             _logop(false),
@@ -55,10 +56,12 @@ namespace mongo {
         bool isMulti() const { return _multi; }
         bool shouldCallLogOp() const { return _logop; }
         bool isGod() const { return _god; }
+        OperationContext* getOpCtx() const { return _txn; }
 
         std::string toString() const;
 
     private:
+        OperationContext* _txn;
         const NamespaceString& _nsString;
         BSONObj _query;
         bool _multi;

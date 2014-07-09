@@ -632,7 +632,7 @@ namespace repl {
                     updates++;
 
                     const NamespaceString requestNs(doc.ns);
-                    UpdateRequest request(requestNs);
+                    UpdateRequest request(txn, requestNs);
 
                     request.setQuery(pattern);
                     request.setUpdates(it->second);
@@ -641,7 +641,7 @@ namespace repl {
                     UpdateLifecycleImpl updateLifecycle(true, requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(txn, ctx.db(), request, &debug);
+                    update(ctx.db(), request, &debug);
 
                 }
             }
