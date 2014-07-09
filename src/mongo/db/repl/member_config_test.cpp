@@ -160,8 +160,8 @@ namespace {
         ASSERT_EQUALS(2U, mc.getNumTags());
         std::vector<ReplicaSetTag> tags(mc.tagsBegin(), mc.tagsEnd());
         ASSERT_EQUALS(2U, tags.size());
-        ASSERT_EQUALS(1U, std::count(tags.begin(), tags.end(), ReplicaSetTag("k1", "v1")));
-        ASSERT_EQUALS(1U, std::count(tags.begin(), tags.end(), ReplicaSetTag("k2", "v2")));
+        ASSERT_EQUALS(1, std::count(tags.begin(), tags.end(), ReplicaSetTag("k1", "v1")));
+        ASSERT_EQUALS(1, std::count(tags.begin(), tags.end(), ReplicaSetTag("k2", "v2")));
     }
 
     TEST(MemberConfig, ValidateFailsWithIdOutOfRange) {
