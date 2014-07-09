@@ -51,10 +51,6 @@ class StringValue : public Value {
 }
 #endif
 
-Cache *NewLRUCache(size_t capacity) {
-  return new CacheImpl(capacity);
-}
-
 Status leveldb::DestroyDB(const std::string& name, const Options& options) {
   WT_CONNECTION *conn;
   int ret, t_ret;
@@ -195,6 +191,9 @@ const FilterPolicy *NewBloomFilterPolicy2(int bits_per_key) {
 #endif
 
 Cache::~Cache() {}
+Cache *NewLRUCache(size_t capacity) {
+  return new CacheImpl(capacity);
+}
 }
 
 int
