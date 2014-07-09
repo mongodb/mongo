@@ -209,6 +209,10 @@ wtleveldb_create(
   s_table << "leaf_item_max=" << options.block_size / 4 << ",";
   if (options.compression == leveldb::kSnappyCompression)
     s_table << "block_compressor=snappy,";
+#ifdef HAVE_ROCKSDB
+  if (options.compression == leveldb::kZlibCompression)
+    s_table << "block_compressor=zlib,";
+#endif
   s_table << "lsm=(";
   s_table << "chunk_size=" << options.write_buffer_size << ",";
   if (options.filter_policy) {
@@ -245,6 +249,12 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
 #ifndef HAVE_BUILTIN_EXTENSION_SNAPPY
   if (options.compression == kSnappyCompression)
     s_conn << "extensions=[libwiredtiger_snappy.so],";
+#endif
+#ifdef HAVE_ROCKSDB
+#ifndef HAVE_BUILTIN_ZLIB
+  if (options.compression == kZlibCompression)
+    s_conn << "extensions=[libwiredtiger_zlib.so],";
+#endif
 #endif
   size_t cache_size = 2 * options.write_buffer_size;
   cache_size += (size_t)options.max_open_files * (4 << 20);

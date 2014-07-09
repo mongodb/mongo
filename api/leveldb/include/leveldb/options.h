@@ -31,6 +31,9 @@ enum CompressionType {
   // part of the persistent format on disk.
   kNoCompression     = 0x0,
   kSnappyCompression = 0x1
+#ifdef HAVE_ROCKSDB
+  , kZlibCompression = 0x2
+#endif
 };
 
 // Options to control the behavior of a database (passed to DB::Open)
