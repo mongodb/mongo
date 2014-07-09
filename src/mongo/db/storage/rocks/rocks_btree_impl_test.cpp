@@ -413,9 +413,9 @@ namespace mongo {
 
             {
                 scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 0 ) );
-                ASSERT_FALSE( cursor->locate( BSON( "" << 2 ), DiskLoc(1,1) ) );
+                ASSERT_FALSE( cursor->locate( BSON( "a" << 2 ), DiskLoc(1,1) ) );
                 ASSERT_FALSE( cursor->isEOF()  );
-                ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
+                ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
             }
         }
@@ -505,8 +505,8 @@ namespace mongo {
                 scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 0 ) );
                 ASSERT_FALSE( cursor->locate( BSON( "" << 2 ), DiskLoc(1,2) ) );
                 ASSERT( !cursor->isEOF()  );
-                ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
-                ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
+                ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
 
                 // advance to the end
                 while ( !cursor->isEOF() ) {

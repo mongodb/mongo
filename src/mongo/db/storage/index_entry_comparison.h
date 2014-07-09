@@ -75,8 +75,6 @@ namespace mongo {
 
         // This should behave the same as customBSONCmp from btree_logic.cpp.
         int comparison(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const {
-            PRINT(lhs.key());
-            PRINT(rhs.key());
             BSONObjIterator lhsIt(lhs.key());
             BSONObjIterator rhsIt(rhs.key());
             
