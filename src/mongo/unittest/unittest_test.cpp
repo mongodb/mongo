@@ -1,20 +1,62 @@
 /**
- * Copyright (C) 2012 10gen Inc.
- */
+*    Copyright (C) 2012 MongoDB, Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*
+*    As a special exception, the copyright holders give permission to link the
+*    code of portions of this program with the OpenSSL library under certain
+*    conditions as described in each individual source file and distribute
+*    linked combinations including the program with the OpenSSL library. You
+*    must comply with the GNU Affero General Public License in all respects
+*    for all of the code used other than as permitted herein. If you modify
+*    file(s) with this exception, you may extend this exception to your
+*    version of the file(s), but you are not obligated to do so. If you do not
+*    wish to do so, delete this exception statement from your version. If you
+*    delete this exception statement from all source files in the program,
+*    then also delete it in the license file.
+*/
 
 /**
  * Unit tests of the unittest framework itself.
  */
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
 #include <string>
 
+#include "mongo/stdx/functional.h"
+
 namespace {
+    namespace stdx = mongo::stdx;
+
+    bool containsPattern(const std::string& pattern, const std::string& value) {
+        return value.find(pattern) != std::string::npos;
+    }
 
 #define ASSERT_TEST_FAILS(TEST_EXPR)                                    \
     ASSERT_THROWS((TEST_EXPR), mongo::unittest::TestAssertionFailureException)
+
+#define ASSERT_TEST_FAILS_MATCH(TEST_EXPR, PATTERN)                     \
+    ASSERT_THROWS_PRED(                                                 \
+            TEST_EXPR,                                                  \
+            mongo::unittest::TestAssertionFailureException,             \
+            stdx::bind(containsPattern,                                 \
+                       PATTERN,                                         \
+                       stdx::bind(&mongo::unittest::TestAssertionFailureException::getMessage, \
+                                  stdx::placeholders::_1)))
 
     TEST(UnitTestSelfTest, DoNothing) {
     }
@@ -74,6 +116,12 @@ namespace {
 
         ASSERT_TEST_FAILS(ASSERT_EQUALS(std::string("hello"), "good bye!"));
         ASSERT_TEST_FAILS(ASSERT_EQUALS("hello", std::string("good bye!")));
+    }
+
+    TEST(UnitTestSelfTest, TestStreamingIntoFailures) {
+        ASSERT_TEST_FAILS_MATCH(ASSERT_TRUE(false) << "Told you so", "Told you so");
+        ASSERT_TEST_FAILS_MATCH(ASSERT(false) << "Told you so", "Told you so");
+        ASSERT_TEST_FAILS_MATCH(ASSERT_FALSE(true) << "Told you so", "Told you so");
     }
 
 }  // namespace

@@ -57,8 +57,7 @@
 /**
  * Fails unless "EXPRESSION" is true.
  */
-#define ASSERT_TRUE(EXPRESSION) ::mongo::unittest::TestAssertion( __FILE__, __LINE__ ).failIf( \
-            !(EXPRESSION), "Expected: " #EXPRESSION )
+#define ASSERT_TRUE(EXPRESSION) if (!(EXPRESSION)) ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, "Expected: " #EXPRESSION).stream()
 #define ASSERT(EXPRESSION) ASSERT_TRUE(EXPRESSION)
 
 /**
@@ -74,8 +73,8 @@
 /**
  * Fails if "EXPRESSION" is true.
  */
-#define ASSERT_FALSE(EXPRESSION) ::mongo::unittest::TestAssertion( __FILE__, __LINE__ ).failIf( \
-            (EXPRESSION), "Expected: !(" #EXPRESSION ")" )
+#define ASSERT_FALSE(EXPRESSION) if (EXPRESSION) \
+::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, "Expected: !(" #EXPRESSION ")").stream()
 
 /*
  * Binary comparison assertions.
@@ -347,21 +346,6 @@ namespace mongo {
         };
 
         /**
-         * Collection of information about failed tests.  Used in reporting
-         * failures.
-         */
-        class TestAssertionFailureDetails : private boost::noncopyable {
-        public:
-            TestAssertionFailureDetails( const std::string& theFile,
-                                         unsigned theLine,
-                                         const std::string& theMessage );
-
-            const std::string file;
-            const unsigned line;
-            const std::string message;
-        };
-
-        /**
          * Exception thrown when a test assertion fails.
          *
          * Typically thrown by helpers in the TestAssertion class and its ilk, below.
@@ -372,18 +356,37 @@ namespace mongo {
          */
         class TestAssertionFailureException {
         public:
-            TestAssertionFailureException( const std::string& theFile,
-                                           unsigned theLine,
-                                           const std::string& theMessage );
+            TestAssertionFailureException(const std::string& theFile,
+                                          unsigned theLine,
+                                          const std::string& theMessage);
 
-            const std::string& getFile() const { return _details->file; }
-            unsigned getLine() const { return _details->line; }
-            const std::string& getMessage() const { return _details->message; }
+            const std::string& getFile() const { return _file; }
+            unsigned getLine() const { return _line; }
+            const std::string& getMessage() const { return _message; }
+            void setMessage(const std::string& message) { _message = message; }
 
             std::string toString() const;
 
         private:
-            boost::shared_ptr<TestAssertionFailureDetails> _details;
+            std::string _file;
+            unsigned _line;
+            std::string _message;
+        };
+
+        class TestAssertionFailure {
+            MONGO_DISALLOW_COPYING(TestAssertionFailure);
+        public:
+            TestAssertionFailure(
+                    const std::string& file, unsigned line, const std::string& message);
+#if __cplusplus < 201103
+            ~TestAssertionFailure();
+#else
+            ~TestAssertionFailure() noexcept(false);
+#endif
+            std::ostream& stream();
+        private:
+            TestAssertionFailureException _exception;
+            std::ostringstream _stream;
         };
 
         /**
