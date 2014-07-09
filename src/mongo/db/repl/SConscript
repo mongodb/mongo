@@ -56,16 +56,19 @@ env.Library('replmocks',
 env.Library('replica_set_config',
             [
                 'member_config.cpp',
-                'replica_set_tag.cpp'
+                'replica_set_config.cpp',
+                'replica_set_tag.cpp',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/bson',
                 '$BUILD_DIR/mongo/hostandport',
+                '$BUILD_DIR/mongo/db/common',
             ])
 
 env.CppUnitTest('replica_set_config_test',
                 [
                     'member_config_test.cpp',
+                    'replica_set_config_test.cpp',
                     'replica_set_tag_test.cpp',
                 ],
                 LIBDEPS=['replica_set_config'])
