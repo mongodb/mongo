@@ -46,7 +46,6 @@ namespace mongo {
           _collection(collection),
           _workingSet(ws),
           _key(query->getQueryObj()["_id"].wrap()),
-          _query(query),
           _killed(false),
           _done(false),
           _commonStats(kStageType) { }
@@ -57,7 +56,6 @@ namespace mongo {
           _collection(collection),
           _workingSet(ws),
           _key(key),
-          _query(NULL),
           _killed(false),
           _done(false),
           _commonStats(kStageType) { }

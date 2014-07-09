@@ -77,7 +77,8 @@ namespace mongo {
      *
      * Does not take ownership of 'query'.
      */
-    Status getExecutorIDHack(Collection* collection,
+    Status getExecutorIDHack(OperationContext* txn,
+                             Collection* collection,
                              CanonicalQuery* query,
                              const QueryPlannerParams& plannerParams,
                              PlanExecutor** out);

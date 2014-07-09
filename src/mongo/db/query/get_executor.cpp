@@ -168,6 +168,7 @@ namespace mongo {
                              const QueryPlannerParams& plannerParams,
                              PlanExecutor** out) {
         invariant(collection);
+        invariant(query);
 
         LOG(2) << "Using idhack: " << query->toStringShort();
         WorkingSet* ws = new WorkingSet();
@@ -182,7 +183,7 @@ namespace mongo {
         // There might be a projection. The idhack stage will always fetch the full document,
         // so we don't support covered projections. However, we might use the simple inclusion
         // fast path.
-        if (NULL != query && NULL != query->getProj()) {
+        if (NULL != query->getProj()) {
             ProjectionStageParams params(WhereCallbackReal(collection->ns().db()));
             params.projObj = query->getProj()->getProjObj();
 

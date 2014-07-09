@@ -87,9 +87,6 @@ namespace mongo {
         // The value to match against the _id field.
         BSONObj _key;
 
-        // Not owned by us.
-        CanonicalQuery* _query;
-
         // Did someone call kill() on us?
         bool _killed;
 
