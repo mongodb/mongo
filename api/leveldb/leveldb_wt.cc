@@ -365,10 +365,16 @@ DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
   Status status = Status::OK();
   OperationContext *context = GetContext();
   WT_SESSION *session = context->GetSession();
-  int ret, t_ret;
+  int ret = 0, t_ret;
+
+#ifdef HAVE_ROCKSDB
+    int need_txn = (updates->Count() > 1);
+#else
+    int need_txn = 1;
+#endif
 
   for (;;) {
-    if ((ret = session->begin_transaction(session, NULL)) != 0) {
+    if (need_txn && (ret = session->begin_transaction(session, NULL)) != 0) {
       errmsg = "Begin transaction failed in Write batch";
       goto err;
     }
@@ -380,22 +386,23 @@ DbImpl::Write(const WriteOptions& options, WriteBatch* updates)
     try {
       status = updates->Iterate(&handler);
     } catch(...) {
-      (void)session->rollback_transaction(session, NULL);
+      if (need_txn)
+        (void)session->rollback_transaction(session, NULL);
       throw;
     }
 #endif
     if (!status.ok() || (ret = handler.GetWiredTigerStatus()) != WT_DEADLOCK)
       break;
     // Roll back the transaction on deadlock so we can try again
-    if ((ret = session->rollback_transaction(session, NULL)) != 0) {
+    if (need_txn && (ret = session->rollback_transaction(session, NULL)) != 0) {
       errmsg = "Rollback transaction failed in Write batch";
       goto err;
     }
   }
 
-  if (status.ok() && ret == 0) {
+  if (need_txn && status.ok() && ret == 0) {
     ret = session->commit_transaction(session, NULL);
-  } else {
+  } else if (need_txn) {
     t_ret = session->rollback_transaction(session, NULL);
     if (ret == 0)
       ret = t_ret;
