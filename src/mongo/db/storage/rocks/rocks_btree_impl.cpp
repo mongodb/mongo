@@ -128,14 +128,32 @@ namespace mongo {
                            const vector<const BSONElement*>& keyEnd,
                            const vector<bool>& keyEndInclusive) {
                 // XXX does this work with reverse iterators?
-                locate( IndexEntryComparison::makeQueryObject (
+                BSONObj key = IndexEntryComparison::makeQueryObject (
                                          keyBegin,
                                          keyBeginLen,
                                          afterKey,
                                          keyEnd,
                                          keyEndInclusive,
-                                         _forward() ),
-                                     DiskLoc() );
+                                         _forward() );
+
+                _cached = false;
+                string keyData = RocksIndexEntry( key, DiskLoc(), false).asString();
+                _iterator->Seek( keyData );
+                _checkStatus();
+                if ( !_iterator->Valid() )
+                    return;
+                _load();
+
+                bool compareResult = key.woCompare( _cachedKey, BSONObj(), false );
+
+                // if we can't find the result and we have a reverse iterator, we need to move
+                // forward by one so we're at the first value greater than the what we were
+                // searching for, rather than the first value less than the value we were searching
+                // for
+                if ( !compareResult && !_forward() ) {
+                    _iterator->Next();
+                    _cached = false;
+                }
             }
 
             /**
@@ -241,10 +259,10 @@ namespace mongo {
 
     // RocksIndexEntry
     
-    RocksIndexEntry::RocksIndexEntry( const BSONObj& key, const DiskLoc loc )
+    RocksIndexEntry::RocksIndexEntry( const BSONObj& key, const DiskLoc loc, bool stripFieldNames )
         : IndexKeyEntry( key, loc ) {
 
-        if ( _key.firstElement().fieldName()[0] ) {
+        if ( stripFieldNames && _key.firstElement().fieldName()[0] ) {
             // XXX move this to comparator
             // need to strip
             BSONObjBuilder b;
@@ -264,7 +282,6 @@ namespace mongo {
         : IndexKeyEntry( BSONObj(), DiskLoc() ) {
 
         _key = BSONObj( slice.data() );
-        invariant( !_key.firstElement().fieldName()[0] );
 
         _loc = reinterpret_cast<const DiskLoc*>( slice.data() + _key.objsize() )[0];
 
