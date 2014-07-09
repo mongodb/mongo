@@ -66,5 +66,6 @@ env.Library('replica_set_config',
 env.CppUnitTest('replica_set_config_test',
                 [
                     'member_config_test.cpp',
+                    'replica_set_tag_test.cpp',
                 ],
                 LIBDEPS=['replica_set_config'])
