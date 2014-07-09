@@ -339,4 +339,81 @@ namespace {
                       ::mongo::logger::LogSeverity::Debug(verbosity));
     }
 
+    TEST(Verbosity, YAMLConfigStringLogComponent) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::OptionSection options;
+
+        // Reset the log level before we test
+        ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+                ::mongo::logger::LogSeverity::Info());
+        // Log level for Storage will be cleared by config file value.
+        ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+                ::mongo::logger::LogComponent::kStorage,
+                ::mongo::logger::LogSeverity::Debug(1));
+
+        ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.yaml",
+                         "systemLog:\n"
+                         "    verbosity: 4\n"
+                         "    component:\n"
+                         "        accessControl:\n"
+                         "            verbosity: 0\n"
+                         "        storage:\n"
+                         "            verbosity: -1\n"
+                         "            journaling:\n"
+                         "                verbosity: 2\n");
+
+        ASSERT_OK(parser.run(options, argv, env_map, &environment));
+
+        ASSERT_OK(::mongo::validateServerOptions(environment));
+        ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
+        ASSERT_OK(::mongo::storeServerOptions(environment, argv));
+
+        // Verify component log levels using global log domain.
+        int verbosity = 4;
+
+        // Default
+        ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(),
+                      ::mongo::logger::LogSeverity::Debug(verbosity));
+        ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(
+                          ::mongo::logger::LogComponent::kDefault),
+                      ::mongo::logger::LogSeverity::Debug(verbosity));
+
+        // AccessControl
+        ASSERT_TRUE(::mongo::logger::globalLogDomain()->hasMinimumLogSeverity(
+                          ::mongo::logger::LogComponent::kAccessControl));
+        ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(
+                          ::mongo::logger::LogComponent::kAccessControl),
+                      ::mongo::logger::LogSeverity::Log());
+
+        // Query - not mentioned in configuration. should match default.
+        ASSERT_FALSE(::mongo::logger::globalLogDomain()->hasMinimumLogSeverity(
+                          ::mongo::logger::LogComponent::kStorage));
+        ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(
+                          ::mongo::logger::LogComponent::kStorage),
+                      ::mongo::logger::LogSeverity::Debug(verbosity));
+
+        // Storage - cleared by -1 value in configuration. should match default.
+        ASSERT_FALSE(::mongo::logger::globalLogDomain()->hasMinimumLogSeverity(
+                          ::mongo::logger::LogComponent::kStorage));
+        ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(
+                          ::mongo::logger::LogComponent::kStorage),
+                      ::mongo::logger::LogSeverity::Debug(verbosity));
+
+        // Journaling - explicitly set to 2 in configuration.
+        ASSERT_TRUE(::mongo::logger::globalLogDomain()->hasMinimumLogSeverity(
+                          ::mongo::logger::LogComponent::kJournaling));
+        ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(
+                          ::mongo::logger::LogComponent::kJournaling),
+                      ::mongo::logger::LogSeverity::Debug(2));
+    }
+
 } // unnamed namespace
