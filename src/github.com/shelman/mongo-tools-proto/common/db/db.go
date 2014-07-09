@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/db/command"
 	"github.com/shelman/mongo-tools-proto/common/db/ssl"
+	"github.com/shelman/mongo-tools-proto/common/db/kerberos"
 	"github.com/shelman/mongo-tools-proto/common/options"
 	"labix.org/v2/mgo"
 	"sync"
@@ -72,6 +73,9 @@ func InitSessionProvider(opts *options.ToolOptions) (*SessionProvider,
 
 // Get the right type of connector, based on the options
 func getConnector(opts *options.ToolOptions) DBConnector {
+	if opts.Auth.Mechanism == "GSSAPI" {
+		return &kerberos.KerberosDBConnector{}
+	}
 
 	if opts.SSL.UseSSL {
 		return &ssl.SSLDBConnector{}

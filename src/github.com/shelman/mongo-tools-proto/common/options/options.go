@@ -29,6 +29,7 @@ type ToolOptions struct {
 	*SSL
 	*Auth
 	*Namespace
+	*Kerberos
 
 	// Extra tool-specific options that can be specified by calling
 	// AddOptions
@@ -90,6 +91,12 @@ type Auth struct {
 	Mechanism string `long:"authenticationMechanism" description:"Specify the authentication mechanism to be used"`
 }
 
+// Struct for Kerberos/GSSAPI-specific options
+type Kerberos struct {
+	Service string `long:"gssapiServiceName" description:"Service name to use when authenticating using GSSAPI/Kerberos ('mongodb' by default)"`
+	// TODO: Add Hostname: https://github.com/mongodb/mongo/commit/f18e88ffafd615d515f3359ee73f719b1667e193
+}
+
 // Ask for a new instance of tool options
 func New(appName, versionStr, usageStr string) *ToolOptions {
 	return &ToolOptions{
@@ -103,6 +110,7 @@ func New(appName, versionStr, usageStr string) *ToolOptions {
 		SSL:        &SSL{},
 		Auth:       &Auth{},
 		Namespace:  &Namespace{},
+		Kerberos:   &Kerberos{},
 	}
 }
 
@@ -150,6 +158,7 @@ func (self *ToolOptions) Parse() ([]string, error) {
 	_, err = self.parser.AddGroup("ssl options", "", self.SSL)
 	_, err = self.parser.AddGroup("authentication options", "", self.Auth)
 	_, err = self.parser.AddGroup("namespace options", "", self.Namespace)
+	_, err = self.parser.AddGroup("kerberos options", "", self.Kerberos)
 
 	// register all of the extra options
 	for _, eo := range self.Extra {
