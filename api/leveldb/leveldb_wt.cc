@@ -242,7 +242,7 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
   }
   if (options.error_if_exists)
     s_conn << "exclusive,";
-#if 0
+#ifndef HAVE_BUILTIN_EXTENSION_SNAPPY
   if (options.compression == kSnappyCompression)
     s_conn << "extensions=[libwiredtiger_snappy.so],";
 #endif
