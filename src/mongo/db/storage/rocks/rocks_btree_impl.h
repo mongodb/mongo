@@ -105,13 +105,10 @@ namespace mongo {
          * Constructs a RocksIndexEntry. Currently (7/7/14), strips field names from key,
          * but this may change
          */
-        RocksIndexEntry( const BSONObj& key, const DiskLoc loc );
+        RocksIndexEntry( const BSONObj& key, const DiskLoc loc, bool stripFieldNames = true );
 
         /**
-         * Constructs a RocksIndexEntry from a Slice. This is intented to be used to deserialize
-         * a RocksIndexEntry that has just been retreived from a rocksdb instance via a call to 
-         * Get(). Therefore, slice must contain the bytes for a RocksIndexEntry where the BSONObj
-         * has already been stripped of its field names.
+         * Constructs a RocksIndexEntry from a Slice. 
          */
         RocksIndexEntry( const rocksdb::Slice& slice );
 
