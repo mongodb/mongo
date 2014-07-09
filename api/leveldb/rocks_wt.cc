@@ -236,7 +236,7 @@ DbImpl::Flush(FlushOptions const&, ColumnFamilyHandle* cfhp)
 	ColumnFamilyHandleImpl *cf =
 	    static_cast<ColumnFamilyHandleImpl *>(cfhp);
 	WT_SESSION *session = GetContext()->GetSession();
-	return WiredTigerErrorToStatus(session->checkpoint(session, ("targets=(" + cf->GetURI() + ")").c_str()));
+	return WiredTigerErrorToStatus(session->checkpoint(session, ("target=(\"" + cf->GetURI() + "\")").c_str()));
 }
 
 Status
