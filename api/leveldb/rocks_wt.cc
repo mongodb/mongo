@@ -231,10 +231,12 @@ DbImpl::Delete(WriteOptions const &write_options, ColumnFamilyHandle *cfhp, Slic
 }
 
 Status
-DbImpl::Flush(FlushOptions const&, ColumnFamilyHandle*)
+DbImpl::Flush(FlushOptions const&, ColumnFamilyHandle* cfhp)
 {
+	ColumnFamilyHandleImpl *cf =
+	    static_cast<ColumnFamilyHandleImpl *>(cfhp);
 	WT_SESSION *session = GetContext()->GetSession();
-	return WiredTigerErrorToStatus(session->checkpoint(session, NULL));
+	return WiredTigerErrorToStatus(session->checkpoint(session, ("targets=(" + cf->GetURI() + ")").c_str()));
 }
 
 Status
