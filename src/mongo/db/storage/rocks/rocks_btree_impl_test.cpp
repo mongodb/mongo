@@ -183,6 +183,45 @@ namespace mongo {
         }
     }
 
+    boost::shared_ptr<rocksdb::ColumnFamilyHandle> makeColumnFamily( rocksdb::DB* db ) {
+        rocksdb::ColumnFamilyOptions options;
+        options.comparator = _rocksComparator.get();
+
+        rocksdb::ColumnFamilyHandle* cfh;
+        rocksdb::Status s = db->CreateColumnFamily( options, "simpleColumnFamily", &cfh );
+        ASSERT( s.ok() );
+
+        return boost::shared_ptr<rocksdb::ColumnFamilyHandle>( cfh );
+    }
+
+    TEST( RocksRecordStoreTest, LocateInexact ) {
+        scoped_ptr<rocksdb::DB> db( getDB() );
+
+        {
+            boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = makeColumnFamily( db.get() );
+
+            RocksBtreeImpl btree( db.get(), cfh.get() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                }
+            }
+
+            {
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+                ASSERT_FALSE( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
+            }
+        }
+    }
+
     TEST( RocksRecordStoreTest, Snapshots ) {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
@@ -365,40 +404,12 @@ namespace mongo {
         }
     }
 
-    boost::shared_ptr<rocksdb::ColumnFamilyHandle> makeColumnFamily( rocksdb::DB* db ) {
-        rocksdb::ColumnFamilyOptions options;
-        options.comparator = _rocksComparator.get();
-
-        rocksdb::ColumnFamilyHandle* cfh;
-        rocksdb::Status s = db->CreateColumnFamily( options, "simpleColumnFamily", &cfh );
-        ASSERT( s.ok() );
-
-        return boost::shared_ptr<rocksdb::ColumnFamilyHandle>( cfh );
-    }
-
-    //TEST ( RocksRecordStoreTest, DirectLocate ) {
-        //scoped_ptr<rocksdb::DB> db( getDB() );
-
-        //boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = makeColumnFamily( db.get() );
-
-        //db->Put( rocksdb::WriteOptions(), cfh.get(), BSON( "a" << 1 ).objdata(), "" );
-        //db->Put( rocksdb::WriteOptions(), cfh.get(), BSON( "a" << 3 ).objdata(), "" );
-
-        //rocksdb::Iterator* it = db->NewIterator( rocksdb::ReadOptions(), cfh.get() );
-
-        //it->Seek( BSON( "a" << 1 ).objdata() );
-        //ASSERT( it->Valid() );
-
-        //it->Seek( BSON( "a" << 2 ).objdata() );
-        //ASSERT( it->Valid() );
-    //}
-
-    TEST( RocksRecordStoreTest, ComplexReverseLocate ) {
+    TEST( RocksRecordStoreTest, LocateInexactReverse ) {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
-        boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = makeColumnFamily( db.get() );
-
         {
+            boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = makeColumnFamily( db.get() );
+
             RocksBtreeImpl btree( db.get(), cfh.get() );
 
             {
