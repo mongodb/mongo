@@ -51,7 +51,7 @@ def parseSourceFiles( callback ):
     patterns = [
         re.compile( r"[umsgf]asser(?:t|ted) *\( *(\d+)" ) ,
         re.compile( r"(?:User|Msg|MsgAssertion)Exception *\( *(\d+)" ),
-        re.compile( r"fassertFailed(?:NoTrace)? *\( *(\d+)" )
+        re.compile( r"fassertFailed(?:NoTrace|WithStatus)? *\( *(\d+)" )
     ]
 
     bad = [ re.compile( r"^\s*assert *\(" ) ]
