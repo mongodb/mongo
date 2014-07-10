@@ -110,19 +110,13 @@ namespace mongo {
          * operation which has a query component (e.g. find, update, group) can be explained via
          * this function.
          *
-         * The explain information is extracted from 'exec' and 'canonicalQuery', and
-         * is added to the out-parameter 'out'.
-         *
-         * The query part of the operation is contained in 'canonicalQuery', but
-         * 'exec' can contain any tree of execution stages. We can explain any
-         * operation that executes as stages by calling into this function.
+         * The explain information is extracted from 'exec' and added to the out-parameter 'out'.
          *
          * The explain information is generated with the level of detail specified by 'verbosity'.
          *
          * Does not take ownership of its arguments.
          */
         static Status explainStages(PlanExecutor* exec,
-                                    CanonicalQuery* canonicalQuery,
                                     Explain::Verbosity verbosity,
                                     BSONObjBuilder* out);
 

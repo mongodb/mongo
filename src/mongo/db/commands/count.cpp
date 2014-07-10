@@ -99,12 +99,8 @@ namespace mongo {
         }
 
         // Get an executor for the command.
-        CanonicalQuery* rawCq;
         PlanExecutor* rawExec;
-        uassertStatusOK(CmdCount::parseCountToExecutor(txn, cmd, dbname, ns, collection,
-                                                       &rawCq, &rawExec));
-
-        scoped_ptr<CanonicalQuery> cq(rawCq);
+        uassertStatusOK(CmdCount::parseCountToExecutor(txn, cmd, dbname, ns, collection, &rawExec));
         scoped_ptr<PlanExecutor> exec(rawExec);
 
         // Store the plan summary string in CurOp.
@@ -176,18 +172,15 @@ namespace mongo {
         }
 
         // Get an executor for the command and use it to generate the explain output.
-        CanonicalQuery* rawCq;
         PlanExecutor* rawExec;
-        Status execStatus = parseCountToExecutor(txn, cmdObj, dbname, ns, collection,
-                                                 &rawCq, &rawExec);
+        Status execStatus = parseCountToExecutor(txn, cmdObj, dbname, ns, collection, &rawExec);
         if (!execStatus.isOK()) {
             return execStatus;
         }
 
-        scoped_ptr<CanonicalQuery> cq(rawCq);
         scoped_ptr<PlanExecutor> exec(rawExec);
 
-        return Explain::explainStages(exec.get(), cq.get(), verbosity, out);
+        return Explain::explainStages(exec.get(), verbosity, out);
     }
 
     // static
@@ -196,7 +189,6 @@ namespace mongo {
                                           const std::string& dbname,
                                           const std::string& ns,
                                           Collection* collection,
-                                          CanonicalQuery** queryOut,
                                           PlanExecutor** execOut) {
 
         long long skip = 0;
@@ -230,16 +222,8 @@ namespace mongo {
                                                      &cq,
                                                      whereCallback));
 
-        auto_ptr<CanonicalQuery> autoCq(cq);
-
-        Status execStat = getExecutor(txn, collection, cq, execOut,
-                                      QueryPlannerParams::PRIVATE_IS_COUNT);
-        if (!execStat.isOK()) {
-            return execStat;
-        }
-
-        *queryOut = autoCq.release();
-        return Status::OK();
+        // Takes ownership of 'cq'.
+        return getExecutor(txn, collection, cq, execOut, QueryPlannerParams::PRIVATE_IS_COUNT);
     }
 
     bool CmdCount::run(OperationContext* txn,

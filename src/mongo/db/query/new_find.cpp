@@ -520,8 +520,6 @@ namespace mongo {
         //
         // TODO temporary until find() becomes a real command.
         if (isExplain && enableNewExplain) {
-            scoped_ptr<CanonicalQuery> safeCq(cq);
-
             size_t options = QueryPlannerParams::DEFAULT;
             if (shardingState.needCollectionMetadata(pq.ns())) {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -531,6 +529,7 @@ namespace mongo {
             bb.skip(sizeof(QueryResult));
 
             PlanExecutor* rawExec;
+            // Takes ownership of 'cq'.
             Status execStatus = getExecutor(txn, collection, cq, &rawExec, options);
             if (!execStatus.isOK()) {
                 uasserted(17510, "Explain error: " + execStatus.reason());
@@ -538,7 +537,7 @@ namespace mongo {
 
             scoped_ptr<PlanExecutor> exec(rawExec);
             BSONObjBuilder explainBob;
-            Status explainStatus = Explain::explainStages(exec.get(), cq, Explain::EXEC_ALL_PLANS,
+            Status explainStatus = Explain::explainStages(exec.get(), Explain::EXEC_ALL_PLANS,
                                                           &explainBob);
             if (!explainStatus.isOK()) {
                 uasserted(18521, "Explain error: " + explainStatus.reason());

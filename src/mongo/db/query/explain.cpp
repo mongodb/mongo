@@ -328,9 +328,14 @@ namespace mongo {
 
         plannerBob.append("plannerVersion", QueryPlanner::kPlannerVersion);
 
-        BSONObjBuilder parsedQueryBob(plannerBob.subobjStart("parsedQuery"));
-        query->root()->toBSON(&parsedQueryBob);
-        parsedQueryBob.doneFast();
+        // In general we should have a canonical query, but sometimes we may avoid
+        // creating a canonical query as an optimization (specifically, the update system
+        // does not canonicalize for idhack updates). In these cases, 'query' is NULL.
+        if (NULL != query) {
+            BSONObjBuilder parsedQueryBob(plannerBob.subobjStart("parsedQuery"));
+            query->root()->toBSON(&parsedQueryBob);
+            parsedQueryBob.doneFast();
+        }
 
         BSONObjBuilder winningPlanBob(plannerBob.subobjStart("winningPlan"));
         explainStatsTree(*winnerStats, Explain::QUERY_PLANNER, &winningPlanBob);
@@ -416,7 +421,6 @@ namespace mongo {
 
     // static
     Status Explain::explainStages(PlanExecutor* exec,
-                                  CanonicalQuery* canonicalQuery,
                                   Explain::Verbosity verbosity,
                                   BSONObjBuilder* out) {
         //
@@ -462,8 +466,9 @@ namespace mongo {
         // Step 3: use the stats trees to produce explain BSON.
         //
 
+        CanonicalQuery* query = exec->getCanonicalQuery();
         if (verbosity >= Explain::QUERY_PLANNER) {
-            generatePlannerInfo(canonicalQuery, winningStats.get(), rejectedStats, out);
+            generatePlannerInfo(query, winningStats.get(), rejectedStats, out);
         }
 
         if (verbosity >= Explain::EXEC_STATS) {

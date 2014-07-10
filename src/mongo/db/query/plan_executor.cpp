@@ -37,23 +37,42 @@ namespace mongo {
 
     PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, const Collection* collection)
         : _collection(collection),
+          _cq(NULL),
           _workingSet(ws),
-          _root(rt),
           _qs(NULL),
+          _root(rt),
+          _killed(false) { }
+
+    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, CanonicalQuery* cq,
+                               const Collection* collection)
+        : _collection(collection),
+          _cq(cq),
+          _workingSet(ws),
+          _qs(NULL),
+          _root(rt),
           _killed(false) { }
 
     PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, QuerySolution* qs,
-                               const Collection* collection)
+                               CanonicalQuery* cq, const Collection* collection)
         : _collection(collection),
+          _cq(cq),
           _workingSet(ws),
-          _root(rt),
           _qs(qs),
+          _root(rt),
           _killed(false) { }
 
     PlanExecutor::~PlanExecutor() { }
 
-    WorkingSet* PlanExecutor::getWorkingSet() {
+    WorkingSet* PlanExecutor::getWorkingSet() const {
         return _workingSet.get();
+    }
+
+    PlanStage* PlanExecutor::getStages() const {
+        return _root.get();
+    }
+
+    CanonicalQuery* PlanExecutor::getCanonicalQuery() const {
+        return _cq.get();
     }
 
     PlanStageStats* PlanExecutor::getStats() const {
@@ -153,10 +172,6 @@ namespace mongo {
 
     void PlanExecutor::kill() {
         _killed = true;
-    }
-
-    PlanStage* PlanExecutor::getStages() {
-        return _root.get();
     }
 
     Status PlanExecutor::executePlan() {

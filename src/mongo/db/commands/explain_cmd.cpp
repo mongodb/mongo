@@ -39,6 +39,8 @@
 
 namespace mongo {
 
+    static CmdExplain cmdExplain;
+
     Status CmdExplain::checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {

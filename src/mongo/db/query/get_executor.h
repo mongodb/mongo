@@ -54,20 +54,35 @@ namespace mongo {
                               QueryPlannerParams* plannerParams);
 
     /**
-     * Get a plan executor for a query. Does not take ownership of canonicalQuery.
+     * Get a plan executor for a query. Takes ownership of 'rawCanonicalQuery'.
      *
      * If the query is valid and an executor could be created, returns Status::OK()
      * and populates *out with the PlanExecutor.
      *
-     * If the query cannot be executed, returns a Status indicating why.  Deletes
-     * rawCanonicalQuery.
-     *
-     * TODO: can we change this function to take ownership of 'canonicalQuery'? We
-     * could transfer the ownership of the CQ to the PlanExecutor being returned.
+     * If the query cannot be executed, returns a Status indicating why.
      */
     Status getExecutor(OperationContext* txn,
                        Collection* collection,
-                       CanonicalQuery* canonicalQuery,
+                       CanonicalQuery* rawCanonicalQuery,
+                       PlanExecutor** out,
+                       size_t plannerOptions = 0);
+
+    /**
+     * Get a plan executor for query. This differs from the getExecutor(...) function
+     * above in that the above requires a non-NULL canonical query, whereas this
+     * function can retrieve a plan executor from the raw query object.
+     *
+     * Used to support idhack updates that do not create a canonical query.
+     *
+     * If the query is valid and an executor could be created, returns Status::OK()
+     * and populates *out with the PlanExecutor.
+     *
+     * If the query cannot be executed, returns a Status indicating why.
+     */
+    Status getExecutor(OperationContext* txn,
+                       Collection* collection,
+                       const std::string& ns,
+                       const BSONObj& unparsedQuery,
                        PlanExecutor** out,
                        size_t plannerOptions = 0);
 
@@ -75,11 +90,11 @@ namespace mongo {
      * Get a plan executor for a simple id query. The executor will wrap an execution
      * tree whose root stage is the idhack stage.
      *
-     * Does not take ownership of 'query'.
+     * Takes ownership of 'rawCanonicalQuery'.
      */
     Status getExecutorIDHack(OperationContext* txn,
                              Collection* collection,
-                             CanonicalQuery* query,
+                             CanonicalQuery* rawCanonicalQuery,
                              const QueryPlannerParams& plannerParams,
                              PlanExecutor** out);
 
@@ -121,14 +136,14 @@ namespace mongo {
     /**
      * Get a plan executor for a query. Ignores the cache and always plans the full query.
      *
-     * Does not take ownership of its arguments.
+     * Takes ownership of 'rawCanonicalQuery'.
      *
      * Returns the resulting executor through 'execOut'. The caller must delete 'execOut',
      * if an OK status is returned.
      */
     Status getExecutorAlwaysPlan(OperationContext* txn,
                                  Collection* collection,
-                                 CanonicalQuery* canonicalQuery,
+                                 CanonicalQuery* rawCanonicalQuery,
                                  const QueryPlannerParams& plannerParams,
                                  PlanExecutor** execOut);
 
