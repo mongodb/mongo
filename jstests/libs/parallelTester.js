@@ -119,9 +119,13 @@ if ( typeof _threadInject != "undefined" ){
                                    "recstore.js",
                                    "extent.js",
                                    "indexb.js",
+
+                                   // tests turn on profiling
                                    "profile1.js",
                                    "profile3.js",
                                    "profile4.js",
+                                   "profile5.js",
+
                                    "mr_drop.js",
                                    "mr3.js",
                                    "indexh.js",
