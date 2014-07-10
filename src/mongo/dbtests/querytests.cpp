@@ -520,7 +520,6 @@ namespace QueryTests {
             _client.insert( ns, BSONObj() );
             auto_ptr< DBClientCursor > c = _client.query( ns, BSONObj(), 0, 0, 0, QueryOption_CursorTailable );
             ASSERT( c->isDead() );
-            ASSERT( !_client.getLastError().empty() );
         }
     };
 
@@ -1520,12 +1519,10 @@ namespace QueryTests {
             {
                 Client::WriteContext ctx(&_txn,  ns() );
                 ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( &_txn, ns() ), cursorId );
- 
-                ASSERT_THROWS(CollectionCursorCache::eraseCursorGlobal(&_txn, cursorId),
-                              MsgAssertionException);
                 string expectedAssertion =
-                        str::stream() << "Cannot kill active cursor " << cursorId;
-                ASSERT_EQUALS( expectedAssertion, _client.getLastError() );
+                        str::stream() << "Cannot kill active cursor " << cursorId; 
+                ASSERT_THROWS_WHAT(CollectionCursorCache::eraseCursorGlobal(&_txn, cursorId),
+                                   MsgAssertionException, expectedAssertion);
                 ctx.commit();
             }
             
