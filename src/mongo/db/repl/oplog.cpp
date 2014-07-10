@@ -1,7 +1,7 @@
 // @file oplog.cpp
 
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -51,7 +51,7 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/counters.h"
@@ -397,11 +397,13 @@ namespace repl {
                           bool *bb,
                           bool fromMigrate ) = _logOpOld;
     void newReplUp() {
-        replSettings.master = true;
+        getGlobalReplicationCoordinator()->getSettings().master = true;
         _logOp = _logOpRS;
     }
     void newRepl() {
-        replSettings.master = true; // TODO(spencer): is this necessary even when a replset?
+        // TODO(spencer): We shouldn't be changing the ReplicationCoordinator's settings after
+        // startup
+        getGlobalReplicationCoordinator()->getSettings().master = true;
         _logOp = _logOpUninitialized;
     }
     void oldRepl() { _logOp = _logOpOld; }
@@ -431,7 +433,7 @@ namespace repl {
                bool* b,
                bool fromMigrate) {
         try {
-            if ( replSettings.master ) {
+            if ( getGlobalReplicationCoordinator()->getSettings().master ) {
                 _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
             }
 
@@ -463,6 +465,7 @@ namespace repl {
 
         const char * ns = "local.oplog.$main";
 
+        const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         bool rs = !replSettings.replSet.empty();
         if( rs )
             ns = rsoplog;
@@ -473,7 +476,7 @@ namespace repl {
         if ( collection ) {
 
             if (replSettings.oplogSize != 0) {
-                int o = (int)(collection->getRecordStore()->storageSize() / ( 1024 * 1024 ) );
+                int o = (int)(collection->getRecordStore()->storageSize(&txn) / ( 1024 * 1024 ) );
                 int n = (int)(replSettings.oplogSize / (1024 * 1024));
                 if ( n != o ) {
                     stringstream ss;
@@ -782,17 +785,14 @@ namespace repl {
         return failedUpdate;
     }
 
-    bool waitForOptimeChange(const OpTime& referenceTime, unsigned timeoutMillis) {
+    void waitUpToOneSecondForOptimeChange(const OpTime& referenceTime) {
         mutex::scoped_lock lk(newOpMutex);
 
         while (referenceTime == getLastSetOptime()) {
             if (!newOptimeNotifier.timed_wait(lk.boost(),
-                                              boost::posix_time::milliseconds(timeoutMillis)))
-                return false;
+                                              boost::posix_time::seconds(1)))
+                return;
         }
-
-        return true;
-
     }
 
     void initOpTimeFromOplog(OperationContext* txn, const std::string& oplogNS) {

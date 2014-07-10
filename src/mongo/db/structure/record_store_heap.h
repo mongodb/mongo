@@ -79,12 +79,14 @@ namespace mongo {
                                           const char* damangeSource,
                                           const mutablebson::DamageVector& damages );
 
-        virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
+        virtual RecordIterator* getIterator( OperationContext* txn,
+                                             const DiskLoc& start,
+                                             bool tailable,
                                              const CollectionScanParams::Direction& dir) const;
 
-        virtual RecordIterator* getIteratorForRepair() const;
+        virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;
 
-        virtual std::vector<RecordIterator*> getManyIterators() const;
+        virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
 
         virtual Status truncate( OperationContext* txn );
 
@@ -102,7 +104,9 @@ namespace mongo {
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const;
                                  
-        virtual void appendCustomStats( BSONObjBuilder* result, double scale ) const;
+        virtual void appendCustomStats( OperationContext* txn,
+                                        BSONObjBuilder* result,
+                                        double scale ) const;
 
         virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
         
@@ -112,7 +116,9 @@ namespace mongo {
 
         virtual void increaseStorageSize( OperationContext* txn,  int size, bool enforceQuota );
 
-        virtual int64_t storageSize(BSONObjBuilder* extraInfo = NULL, int infoLevel = 0) const;
+        virtual int64_t storageSize( OperationContext* txn,
+                                     BSONObjBuilder* extraInfo = NULL,
+                                     int infoLevel = 0) const;
 
         virtual long long dataSize() const { return _dataSize; }
 
@@ -170,7 +176,8 @@ namespace mongo {
 
     class HeapRecordIterator : public RecordIterator {
     public:
-        HeapRecordIterator(const HeapRecordStore::Records& records,
+        HeapRecordIterator(OperationContext* txn,
+                           const HeapRecordStore::Records& records,
                            const HeapRecordStore& rs,
                            DiskLoc start = DiskLoc(),
                            bool tailable = false);
@@ -190,6 +197,7 @@ namespace mongo {
         virtual RecordData dataFor( const DiskLoc& loc ) const;
 
     private:
+        OperationContext* _txn; // not owned
         HeapRecordStore::Records::const_iterator _it;
         bool _tailable;
         DiskLoc _lastLoc; // only for restarting tailable
@@ -201,7 +209,8 @@ namespace mongo {
 
     class HeapRecordReverseIterator : public RecordIterator {
     public:
-        HeapRecordReverseIterator(const HeapRecordStore::Records& records,
+        HeapRecordReverseIterator(OperationContext* txn,
+                                  const HeapRecordStore::Records& records,
                                   const HeapRecordStore& rs,
                                   DiskLoc start = DiskLoc());
 
@@ -220,6 +229,7 @@ namespace mongo {
         virtual RecordData dataFor( const DiskLoc& loc ) const;
 
     private:
+        OperationContext* _txn; // not owned
         HeapRecordStore::Records::const_reverse_iterator _it;
         bool _killedByInvalidate;
 

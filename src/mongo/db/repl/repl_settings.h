@@ -94,8 +94,44 @@ namespace repl {
             discoveredSeeds_mx("ReplSettings::discoveredSeeds") {
         }
 
+        // TODO(spencer): Remove explicit copy constructor after we no longer have mutable state
+        // in ReplSettings.
+        ReplSettings(const ReplSettings& other) :
+            slave(other.slave),
+            master(other.master),
+            fastsync(other.fastsync),
+            autoresync(other.autoresync),
+            slavedelay(other.slavedelay),
+            oplogSize(other.oplogSize),
+            source(other.source),
+            only(other.only),
+            pretouch(other.pretouch),
+            replSet(other.replSet),
+            rsIndexPrefetch(other.rsIndexPrefetch),
+            discoveredSeeds(other.discoveredSeeds),
+            discoveredSeeds_mx("ReplSettings::discoveredSeeds"),
+            reconfig(other.reconfig.getOwned()) {}
+
+        ReplSettings& operator=(const ReplSettings& other) {
+            if (this == &other) return *this;
+
+            slave = other.slave;
+            master = other.master;
+            fastsync = other.fastsync;
+            autoresync = other.autoresync;
+            slavedelay = other.slavedelay;
+            oplogSize = other.oplogSize;
+            source = other.source;
+            only = other.only;
+            pretouch = other.pretouch;
+            replSet = other.replSet;
+            rsIndexPrefetch = other.rsIndexPrefetch;
+            discoveredSeeds = other.discoveredSeeds;
+            reconfig = other.reconfig.getOwned();
+            return *this;
+        }
+
     };
 
-    extern ReplSettings replSettings;
 } // namespace repl
 } // namespace mongo

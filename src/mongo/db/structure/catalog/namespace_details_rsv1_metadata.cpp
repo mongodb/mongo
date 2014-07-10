@@ -101,7 +101,7 @@ namespace mongo {
         }
     }
 
-    const DiskLoc& NamespaceDetailsRSV1MetaData::firstExtent() const {
+    const DiskLoc& NamespaceDetailsRSV1MetaData::firstExtent( OperationContext* txn ) const {
         return _details->firstExtent;
     }
 
@@ -109,7 +109,7 @@ namespace mongo {
         *txn->recoveryUnit()->writing( &_details->firstExtent ) = loc;
     }
 
-    const DiskLoc& NamespaceDetailsRSV1MetaData::lastExtent() const {
+    const DiskLoc& NamespaceDetailsRSV1MetaData::lastExtent( OperationContext* txn ) const {
         return _details->lastExtent;
     }
 
@@ -156,7 +156,7 @@ namespace mongo {
         return true;
     }
 
-    int NamespaceDetailsRSV1MetaData::lastExtentSize() const {
+    int NamespaceDetailsRSV1MetaData::lastExtentSize( OperationContext* txn ) const {
         return _details->lastExtentSize;
     }
 
@@ -191,7 +191,8 @@ namespace mongo {
         if ( !_namespaceRecordStore )
             return;
 
-        scoped_ptr<RecordIterator> iterator( _namespaceRecordStore->getIterator( DiskLoc(),
+        scoped_ptr<RecordIterator> iterator( _namespaceRecordStore->getIterator( txn,
+                                                                                 DiskLoc(),
                                                                                  false,
                                                                                  CollectionScanParams::FORWARD ) );
         while ( !iterator->isEOF() ) {

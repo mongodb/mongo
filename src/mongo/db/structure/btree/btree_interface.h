@@ -107,14 +107,16 @@ namespace mongo {
                              const DiskLoc& loc) = 0;
 
         // TODO: Hide this by exposing an update method?
-        virtual Status dupKeyCheck(const BSONObj& key, const DiskLoc& loc) = 0;
+        virtual Status dupKeyCheck(OperationContext* txn,
+                                   const BSONObj& key,
+                                   const DiskLoc& loc) = 0;
 
         //
         // Information about the tree
         //
 
         // TODO: expose full set of args for testing?
-        virtual void fullValidate(long long* numKeysOut) = 0;
+        virtual void fullValidate(OperationContext* txn, long long* numKeysOut) = 0;
 
         virtual bool isEmpty() = 0;
         
@@ -187,7 +189,7 @@ namespace mongo {
         /**
          * Caller takes ownership. BtreeInterface must outlive all Cursors it produces.
          */
-        virtual Cursor* newCursor(int direction) const = 0;
+        virtual Cursor* newCursor(OperationContext* txn, int direction) const = 0;
 
         //
         // Index creation

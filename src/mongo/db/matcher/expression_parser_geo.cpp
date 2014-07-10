@@ -61,8 +61,8 @@ namespace mongo {
         }
         else {
             verify(BSONObj::opNEAR == type);
-            NearQuery nq(name);
-            Status s = nq.parseFrom( section );
+            auto_ptr<NearQuery> nq(new NearQuery(name));
+            Status s = nq->parseFrom( section );
             if ( !s.isOK() ) {
                 return StatusWithMatchExpression( s );
             }
@@ -72,7 +72,7 @@ namespace mongo {
             // layer.
             BSONObjBuilder bob;
             bob.append(name, section);
-            s = e->init( name, nq, bob.obj() );
+            s = e->init( name, nq.release(), bob.obj() );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
             return StatusWithMatchExpression( e.release() );

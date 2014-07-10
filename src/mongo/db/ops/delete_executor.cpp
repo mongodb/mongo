@@ -118,11 +118,12 @@ namespace mongo {
 
         Runner* rawRunner;
         if (_canonicalQuery.get()) {
-            uassertStatusOK(getRunner(collection, _canonicalQuery.release(), &rawRunner));
+            uassertStatusOK(getRunner(txn, collection, _canonicalQuery.release(), &rawRunner));
         }
         else {
             CanonicalQuery* ignored;
-            uassertStatusOK(getRunner(collection,
+            uassertStatusOK(getRunner(txn,
+                                      collection,
                                       ns.ns(),
                                       _request->getQuery(),
                                       &rawRunner,

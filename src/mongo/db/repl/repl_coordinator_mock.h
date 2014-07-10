@@ -43,7 +43,7 @@ namespace repl {
 
     public:
 
-        ReplicationCoordinatorMock();
+        ReplicationCoordinatorMock(const ReplSettings& settings);
         virtual ~ReplicationCoordinatorMock();
 
         virtual void startReplication(TopologyCoordinator* topCoord,
@@ -52,6 +52,8 @@ namespace repl {
         virtual void shutdown();
 
         virtual bool isShutdownOkay() const;
+
+        virtual ReplSettings& getSettings();
 
         virtual bool isReplEnabled() const;
 
@@ -84,7 +86,9 @@ namespace repl {
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptime(const OID& rid, const OpTime& ts, const BSONObj& config);
+        virtual Status setLastOptime(const OID& rid, const OpTime& ts);
+
+        virtual OID getElectionId();
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
@@ -124,6 +128,17 @@ namespace repl {
         virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj);
 
+        virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake);
+
+        virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
+
+        virtual bool buildsIndexes();
+
+        virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
+
+    private:
+
+        ReplSettings _settings;
     };
 
 } // namespace repl

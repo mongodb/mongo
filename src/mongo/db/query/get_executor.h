@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -54,16 +54,35 @@ namespace mongo {
                               QueryPlannerParams* plannerParams);
 
     /**
-     * Get a plan executor for a query. Does not take ownership of canonicalQuery.
+     * Get a plan executor for a query. Takes ownership of 'rawCanonicalQuery'.
      *
      * If the query is valid and an executor could be created, returns Status::OK()
      * and populates *out with the PlanExecutor.
      *
-     * If the query cannot be executed, returns a Status indicating why.  Deletes
-     * rawCanonicalQuery.
+     * If the query cannot be executed, returns a Status indicating why.
      */
-    Status getExecutor(Collection* collection,
-                       CanonicalQuery* canonicalQuery,
+    Status getExecutor(OperationContext* txn,
+                       Collection* collection,
+                       CanonicalQuery* rawCanonicalQuery,
+                       PlanExecutor** out,
+                       size_t plannerOptions = 0);
+
+    /**
+     * Get a plan executor for query. This differs from the getExecutor(...) function
+     * above in that the above requires a non-NULL canonical query, whereas this
+     * function can retrieve a plan executor from the raw query object.
+     *
+     * Used to support idhack updates that do not create a canonical query.
+     *
+     * If the query is valid and an executor could be created, returns Status::OK()
+     * and populates *out with the PlanExecutor.
+     *
+     * If the query cannot be executed, returns a Status indicating why.
+     */
+    Status getExecutor(OperationContext* txn,
+                       Collection* collection,
+                       const std::string& ns,
+                       const BSONObj& unparsedQuery,
                        PlanExecutor** out,
                        size_t plannerOptions = 0);
 
@@ -71,10 +90,11 @@ namespace mongo {
      * Get a plan executor for a simple id query. The executor will wrap an execution
      * tree whose root stage is the idhack stage.
      *
-     * Does not take ownership of 'query'.
+     * Takes ownership of 'rawCanonicalQuery'.
      */
-    Status getExecutorIDHack(Collection* collection,
-                             CanonicalQuery* query,
+    Status getExecutorIDHack(OperationContext* txn,
+                             Collection* collection,
+                             CanonicalQuery* rawCanonicalQuery,
                              const QueryPlannerParams& plannerParams,
                              PlanExecutor** out);
 
@@ -94,7 +114,8 @@ namespace mongo {
      * possible values of a certain field.  As such, we can skip lots of data in certain cases (see
      * body of method for detail).
      */
-    Status getExecutorDistinct(Collection* collection,
+    Status getExecutorDistinct(OperationContext* txn,
+                               Collection* collection,
                                const BSONObj& query,
                                const std::string& field,
                                PlanExecutor** out);
@@ -106,7 +127,8 @@ namespace mongo {
      * As such, with certain covered queries, we can skip the overhead of fetching etc. when
      * executing a count.
      */
-    Status getExecutorCount(Collection* collection,
+    Status getExecutorCount(OperationContext* txn,
+                            Collection* collection,
                             const BSONObj& query,
                             const BSONObj& hintObj,
                             PlanExecutor** execOut);
@@ -114,13 +136,14 @@ namespace mongo {
     /**
      * Get a plan executor for a query. Ignores the cache and always plans the full query.
      *
-     * Does not take ownership of its arguments.
+     * Takes ownership of 'rawCanonicalQuery'.
      *
      * Returns the resulting executor through 'execOut'. The caller must delete 'execOut',
      * if an OK status is returned.
      */
-    Status getExecutorAlwaysPlan(Collection* collection,
-                                 CanonicalQuery* canonicalQuery,
+    Status getExecutorAlwaysPlan(OperationContext* txn,
+                                 Collection* collection,
+                                 CanonicalQuery* rawCanonicalQuery,
                                  const QueryPlannerParams& plannerParams,
                                  PlanExecutor** execOut);
 

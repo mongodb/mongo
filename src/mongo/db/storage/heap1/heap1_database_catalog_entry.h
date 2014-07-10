@@ -150,7 +150,7 @@ namespace mongo {
                                    const StringData& idxName,
                                    long long newExpireSeconds );
 
-            CollectionOptions getCollectionOptions() const { return options; }
+            CollectionOptions getCollectionOptions(OperationContext* txn) const { return options; }
 
             CollectionOptions options;
             scoped_ptr<HeapRecordStore> rs;

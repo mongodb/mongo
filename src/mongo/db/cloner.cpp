@@ -409,7 +409,7 @@ namespace mongo {
                 _conn = con;
             }
             else {
-                _conn.reset(new DBDirectClient());
+                _conn.reset(new DBDirectClient(txn));
             }
         }
 

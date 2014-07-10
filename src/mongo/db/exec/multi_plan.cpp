@@ -511,4 +511,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* MultiPlanStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* MultiPlanStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

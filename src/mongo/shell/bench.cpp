@@ -28,11 +28,9 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
 
-
-#include "mongo/pch.h"
-
-#include "mongo/scripting/bench.h"
+#include "mongo/shell/bench.h"
 
 #include <boost/thread/thread.hpp>
 

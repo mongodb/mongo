@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -37,7 +37,6 @@
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
@@ -48,8 +47,10 @@ namespace mongo {
 namespace repl {
 
     void appendReplicationInfo(OperationContext* txn, BSONObjBuilder& result, int level) {
-        if ( replSet ) {
-            if( theReplSet == 0 || theReplSet->state().shunned() ) {
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        if (replCoord->getSettings().usingReplSets()) {
+            if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet
+                    || replCoord->getCurrentMemberState().shunned()) {
                 result.append("ismaster", false);
                 result.append("secondary", false);
                 result.append("info", ReplSet::startupStatusMsg.get());
@@ -71,7 +72,7 @@ namespace repl {
                               getGlobalReplicationCoordinator()->isMasterForReportingPurposes());
         }
         
-        if ( level && replSet ) {
+        if (level && replCoord->getSettings().usingReplSets()) {
             result.append( "info" , "is replica set" );
         }
         else if ( level ) {
@@ -83,7 +84,8 @@ namespace repl {
                 const char* localSources = "local.sources";
                 Client::ReadContext ctx(txn, localSources);
                 auto_ptr<Runner> runner(
-                    InternalPlanner::collectionScan(localSources,
+                    InternalPlanner::collectionScan(txn,
+                                                    localSources,
                                                     ctx.ctx().db()->getCollection(txn,
                                                                                   localSources)));
                 BSONObj obj;

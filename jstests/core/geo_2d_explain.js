@@ -24,6 +24,5 @@ var explain = t.find({loc: {$near: [40, 40]}, _id: {$lt: 50}}).explain();
 
 print('explain = ' + tojson(explain));
 
-assert.eq({}, explain.indexBounds);
 assert.eq(explain.n, explain.nscannedObjects);
 assert.lte(explain.n, explain.nscanned);

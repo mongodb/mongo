@@ -103,8 +103,7 @@ namespace mongo {
             : _keyPattern(keyPattern), _key(key) { }
 
         BSONObj toBSON() const {
-            // Planning shouldn't let this happen.
-            invariant(0);
+            return _key;
         }
 
         virtual ElementIterator* allocateIterator(const ElementPath* path) const {

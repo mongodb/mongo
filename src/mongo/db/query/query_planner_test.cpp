@@ -1984,7 +1984,7 @@ namespace {
 
         // GEO_NEAR must use the index, and GEO predicate becomes a filter.
         assertNumSolutions(1U);
-        assertSolutionExists("{geoNear2d: {a: '2d'}}");
+        assertSolutionExists("{fetch: { node : { geoNear2d: {a: '2d'} } } }");
     }
 
     TEST_F(QueryPlannerTest, And2DSphereSameFieldNonNear) {
@@ -2141,7 +2141,8 @@ namespace {
         runQuery(fromjson("{a: {$near: [0, 0]}, b: {$gte: 0}}"));
 
         assertNumSolutions(1U);
-        assertSolutionExists("{geoNear2d: {a: '2d', b: 1}}");
+        assertSolutionExists("{fetch: { filter : {b:{$gte: 0}}, node: "
+                                 "{geoNear2d: {a: '2d', b: 1} } } }");
     }
 
     //
@@ -3220,7 +3221,7 @@ namespace {
         addIndex(BSON("a" << "2d"));
         runQuery(fromjson("{$and: [{a: {$near: [0, 0], $maxDistance: 0.3}}, {b: {$ne: 1}}]}"));
         assertNumSolutions(1U);
-        assertSolutionExists("{geoNear2d: {a: '2d'}}");
+        assertSolutionExists("{fetch: {node: { geoNear2d: {a: '2d'} } } }");
     }
 
     //

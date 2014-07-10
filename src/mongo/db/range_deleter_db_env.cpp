@@ -85,6 +85,8 @@ namespace mongo {
                   << endl;
 
             try {
+                bool throttle = repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                        repl::ReplicationCoordinator::modeReplSet ? secondaryThrottle : false;
                 *deletedDocs =
                         Helpers::removeRange(txn,
                                              KeyRange(ns,
@@ -92,7 +94,7 @@ namespace mongo {
                                                       exclusiveUpper,
                                                       keyPattern),
                                              false, /*maxInclusive*/
-                                             repl::replSet ? secondaryThrottle : false,
+                                             throttle,
                                              serverGlobalParams.moveParanoia ? &removeSaver : NULL,
                                              true, /*fromMigrate*/
                                              true); /*onlyRemoveOrphans*/

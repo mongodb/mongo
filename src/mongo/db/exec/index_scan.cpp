@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -51,9 +51,12 @@ namespace mongo {
     // static
     const char* IndexScan::kStageType = "IXSCAN";
 
-    IndexScan::IndexScan(const IndexScanParams& params, WorkingSet* workingSet,
+    IndexScan::IndexScan(OperationContext* txn,
+                         const IndexScanParams& params,
+                         WorkingSet* workingSet,
                          const MatchExpression* filter)
-        : _workingSet(workingSet),
+        : _txn(txn),
+          _workingSet(workingSet),
           _hitEnd(false),
           _filter(filter), 
           _shouldDedup(true),
@@ -63,6 +66,7 @@ namespace mongo {
           _commonStats(kStageType) {
         _iam = _params.descriptor->getIndexCatalog()->getIndex(_params.descriptor);
         _keyPattern = _params.descriptor->keyPattern().getOwned();
+        _specificStats.keyPattern = _keyPattern;
     }
 
     void IndexScan::initIndexScan() {
@@ -90,7 +94,7 @@ namespace mongo {
         }
 
         IndexCursor *cursor;
-        Status s = _iam->newCursor(cursorOptions, &cursor);
+        Status s = _iam->newCursor(_txn, cursorOptions, &cursor);
         verify(s.isOK());
         _indexCursor.reset(cursor);
 
@@ -374,12 +378,19 @@ namespace mongo {
 
             _specificStats.indexBoundsVerbose = _params.bounds.toString();
             _specificStats.direction = _params.direction;
-            _specificStats.keyPattern = _keyPattern;
         }
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IXSCAN));
         ret->specific.reset(new IndexScanStats(_specificStats));
         return ret.release();
+    }
+
+    const CommonStats* IndexScan::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* IndexScan::getSpecificStats() {
+        return &_specificStats;
     }
 
 }  // namespace mongo

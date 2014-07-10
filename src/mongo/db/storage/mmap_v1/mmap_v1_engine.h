@@ -36,6 +36,7 @@ namespace mongo {
 
     class MMAPV1Engine : public StorageEngine {
     public:
+        MMAPV1Engine();
         virtual ~MMAPV1Engine();
 
         RecoveryUnit* newRecoveryUnit( OperationContext* opCtx );
@@ -49,6 +50,8 @@ namespace mongo {
 
         DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
                                                        const StringData& db );
+
+        void cleanShutdown(OperationContext* txn);
 
     private:
         static void _listDatabases( const std::string& directory,

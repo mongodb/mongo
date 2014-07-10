@@ -162,15 +162,63 @@ namespace mongo {
         plannerParams->options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
     }
 
-    Status getExecutorIDHack(Collection* collection,
-                             CanonicalQuery* query,
+    Status getExecutor(OperationContext* txn,
+                       Collection* collection,
+                       const std::string& ns,
+                       const BSONObj& unparsedQuery,
+                       PlanExecutor** out,
+                       size_t plannerOptions) {
+
+        if (!collection) {
+            LOG(2) << "Collection " << ns << " does not exist."
+                   << " Using EOF stage: " << unparsedQuery.toString();
+            EOFStage* eofStage = new EOFStage();
+            WorkingSet* ws = new WorkingSet();
+            *out = new PlanExecutor(ws, eofStage, collection);
+            return Status::OK();
+        }
+
+        if (!CanonicalQuery::isSimpleIdQuery(unparsedQuery) ||
+            !collection->getIndexCatalog()->findIdIndex()) {
+
+            const WhereCallbackReal whereCallback(collection->ns().db());
+            CanonicalQuery* cq;
+            Status status = CanonicalQuery::canonicalize(
+                        collection->ns(), unparsedQuery, &cq, whereCallback);
+            if (!status.isOK())
+                return status;
+
+            // Takes ownership of 'cq'.
+            return getExecutor(txn, collection, cq, out, plannerOptions);
+        }
+
+        LOG(2) << "Using idhack: " << unparsedQuery.toString();
+
+        WorkingSet* ws = new WorkingSet();
+        PlanStage* root = new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(), ws);
+
+        // Might have to filter out orphaned docs.
+        if (plannerOptions & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+            root = new ShardFilterStage(shardingState.getCollectionMetadata(collection->ns()),
+                                        ws, root);
+        }
+
+        *out = new PlanExecutor(ws, root, collection);
+        return Status::OK();
+    }
+
+    Status getExecutorIDHack(OperationContext* txn,
+                             Collection* collection,
+                             CanonicalQuery* rawCanonicalQuery,
                              const QueryPlannerParams& plannerParams,
                              PlanExecutor** out) {
         invariant(collection);
+        invariant(rawCanonicalQuery);
+        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
 
-        LOG(2) << "Using idhack: " << query->toStringShort();
+        LOG(2) << "Using idhack: " << canonicalQuery->toStringShort();
         WorkingSet* ws = new WorkingSet();
-        PlanStage* root = new IDHackStage(collection, query, ws);
+        PlanStage* root = new IDHackStage(txn, collection, canonicalQuery.get(), ws);
 
         // Might have to filter out orphaned docs.
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
@@ -181,13 +229,14 @@ namespace mongo {
         // There might be a projection. The idhack stage will always fetch the full document,
         // so we don't support covered projections. However, we might use the simple inclusion
         // fast path.
-        if (NULL != query && NULL != query->getProj()) {
+        if (NULL != canonicalQuery->getProj()) {
             ProjectionStageParams params(WhereCallbackReal(collection->ns().db()));
-            params.projObj = query->getProj()->getProjObj();
+            params.projObj = canonicalQuery->getProj()->getProjObj();
 
             // Stuff the right data into the params depending on what proj impl we use.
-            if (query->getProj()->requiresDocument() || query->getProj()->wantIndexKey()) {
-                params.fullExpression = query->root();
+            if (canonicalQuery->getProj()->requiresDocument()
+                || canonicalQuery->getProj()->wantIndexKey()) {
+                params.fullExpression = canonicalQuery->root();
                 params.projImpl = ProjectionStageParams::NO_FAST_PATH;
             }
             else {
@@ -197,15 +246,17 @@ namespace mongo {
             root = new ProjectionStage(params, ws, root);
         }
 
-        *out = new PlanExecutor(ws, root, collection);
+        *out = new PlanExecutor(ws, root, canonicalQuery.release(), collection);
         return Status::OK();
     }
 
-    Status getExecutor(Collection* collection,
-                      CanonicalQuery* canonicalQuery,
+    Status getExecutor(OperationContext* txn,
+                      Collection* collection,
+                      CanonicalQuery* rawCanonicalQuery,
                       PlanExecutor** out,
                       size_t plannerOptions) {
-        invariant(canonicalQuery);
+        invariant(rawCanonicalQuery);
+        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
 
         // This can happen as we're called by internal clients as well.
         if (NULL == collection) {
@@ -214,19 +265,19 @@ namespace mongo {
                    << " Using EOF runner: " << canonicalQuery->toStringShort();
             EOFStage* eofStage = new EOFStage();
             WorkingSet* ws = new WorkingSet();
-            *out = new PlanExecutor(ws, eofStage, collection);
+            *out = new PlanExecutor(ws, eofStage, canonicalQuery.release(), collection);
             return Status::OK();
         }
 
         // Fill out the planning params.  We use these for both cached solutions and non-cached.
         QueryPlannerParams plannerParams;
         plannerParams.options = plannerOptions;
-        fillOutPlannerParams(collection, canonicalQuery, &plannerParams);
+        fillOutPlannerParams(collection, canonicalQuery.get(), &plannerParams);
 
         // If we have an _id index we can use the idhack runner.
-        if (IDHackStage::supportsQuery(*canonicalQuery) &&
+        if (IDHackStage::supportsQuery(*canonicalQuery.get()) &&
             collection->getIndexCatalog()->findIdIndex()) {
-            return getExecutorIDHack(collection, canonicalQuery, plannerParams, out);
+            return getExecutorIDHack(txn, collection, canonicalQuery.release(), plannerParams, out);
         }
 
         // Tailable: If the query requests tailable the collection must be capped.
@@ -252,12 +303,12 @@ namespace mongo {
 
         CachedSolution* rawCS;
         if (PlanCache::shouldCacheQuery(*canonicalQuery) &&
-            collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
+            collection->infoCache()->getPlanCache()->get(*canonicalQuery.get(), &rawCS).isOK()) {
             // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
             boost::scoped_ptr<CachedSolution> cs(rawCS);
             QuerySolution *qs, *backupQs;
             QuerySolution*& chosenSolution=qs; // either qs or backupQs
-            Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs,
+            Status status = QueryPlanner::planFromCache(*canonicalQuery.get(), plannerParams, *cs,
                                                         &qs, &backupQs);
 
             if (status.isOK()) {
@@ -267,7 +318,7 @@ namespace mongo {
                 WorkingSet* sharedWs = new WorkingSet();
 
                 PlanStage *root, *backupRoot=NULL;
-                verify(StageBuilder::build(collection, *qs, sharedWs, &root));
+                verify(StageBuilder::build(txn, collection, *qs, sharedWs, &root));
                 if ((plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT)
                     && turnIxscanIntoCount(qs)) {
                     LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
@@ -278,13 +329,14 @@ namespace mongo {
                     }
                 }
                 else if (NULL != backupQs) {
-                    verify(StageBuilder::build(collection, *backupQs, sharedWs, &backupRoot));
+                    verify(StageBuilder::build(txn, collection, *backupQs, sharedWs, &backupRoot));
                 }
 
                 // add a CachedPlanStage on top of the previous root
-                root = new CachedPlanStage(collection, canonicalQuery, root, backupRoot);
+                root = new CachedPlanStage(collection, canonicalQuery.get(), root, backupRoot);
 
-                *out = new PlanExecutor(sharedWs, root, chosenSolution, collection);
+                *out = new PlanExecutor(sharedWs, root, chosenSolution, canonicalQuery.release(),
+                                        collection);
                 return Status::OK();
             }
         }
@@ -293,35 +345,39 @@ namespace mongo {
             && SubplanStage::canUseSubplanning(*canonicalQuery)) {
 
             QLOG() << "Running query as sub-queries: " << canonicalQuery->toStringShort();
-            LOG(2) << "Running query as sub-queries: " << canonicalQuery->toStringShort();
 
             auto_ptr<WorkingSet> ws(new WorkingSet());
 
             SubplanStage* subplan;
-            Status runnerStatus = SubplanStage::make(collection, ws.get(), plannerParams,
-                                                     canonicalQuery, &subplan);
-            if (!runnerStatus.isOK()) {
-                return runnerStatus;
+            Status subplanStatus = SubplanStage::make(txn, collection, ws.get(), plannerParams,
+                                                      canonicalQuery.get(), &subplan);
+            if (subplanStatus.isOK()) {
+                LOG(2) << "Running query as sub-queries: " << canonicalQuery->toStringShort();
+                *out = new PlanExecutor(ws.release(), subplan, canonicalQuery.release(),
+                                        collection);
+                return Status::OK();
             }
-
-            *out = new PlanExecutor(ws.release(), subplan, collection);
-            return Status::OK();
+            else {
+                QLOG() << "Subplanner: " << subplanStatus.reason();
+            }
         }
 
-        return getExecutorAlwaysPlan(collection, canonicalQuery, plannerParams, out);
+        return getExecutorAlwaysPlan(txn, collection, canonicalQuery.release(), plannerParams, out);
     }
 
-    Status getExecutorAlwaysPlan(Collection* collection,
-                                 CanonicalQuery* canonicalQuery,
+    Status getExecutorAlwaysPlan(OperationContext* txn,
+                                 Collection* collection,
+                                 CanonicalQuery* rawCanonicalQuery,
                                  const QueryPlannerParams& plannerParams,
                                  PlanExecutor** execOut) {
         invariant(collection);
-        invariant(canonicalQuery);
+        invariant(rawCanonicalQuery);
+        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
 
         *execOut = NULL;
 
         vector<QuerySolution*> solutions;
-        Status status = QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);
+        Status status = QueryPlanner::plan(*canonicalQuery.get(), plannerParams, &solutions);
         if (!status.isOK()) {
             return Status(ErrorCodes::BadValue,
                           "error processing query: " + canonicalQuery->toString() +
@@ -355,9 +411,11 @@ namespace mongo {
                     // We're not going to cache anything that's fast count.
                     WorkingSet* ws = new WorkingSet();
                     PlanStage* root;
-                    verify(StageBuilder::build(collection, *solutions[i], ws, &root));
 
-                    *execOut = new PlanExecutor(ws, root, solutions[i], collection);
+                    verify(StageBuilder::build(txn, collection, *solutions[i], ws, &root));
+
+                    *execOut = new PlanExecutor(ws, root, solutions[i], canonicalQuery.release(),
+                                                collection);
                     return Status::OK();
                 }
             }
@@ -371,9 +429,11 @@ namespace mongo {
             // Only one possible plan.  Run it.  Build the stages from the solution.
             WorkingSet* ws = new WorkingSet();
             PlanStage* root;
-            verify(StageBuilder::build(collection, *solutions[0], ws, &root));
 
-            *execOut = new PlanExecutor(ws, root, solutions[0], collection);
+            verify(StageBuilder::build(txn, collection, *solutions[0], ws, &root));
+
+            *execOut = new PlanExecutor(ws, root, solutions[0], canonicalQuery.release(),
+                                        collection);
             return Status::OK();
         }
         else {
@@ -382,7 +442,7 @@ namespace mongo {
             // The working set will be shared by all candidate plans and owned by the containing runner
             WorkingSet* sharedWorkingSet = new WorkingSet();
 
-            MultiPlanStage* multiPlanStage = new MultiPlanStage(collection, canonicalQuery);
+            MultiPlanStage* multiPlanStage = new MultiPlanStage(collection, canonicalQuery.get());
 
             for (size_t ix = 0; ix < solutions.size(); ++ix) {
                 if (solutions[ix]->cacheData.get()) {
@@ -391,14 +451,18 @@ namespace mongo {
 
                 // version of StageBuild::build when WorkingSet is shared
                 PlanStage* nextPlanRoot;
-                verify(StageBuilder::build(collection, *solutions[ix],
+                verify(StageBuilder::build(txn, collection, *solutions[ix],
                                            sharedWorkingSet, &nextPlanRoot));
 
                 // Owns none of the arguments
                 multiPlanStage->addPlan(solutions[ix], nextPlanRoot, sharedWorkingSet);
             }
 
-            PlanExecutor* exec = new PlanExecutor(sharedWorkingSet, multiPlanStage, collection);
+            // Do the plan selection up front.
+            multiPlanStage->pickBestPlan();
+
+            PlanExecutor* exec = new PlanExecutor(sharedWorkingSet, multiPlanStage,
+                                                  canonicalQuery.release(), collection);
 
             *execOut = exec;
             return Status::OK();
@@ -581,7 +645,8 @@ namespace mongo {
 
     }  // namespace
 
-    Status getExecutorCount(Collection* collection,
+    Status getExecutorCount(OperationContext* txn,
+                            Collection* collection,
                             const BSONObj& query,
                             const BSONObj& hintObj,
                             PlanExecutor** execOut) {
@@ -600,9 +665,8 @@ namespace mongo {
                                                      &cq,
                                                      whereCallback));
 
-        scoped_ptr<CanonicalQuery> cleanupCq(cq);
-
-        return getExecutor(collection, cq, execOut, QueryPlannerParams::PRIVATE_IS_COUNT);
+        // Takes ownership of 'cq'.
+        return getExecutor(txn, collection, cq, execOut, QueryPlannerParams::PRIVATE_IS_COUNT);
     }
 
     //
@@ -658,7 +722,8 @@ namespace mongo {
         return false;
     }
 
-    Status getExecutorDistinct(Collection* collection,
+    Status getExecutorDistinct(OperationContext* txn,
+                               Collection* collection,
                                const BSONObj& query,
                                const std::string& field,
                                PlanExecutor** out) {
@@ -706,10 +771,8 @@ namespace mongo {
                 return status;
             }
 
-            scoped_ptr<CanonicalQuery> cleanupCq(cq);
-
-            // Does not take ownership of its args.
-            return getExecutor(collection, cq, out);
+            // Takes ownership of 'cq'.
+            return getExecutor(txn, collection, cq, out);
         }
 
         //
@@ -733,7 +796,7 @@ namespace mongo {
             return status;
         }
 
-        scoped_ptr<CanonicalQuery> cleanupCq(cq);
+        auto_ptr<CanonicalQuery> autoCq(cq);
 
         // If there's no query, we can just distinct-scan one of the indices.
         // Not every index in plannerParams.indices may be suitable. Refer to
@@ -758,9 +821,9 @@ namespace mongo {
 
             WorkingSet* ws = new WorkingSet();
             PlanStage* root;
-            verify(StageBuilder::build(collection, *soln, ws, &root));
-            // Takes ownership of 'ws', 'root', and 'soln'.
-            *out = new PlanExecutor(ws, root, soln, collection);
+            verify(StageBuilder::build(txn, collection, *soln, ws, &root));
+            // Takes ownership of its arguments (except for 'collection').
+            *out = new PlanExecutor(ws, root, soln, autoCq.release(), collection);
             return Status::OK();
         }
 
@@ -768,7 +831,7 @@ namespace mongo {
         vector<QuerySolution*> solutions;
         status = QueryPlanner::plan(*cq, plannerParams, &solutions);
         if (!status.isOK()) {
-            return getExecutor(collection, cq, out);
+            return getExecutor(txn, collection, autoCq.release(), out);
         }
 
         // We look for a solution that has an ixscan we can turn into a distinctixscan
@@ -787,9 +850,9 @@ namespace mongo {
                 // Build and return the SSR over solutions[i].
                 WorkingSet* ws = new WorkingSet();
                 PlanStage* root;
-                verify(StageBuilder::build(collection, *solutions[i], ws, &root));
-                // Takes ownership of 'ws', 'root', and 'solutions[i]'.
-                *out = new PlanExecutor(ws, root, solutions[i], collection);
+                verify(StageBuilder::build(txn, collection, *solutions[i], ws, &root));
+                // Takes ownership of its arguments (except for 'collection').
+                *out = new PlanExecutor(ws, root, solutions[i], autoCq.release(), collection);
                 return Status::OK();
             }
         }
@@ -807,10 +870,10 @@ namespace mongo {
             return status;
         }
 
-        cleanupCq.reset(cq);
+        autoCq.reset(cq);
 
-        // Does not take ownership.
-        return getExecutor(collection, cq, out);
+        // Takes ownership of 'autoCq'.
+        return getExecutor(txn, collection, autoCq.release(), out);
     }
 
 }  // namespace mongo

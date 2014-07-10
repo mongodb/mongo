@@ -66,18 +66,23 @@ namespace mongo {
     }
 
     // static
-    WorkingSetID WorkingSetCommon::allocateStatusMember(WorkingSet* ws, const Status& status) {
-        invariant(ws);
-
+    BSONObj WorkingSetCommon::buildMemberStatusObject(const Status& status) {
         BSONObjBuilder bob;
         bob.append("ok", status.isOK() ? 1.0 : 0.0);
         bob.append("code", status.code());
         bob.append("errmsg", status.reason());
 
+        return bob.obj();
+    }
+
+    // static
+    WorkingSetID WorkingSetCommon::allocateStatusMember(WorkingSet* ws, const Status& status) {
+        invariant(ws);
+
         WorkingSetID wsid = ws->allocate();
         WorkingSetMember* member = ws->get(wsid);
         member->state = WorkingSetMember::OWNED_OBJ;
-        member->obj = bob.obj();
+        member->obj = buildMemberStatusObject(status);
 
         return wsid;
     }
@@ -108,6 +113,19 @@ namespace mongo {
             return;
         }
         *objOut = member->obj;
+    }
+
+    // static
+    Status WorkingSetCommon::getMemberObjectStatus(const BSONObj& memberObj) {
+        invariant(WorkingSetCommon::isValidStatusMemberObject(memberObj));
+        return Status(static_cast<ErrorCodes::Error>(memberObj["code"].numberInt()),
+                      memberObj["errMsg"]);
+    }
+
+    // static
+    Status WorkingSetCommon::getMemberStatus(const WorkingSetMember& member) {
+        invariant(member.hasObj());
+        return getMemberObjectStatus(member.obj);
     }
 
     // static

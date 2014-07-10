@@ -268,4 +268,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* ProjectionStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* ProjectionStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

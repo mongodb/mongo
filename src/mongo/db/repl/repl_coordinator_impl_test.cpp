@@ -46,29 +46,32 @@ namespace repl {
 namespace {
 
     TEST(ReplicationCoordinator, StartupShutdown) {
-        ReplicationCoordinatorImpl coordinator;
+        ReplSettings settings;
+        // Make sure we think we're a replSet
+        settings.replSet = "mySet/node1:12345,node2:54321";
+        ReplicationCoordinatorImpl coordinator(settings);
         coordinator.startReplication(new TopologyCoordinatorMock, new NetworkInterfaceMock);
         coordinator.shutdown();
     }
 
     TEST(ReplicationCoordinator, AwaitReplicationNumberBaseCases) {
-        ReplicationCoordinatorImpl coordinator;
+        ReplSettings settings;
+        ReplicationCoordinatorImpl coordinator(settings);
         OperationContextNoop txn;
         OpTime time(1, 1);
-        BSONObj dummyConfig;
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
         writeConcern.wNumNodes = 2;
 
-        // Because we didn't set replSettings.replSet, it will think we're a standalone so
+        // Because we didn't set ReplSettings.replSet, it will think we're a standalone so
         // awaitReplication will always work.
         ReplicationCoordinator::StatusAndDuration statusAndDur = coordinator.awaitReplication(
                 &txn, time, writeConcern);
         ASSERT_OK(statusAndDur.status);
 
         // Now make us a master in master/slave
-        replSettings.master = true;
+        coordinator.getSettings().master = true;
 
         writeConcern.wNumNodes = 0;
         writeConcern.wMode = "majority";
@@ -77,7 +80,7 @@ namespace {
         ASSERT_OK(statusAndDur.status);
 
         // Now make us a replica set
-        replSettings.replSet = "mySet/node1:12345,node2:54321";
+        coordinator.getSettings().replSet = "mySet/node1:12345,node2:54321";
 
         // Waiting for 1 nodes always works
         writeConcern.wNumNodes = 1;
@@ -87,17 +90,17 @@ namespace {
     }
 
     TEST(ReplicationCoordinator, AwaitReplicationNumberOfNodesNonBlocking) {
-        ReplicationCoordinatorImpl coordinator;
-        OperationContextNoop txn;
+        ReplSettings settings;
         // Make sure we think we're a replSet
-        replSettings.replSet = "mySet/node1:12345,node2:54321";
+        settings.replSet = "mySet/node1:12345,node2:54321";
+        ReplicationCoordinatorImpl coordinator(settings);
+        OperationContextNoop txn;
 
         OID client1 = OID::gen();
         OID client2 = OID::gen();
         OID client3 = OID::gen();
         OpTime time1(1, 1);
         OpTime time2(1, 2);
-        BSONObj dummyConfig;
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -107,20 +110,20 @@ namespace {
         ReplicationCoordinator::StatusAndDuration statusAndDur = coordinator.awaitReplication(
                 &txn, time1, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(coordinator.setLastOptime(client1, time1, dummyConfig));
+        ASSERT_OK(coordinator.setLastOptime(client1, time1));
         statusAndDur = coordinator.awaitReplication(&txn, time1, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(coordinator.setLastOptime(client2, time1, dummyConfig));
+        ASSERT_OK(coordinator.setLastOptime(client2, time1));
         statusAndDur = coordinator.awaitReplication(&txn, time1, writeConcern);
         ASSERT_OK(statusAndDur.status);
 
         // 2 nodes waiting for time2
         statusAndDur = coordinator.awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(coordinator.setLastOptime(client2, time2, dummyConfig));
+        ASSERT_OK(coordinator.setLastOptime(client2, time2));
         statusAndDur = coordinator.awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(coordinator.setLastOptime(client3, time2, dummyConfig));
+        ASSERT_OK(coordinator.setLastOptime(client3, time2));
         statusAndDur = coordinator.awaitReplication(&txn, time2, writeConcern);
         ASSERT_OK(statusAndDur.status);
 
@@ -128,7 +131,7 @@ namespace {
         writeConcern.wNumNodes = 3;
         statusAndDur = coordinator.awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(coordinator.setLastOptime(client1, time2, dummyConfig));
+        ASSERT_OK(coordinator.setLastOptime(client1, time2));
         statusAndDur = coordinator.awaitReplication(&txn, time2, writeConcern);
         ASSERT_OK(statusAndDur.status);
     }
@@ -194,18 +197,18 @@ namespace {
     };
 
     TEST(ReplicationCoordinator, AwaitReplicationNumberOfNodesBlocking) {
-        ReplicationCoordinatorImpl coordinator;
+        ReplSettings settings;
+        // Make sure we think we're a replSet
+        settings.replSet = "mySet/node1:12345,node2:54321";
+        ReplicationCoordinatorImpl coordinator(settings);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
-        // Make sure we think we're a replSet
-        replSettings.replSet = "mySet/node1:12345,node2:54321";
 
         OID client1 = OID::gen();
         OID client2 = OID::gen();
         OID client3 = OID::gen();
         OpTime time1(1, 1);
         OpTime time2(1, 2);
-        BSONObj dummyConfig;
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
@@ -215,8 +218,8 @@ namespace {
         awaiter.setOpTime(time1);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start();
-        ASSERT_OK(coordinator.setLastOptime(client1, time1, dummyConfig));
-        ASSERT_OK(coordinator.setLastOptime(client2, time1, dummyConfig));
+        ASSERT_OK(coordinator.setLastOptime(client1, time1));
+        ASSERT_OK(coordinator.setLastOptime(client2, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -224,8 +227,8 @@ namespace {
         // 2 nodes waiting for time2
         awaiter.setOpTime(time2);
         awaiter.start();
-        ASSERT_OK(coordinator.setLastOptime(client2, time2, dummyConfig));
-        ASSERT_OK(coordinator.setLastOptime(client3, time2, dummyConfig));
+        ASSERT_OK(coordinator.setLastOptime(client2, time2));
+        ASSERT_OK(coordinator.setLastOptime(client3, time2));
         statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -234,24 +237,24 @@ namespace {
         writeConcern.wNumNodes = 3;
         awaiter.setWriteConcern(writeConcern);
         awaiter.start();
-        ASSERT_OK(coordinator.setLastOptime(client1, time2, dummyConfig));
+        ASSERT_OK(coordinator.setLastOptime(client1, time2));
         statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
     }
 
     TEST(ReplicationCoordinator, AwaitReplicationTimeout) {
-        ReplicationCoordinatorImpl coordinator;
+        ReplSettings settings;
+        // Make sure we think we're a replSet
+        settings.replSet = "mySet/node1:12345,node2:54321";
+        ReplicationCoordinatorImpl coordinator(settings);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
-        // Make sure we think we're a replSet
-        replSettings.replSet = "mySet/node1:12345,node2:54321";
 
         OID client1 = OID::gen();
         OID client2 = OID::gen();
         OpTime time1(1, 1);
         OpTime time2(1, 2);
-        BSONObj dummyConfig;
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = 50;
@@ -261,26 +264,26 @@ namespace {
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start();
-        ASSERT_OK(coordinator.setLastOptime(client1, time1, dummyConfig));
-        ASSERT_OK(coordinator.setLastOptime(client2, time1, dummyConfig));
+        ASSERT_OK(coordinator.setLastOptime(client1, time1));
+        ASSERT_OK(coordinator.setLastOptime(client2, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
         awaiter.reset();
     }
 
     TEST(ReplicationCoordinator, AwaitReplicationShutdown) {
-        ReplicationCoordinatorImpl coordinator;
+        ReplSettings settings;
+        // Make sure we think we're a replSet
+        settings.replSet = "mySet/node1:12345,node2:54321";
+        ReplicationCoordinatorImpl coordinator(settings);
         coordinator.startReplication(new TopologyCoordinatorMock, new NetworkInterfaceMock);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
-        // Make sure we think we're a replSet
-        replSettings.replSet = "mySet/node1:12345,node2:54321";
 
         OID client1 = OID::gen();
         OID client2 = OID::gen();
         OpTime time1(1, 1);
         OpTime time2(1, 2);
-        BSONObj dummyConfig;
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
@@ -290,8 +293,8 @@ namespace {
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start();
-        ASSERT_OK(coordinator.setLastOptime(client1, time1, dummyConfig));
-        ASSERT_OK(coordinator.setLastOptime(client2, time1, dummyConfig));
+        ASSERT_OK(coordinator.setLastOptime(client1, time1));
+        ASSERT_OK(coordinator.setLastOptime(client2, time1));
         coordinator.shutdown();
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, statusAndDur.status);

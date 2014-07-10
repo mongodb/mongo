@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -96,6 +97,13 @@ namespace repl {
          * of our optime.
          */
         virtual bool isShutdownOkay() const = 0;
+
+        /**
+         * Returns a reference to the parsed command line arguments that are related to replication.
+         * TODO(spencer): Change this to a const ref once we are no longer using it for mutable
+         * global state.
+         */
+        virtual ReplSettings& getSettings() = 0;
 
         enum Mode {
             modeNone = 0,
@@ -207,8 +215,7 @@ namespace repl {
         /**
          * Updates our internal tracking of the last OpTime applied for the given member of the set
          * identified by "rid".  Also updates all bookkeeping related to tracking what the last
-         * OpTime applied by all tag groups that "rid" is a part of.  The config BSONObj is passed
-         * into SlaveTracking, which needs it to update local.slaves.  This is called when
+         * OpTime applied by all tag groups that "rid" is a part of.  This is called when
          * secondaries notify the member they are syncing from of their progress in replication.
          * This information is used by awaitReplication to satisfy write concerns.  It is *not* used
          * in elections, we maintain a separate view of member optimes in the topology coordinator
@@ -217,7 +224,13 @@ namespace repl {
          * @returns ErrorCodes::NodeNotFound if the member cannot be found in sync progress tracking
          * @returns Status::OK() otherwise
          */
-        virtual Status setLastOptime(const OID& rid, const OpTime& ts, const BSONObj& config) = 0;
+        virtual Status setLastOptime(const OID& rid, const OpTime& ts) = 0;
+
+        /**
+         * Retrieves and returns the current election id, which is a unique id which changes after
+         * every election.
+         */
+        virtual OID getElectionId() = 0;
 
         /**
          * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.
@@ -331,7 +344,7 @@ namespace repl {
                                            BSONObjBuilder* resultObj) = 0;
 
         /**
-         * Handles an incoming replSetPositionUpdate command, updating each nodes oplog progress.
+         * Handles an incoming replSetUpdatePosition command, updating each nodes oplog progress.
          * returns Status::OK() if the all updates are processed correctly, ErrorCodes::NodeNotFound
          * if any updating node cannot be found in the config, or any of the normal replset
          * command ErrorCodes.
@@ -340,13 +353,42 @@ namespace repl {
                                                     BSONObjBuilder* resultObj) = 0;
 
         /**
-         * Handles an incoming replSetPositionUpdate command that contains a handshake.
+         * Handles an incoming replSetUpdatePosition command that contains a handshake.
          * returns Status::OK() if the handshake processes properly, ErrorCodes::NodeNotFound
          * if the handshaking node cannot be found in the config, or any of the normal replset
          * command ErrorCodes.
          */
         virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj) = 0;
+
+        /**
+         * Handles an incoming Handshake command (or a handshake from replSetUpdatePosition).
+         * Associates the node's 'remoteID' with its 'handshake' object. This association is used
+         * to update local.slaves and to forward the node's replication progress upstream when this
+         * node is being chainged through.
+         *
+         * Returns true if it was able to associate the 'remoteID' and 'handshake' and false
+         * otherwise.
+         */
+        virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake) = 0;
+
+        /**
+         * Returns once the oplog's most recent entry changes or after one second, whichever
+         * occurs first.
+         */
+        virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot) = 0;
+
+        /**
+         * Returns a bool indicating whether or not this node builds indexes.
+         */
+        virtual bool buildsIndexes() = 0;
+
+        /**
+         * Returns a vector containing BSONObjs describing each member that has applied operation
+         * at OpTime 'op'.
+         */
+        virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op) = 0;
+
     protected:
 
         ReplicationCoordinator();

@@ -93,11 +93,12 @@ namespace mongo {
     }
 
     // static
-    Status SubplanRunner::make(Collection* collection,
+    Status SubplanRunner::make(OperationContext* txn,
+                               Collection* collection,
                                const QueryPlannerParams& params,
                                CanonicalQuery* cq,
                                SubplanRunner** out) {
-        auto_ptr<SubplanRunner> autoRunner(new SubplanRunner(collection, params, cq));
+        auto_ptr<SubplanRunner> autoRunner(new SubplanRunner(txn, collection, params, cq));
         Status planningStatus = autoRunner->planSubqueries();
         if (!planningStatus.isOK()) {
             return planningStatus;
@@ -107,10 +108,12 @@ namespace mongo {
         return Status::OK();
     }
 
-    SubplanRunner::SubplanRunner(Collection* collection,
+    SubplanRunner::SubplanRunner(OperationContext* txn,
+                                 Collection* collection,
                                  const QueryPlannerParams& params,
                                  CanonicalQuery* cq)
-        : _state(SubplanRunner::PLANNING),
+        : _txn(txn),
+          _state(SubplanRunner::PLANNING),
           _collection(collection),
           _plannerParams(params),
           _query(cq),
@@ -150,7 +153,8 @@ namespace mongo {
 
                 Runner* runner;
                 Status status = getRunnerAlwaysPlan(
-                    _collection, _query.release(), _plannerParams, &runner);
+                    _txn, _collection, _query.release(), _plannerParams, &runner
+                );
 
                 if (!status.isOK()) {
                     // We utterly failed.
@@ -315,7 +319,8 @@ namespace mongo {
                 // Dump all the solutions into the MPR.
                 for (size_t ix = 0; ix < solutions.size(); ++ix) {
                     PlanStage* nextPlanRoot;
-                    verify(StageBuilder::build(_collection,
+                    verify(StageBuilder::build(_txn,
+                                               _collection,
                                                *solutions[ix],
                                                sharedWorkingSet,
                                                &nextPlanRoot));
@@ -404,7 +409,7 @@ namespace mongo {
         MultiPlanStage* multiPlanStage = new MultiPlanStage(_collection, _query.get());
         WorkingSet* ws = new WorkingSet();
         PlanStage* root;
-        verify(StageBuilder::build(_collection, *soln, ws, &root));
+        verify(StageBuilder::build(_txn, _collection, *soln, ws, &root));
         multiPlanStage->addPlan(soln, root, ws); // Takes ownership first two arguments.
 
         multiPlanStage->pickBestPlan();

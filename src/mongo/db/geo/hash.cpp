@@ -28,7 +28,6 @@
 
 #include "mongo/db/field_parser.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/geo/core.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/util/mongoutils/str.h"
@@ -679,6 +678,10 @@ namespace mongo {
         Point max(min.x + sizeEdgeBox, min.y + sizeEdgeBox);
         Box box(min, max);
         return box;
+    }
+
+    Box GeoHashConverter::unhashToBox(const BSONElement &e) const {
+        return unhashToBox(hash(e));
     }
 
     double GeoHashConverter::sizeOfDiag(const GeoHash& a) const {

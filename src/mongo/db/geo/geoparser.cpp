@@ -77,7 +77,7 @@ namespace mongo {
         return isValidLngLat(lng, lat);
     }
 
-    static bool isLegacyPoint(const BSONObj &obj) {
+    static bool isLegacyPoint(const BSONObj &obj, bool allowAddlFields) {
         BSONObjIterator it(obj);
         if (!it.more()) { return false; }
         BSONElement x = it.next();
@@ -85,7 +85,7 @@ namespace mongo {
         if (!it.more()) { return false; }
         BSONElement y = it.next();
         if (!y.isNumber()) { return false; }
-        if (it.more()) { return false; }
+        if (it.more() && !allowAddlFields) { return false; }
         return true;
     }
 
@@ -269,7 +269,7 @@ namespace mongo {
         while (coordIt.more()) {
             BSONElement coord = coordIt.next();
             if (!coord.isABSONObj()) { return false; }
-            if (!isLegacyPoint(coord.Obj())) { return false; }
+            if (!isLegacyPoint(coord.Obj(), false)) { return false; }
             ++vertices;
         }
         if (vertices < 3) { return false; }
@@ -285,7 +285,7 @@ namespace mongo {
         BSONObjIterator objIt(type.embeddedObject());
         BSONElement center = objIt.next();
         if (!center.isABSONObj()) { return false; }
-        if (!isLegacyPoint(center.Obj())) { return false; }
+        if (!isLegacyPoint(center.Obj(), false)) { return false; }
         if (!objIt.more()) { return false; }
         BSONElement radius = objIt.next();
         if (!radius.isNumber()) { return false; }
@@ -301,7 +301,7 @@ namespace mongo {
         BSONObjIterator objIt(type.embeddedObject());
         BSONElement center = objIt.next();
         if (!center.isABSONObj()) { return false; }
-        if (!isLegacyPoint(center.Obj())) { return false; }
+        if (!isLegacyPoint(center.Obj(), false)) { return false; }
         // Check to make sure the points are valid lng/lat.
         BSONObjIterator coordIt(center.Obj());
         BSONElement lng = coordIt.next();
@@ -316,7 +316,11 @@ namespace mongo {
     /** exported **/
 
     bool GeoParser::isPoint(const BSONObj &obj) {
-        return isGeoJSONPoint(obj) || isLegacyPoint(obj);
+        return isGeoJSONPoint(obj) || isLegacyPoint(obj, false);
+    }
+
+    bool GeoParser::isIndexablePoint(const BSONObj &obj) {
+        return isGeoJSONPoint(obj) || isLegacyPoint(obj, true);
     }
 
     bool GeoParser::parsePoint(const BSONObj &obj, PointWithCRS *out) {
@@ -327,7 +331,7 @@ namespace mongo {
             out->oldPoint.x = coords[0].Number();
             out->oldPoint.y = coords[1].Number(); 
             out->crs = SPHERE;
-        } else if (isLegacyPoint(obj)) {
+        } else if (isLegacyPoint(obj, true)) {
             BSONObjIterator it(obj);
             BSONElement x = it.next();
             BSONElement y = it.next();
@@ -379,11 +383,11 @@ namespace mongo {
         BSONObjIterator coordIt(type.embeddedObject());
         BSONElement minE = coordIt.next();
         if (!minE.isABSONObj()) { return false; }
-        if (!isLegacyPoint(minE.Obj())) { return false; }
+        if (!isLegacyPoint(minE.Obj(), false)) { return false; }
         if (!coordIt.more()) { return false; }
         BSONElement maxE = coordIt.next();
         if (!maxE.isABSONObj()) { return false; }
-        if (!isLegacyPoint(maxE.Obj())) { return false; }
+        if (!isLegacyPoint(maxE.Obj(), false)) { return false; }
         // XXX: VERIFY AREA >= 0
         return true;
     }

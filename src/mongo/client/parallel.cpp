@@ -238,7 +238,6 @@ namespace mongo {
 
         BSONObj ret = _next;
         _next = BSONObj();
-        _advance();
         return ret;
     }
 

@@ -1,7 +1,7 @@
 // database.cpp
 
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -172,7 +172,7 @@ namespace mongo {
 
             CollectionCatalogEntry* coll = _dbEntry->getCollectionCatalogEntry( txn, ns );
 
-            CollectionOptions options = coll->getCollectionOptions();
+            CollectionOptions options = coll->getCollectionOptions( txn );
             if ( !options.temp )
                 continue;
 
@@ -267,7 +267,7 @@ namespace mongo {
             size += collection->dataSize();
 
             BSONObjBuilder temp;
-            storageSize += collection->getRecordStore()->storageSize( &temp );
+            storageSize += collection->getRecordStore()->storageSize( opCtx, &temp );
             numExtents += temp.obj()["numExtents"].numberInt(); // XXX
 
             indexes += collection->getIndexCatalog()->numIndexesTotal();

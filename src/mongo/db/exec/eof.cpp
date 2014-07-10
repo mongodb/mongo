@@ -72,4 +72,12 @@ namespace mongo {
         return new PlanStageStats(_commonStats, STAGE_EOF);
     }
 
+    const CommonStats* EOFStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* EOFStage::getSpecificStats() {
+        return NULL;
+    }
+
 }  // namespace mongo

@@ -51,14 +51,6 @@ namespace repl {
     class ReplSetSeedList;
     class ReplSetHealthPollTask;
 
-    class ReplicationStartSynchronizer {
-    public:
-        ReplicationStartSynchronizer() : indexRebuildDone(false) {}
-        boost::mutex mtx;
-        bool indexRebuildDone;
-        boost::condition cond;
-    };
-
     // information about the entire replset, such as the various servers in the set, and their state
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a
              singleton and long lived.
@@ -73,7 +65,6 @@ namespace repl {
         static StartupStatus startupStatus;
         static DiagStr startupStatusMsg;
         static string stateAsHtml(MemberState state);
-        static ReplicationStartSynchronizer rss;
 
         /* todo thread */
         void msgUpdateHBInfo(HeartbeatInfo);
@@ -266,7 +257,7 @@ namespace repl {
         bool setMaintenanceMode(const bool inc);
 
         // Records a new slave's id in the GhostSlave map, at handshake time.
-        bool registerSlave(const BSONObj& rid, const int memberId);
+        bool registerSlave(const OID& rid, const int memberId);
     private:
         Member* head() const { return _members.head(); }
     public:

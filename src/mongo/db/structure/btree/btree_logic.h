@@ -137,7 +137,9 @@ namespace mongo {
          */
         Builder* newBuilder(OperationContext* txn, bool dupsAllowed);
 
-        Status dupKeyCheck(const BSONObj& key, const DiskLoc& loc) const;
+        Status dupKeyCheck(OperationContext* txn,
+                           const BSONObj& key,
+                           const DiskLoc& loc) const;
 
         Status insert(OperationContext* txn,
                       const BSONObj& rawKey,
@@ -152,15 +154,19 @@ namespace mongo {
          *      bucketLocOut would contain the bucket containing key which is before or after the
          *      searched one (dependent on the direction).
          */
-        bool locate(const BSONObj& key,
+        bool locate(OperationContext* txn,
+                    const BSONObj& key,
                     const DiskLoc& recordLoc,
                     const int direction,
                     int* posOut,
                     DiskLoc* bucketLocOut) const;
 
-        void advance(DiskLoc* bucketLocInOut, int* posInOut, int direction) const;
+        void advance(OperationContext* txn,
+                     DiskLoc* bucketLocInOut,
+                     int* posInOut,
+                     int direction) const;
 
-        bool exists(const KeyDataType& key) const;
+        bool exists(OperationContext* txn, const KeyDataType& key) const;
 
         bool unindex(OperationContext* txn,
                      const BSONObj& key,
@@ -168,7 +174,8 @@ namespace mongo {
 
         bool isEmpty() const;
 
-        long long fullValidate(long long *unusedCount,
+        long long fullValidate(OperationContext*,
+                               long long *unusedCount,
                                bool strict,
                                bool dumpBuckets,
                                unsigned depth);
@@ -185,7 +192,8 @@ namespace mongo {
         // Composite key navigation methods
         //
 
-        void customLocate(DiskLoc* locInOut,
+        void customLocate(OperationContext* txn,
+                          DiskLoc* locInOut,
                           int* keyOfsInOut,
                           const BSONObj& keyBegin,
                           int keyBeginLen,
@@ -194,7 +202,8 @@ namespace mongo {
                           const vector<bool>& keyEndInclusive,
                           int direction) const;
 
-        void advanceTo(DiskLoc* thisLocInOut,
+        void advanceTo(OperationContext*,
+                       DiskLoc* thisLocInOut,
                        int* keyOfsInOut,
                        const BSONObj &keyBegin,
                        int keyBeginLen,
@@ -203,7 +212,8 @@ namespace mongo {
                        const vector<bool>& keyEndInclusive,
                        int direction) const;
 
-        void restorePosition(const BSONObj& savedKey,
+        void restorePosition(OperationContext* txn,
+                             const BSONObj& savedKey,
                              const DiskLoc& savedLoc,
                              int direction,
                              DiskLoc* bucketInOut,
@@ -330,7 +340,8 @@ namespace mongo {
 
         void _pack(OperationContext* txn, BucketType* bucket, const DiskLoc thisLoc, int &refPos);
 
-        void customLocate(DiskLoc* locInOut,
+        void customLocate(OperationContext* txn,
+                          DiskLoc* locInOut,
                           int* keyOfsInOut,
                           const BSONObj& keyBegin,
                           int keyBeginLen,
@@ -340,12 +351,13 @@ namespace mongo {
                           int direction,
                           pair<DiskLoc, int>& bestParent) const;
 
-        Status _find(BucketType* bucket,
-                    const KeyDataType& key,
-                    const DiskLoc& recordLoc,
-                    bool errorIfDup,
-                    int* keyPositionOut,
-                    bool* foundOut) const;
+        Status _find(OperationContext* txn,
+                     BucketType* bucket,
+                     const KeyDataType& key,
+                     const DiskLoc& recordLoc,
+                     bool errorIfDup,
+                     int* keyPositionOut,
+                     bool* foundOut) const;
 
         bool customFind(int low,
                         int high,
@@ -360,7 +372,8 @@ namespace mongo {
                         int* keyOfsInOut,
                         pair<DiskLoc, int>& bestParent) const;
 
-        void advanceToImpl(DiskLoc* thisLocInOut,
+        void advanceToImpl(OperationContext* txn,
+                           DiskLoc* thisLocInOut,
                            int* keyOfsInOut,
                            const BSONObj &keyBegin,
                            int keyBeginLen,
@@ -369,35 +382,48 @@ namespace mongo {
                            const vector<bool>& keyEndInclusive,
                            int direction) const;
 
-        bool wouldCreateDup(const KeyDataType& key, const DiskLoc self) const;
+        bool wouldCreateDup(OperationContext* txn,
+                            const KeyDataType& key,
+                            const DiskLoc self) const;
 
         bool keyIsUsed(const DiskLoc& loc, const int& pos) const;
 
-        void skipUnusedKeys(DiskLoc* loc, int* pos, int direction) const;
+        void skipUnusedKeys(OperationContext* txn,
+                            DiskLoc* loc,
+                            int* pos,
+                            int direction) const;
 
-        DiskLoc advance(const DiskLoc& bucketLoc, int* posInOut, int direction) const;
+        DiskLoc advance(OperationContext* txn,
+                        const DiskLoc& bucketLoc,
+                        int* posInOut,
+                        int direction) const;
 
-        DiskLoc _locate(const DiskLoc& bucketLoc,
-                       const KeyDataType& key,
-                       int* posOut,
-                       bool* foundOut,
-                       const DiskLoc& recordLoc,
-                       const int direction) const;
+        DiskLoc _locate(OperationContext* txn,
+                        const DiskLoc& bucketLoc,
+                        const KeyDataType& key,
+                        int* posOut,
+                        bool* foundOut,
+                        const DiskLoc& recordLoc,
+                        const int direction) const;
 
-        long long _fullValidate(const DiskLoc bucketLoc,
-                               long long *unusedCount,
-                               bool strict,
-                               bool dumpBuckets,
-                               unsigned depth);
+        long long _fullValidate(OperationContext* txn,
+                                const DiskLoc bucketLoc,
+                                long long *unusedCount,
+                                bool strict,
+                                bool dumpBuckets,
+                                unsigned depth);
 
         DiskLoc _addBucket(OperationContext* txn);
 
-        bool canMergeChildren(BucketType* bucket,
+        bool canMergeChildren(OperationContext* txn,
+                              BucketType* bucket,
                               const DiskLoc bucketLoc,
                               const int leftIndex);
 
         // has to look in children of 'bucket' and requires record store
-        int _rebalancedSeparatorPos(BucketType* bucket, int leftIndex);
+        int _rebalancedSeparatorPos(OperationContext* txn,
+                                    BucketType* bucket,
+                                    int leftIndex);
 
         void _packReadyForMod(BucketType* bucket, int &refPos);
 
@@ -466,7 +492,7 @@ namespace mongo {
 
         void doBalanceRightToLeft(OperationContext* txn,
                                   BucketType* bucket,
-                                  const DiskLoc bucketLoc,
+                                  const DiskLoc thisLoc,
                                   int leftIndex,
                                   int split,
                                   BucketType* l,
@@ -479,7 +505,9 @@ namespace mongo {
                                 const DiskLoc bucketLoc,
                                 int leftIndex);
 
-        int indexInParent(BucketType* bucket, const DiskLoc bucketLoc) const;
+        int indexInParent(OperationContext* txn,
+                          BucketType* bucket,
+                          const DiskLoc bucketLoc) const;
 
         void doMergeChildren(OperationContext* txn,
                              BucketType* bucket,

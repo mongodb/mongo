@@ -1,7 +1,7 @@
 // list_collections.cpp
 
 /**
-*    Copyright (C) 2014 10gen Inc.
+*    Copyright (C) 2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -83,7 +83,7 @@ namespace mongo {
                 b.append( "name", nsToCollectionSubstring( ns ) );
 
                 CollectionOptions options =
-                    dbEntry->getCollectionCatalogEntry( txn, ns )->getCollectionOptions();
+                    dbEntry->getCollectionCatalogEntry( txn, ns )->getCollectionOptions(txn);
                 b.append( "options", options.toBSON() );
 
                 arr.append( b.obj() );

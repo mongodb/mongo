@@ -42,7 +42,8 @@ namespace mongo {
      */
     class SimpleRecordStoreV1Iterator : public RecordIterator {
     public:
-        SimpleRecordStoreV1Iterator( const SimpleRecordStoreV1* records,
+        SimpleRecordStoreV1Iterator( OperationContext* txn,
+                                     const SimpleRecordStoreV1* records,
                                      const DiskLoc& start,
                                      const CollectionScanParams::Direction& dir );
         virtual ~SimpleRecordStoreV1Iterator() { }
@@ -58,6 +59,9 @@ namespace mongo {
         virtual RecordData dataFor( const DiskLoc& loc ) const;
 
     private:
+         // for getNext, not owned
+        OperationContext* _txn;
+
         // The result returned on the next call to getNext().
         DiskLoc _curr;
 

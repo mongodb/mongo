@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -41,10 +41,12 @@ namespace mongo {
     // static
     const char* TextStage::kStageType = "TEXT";
 
-    TextStage::TextStage(const TextStageParams& params,
+    TextStage::TextStage(OperationContext* txn,
+                         const TextStageParams& params,
                          WorkingSet* ws,
                          const MatchExpression* filter)
-        : _params(params),
+        : _txn(txn),
+          _params(params),
           _ftsMatcher(params.query, params.spec),
           _ws(ws),
           _filter(filter),
@@ -52,6 +54,7 @@ namespace mongo {
           _internalState(INIT_SCANS),
           _currentIndexScanner(0) {
         _scoreIterator = _scores.end();
+        _specificStats.indexPrefix = _params.indexPrefix;
     }
 
     TextStage::~TextStage() { }
@@ -152,11 +155,17 @@ namespace mongo {
             _commonStats.filter = bob.obj();
         }
 
-        _specificStats.indexPrefix = _params.indexPrefix;
-
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_TEXT));
         ret->specific.reset(new TextStats(_specificStats));
         return ret.release();
+    }
+
+    const CommonStats* TextStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* TextStage::getSpecificStats() {
+        return &_specificStats;
     }
 
     PlanStage::StageState TextStage::initScans(WorkingSetID* out) {
@@ -180,7 +189,7 @@ namespace mongo {
             params.bounds.isSimpleRange = true;
             params.descriptor = _params.index;
             params.direction = -1;
-            _scanners.mutableVector().push_back(new IndexScan(params, _ws, NULL));
+            _scanners.mutableVector().push_back(new IndexScan(_txn, params, _ws, NULL));
         }
 
         // If we have no terms we go right to EOF.

@@ -93,6 +93,10 @@ namespace mongo {
 
         PlanStageStats* getStats();
 
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
         typedef unordered_set<StringData, StringData::Hasher> FieldSet;
 
         /**

@@ -77,10 +77,10 @@ namespace mongo {
                                           const DiskLoc& loc );
         virtual void orphanDeletedList(OperationContext* txn);
 
-        virtual const DiskLoc& firstExtent() const;
+        virtual const DiskLoc& firstExtent( OperationContext* txn ) const;
         virtual void setFirstExtent( OperationContext* txn, const DiskLoc& loc );
 
-        virtual const DiskLoc& lastExtent() const;
+        virtual const DiskLoc& lastExtent( OperationContext* txn ) const;
         virtual void setLastExtent( OperationContext* txn, const DiskLoc& loc );
 
         virtual bool isCapped() const;
@@ -91,7 +91,7 @@ namespace mongo {
         virtual bool clearUserFlag( OperationContext* txn, int flag );
         virtual bool replaceUserFlags( OperationContext* txn, int flags );
 
-        virtual int lastExtentSize() const;
+        virtual int lastExtentSize( OperationContext* txn ) const;
         virtual void setLastExtentSize( OperationContext* txn, int newMax );
 
         virtual long long maxCappedDocs() const;

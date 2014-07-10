@@ -50,7 +50,7 @@ namespace repl {
 
     public:
 
-        ReplicationCoordinatorImpl();
+        ReplicationCoordinatorImpl(const ReplSettings& settings);
         virtual ~ReplicationCoordinatorImpl();
 
         // ================== Members of public ReplicationCoordinator API ===================
@@ -61,6 +61,8 @@ namespace repl {
         virtual void shutdown();
 
         virtual bool isShutdownOkay() const;
+
+        virtual ReplSettings& getSettings();
 
         virtual Mode getReplicationMode() const;
 
@@ -91,7 +93,9 @@ namespace repl {
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptime(const OID& rid, const OpTime& opTime, const BSONObj& config);
+        virtual Status setLastOptime(const OID& rid, const OpTime& ts);
+
+        virtual OID getElectionId();
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
@@ -131,6 +135,14 @@ namespace repl {
         virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj);
 
+        virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake);
+
+        virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
+
+        virtual bool buildsIndexes();
+
+        virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions
@@ -160,6 +172,9 @@ namespace repl {
 
         // Set to true when we are in the process of shutting down replication
         bool _inShutdown;
+
+        // Parsed command line arguments related to replication
+        ReplSettings _settings;
 
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator
         boost::scoped_ptr<TopologyCoordinator> _topCoord;

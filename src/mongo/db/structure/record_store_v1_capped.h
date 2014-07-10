@@ -62,10 +62,11 @@ namespace mongo {
          */
         virtual void temp_cappedTruncateAfter( OperationContext* txn, DiskLoc end, bool inclusive );
 
-        virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
+        virtual RecordIterator* getIterator( OperationContext* txn,
+                                             const DiskLoc& start, bool tailable,
                                              const CollectionScanParams::Direction& dir) const;
 
-        virtual std::vector<RecordIterator*> getManyIterators() const;
+        virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
 
         virtual bool compactSupported() const { return false; }
 
@@ -75,9 +76,11 @@ namespace mongo {
                                 CompactStats* stats );
 
         // Start from firstExtent by default.
-        DiskLoc firstRecord( const DiskLoc &startExtent = DiskLoc() ) const;
+        DiskLoc firstRecord( OperationContext* txn,
+                             const DiskLoc &startExtent = DiskLoc() ) const;
         // Start from lastExtent by default.
-        DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc() ) const;
+        DiskLoc lastRecord( OperationContext* txn,
+                            const DiskLoc &startExtent = DiskLoc() ) const;
 
     protected:
 
@@ -121,7 +124,7 @@ namespace mongo {
                                  DiskLoc end,
                                  bool inclusive);
 
-        void _maybeComplain( int len ) const;
+        void _maybeComplain( OperationContext* txn, int len ) const;
 
         // -- end copy from cap.cpp --
 

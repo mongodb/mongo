@@ -2,7 +2,7 @@
 //
 
 /**
- *    Copyright (C) 2009 10gen Inc.
+ *    Copyright (C) 2009-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -37,11 +37,12 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/timer.h"
 
+using std::string;
 
 namespace mongo {
     bool dbEval(const string& dbName , BSONObj& cmd, BSONObjBuilder& result, string& errmsg);
@@ -149,22 +150,17 @@ namespace JSTests {
         }
     };
 
-    /** Installs a tee for auditing log messages. */
+    /** Installs a tee for auditing log messages in the same thread. */
     class LogRecordingScope {
     public:
         LogRecordingScope() :
             _logged(false),
-            _durOptionsOld(storageGlobalParams.durOptions),
+            _threadName(mongo::getThreadName()),
             _handle(mongo::logger::globalLogDomain()->attachAppender(
                             mongo::logger::MessageLogDomain::AppenderAutoPtr(new Tee(this)))) {
-            // Disable DurParanoid mode.
-            // This ensures that _logged will not be erroneously set due
-            // to occasional DurParanoid logging.
-            storageGlobalParams.durOptions = 0;
         }
         ~LogRecordingScope() {
             mongo::logger::globalLogDomain()->detachAppender(_handle);
-            storageGlobalParams.durOptions = _durOptionsOld;
         }
         /** @return most recent log entry. */
         bool logged() const { return _logged; }
@@ -174,14 +170,17 @@ namespace JSTests {
             Tee(LogRecordingScope* scope) : _scope(scope) {}
             virtual ~Tee() {}
             virtual Status append(const logger::MessageEventEphemeral& event) {
-                _scope->_logged = true;
+                // Don't want to consider logging by background threads.
+                if (mongo::getThreadName() == _scope->_threadName) {
+                    _scope->_logged = true;
+                }
                 return Status::OK();
             }
         private:
             LogRecordingScope* _scope;
         };
         bool _logged;
-        const int _durOptionsOld;
+        const string _threadName;
         mongo::logger::MessageLogDomain::AppenderHandle _handle;
     };
 
@@ -2010,7 +2009,6 @@ namespace JSTests {
 
             OperationContextImpl txn;
             DBDirectClient client(&txn);
-
             client.update( "test.system.js" , query.obj() , update.obj() , true /* upsert */ );
 
             scoped_ptr<Scope> s( globalScriptEngine->newScope() );

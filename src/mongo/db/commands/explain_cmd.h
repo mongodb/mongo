@@ -80,6 +80,6 @@ namespace mongo {
                          BSONObjBuilder& result,
                          bool fromRepl);
 
-    } cmdExplain;
+    };
 
 }  // namespace mongo

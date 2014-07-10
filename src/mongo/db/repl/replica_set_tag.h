@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 MongoDB Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,22 +28,23 @@
 
 #pragma once
 
-#include <cmath>
-
-#ifndef M_PI
-#  define M_PI 3.14159265358979323846
-#endif
+#include <string>
 
 namespace mongo {
+    class StringData;
 
-    inline double deg2rad(const double deg) { return deg * (M_PI / 180.0); }
+namespace repl {
 
-    inline double rad2deg(const double rad) { return rad * (180.0 / M_PI); }
+    struct ReplicaSetTag {
+        ReplicaSetTag() {}
+        ReplicaSetTag(const StringData& aKey, const StringData& aValue);
 
-    inline double computeXScanDistance(double y, double maxDistDegrees) {
-        // TODO: this overestimates for large maxDistDegrees far from the equator
-        return maxDistDegrees / std::min(cos(deg2rad(std::min(+89.0, y + maxDistDegrees))),
-                                         cos(deg2rad(std::max(-89.0, y - maxDistDegrees))));
-    }
+        bool operator==(const ReplicaSetTag& other) const;
+        bool operator!=(const ReplicaSetTag& other) const;
 
-}
+        std::string key;
+        std::string value;
+    };
+
+}  // namespace repl
+}  // namespace mongo

@@ -61,8 +61,8 @@ namespace QueryStageKeep {
         }
 
         void getLocs(set<DiskLoc>* out, Collection* coll) {
-            RecordIterator* it = coll->getIterator(DiskLoc(), false,
-                                                       CollectionScanParams::FORWARD);
+            RecordIterator* it = coll->getIterator(&_txn, DiskLoc(), false,
+                                                   CollectionScanParams::FORWARD);
             while (!it->isEOF()) {
                 DiskLoc nextLoc = it->getNext();
                 out->insert(nextLoc);
@@ -135,7 +135,7 @@ namespace QueryStageKeep {
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
             params.start = DiskLoc();
-            CollectionScan* cs = new CollectionScan(params, &ws, NULL);
+            CollectionScan* cs = new CollectionScan(&_txn, params, &ws, NULL);
 
             // Create a KeepMutations stage to merge in the 10 flagged objects.
             // Takes ownership of 'cs'

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -60,7 +60,10 @@ namespace mongo {
     class OplogStart : public PlanStage {
     public:
         // Does not take ownership.
-        OplogStart(const Collection* collection, MatchExpression* filter, WorkingSet* ws);
+        OplogStart(OperationContext* txn,
+                   const Collection* collection,
+                   MatchExpression* filter,
+                   WorkingSet* ws);
         virtual ~OplogStart();
 
         virtual StageState work(WorkingSetID* out);
@@ -72,8 +75,15 @@ namespace mongo {
 
         virtual std::vector<PlanStage*> getChildren() const;
 
-        // PS. don't call this.
+        //
+        // Exec stats -- do not call these for the oplog start stage.
+        //
+
         virtual PlanStageStats* getStats() { return NULL; }
+
+        virtual const CommonStats* getCommonStats() { return NULL; }
+
+        virtual const SpecificStats* getSpecificStats() { return NULL; }
 
         virtual StageType stageType() const { return STAGE_OPLOG_START; }
 
@@ -87,6 +97,9 @@ namespace mongo {
         void switchToExtentHopping();
 
         StageState workExtentHopping(WorkingSetID* out);
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
 
         // If we're backwards scanning we just punt to a collscan.
         scoped_ptr<CollectionScan> _cs;

@@ -37,7 +37,6 @@
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/log.h"
@@ -79,9 +78,6 @@ namespace mongo {
         catch (const DBException& e) {
             warning() << "Index rebuilding did not complete: " << e.what() << endl;
         }
-        boost::unique_lock<boost::mutex> lk(repl::ReplSet::rss.mtx);
-        repl::ReplSet::rss.indexRebuildDone = true;
-        repl::ReplSet::rss.cond.notify_all();
         LOG(1) << "checking complete" << endl;
     }
 

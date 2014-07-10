@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -54,6 +54,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -114,6 +115,9 @@ namespace mongo {
 
     MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
+    // Failpoint for checking whether we've received a getmore.
+    MONGO_FP_DECLARE(failReceivedGetmore);
+
     // TODO: Move this and the other command stuff in newRunQuery outta here and up a level.
     static bool runCommands(OperationContext* txn,
                             const char *ns,
@@ -155,6 +159,12 @@ namespace mongo {
                             int pass,
                             bool& exhaust,
                             bool* isCursorAuthorized) {
+
+        // For testing, we may want to fail if we receive a getmore.
+        if (MONGO_FAIL_POINT(failReceivedGetmore)) {
+            invariant(0);
+        }
+
         exhaust = false;
 
         // This is a read lock.
@@ -264,6 +274,15 @@ namespace mongo {
                 return 0;
             }
 
+            // We save the client cursor when there might be more results, and hence we may receive
+            // another getmore. If we receive a EOF or an error, or the runner is dead, then we know
+            // that we will not be producing more results. We indicate that the cursor is closed by
+            // sending a cursorId of 0 back to the client.
+            //
+            // On the other hand, if we retrieve all results necessary for this batch, then
+            // 'saveClientCursor' is true and we send a valid cursorId back to the client. In
+            // this case, there may or may not actually be more results (for example, the next call
+            // to getNext(...) might just return EOF).
             bool saveClientCursor = false;
 
             if (Runner::RUNNER_DEAD == state || Runner::RUNNER_ERROR == state) {
@@ -346,7 +365,10 @@ namespace mongo {
         return qr;
     }
 
-    Status getOplogStartHack(Collection* collection, CanonicalQuery* cq, Runner** runnerOut) {
+    Status getOplogStartHack(OperationContext* txn,
+                             Collection* collection,
+                             CanonicalQuery* cq,
+                             Runner** runnerOut) {
         if ( collection == NULL )
             return Status(ErrorCodes::InternalError,
                           "getOplogStartHack called with a NULL collection" );
@@ -379,7 +401,7 @@ namespace mongo {
 
         // Make an oplog start finding stage.
         WorkingSet* oplogws = new WorkingSet();
-        OplogStart* stage = new OplogStart(collection, tsExpr, oplogws);
+        OplogStart* stage = new OplogStart(txn, collection, tsExpr, oplogws);
 
         // Takes ownership of ws and stage.
         auto_ptr<InternalRunner> runner(new InternalRunner(collection, stage, oplogws));
@@ -389,7 +411,7 @@ namespace mongo {
         Runner::RunnerState state = runner->getNext(NULL, &startLoc);
 
         // This is normal.  The start of the oplog is the beginning of the collection.
-        if (Runner::RUNNER_EOF == state) { return getRunner(collection, cq, runnerOut); }
+        if (Runner::RUNNER_EOF == state) { return getRunner(txn, collection, cq, runnerOut); }
 
         // This is not normal.  An error was encountered.
         if (Runner::RUNNER_ADVANCED != state) {
@@ -407,7 +429,7 @@ namespace mongo {
         params.tailable = cq->getParsed().hasOption(QueryOption_CursorTailable);
 
         WorkingSet* ws = new WorkingSet();
-        CollectionScan* cs = new CollectionScan(params, ws, cq->root());
+        CollectionScan* cs = new CollectionScan(txn, params, ws, cq->root());
         // Takes ownership of cq, cs, ws.
         *runnerOut = new SingleSolutionRunner(collection, cq, NULL, cs, ws);
         return Status::OK();
@@ -498,8 +520,6 @@ namespace mongo {
         //
         // TODO temporary until find() becomes a real command.
         if (isExplain && enableNewExplain) {
-            scoped_ptr<CanonicalQuery> safeCq(cq);
-
             size_t options = QueryPlannerParams::DEFAULT;
             if (shardingState.needCollectionMetadata(pq.ns())) {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -509,14 +529,15 @@ namespace mongo {
             bb.skip(sizeof(QueryResult));
 
             PlanExecutor* rawExec;
-            Status execStatus = getExecutor(collection, cq, &rawExec, options);
+            // Takes ownership of 'cq'.
+            Status execStatus = getExecutor(txn, collection, cq, &rawExec, options);
             if (!execStatus.isOK()) {
                 uasserted(17510, "Explain error: " + execStatus.reason());
             }
 
             scoped_ptr<PlanExecutor> exec(rawExec);
             BSONObjBuilder explainBob;
-            Status explainStatus = Explain::explainStages(exec.get(), cq, Explain::EXEC_ALL_PLANS,
+            Status explainStatus = Explain::explainStages(exec.get(), Explain::EXEC_ALL_PLANS,
                                                           &explainBob);
             if (!explainStatus.isOK()) {
                 uasserted(18521, "Explain error: " + explainStatus.reason());
@@ -562,7 +583,7 @@ namespace mongo {
             rawRunner = new EOFRunner(cq, cq->ns());
         }
         else if (pq.hasOption(QueryOption_OplogReplay)) {
-            status = getOplogStartHack(collection, cq, &rawRunner);
+            status = getOplogStartHack(txn, collection, cq, &rawRunner);
         }
         else {
             // Takes ownership of cq.
@@ -570,7 +591,7 @@ namespace mongo {
             if (shardingState.needCollectionMetadata(pq.ns())) {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
             }
-            status = getRunner(collection, cq, &rawRunner, options);
+            status = getRunner(txn, collection, cq, &rawRunner, options);
         }
 
         if (!status.isOK()) {

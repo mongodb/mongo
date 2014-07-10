@@ -33,12 +33,11 @@
 #include <boost/thread/locks.hpp>
 #include <sstream>
 
+#include "mongo/base/init.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
-#include "mongo/base/init.h"
-
-using boost::unique_lock;
 
 using std::endl;
 using std::exception;
@@ -274,6 +273,11 @@ namespace mongo {
 
     /*---------- LockManager public functions (mutex guarded) ---------*/
 
+
+    // This startup parameter enables experimental document-level locking features
+    // It should be removed once full document-level locking is checked-in.
+    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useExperimentalDocLocking, bool, false);
+
     static LockManager* _singleton = NULL;
 
     MONGO_INITIALIZER(InstantiateLockManager)(InitializerContext* context) {
@@ -300,7 +304,7 @@ namespace mongo {
     }
 
     void LockManager::shutdown(const unsigned& millisToQuiesce) {
-        unique_lock<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
 
 #ifdef DONT_ALLOW_CHANGE_TO_QUIESCE_PERIOD
         // XXX not sure whether we want to allow multiple shutdowns
@@ -316,19 +320,19 @@ namespace mongo {
     }
 
     LockManager::Policy LockManager::getPolicy() const {
-        unique_lock<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         _throwIfShuttingDown();
         return _policy;
     }
 
     Transaction* LockManager::getPolicySetter() const {
-        unique_lock<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         _throwIfShuttingDown();
         return _policySetter;
     }
 
     void LockManager::setPolicy(Transaction* tx, const Policy& policy, Notifier* notifier) {
-        unique_lock<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         _throwIfShuttingDown();
         
         if (policy == _policy) return;
@@ -379,9 +383,14 @@ namespace mongo {
     }
 
     void LockManager::acquireLock(LockRequest* lr, Notifier* notifier) {
-        if (NULL == lr) return;
+        if (!useExperimentalDocLocking)  {
+            return;
+        }
+
+        invariant(lr);
+
         {
-            unique_lock<boost::mutex> lk(_mutex);
+            boost::unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown();
         }
 
@@ -389,7 +398,7 @@ namespace mongo {
         if (Transaction::kAborted == lr->requestor->_state) {
             throw AbortException();
         }
-        unique_lock<boost::mutex> lk(_resourceMutexes[lr->slice]);
+        boost::unique_lock<boost::mutex> lk(_resourceMutexes[lr->slice]);
 
         LockRequest* queue = _resourceLocks[lr->slice][lr->resId];
         LockRequest* conflictPosition = queue;
@@ -408,8 +417,12 @@ namespace mongo {
                               const LockMode& mode,
                               const ResourceId& resId,
                               Notifier* notifier) {
+        if (kReservedResourceId == resId || !useExperimentalDocLocking) {
+            return;
+        }
+
         {
-            unique_lock<boost::mutex> lk(_mutex);
+            boost::unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown();
         }
 
@@ -418,7 +431,7 @@ namespace mongo {
             throw AbortException();
         }
         unsigned slice = partitionResource(resId);
-        unique_lock<boost::mutex> lk(_resourceMutexes[slice]);
+        boost::unique_lock<boost::mutex> lk(_resourceMutexes[slice]);
 
         LockRequest* queue = _resourceLocks[slice][resId];
         LockRequest* conflictPosition = queue;
@@ -440,7 +453,7 @@ namespace mongo {
                                 const vector<ResourceId>& resources,
                                 Notifier* notifier) {
         {
-            unique_lock<boost::mutex> lk(_mutex);
+            boost::unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown(requestor);
         }
 
@@ -457,7 +470,7 @@ namespace mongo {
             unsigned slice = partitionResource(resId);
             bool isAvailable = false;
             {
-                unique_lock<boost::mutex> lk(_resourceMutexes[slice]);
+                boost::unique_lock<boost::mutex> lk(_resourceMutexes[slice]);
                 isAvailable = _isAvailable(requestor, mode, resId, slice);
             }
             if (isAvailable) {
@@ -472,12 +485,13 @@ namespace mongo {
     }
 
     LockManager::LockStatus LockManager::releaseLock(LockRequest* lr) {
-        if (NULL == lr) return kLockNotFound;
+        if (!useExperimentalDocLocking) return kLockNotFound;
+        invariant(lr);
         {
-            unique_lock<boost::mutex> lk(_mutex);
+            boost::unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown(lr->requestor);
         }
-        unique_lock<boost::mutex> lk(_resourceMutexes[lr->slice]);
+        boost::unique_lock<boost::mutex> lk(_resourceMutexes[lr->slice]);
         _decStatsForMode(lr->mode);
         return _releaseInternal(lr);
     }
@@ -485,12 +499,16 @@ namespace mongo {
     LockManager::LockStatus LockManager::release(const Transaction* holder,
                                                  const LockMode& mode,
                                                  const ResourceId& resId) {
+        if (kReservedResourceId == resId || !useExperimentalDocLocking) {
+            return kLockNotFound;
+        }
+
         {
-            unique_lock<boost::mutex> lk(_mutex);
+            boost::unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown(holder);
         }
         unsigned slice = partitionResource(resId);
-        unique_lock<boost::mutex> lk(_resourceMutexes[slice]);
+        boost::unique_lock<boost::mutex> lk(_resourceMutexes[slice]);
 
         LockRequest* lr;
         LockStatus status = _findLock(holder, mode, resId, slice, lr);
@@ -507,7 +525,7 @@ namespace mongo {
      */
     size_t LockManager::release(Transaction* holder) {
         {
-            unique_lock<boost::mutex> lk(_mutex);
+            boost::unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown(holder);
         }
 
@@ -529,16 +547,16 @@ namespace mongo {
         return numLocksReleased;
     }
 #endif
-    void LockManager::abort(Transaction* goner) {
+    void LockManager::abort(Transaction* goner) {   
         {
-            unique_lock<boost::mutex> lk(_mutex);
+            boost::unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown(goner);
         }
         _abortInternal(goner);
     }
 
     LockManager::LockStats LockManager::getStats() const {
-        unique_lock<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         _throwIfShuttingDown();
 
         LockStats result;
@@ -549,7 +567,7 @@ namespace mongo {
     }
 
     string LockManager::toString() const {
-//     unique_lock<boost::mutex> lk(_mutex);
+//     boost::unique_lock<boost::mutex> lk(_mutex);
 #ifdef DONT_CARE_ABOUT_DEBUG_EVEN_WHEN_SHUTTING_DOWN
         // seems like we might want to allow toString for debug during shutdown?
         _throwIfShuttingDown();
@@ -619,8 +637,11 @@ namespace mongo {
     bool LockManager::isLocked(const Transaction* holder,
                                const LockMode& mode,
                                const ResourceId& resId) const {
+        if (!useExperimentalDocLocking) {
+            return false;
+        }
         {
-            unique_lock<boost::mutex> lk(_mutex);
+            boost::unique_lock<boost::mutex> lk(_mutex);
             _throwIfShuttingDown(holder);
         }
 
@@ -733,7 +754,7 @@ namespace mongo {
                                        LockRequest* conflictPosition,
                                        ResourceStatus resourceStatus,
                                        Notifier* sleepNotifier,
-                                       unique_lock<boost::mutex>& guard) {
+                                       boost::unique_lock<boost::mutex>& guard) {
 
         if (kResourceAvailable == resourceStatus) {
             if (!conflictPosition)

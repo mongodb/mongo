@@ -32,6 +32,7 @@
 #include <iosfwd>
 #include <ctime>
 #include <string>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/thread/xtime.hpp>
 #include <boost/version.hpp>
 
@@ -39,6 +40,9 @@
 #include "mongo/client/export_macros.h"
 
 namespace mongo {
+
+    typedef boost::posix_time::milliseconds Milliseconds;
+    typedef boost::posix_time::seconds Seconds;
 
     void time_t_to_Struct(time_t t, struct tm * buf , bool local = false );
     std::string time_t_to_String(time_t t);

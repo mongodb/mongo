@@ -31,7 +31,6 @@
 #include <vector>
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/geo/core.h"
 #include "mongo/db/geo/shapes.h"
 
 namespace mongo {

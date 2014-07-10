@@ -47,7 +47,8 @@ namespace mongo {
      */
     class CappedRecordStoreV1Iterator : public RecordIterator {
     public:
-        CappedRecordStoreV1Iterator( const CappedRecordStoreV1* collection,
+        CappedRecordStoreV1Iterator( OperationContext* txn,
+                                     const CappedRecordStoreV1* collection,
                                      const DiskLoc& start,
                                      bool tailable,
                                      const CollectionScanParams::Direction& dir );
@@ -75,6 +76,9 @@ namespace mongo {
         Extent* _getExtent( const DiskLoc& loc );
         DiskLoc _getNextRecord( const DiskLoc& loc );
         DiskLoc _getPrevRecord( const DiskLoc& loc );
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
 
         // The collection we're iterating over.
         const CappedRecordStoreV1* _recordStore;

@@ -1,7 +1,7 @@
 // record_store_v1_simple.cpp
 
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -96,6 +96,7 @@ namespace mongo {
             int bestmatchlen = INT_MAX; // sentinel meaning we haven't found a record big enough
             int b = bucket(lenToAlloc);
             DiskLoc cur = _details->deletedListEntry(b);
+            
             int extra = 5; // look for a better fit, a little.
             int chain = 0;
             while ( 1 ) {
@@ -220,9 +221,7 @@ namespace mongo {
         newDelW->nextDeleted().Null();
 
         addDeletedRec( txn, newDelLoc );
-
         return loc;
-
     }
 
     StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord( OperationContext* txn,
@@ -236,7 +235,7 @@ namespace mongo {
 
         increaseStorageSize( txn,
                              _extentManager->followupSize( lengthWithHeaders,
-                                                           _details->lastExtentSize()),
+                                                           _details->lastExtentSize(txn)),
                              enforceQuota );
 
         loc = _allocFromExistingExtents( txn, lengthWithHeaders );
@@ -247,14 +246,14 @@ namespace mongo {
 
         log() << "warning: alloc() failed after allocating new extent. "
               << "lengthWithHeaders: " << lengthWithHeaders << " last extent size:"
-              << _details->lastExtentSize() << "; trying again";
+              << _details->lastExtentSize(txn) << "; trying again";
 
-        for ( int z = 0; z < 10 && lengthWithHeaders > _details->lastExtentSize(); z++ ) {
+        for ( int z = 0; z < 10 && lengthWithHeaders > _details->lastExtentSize(txn); z++ ) {
             log() << "try #" << z << endl;
 
             increaseStorageSize( txn,
                                  _extentManager->followupSize( lengthWithHeaders,
-                                                               _details->lastExtentSize()),
+                                                               _details->lastExtentSize(txn)),
                                  enforceQuota );
 
             loc = _allocFromExistingExtents( txn, lengthWithHeaders );
@@ -280,20 +279,22 @@ namespace mongo {
         _details->setDeletedListEntry(txn, b, dloc);
     }
 
-    RecordIterator* SimpleRecordStoreV1::getIterator( const DiskLoc& start, bool tailable,
+    RecordIterator* SimpleRecordStoreV1::getIterator( OperationContext* txn,
+                                                      const DiskLoc& start,
+                                                      bool tailable,
                                                       const CollectionScanParams::Direction& dir) const {
-        return new SimpleRecordStoreV1Iterator( this, start, dir );
+        return new SimpleRecordStoreV1Iterator( txn, this, start, dir );
     }
 
-    vector<RecordIterator*> SimpleRecordStoreV1::getManyIterators() const {
+    vector<RecordIterator*> SimpleRecordStoreV1::getManyIterators( OperationContext* txn ) const {
         OwnedPointerVector<RecordIterator> iterators;
         const Extent* ext;
-        for (DiskLoc extLoc = details()->firstExtent(); !extLoc.isNull(); extLoc = ext->xnext) {
-            ext = _getExtent(extLoc);
+        for (DiskLoc extLoc = details()->firstExtent(txn); !extLoc.isNull(); extLoc = ext->xnext) {
+            ext = _getExtent(txn, extLoc);
             if (ext->firstRecord.isNull())
                 continue;
-
-            iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(ext->firstRecord, this));
+            iterators.push_back(
+                new RecordStoreV1Base::IntraExtentIterator(txn, ext->firstRecord, this));
         }
 
         return iterators.release();
@@ -370,7 +371,7 @@ namespace mongo {
                 while( 1 ) {
                     Record *recOld = recordFor(L);
                     RecordData oldData = recOld->toRecordData();
-                    L = getNextRecordInExtent(L);
+                    L = getNextRecordInExtent(txn, L);
 
                     if ( compactOptions->validateDocuments && !adaptor->isDataValid( oldData ) ) {
                         // object is corrupt!
@@ -432,8 +433,8 @@ namespace mongo {
                 }
             } // if !L.isNull()
 
-            invariant( _details->firstExtent() == diskloc );
-            invariant( _details->lastExtent() != diskloc );
+            invariant( _details->firstExtent(txn) == diskloc );
+            invariant( _details->lastExtent(txn) != diskloc );
             DiskLoc newFirst = e->xnext;
             _details->setFirstExtent( txn, newFirst );
             *txn->recoveryUnit()->writing(&_extentManager->getExtent( newFirst )->xprev) = DiskLoc();
@@ -462,7 +463,7 @@ namespace mongo {
         txn->recoveryUnit()->commitIfNeeded();
 
         list<DiskLoc> extents;
-        for( DiskLoc extLocation = _details->firstExtent();
+        for( DiskLoc extLocation = _details->firstExtent(txn);
              !extLocation.isNull();
              extLocation = _extentManager->getExtent( extLocation )->xnext ) {
             extents.push_back( extLocation );
@@ -476,7 +477,7 @@ namespace mongo {
         _details->setLastExtentSize( txn, 0 );
 
         // create a new extent so new records go there
-        increaseStorageSize( txn, _details->lastExtentSize(), true );
+        increaseStorageSize( txn, _details->lastExtentSize(txn), true );
 
         // reset data size and record counts to 0 for this namespace
         // as we're about to tally them up again for each new extent
@@ -492,8 +493,8 @@ namespace mongo {
             pm.hit();
         }
 
-        invariant( _extentManager->getExtent( _details->firstExtent() )->xprev.isNull() );
-        invariant( _extentManager->getExtent( _details->lastExtent() )->xnext.isNull() );
+        invariant( _extentManager->getExtent( _details->firstExtent(txn) )->xprev.isNull() );
+        invariant( _extentManager->getExtent( _details->lastExtent(txn) )->xnext.isNull() );
 
         // indexes will do their own progress meter
         pm.finished();

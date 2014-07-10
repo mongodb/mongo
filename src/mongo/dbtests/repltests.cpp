@@ -2,7 +2,7 @@
 //
 
 /**
- *    Copyright (C) 2009 10gen Inc.
+ *    Copyright (C) 2009-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -38,7 +38,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/catalog/collection.h"
@@ -70,6 +70,7 @@ namespace ReplTests {
                  _context(&_txn, ns()) {
 
             oldRepl();
+            ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
             replSettings.replSet = "";
             replSettings.oplogSize = 5 * 1024 * 1024;
             replSettings.master = true;
@@ -84,7 +85,7 @@ namespace ReplTests {
         }
         ~Base() {
             try {
-                replSettings.master = false;
+                getGlobalReplicationCoordinator()->getSettings().master = false;
                 deleteAll( ns() );
                 deleteAll( cllNS() );
                 _wunit.commit();
@@ -133,8 +134,8 @@ namespace ReplTests {
             }
 
             int count = 0;
-            RecordIterator* it = coll->getIterator( DiskLoc(), false,
-                                                        CollectionScanParams::FORWARD );
+            RecordIterator* it = coll->getIterator( &_txn, DiskLoc(), false,
+                                                    CollectionScanParams::FORWARD );
             for ( ; !it->isEOF(); it->getNext() ) {
                 ++count;
             }
@@ -154,8 +155,8 @@ namespace ReplTests {
             }
 
             int count = 0;
-            RecordIterator* it = coll->getIterator( DiskLoc(), false,
-                                                        CollectionScanParams::FORWARD );
+            RecordIterator* it = coll->getIterator( &txn, DiskLoc(), false,
+                                                    CollectionScanParams::FORWARD );
             for ( ; !it->isEOF(); it->getNext() ) {
                 ++count;
             }
@@ -173,8 +174,8 @@ namespace ReplTests {
                 Database* db = ctx.db();
                 Collection* coll = db->getCollection( &txn, cllNS() );
 
-                RecordIterator* it = coll->getIterator( DiskLoc(), false,
-                                                            CollectionScanParams::FORWARD );
+                RecordIterator* it = coll->getIterator( &txn, DiskLoc(), false,
+                                                        CollectionScanParams::FORWARD );
                 while ( !it->isEOF() ) {
                     DiskLoc currLoc = it->getNext();
                     ops.push_back(coll->docFor(currLoc));
@@ -208,8 +209,8 @@ namespace ReplTests {
                 coll = db->createCollection( &txn, ns );
             }
 
-            RecordIterator* it = coll->getIterator( DiskLoc(), false,
-                                                        CollectionScanParams::FORWARD );
+            RecordIterator* it = coll->getIterator( &txn, DiskLoc(), false,
+                                                    CollectionScanParams::FORWARD );
             ::mongo::log() << "all for " << ns << endl;
             while ( !it->isEOF() ) {
                 DiskLoc currLoc = it->getNext();
@@ -231,8 +232,8 @@ namespace ReplTests {
             }
 
             vector< DiskLoc > toDelete;
-            RecordIterator* it = coll->getIterator( DiskLoc(), false,
-                                                        CollectionScanParams::FORWARD );
+            RecordIterator* it = coll->getIterator( &txn, DiskLoc(), false,
+                                                    CollectionScanParams::FORWARD );
             while ( !it->isEOF() ) {
                 toDelete.push_back( it->getNext() );
             }

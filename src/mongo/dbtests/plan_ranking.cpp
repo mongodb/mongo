@@ -114,7 +114,7 @@ namespace PlanRankingTests {
             // Put each solution from the planner into the MPR.
             for (size_t i = 0; i < solutions.size(); ++i) {
                 PlanStage* root;
-                ASSERT(StageBuilder::build(collection, *solutions[i], ws, &root));
+                ASSERT(StageBuilder::build(&_txn, collection, *solutions[i], ws, &root));
                 // Takes ownership of all arguments.
                 _mps->addPlan(solutions[i], root, ws);
             }

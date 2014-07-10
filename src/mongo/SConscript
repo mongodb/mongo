@@ -208,6 +208,7 @@ env.CppUnitTest('expression_parser_test',
 
 
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
+env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
 
 env.CppUnitTest('descriptive_stats_test',
                 ['util/descriptive_stats_test.cpp'],
@@ -513,7 +514,6 @@ if windows:
 
 scripting_common_files = [ "scripting/engine.cpp",
                            "scripting/utils.cpp",
-                           "scripting/bench.cpp",
                            ]
 
 env.Library('bson_template_evaluator', ["scripting/bson_template_evaluator.cpp"],
@@ -642,7 +642,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/structure/catalog/index_details.cpp",
                     "db/index_builder.cpp",
                     "db/index_rebuilder.cpp",
-                    "db/commands/geonear.cpp",
+                    "db/commands/geo_near_cmd.cpp",
                     "db/geo/haystack.cpp",
                     "db/geo/s2common.cpp",
                     "db/ops/delete.cpp",
@@ -845,7 +845,9 @@ if has_option( 'use-cpu-profiler' ):
 env.Library("defaultversion", "s/default_version.cpp")
 
 # Geo
-env.Library("geometry", [ "db/geo/hash.cpp", "db/geo/shapes.cpp", ], LIBDEPS = [ "bson" ])
+env.Library("geometry", [ "db/geo/hash.cpp", "db/geo/shapes.cpp", ], 
+            LIBDEPS = [ "bson",
+                        "$BUILD_DIR/third_party/s2/s2" ])
 env.Library("geoparser", [ "db/geo/geoparser.cpp", ],
             LIBDEPS = [ "bson",
                         "geometry",
@@ -946,7 +948,6 @@ serveronlyLibdeps = ["coreshard",
                      "db/repl/replication_executor",
                      "db/repl/repl_coordinator_impl",
                      "db/repl/repl_coordinator_global",
-                     "db/repl/repl_settings",
                      "db/repl/replication_executor",
                      'db/storage/mmap_v1/extent',
                      'db/storage/heap1/storage_heap1',
@@ -1184,7 +1185,8 @@ env.JSHeader(
                 "shell/replsetbridge.js"
              ])
 
-coreShellFiles = [ "shell/shell_utils.cpp",
+coreShellFiles = [ "shell/bench.cpp",
+                   "shell/shell_utils.cpp",
                    "shell/shell_utils_extended.cpp",
                    "shell/shell_utils_launcher.cpp",
                    "shell/mongo-server.cpp",

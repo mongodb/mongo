@@ -67,7 +67,7 @@ namespace mongo {
         : RecordStoreV1Base( ns, details, em, isSystemIndexes ),
           _deleteCallback( collection ) {
 
-        DiskLoc extentLoc = details->firstExtent();
+        DiskLoc extentLoc = details->firstExtent(txn);
         while ( !extentLoc.isNull() ) {
             _extentAdvice.push_back( _extentManager->cacheHint( extentLoc,
                                                                 ExtentManager::Sequential ) );
@@ -94,11 +94,11 @@ namespace mongo {
             // the extent check is a way to try and improve performance
             // since we have to iterate all the extents (for now) to get
             // storage size
-            if ( lenToAlloc > storageSize() ) {
+            if ( lenToAlloc > storageSize(txn) ) {
                 return StatusWith<DiskLoc>( ErrorCodes::BadValue,
                                             mongoutils::str::stream()
                                             << "document is larger than capped size "
-                                            << lenToAlloc << " > " << storageSize(),
+                                            << lenToAlloc << " > " << storageSize(txn),
                                             16328 );
             }
 
@@ -136,7 +136,7 @@ namespace mongo {
                 if ( !_details->capFirstNewRecord().isValid() ) {
                     advanceCapExtent( txn, _ns );
 
-                    if ( _details->capExtent() != _details->firstExtent() )
+                    if ( _details->capExtent() != _details->firstExtent(txn) )
                         _details->setCapFirstNewRecord( txn, DiskLoc().setInvalid() );
                     // else signal done with first iteration through extents.
                     continue;
@@ -155,7 +155,7 @@ namespace mongo {
                         firstEmptyExtent = _details->capExtent();
                     advanceCapExtent( txn, _ns );
                     if ( firstEmptyExtent == _details->capExtent() ) {
-                        _maybeComplain( lenToAlloc );
+                        _maybeComplain( txn, lenToAlloc );
                         return StatusWith<DiskLoc>( ErrorCodes::InternalError,
                                                     "no space in capped collection" );
                     }
@@ -220,7 +220,7 @@ namespace mongo {
         setListOfAllDeletedRecords( txn, DiskLoc() );
 
         // preserve firstExtent/lastExtent
-        _details->setCapExtent( txn, _details->firstExtent() );
+        _details->setCapExtent( txn, _details->firstExtent(txn) );
         _details->setStats( txn, 0, 0 );
         // preserve lastExtentSize
         // nIndexes preserve 0
@@ -234,7 +234,7 @@ namespace mongo {
 
         // Reset all existing extents and recreate the deleted list.
         Extent* ext;
-        for( DiskLoc extLoc = _details->firstExtent();
+        for( DiskLoc extLoc = _details->firstExtent(txn);
              !extLoc.isNull();
              extLoc = ext->xnext ) {
             ext = _extentManager->getExtent(extLoc);
@@ -340,7 +340,7 @@ namespace mongo {
             // NOTE cappedLastDelRecLastExtent() set to DiskLoc() in above
 
             // Last, in case we're killed before getting here
-            _details->setCapExtent( txn, _details->firstExtent() );
+            _details->setCapExtent( txn, _details->firstExtent(txn) );
         }
     }
 
@@ -369,7 +369,7 @@ namespace mongo {
     void CappedRecordStoreV1::advanceCapExtent( OperationContext* txn, const StringData& ns ) {
         // We want cappedLastDelRecLastExtent() to be the last DeletedRecord of the prev cap extent
         // (or DiskLoc() if new capExtent == firstExtent)
-        if ( _details->capExtent() == _details->lastExtent() )
+        if ( _details->capExtent() == _details->lastExtent(txn) )
             setLastDelRecLastExtent( txn, DiskLoc() );
         else {
             DiskLoc i = cappedFirstDeletedInCurExtent();
@@ -378,7 +378,7 @@ namespace mongo {
         }
 
         _details->setCapExtent( txn,
-                                theCapExtent()->xnext.isNull() ?  _details->firstExtent()
+                                theCapExtent()->xnext.isNull() ?  _details->firstExtent(txn)
                                                                : theCapExtent()->xnext );
 
         /* this isn't true if a collection has been renamed...that is ok just used for diagnostics */
@@ -415,7 +415,7 @@ namespace mongo {
     }
 
     void CappedRecordStoreV1::cappedTruncateLastDelUpdate(OperationContext* txn) {
-        if ( _details->capExtent() == _details->firstExtent() ) {
+        if ( _details->capExtent() == _details->firstExtent(txn) ) {
             // Only one extent of the collection is in use, so there
             // is no deleted record in a previous extent, so nullify
             // cappedLastDelRecLastExtent().
@@ -522,8 +522,8 @@ namespace mongo {
                 DiskLoc newCapExtent = _details->capExtent();
                 do {
                     // Find the previous extent, looping if necessary.
-                    newCapExtent = ( newCapExtent == _details->firstExtent() ) ?
-                        _details->lastExtent() :
+                    newCapExtent = ( newCapExtent == _details->firstExtent(txn) ) ?
+                        _details->lastExtent(txn) :
                         _extentManager->getExtent(newCapExtent)->xprev;
                     _extentManager->getExtent(newCapExtent)->assertOk();
                 }
@@ -586,23 +586,26 @@ namespace mongo {
         }
     }
 
-    RecordIterator* CappedRecordStoreV1::getIterator( const DiskLoc& start, bool tailable,
+    RecordIterator* CappedRecordStoreV1::getIterator( OperationContext* txn,
+                                                      const DiskLoc& start,
+                                                      bool tailable,
                                                       const CollectionScanParams::Direction& dir) const {
-        return new CappedRecordStoreV1Iterator( this, start, tailable, dir );
+        return new CappedRecordStoreV1Iterator( txn, this, start, tailable, dir );
     }
 
-    vector<RecordIterator*> CappedRecordStoreV1::getManyIterators() const {
+    vector<RecordIterator*> CappedRecordStoreV1::getManyIterators( OperationContext* txn ) const {
         OwnedPointerVector<RecordIterator> iterators;
 
         if (!_details->capLooped()) {
             // if we haven't looped yet, just spit out all extents (same as non-capped impl)
             const Extent* ext;
-            for (DiskLoc extLoc = details()->firstExtent(); !extLoc.isNull(); extLoc = ext->xnext) {
-                ext = _getExtent(extLoc);
+            for (DiskLoc extLoc = details()->firstExtent(txn); !extLoc.isNull(); extLoc = ext->xnext) {
+                ext = _getExtent(txn, extLoc);
                 if (ext->firstRecord.isNull())
                     continue;
 
-                iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(ext->firstRecord,
+                iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(txn,
+                                                                               ext->firstRecord,
                                                                                this));
             }
         }
@@ -616,28 +619,32 @@ namespace mongo {
             // First do the "old" portion of capExtent if there is any
             DiskLoc extLoc = capExtent;
             {
-                const Extent* ext = _getExtent(extLoc);
+                const Extent* ext = _getExtent(txn, extLoc);
                 if (ext->firstRecord != details()->capFirstNewRecord()) {
                     // this means there is old data in capExtent
-                    iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(ext->firstRecord,
+                    iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(txn,
+                                                                                   ext->firstRecord,
                                                                                    this));
                 }
 
-                extLoc = ext->xnext.isNull() ? details()->firstExtent() : ext->xnext;
+                extLoc = ext->xnext.isNull() ? details()->firstExtent(txn) : ext->xnext;
             }
 
             // Next handle all the other extents
             while (extLoc != capExtent) {
-                const Extent* ext = _getExtent(extLoc);
-                iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(ext->firstRecord,
+                const Extent* ext = _getExtent(txn, extLoc);
+                iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(txn,
+                                                                               ext->firstRecord,
                                                                                this));
 
-                extLoc = ext->xnext.isNull() ? details()->firstExtent() : ext->xnext;
+                extLoc = ext->xnext.isNull() ? details()->firstExtent(txn) : ext->xnext;
             }
 
             // Finally handle the "new" data in the capExtent
             iterators.push_back(
-                new RecordStoreV1Base::IntraExtentIterator(details()->capFirstNewRecord(), this));
+                new RecordStoreV1Base::IntraExtentIterator(txn,
+                                                           details()->capFirstNewRecord(),
+                                                           this));
         }
 
         return iterators.release();
@@ -650,13 +657,13 @@ namespace mongo {
         invariant(false);
     }
 
-    void CappedRecordStoreV1::_maybeComplain( int len ) const {
+    void CappedRecordStoreV1::_maybeComplain( OperationContext* txn, int len ) const {
         RARELY {
             std::stringstream buf;
             buf << "couldn't make room for record len: " << len << " in capped ns " << _ns << '\n';
             buf << "numRecords: " << numRecords() << '\n';
             int i = 0;
-            for ( DiskLoc e = _details->firstExtent();
+            for ( DiskLoc e = _details->firstExtent(txn);
                   !e.isNull();
                   e = _extentManager->getExtent( e )->xnext, ++i ) {
                 buf << "  Extent " << i;
@@ -676,12 +683,13 @@ namespace mongo {
             warning() << buf.str();
 
             // assume it is unusually large record; if not, something is broken
-            fassert( 17438, len * 5 > _details->lastExtentSize() );
+            fassert( 17438, len * 5 > _details->lastExtentSize(txn) );
         }
     }
 
-    DiskLoc CappedRecordStoreV1::firstRecord( const DiskLoc &startExtent ) const {
-        for (DiskLoc i = startExtent.isNull() ? _details->firstExtent() : startExtent;
+    DiskLoc CappedRecordStoreV1::firstRecord( OperationContext* txn,
+                                              const DiskLoc &startExtent ) const {
+        for (DiskLoc i = startExtent.isNull() ? _details->firstExtent(txn) : startExtent;
                 !i.isNull();
              i = _extentManager->getExtent( i )->xnext ) {
 
@@ -693,8 +701,9 @@ namespace mongo {
         return DiskLoc();
     }
 
-    DiskLoc CappedRecordStoreV1::lastRecord( const DiskLoc &startExtent ) const {
-        for (DiskLoc i = startExtent.isNull() ? _details->lastExtent() : startExtent;
+    DiskLoc CappedRecordStoreV1::lastRecord( OperationContext* txn,
+                                             const DiskLoc &startExtent ) const {
+        for (DiskLoc i = startExtent.isNull() ? _details->lastExtent(txn) : startExtent;
                 !i.isNull();
              i = _extentManager->getExtent( i )->xprev ) {
 

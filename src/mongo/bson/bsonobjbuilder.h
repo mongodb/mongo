@@ -834,6 +834,11 @@ namespace mongo {
             return *this;
         }
 
+        BSONArrayBuilder& appendRegex(const StringData& regex, const StringData& options = "") {
+            _b.appendRegex(num(), regex, options);
+            return *this;
+        }
+
         BSONArrayBuilder& appendTimestamp(unsigned long long ts) {
             _b.appendTimestamp(num(), ts);
             return *this;

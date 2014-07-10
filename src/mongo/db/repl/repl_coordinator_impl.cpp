@@ -73,7 +73,8 @@ namespace repl {
         boost::condition_variable* condVar;
     };
 
-    ReplicationCoordinatorImpl::ReplicationCoordinatorImpl() : _inShutdown(false) {}
+    ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(const ReplSettings& settings) :
+            _inShutdown(false), _settings(settings) {}
 
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
@@ -129,11 +130,14 @@ namespace repl {
         return false;
     }
 
+    ReplSettings& ReplicationCoordinatorImpl::getSettings() {
+        return _settings;
+    }
+
     ReplicationCoordinator::Mode ReplicationCoordinatorImpl::getReplicationMode() const {
-        // TODO(spencer): Don't rely on global replSettings object
-        if (replSettings.usingReplSets()) {
+        if (_settings.usingReplSets()) {
             return modeReplSet;
-        } else if (replSettings.slave || replSettings.master) {
+        } else if (_settings.slave || _settings.master) {
             return modeMasterSlave;
         }
         return modeNone;
@@ -152,8 +156,7 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorImpl::setLastOptime(const OID& rid,
-                                                     const OpTime& ts,
-                                                     const BSONObj& config) {
+                                                     const OpTime& ts) {
         // TODO(spencer): update slave tracking thread for local.slaves
         // TODO(spencer): pass info upstream if we're not primary
         boost::lock_guard<boost::mutex> lk(_mutex);
@@ -321,6 +324,11 @@ namespace repl {
         return true;
     }
 
+    OID ReplicationCoordinatorImpl::getElectionId() {
+        // TODO
+        return OID();
+    }
+
     void ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* result) {
         // TODO
     }
@@ -417,6 +425,26 @@ namespace repl {
             BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();
+    }
+
+    bool ReplicationCoordinatorImpl::processHandshake(const OID& remoteID,
+                                                      const BSONObj& handshake) {
+        // TODO
+        return false;
+    }
+
+    void ReplicationCoordinatorImpl::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
+        //TODO
+    }
+
+    bool ReplicationCoordinatorImpl::buildsIndexes() {
+        // TODO
+        return false;
+    }
+
+    std::vector<BSONObj> ReplicationCoordinatorImpl::getHostsWrittenTo(const OpTime& op) {
+        // TODO
+        return std::vector<BSONObj>();
     }
 } // namespace repl
 } // namespace mongo

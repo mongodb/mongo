@@ -202,6 +202,7 @@ namespace mongo {
             }
 
             scoped_ptr<rocksdb::Iterator> _iterator;
+            OperationContext* _txn; // not owned
             bool _direction;
 
             mutable bool _cached;
@@ -231,7 +232,7 @@ namespace mongo {
 
         if ( !dupsAllowed ) {
             // XXX: this is slow
-            Status status = dupKeyCheck( key, loc );
+            Status status = dupKeyCheck( txn, key, loc );
             if ( !status.isOK() )
                 return status;
         }
@@ -263,12 +264,12 @@ namespace mongo {
         return 1; // XXX: fix? does it matter since its so slow to check?
     }
 
-    Status RocksBtreeImpl::dupKeyCheck(const BSONObj& key, const DiskLoc& loc) {
+    Status RocksBtreeImpl::dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
         // XXX: not done yet!
         return Status::OK();
     }
 
-    void RocksBtreeImpl::fullValidate(long long* numKeysOut) {
+    void RocksBtreeImpl::fullValidate(OperationContext* txn, long long* numKeysOut) {
         // XXX: no key counts
         if ( numKeysOut )
             numKeysOut[0] = -1;
@@ -284,9 +285,11 @@ namespace mongo {
         return Status::OK();
     }
 
-    BtreeInterface::Cursor* RocksBtreeImpl::newCursor(int direction) const {
+    BtreeInterface::Cursor* RocksBtreeImpl::newCursor(OperationContext* txn,
+                                                      int direction) const {
         return new RocksCursor( _db->NewIterator( rocksdb::ReadOptions(),
                                                   _columnFamily ),
+                                txn,
                                 direction );
     }
 

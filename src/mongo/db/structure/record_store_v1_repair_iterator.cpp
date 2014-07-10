@@ -35,8 +35,9 @@
 
 namespace mongo {
 
-    RecordStoreV1RepairIterator::RecordStoreV1RepairIterator(const RecordStoreV1Base* recordStore)
-        : _recordStore(recordStore), _stage(FORWARD_SCAN) {
+    RecordStoreV1RepairIterator::RecordStoreV1RepairIterator(OperationContext* txn,
+                                                             const RecordStoreV1Base* recordStore)
+        : _txn(txn), _recordStore(recordStore), _stage(FORWARD_SCAN) {
         
         // Position the iterator at the first record
         //
@@ -73,10 +74,10 @@ namespace mongo {
             else {
                 switch (_stage) {
                 case FORWARD_SCAN:
-                    _currRecord = _recordStore->getNextRecordInExtent(_currRecord);
+                    _currRecord = _recordStore->getNextRecordInExtent(_txn, _currRecord);
                     break;
                 case BACKWARD_SCAN:
-                    _currRecord = _recordStore->getPrevRecordInExtent(_currRecord);
+                    _currRecord = _recordStore->getPrevRecordInExtent(_txn, _currRecord);
                     break;
                 default:
                     invariant(!"This should never be reached.");
@@ -113,10 +114,10 @@ namespace mongo {
             if (_currExtent.isNull()) {
                 switch (_stage) {
                 case FORWARD_SCAN:
-                    _currExtent = _recordStore->details()->firstExtent();
+                    _currExtent = _recordStore->details()->firstExtent(_txn);
                     break;
                 case BACKWARD_SCAN:
-                    _currExtent = _recordStore->details()->lastExtent();
+                    _currExtent = _recordStore->details()->lastExtent(_txn);
                     break;
                 default:
                     invariant(DONE == _stage);

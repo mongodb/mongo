@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -42,9 +42,11 @@ namespace mongo {
     class IDHackStage : public PlanStage {
     public:
         /** Takes ownership of all the arguments -collection. */
-        IDHackStage(const Collection* collection, CanonicalQuery* query, WorkingSet* ws);
+        IDHackStage(OperationContext* txn, const Collection* collection,
+                    CanonicalQuery* query, WorkingSet* ws);
 
-        IDHackStage(Collection* collection, const BSONObj& key, WorkingSet* ws);
+        IDHackStage(OperationContext* txn, Collection* collection,
+                    const BSONObj& key, WorkingSet* ws);
 
         virtual ~IDHackStage();
 
@@ -66,9 +68,16 @@ namespace mongo {
 
         PlanStageStats* getStats();
 
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
         static const char* kStageType;
 
     private:
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
+
         // Not owned here.
         const Collection* _collection;
 
@@ -77,9 +86,6 @@ namespace mongo {
 
         // The value to match against the _id field.
         BSONObj _key;
-
-        // Not owned by us.
-        CanonicalQuery* _query;
 
         // Did someone call kill() on us?
         bool _killed;

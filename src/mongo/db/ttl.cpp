@@ -68,11 +68,12 @@ namespace mongo {
         
         static string secondsExpireField;
         
-        void doTTLForDB( const string& dbName ) {
+        void doTTLForDB( OperationContext* txn, const string& dbName ) {
 
             if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName))
                 return;
 
+            DBDirectClient db(txn);
             vector<BSONObj> indexes;
             {
                 auto_ptr<DBClientCursor> cursor =
@@ -118,9 +119,8 @@ namespace mongo {
                 {
                     const string ns = idx["ns"].String();
 
-                    OperationContextImpl txn;
-                    Client::WriteContext ctx(&txn,  ns );
-                    Collection* collection = ctx.ctx().db()->getCollection( &txn, ns );
+                    Client::WriteContext ctx(txn,  ns );
+                    Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
                     if ( !collection ) {
                         // collection was dropped
                         continue;
@@ -139,7 +139,7 @@ namespace mongo {
                         continue;
                     }
 
-                    n = deleteObjects(&txn, ctx.ctx().db(), ns, query, false, true);
+                    n = deleteObjects(txn, ctx.ctx().db(), ns, query, false, true);
                     ttlDeletedDocuments.increment( n );
                     ctx.commit();
                 }
@@ -164,6 +164,8 @@ namespace mongo {
                    continue;
                 }
                 
+                OperationContextImpl txn;
+
                 if ( lockedForWriting() ) {
                     // note: this is not perfect as you can go into fsync+lock between 
                     // this and actually doing the delete later
@@ -179,7 +181,6 @@ namespace mongo {
 
                 set<string> dbs;
                 {
-                    OperationContextImpl txn;   // XXX?
                     Lock::DBRead lk(txn.lockState(), "local");
                     dbHolder().getAllShortNames( dbs );
                 }
@@ -189,7 +190,7 @@ namespace mongo {
                 for ( set<string>::const_iterator i=dbs.begin(); i!=dbs.end(); ++i ) {
                     string db = *i;
                     try {
-                        doTTLForDB( db );
+                        doTTLForDB( &txn, db );
                     }
                     catch ( DBException& e ) {
                         error() << "error processing ttl for db: " << db << " " << e << endl;
@@ -198,8 +199,6 @@ namespace mongo {
 
             }
         }
-
-        DBDirectClient db;
     };
 
     void startTTLBackgroundJob() {

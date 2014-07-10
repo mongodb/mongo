@@ -34,13 +34,14 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/commands/get_last_error.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index_rebuilder.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
-#include "mongo/db/repl/repl_settings.h"  // replSettings
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/util/background.h"
@@ -417,7 +418,7 @@ namespace {
         }
 
         // Figure out indexPrefetch setting
-        std::string& prefetch = replSettings.rsIndexPrefetch;
+        std::string& prefetch = getGlobalReplicationCoordinator()->getSettings().rsIndexPrefetch;
         if (!prefetch.empty()) {
             IndexPrefetchConfig prefetchConfig = PREFETCH_ALL;
             if (prefetch == "none")
@@ -469,12 +470,7 @@ namespace {
 
     // call after constructing to start - returns fairly quickly after launching its threads
     void ReplSetImpl::_go() {
-        {
-            boost::unique_lock<boost::mutex> lk(rss.mtx);
-            while (!rss.indexRebuildDone) {
-                rss.cond.wait(lk);
-            }
-        }
+        indexRebuilder.wait();
         try {
             loadLastOpTimeWritten();
         }
@@ -775,6 +771,7 @@ namespace {
                               << " : " << e.toString() << rsLog;
                     }
                 }
+                ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
                 {
                     scoped_lock lck(replSettings.discoveredSeeds_mx);
                     if (replSettings.discoveredSeeds.size() > 0) {
@@ -923,7 +920,7 @@ namespace {
         return OpTime();
     }
 
-    bool ReplSetImpl::registerSlave(const BSONObj& rid, const int memberId) {
+    bool ReplSetImpl::registerSlave(const OID& rid, const int memberId) {
         Member* member = NULL;
         {
             lock lk(this);

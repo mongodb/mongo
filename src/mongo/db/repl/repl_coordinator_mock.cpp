@@ -36,7 +36,8 @@
 namespace mongo {
 namespace repl {
 
-    ReplicationCoordinatorMock::ReplicationCoordinatorMock() {}
+    ReplicationCoordinatorMock::ReplicationCoordinatorMock(const ReplSettings& settings) :
+            _settings(settings) {}
     ReplicationCoordinatorMock::~ReplicationCoordinatorMock() {}
 
     void ReplicationCoordinatorMock::startReplication(
@@ -52,6 +53,10 @@ namespace repl {
     bool ReplicationCoordinatorMock::isShutdownOkay() const {
         // TODO
         return false;
+    }
+
+    ReplSettings& ReplicationCoordinatorMock::getSettings() {
+        return _settings;
     }
 
     bool ReplicationCoordinatorMock::isReplEnabled() const {
@@ -116,10 +121,14 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorMock::setLastOptime(const OID& rid,
-                                                     const OpTime& ts,
-                                                     const BSONObj& config) {
+                                                     const OpTime& ts) {
         // TODO
         return Status::OK();
+    }
+    
+    OID ReplicationCoordinatorMock::getElectionId() {
+        // TODO
+        return OID();
     }
 
     void ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
@@ -193,6 +202,26 @@ namespace repl {
             BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();
+    }
+
+    bool ReplicationCoordinatorMock::processHandshake(const OID& remoteID,
+                                                      const BSONObj& handshake) {
+        // TODO
+        return false;
+    }
+
+    void ReplicationCoordinatorMock::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
+        // TODO
+    }
+
+    bool ReplicationCoordinatorMock::buildsIndexes() {
+        // TODO
+        return false;
+    }
+
+    std::vector<BSONObj> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op) {
+        // TODO
+        return std::vector<BSONObj>();
     }
 } // namespace repl
 } // namespace mongo

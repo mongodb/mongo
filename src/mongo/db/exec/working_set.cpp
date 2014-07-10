@@ -88,6 +88,19 @@ namespace mongo {
         return _flagged.end() != _flagged.find(id);
     }
 
+    void WorkingSet::clear() {
+        for (size_t i = 0; i < _data.size(); i++) {
+            delete _data[i].member;
+        }
+        _data.clear();
+
+        // Since working set is now empty, the free list pointer should
+        // point to nothing.
+        _freeList = INVALID_ID;
+
+        _flagged.clear();
+    }
+
     WorkingSetMember::WorkingSetMember() : state(WorkingSetMember::INVALID) { }
 
     WorkingSetMember::~WorkingSetMember() { }
