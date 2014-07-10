@@ -101,7 +101,8 @@ namespace mongo {
         const MmapV1ExtentManager* getExtentManager() const { return &_extentManager; }
         MmapV1ExtentManager* getExtentManager() { return &_extentManager; }
 
-        CollectionOptions getCollectionOptions( const StringData& ns ) const;
+        CollectionOptions getCollectionOptions( OperationContext* txn,
+                                                const StringData& ns ) const;
 
     private:
 

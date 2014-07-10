@@ -42,8 +42,7 @@
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/master_slave.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/net/miniwebserver.h"
@@ -277,21 +276,24 @@ namespace mongo {
         virtual void init() {}
 
         void _gotLock( int millis , stringstream& ss ) {
+            const repl::ReplSettings& replSettings =
+                    repl::getGlobalReplicationCoordinator()->getSettings();
             ss << "<pre>\n";
             ss << "time to get readlock: " << millis << "ms\n";
             ss << "# Cursors: " << ClientCursor::totalOpen() << '\n';
             ss << "replication: ";
             if (*repl::replInfo)
                 ss << "\nreplInfo:  " << repl::replInfo << "\n\n";
-            if (repl::replSet) {
+            if (repl::getGlobalReplicationCoordinator()->getReplicationMode() == 
+                    repl::ReplicationCoordinator::modeReplSet) {
                 ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>"
-                   << repl::replSettings.replSet;
+                   << replSettings.replSet;
             }
             if (repl::replAllDead)
                 ss << "\n<b>replication replAllDead=" << repl::replAllDead << "</b>\n";
             else {
-                ss << "\nmaster: " << repl::replSettings.master << '\n';
-                ss << "slave:  " << repl::replSettings.slave << '\n';
+                ss << "\nmaster: " << replSettings.master << '\n';
+                ss << "slave:  " << replSettings.slave << '\n';
                 ss << '\n';
             }
 

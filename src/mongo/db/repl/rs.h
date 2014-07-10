@@ -65,7 +65,6 @@
 namespace mongo {
 namespace repl {
 
-    extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
 
     class ReplSetSeedList;

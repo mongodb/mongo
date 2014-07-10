@@ -207,13 +207,39 @@ namespace mongo {
          */
         virtual StageType stageType() const = 0;
 
+        //
+        // Execution stats.
+        //
+
         /**
          * Returns a tree of stats.  See plan_stats.h for the details of this structure.  If the
          * stage has any children it must propagate the request for stats to them.
          *
+         * Creates plan stats tree which has the same topology as the original execution tree,
+         * but has a separate lifetime.
+         *
          * Caller owns returned pointer.
          */
         virtual PlanStageStats* getStats() = 0;
+
+        /**
+         * Get the CommonStats for this stage. The pointer is *not* owned by the caller.
+         *
+         * The returned pointer is only valid when the corresponding stage is also valid.
+         * It must not exist past the stage. If you need the stats to outlive the stage,
+         * use the getStats(...) method above.
+         */
+        virtual const CommonStats* getCommonStats() = 0;
+
+        /**
+         * Get stats specific to this stage. Some stages may not have specific stats, in which
+         * case they return NULL. The pointer is *not* owned by the caller.
+         *
+         * The returned pointer is only valid when the corresponding stage is also valid.
+         * It must not exist past the stage. If you need the stats to outlive the stage,
+         * use the getStats(...) method above.
+         */
+        virtual const SpecificStats* getSpecificStats() = 0;
 
     };
 

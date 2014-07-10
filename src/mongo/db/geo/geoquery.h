@@ -41,10 +41,13 @@ namespace mongo {
     public:
 
         /**
-         * Creates an empty geometry container which may then only be loaded via parseFrom().
+         * Creates an empty geometry container which may then be loaded from BSON or directly.
          */
         GeometryContainer();
 
+        /**
+         * Loads an empty GeometryContainer from BSON
+         */
         bool parseFrom(const BSONObj &obj);
 
         /**
@@ -53,11 +56,32 @@ namespace mongo {
         bool isSimpleContainer() const;
 
         /**
-         * To check intersection, we iterate over the otherContainer's geometries, checking each
-         * geometry to see if we intersect it.  If we intersect one geometry, we intersect the
-         * entire other container.
+         * Reports the CRS of the contained geometry.
+         * TODO: Rework once we have collections of multiple CRSes
          */
-        bool intersects(const GeometryContainer& otherContainer) const;
+        CRS getNativeCRS() const;
+
+        /**
+         * Whether or not this geometry can be projected into a particular CRS
+         */
+        bool supportsProject(CRS crs) const;
+
+        /**
+         * Projects the current geometry into the supplied crs.
+         * It is an error to call this function if canProjectInto(crs) is false.
+         */
+        void projectInto(CRS crs);
+
+        /**
+         * Minimum distance between this geometry and the supplied point.
+         * TODO: Rework and generalize to full GeometryContainer distance
+         */
+        double minDistance(const PointWithCRS& point) const;
+
+        /**
+         * Only polygons (and aggregate types thereof) support contains.
+         */
+        bool supportsContains() const;
 
         /**
          * To check containment, we iterate over the otherContainer's geometries.  If we don't
@@ -68,9 +92,11 @@ namespace mongo {
         bool contains(const GeometryContainer& otherContainer) const;
 
         /**
-         * Only polygons (and aggregate types thereof) support contains.
+         * To check intersection, we iterate over the otherContainer's geometries, checking each
+         * geometry to see if we intersect it.  If we intersect one geometry, we intersect the
+         * entire other container.
          */
-        bool supportsContains() const;
+        bool intersects(const GeometryContainer& otherContainer) const;
 
         // Region which can be used to generate a covering of the query object in the S2 space.
         bool hasS2Region() const;
@@ -79,9 +105,6 @@ namespace mongo {
         // Region which can be used to generate a covering of the query object in euclidean space.
         bool hasR2Region() const;
         const R2Region& getR2Region() const;
-
-        // Reports as best we can the CRS closest to that of the contained geometry
-        CRS getNativeCRS() const;
 
         // Returns a string related to the type of the geometry (for debugging queries)
         std::string getDebugType() const;
@@ -145,6 +168,18 @@ namespace mongo {
 
         Status parseFrom(const BSONObj &obj);
 
+        CRS getQueryCRS() const {
+            return isNearSphere ? SPHERE : centroid.crs;
+        }
+
+        bool unitsAreRadians() const {
+            return isNearSphere && FLAT == centroid.crs;
+        }
+
+        bool isWrappingQuery() const {
+            return SPHERE == centroid.crs && !isNearSphere;
+        }
+
         // The name of the field that contains the geometry.
         std::string field;
 
@@ -152,9 +187,7 @@ namespace mongo {
         PointWithCRS centroid;
 
         // Min and max distance from centroid that we're willing to search.
-        // Distance is in whatever units the centroid's CRS implies.
-        // If centroid.crs == FLAT these are radians.
-        // If centroid.crs == SPHERE these are meters.
+        // Distance is in units of the geometry's CRS, except SPHERE and isNearSphere => radians
         double minDistance;
         double maxDistance;
 

@@ -1,7 +1,7 @@
 // collection.cpp
 
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2013-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -122,20 +122,23 @@ namespace mongo {
         return true;
     }
 
-    RecordIterator* Collection::getIterator( const DiskLoc& start, bool tailable,
-                                                     const CollectionScanParams::Direction& dir) const {
+    RecordIterator* Collection::getIterator( OperationContext* txn,
+                                             const DiskLoc& start,
+                                             bool tailable,
+                                             const CollectionScanParams::Direction& dir) const {
         invariant( ok() );
-        return _recordStore->getIterator( start, tailable, dir );
+        return _recordStore->getIterator( txn, start, tailable, dir );
     }
 
-    vector<RecordIterator*> Collection::getManyIterators() const {
-        return _recordStore->getManyIterators();
+    vector<RecordIterator*> Collection::getManyIterators( OperationContext* txn ) const {
+        return _recordStore->getManyIterators(txn);
     }
 
-    int64_t Collection::countTableScan( const MatchExpression* expression ) {
-        scoped_ptr<RecordIterator> iterator( getIterator( DiskLoc(),
-                                                              false,
-                                                              CollectionScanParams::FORWARD ) );
+    int64_t Collection::countTableScan( OperationContext* txn, const MatchExpression* expression ) {
+        scoped_ptr<RecordIterator> iterator( getIterator( txn,
+                                                          DiskLoc(),
+                                                          false,
+                                                          CollectionScanParams::FORWARD ) );
         int64_t count = 0;
         while ( !iterator->isEOF() ) {
             DiskLoc loc = iterator->getNext();
@@ -178,7 +181,7 @@ namespace mongo {
 
         if ( isCapped() ) {
             // TOOD: old god not done
-            Status ret = _indexCatalog.checkNoIndexConflicts( docToInsert );
+            Status ret = _indexCatalog.checkNoIndexConflicts( txn, docToInsert );
             if ( !ret.isOK() )
                 return StatusWith<DiskLoc>( ret );
         }
@@ -332,7 +335,7 @@ namespace mongo {
                 || repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor);
             UpdateTicket* updateTicket = new UpdateTicket();
             updateTickets.mutableMap()[descriptor] = updateTicket;
-            Status ret = iam->validateUpdate(objOld, objNew, oldLocation, options, updateTicket );
+            Status ret = iam->validateUpdate(txn, objOld, objNew, oldLocation, options, updateTicket );
             if ( !ret.isOK() ) {
                 return StatusWith<DiskLoc>( ret );
             }
@@ -527,7 +530,7 @@ namespace mongo {
                     invariant( iam );
 
                     int64_t keys;
-                    iam->validate(&keys);
+                    iam->validate(txn, &keys);
                     indexes.appendNumber(descriptor->indexNamespace(),
                                          static_cast<long long>(keys));
                     idxn++;

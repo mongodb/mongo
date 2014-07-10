@@ -43,7 +43,10 @@ namespace mongo {
     // encounter invalid geometry and true if the geometry is parsed successfully.
     class GeoParser {
     public:
+
         static bool isPoint(const BSONObj &obj);
+        // Legacy points can contain extra data as extra fields - these are valid to index
+        static bool isIndexablePoint(const BSONObj& obj);
         static bool parsePoint(const BSONObj &obj, PointWithCRS *out);
 
         static bool isLine(const BSONObj &obj);

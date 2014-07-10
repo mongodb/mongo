@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -40,20 +40,22 @@ namespace mongo {
     // static
     const char* IDHackStage::kStageType = "IDHACK";
 
-    IDHackStage::IDHackStage(const Collection* collection, CanonicalQuery* query, WorkingSet* ws)
-        : _collection(collection),
+    IDHackStage::IDHackStage(OperationContext* txn, const Collection* collection,
+                             CanonicalQuery* query, WorkingSet* ws)
+        : _txn(txn),
+          _collection(collection),
           _workingSet(ws),
           _key(query->getQueryObj()["_id"].wrap()),
-          _query(query),
           _killed(false),
           _done(false),
           _commonStats(kStageType) { }
 
-    IDHackStage::IDHackStage(Collection* collection, const BSONObj& key, WorkingSet* ws)
-        : _collection(collection),
+    IDHackStage::IDHackStage(OperationContext* txn, Collection* collection,
+                             const BSONObj& key, WorkingSet* ws)
+        : _txn(txn),
+          _collection(collection),
           _workingSet(ws),
           _key(key),
-          _query(NULL),
           _killed(false),
           _done(false),
           _commonStats(kStageType) { }
@@ -88,7 +90,7 @@ namespace mongo {
             static_cast<const BtreeBasedAccessMethod*>(catalog->getIndex(idDesc));
 
         // Look up the key by going directly to the Btree.
-        DiskLoc loc = accessMethod->findSingle( _key );
+        DiskLoc loc = accessMethod->findSingle( _txn, _key );
 
         // Key not found.
         if (loc.isNull()) {
@@ -143,6 +145,14 @@ namespace mongo {
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IDHACK));
         ret->specific.reset(new IDHackStats(_specificStats));
         return ret.release();
+    }
+
+    const CommonStats* IDHackStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* IDHackStage::getSpecificStats() {
+        return &_specificStats;
     }
 
 }  // namespace mongo

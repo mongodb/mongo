@@ -30,7 +30,7 @@
 
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_settings.h"  // replSettings
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/mongoutils/str.h"
@@ -75,7 +75,7 @@ namespace repl {
             s << p(t);
 
             if( theReplSet == 0 ) {
-                if (replSettings.replSet.empty())
+                if (getGlobalReplicationCoordinator()->getSettings().replSet.empty())
                     s << p("Not using --replSet");
                 else  {
                     s << p("Still starting up, or else set is not yet " + a("http://dochub.mongodb.org/core/replicasetconfiguration#ReplicaSetConfiguration-InitialSetup", "", "initiated")
@@ -106,7 +106,7 @@ namespace repl {
                   );
 
             if( theReplSet == 0 ) {
-                if (replSettings.replSet.empty())
+                if (getGlobalReplicationCoordinator()->getSettings().replSet.empty())
                     s << p("Not using --replSet");
                 else  {
                     s << p("Still starting up, or else set is not yet " + a("http://dochub.mongodb.org/core/replicasetconfiguration#ReplicaSetConfiguration-InitialSetup", "", "initiated")

@@ -40,30 +40,6 @@ namespace mongo {
     class IndexDescriptor;
     struct TwoDIndexingParams;
 
-    namespace twod_exec {
-        class GeoPoint;
-        class GeoAccumulator;
-        class GeoBrowse;
-        class GeoHopper;
-        class GeoSearch;
-        class GeoCircleBrowse;
-        class GeoBoxBrowse;
-        class GeoPolygonBrowse;
-        class TwoDGeoNearRunner;
-    }
-
-    namespace twod_internal {
-        class GeoPoint;
-        class GeoAccumulator;
-        class GeoBrowse;
-        class GeoHopper;
-        class GeoSearch;
-        class GeoCircleBrowse;
-        class GeoBoxBrowse;
-        class GeoPolygonBrowse;
-        class TwoDGeoNearRunner;
-    }
-
     class TwoDAccessMethod : public BtreeBasedAccessMethod {
     public:
         using BtreeBasedAccessMethod::_descriptor;
@@ -73,25 +49,6 @@ namespace mongo {
         virtual ~TwoDAccessMethod() { }
 
     private:
-        friend class TwoDIndexCursor;
-        friend class twod_internal::GeoAccumulator;
-        friend class twod_internal::GeoBrowse;
-        friend class twod_internal::GeoHopper;
-        friend class twod_internal::GeoSearch;
-        friend class twod_internal::GeoCircleBrowse;
-        friend class twod_internal::GeoBoxBrowse;
-        friend class twod_internal::GeoPolygonBrowse;
-
-        friend class twod_exec::GeoPoint;
-        friend class twod_exec::GeoAccumulator;
-        friend class twod_exec::GeoBrowse;
-        friend class twod_exec::GeoHopper;
-        friend class twod_exec::GeoSearch;
-        friend class twod_exec::GeoCircleBrowse;
-        friend class twod_exec::GeoBoxBrowse;
-        friend class twod_exec::GeoPolygonBrowse;
-
-        friend class twod_internal::TwoDGeoNearRunner;
 
         const IndexDescriptor* getDescriptor() { return _descriptor; }
         TwoDIndexingParams& getParams() { return _params; }

@@ -170,4 +170,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* FetchStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* FetchStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

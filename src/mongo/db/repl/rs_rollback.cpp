@@ -1,6 +1,6 @@
 /* @file rs_rollback.cpp
 *
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -237,7 +237,8 @@ namespace repl {
         Client::Context ctx(txn, rsoplog);
 
         boost::scoped_ptr<Runner> runner(
-                InternalPlanner::collectionScan(rsoplog,
+                InternalPlanner::collectionScan(txn,
+                                                rsoplog,
                                                 ctx.db()->getCollection(txn, rsoplog),
                                                 InternalPlanner::BACKWARD));
 

@@ -117,4 +117,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* SkipStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* SkipStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

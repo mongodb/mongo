@@ -113,4 +113,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* ShardFilterStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* ShardFilterStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

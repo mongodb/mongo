@@ -31,7 +31,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 
 namespace mongo {
 
@@ -58,7 +58,7 @@ namespace mongo {
         CmdCount() : Command("count") { }
         virtual bool slaveOk() const {
             // ok on --slave setups
-            return repl::replSettings.slave == repl::SimpleSlave;
+            return repl::getGlobalReplicationCoordinator()->getSettings().slave == repl::SimpleSlave;
         }
         virtual bool slaveOverrideOk() const { return true; }
         virtual bool maintenanceOk() const { return false; }
@@ -84,26 +84,21 @@ namespace mongo {
                          int, string& errmsg,
                          BSONObjBuilder& result, bool);
 
-    private:
         /**
          * Converts the command object 'cmdObj' for a count into a PlanExecutor capable
          * of running the count and a CanonicalQuery.
          *
-         * If successful, returns the executor through 'execOut' and the canonicalized
-         * query through 'queryOut'. The caller must delete both 'queryOut' and 'execOut'.
+         * If successful, returns the executor through 'execOut'. The caller must delete
+         * 'execOut'.
          *
-         * On failure, returns a non-OK status, and the caller should not delete either
-         * 'queryOut' or 'execOut'.
-         *
-         * TODO: the regular run() command for count should call this instead of getting
-         * a runner.
+         * On failure, returns a non-OK status, and the caller should not delete 'execOut'.
          */
-        Status parseCountToExecutor(const BSONObj& cmdObj,
-                                    const std::string& dbname,
-                                    const std::string& ns,
-                                    Collection* collection,
-                                    CanonicalQuery** queryOut,
-                                    PlanExecutor** execOut) const;
+        static Status parseCountToExecutor(OperationContext* txn,
+                                           const BSONObj& cmdObj,
+                                           const std::string& dbname,
+                                           const std::string& ns,
+                                           Collection* collection,
+                                           PlanExecutor** execOut);
 
     };
 

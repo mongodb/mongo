@@ -10,6 +10,7 @@ env.Library(
     LIBDEPS= [
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/concurrency/lock_mgr',
         '$BUILD_DIR/mongo/foundation',
         '$BUILD_DIR/mongo/mongocommon',
         ]

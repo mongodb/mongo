@@ -43,7 +43,7 @@ namespace repl {
 
     public:
 
-        ReplicationCoordinatorMock();
+        ReplicationCoordinatorMock(const ReplSettings& settings);
         virtual ~ReplicationCoordinatorMock();
 
         virtual void startReplication(TopologyCoordinator* topCoord,
@@ -52,6 +52,8 @@ namespace repl {
         virtual void shutdown();
 
         virtual bool isShutdownOkay() const;
+
+        virtual ReplSettings& getSettings();
 
         virtual bool isReplEnabled() const;
 
@@ -134,6 +136,9 @@ namespace repl {
 
         virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
 
+    private:
+
+        ReplSettings _settings;
     };
 
 } // namespace repl

@@ -185,7 +185,7 @@ namespace mongo {
                                                     "numCursors has to be between 1 and 10000" <<
                                                     " was: " << numCursors ) );
 
-            OwnedPointerVector<RecordIterator> iterators(collection->getManyIterators());
+            OwnedPointerVector<RecordIterator> iterators(collection->getManyIterators(txn));
 
             if (iterators.size() < numCursors) {
                 numCursors = iterators.size();

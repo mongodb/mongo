@@ -44,7 +44,7 @@
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
-#include "mongo/db/repl/repl_settings.h"  // replSettings
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -400,7 +400,7 @@ namespace repl {
         // written by applyToHead calls
         BSONObj minValid;
 
-        if (replSettings.fastsync) {
+        if (getGlobalReplicationCoordinator()->getSettings().fastsync) {
             log() << "fastsync: skipping database clone" << rsLog;
 
             // prime oplog

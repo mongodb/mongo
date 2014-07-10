@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011 10gen Inc.
+ * Copyright (c) 2011-2014 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -324,7 +324,8 @@ namespace {
 
                 // This does mongod-specific stuff like creating the input Runner and adding to the
                 // front of the pipeline if needed.
-                boost::shared_ptr<Runner> input = PipelineD::prepareCursorSource(collection,
+                boost::shared_ptr<Runner> input = PipelineD::prepareCursorSource(txn,
+                                                                                 collection,
                                                                                  pPipeline,
                                                                                  pCtx);
                 pPipeline->stitch();

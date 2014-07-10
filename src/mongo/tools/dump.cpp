@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -292,8 +292,8 @@ public:
         return _repairByName(toolGlobalParams.db);
     }
     
-    void _repairExtents(Collection* coll, Writer& writer) {
-        scoped_ptr<RecordIterator> iter(coll->getRecordStore()->getIteratorForRepair());
+    void _repairExtents(OperationContext* opCtx, Collection* coll, Writer& writer) {
+        scoped_ptr<RecordIterator> iter(coll->getRecordStore()->getIteratorForRepair(opCtx));
 
         for (DiskLoc currLoc = iter->getNext(); !currLoc.isNull(); currLoc = iter->getNext()) {
             if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
@@ -359,7 +359,7 @@ public:
         Writer w( f , &m );
 
         try {
-            _repairExtents(collection, w);
+            _repairExtents(opCtx, collection, w);
         }
         catch ( DBException& e ){
             toolError() << "Repair scan failed: " << e.toString() << std::endl;

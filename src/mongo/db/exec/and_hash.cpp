@@ -529,4 +529,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* AndHashStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* AndHashStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
 }  // namespace mongo

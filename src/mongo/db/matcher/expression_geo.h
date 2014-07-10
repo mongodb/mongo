@@ -71,7 +71,7 @@ namespace mongo {
         GeoNearMatchExpression() : LeafMatchExpression( GEO_NEAR ){}
         virtual ~GeoNearMatchExpression(){}
 
-        Status init( const StringData& path, const NearQuery& query, const BSONObj& rawObj );
+        Status init( const StringData& path, const NearQuery* query, const BSONObj& rawObj );
 
         // This shouldn't be called and as such will crash.  GeoNear always requires an index.
         virtual bool matchesSingleElement( const BSONElement& e ) const;
@@ -84,11 +84,12 @@ namespace mongo {
 
         virtual LeafMatchExpression* shallowClone() const;
 
-        const NearQuery& getData() const { return _query; }
+        const NearQuery& getData() const { return *_query; }
         const BSONObj getRawObj() const { return _rawObj; }
     private:
-        NearQuery _query;
         BSONObj _rawObj;
+        // Share ownership of our query with all of our clones
+        shared_ptr<const NearQuery> _query;
     };
 
 }  // namespace mongo

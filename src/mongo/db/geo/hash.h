@@ -221,6 +221,7 @@ namespace mongo {
          * geo hashes in plan stats.
          */
         Box unhashToBox(const GeoHash &h) const;
+        Box unhashToBox(const BSONElement &e) const;
 
         double sizeOfDiag(const GeoHash& a) const;
         // XXX: understand/clean this.

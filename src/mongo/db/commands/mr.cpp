@@ -981,7 +981,7 @@ namespace mongo {
                                                 whereCallback).isOK());
 
             Runner* rawRunner;
-            verify(getRunner(ctx->ctx().db()->getCollection(_txn, _config.incLong),
+            verify(getRunner(_txn, ctx->ctx().db()->getCollection(_txn, _config.incLong),
                              cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
             auto_ptr<Runner> runner(rawRunner);
@@ -1204,10 +1204,10 @@ namespace mongo {
         public:
             MapReduceCommand() : Command("mapReduce", false, "mapreduce") {}
 
-            /* why !replset ?
-               bad things happen with --slave (i think because of this)
-            */
-            virtual bool slaveOk() const { return !repl::replSet; }
+            virtual bool slaveOk() const {
+                return repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+                        repl::ReplicationCoordinator::modeReplSet;
+            }
 
             virtual bool slaveOverrideOk() const { return true; }
 
@@ -1261,12 +1261,12 @@ namespace mongo {
                     errmsg = "ns doesn't exist";
                     return false;
                 }
-
-                if (repl::replSet && state.isOnDisk()) {
+                repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+                if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet
+                        && state.isOnDisk()) {
                     // this means that it will be doing a write operation, make sure we are on Master
                     // ideally this check should be in slaveOk(), but at that point config is not known
-                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                            dbname)) {
+                    if (!replCoord->canAcceptWritesForDatabase(dbname)) {
                         errmsg = "not master";
                         return false;
                     }
@@ -1324,7 +1324,7 @@ namespace mongo {
                         }
 
                         Runner* rawRunner;
-                        if (!getRunner(ctx->db()->getCollection(txn, config.ns), cq, &rawRunner).isOK()) {
+                        if (!getRunner(txn, ctx->db()->getCollection(txn, config.ns), cq, &rawRunner).isOK()) {
                             uasserted(17239, "Can't get runner for query " + config.filter.toString());
                             return 0;
                         }
@@ -1454,7 +1454,10 @@ namespace mongo {
         public:
             void help(stringstream& h) const { h << "internal"; }
             MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ) {}
-            virtual bool slaveOk() const { return !repl::replSet; }
+            virtual bool slaveOk() const {
+                return repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+                        repl::ReplicationCoordinator::modeReplSet;
+            }
             virtual bool slaveOverrideOk() const { return true; }
             virtual bool isWriteCommandForConfigServer() const { return false; }
             virtual void addRequiredPrivileges(const std::string& dbname,

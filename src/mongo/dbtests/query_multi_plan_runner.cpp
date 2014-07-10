@@ -118,7 +118,7 @@ namespace QueryMultiPlanRunner {
             const Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
 
             auto_ptr<WorkingSet> sharedWs(new WorkingSet());
-            IndexScan* ix = new IndexScan(ixparams, sharedWs.get(), NULL);
+            IndexScan* ix = new IndexScan(&_txn, ixparams, sharedWs.get(), NULL);
             auto_ptr<PlanStage> firstRoot(new FetchStage(sharedWs.get(), ix, NULL, coll));
 
             // Plan 1: CollScan with matcher.
@@ -132,7 +132,7 @@ namespace QueryMultiPlanRunner {
             verify(swme.isOK());
             auto_ptr<MatchExpression> filter(swme.getValue());
             // Make the stage.
-            auto_ptr<PlanStage> secondRoot(new CollectionScan(csparams, sharedWs.get(),
+            auto_ptr<PlanStage> secondRoot(new CollectionScan(&_txn, csparams, sharedWs.get(),
                                                               filter.get()));
 
             // Hand the plans off to the runner.

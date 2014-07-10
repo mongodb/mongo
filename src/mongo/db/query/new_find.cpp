@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -365,7 +365,10 @@ namespace mongo {
         return qr;
     }
 
-    Status getOplogStartHack(Collection* collection, CanonicalQuery* cq, Runner** runnerOut) {
+    Status getOplogStartHack(OperationContext* txn,
+                             Collection* collection,
+                             CanonicalQuery* cq,
+                             Runner** runnerOut) {
         if ( collection == NULL )
             return Status(ErrorCodes::InternalError,
                           "getOplogStartHack called with a NULL collection" );
@@ -398,7 +401,7 @@ namespace mongo {
 
         // Make an oplog start finding stage.
         WorkingSet* oplogws = new WorkingSet();
-        OplogStart* stage = new OplogStart(collection, tsExpr, oplogws);
+        OplogStart* stage = new OplogStart(txn, collection, tsExpr, oplogws);
 
         // Takes ownership of ws and stage.
         auto_ptr<InternalRunner> runner(new InternalRunner(collection, stage, oplogws));
@@ -408,7 +411,7 @@ namespace mongo {
         Runner::RunnerState state = runner->getNext(NULL, &startLoc);
 
         // This is normal.  The start of the oplog is the beginning of the collection.
-        if (Runner::RUNNER_EOF == state) { return getRunner(collection, cq, runnerOut); }
+        if (Runner::RUNNER_EOF == state) { return getRunner(txn, collection, cq, runnerOut); }
 
         // This is not normal.  An error was encountered.
         if (Runner::RUNNER_ADVANCED != state) {
@@ -426,7 +429,7 @@ namespace mongo {
         params.tailable = cq->getParsed().hasOption(QueryOption_CursorTailable);
 
         WorkingSet* ws = new WorkingSet();
-        CollectionScan* cs = new CollectionScan(params, ws, cq->root());
+        CollectionScan* cs = new CollectionScan(txn, params, ws, cq->root());
         // Takes ownership of cq, cs, ws.
         *runnerOut = new SingleSolutionRunner(collection, cq, NULL, cs, ws);
         return Status::OK();
@@ -517,8 +520,6 @@ namespace mongo {
         //
         // TODO temporary until find() becomes a real command.
         if (isExplain && enableNewExplain) {
-            scoped_ptr<CanonicalQuery> safeCq(cq);
-
             size_t options = QueryPlannerParams::DEFAULT;
             if (shardingState.needCollectionMetadata(pq.ns())) {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -528,14 +529,15 @@ namespace mongo {
             bb.skip(sizeof(QueryResult));
 
             PlanExecutor* rawExec;
-            Status execStatus = getExecutor(collection, cq, &rawExec, options);
+            // Takes ownership of 'cq'.
+            Status execStatus = getExecutor(txn, collection, cq, &rawExec, options);
             if (!execStatus.isOK()) {
                 uasserted(17510, "Explain error: " + execStatus.reason());
             }
 
             scoped_ptr<PlanExecutor> exec(rawExec);
             BSONObjBuilder explainBob;
-            Status explainStatus = Explain::explainStages(exec.get(), cq, Explain::EXEC_ALL_PLANS,
+            Status explainStatus = Explain::explainStages(exec.get(), Explain::EXEC_ALL_PLANS,
                                                           &explainBob);
             if (!explainStatus.isOK()) {
                 uasserted(18521, "Explain error: " + explainStatus.reason());
@@ -581,7 +583,7 @@ namespace mongo {
             rawRunner = new EOFRunner(cq, cq->ns());
         }
         else if (pq.hasOption(QueryOption_OplogReplay)) {
-            status = getOplogStartHack(collection, cq, &rawRunner);
+            status = getOplogStartHack(txn, collection, cq, &rawRunner);
         }
         else {
             // Takes ownership of cq.
@@ -589,7 +591,7 @@ namespace mongo {
             if (shardingState.needCollectionMetadata(pq.ns())) {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
             }
-            status = getRunner(collection, cq, &rawRunner, options);
+            status = getRunner(txn, collection, cq, &rawRunner, options);
         }
 
         if (!status.isOK()) {

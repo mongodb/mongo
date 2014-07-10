@@ -46,6 +46,10 @@ namespace mongo {
          */
         static void initFrom(WorkingSetMember* dest, const WorkingSetMember& src);
 
+        /**
+         * Build a BSONObj which represents a Status to return in a WorkingSet.
+         */
+        static BSONObj buildMemberStatusObject(const Status& status);
 
         /**
          * Allocate a new WSM and initialize it with
@@ -72,6 +76,18 @@ namespace mongo {
          */
         static void getStatusMemberObject(const WorkingSet& ws, WorkingSetID wsid,
                                           BSONObj* objOut);
+
+        /**
+         * Returns status from working set member object.
+         * Assumes isValidStatusMemberObject().
+         */
+        static Status getMemberObjectStatus(const BSONObj& memberObj);
+
+        /**
+         * Returns status from working set member created with allocateStatusMember().
+         * Assumes isValidStatusMemberObject().
+         */
+        static Status getMemberStatus(const WorkingSetMember& member);
 
         /**
          * Formats working set member object created with allocateStatusMember().

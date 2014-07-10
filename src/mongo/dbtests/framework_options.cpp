@@ -33,7 +33,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/query/new_find.h"
-#include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
@@ -190,8 +189,6 @@ namespace mongo {
         if( params.count("bigfiles") ) {
             storageGlobalParams.dur = true;
         }
-
-        repl::replSettings.oplogSize = 10 * 1024 * 1024;
 
         DEV log() << "_DEBUG build" << endl;
         if( sizeof(void*)==4 )

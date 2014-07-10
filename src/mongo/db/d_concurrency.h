@@ -1,7 +1,7 @@
 // @file d_concurrency.h
 
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -250,7 +250,4 @@ namespace mongo {
         ~writelocktry();
         bool got() const { return _got; }
     };
-
-    // Defined in instance.cpp
-    extern bool useExperimentalDocLocking;
 }

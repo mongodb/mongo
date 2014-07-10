@@ -1,7 +1,7 @@
 // @file db.cpp : Defines main() for the mongod program.
 
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -80,7 +80,6 @@
 #include "mongo/db/startup_warnings.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
@@ -93,7 +92,6 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -118,7 +116,6 @@ namespace mongo {
     void (*snmpInit)() = NULL;
 
     extern int diagLogging;
-    extern int lockFile;
 
 #ifdef _WIN32
     ntservice::NtServiceDefaultStrings defaultServiceStrings = {
@@ -342,7 +339,7 @@ namespace mongo {
 
             Client::Context ctx(&txn,  dbName );
 
-            if (repl::replSettings.usingReplSets()) {
+            if (repl::getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
                 // we only care about the _id index if we are in a replset
                 checkForIdIndexes(&txn, ctx.db());
             }
@@ -350,7 +347,7 @@ namespace mongo {
             if (shouldClearNonLocalTmpCollections || dbName == "local")
                 ctx.db()->clearTmpCollections(&txn);
 
-            if ( mongodGlobalParams.repair ) {
+            if ( storageGlobalParams.repair ) {
                 fassert(18506, globalStorageEngine->repairDatabase(&txn, dbName));
             }
             else if (!ctx.db()->getDatabaseCatalogEntry()->currentFilesCompatible(&txn)) {
@@ -366,7 +363,7 @@ namespace mongo {
 
                 const string systemIndexes = ctx.db()->name() + ".system.indexes";
                 Collection* coll = ctx.db()->getCollection( &txn, systemIndexes );
-                auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes,coll));
+                auto_ptr<Runner> runner(InternalPlanner::collectionScan(&txn, systemIndexes,coll));
                 BSONObj index;
                 Runner::RunnerState state;
                 while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&index, NULL))) {
@@ -406,17 +403,6 @@ namespace mongo {
         LOG(1) << "done repairDatabases" << endl;
     }
 
-    void clearTmpFiles() {
-        boost::filesystem::path path(storageGlobalParams.dbpath);
-        for ( boost::filesystem::directory_iterator i( path );
-                i != boost::filesystem::directory_iterator(); ++i ) {
-            string fileName = boost::filesystem::path(*i).leaf().string();
-            if ( boost::filesystem::is_directory( *i ) &&
-                    fileName.length() && fileName[ 0 ] == '$' )
-                boost::filesystem::remove_all( *i );
-        }
-    }
-
     /**
      * Checks if this server was started without --replset but has a config in local.system.replset
      * (meaning that this is probably a replica set member started in stand-alone mode).
@@ -429,7 +415,7 @@ namespace mongo {
 
         // This is helpful for the query below to work as you can't open files when readlocked
         Lock::GlobalWrite lk(txn.lockState());
-        if (!repl::replSettings.usingReplSets()) {
+        if (!repl::getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
             DBDirectClient c(&txn);
             return c.count("local.system.replset");
         }
@@ -548,66 +534,21 @@ namespace mongo {
     }
 #endif
 
-    /// warn if readahead > 256KB (gridfs chunk size)
-    static void checkReadAhead(const string& dir) {
-#ifdef __linux__
-        try {
-            const dev_t dev = getPartition(dir);
-
-            // This path handles the case where the filesystem uses the whole device (including LVM)
-            string path = str::stream() <<
-                "/sys/dev/block/" << major(dev) << ':' << minor(dev) << "/queue/read_ahead_kb";
-
-            if (!boost::filesystem::exists(path)){
-                // This path handles the case where the filesystem is on a partition.
-                path = str::stream()
-                    << "/sys/dev/block/" << major(dev) << ':' << minor(dev) // this is a symlink
-                    << "/.." // parent directory of a partition is for the whole device
-                    << "/queue/read_ahead_kb";
-            }
-
-            if (boost::filesystem::exists(path)) {
-                ifstream file (path.c_str());
-                if (file.is_open()) {
-                    int kb;
-                    file >> kb;
-                    if (kb > 256) {
-                        log() << startupWarningsLog;
-
-                        log() << "** WARNING: Readahead for " << dir << " is set to " << kb << "KB"
-                                << startupWarningsLog;
-
-                        log() << "**          We suggest setting it to 256KB (512 sectors) or less"
-                                << startupWarningsLog;
-
-                        log() << "**          http://dochub.mongodb.org/core/readahead"
-                                << startupWarningsLog;
-                    }
-                }
-            }
-        }
-        catch (const std::exception& e) {
-            log() << "unable to validate readahead settings due to error: " << e.what()
-                  << startupWarningsLog;
-            log() << "for more information, see http://dochub.mongodb.org/core/readahead"
-                  << startupWarningsLog;
-        }
-#endif // __linux__
-    }
-
     static void _initAndListen(int listenPort ) {
         Client::initThread("initandlisten");
 
         bool is32bit = sizeof(int*) == 4;
 
+        const repl::ReplSettings& replSettings =
+                repl::getGlobalReplicationCoordinator()->getSettings();
         {
             ProcessId pid = ProcessId::getCurrent();
             LogstreamBuilder l = log();
             l << "MongoDB starting : pid=" << pid
               << " port=" << serverGlobalParams.port
               << " dbpath=" << storageGlobalParams.dbpath;
-            if( repl::replSettings.master ) l << " master=" << repl::replSettings.master;
-            if( repl::replSettings.slave )  l << " slave=" << (int) repl::replSettings.slave;
+            if( replSettings.master ) l << " master=" << replSettings.master;
+            if( replSettings.slave )  l << " slave=" << (int) replSettings.slave;
             l << ( is32bit ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << endl;
         }
         DEV log() << "_DEBUG build (which is slower)" << endl;
@@ -633,23 +574,15 @@ namespace mongo {
                     boost::filesystem::exists(storageGlobalParams.repairpath));
         }
 
-        // TODO check non-journal subdirs if using directory-per-db
-        checkReadAhead(storageGlobalParams.dbpath);
-
-        acquirePathLock(mongodGlobalParams.repair);
-        boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
-
-        FileAllocator::get()->start();
-
         // TODO:  This should go into a MONGO_INITIALIZER once we have figured out the correct
         // dependencies.
         if (snmpInit) {
             snmpInit();
         }
 
-        MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( clearTmpFiles(), "clear tmp files" );
+        initGlobalStorageEngine();
 
-        dur::startup();
+        boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
 
         if (storageGlobalParams.durOptions & StorageGlobalParams::DurRecoverOnly)
             return;
@@ -678,11 +611,11 @@ namespace mongo {
         // promotion to primary. On pure slaves, they are only cleared when the oplog tells them to.
         // The local DB is special because it is not replicated.  See SERVER-10927 for more details.
         const bool shouldClearNonLocalTmpCollections =!(missingRepl
-                                         || repl::replSettings.usingReplSets()
-                                         || repl::replSettings.slave == repl::SimpleSlave);
+                                         || replSettings.usingReplSets()
+                                         || replSettings.slave == repl::SimpleSlave);
         repairDatabasesAndCheckVersion(shouldClearNonLocalTmpCollections);
 
-        if (mongodGlobalParams.upgrade) {
+        if (storageGlobalParams.upgrade) {
             log() << "finished checking dbs" << endl;
             cc().shutdown();
             exitCleanly(EXIT_CLEAN);
@@ -900,11 +833,23 @@ namespace {
     MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useNewReplCoordinator, bool, false);
 } // namespace
 
-MONGO_INITIALIZER(CreateReplicationManager)(InitializerContext* context) {
+namespace {
+    repl::ReplSettings replSettings;
+} // namespace
+
+namespace mongo {
+    void setGlobalReplSettings(const repl::ReplSettings& settings) {
+        replSettings = settings;
+    }
+} // namespace mongo
+
+MONGO_INITIALIZER(CreateReplicationCoordinator)(InitializerContext* context) {
     if (useNewReplCoordinator) {
-        repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorImpl());
+        repl::setGlobalReplicationCoordinator(
+                new repl::ReplicationCoordinatorImpl(replSettings));
     } else {
-        repl::setGlobalReplicationCoordinator(new repl::LegacyReplicationCoordinator());
+        repl::setGlobalReplicationCoordinator(
+                new repl::LegacyReplicationCoordinator(replSettings));
     }
     return Status::OK();
 }

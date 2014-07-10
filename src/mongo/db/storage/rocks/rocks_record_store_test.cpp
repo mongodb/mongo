@@ -365,8 +365,9 @@ namespace mongo {
         }
 
         {
+            MyOperationContext opCtx( db.get() );
             BSONObjBuilder b;
-            rs.appendCustomStats( &b, 1 );
+            rs.appendCustomStats( &opCtx, &b, 1 );
             BSONObj obj = b.obj();
             ASSERT( obj["stats"].String().find( "WAL" ) != string::npos );
         }
@@ -476,7 +477,9 @@ namespace mongo {
                 }
             }
 
-            scoped_ptr<RecordIterator> iter(rs.getIterator());
+            OperationContextNoop txn;
+
+            scoped_ptr<RecordIterator> iter(rs.getIterator(&txn));
             ASSERT_EQUALS( false, iter->isEOF() );
             ASSERT_EQUALS( s, iter->dataFor(loc1).data() );
             ASSERT_EQUALS( loc1, iter->getNext() );
@@ -524,7 +527,8 @@ namespace mongo {
                 }
             }
 
-            scoped_ptr<RecordIterator> iter(rs.getIterator(DiskLoc(), false, 
+            OperationContextNoop txn;
+            scoped_ptr<RecordIterator> iter(rs.getIterator(&txn, DiskLoc(), false, 
                                              CollectionScanParams::BACKWARD));
             ASSERT_EQUALS( false, iter->isEOF() );
             ASSERT_EQUALS( s2, iter->dataFor(loc3).data() );

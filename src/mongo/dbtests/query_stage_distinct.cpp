@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -145,7 +145,7 @@ namespace QueryStageDistinct {
             params.bounds.fields.push_back(oil);
 
             WorkingSet ws;
-            DistinctScan* distinct = new DistinctScan(params, &ws);
+            DistinctScan* distinct = new DistinctScan(&_txn, params, &ws);
 
             WorkingSetID wsid;
             // Get our first result.
@@ -210,7 +210,7 @@ namespace QueryStageDistinct {
             params.bounds.fields.push_back(oil);
 
             WorkingSet ws;
-            DistinctScan* distinct = new DistinctScan(params, &ws);
+            DistinctScan* distinct = new DistinctScan(&_txn, params, &ws);
 
             // We should see each number in the range [1, 6] exactly once.
             std::set<int> seen;

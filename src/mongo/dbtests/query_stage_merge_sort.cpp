@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -74,8 +74,10 @@ namespace QueryStageMergeSortTests {
         }
 
         void getLocs(set<DiskLoc>* out, Collection* coll) {
-            RecordIterator* it = coll->getIterator(DiskLoc(), false,
-                                                       CollectionScanParams::FORWARD);
+            RecordIterator* it = coll->getIterator(&_txn,
+                                                   DiskLoc(),
+                                                   false,
+                                                   CollectionScanParams::FORWARD);
             while (!it->isEOF()) {
                 DiskLoc nextLoc = it->getNext();
                 out->insert(nextLoc);
@@ -145,11 +147,11 @@ namespace QueryStageMergeSortTests {
             params.bounds.endKey = objWithMaxKey(1);
             params.bounds.endKeyInclusive = true;
             params.direction = 1;
-            ms->addChild(new IndexScan(params, ws, NULL));
+            ms->addChild(new IndexScan(&_txn, params, ws, NULL));
 
             // b:1
             params.descriptor = getIndex(secondIndex, coll);
-            ms->addChild(new IndexScan(params, ws, NULL));
+            ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
             // Must fetch if we want to easily pull out an obj.
@@ -209,11 +211,11 @@ namespace QueryStageMergeSortTests {
             params.bounds.endKey = objWithMaxKey(1);
             params.bounds.endKeyInclusive = true;
             params.direction = 1;
-            ms->addChild(new IndexScan(params, ws, NULL));
+            ms->addChild(new IndexScan(&_txn, params, ws, NULL));
 
             // b:1
             params.descriptor = getIndex(secondIndex, coll);
-            ms->addChild(new IndexScan(params, ws, NULL));
+            ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
             PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
@@ -272,11 +274,11 @@ namespace QueryStageMergeSortTests {
             params.bounds.endKey = objWithMaxKey(1);
             params.bounds.endKeyInclusive = true;
             params.direction = 1;
-            ms->addChild(new IndexScan(params, ws, NULL));
+            ms->addChild(new IndexScan(&_txn, params, ws, NULL));
 
             // b:1
             params.descriptor = getIndex(secondIndex, coll);
-            ms->addChild(new IndexScan(params, ws, NULL));
+            ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
             PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
@@ -338,11 +340,11 @@ namespace QueryStageMergeSortTests {
             params.bounds.endKeyInclusive = true;
             // This is the direction along the index.
             params.direction = 1;
-            ms->addChild(new IndexScan(params, ws, NULL));
+            ms->addChild(new IndexScan(&_txn, params, ws, NULL));
 
             // b:1
             params.descriptor = getIndex(secondIndex, coll);
-            ms->addChild(new IndexScan(params, ws, NULL));
+            ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
             PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
@@ -401,13 +403,13 @@ namespace QueryStageMergeSortTests {
             params.bounds.endKey = objWithMaxKey(1);
             params.bounds.endKeyInclusive = true;
             params.direction = 1;
-            ms->addChild(new IndexScan(params, ws, NULL));
+            ms->addChild(new IndexScan(&_txn, params, ws, NULL));
 
             // b:51 (EOF)
             params.descriptor = getIndex(secondIndex, coll);
             params.bounds.startKey = BSON("" << 51 << "" << MinKey);
             params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
-            ms->addChild(new IndexScan(params, ws, NULL));
+            ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
             PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
@@ -459,7 +461,7 @@ namespace QueryStageMergeSortTests {
                 BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
                 addIndex(indexSpec);
                 params.descriptor = getIndex(indexSpec, coll);
-                ms->addChild(new IndexScan(params, ws, NULL));
+                ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             }
             ctx.commit();
 
@@ -514,7 +516,7 @@ namespace QueryStageMergeSortTests {
                 BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
                 addIndex(indexSpec);
                 params.descriptor = getIndex(indexSpec, coll);
-                ms->addChild(new IndexScan(params, &ws, NULL));
+                ms->addChild(new IndexScan(&_txn, params, &ws, NULL));
             }
 
             set<DiskLoc> locs;

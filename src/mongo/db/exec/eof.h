@@ -55,6 +55,10 @@ namespace mongo {
 
         PlanStageStats* getStats();
 
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
         static const char* kStageType;
 
     private:

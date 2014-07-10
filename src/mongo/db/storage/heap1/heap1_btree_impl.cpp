@@ -156,12 +156,12 @@ namespace {
             
         }
 
-        virtual void fullValidate(long long *numKeysOut) {
+        virtual void fullValidate(OperationContext* txn, long long *numKeysOut) {
             // TODO check invariants?
             *numKeysOut = _data->size();
         }
 
-        virtual Status dupKeyCheck(const BSONObj& key, const DiskLoc& loc) {
+        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
             invariant(!hasFieldNames(key));
             if (isDup(*_data, key, loc))
                 return dupKeyError(key);
@@ -179,8 +179,9 @@ namespace {
 
         class ForwardCursor : public BtreeInterface::Cursor {
         public:
-            ForwardCursor(const IndexSet& data)
-                : _data(data),
+            ForwardCursor(const IndexSet& data, OperationContext* txn)
+                : _txn(txn),
+                  _data(data),
                   _it(data.end())
             {}
 
@@ -264,6 +265,7 @@ namespace {
             }
 
         private:
+            OperationContext* _txn; // not owned
             const IndexSet& _data;
             IndexSet::const_iterator _it;
 
@@ -276,8 +278,9 @@ namespace {
         // TODO see if this can share any code with ForwardIterator
         class ReverseCursor : public BtreeInterface::Cursor {
         public:
-            ReverseCursor(const IndexSet& data)
-                : _data(data),
+            ReverseCursor(const IndexSet& data, OperationContext* txn)
+                : _txn(txn),
+                  _data(data),
                   _it(data.rend())
             {}
 
@@ -376,6 +379,7 @@ namespace {
                 return IndexSet::const_reverse_iterator(it);
             }
 
+            OperationContext* _txn; // not owned
             const IndexSet& _data;
             IndexSet::const_reverse_iterator _it;
 
@@ -385,12 +389,12 @@ namespace {
             DiskLoc _savedLoc;
         };
 
-        virtual BtreeInterface::Cursor* newCursor(int direction) const {
+        virtual BtreeInterface::Cursor* newCursor(OperationContext* txn, int direction) const {
             if (direction == 1)
-                return new ForwardCursor(*_data);
+                return new ForwardCursor(*_data, txn);
 
             invariant(direction == -1);
-            return new ReverseCursor(*_data);
+            return new ReverseCursor(*_data, txn);
         }
 
         virtual Status initAsEmpty(OperationContext* txn) {

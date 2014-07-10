@@ -1,7 +1,7 @@
 // record_store_v1_base.h
 
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2013-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -72,10 +72,10 @@ namespace mongo {
                                           const DiskLoc& loc ) = 0;
         virtual void orphanDeletedList(OperationContext* txn) = 0;
 
-        virtual const DiskLoc& firstExtent() const = 0;
+        virtual const DiskLoc& firstExtent( OperationContext* txn ) const = 0;
         virtual void setFirstExtent( OperationContext* txn, const DiskLoc& loc ) = 0;
 
-        virtual const DiskLoc& lastExtent() const = 0;
+        virtual const DiskLoc& lastExtent( OperationContext* txn ) const = 0;
         virtual void setLastExtent( OperationContext* txn, const DiskLoc& loc ) = 0;
 
         virtual bool isCapped() const = 0;
@@ -86,7 +86,7 @@ namespace mongo {
         virtual bool clearUserFlag( OperationContext* txn, int flag ) = 0;
         virtual bool replaceUserFlags( OperationContext* txn, int flags ) = 0;
 
-        virtual int lastExtentSize() const = 0;
+        virtual int lastExtentSize( OperationContext* txn) const = 0;
         virtual void setLastExtentSize( OperationContext* txn, int newMax ) = 0;
 
         virtual long long maxCappedDocs() const = 0;
@@ -127,7 +127,9 @@ namespace mongo {
         virtual long long dataSize() const { return _details->dataSize(); }
         virtual long long numRecords() const { return _details->numRecords(); }
 
-        virtual int64_t storageSize( BSONObjBuilder* extraInfo = NULL, int level = 0 ) const;
+        virtual int64_t storageSize( OperationContext* txn,
+                                     BSONObjBuilder* extraInfo = NULL,
+                                     int level = 0 ) const;
 
         virtual RecordData dataFor( const DiskLoc& loc ) const;
 
@@ -155,7 +157,7 @@ namespace mongo {
                                           const char* damangeSource,
                                           const mutablebson::DamageVector& damages );
 
-        virtual RecordIterator* getIteratorForRepair() const;
+        virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;
 
         void increaseStorageSize( OperationContext* txn, int size, bool enforceQuota );
 
@@ -164,7 +166,9 @@ namespace mongo {
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const;
 
-        virtual void appendCustomStats( BSONObjBuilder* result, double scale ) const;
+        virtual void appendCustomStats( OperationContext* txn,
+                                        BSONObjBuilder* result,
+                                        double scale ) const;
 
         virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
 
@@ -177,13 +181,13 @@ namespace mongo {
          */
         int getRecordAllocationSize( int minRecordSize ) const;
 
-        DiskLoc getExtentLocForRecord( const DiskLoc& loc ) const;
+        DiskLoc getExtentLocForRecord( OperationContext* txn, const DiskLoc& loc ) const;
 
-        DiskLoc getNextRecord( const DiskLoc& loc ) const;
-        DiskLoc getPrevRecord( const DiskLoc& loc ) const;
+        DiskLoc getNextRecord( OperationContext* txn, const DiskLoc& loc ) const;
+        DiskLoc getPrevRecord( OperationContext* txn, const DiskLoc& loc ) const;
 
-        DiskLoc getNextRecordInExtent( const DiskLoc& loc ) const;
-        DiskLoc getPrevRecordInExtent( const DiskLoc& loc ) const;
+        DiskLoc getNextRecordInExtent( OperationContext* txn, const DiskLoc& loc ) const;
+        DiskLoc getPrevRecordInExtent( OperationContext* txn, const DiskLoc& loc ) const;
 
         /* @return the size for an allocated record quantized to 1/16th of the BucketSize.
            @param allocSize    requested size to allocate
@@ -221,15 +225,15 @@ namespace mongo {
         virtual DeletedRecord* drec( const DiskLoc& loc ) const;
 
         // just a wrapper for _extentManager->getExtent( loc );
-        Extent* _getExtent( const DiskLoc& loc ) const;
+        Extent* _getExtent( OperationContext* txn, const DiskLoc& loc ) const;
 
-        DiskLoc _getExtentLocForRecord( const DiskLoc& loc ) const;
+        DiskLoc _getExtentLocForRecord( OperationContext* txn, const DiskLoc& loc ) const;
 
-        DiskLoc _getNextRecord( const DiskLoc& loc ) const;
-        DiskLoc _getPrevRecord( const DiskLoc& loc ) const;
+        DiskLoc _getNextRecord( OperationContext* txn, const DiskLoc& loc ) const;
+        DiskLoc _getPrevRecord( OperationContext* txn, const DiskLoc& loc ) const;
 
-        DiskLoc _getNextRecordInExtent( const DiskLoc& loc ) const;
-        DiskLoc _getPrevRecordInExtent( const DiskLoc& loc ) const;
+        DiskLoc _getNextRecordInExtent( OperationContext* txn, const DiskLoc& loc ) const;
+        DiskLoc _getPrevRecordInExtent( OperationContext* txn, const DiskLoc& loc ) const;
 
         /**
          * finds the first suitable DiskLoc for data
@@ -268,14 +272,17 @@ namespace mongo {
      */
     class RecordStoreV1Base::IntraExtentIterator : public RecordIterator {
     public:
-        IntraExtentIterator(DiskLoc start, const RecordStoreV1Base* rs, bool forward = true)
-            : _curr(start), _rs(rs), _forward(forward) {}
+        IntraExtentIterator(OperationContext* txn,
+                            DiskLoc start,
+                            const RecordStoreV1Base* rs,
+                            bool forward = true)
+            : _txn(txn), _curr(start), _rs(rs), _forward(forward) {}
 
         virtual bool isEOF() { return _curr.isNull(); }
 
         virtual DiskLoc curr() { return _curr; }
 
-        virtual DiskLoc getNext();
+        virtual DiskLoc getNext( );
 
         virtual void invalidate(const DiskLoc& dl);
 
@@ -287,6 +294,7 @@ namespace mongo {
 
     private:
         virtual const Record* recordFor( const DiskLoc& loc ) const { return _rs->recordFor(loc); }
+        OperationContext* _txn;
         DiskLoc _curr;
         const RecordStoreV1Base* _rs;
         bool _forward;

@@ -37,7 +37,6 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/platform/unordered_set.h"
-#include "mongo/scripting/bench.h"
 #include "mongo/util/file.h"
 #include "mongo/util/text.h"
 
@@ -277,14 +276,6 @@ namespace mongo {
         execSetup(JSFiles::bulk_api);
         execSetup(JSFiles::collection);
         execSetup(JSFiles::upgrade_check);
-    }
-
-    /** install BenchRunner suite */
-    void Scope::installBenchRun() {
-        injectNative("benchRun", BenchRunner::benchRunSync);
-        injectNative("benchRunSync", BenchRunner::benchRunSync);
-        injectNative("benchStart", BenchRunner::benchStart);
-        injectNative("benchFinish", BenchRunner::benchFinish);
     }
 
 namespace {

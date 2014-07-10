@@ -1,5 +1,5 @@
 /**
- * Copyright 2012 (c) 10gen Inc.
+ * Copyright (C) 2012-2014 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -34,6 +34,7 @@ namespace mongo {
     class Collection;
     class DocumentSourceCursor;
     struct ExpressionContext;
+    class OperationContext;
     class Pipeline;
     class Runner;
 
@@ -71,6 +72,7 @@ namespace mongo {
          * @param pExpCtx the expression context for this pipeline
          */
         static boost::shared_ptr<Runner> prepareCursorSource(
+            OperationContext* txn,
             Collection* collection,
             const intrusive_ptr<Pipeline> &pPipeline,
             const intrusive_ptr<ExpressionContext> &pExpCtx);

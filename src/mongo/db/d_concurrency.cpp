@@ -1,7 +1,7 @@
 // @file d_concurrency.cpp 
 
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2008-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -847,11 +847,4 @@ namespace mongo {
         }
 
     } lockStatsServerStatusSection;
-
-
-    // This startup parameter enables experimental document-level locking features, which work
-    // for update-in-place changes only (i.e., no index updates and no document growth or 
-    // movement). It should be removed once full document-level locking is checked-in.
-    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useExperimentalDocLocking, bool, false);
-
 }

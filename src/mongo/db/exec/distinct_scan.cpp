@@ -39,14 +39,17 @@ namespace mongo {
     // static
     const char* DistinctScan::kStageType = "DISTINCT";
 
-    DistinctScan::DistinctScan(const DistinctParams& params, WorkingSet* workingSet)
-        : _workingSet(workingSet),
+    DistinctScan::DistinctScan(OperationContext* txn, const DistinctParams& params, WorkingSet* workingSet)
+        : _txn(txn),
+          _workingSet(workingSet),
           _descriptor(params.descriptor),
           _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
           _btreeCursor(NULL),
           _hitEnd(false),
           _params(params),
-          _commonStats(kStageType) { }
+          _commonStats(kStageType) {
+        _specificStats.keyPattern = _params.descriptor->keyPattern();
+    }
 
     void DistinctScan::initIndexCursor() {
         // Create an IndexCursor over the btree we're distinct-ing over.
@@ -60,7 +63,7 @@ namespace mongo {
         }
 
         IndexCursor *cursor;
-        Status s = _iam->newCursor(cursorOptions, &cursor);
+        Status s = _iam->newCursor(_txn, cursorOptions, &cursor);
         verify(s.isOK());
         verify(cursor);
         // Is this assumption always valid?  See SERVER-12397
@@ -226,6 +229,14 @@ namespace mongo {
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_DISTINCT));
         ret->specific.reset(new DistinctScanStats(_specificStats));
         return ret.release();
+    }
+
+    const CommonStats* DistinctScan::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* DistinctScan::getSpecificStats() {
+        return &_specificStats;
     }
 
 }  // namespace mongo

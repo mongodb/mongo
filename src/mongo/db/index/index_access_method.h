@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2013-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -91,7 +91,8 @@ namespace mongo {
          *
          * There is no obligation to perform the update after performing validation.
          */
-        virtual Status validateUpdate(const BSONObj& from,
+        virtual Status validateUpdate(OperationContext* txn,
+                                      const BSONObj& from,
                                       const BSONObj& to,
                                       const DiskLoc& loc,
                                       const InsertDeleteOptions& options,
@@ -113,7 +114,7 @@ namespace mongo {
          * Fills in '*out' with an IndexCursor.  Return a status indicating success or reason of
          * failure. If the latter, '*out' contains NULL.  See index_cursor.h for IndexCursor usage.
          */
-        virtual Status newCursor(const CursorOptions& opts, IndexCursor** out) const = 0;
+        virtual Status newCursor(OperationContext* txn, const CursorOptions& opts, IndexCursor** out) const = 0;
 
         // ------ index level operations ------
 
@@ -131,12 +132,12 @@ namespace mongo {
          * appropriate pages are not swapped out.
          * See prefetch.cpp.
          */
-        virtual Status touch(const BSONObj& obj) = 0;
+        virtual Status touch(OperationContext* txn, const BSONObj& obj) = 0;
 
         /**
          * this pages in the entire index
          */
-        virtual Status touch( OperationContext* txn ) const = 0;
+        virtual Status touch(OperationContext* txn) const = 0;
 
         /**
          * Walk the entire index, checking the internal structure for consistency.
@@ -147,7 +148,7 @@ namespace mongo {
          * Currently wasserts that the index is invalid.  This could/should be changed in
          * the future to return a Status.
          */
-        virtual Status validate(int64_t* numKeys) = 0;
+        virtual Status validate(OperationContext* txn, int64_t* numKeys) = 0;
 
         //
         // Bulk operations support

@@ -90,6 +90,44 @@ namespace mongo {
         return csn;
     }
 
+    // Helper needed for GeoNear until we remove the default 100 limit
+    static MatchExpression* cloneExcludingGeoNear(const MatchExpression* expr) {
+
+        if (MatchExpression::GEO_NEAR == expr->matchType()) {
+            return NULL;
+        }
+
+        auto_ptr<MatchExpression> clone(expr->shallowClone());
+        vector<MatchExpression*> stack;
+        stack.push_back(clone.get());
+
+        while (!stack.empty()) {
+
+            MatchExpression* next = stack.back();
+            stack.pop_back();
+
+            vector<MatchExpression*>* childVector = next->getChildVector();
+            if (!childVector)
+                continue;
+
+            for (vector<MatchExpression*>::iterator it = childVector->begin();
+                it != childVector->end();) {
+
+                MatchExpression* child = *it;
+                if (MatchExpression::GEO_NEAR == child->matchType()) {
+                    it = childVector->erase(it);
+                    delete child;
+                }
+                else {
+                    stack.push_back(child);
+                    ++it;
+                }
+            }
+        }
+
+        return clone.release();
+    }
+
     // static
     QuerySolutionNode* QueryPlannerAccess::makeLeafNode(const CanonicalQuery& query,
                                                         const IndexEntry& index,
@@ -111,21 +149,37 @@ namespace mongo {
             *tightnessOut = IndexBoundsBuilder::EXACT;
             GeoNearMatchExpression* nearExpr = static_cast<GeoNearMatchExpression*>(expr);
 
-            // 2d geoNear requires a hard limit and as such we take it out before it gets here.  If
-            // this happens it's a bug.
             BSONElement elt = index.keyPattern.firstElement();
             bool indexIs2D = (String == elt.type() && "2d" == elt.String());
-            verify(!indexIs2D);
 
-            GeoNear2DSphereNode* ret = new GeoNear2DSphereNode();
-            ret->indexKeyPattern = index.keyPattern;
-            ret->nq = nearExpr->getData();
-            ret->baseBounds.fields.resize(index.keyPattern.nFields());
-            if (NULL != query.getProj()) {
-                ret->addPointMeta = query.getProj()->wantGeoNearPoint();
-                ret->addDistMeta = query.getProj()->wantGeoNearDistance();
+            if (indexIs2D) {
+                GeoNear2DNode* ret = new GeoNear2DNode();
+                ret->indexKeyPattern = index.keyPattern;
+                ret->nq = nearExpr->getData();
+                ret->baseBounds.fields.resize(index.keyPattern.nFields());
+                if (NULL != query.getProj()) {
+                    ret->addPointMeta = query.getProj()->wantGeoNearPoint();
+                    ret->addDistMeta = query.getProj()->wantGeoNearDistance();
+                }
+
+                ret->numToReturn = query.getParsed().getNumToReturn();
+                if (ret->numToReturn == 0)
+                    ret->numToReturn = 100;
+                ret->fullFilterExcludingNear.reset(cloneExcludingGeoNear(query.root()));
+
+                return ret;
             }
-            return ret;
+            else {
+                GeoNear2DSphereNode* ret = new GeoNear2DSphereNode();
+                ret->indexKeyPattern = index.keyPattern;
+                ret->nq = nearExpr->getData();
+                ret->baseBounds.fields.resize(index.keyPattern.nFields());
+                if (NULL != query.getProj()) {
+                    ret->addPointMeta = query.getProj()->wantGeoNearPoint();
+                    ret->addDistMeta = query.getProj()->wantGeoNearDistance();
+                }
+                return ret;
+            }
         }
         else if (MatchExpression::TEXT == expr->matchType()) {
             // We must not keep the expression node around.
@@ -184,8 +238,6 @@ namespace mongo {
         const MatchExpression::MatchType mergeType = scanState.root->matchType();
 
         const StageType type = node->getType();
-        verify(STAGE_GEO_NEAR_2D != type);
-
         const MatchExpression::MatchType exprType = expr->matchType();
 
         //
@@ -204,7 +256,7 @@ namespace mongo {
                 && MatchExpression::TEXT != exprType;
         }
 
-        if (STAGE_GEO_NEAR_2DSPHERE == type) {
+        if (STAGE_GEO_NEAR_2D == type || STAGE_GEO_NEAR_2DSPHERE == type) {
             // Currently only one GEO_NEAR is allowed, but to be safe, make sure that we
             // do not try to merge two GEO_NEAR predicates.
             return MatchExpression::AND == mergeType
@@ -250,7 +302,6 @@ namespace mongo {
         const IndexEntry& index = scanState->indices[scanState->currentIndexNumber];
 
         const StageType type = node->getType();
-        verify(STAGE_GEO_NEAR_2D != type);
 
         // Text data is covered, but not exactly.  Text covering is unlike any other covering
         // so we deal with it in addFilterToSolutionNode.
@@ -261,7 +312,32 @@ namespace mongo {
 
         IndexBounds* boundsToFillOut = NULL;
 
-        if (STAGE_GEO_NEAR_2DSPHERE == type) {
+        if (STAGE_GEO_NEAR_2D == type) {
+
+            invariant(INDEX_2D == index.type);
+
+            // 2D indexes are weird - the "2d" field stores a normally-indexed BinData field, but
+            // additional array fields are *not* exploded into multi-keys - they are stored directly
+            // as arrays in the index.  Also, no matter what the index expression, the "2d" field is
+            // always first.
+            // This means that we can only generically accumulate bounds for 2D indexes over the
+            // first "2d" field (pos == 0) - MatchExpressions over other fields in the 2D index may
+            // be covered (can be evaluated using only the 2D index key).  The additional fields
+            // must not affect the index scan bounds, since they are not stored in an
+            // IndexScan-compatible format.
+
+            if (pos > 0) {
+                // Marking this field as covered allows the planner to accumulate a MatchExpression
+                // over the returned 2D index keys instead of adding to the index bounds.
+                scanState->tightness = IndexBoundsBuilder::INEXACT_COVERED;
+                return;
+            }
+
+            // We may have other $geoPredicates on a near index - generate bounds for these
+            GeoNear2DNode* gn = static_cast<GeoNear2DNode*>(node);
+            boundsToFillOut = &gn->baseBounds;
+        }
+        else if (STAGE_GEO_NEAR_2DSPHERE == type) {
             GeoNear2DSphereNode* gn = static_cast<GeoNear2DSphereNode*>(node);
             boundsToFillOut = &gn->baseBounds;
         }
@@ -269,8 +345,8 @@ namespace mongo {
             verify(type == STAGE_IXSCAN);
             IndexScanNode* scan = static_cast<IndexScanNode*>(node);
 
-            // 2D indexes can only support additional non-geometric criteria by filtering after the
-            // initial element - don't generate bounds if this is not the first field
+            // See STAGE_GEO_NEAR_2D above - 2D indexes can only accumulate scan bounds over the
+            // first "2d" field (pos == 0)
             if (INDEX_2D == index.type && pos > 0) {
                 scanState->tightness = IndexBoundsBuilder::INEXACT_COVERED;
                 return;
@@ -463,7 +539,6 @@ namespace mongo {
     // static
     void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntry& index) {
         const StageType type = node->getType();
-        verify(STAGE_GEO_NEAR_2D != type);
 
         if (STAGE_TEXT == type) {
             finishTextNode(node, index);
@@ -472,7 +547,11 @@ namespace mongo {
 
         IndexBounds* bounds = NULL;
 
-        if (STAGE_GEO_NEAR_2DSPHERE == type) {
+        if (STAGE_GEO_NEAR_2D == type) {
+            GeoNear2DNode* gnode = static_cast<GeoNear2DNode*>(node);
+            bounds = &gnode->baseBounds;
+        }
+        else if (STAGE_GEO_NEAR_2DSPHERE == type) {
             GeoNear2DSphereNode* gnode = static_cast<GeoNear2DSphereNode*>(node);
             bounds = &gnode->baseBounds;
         }

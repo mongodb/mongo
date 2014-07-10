@@ -103,7 +103,9 @@ namespace mongo {
         return false;
     }
 
-    int64_t RocksRecordStore::storageSize( BSONObjBuilder* extraInfo, int infoLevel ) const {
+    int64_t RocksRecordStore::storageSize( OperationContext* txn, 
+                                           BSONObjBuilder* extraInfo, 
+                                           int infoLevel ) const {
         return dataSize(); // todo: this isn't very good
     }
 
@@ -317,7 +319,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    RecordIterator* RocksRecordStore::getIterator( const DiskLoc& start,
+    RecordIterator* RocksRecordStore::getIterator( OperationContext* txn,
+                                                   const DiskLoc& start,
                                                    bool tailable,
                                                    const CollectionScanParams::Direction& dir
                                                    ) const {
@@ -328,20 +331,20 @@ namespace mongo {
     }
 
 
-    RecordIterator* RocksRecordStore::getIteratorForRepair() const {
-        return getIterator();
+    RecordIterator* RocksRecordStore::getIteratorForRepair( OperationContext* txn ) const {
+        return getIterator(txn);
     }
 
-    std::vector<RecordIterator*> RocksRecordStore::getManyIterators() const {
+    std::vector<RecordIterator*> RocksRecordStore::getManyIterators( OperationContext* txn ) const {
         // XXX do we want this to actually return a set of iterators?
 
         std::vector<RecordIterator*> iterators;
-        iterators.push_back(getIterator());
+        iterators.push_back( getIterator( txn ) );
         return iterators;
     }
 
     Status RocksRecordStore::truncate( OperationContext* txn ) {
-        RecordIterator* iter = getIterator();
+        RecordIterator* iter = getIterator( txn );
         while(!iter->isEOF()) {
             DiskLoc loc = iter->getNext();
             deleteRecord(txn, loc);
@@ -368,7 +371,7 @@ namespace mongo {
                                        bool full, bool scanData,
                                        ValidateAdaptor* adaptor,
                                        ValidateResults* results, BSONObjBuilder* output ) const {
-        RecordIterator* iter = getIterator();
+        RecordIterator* iter = getIterator( txn );
         while(!iter->isEOF()) {
             RecordData data = dataFor(iter->curr());
             if (scanData) {
@@ -383,7 +386,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    void RocksRecordStore::appendCustomStats( BSONObjBuilder* result, double scale ) const {
+    void RocksRecordStore::appendCustomStats( OperationContext* txn,
+                                              BSONObjBuilder* result,
+                                              double scale ) const {
         string statsString;
         bool valid = _db->GetProperty( _columnFamily, "rocksdb.stats", &statsString );
         invariant( valid );

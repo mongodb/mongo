@@ -174,7 +174,8 @@ namespace mongo {
     bool ArtificialTreeBuilder<OnDiskFormat>::isPresent(const BSONObj &key, int direction) const {
         int pos;
         DiskLoc loc;
-        return _helper->btree.locate(key, _helper->dummyDiskLoc, direction, &pos, &loc);
+        OperationContextNoop txn;
+        return _helper->btree.locate(&txn, key, _helper->dummyDiskLoc, direction, &pos, &loc);
     }
 
     // Static

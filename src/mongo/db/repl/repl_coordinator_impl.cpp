@@ -73,7 +73,8 @@ namespace repl {
         boost::condition_variable* condVar;
     };
 
-    ReplicationCoordinatorImpl::ReplicationCoordinatorImpl() : _inShutdown(false) {}
+    ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(const ReplSettings& settings) :
+            _inShutdown(false), _settings(settings) {}
 
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
@@ -129,11 +130,14 @@ namespace repl {
         return false;
     }
 
+    ReplSettings& ReplicationCoordinatorImpl::getSettings() {
+        return _settings;
+    }
+
     ReplicationCoordinator::Mode ReplicationCoordinatorImpl::getReplicationMode() const {
-        // TODO(spencer): Don't rely on global replSettings object
-        if (replSettings.usingReplSets()) {
+        if (_settings.usingReplSets()) {
             return modeReplSet;
-        } else if (replSettings.slave || replSettings.master) {
+        } else if (_settings.slave || _settings.master) {
             return modeMasterSlave;
         }
         return modeNone;

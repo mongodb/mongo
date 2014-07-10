@@ -1,7 +1,7 @@
 // collection_to_capped.cpp
 
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2013-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -81,9 +81,10 @@ namespace mongo {
         // datasize and extentSize can't be compared exactly, so add some padding to 'size'
         long long excessSize =
             static_cast<long long>( fromCollection->dataSize() -
-                                    ( toCollection->getRecordStore()->storageSize() * 2 ) );
+                                    ( toCollection->getRecordStore()->storageSize( txn ) * 2 ) );
 
-        scoped_ptr<Runner> runner( InternalPlanner::collectionScan(fromNs,
+        scoped_ptr<Runner> runner( InternalPlanner::collectionScan(txn,
+                                                                   fromNs,
                                                                    fromCollection,
                                                                    InternalPlanner::FORWARD ) );
 

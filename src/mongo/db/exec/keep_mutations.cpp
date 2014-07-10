@@ -132,4 +132,12 @@ namespace mongo {
         return ret.release();
     }
 
+    const CommonStats* KeepMutationsStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* KeepMutationsStage::getSpecificStats() {
+        return NULL;
+    }
+
 }  // namespace mongo

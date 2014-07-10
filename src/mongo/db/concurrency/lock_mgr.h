@@ -39,7 +39,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/timer.h"
-
 #include "mongo/bson/util/atomic_int.h"
 
 /*
@@ -60,6 +59,9 @@
 
 namespace mongo {
 
+    // Defined in lock_mgr.cpp
+    extern bool useExperimentalDocLocking;
+
     class ResourceId {
     public:
         ResourceId() : _rid(0) { }
@@ -69,7 +71,7 @@ namespace mongo {
         operator size_t() const { return _rid; }
 
     private:
-        size_t _rid;
+        uint64_t _rid;
     };
     static const ResourceId kReservedResourceId = 0;
 
@@ -706,29 +708,29 @@ namespace mongo {
 
     class SharedResourceLock : public ResourceLock {
     public:
-    SharedResourceLock(Transaction* requestor, void* resource)
-        : ResourceLock(LockManager::getSingleton(),
-                       requestor,
-                       kShared,
-                       (size_t)resource) { }
-    SharedResourceLock(Transaction* requestor, size_t resource)
-        : ResourceLock(LockManager::getSingleton(),
-                       requestor,
-                       kShared,
-                       resource) { }
+        SharedResourceLock(Transaction* requestor, void* resource)
+            : ResourceLock(LockManager::getSingleton(),
+                           requestor,
+                           kShared,
+                           (size_t)resource) { }
+        SharedResourceLock(Transaction* requestor, uint64_t resource)
+            : ResourceLock(LockManager::getSingleton(),
+                           requestor,
+                           kShared,
+                           resource) { }
     };
 
     class ExclusiveResourceLock : public ResourceLock {
     public:
-    ExclusiveResourceLock(Transaction* requestor, void* resource)
-        : ResourceLock(LockManager::getSingleton(),
-                       requestor,
-                       kExclusive,
-                       (size_t)resource) { }
-    ExclusiveResourceLock(Transaction* requestor, size_t resource)
-        : ResourceLock(LockManager::getSingleton(),
-                       requestor,
-                       kExclusive,
-                       resource) { }
+        ExclusiveResourceLock(Transaction* requestor, void* resource)
+            : ResourceLock(LockManager::getSingleton(),
+                           requestor,
+                           kExclusive,
+                           (size_t)resource) { }
+        ExclusiveResourceLock(Transaction* requestor, uint64_t resource)
+            : ResourceLock(LockManager::getSingleton(),
+                           requestor,
+                           kExclusive,
+                           resource) { }
     };
 } // namespace mongo

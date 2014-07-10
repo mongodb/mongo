@@ -42,7 +42,7 @@ namespace mongo {
 
         virtual ~RocksCollectionCatalogEntry(){}
 
-        virtual CollectionOptions getCollectionOptions() const;
+        virtual CollectionOptions getCollectionOptions(OperationContext* txn) const;
 
         // ------- indexes ----------
 

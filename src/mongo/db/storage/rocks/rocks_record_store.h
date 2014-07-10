@@ -64,7 +64,9 @@ namespace mongo {
 
         virtual bool isCapped() const;
 
-        virtual int64_t storageSize( BSONObjBuilder* extraInfo = NULL, int infoLevel = 0 ) const;
+        virtual int64_t storageSize( OperationContext* txn, 
+                                     BSONObjBuilder* extraInfo = NULL,
+                                     int infoLevel = 0 ) const;
 
         // CRUD related
 
@@ -93,15 +95,16 @@ namespace mongo {
                                           const char* damangeSource,
                                           const mutablebson::DamageVector& damages );
 
-        virtual RecordIterator* getIterator( const DiskLoc& start = DiskLoc(),
+        virtual RecordIterator* getIterator( OperationContext* txn,
+                                             const DiskLoc& start = DiskLoc(),
                                              bool tailable = false,
                                              const CollectionScanParams::Direction& dir =
                                              CollectionScanParams::FORWARD
                                              ) const;
 
-        virtual RecordIterator* getIteratorForRepair() const;
+        virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;
 
-        virtual std::vector<RecordIterator*> getManyIterators() const;
+        virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
 
         virtual Status truncate( OperationContext* txn );
 
@@ -117,7 +120,9 @@ namespace mongo {
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const;
 
-        virtual void appendCustomStats( BSONObjBuilder* result, double scale ) const;
+        virtual void appendCustomStats( OperationContext* txn,
+                                        BSONObjBuilder* result,
+                                        double scale ) const;
 
         virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
 

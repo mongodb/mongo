@@ -53,7 +53,7 @@ namespace mongo {
         _metaDataKey = string("metadata-") + ns.toString();
     }
 
-    CollectionOptions RocksCollectionCatalogEntry::getCollectionOptions() const {
+    CollectionOptions RocksCollectionCatalogEntry::getCollectionOptions( OperationContext* txn ) const {
         // TODO: put more options in here?
         return CollectionOptions();
     }

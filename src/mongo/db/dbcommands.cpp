@@ -1,7 +1,7 @@
 // dbcommands.cpp
 
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2012-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -674,7 +674,7 @@ namespace mongo {
             }
 
             Runner* rawRunner;
-            if (!getRunner(coll, cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
+            if (!getRunner(txn, coll, cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
                 uasserted(17241, "Can't get runner for query " + query.toString());
                 return 0;
             }
@@ -797,7 +797,7 @@ namespace mongo {
                     result.append( "millis" , timer.millis() );
                     return 1;
                 }
-                runner.reset(InternalPlanner::collectionScan(ns,collection));
+                runner.reset(InternalPlanner::collectionScan(txn, ns,collection));
             }
             else if ( min.isEmpty() || max.isEmpty() ) {
                 errmsg = "only one of min or max specified";
@@ -822,7 +822,7 @@ namespace mongo {
                 min = Helpers::toKeyFormat( kp.extendRangeBound( min, false ) );
                 max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
 
-                runner.reset(InternalPlanner::indexScan(collection, idx, min, max, false));
+                runner.reset(InternalPlanner::indexScan(txn, collection, idx, min, max, false));
             }
 
             long long avgObjSize = collection->dataSize() / collection->numRecords();
@@ -925,12 +925,12 @@ namespace mongo {
                 result.append( "avgObjSize" , collection->averageObjectSize() );
 
             result.appendNumber( "storageSize",
-                                 static_cast<long long>(collection->getRecordStore()->storageSize( &result,
+                                 static_cast<long long>(collection->getRecordStore()->storageSize( txn, &result,
                                                                                                    verbose ? 1 : 0 ) ) / 
                                  scale );
             result.append( "nindexes" , collection->getIndexCatalog()->numIndexesReady() );
 
-            collection->getRecordStore()->appendCustomStats( &result, scale );
+            collection->getRecordStore()->appendCustomStats( txn, &result, scale );
 
             BSONObjBuilder indexSizes;
             result.appendNumber( "totalIndexSize" , db->getIndexSizeForCollection(txn,

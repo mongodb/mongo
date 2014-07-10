@@ -134,7 +134,9 @@ namespace mongo {
             DiskLoc loc( 5, 16 );
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
                 ASSERT( !cursor->locate( key, loc ) );
             }
 
@@ -148,7 +150,8 @@ namespace mongo {
             }
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
                 ASSERT( cursor->locate( key, loc ) );
                 ASSERT_EQUALS( key, cursor->getKey() );
                 ASSERT_EQUALS( loc, cursor->getDiskLoc() );
@@ -174,7 +177,8 @@ namespace mongo {
             }
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
                 ASSERT( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
@@ -213,7 +217,8 @@ namespace mongo {
             }
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
                 ASSERT_FALSE( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
@@ -238,11 +243,12 @@ namespace mongo {
             }
 
             {
+                MyOperationContext opCtx( db.get() );
+
                 // get a cursor
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
 
                 // insert some more stuff
-                MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
@@ -280,7 +286,8 @@ namespace mongo {
             }
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
                 ASSERT( cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
@@ -343,7 +350,8 @@ namespace mongo {
             }
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
                 ASSERT( cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
@@ -382,7 +390,8 @@ namespace mongo {
             DiskLoc loc( 5, 16 );
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 0 ) );
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( &opCtx, 0 ) );
                 ASSERT( !cursor->locate( key, loc ) );
             }
 
@@ -396,7 +405,8 @@ namespace mongo {
             }
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 0 ) );
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( &opCtx, 0 ) );
                 ASSERT( cursor->locate( key, loc ) );
                 ASSERT_EQUALS( key, cursor->getKey() );
                 ASSERT_EQUALS( loc, cursor->getDiskLoc() );
@@ -423,7 +433,8 @@ namespace mongo {
             }
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 0 ) );
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( &opCtx, 0 ) );
                 ASSERT_FALSE( cursor->locate( BSON( "a" << 2 ), DiskLoc(1,1) ) );
                 ASSERT_FALSE( cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
@@ -450,7 +461,8 @@ namespace mongo {
             }
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 0 ) );
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( &opCtx, 0 ) );
                 ASSERT( cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
@@ -513,7 +525,8 @@ namespace mongo {
             }
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 0 ) );
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( &opCtx, 0 ) );
                 ASSERT_FALSE( cursor->locate( BSON( "" << 2 ), DiskLoc(1,2) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
