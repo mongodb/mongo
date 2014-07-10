@@ -1,0 +1,195 @@
+/**
+ *    Copyright (C) 2014 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/db/jsobj.h"
+
+#include <boost/lexical_cast.hpp>
+
+#include "mongo/bson/optime.h"
+#include "mongo/util/log.h"
+
+namespace mongo {
+    void BSONObjBuilder::appendMinForType( const StringData& fieldName , int t ) {
+        switch ( t ) {
+                
+        // Shared canonical types
+        case NumberInt:
+        case NumberDouble:
+        case NumberLong:
+            append( fieldName , - std::numeric_limits<double>::max() ); return;
+        case Symbol:
+        case String:
+            append( fieldName , "" ); return;
+        case Date: 
+            // min varies with V0 and V1 indexes, so we go one type lower.
+            appendBool(fieldName, true);
+            //appendDate( fieldName , numeric_limits<long long>::min() ); 
+            return;
+        case Timestamp: // TODO integrate with Date SERVER-3304
+            appendTimestamp( fieldName , 0 ); return;
+        case Undefined: // shared with EOO
+            appendUndefined( fieldName ); return;
+                
+        // Separate canonical types
+        case MinKey:
+            appendMinKey( fieldName ); return;
+        case MaxKey:
+            appendMaxKey( fieldName ); return;
+        case jstOID: {
+            OID o;
+            memset(&o, 0, sizeof(o));
+            appendOID( fieldName , &o);
+            return;
+        }
+        case Bool:
+            appendBool( fieldName , false); return;
+        case jstNULL:
+            appendNull( fieldName ); return;
+        case Object:
+            append( fieldName , BSONObj() ); return;
+        case Array:
+            appendArray( fieldName , BSONObj() ); return;
+        case BinData:
+            appendBinData( fieldName , 0 , BinDataGeneral , (const char *) 0 ); return;
+        case RegEx:
+            appendRegex( fieldName , "" ); return;
+        case DBRef: {
+            OID o;
+            memset(&o, 0, sizeof(o));
+            appendDBRef( fieldName , "" , o );
+            return;
+        }
+        case Code:
+            appendCode( fieldName , "" ); return;
+        case CodeWScope:
+            appendCodeWScope( fieldName , "" , BSONObj() ); return;
+        };
+        log() << "type not supported for appendMinElementForType: " << t;
+        uassert( 10061 ,  "type not supported for appendMinElementForType" , false );
+    }
+
+    void BSONObjBuilder::appendMaxForType( const StringData& fieldName , int t ) {
+        switch ( t ) {
+                
+        // Shared canonical types
+        case NumberInt:
+        case NumberDouble:
+        case NumberLong:
+            append( fieldName , std::numeric_limits<double>::max() ); return;
+        case Symbol:
+        case String:
+            appendMinForType( fieldName, Object ); return;
+        case Date:
+            appendDate( fieldName , std::numeric_limits<long long>::max() ); return;
+        case Timestamp: // TODO integrate with Date SERVER-3304
+            append( fieldName , OpTime::max() ); return;
+        case Undefined: // shared with EOO
+            appendUndefined( fieldName ); return;
+
+        // Separate canonical types
+        case MinKey:
+            appendMinKey( fieldName ); return;
+        case MaxKey:
+            appendMaxKey( fieldName ); return;
+        case jstOID: {
+            OID o;
+            memset(&o, 0xFF, sizeof(o));
+            appendOID( fieldName , &o);
+            return;
+        }
+        case Bool:
+            appendBool( fieldName , true ); return;
+        case jstNULL:
+            appendNull( fieldName ); return;
+        case Object:
+            appendMinForType( fieldName, Array ); return;
+        case Array:
+            appendMinForType( fieldName, BinData ); return;
+        case BinData:
+            appendMinForType( fieldName, jstOID ); return;
+        case RegEx:
+            appendMinForType( fieldName, DBRef ); return;
+        case DBRef:
+            appendMinForType( fieldName, Code ); return;                
+        case Code:
+            appendMinForType( fieldName, CodeWScope ); return;
+        case CodeWScope:
+            // This upper bound may change if a new bson type is added.
+            appendMinForType( fieldName , MaxKey ); return;
+        }
+        log() << "type not supported for appendMaxElementForType: " << t;
+        uassert( 14853 ,  "type not supported for appendMaxElementForType" , false );
+    }
+
+
+    bool BSONObjBuilder::appendAsNumber( const StringData& fieldName , const string& data ) {
+        if ( data.size() == 0 || data == "-" || data == ".")
+            return false;
+
+        unsigned int pos=0;
+        if ( data[0] == '-' )
+            pos++;
+
+        bool hasDec = false;
+
+        for ( ; pos<data.size(); pos++ ) {
+            if ( isdigit(data[pos]) )
+                continue;
+
+            if ( data[pos] == '.' ) {
+                if ( hasDec )
+                    return false;
+                hasDec = true;
+                continue;
+            }
+
+            return false;
+        }
+
+        if ( hasDec ) {
+            double d = atof( data.c_str() );
+            append( fieldName , d );
+            return true;
+        }
+
+        if ( data.size() < 8 ) {
+            append( fieldName , atoi( data.c_str() ) );
+            return true;
+        }
+
+        try {
+            long long num = boost::lexical_cast<long long>( data );
+            append( fieldName , num );
+            return true;
+        }
+        catch(boost::bad_lexical_cast &) {
+            return false;
+        }
+    }
+} // namespace mongo

@@ -98,7 +98,13 @@ env.Library('bson', [
         'bson/bson_validate.cpp',
         'bson/oid.cpp',
         "bson/optime.cpp",
-        'db/jsobj.cpp',
+        'bson/bson_startuptest.cpp',
+        'bson/bsonelement.cpp',
+        'bson/bsonmisc.cpp',
+        'bson/bsonobj.cpp',
+        'bson/bsonobjbuilder.cpp',
+        'bson/bsonobjiterator.cpp',
+        'bson/bsontypes.cpp',
         'db/json.cpp'
         ], LIBDEPS=[
         'base/base',

@@ -711,7 +711,7 @@ namespace mongo {
         bool _doneCalled;
 
         static const std::string numStrs[100]; // cache of 0 to 99 inclusive
-        static bool numStrsReady; // for static init safety. see comments in db/jsobj.cpp
+        static bool numStrsReady; // for static init safety
     };
 
     class BSONArrayBuilder : public BSONBuilderBase, private boost::noncopyable {

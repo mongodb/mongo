@@ -101,7 +101,6 @@ namespace mongo {
 
     /**
      * returns the name of the argument's type
-     * defined in jsobj.cpp
      */
     const char* typeName (BSONType type);
 

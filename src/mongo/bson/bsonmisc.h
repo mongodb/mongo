@@ -65,10 +65,6 @@ namespace mongo {
         RIGHT_SUBFIELD = 2
     };
 
-    class LexNumCmp;
-    FieldCompareResult compareDottedFieldNames( const std::string& l , const std::string& r ,
-                                               const LexNumCmp& cmp );
-
     /** Use BSON macro to build a BSONObj from a stream
 
         e.g.,
