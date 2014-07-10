@@ -9,6 +9,7 @@ Optionally replaces zero codes in source code with new distinct values.
 import os
 import re
 import utils
+import sys
 from collections import defaultdict, namedtuple
 from optparse import OptionParser
 
@@ -306,6 +307,7 @@ def main():
         replaceBadCodes(errors, next)
     else:
         print ERROR_HELP
+        sys.exit(1)
 
 
 ERROR_HELP = """
