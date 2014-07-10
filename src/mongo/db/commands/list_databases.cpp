@@ -78,7 +78,7 @@ namespace mongo {
                 totalSize += size;
 
                 {
-                    Client::ReadContext rc(txn, *i + ".system.namespaces");
+                    Client::ReadContext rc(txn, *i );
                     b.appendBool( "empty", rc.ctx().db()->getDatabaseCatalogEntry()->isEmpty() );
                 }
 

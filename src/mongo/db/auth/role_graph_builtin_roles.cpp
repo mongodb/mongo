@@ -115,6 +115,7 @@ namespace {
             << ActionType::dbStats
             << ActionType::find
             << ActionType::killCursors
+            << ActionType::listCollections
             << ActionType::planCacheRead;
 
         // Read-write role
