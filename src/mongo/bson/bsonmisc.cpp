@@ -68,4 +68,50 @@ namespace mongo {
     MinKeyLabeler MINKEY;
     MaxKeyLabeler MAXKEY;
 
+    BSONObjBuilderValueStream::BSONObjBuilderValueStream( BSONObjBuilder * builder ) {
+        _builder = builder;
+    }
+
+    BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const BSONElement& e ) {
+        _builder->appendAs( e , _fieldName );
+        _fieldName = StringData();
+        return *_builder;
+    }
+
+    BufBuilder& BSONObjBuilderValueStream::subobjStart() {
+        StringData tmp = _fieldName;
+        _fieldName = StringData();
+        return _builder->subobjStart(tmp);
+    }
+
+    BufBuilder& BSONObjBuilderValueStream::subarrayStart() {
+        StringData tmp = _fieldName;
+        _fieldName = StringData();
+        return _builder->subarrayStart(tmp);
+    }
+
+    Labeler BSONObjBuilderValueStream::operator<<( const Labeler::Label &l ) {
+        return Labeler( l, this );
+    }
+
+    void BSONObjBuilderValueStream::endField( const StringData& nextFieldName ) {
+        if ( haveSubobj() ) {
+            verify( _fieldName.rawData() );
+            _builder->append( _fieldName, subobj()->done() );
+            _subobj.reset();
+        }
+        _fieldName = nextFieldName;
+    }
+
+    BSONObjBuilder *BSONObjBuilderValueStream::subobj() {
+        if ( !haveSubobj() )
+            _subobj.reset( new BSONObjBuilder() );
+        return _subobj.get();
+    }
+
+    BSONObjBuilder& Labeler::operator<<( const BSONElement& e ) {
+        s_->subobj()->appendAs( e, l_.l_ );
+        return *s_->_builder;
+    }
+
 } // namespace mongo

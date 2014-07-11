@@ -31,8 +31,6 @@
 
 #include "mongo/util/assert_util.h"
 
-namespace bson { }
-
 namespace mongo {
 
     class BSONArrayBuilder;

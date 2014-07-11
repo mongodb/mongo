@@ -55,7 +55,6 @@ namespace mongo {
 namespace repl {
 
     using namespace mongoutils;
-    using namespace bson;
 
     // add try/catch with sleep
 

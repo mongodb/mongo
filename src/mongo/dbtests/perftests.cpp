@@ -63,8 +63,6 @@
 #include <mutex>
 #endif
 
-using namespace bson;
-
 namespace PerfTests {
 
     const bool profiling = false;

@@ -192,4 +192,60 @@ namespace mongo {
             return false;
         }
     }
+
+    /* add all the fields from the object specified to this object */
+    BSONObjBuilder& BSONObjBuilder::appendElements(BSONObj x) {
+        if (!x.isEmpty())
+            _b.appendBuf(
+                x.objdata() + 4,   // skip over leading length
+                x.objsize() - 5);  // ignore leading length and trailing \0
+        return *this;
+    }
+
+    /* add all the fields from the object specified to this object if they don't exist */
+    BSONObjBuilder& BSONObjBuilder::appendElementsUnique(BSONObj x) {
+        std::set<std::string> have;
+        {
+            BSONObjIterator i = iterator();
+            while ( i.more() )
+                have.insert( i.next().fieldName() );
+        }
+        
+        BSONObjIterator it(x);
+        while ( it.more() ) {
+            BSONElement e = it.next();
+            if ( have.count( e.fieldName() ) )
+                continue;
+            append(e);
+        }
+        return *this;
+    }
+
+    void BSONObjBuilder::appendKeys( const BSONObj& keyPattern , const BSONObj& values ) {
+        BSONObjIterator i(keyPattern);
+        BSONObjIterator j(values);
+
+        while ( i.more() && j.more() ) {
+            appendAs( j.next() , i.next().fieldName() );
+        }
+
+        verify( ! i.more() );
+        verify( ! j.more() );
+    }
+
+    BSONObjIterator BSONObjBuilder::iterator() const {
+        const char * s = _b.buf() + _offset;
+        const char * e = _b.buf() + _b.len();
+        return BSONObjIterator( s , e );
+    }
+
+    bool BSONObjBuilder::hasField( const StringData& name ) const {
+        BSONObjIterator i = iterator();
+        while ( i.more() )
+            if ( name == i.next().fieldName() )
+                return true;
+        return false;
+    }
+
+
 } // namespace mongo

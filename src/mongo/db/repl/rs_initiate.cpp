@@ -53,7 +53,6 @@
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 
-using namespace bson;
 using namespace mongoutils;
 
 namespace mongo {

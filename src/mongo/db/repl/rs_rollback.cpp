@@ -89,8 +89,6 @@ namespace mongo {
 
 namespace repl {
 
-    using namespace bson;
-
     class RSFatalException : public std::exception {
     public:
         RSFatalException(std::string m = "replica set fatal exception")
