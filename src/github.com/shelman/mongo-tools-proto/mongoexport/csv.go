@@ -1,15 +1,11 @@
 package mongoexport
 
 import (
-	"bufio"
 	"encoding/csv"
-	"github.com/shelman/mongo-tools-proto/common/bson_ext"
-	//"encoding/json"
 	"fmt"
+	"github.com/shelman/mongo-tools-proto/common/bson_ext"
 	"io"
-
 	"labix.org/v2/mgo/bson"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -25,24 +21,6 @@ type CSVExportOutput struct {
 	NumExported int64
 
 	csvWriter *csv.Writer
-}
-
-func getFieldsFromFile(path string) ([]string, error) {
-	fieldFileReader, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer fieldFileReader.Close()
-
-	var fields []string
-	fieldScanner := bufio.NewScanner(fieldFileReader)
-	for fieldScanner.Scan() {
-		fields = append(fields, fieldScanner.Text())
-	}
-	if err := fieldScanner.Err(); err != nil {
-		return nil, err
-	}
-	return fields, nil
 }
 
 //NewCSVExportOutput returns a CSVExportOutput configured to write output to the

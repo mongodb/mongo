@@ -6,6 +6,7 @@ import (
 	"github.com/shelman/mongo-tools-proto/common/bson_ext"
 	"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
+	"github.com/shelman/mongo-tools-proto/common/util"
 	"github.com/shelman/mongo-tools-proto/mongoexport/options"
 	"io"
 	"labix.org/v2/mgo/bson"
@@ -140,7 +141,7 @@ func (exp *MongoExport) getExportOutput(out io.Writer) (ExportOutput, error) {
 		if len(exp.OutputOpts.Fields) > 0 {
 			fields = strings.Split(exp.OutputOpts.Fields, ",")
 		} else if exp.OutputOpts.FieldFile != "" {
-			fields, err = getFieldsFromFile(exp.OutputOpts.FieldFile)
+			fields, err = util.GetFieldsFromFile(exp.OutputOpts.FieldFile)
 			if err != nil {
 				return nil, err
 			}

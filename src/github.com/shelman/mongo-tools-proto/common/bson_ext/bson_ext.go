@@ -8,12 +8,14 @@ import (
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"reflect"
+	"strconv"
 	"time"
 )
 
 type BSONExt map[string]interface{}
-
 type ObjectIdExt bson.ObjectId
+
+//TODO NumberIntExt, null
 type NumberLongExt int64
 type MongoTimestampExt bson.MongoTimestamp
 type GenericBinaryExt []byte
@@ -25,6 +27,16 @@ type MinKeyExt struct{}
 type MaxKeyExt struct{}
 type UndefinedExt struct{}
 type DBRefExt mgo.DBRef
+
+var (
+	acceptedDateFormats = []string{
+		"Mon Jan 2 2006 15:04:05 MST-0700 (EDT)",
+		"2006-01-02 15:04:05.00 -0700 EDT",
+		"2006-01-02 15:04:05 -0700 EDT",
+		"2006-01-02 15:04:05 -0700 EST",
+		"2006-01-02T15:04:05.000-0700",
+	}
+)
 
 /* ObjectID */
 func (m ObjectIdExt) MarshalJSON() ([]byte, error) {
@@ -118,7 +130,7 @@ func (m JavascriptExt) MarshalJSON() ([]byte, error) {
 	//return []byte("\"" + m.Code + "\""), nil
 }
 
-func convertSubdocsFromJSON(doc map[string]interface{}) error {
+func ConvertSubdocsFromJSON(doc map[string]interface{}) error {
 	for key, val := range doc {
 		if valSubDoc, ok := val.(map[string]interface{}); ok {
 			newVal, err := ParseExtendedJSON(valSubDoc)
@@ -140,12 +152,18 @@ func ParseExtendedJSON(doc map[string]interface{}) (interface{}, error) {
 	if docSize == 1 {
 		if dateValue, ok := doc["$date"]; ok {
 			if dateStr, isStr := dateValue.(string); isStr {
-				//"Mon Jun 30 2014 16:50:34 GMT-0400 (EDT)"
-				date, err := time.Parse("Mon Jan 2 2006 15:04:05 MST-0700 (EDT)", dateStr)
-				if err != nil {
-					return nil, err
+				// "Mon Jun 30 2014 16:50:34 GMT-0400 (EDT)"
+				// TODO: add other parse formats
+				var date time.Time
+				var err error
+				for _, format := range acceptedDateFormats {
+					date, err = time.Parse(format, dateStr)
+					if err != nil {
+						continue
+					}
+					break
 				}
-				return date, nil
+				return date, err
 			} else {
 				return nil, fmt.Errorf("Invalid date string.")
 			}
@@ -171,7 +189,18 @@ func ParseExtendedJSON(doc map[string]interface{}) (interface{}, error) {
 			return bson.MinKey, nil
 		}
 
-		err := convertSubdocsFromJSON(doc)
+		if val, ok := doc["$numberLong"]; ok {
+			if valStr, isStr := val.(string); isStr {
+				intVal, err := strconv.ParseInt(valStr, 10, 64)
+				if err != nil {
+					return nil, err
+				}
+				return NumberLongExt(intVal), nil
+			}
+			return nil, fmt.Errorf("Invalid numberLong string.")
+		}
+
+		err := ConvertSubdocsFromJSON(doc)
 		if err != nil {
 			return nil, err
 		}
@@ -213,13 +242,13 @@ func ParseExtendedJSON(doc map[string]interface{}) (interface{}, error) {
 				return bson.Binary{Kind: binTypeByte[0], Data: data}, nil
 			}
 		}
-		err := convertSubdocsFromJSON(doc)
+		err := ConvertSubdocsFromJSON(doc)
 		if err != nil {
 			return nil, err
 		}
 		return doc, nil
 	} else {
-		err := convertSubdocsFromJSON(doc)
+		err := ConvertSubdocsFromJSON(doc)
 		if err != nil {
 			return nil, err
 		}
