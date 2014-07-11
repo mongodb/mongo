@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/structure/btree/btree_interface.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 
 #include <rocksdb/db.h>
 
@@ -51,7 +51,7 @@ namespace mongo {
         virtual unsigned long long commit(bool mayInterrupt) = 0;
     };
 
-    class RocksBtreeImpl : public BtreeInterface {
+    class RocksBtreeImpl : public SortedDataInterface {
     public:
         RocksBtreeImpl( rocksdb::DB* db,
                         rocksdb::ColumnFamilyHandle* cf );

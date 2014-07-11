@@ -8,9 +8,20 @@ env.Library(
         'heap1_engine.cpp',
         ],
     LIBDEPS= [
+        'heap_record_store',
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/structure/record_store',
+        '$BUILD_DIR/mongo/foundation',
+        ]
+    )
+
+env.Library(
+    target= 'heap_record_store',
+    source= [
+        'record_store_heap.cpp'
+        ],
+    LIBDEPS= [
+        '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/foundation',
         ]
     )

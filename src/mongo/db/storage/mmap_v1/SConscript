@@ -1,6 +1,34 @@
 Import("env")
 
 env.Library(
+    target = 'storage_mmapv1',
+    source = [ "catalog/index_details.cpp",
+               "catalog/namespace.cpp",
+               "catalog/namespace_details.cpp",
+               "catalog/namespace_details_collection_entry.cpp",
+               "catalog/namespace_details_rsv1_metadata.cpp",
+               "catalog/namespace_index.cpp",
+               "data_file.cpp",
+               "durable_mapped_file.cpp",
+               "dur.cpp",
+               "durop.cpp",
+               "dur_writetodatafiles.cpp",
+               "dur_preplogbuffer.cpp",
+               "dur_commitjob.cpp",
+               "dur_recover.cpp",
+               "dur_journal.cpp",
+               "dur_recovery_unit.cpp",
+               "mmap_v1_database_catalog_entry.cpp",
+               "mmap_v1_engine.cpp",
+               "mmap_v1_extent_manager.cpp",
+               "repair_database.cpp",
+             ],
+    LIBDEPS = [
+        'record_store_v1',
+        'btree']
+    )
+
+env.Library(
     target= 'extent',
     source= [
         'extent.cpp',
@@ -9,5 +37,96 @@ env.Library(
     LIBDEPS= [
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/foundation',
+        ]
+    )
+
+env.Library(
+    target= 'record_store_v1',
+    source= [
+        'record_store_v1_base.cpp',
+        'record_store_v1_capped.cpp',
+        'record_store_v1_capped_iterator.cpp',
+        'record_store_v1_repair_iterator.cpp',
+        'record_store_v1_simple.cpp',
+        'record_store_v1_simple_iterator.cpp',
+        ],
+    LIBDEPS= [
+        'extent',
+        '$BUILD_DIR/mongo/mongocommon',  # for ProgressMeter
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        ]
+    )
+
+env.Library(
+    target='record_store_v1_test_help',
+    source=['record_store_v1_test_help.cpp',
+            ],
+    LIBDEPS=[
+        'record_store_v1'
+        ]
+    )
+
+env.CppUnitTest(target = 'namespace_test',
+                source = ['catalog/namespace_test.cpp'],
+                LIBDEPS = ['$BUILD_DIR/mongo/foundation'])
+
+env.CppUnitTest(
+    target='record_store_v1_simple_test',
+    source=['record_store_v1_simple_test.cpp',
+            ],
+    LIBDEPS=[
+        'record_store_v1_test_help'
+        ]
+    )
+
+env.CppUnitTest(
+    target='record_store_v1_capped_test',
+    source=['record_store_v1_capped_test.cpp',
+            ],
+    LIBDEPS=[
+        'record_store_v1_test_help'
+        ]
+    )
+
+env.Library(
+    target= 'btree',
+    source= [
+        'btree/btree_logic.cpp',
+        'btree/btree_interface.cpp',
+        'btree/key.cpp'
+        ],
+    LIBDEPS= [
+        '$BUILD_DIR/mongo/bson'
+        ]
+    )
+
+env.Library(
+    target= 'btree_test_help',
+    source= [
+        'btree/btree_test_help.cpp'
+        ],
+    LIBDEPS= [
+        'btree',
+        '$BUILD_DIR/mongo/mongocommon',  # for ProgressMeter
+        '$BUILD_DIR/mongo/db/storage/mmap_v1/record_store_v1_test_help',
+        '$BUILD_DIR/mongo/db/storage/heap1/heap_record_store'  # XXX?
+        ]
+    )
+
+env.CppUnitTest(
+    target='btree_logic_test',
+    source=['btree/btree_logic_test.cpp'
+            ],
+    LIBDEPS=[
+        'btree_test_help'
+        ]
+    )
+
+env.CppUnitTest(
+    target='btree_builder_test',
+    source=['btree/btree_builder_test.cpp'
+            ],
+    LIBDEPS=[
+        'btree_test_help'        
         ]
     )

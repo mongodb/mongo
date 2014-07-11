@@ -56,6 +56,7 @@ namespace mongo {
                          WorkingSet* workingSet,
                          const MatchExpression* filter)
         : _txn(txn),
+          _checkEndKeys(0),
           _workingSet(workingSet),
           _hitEnd(false),
           _filter(filter), 
@@ -138,10 +139,21 @@ namespace mongo {
         // Adds the amount of time taken by work() to executionTimeMillis.
         ScopedTimer timer(&_commonStats.executionTimeMillis);
 
+        // If we examined multiple keys in a prior work cycle, make up for it here by returning
+        // NEED_TIME. This is done for plan ranking. Refer to the comment for '_checkEndKeys'
+        // in the .h for details.
+        if (_checkEndKeys > 0) {
+            --_checkEndKeys;
+            ++_commonStats.needTime;
+            return PlanStage::NEED_TIME;
+        }
+
         if (NULL == _indexCursor.get()) {
             // First call to work().  Perform possibly heavy init.
             initIndexScan();
             checkEnd();
+            ++_commonStats.needTime;
+            return PlanStage::NEED_TIME;
         }
         else if (_yieldMovedCursor) {
             _yieldMovedCursor = false;
@@ -216,6 +228,10 @@ namespace mongo {
             if (_specificStats.keysExamined >= _params.maxScan) {
                 return true;
             }
+        }
+
+        if (_checkEndKeys != 0) {
+            return false;
         }
 
         return _hitEnd || _indexCursor->isEOF();
@@ -340,8 +356,7 @@ namespace mongo {
                     break;
                 }
 
-                // TODO: Can we do too much scanning here?  Old BtreeCursor stops scanning after a
-                // while and relies on a Matcher to make sure the result is ok.
+                ++_checkEndKeys;
             }
         }
     }

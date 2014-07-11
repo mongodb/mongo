@@ -46,7 +46,7 @@
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/structure/btree/key.h"
+#include "mongo/db/storage/mmap_v1/btree/key.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"

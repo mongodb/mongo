@@ -29,9 +29,7 @@
  *    then also delete it in the license file.
  */
 
-// Where IndexDetails defined.
-#include "mongo/pch.h"
-
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/db.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index_legacy.h"
@@ -42,12 +40,11 @@
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
-#include "mongo/db/structure/record_store_v1_capped.h"
-#include "mongo/db/structure/record_store_v1_simple.h"
-#include "mongo/db/structure/catalog/namespace.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
-#include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
+#include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
+#include "mongo/db/storage/mmap_v1/catalog/namespace.h"
+#include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
+#include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/dbtests/dbtests.h"
 
 

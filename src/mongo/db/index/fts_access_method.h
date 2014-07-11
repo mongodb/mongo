@@ -38,7 +38,7 @@ namespace mongo {
 
     class FTSAccessMethod : public BtreeBasedAccessMethod {
     public:
-        FTSAccessMethod(IndexCatalogEntry* btreeState, BtreeInterface* btree );
+        FTSAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree );
         virtual ~FTSAccessMethod() { }
 
         const fts::FTSSpec& getSpec() const { return _ftsSpec; }

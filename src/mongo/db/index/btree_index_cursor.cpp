@@ -44,7 +44,7 @@ namespace mongo {
     unordered_set<BtreeIndexCursor*> BtreeIndexCursor::_activeCursors;
     SimpleMutex BtreeIndexCursor::_activeCursorsMutex("active_btree_index_cursors");
 
-    BtreeIndexCursor::BtreeIndexCursor(BtreeInterface::Cursor* cursor)
+    BtreeIndexCursor::BtreeIndexCursor(SortedDataInterface::Cursor* cursor)
         : _cursor(cursor) {
 
         SimpleMutex::scoped_lock lock(_activeCursorsMutex);

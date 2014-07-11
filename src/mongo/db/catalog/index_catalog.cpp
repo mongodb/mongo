@@ -506,7 +506,7 @@ namespace mongo {
             return Status( ErrorCodes::CannotCreateIndex, "no index name specified" );
 
         string indexNamespace = IndexDescriptor::makeIndexNamespace( specNamespace, name );
-        if ( indexNamespace.length() > Namespace::MaxNsLen )
+        if ( indexNamespace.length() > NamespaceString::MaxNsLen )
             return Status( ErrorCodes::CannotCreateIndex,
                            str::stream() << "namespace name generated from index name \"" <<
                            indexNamespace << "\" is too long (127 byte max)" );

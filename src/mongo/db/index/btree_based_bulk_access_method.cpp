@@ -74,7 +74,7 @@ namespace mongo {
 
     BtreeBasedBulkAccessMethod::BtreeBasedBulkAccessMethod(OperationContext* txn,
                                                            BtreeBasedAccessMethod* real,
-                                                           BtreeInterface* interface,
+                                                           SortedDataInterface* interface,
                                                            const IndexDescriptor* descriptor) {
         _real = real;
         _interface = interface;
@@ -138,7 +138,7 @@ namespace mongo {
                                                          _keysInserted,
                                                          10);
 
-        scoped_ptr<BtreeBuilderInterface> builder;
+        scoped_ptr<SortedDataBuilderInterface> builder;
 
         builder.reset(_interface->getBulkBuilder(_txn, dupsAllowed));
 

@@ -168,6 +168,10 @@ namespace mongo {
             return *this;
         }
 
+        ThreadSafeString& operator=(const string& str) {
+            return (*this = str.c_str());
+        }
+
         bool empty() const {
             return _buf == 0 || _buf[0] == 0;
         }

@@ -802,7 +802,9 @@ namespace QueryStageAnd {
             // This isn't true in general if the collection is not dropped beforehand.
             WorkingSetID id = WorkingSet::INVALID_ID;
 
-            // Sorted AND looks at the first child, which is an index scan over foo==1.
+            // Sorted AND looks at the first child, which is an index scan over foo==1. The
+            // first work() just does initialization, so we have to call work() twice.
+            ah->work(&id);
             ah->work(&id);
 
             // The first thing that the index scan returns (due to increasing DiskLoc trick) is the

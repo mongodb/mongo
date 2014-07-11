@@ -45,7 +45,7 @@ namespace mongo {
         rocksdb::Slice emptyByteSlice( "" );
         rocksdb::SliceParts emptyByteSliceParts( &emptyByteSlice, 1 );
 
-        class RocksCursor : public BtreeInterface::Cursor {
+        class RocksCursor : public SortedDataInterface::Cursor {
         public:
             // constructor that doesn't take a snapshot
             RocksCursor( rocksdb::Iterator* iterator, bool direction ):
@@ -389,7 +389,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    BtreeInterface::Cursor* RocksBtreeImpl::newCursor(OperationContext* txn, int direction) const {
+    SortedDataInterface::Cursor* RocksBtreeImpl::newCursor(OperationContext* txn, int direction) const {
         rocksdb::ReadOptions options = rocksdb::ReadOptions();
         options.snapshot = _db->GetSnapshot();
         return new RocksCursor( _db->NewIterator( options, _columnFamily ),

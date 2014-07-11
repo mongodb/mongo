@@ -43,8 +43,8 @@
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
-#include "mongo/db/structure/record_store.h"
+// #include "mongo/db/structure/catalog/namespace_details.h"  // XXX SERVER-13640
+#include "mongo/db/storage/record_store.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/fail_point_service.h"
 

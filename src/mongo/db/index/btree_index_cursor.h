@@ -35,7 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/structure/btree/btree_interface.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
 
@@ -96,7 +96,7 @@ namespace mongo {
          *
          * Intentionally private, we're friends with the only class allowed to call it.
          */
-        BtreeIndexCursor(BtreeInterface::Cursor* cursor);
+        BtreeIndexCursor(SortedDataInterface::Cursor* cursor);
 
         bool isSavedPositionValid();
 
@@ -110,7 +110,7 @@ namespace mongo {
         static unordered_set<BtreeIndexCursor*> _activeCursors;
         static SimpleMutex _activeCursorsMutex;
 
-        boost::scoped_ptr<BtreeInterface::Cursor> _cursor;
+        boost::scoped_ptr<SortedDataInterface::Cursor> _cursor;
     };
 
 }  // namespace mongo

@@ -50,7 +50,7 @@ namespace mongo {
                                           unsigned long long progressMeterTotal,
                                           int secondsBetween);
 
-        virtual const char * getNS() const;
+        virtual string getNS() const;
 
         virtual Client* getClient() const;
 
