@@ -12,7 +12,8 @@ env.Library(
 
 env.Library('replication_executor',
             'replication_executor.cpp',
-            LIBDEPS=['$BUILD_DIR/mongo/foundation'])
+            LIBDEPS=['$BUILD_DIR/mongo/foundation',
+                     '$BUILD_DIR/mongo/hostandport'])
 
 env.CppUnitTest('replication_executor_test',
                 'replication_executor_test.cpp',
@@ -24,7 +25,9 @@ env.Library('repl_coordinator_impl',
             LIBDEPS=['$BUILD_DIR/mongo/db/common',
                      '$BUILD_DIR/mongo/foundation',
                      '$BUILD_DIR/mongo/server_options_core',
-                     'replication_executor'])
+                     'repl_coordinator_interface',
+                     'replication_executor',
+                 ])
 
 env.CppUnitTest('repl_coordinator_impl_test',
                 'repl_coordinator_impl_test.cpp',
@@ -32,7 +35,10 @@ env.CppUnitTest('repl_coordinator_impl_test',
                          'replmocks'])
 
 env.Library('repl_coordinator_interface',
-            'repl_coordinator.cpp')
+            ['repl_coordinator.cpp',],
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/hostandport',
+            ])
 
 env.Library('repl_coordinator_global',
             'repl_coordinator_global.cpp',
@@ -54,6 +60,7 @@ env.Library('replica_set_config',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/bson',
+                '$BUILD_DIR/mongo/hostandport',
             ])
 
 env.CppUnitTest('replica_set_config_test',
