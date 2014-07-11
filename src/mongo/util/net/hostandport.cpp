@@ -80,31 +80,6 @@ namespace mongo {
                );
     }
 
-    HostAndPort HostAndPort::me() {
-        const char* ips = serverGlobalParams.bind_ip.c_str();
-        while(*ips) {
-            std::string ip;
-            const char * comma = strchr(ips, ',');
-            if (comma) {
-                ip = std::string(ips, comma - ips);
-                ips = comma + 1;
-            }
-            else {
-                ip = std::string(ips);
-                ips = "";
-            }
-            HostAndPort h = HostAndPort(ip, serverGlobalParams.port);
-            if (!h.isLocalHost()) {
-                return h;
-            }
-        }
-
-        std::string h = getHostName();
-        verify( !h.empty() );
-        verify( h != "localhost" );
-        return HostAndPort(h, serverGlobalParams.port);
-    }
-
     std::string HostAndPort::toString() const {
         StringBuilder ss;
         append( ss );
