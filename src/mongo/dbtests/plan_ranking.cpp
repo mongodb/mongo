@@ -731,25 +731,26 @@ namespace PlanRankingTests {
     class PlanRankingAccountForKeySkips : public PlanRankingTestBase {
     public:
         void run() {
-            for (int i = 0; i < 4; ++i) {
-                insert(BSON("a" << 1 << "b" << 1));
+            for (int i = 0; i < 100; ++i) {
+                insert(BSON("a" << i << "b" << i << "c" << i));
             }
 
-            // Second index has intervening fields which leads to more
-            // skipping of keys. We should pick a plan that uses the first.
-            addIndex(BSON("a" << 1 << "b" << 1));
-            addIndex(BSON("a" << 1 << "x" << 1 << "y" << 1 << "z" << 1 << "b" << 1));
+            // These indices look equivalent to the ranker for the query below unless we account
+            // for key skipping. We should pick index {a: 1} if we account for key skipping
+            // properly.
+            addIndex(BSON("b" << 1 << "c" << 1));
+            addIndex(BSON("a" << 1));
 
             CanonicalQuery* cq;
             ASSERT(CanonicalQuery::canonicalize(ns,
-                                                fromjson("{a: 1, b: 1}"),
+                                                fromjson("{a: 9, b: {$ne: 10}, c: 9}"),
                                                 &cq).isOK());
             ASSERT(NULL != cq);
 
             // Expect to use index {a: 1, b: 1}.
             QuerySolution* soln = pickBestPlan(cq);
             ASSERT(QueryPlannerTestLib::solutionMatches(
-                        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}}}}}",
+                        "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}",
                         soln->root.get()));
         }
     };
