@@ -1,0 +1,300 @@
+functions:
+  "setup go env":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        export GOPATH=`pwd`
+        ./gpm install godeps
+
+  "generate coverage html + text":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        export GOPATH=`pwd`
+        go tool cover -html=coverage.out -o coverage.html
+        go tool cover -func=coverage.out -o coverage.txt
+
+  "upload coverage html report":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/coverage.html
+      remote_file: mci-tools/coverage/${task_id}.html
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/html
+
+  "upload coverage txt report":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/coverage.txt
+      remote_file: mci-tools/coverage/${task_id}.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+
+  "attach coverage reports" :
+    command: attach.task_files
+    params:
+      "Coverage Report (HTML)": https://s3.amazonaws.com/mciuploads/mci-tools/coverage/${task_id}.html
+      "Coverage Report (TXT)": https://s3.amazonaws.com/mciuploads/mci-tools/coverage/${task_id}.txt
+
+  "download mongod":
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
+        rm -rf mongodb
+        mkdir mongodb
+        cd mongodb
+        wget -q ${mongo_url} -O mongodb.tgz
+        tar xvf mongodb.tgz --strip-components=1
+
+  "start mongod":
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
+        rm -rf mongodb/${db_files_dir|db_files}
+        rm -f mongodb/${logfile|run.log}
+        mkdir mongodb/${db_files_dir|db_files}
+        ./mongodb/bin/mongod --dbpath ./mongodb/${db_files_dir|db_files} --logpath ./mongodb/${logfile|run.log} --port ${port|27017} --fork ${mongod_extra_options|}
+
+  "kill mongod":
+    command: shell.exec
+    params:
+      script: |
+        pkill -9 mongod;
+
+  "run tests":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        export GOPATH=`pwd`
+        cd src/github.com/shelman/mongo-tools-proto/${package}
+        go test -i
+        go test -v -test.types=${types} -coverprofile=coverage.out
+        mv coverage.out $GOPATH
+
+pre:
+  - command: expansions.fetch
+    params:
+      keys:
+        - local_key: "aws_key"
+          remote_key: "project_aws_key"
+        - local_key: "aws_secret"
+          remote_key: "project_aws_secret"
+
+post:
+  - func: "kill mongod"
+
+tasks:
+
+- name: db
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - func: "download mongod"
+    - func: "start mongod"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "common/db"
+          - key: "types"
+            value: "db"
+    - func: "run tests"
+    - func: "generate coverage html + text"
+    - func: "upload coverage html report"
+    - func: "upload coverage txt report"
+    - func: "attach coverage reports"
+
+- name: lint
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          export GOPATH=`pwd`
+          go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/shelman/mongo-tools-proto
+
+- name: vet
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          export GOPATH=`pwd`
+          go tool vet src/github.com/shelman/mongo-tools-proto/
+
+- name: util
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "common/util"
+          - key: "types"
+            value: "unit"
+    - func: "run tests"
+    - func: "generate coverage html + text"
+    - func: "upload coverage html report"
+    - func: "upload coverage txt report"
+    - func: "attach coverage reports"
+
+- name: ssl
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - func: "download mongod"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "common/db/ssl"
+          - key: "types"
+            value: "ssl"
+          - key: "port"
+            value: "20000"
+    - func: "start mongod"
+    - func: "run tests"
+    - func: "kill mongod"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "types"
+            value: "ssl_auth"
+          - key: "mongod_extra_options"
+            value: "--sslMode requireSSL --sslCAFile src/src/github.com/shelman/mongo-tools-proto/common/db/ssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/shelman/mongo-tools-proto/common/db/ssl/testdata/server.pem --auth"
+    - func: "start mongod"
+    - func: "run tests"
+
+- name: auth
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - func: "download mongod"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "common/db"
+          - key: "types"
+            value: "auth"
+    - func: "start mongod"
+    - func: "run tests"
+    - func: "generate coverage html + text"
+    - func: "upload coverage html report"
+    - func: "upload coverage txt report"
+    - func: "attach coverage reports"
+
+- name: dist
+  depends_on:
+  - name: "db"
+  - name: "util"
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          export GOPATH=`pwd`
+          go build -o mongotop github.com/shelman/mongo-tools-proto/mongotop/main
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongotop
+        remote_file: mcitools/binaries/${build_id}/mongotop
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/octet-stream
+    - command: attach.task_files
+      params:
+        "mongotop": https://s3.amazonaws.com/mciuploads/mcitools/binaries/${build_id}/mongotop
+
+- name: smoke
+  depends_on:
+  - name: "dist"
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "download mongod"
+    - func: "start mongod"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          wget https://s3.amazonaws.com/mciuploads/mcitools/binaries/${build_id}/mongotop
+          chmod 755 mongotop
+          ./smoke.sh
+
+buildvariants:
+
+- name: ubuntu
+  display_name: Ubuntu
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    mongo_url: http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-2.6.1.tgz
+  tasks:
+  - name: lint
+  - name: db
+  - name: util
+  - name: dist
+  - name: smoke
+
+- name: ubuntu-ssl
+  display_name: Ubuntu SSL
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    mongo_url: http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1404-latest.tgz
+    mongod_extra_options: --sslMode requireSSL --sslCAFile src/src/github.com/shelman/mongo-tools-proto/common/db/ssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/shelman/mongo-tools-proto/common/db/ssl/testdata/server.pem
+  tasks:
+  - name: ssl
+
+- name: ubuntu-auth
+  display_name: Ubuntu Auth
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    mongo_url: http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1404-latest.tgz
+    mongod_extra_options: --auth
+  tasks:
+  - name: auth
