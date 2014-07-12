@@ -300,7 +300,8 @@ add_option( "use-cpu-profiler",
             "Link against the google-perftools profiler library",
             0, False )
 
-add_option('build-fast-and-loose', "NEVER for production builds", 0, False)
+add_option('build-fast-and-loose', "looser dependency checking, ignored for --release builds",
+           '?', False, type="choice", choices=["on", "off"], const="on", default="on")
 
 add_option('disable-warnings-as-errors', "Don't add -Werror to compiler command line", 0, False)
 
@@ -486,11 +487,11 @@ if has_option("propagate-shell-environment"):
 
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS'
 
-if has_option('build-fast-and-loose'):
+# Ignore requests to build fast and loose for release builds.
+if get_option('build-fast-and-loose') == "on" and not has_option('release'):
     # See http://www.scons.org/wiki/GoFastButton for details
     env.Decider('MD5-timestamp')
     env.SetOption('max_drift', 1)
-    env.SourceCode('.', None)
 
 if has_option('mute'):
     env.Append( CCCOMSTR = "Compiling $TARGET" )
