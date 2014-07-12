@@ -218,19 +218,12 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT))
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));
 
-	fmt = LF_ISSET(WT_CURSOR_RAW_OK) ? "u" : cursor->key_format;
-
 	/*
-	 * Fast path common cases in the order we expect to see them; not using
-	 * strcmp in this code because clang doesn't inline calls to strcmp.
+	 * Fast path common cases; don't use strcmp in this code because clang
+	 * doesn't inline calls to strcmp.
 	 */
-	if (fmt[0] == 'S' && fmt[1] == '\0')
-		*va_arg(ap, const char **) = cursor->key.data;
-	else if (fmt[0] == 'u' && fmt[1] == '\0') {
-		key = va_arg(ap, WT_ITEM *);
-		key->data = cursor->key.data;
-		key->size = cursor->key.size;
-	} else if (fmt[0] == 'r' && fmt[1] == '\0') {
+	fmt = cursor->key_format;
+	if (fmt[0] == 'r' && fmt[1] == '\0') {
 		if (LF_ISSET(WT_CURSTD_RAW)) {
 			key = va_arg(ap, WT_ITEM *);
 			key->data = cursor->raw_recno_buf;
@@ -241,9 +234,20 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 			    sizeof(cursor->raw_recno_buf), "q", cursor->recno);
 		} else
 			*va_arg(ap, uint64_t *) = cursor->recno;
-	} else
-		ret = __wt_struct_unpackv(session,
-		    cursor->key.data, cursor->key.size, fmt, ap);
+	} else {
+		if (LF_ISSET(WT_CURSOR_RAW_OK))
+			fmt = "u";
+
+		if (fmt[0] == 'S' && fmt[1] == '\0')
+			*va_arg(ap, const char **) = cursor->key.data;
+		else if (fmt[0] == 'u' && fmt[1] == '\0') {
+			key = va_arg(ap, WT_ITEM *);
+			key->data = cursor->key.data;
+			key->size = cursor->key.size;
+		} else
+			ret = __wt_struct_unpackv(session,
+			    cursor->key.data, cursor->key.size, fmt, ap);
+	}
 
 err:	API_END_RET(session, ret);
 }
@@ -265,21 +269,12 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET);
 
-	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->key_format;
-
 	/*
-	 * Fast path common cases in the order we expect to see them; not using
-	 * strcmp in this code because clang doesn't inline calls to strcmp.
+	 * Fast path common cases; don't use strcmp in this code because clang
+	 * doesn't inline calls to strcmp.
 	 */
-	if (fmt[0] == 'S' && fmt[1] == '\0') {
-		str = va_arg(ap, const char *);
-		sz = strlen(str) + 1;
-		cursor->key.data = (void *)str;
-	} else if (fmt[0] == 'u' && fmt[1] == '\0') {
-		item = va_arg(ap, WT_ITEM *);
-		sz = item->size;
-		cursor->key.data = item->data;
-	} else if (fmt[0] == 'r' && fmt[1] == '\0') {
+	fmt = cursor->key_format;
+	if (fmt[0] == 'r' && fmt[1] == '\0') {
 		if (LF_ISSET(WT_CURSTD_RAW)) {
 			item = va_arg(ap, WT_ITEM *);
 			WT_ERR(__wt_struct_unpack(session,
@@ -292,17 +287,28 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		cursor->key.data = &cursor->recno;
 		sz = sizeof(cursor->recno);
 	} else {
-		buf = &cursor->key;
+		if (LF_ISSET(WT_CURSOR_RAW_OK) ||
+		    (fmt[0] == 'u' && fmt[1] == '\0')) {
+			item = va_arg(ap, WT_ITEM *);
+			sz = item->size;
+			cursor->key.data = item->data;
+		} else if (fmt[0] == 'S' && fmt[1] == '\0') {
+			str = va_arg(ap, const char *);
+			sz = strlen(str) + 1;
+			cursor->key.data = (void *)str;
+		} else {
+			buf = &cursor->key;
 
-		va_copy(ap_copy, ap);
-		ret = __wt_struct_sizev(
-		    session, &sz, cursor->key_format, ap_copy);
-		va_end(ap_copy);
-		WT_ERR(ret);
+			va_copy(ap_copy, ap);
+			ret = __wt_struct_sizev(
+			    session, &sz, cursor->key_format, ap_copy);
+			va_end(ap_copy);
+			WT_ERR(ret);
 
-		WT_ERR(__wt_buf_initsize(session, buf, sz));
-		WT_ERR(__wt_struct_packv(
-		    session, buf->mem, sz, cursor->key_format, ap));
+			WT_ERR(__wt_buf_initsize(session, buf, sz));
+			WT_ERR(__wt_struct_packv(
+			    session, buf->mem, sz, cursor->key_format, ap));
+		}
 	}
 	if (sz == 0)
 		WT_ERR_MSG(session, EINVAL, "Empty keys not permitted");
@@ -355,8 +361,8 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 
 	/*
-	 * Fast path common cases in the order we expect to see them; not using
-	 * strcmp in this code because clang doesn't inline calls to strcmp.
+	 * Fast path common cases; don't use strcmp in this code because clang
+	 * doesn't inline calls to strcmp.
 	 */
 	if (fmt[0] == 'S' && fmt[1] == '\0')
 		*va_arg(ap, const char **) = cursor->value.data;
@@ -407,8 +413,8 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 
 	/*
-	 * Fast path common cases in the order we expect to see them; not using
-	 * strcmp in this code because clang doesn't inline calls to strcmp.
+	 * Fast path common cases; don't use strcmp in this code because clang
+	 * doesn't inline calls to strcmp.
 	 */
 	if (fmt[0] == 'S' && fmt[1] == '\0') {
 		str = va_arg(ap, const char *);
