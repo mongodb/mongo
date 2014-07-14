@@ -116,6 +116,7 @@ namespace {
             << ActionType::find
             << ActionType::killCursors
             << ActionType::listCollections
+            << ActionType::listIndexes
             << ActionType::planCacheRead;
 
         // Read-write role

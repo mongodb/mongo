@@ -67,6 +67,7 @@
 "killop",
 "listCollections",
 "listDatabases",
+"listIndexes",
 "listShards",
 "logRotate",
 "moveChunk",
