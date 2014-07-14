@@ -33,7 +33,7 @@
 
 #include <rocksdb/options.h>
 
-#include "mongo/db/structure/record_store.h"
+#include "mongo/db/storage/record_store.h"
 
 namespace rocksdb {
     class ColumnFamilyHandle;

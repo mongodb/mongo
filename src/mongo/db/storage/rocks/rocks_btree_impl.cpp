@@ -295,7 +295,7 @@ namespace mongo {
         return s;
     }
 
-    // RocksBtreeImpl
+    // RocksBtreeDataImpl
 
     RocksBtreeImpl::RocksBtreeImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf )
         : _db( db ), _columnFamily( cf ) {
@@ -303,7 +303,7 @@ namespace mongo {
         invariant( _columnFamily );
     }
 
-    BtreeBuilderInterface* RocksBtreeImpl::getBulkBuilder(OperationContext* txn,
+    SortedDataBuilderInterface* RocksBtreeImpl::getBulkBuilder(OperationContext* txn,
                                                           bool dupsAllowed) {
         invariant( false );
     }

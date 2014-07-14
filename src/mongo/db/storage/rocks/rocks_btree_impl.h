@@ -45,7 +45,7 @@ namespace mongo {
 
     class RocksRecoveryUnit;
 
-    class RocksBtreeBuilderImpl : public BtreeBuilderInterface {
+    class RocksBtreeBuilderImpl : public SortedDataBuilderInterface {
     public:
         virtual Status addKey(const BSONObj& key, const DiskLoc& loc) = 0;
         virtual unsigned long long commit(bool mayInterrupt) = 0;
@@ -56,7 +56,7 @@ namespace mongo {
         RocksBtreeImpl( rocksdb::DB* db,
                         rocksdb::ColumnFamilyHandle* cf );
 
-        virtual BtreeBuilderInterface* getBulkBuilder(OperationContext* txn,
+        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
                                                       bool dupsAllowed);
 
         virtual Status insert(OperationContext* txn,
