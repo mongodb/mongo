@@ -43,4 +43,5 @@ assert.writeError(res, "$setOnInsert _id.a/b worked" );
 
 res = t.update( {"_id.a": 4} , { $setOnInsert: { "_id": {a:4, b:1} } } , true );
 assert.writeError(res, "$setOnInsert _id.a/a+b worked" );
+
 db.setProfilingLevel( 0 );
