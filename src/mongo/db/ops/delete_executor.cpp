@@ -152,6 +152,8 @@ namespace mongo {
             }
             BSONObj toDelete;
 
+            WriteUnitOfWork wunit(_request->getOpCtx()->recoveryUnit());
+
             // TODO: do we want to buffer docs and delete them in a group rather than
             // saving/restoring state repeatedly?
             exec->saveState();
@@ -172,6 +174,8 @@ namespace mongo {
                             _request->getOpCtx(), "d", ns.ns().c_str(), toDelete, 0, &replJustOne);
                 }
             }
+
+            wunit.commit();
 
             if (!_request->isMulti()) {
                 break;
