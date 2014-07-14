@@ -35,12 +35,12 @@ of the WiredTiger library should comply with these copyrights.
 
 @section leveldb 3rd party software optionally included in the WiredTiger library: LevelDB
 
-If the \c --enable-leveldb or --enable-rocksdb configuration options are
-specified when configuring the WiredTiger build, additional 3rd party
-software is included in the WiredTiger LevelDB library binary,
-distributed under their license terms.  Redistribution of the WiredTiger
-library built with the \c --enable-leveldb or \c --enable-rocksdb
-configuration options should comply with these copyrights.
+If the \c --enable-leveldb configuration option is specified when
+configuring the WiredTiger build, additional 3rd party software is
+included in the WiredTiger LevelDB library binary, distributed under
+their license terms.  Redistribution of the WiredTiger library built
+with the \c --enable-leveldb configuration option should comply with
+these copyrights.
 
 <table>
 @hrow{Distribution Files, Copyright Holder, License}
