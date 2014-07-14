@@ -424,8 +424,8 @@ env = env.Clone()
 # in addition, v8 source needs to compile with src/parser.h, which
 # is being placed here earlier in the search path than windows sdk's
 # Include/parser.h (v8 doesn't even use any of those header files)
-env['CPPPATH'].remove('$BUILD_DIR/third_party/v8-3.25/include')
-env.Prepend(CPPPATH='$BUILD_DIR/third_party/v8-3.25/src')
+env['CPPPATH'].remove('#/src/third_party/v8-3.25/include')
+env.Prepend(CPPPATH='#/src/third_party/v8-3.25/src')
 
 # add v8 ccflags and cppdefines to environment if they're not already
 # present

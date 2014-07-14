@@ -33,12 +33,15 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/thread/mutex.hpp>
-#include <pcrecpp.h>
 
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/timer.h"
+
+namespace pcrecpp {
+    class RE;
+} // namespace pcrecpp;
 
 namespace mongo {
 

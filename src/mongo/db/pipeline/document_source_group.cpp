@@ -621,5 +621,5 @@ namespace mongo {
     }
 }
 
-#include "db/sorter/sorter.cpp"
+#include "mongo/db/sorter/sorter.cpp"
 // Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

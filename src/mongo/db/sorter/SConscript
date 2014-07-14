@@ -1,3 +1,5 @@
 Import("env")
 
-env.CppUnitTest('sorter_test', 'sorter_test.cpp', LIBDEPS=['$BUILD_DIR/third_party/shim_snappy'])
+sorterEnv = env.Clone()
+sorterEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+sorterEnv.CppUnitTest('sorter_test', 'sorter_test.cpp', LIBDEPS=['$BUILD_DIR/third_party/shim_snappy'])

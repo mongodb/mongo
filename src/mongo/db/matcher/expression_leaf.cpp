@@ -30,6 +30,8 @@
 
 #include "mongo/db/matcher/expression_leaf.h"
 
+#include <pcrecpp.h>
+
 #include "mongo/bson/bsonobjiterator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
@@ -217,6 +219,11 @@ namespace mongo {
         }
         return options;
     }
+
+    RegexMatchExpression::RegexMatchExpression()
+        : LeafMatchExpression( REGEX ) {}
+
+    RegexMatchExpression::~RegexMatchExpression() {}
 
     bool RegexMatchExpression::equivalent( const MatchExpression* other ) const {
         if ( matchType() != other->matchType() )

@@ -30,7 +30,7 @@
 #include <iosfwd>
 #include <string>
 
-#include "bson/util/builder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 
