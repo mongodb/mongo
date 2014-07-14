@@ -2102,6 +2102,23 @@ namespace mutablebson {
             BufBuilder& buffer;
         };
 
+        static void appendElement(BSONObjBuilder* builder,
+                                  const BSONElement& element,
+                                  const StringData* fieldName) {
+            if (fieldName)
+                builder->appendAs(element, *fieldName);
+            else
+                builder->append(element);
+        }
+
+        // BSONArrayBuilder should not be appending elements with a fieldName
+        static void appendElement(BSONArrayBuilder* builder,
+                                  const BSONElement& element,
+                                  const StringData* fieldName) {
+            invariant(!fieldName);
+            builder->append(element);
+        }
+
     } // namespace
 
     template<typename Builder>
@@ -2111,11 +2128,7 @@ namespace mutablebson {
         const ElementRep& rep = getElementRep(repIdx);
 
         if (hasValue(rep)) {
-            const BSONElement element = getSerializedElement(rep);
-            if (fieldName)
-                builder->appendAs(element, *fieldName);
-            else
-                builder->append(element);
+            appendElement(builder, getSerializedElement(rep), fieldName);
         } else {
             const BSONType type = getType(rep);
             const StringData subName = fieldName ? *fieldName : getFieldName(rep);

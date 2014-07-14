@@ -875,21 +875,6 @@ namespace JsobjTests {
             }
         };
 
-        class ArrayAppendAs {
-        public:
-            void run() {
-                BSONArrayBuilder b;
-                {
-                    BSONObj foo = BSON( "foo" << 1 );
-                    b.appendAs( foo.firstElement(), "3" );
-                }
-                BSONArray a = b.arr();
-                BSONObj expected = BSON( "3" << 1 );
-                ASSERT_EQUALS( expected.firstElement(), a[ 3 ] );
-                ASSERT_EQUALS( 4, a.nFields() );
-            }
-        };
-
         class GetField {
         public:
             void run(){
@@ -1805,6 +1790,23 @@ namespace JsobjTests {
             objb.appendRegex(objb.numStr(i++), "test", "imx");
             arrb.appendRegex("test", "imx");
 
+            objb.appendBinData(objb.numStr(i++), 4, BinDataGeneral, "wow");
+            arrb.appendBinData(4, BinDataGeneral, "wow");
+
+            objb.appendCode(objb.numStr(i++), "function(){ return 1; }");
+            arrb.appendCode("function(){ return 1; }");
+
+            objb.appendCodeWScope(objb.numStr(i++), "function(){ return a; }", BSON("a" << 1));
+            arrb.appendCodeWScope("function(){ return a; }", BSON("a" << 1));
+
+            time_t dt(0);
+            objb.appendTimeT(objb.numStr(i++), dt);
+            arrb.appendTimeT(dt);
+
+            Date_t date(0);
+            objb.appendDate(objb.numStr(i++), date);
+            arrb.appendDate(date);
+
             objb.append(objb.numStr(i++), BSONRegEx("test2", "s"));
             arrb.append(BSONRegEx("test2", "s"));
 
@@ -2233,7 +2235,6 @@ namespace JsobjTests {
             add< BSONObjTests::ToStringArray >();
             add< BSONObjTests::ToStringNumber >();
             add< BSONObjTests::AppendAs >();
-            add< BSONObjTests::ArrayAppendAs >();
             add< BSONObjTests::GetField >();
             add< BSONObjTests::ToStringRecursionDepth >();
             add< BSONObjTests::StringWithNull >();
