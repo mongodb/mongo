@@ -41,7 +41,6 @@ libwiredtiger_leveldb_la_LDFLAGS = -release @VERSION@
 libwiredtiger_leveldb_la_LIBADD = $(top_builddir)/libwiredtiger.la
 libwiredtiger_leveldb_la_SOURCES = \
 	leveldb_wt.cc \
-	db/write_batch.cc \
 	util/coding.cc util/comparator.cc util/env.cc util/env_posix.cc \
 	util/logging.cc util/options.cc util/status.cc
 
@@ -49,7 +48,9 @@ if HAVE_ELEVELDB
 libwiredtiger_leveldb_la_SOURCES += util/perf_count.cc
 endif
 if HAVE_ROCKSDB
-libwiredtiger_leveldb_la_SOURCES += rocks_wt.cc
+libwiredtiger_leveldb_la_SOURCES += rocks_wt.cc rocksdb/write_batch.cc
+else
+libwiredtiger_leveldb_la_SOURCES += db/write_batch.cc
 endif
 
 if HAVE_ROCKSDB

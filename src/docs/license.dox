@@ -27,25 +27,35 @@ copyrights.
 
 <table>
 @hrow{Distribution Files, Copyright Holder, License}
-@row{src/include/bitstring.i, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{src/include/queue.h, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{src/support/hash_city.c, Google\, Inc., <a href="http://www.opensource.org/licenses/MIT">The MIT License</a>}
-@row{src/support/hash_fnv.c, Authors, Public Domain}
-@row{src/utilities/util_getopt.c, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
+@row{\c src/include/bitstring.i, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
+@row{\c src/include/queue.h, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
+@row{\c src/support/hash_city.c, Google\, Inc., <a href="http://www.opensource.org/licenses/MIT">The MIT License</a>}
+@row{\c src/support/hash_fnv.c, Authors, Public Domain}
+@row{\c src/utilities/util_getopt.c, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 </table>
 
 @section leveldb Optional 3rd party software included in the WiredTiger library: LevelDB
 
 If the \c --enable-leveldb configuration option is specified when
-configuring the WiredTiger library build, additional 3rd party software
-is included in the WiredTiger library binary, distributed under the
-terms of the LevelDB license.  Any redistribution of the WiredTiger
-library built with the \c --enable-leveldb configuration option should
-comply with this copyright.
+configuring the WiredTiger build, additional 3rd party software is
+included in the WiredTiger LevelDB library binary, distributed under
+the terms of the LevelDB license.  Any redistribution of the
+WiredTiger library built with the \c --enable-leveldb configuration
+option should comply with this copyright.
 
 <table>
 @hrow{Distribution Files, Copyright Holder, License}
-@row{api/leveldb/, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
+@row{\c api/leveldb/, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
+</table>
+
+If the \c --enable-leveldb=rocksdb configuration operation is
+specified when configuring the WiredTiger library build, the following
+3rd party software is also including in the WiredTiger LevelDB library
+binary, distributed under the LevelDB license.
+
+<table>
+@hrow{Distribution Files, Copyright Holder, License}
+@row{\c api/leveldb/rockdb, Facebook\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 </table>
 
 @section distribution 3rd party software included in the WiredTiger distribution
