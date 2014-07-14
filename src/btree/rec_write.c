@@ -4058,7 +4058,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		}
 
 		/* Unpack the on-page value cell, and look for an update. */
-		if ((val_cell = __wt_row_leaf_value(page, rip, NULL)) == NULL)
+		if ((val_cell =
+		    __wt_row_leaf_value_cell(page, rip, NULL)) == NULL)
 			vpack = NULL;
 		else {
 			vpack = &_vpack;
@@ -4256,6 +4257,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			    NULL, &cell, &tmpkey->data, &tmpkey->size))
 				goto build;
 
+			kpack = &_kpack;
 			__wt_cell_unpack(cell, kpack);
 			if (btree->huffman_key == NULL &&
 			    kpack->type == WT_CELL_KEY &&
