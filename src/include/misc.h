@@ -159,7 +159,7 @@
  * all compilers optimize this case in strcmp (e.g., clang).
  */
 #define	WT_STREQ(s, cs)							\
-	(sizeof (cs) == 2 ? (s)[0] == (cs)[0] && (s)[1] == '\0' :	\
+	(sizeof(cs) == 2 ? (s)[0] == (cs)[0] && (s)[1] == '\0' :	\
 	strcmp(s, cs) == 0)
 
 /* Check if a string matches a prefix, and move past it. */
