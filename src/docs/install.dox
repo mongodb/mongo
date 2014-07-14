@@ -130,8 +130,14 @@ Configure WiredTiger to perform various run-time diagnostic tests.
 @par \c --enable-java
 Build the WiredTiger Java API.
 
+@par \c --enable-leveldb
+Build the Google, Inc. LevelDB API.
+
 @par \c --enable-python
 Build the WiredTiger <a href="http://www.python.org">Python</a> API.
+
+@par \c --enable-rocksdb
+Build the Facebook, Inc. RocksDB API.
 
 @par \c --enable-snappy
 Configure WiredTiger for <a href="http://code.google.com/p/snappy/">snappy</a>
