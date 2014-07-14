@@ -86,7 +86,8 @@ Status WiredTigerErrorToStatus(int wiredTigerError, const char *msg) {
   if (msg == NULL)
     msg = wiredtiger_strerror(wiredTigerError);
 
-  printf("Failing status: %d -> %s\n", wiredTigerError, msg);
+  if (wiredTigerError != WT_NOTFOUND)
+    printf("Failing status: %d -> %s\n", wiredTigerError, msg);
 
   if (wiredTigerError == WT_NOTFOUND)
     return Status::NotFound(Slice(msg));
