@@ -230,16 +230,15 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		} else
 			*va_arg(ap, uint64_t *) = cursor->recno;
 	} else {
-		fmt = LF_ISSET(WT_CURSOR_RAW_OK) ? "u" : cursor->key_format;
-
 		/* Fast path some common cases. */
-		if (strcmp(fmt, "S") == 0)
-			*va_arg(ap, const char **) = cursor->key.data;
-		else if (strcmp(fmt, "u") == 0) {
+		fmt = cursor->key_format;
+		if (LF_ISSET(WT_CURSOR_RAW_OK) || WT_STREQ(fmt, "u")) {
 			key = va_arg(ap, WT_ITEM *);
 			key->data = cursor->key.data;
 			key->size = cursor->key.size;
-		} else
+		} else if (WT_STREQ(fmt, "S"))
+			*va_arg(ap, const char **) = cursor->key.data;
+		else
 			ret = __wt_struct_unpackv(session,
 			    cursor->key.data, cursor->key.size, fmt, ap);
 	}
@@ -264,7 +263,6 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET);
 
-	/* Fast path some common cases: single strings or byte arrays. */
 	if (WT_CURSOR_RECNO(cursor)) {
 		if (LF_ISSET(WT_CURSTD_RAW)) {
 			item = va_arg(ap, WT_ITEM *);
@@ -278,12 +276,13 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		cursor->key.data = &cursor->recno;
 		sz = sizeof(cursor->recno);
 	} else {
+		/* Fast path some common cases. */
 		fmt = cursor->key_format;
-		if (LF_ISSET(WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
+		if (LF_ISSET(WT_CURSOR_RAW_OK) || WT_STREQ(fmt, "u")) {
 			item = va_arg(ap, WT_ITEM *);
 			sz = item->size;
 			cursor->key.data = item->data;
-		} else if (strcmp(fmt, "S") == 0) {
+		} else if (WT_STREQ(fmt, "S")) {
 			str = va_arg(ap, const char *);
 			sz = strlen(str) + 1;
 			cursor->key.data = (void *)str;
@@ -349,17 +348,16 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT))
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));
 
-	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
-
-	/* Fast path some common cases: single strings, byte arrays and bits. */
-	if (strcmp(fmt, "S") == 0)
-		*va_arg(ap, const char **) = cursor->value.data;
-	else if (strcmp(fmt, "u") == 0) {
+	/* Fast path some common cases. */
+	fmt = cursor->value_format;
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK) || WT_STREQ(fmt, "u")) {
 		value = va_arg(ap, WT_ITEM *);
 		value->data = cursor->value.data;
 		value->size = cursor->value.size;
-	} else if (strcmp(fmt, "t") == 0 ||
-	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t") == 0))
+	} else if (WT_STREQ(fmt, "S"))
+		*va_arg(ap, const char **) = cursor->value.data;
+	else if (WT_STREQ(fmt, "t") ||
+	    (isdigit(fmt[0]) && WT_STREQ(fmt + 1, "t")))
 		*va_arg(ap, uint8_t *) = *(uint8_t *)cursor->value.data;
 	else
 		ret = __wt_struct_unpackv(session,
@@ -398,19 +396,18 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
 
-	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
-
-	/* Fast path some common cases: single strings, byte arrays and bits. */
-	if (strcmp(fmt, "S") == 0) {
-		str = va_arg(ap, const char *);
-		sz = strlen(str) + 1;
-		cursor->value.data = str;
-	} else if (F_ISSET(cursor, WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
+	/* Fast path some common cases. */
+	fmt = cursor->value_format;
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK) || WT_STREQ(fmt, "u")) {
 		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
 		cursor->value.data = item->data;
-	} else if (strcmp(fmt, "t") == 0 ||
-	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t") == 0)) {
+	} else if (WT_STREQ(fmt, "S")) {
+		str = va_arg(ap, const char *);
+		sz = strlen(str) + 1;
+		cursor->value.data = str;
+	} else if (WT_STREQ(fmt, "t") ||
+	    (isdigit(fmt[0]) && WT_STREQ(fmt + 1, "t"))) {
 		sz = 1;
 		buf = &cursor->value;
 		WT_ERR(__wt_buf_initsize(session, buf, sz));
