@@ -381,6 +381,8 @@ namespace {
             boost::lock_guard<boost::mutex> lock(_ridConfigMapMutex);
             config = _ridConfigMap[rid];
         }
+        LOG(2) << "received notification that node with RID " << rid << " and config " << config <<
+                " has reached optime: " << ts.toStringPretty();
         invariant(!config.isEmpty());
         std::string oplogNs = getReplicationMode() == modeReplSet?
                 "local.oplog.rs" : "local.oplog.$main";
@@ -393,8 +395,6 @@ namespace {
 
         if (getReplicationMode() == modeReplSet && !getCurrentMemberState().primary()) {
             // pass along if we are not primary
-            LOG(2) << "received notification that " << config << " has reached optime: "
-                   << ts.toStringPretty();
             theReplSet->syncSourceFeedback.updateMap(rid, ts);
         }
         return Status::OK();
@@ -916,10 +916,13 @@ namespace {
 
     bool LegacyReplicationCoordinator::processHandshake(const OID& remoteID,
                                                         const BSONObj& handshake) {
+        LOG(2) << "Received handshake " << handshake << " from node with RID " << remoteID;
 
         {
             boost::lock_guard<boost::mutex> lock(_ridConfigMapMutex);
-            _ridConfigMap[remoteID] = handshake["config"].Obj().getOwned();
+            BSONObj configObj = handshake["config"].Obj().getOwned();
+            invariant(!configObj.isEmpty());
+            _ridConfigMap[remoteID] = configObj;
         }
 
         if (getReplicationMode() != modeReplSet || !handshake.hasField("member")) {
