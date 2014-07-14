@@ -32,6 +32,7 @@ Gimpel
 GitHub
 Google
 Google's
+HyperLevelDB
 IEC
 JavaScript
 LDFLAGS
@@ -53,6 +54,7 @@ NoSQL
 README
 RedHat
 RepMgr
+RocksDB
 Roelofs
 Rrx
 Seward's
@@ -127,6 +129,7 @@ dataitem
 datasets
 datastore
 dbc
+dbformat
 dbm
 dbt
 decl
@@ -286,6 +289,7 @@ os
 ovfl
 pcoll
 pdf
+perf
 petabyte
 pget
 php
@@ -330,6 +334,7 @@ schemas
 selectable
 seqname
 serializable
+skiplist
 spinlock
 spinlocks
 sql
