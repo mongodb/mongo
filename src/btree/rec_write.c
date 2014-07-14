@@ -4058,7 +4058,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		}
 
 		/* Unpack the on-page value cell, and look for an update. */
-		if ((val_cell = __wt_row_leaf_value(page, rip, NULL)) == NULL)
+		if ((val_cell =
+		    __wt_row_leaf_value_cell(page, rip, NULL)) == NULL)
 			vpack = NULL;
 		else {
 			vpack = &_vpack;

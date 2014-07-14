@@ -673,6 +673,14 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 			++rip;
 			break;
 		case WT_CELL_VALUE:
+			/*
+			 * Simple values without compression can be directly
+			 * referenced on the page to avoid repeatedly unpacking
+			 * their cells.
+			 */
+			if (!btree->huffman_value)
+				__wt_row_leaf_value_set(page, rip - 1, unpack);
+			break;
 		case WT_CELL_VALUE_OVFL:
 			break;
 		WT_ILLEGAL_VALUE(session);
