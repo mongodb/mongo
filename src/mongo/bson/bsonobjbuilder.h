@@ -43,7 +43,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bson_builder_base.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/client/export_macros.h"
 
@@ -61,7 +60,7 @@ namespace mongo {
     /** Utility for creating a BSONObj.
         See also the BSON() and BSON_ARRAY() macros.
     */
-    class MONGO_CLIENT_API BSONObjBuilder : public BSONBuilderBase, private boost::noncopyable {
+    class MONGO_CLIENT_API BSONObjBuilder : boost::noncopyable {
     public:
         /** @param initsize this is just a hint as to the final size of the object */
         BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize + sizeof(unsigned)), _offset( sizeof(unsigned) ), _s( this ) , _tracker(0) , _doneCalled(false) {
@@ -714,7 +713,7 @@ namespace mongo {
         static bool numStrsReady; // for static init safety
     };
 
-    class BSONArrayBuilder : public BSONBuilderBase, private boost::noncopyable {
+    class BSONArrayBuilder : boost::noncopyable {
     public:
         BSONArrayBuilder() : _i(0), _b() {}
         BSONArrayBuilder( BufBuilder &_b ) : _i(0), _b(_b) {}
