@@ -58,9 +58,6 @@ namespace mongo {
         else if ( storageGlobalParams.engine == "heap1" ) {
             globalStorageEngine = new Heap1Engine();
         }
-        else if ( storageGlobalParams.engine == "rocks" ) {
-            globalStorageEngine = new RocksEngine( storageGlobalParams.dbpath );
-        }
         else {
             const StorageEngine::Factory* factory = factorys[storageGlobalParams.engine];
             uassert(18525, "unknown storage engine: " + storageGlobalParams.engine,

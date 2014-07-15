@@ -96,6 +96,8 @@ namespace mongo {
         // all indexes have to be dropped first
         void dropMetaData();
 
+        const string metaDataKey() { return _metaDataKey; }
+
         struct IndexMetaData {
             IndexMetaData() {}
             IndexMetaData( BSONObj s, bool r, DiskLoc h, bool m )

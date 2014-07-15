@@ -32,6 +32,7 @@
 #pragma once
 
 #include <list>
+#include <map>
 #include <string>
 
 #include <boost/optional.hpp>
@@ -39,15 +40,17 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
-#include "bson/ordering.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/string_map.h"
 
 namespace rocksdb {
     class ColumnFamilyHandle;
+    struct ColumnFamilyDescriptor;
     struct ColumnFamilyOptions;
     class DB;
+    struct Options;
 }
 
 namespace mongo {
@@ -121,6 +124,9 @@ namespace mongo {
         Entry* getEntry( const StringData& ns );
         const Entry* getEntry( const StringData& ns ) const;
 
+        typedef std::vector<boost::shared_ptr<Entry> > EntryVector;
+        typedef std::vector<rocksdb::ColumnFamilyDescriptor> CfdVector;
+
     private:
 
         rocksdb::ColumnFamilyOptions _collectionOptions() const;
@@ -133,5 +139,40 @@ namespace mongo {
         mutable boost::mutex _mapLock;
         Map _map;
 
+        // private methods that should only be called from the RocksEngine constructor
+        
+        /**
+         * Create Entry's for all non-index column families. See larger comment in .cpp for why
+         * this is necessary
+         */
+        EntryVector _createNonIndexCatalogEntries( const std::vector<std::string>& families );
+
+        /**
+         * Generate column family descriptors for the metadata column family corresponding to each
+         * Entry in entries
+         */
+        CfdVector _generateCfds( const EntryVector& entries, const std::vector<string>& nsVec );
+
+        /**
+         * Helper function to the _generateIndexOrderings method
+         */
+        std::map<string, Ordering> _createIndexOrderingsHelper(
+                const std::vector<std::string>& namespaces );
+
+        /**
+         * Highest level helper function to generate a map from index names to Orderings. This is
+         * needed to properly open column families representing indexes, because an Ordering for
+         * each such index is needed in order to create the comparator for the column family.
+         *
+         * @families a vector containing the name of every column family in the database
+         */
+        std::map<string, Ordering> _createIndexOrderings( const std::vector<string>& namespaces,
+                                                          const rocksdb::Options& options,
+                                                          const string& path,
+                                                          rocksdb::DB* const db );
+
+        CfdVector _createCfds ( const string& path, 
+                                const rocksdb::Options& options, 
+                                rocksdb::DB* const db);        
     };
 }
