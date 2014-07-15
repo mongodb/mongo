@@ -44,9 +44,9 @@ these copyrights.
 
 <table>
 @hrow{Distribution Files, Copyright Holder, License}
-@row{\c api/leveldb/leveldb/*, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 @row{\c api/leveldb/basho/*, Basho Technologies\, Inc., <a href="http://opensource.org/licenses/Apache-2.0">Apache License\, Version 2.0</a>}
 @row{\c api/leveldb/hyperleveldb/*, The HyperLevelDB Authors, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
+@row{\c api/leveldb/leveldb/*, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 @row{\c api/leveldb/rocksdb/*, Facebook\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 </table>
 
