@@ -74,9 +74,10 @@ for i in `cd .. &&
         -o -name '*.cxx' -o -name '*.in' -o -name '*.java' -o -name '*.py' |
     sed	-e '/Makefile.in/d' \
 	-e '/^build_posix\//d' \
-        -e '/api\/leveldb\/db\//d' \
-        -e '/api\/leveldb\/include\//d' \
-        -e '/api\/leveldb\/util\//d' \
+        -e '/api\/leveldb\/basho\//d' \
+        -e '/api\/leveldb\/hyperleveldb\//d' \
+        -e '/api\/leveldb\/leveldb\//d' \
+        -e '/api\/leveldb\/rocksdb\//d' \
         -e '/test\/3rdparty\//d' \
 	-e 's/^\.\///'`
 do
