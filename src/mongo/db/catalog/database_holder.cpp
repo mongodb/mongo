@@ -55,12 +55,12 @@ namespace mongo {
     }
 
     Database* DatabaseHolder::get(OperationContext* txn,
-                                  const std::string& ns) const {
+                                  const StringData& ns) const {
 
         txn->lockState()->assertAtLeastReadLocked(ns);
 
         SimpleMutex::scoped_lock lk(_m);
-        const std::string db = _todb( ns );
+        const StringData db = _todb( ns );
         DBs::const_iterator it = _dbs.find(db);
         if ( it != _dbs.end() )
             return it->second;
@@ -68,10 +68,10 @@ namespace mongo {
     }
 
     Database* DatabaseHolder::getOrCreate(OperationContext* txn,
-                                          const string& ns,
+                                          const StringData& ns,
                                           bool& justCreated) {
 
-        const string dbname = _todb( ns );
+        const StringData dbname = _todb( ns );
         invariant(txn->lockState()->isAtLeastReadLocked(dbname));
 
         if (txn->lockState()->isWriteLocked() && FileAllocator::get()->hasFailed()) {
@@ -81,7 +81,7 @@ namespace mongo {
         {
             SimpleMutex::scoped_lock lk(_m);
             {
-                DBs::iterator i = _dbs.find(dbname);
+                DBs::const_iterator i = _dbs.find(dbname);
                 if( i != _dbs.end() ) {
                     justCreated = false;
                     return i->second;
@@ -122,7 +122,7 @@ namespace mongo {
     }
 
     void DatabaseHolder::erase(OperationContext* txn,
-                               const std::string& ns) {
+                               const StringData& ns) {
         invariant(txn->lockState()->isW());
 
         SimpleMutex::scoped_lock lk(_m);
@@ -137,7 +137,7 @@ namespace mongo {
         getDur().commitNow(txn); // bad things happen if we close a DB with outstanding writes
 
         set< string > dbs;
-        for ( map<string,Database*>::iterator i = _dbs.begin(); i != _dbs.end(); i++ ) {
+        for ( DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i ) {
             dbs.insert( i->first );
         }
 

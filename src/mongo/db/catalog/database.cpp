@@ -120,9 +120,9 @@ namespace mongo {
     }
 
     Database::Database(OperationContext* txn,
-                       const std::string& name,
+                       const StringData& name,
                        DatabaseCatalogEntry* dbEntry )
-        : _name(name),
+        : _name(name.toString()),
           _dbEntry( dbEntry ),
           _profileName(_name + ".system.profile"),
           _indexesName(_name + ".system.indexes"),

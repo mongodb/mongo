@@ -536,7 +536,7 @@ namespace mongo {
     }
 
     /*static*/ 
-    void Database::closeDatabase(OperationContext* txn, const string& db) {
+    void Database::closeDatabase(OperationContext* txn, const StringData& db) {
         // XXX? - Do we need to close database under global lock or just DB-lock is sufficient ?
         invariant(txn->lockState()->isW());
 

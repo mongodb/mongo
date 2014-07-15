@@ -30,9 +30,11 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -40,7 +42,7 @@ namespace mongo {
      * dbname -> Database
      */
     class DatabaseHolder {
-        typedef std::map<std::string,Database*> DBs;
+        typedef StringMap<Database*> DBs;
         // todo: we want something faster than this if called a lot:
         mutable SimpleMutex _m;
         DBs _dbs;
@@ -48,13 +50,13 @@ namespace mongo {
         DatabaseHolder() : _m("dbholder"){ }
 
         Database* get(OperationContext* txn,
-                      const std::string& ns) const;
+                      const StringData& ns) const;
 
         Database* getOrCreate(OperationContext* txn,
-                              const std::string& ns,
+                              const StringData& ns,
                               bool& justCreated);
 
-        void erase(OperationContext* txn, const std::string& ns);
+        void erase(OperationContext* txn, const StringData& ns);
 
         /** @param force - force close even if something underway - use at shutdown */
         bool closeAll(OperationContext* txn,
@@ -66,18 +68,18 @@ namespace mongo {
          */
         void getAllShortNames( std::set<std::string>& all ) const {
             SimpleMutex::scoped_lock lk(_m);
-            for( DBs::const_iterator j=_dbs.begin(); j!=_dbs.end(); j++ ) {
+            for( DBs::const_iterator j=_dbs.begin(); j!=_dbs.end(); ++j ) {
                 all.insert( j->first );
             }
         }
 
     private:
-        static std::string _todb( const std::string& ns ) {
-            std::string d = __todb( ns );
-            uassert( 13280 , (std::string)"invalid db name: " + ns , NamespaceString::validDBName( d ) );
+        static StringData _todb( const StringData& ns ) {
+            StringData d = __todb( ns );
+            uassert(13280, "invalid db name: " + ns.toString(), NamespaceString::validDBName(d));
             return d;
         }
-        static std::string __todb( const std::string& ns ) {
+        static StringData __todb( const StringData& ns ) {
             size_t i = ns.find( '.' );
             if ( i == std::string::npos ) {
                 uassert( 13074 , "db name can't be empty" , ns.size() );

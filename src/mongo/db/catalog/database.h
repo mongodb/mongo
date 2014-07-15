@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
@@ -57,14 +58,14 @@ namespace mongo {
     public:
         // you probably need to be in dbHolderMutex when constructing this
         Database(OperationContext* txn,
-                 const std::string& name,
+                 const StringData& name,
                  DatabaseCatalogEntry* dbEntry );
 
         /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
            thus the destructor is private.  this could be cleaned up one day...
         */
         static void closeDatabase(OperationContext* txn,
-                                  const std::string& db);
+                                  const StringData& db);
 
         // do not use!
         ~Database(); // closes files and other cleanup see below.
