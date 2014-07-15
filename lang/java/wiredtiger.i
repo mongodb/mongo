@@ -1641,6 +1641,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 %ignore __wt_extractor;
 %ignore __wt_connection::add_extractor;
 %ignore __wt_item;
+%ignore __wt_lsn;
 %ignore __wt_session::msg_printf;
 
 %ignore wiredtiger_struct_pack;
