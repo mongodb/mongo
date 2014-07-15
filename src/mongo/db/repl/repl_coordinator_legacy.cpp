@@ -314,11 +314,6 @@ namespace {
             return true;
         }
 
-        //TODO: Investigate if this is needed/used, see SERVER-9188
-        if (cc().isGod()) {
-            return true;
-        }
-
         return dbName == "local";
     }
 
