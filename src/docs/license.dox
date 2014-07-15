@@ -44,36 +44,10 @@ these copyrights.
 
 <table>
 @hrow{Distribution Files, Copyright Holder, License}
-@row{\c api/leveldb/db/dbformat.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/db/skiplist.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/db/write_batch.cc, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/db/write_batch_internal.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/include/leveldb/cache.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/include/leveldb/comparator.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/include/leveldb/db.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/include/leveldb/env.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/include/leveldb/filter_policy.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/include/leveldb/iterator.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/include/leveldb/options.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/include/leveldb/slice.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/include/leveldb/status.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/include/leveldb/perf_count.h, Basho Technologies\, Inc., <a href="http://opensource.org/licenses/Apache-2.0">Apache License\, Version 2.0</a>}
-@row{\c api/leveldb/include/leveldb/write_batch.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/include/leveldb/replay_iterator.h, The HyperLevelDB Authors, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/arena.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/coding.cc, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/coding.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/comparator.cc, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/env.cc, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/env_posix.cc, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/logging.cc, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/logging.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/options.cc, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/posix_logger.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/random.h, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/status.cc, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c api/leveldb/util/perf_count.cc, Basho Technologies\, Inc., <a href="http://opensource.org/licenses/Apache-2.0">Apache License\, Version 2.0</a>}
-@row{\c api/leveldb/rocksdb/write_batch.cc, Facebook\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
+@row{\c api/leveldb/leveldb/*, Google\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
+@row{\c api/leveldb/basho/*, Basho Technologies\, Inc., <a href="http://opensource.org/licenses/Apache-2.0">Apache License\, Version 2.0</a>}
+@row{\c api/leveldb/hyperleveldb/*, The HyperLevelDB Authors, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
+@row{\c api/leveldb/rocksdb/*, Facebook\, Inc., <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 </table>
 
 @section distribution 3rd party software included in the WiredTiger distribution
