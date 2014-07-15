@@ -149,7 +149,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	    NULL,			/* get-key */
 	    NULL,			/* get-value */
 	    NULL,			/* set-key */
-	    __wt_cursor_notsup,		/* set-value */
+	    NULL,			/* set-value */
 	    __curlog_compare,		/* compare */
 	    __curlog_next,		/* next */
 	    __wt_cursor_notsup,		/* prev */
