@@ -84,7 +84,7 @@ tfile.write('''\
 }
 ''')
 tfile.close()
-compare_srcfile(tmp_file, '../src/api/api_strerror.c')
+compare_srcfile(tmp_file, '../src/conn/api_strerror.c')
 
 # Update the error documentation block.
 tmp_file = '__tmp'

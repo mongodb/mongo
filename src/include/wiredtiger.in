@@ -1909,6 +1909,8 @@ struct __wt_connection {
  * (as a percentage)., an integer between 10 and 99; default \c 95.}
  * @config{eviction_workers, additional threads to help evict pages from cache.,
  * an integer between 0 and 20; default \c 0.}
+ * @config{exclusive, fail if the database already exists\, generally used with
+ * the \c create option., a boolean flag; default \c false.}
  * @config{extensions, list of shared library extensions to load (using dlopen).
  * Any values specified to an library extension are passed to
  * WT_CONNECTION::load_extension as the \c config parameter (for example\,
