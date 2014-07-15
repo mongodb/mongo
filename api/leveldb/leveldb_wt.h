@@ -38,8 +38,8 @@
 #include "leveldb/slice.h"
 #include "leveldb/status.h"
 #include "leveldb/write_batch.h"
-#if HAVE_ELEVELDB
-#include "leveldb/perf_count.h"
+#if HAVE_BASHO_LEVELDB
+#include "basho/perf_count.h"
 #endif
 
 #include "wiredtiger.h"
@@ -63,7 +63,7 @@ using leveldb::Range;
 using leveldb::Slice;
 using leveldb::Snapshot;
 using leveldb::Status;
-#if HAVE_ELEVELDB
+#if HAVE_BASHOLEVELDB
 using leveldb::Value;
 #endif
 #if HAVE_ROCKSDB
@@ -279,7 +279,7 @@ public:
   virtual Status Get(const ReadOptions& options,
          const Slice& key, std::string* value);
 
-#if HAVE_ELEVELDB
+#if HAVE_BASHOLEVELDB
   virtual Status Get(const ReadOptions& options,
          const Slice& key, Value* value);
 #endif

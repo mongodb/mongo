@@ -86,23 +86,24 @@ AM_CONDITIONAL([JAVA], [test x$wt_cv_enable_java = xyes])
 
 AC_MSG_CHECKING(if --enable-leveldb option specified)
 AC_ARG_ENABLE(leveldb,
-	[AS_HELP_STRING([--enable-leveldb],
+	[AS_HELP_STRING([--enable-leveldb[[=yes|basho|hyper|rocksdb]]],
 	    [Build the LevelDB API.])], r=$enableval, r=no)
-
 wt_cv_enable_leveldb=yes
-wt_cv_enable_eleveldb=no
+wt_cv_enable_basholeveldb=no
 wt_cv_enable_hyperleveldb=no
 wt_cv_enable_rocksdb=no
 case "$r" in
+yes)		;;
 no)		wt_cv_enable_leveldb=no;;
-eleveldb)	wt_cv_enable_eleveldb=yes;;
+basho)		wt_cv_enable_basholeveldb=yes;;
 hyper)		wt_cv_enable_hyperleveldb=yes;;
 rocksdb)	wt_cv_enable_rocksdb=yes;;
+*)		AC_MSG_ERROR([Unknown LevelDB flavor \"$r\"]);;
 esac
 
-AH_TEMPLATE(HAVE_ELEVELDB, [Build the LevelDB API with ELevelDB support.])
-if test "$wt_cv_enable_eleveldb" = "yes"; then
-	AC_DEFINE(HAVE_ELEVELDB)
+AH_TEMPLATE(HAVE_BASHOLEVELDB, [Build the LevelDB API with Basho LevelDB support.])
+if test "$wt_cv_enable_basholeveldb" = "yes"; then
+	AC_DEFINE(HAVE_BASHOLEVELDB)
 fi
 AH_TEMPLATE(HAVE_HYPERLEVELDB,
     [Build the LevelDB API with HyperLevelDB support.])
@@ -115,7 +116,7 @@ if test "$wt_cv_enable_rocksdb" = "yes"; then
 fi
 AC_MSG_RESULT($wt_cv_enable_leveldb)
 AM_CONDITIONAL([LEVELDB], [test "$wt_cv_enable_leveldb" = "yes"])
-AM_CONDITIONAL([HAVE_ELEVELDB], [test "$wt_cv_enable_eleveldb" = "yes"])
+AM_CONDITIONAL([HAVE_BASHOLEVELDB], [test "$wt_cv_enable_basholeveldb" = "yes"])
 AM_CONDITIONAL([HAVE_HYPERLEVELDB], [test "$wt_cv_enable_hyperleveldb" = "yes"])
 AM_CONDITIONAL([HAVE_ROCKSDB], [test "$wt_cv_enable_rocksdb" = "yes"])
 

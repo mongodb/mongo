@@ -31,7 +31,7 @@
 #include <unistd.h>
 #include <sstream>
 
-#if HAVE_ELEVELDB
+#if HAVE_BASHOLEVELDB
 namespace leveldb {
 Value::~Value() {}
 
@@ -185,7 +185,7 @@ FilterPolicy::~FilterPolicy() {}
 const FilterPolicy *NewBloomFilterPolicy(int bits_per_key) {
   return new FilterPolicyImpl(bits_per_key);
 }
-#if HAVE_ELEVELDB
+#if HAVE_BASHOLEVELDB
 const FilterPolicy *NewBloomFilterPolicy2(int bits_per_key) {
   return NewBloomFilterPolicy(bits_per_key);
 }
@@ -449,7 +449,7 @@ DbImpl::Get(const ReadOptions& options,
   return WiredTigerErrorToStatus(ret, errmsg);
 }
 
-#if HAVE_ELEVELDB
+#if HAVE_BASHOLEVELDB
 // If the database contains an entry for "key" store the
 // corresponding value in *value and return OK.
 //

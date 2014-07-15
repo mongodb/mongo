@@ -67,7 +67,7 @@ struct Range {
   Range(const Slice& s, const Slice& l) : start(s), limit(l) { }
 };
 
-#if HAVE_ELEVELDB
+#if HAVE_BASHOLEVELDB
 // Abstract holder for a DB value.
 // This allows callers to manage their own value buffers and have
 // DB values copied directly into those buffers.
@@ -230,7 +230,7 @@ class DB {
   // May return some other Status on an error.
   virtual Status Get(const ReadOptions& options,
                      const Slice& key, std::string* value) = 0;
-#if HAVE_ELEVELDB
+#if HAVE_BASHOLEVELDB
   virtual Status Get(const ReadOptions& options,
                      const Slice& key, Value* value) = 0;
 #endif

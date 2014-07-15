@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir)/api/leveldb/include
+AM_CPPFLAGS = -I$(top_builddir) -I$(srcdir)/leveldb -I$(srcdir)/leveldb/include
 
 lib_LTLIBRARIES = libwiredtiger_leveldb.la
 
@@ -17,40 +17,42 @@ endif
 endif
 leveldbinclude_HEADERS = \
 	wiredtiger_config.h \
-	include/leveldb/cache.h \
-	include/leveldb/comparator.h\
-	include/leveldb/db.h \
-	include/leveldb/env.h \
-	include/leveldb/filter_policy.h \
-	include/leveldb/iterator.h \
-	include/leveldb/options.h \
-	include/leveldb/slice.h \
-	include/leveldb/status.h \
-	include/leveldb/write_batch.h
+	leveldb/include/leveldb/cache.h \
+	leveldb/include/leveldb/comparator.h\
+	leveldb/include/leveldb/db.h \
+	leveldb/include/leveldb/env.h \
+	leveldb/include/leveldb/filter_policy.h \
+	leveldb/include/leveldb/iterator.h \
+	leveldb/include/leveldb/options.h \
+	leveldb/include/leveldb/slice.h \
+	leveldb/include/leveldb/status.h \
+	leveldb/include/leveldb/write_batch.h
 
-if HAVE_ELEVELDB
+if HAVE_BASHOLEVELDB
+AM_CPPFLAGS += -I$(srcdir)/leveldb/include/leveldb -I$(srcdir)/basho
 leveldbinclude_HEADERS += \
-	 include/leveldb/perf_count.h
+	 basho/perf_count.h
 endif
 if HAVE_HYPERLEVELDB
+AM_CPPFLAGS += -I$(srcdir)/leveldb/include/leveldb -I$(srcdir)/hyperleveldb
 leveldbinclude_HEADERS += \
-	 include/leveldb/replay_iterator.h
+	 hyperleveldb/replay_iterator.h
 endif
 
 libwiredtiger_leveldb_la_LDFLAGS = -release @VERSION@
 libwiredtiger_leveldb_la_LIBADD = $(top_builddir)/libwiredtiger.la
 libwiredtiger_leveldb_la_SOURCES = \
 	leveldb_wt.cc \
-	util/coding.cc util/comparator.cc util/env.cc util/env_posix.cc \
-	util/logging.cc util/options.cc util/status.cc
+	leveldb/util/coding.cc leveldb/util/comparator.cc leveldb/util/env.cc leveldb/util/env_posix.cc \
+	leveldb/util/logging.cc leveldb/util/options.cc leveldb/util/status.cc
 
-if HAVE_ELEVELDB
-libwiredtiger_leveldb_la_SOURCES += util/perf_count.cc
+if HAVE_BASHOLEVELDB
+libwiredtiger_leveldb_la_SOURCES += basho/perf_count.cc
 endif
 if HAVE_ROCKSDB
 libwiredtiger_leveldb_la_SOURCES += rocks_wt.cc rocksdb/write_batch.cc
 else
-libwiredtiger_leveldb_la_SOURCES += db/write_batch.cc
+libwiredtiger_leveldb_la_SOURCES += leveldb/db/write_batch.cc
 endif
 
 if HAVE_ROCKSDB

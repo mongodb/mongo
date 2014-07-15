@@ -75,7 +75,7 @@ struct Options {
   Options* OptimizeLevelStyleCompaction() { return this; }
 #endif
 
-#if HAVE_ELEVELDB
+#if HAVE_BASHOLEVELDB
   // Riak specific: this variable replaces paranoid_checks at one
   // one place in the code.  This variable alone controls whether or not
   // compaction read operations check CRC values.  Riak needs

@@ -22,7 +22,7 @@
 #include <vector>
 #include <stdarg.h>
 #include <stdint.h>
-#if HAVE_ELEVELDB
+#if HAVE_BASHOLEVELDB
 #include "perf_count.h"
 #endif
 #include "status.h"
@@ -153,7 +153,7 @@ class Env {
   // Sleep/delay the thread for the perscribed number of micro-seconds.
   virtual void SleepForMicroseconds(int micros) = 0;
 
-#if HAVE_ELEVELDB
+#if HAVE_BASHOLEVELDB
   // Riak specific:  Where supported, give count of background jobs pending.
   virtual int GetBackgroundBacklog() const {return(0);};
   

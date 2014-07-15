@@ -31,7 +31,7 @@
 #include <errno.h>
 
 #ifndef STORAGE_LEVELDB_INCLUDE_PERF_COUNT_H_
-#include "leveldb/perf_count.h"
+#include "perf_count.h"
 #endif
 
 #include "util/coding.h"
