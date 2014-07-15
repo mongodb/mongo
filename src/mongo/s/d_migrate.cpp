@@ -88,6 +88,31 @@
 
 using namespace std;
 
+namespace {
+    using mongo::WriteConcernOptions;
+    using mongo::repl::ReplicationCoordinator;
+
+    const int kDefaultWTimeoutMs = 60 * 1000;
+    const WriteConcernOptions DefaultWriteConcern(2, WriteConcernOptions::NONE, kDefaultWTimeoutMs);
+
+    /**
+     * Returns the default write concern for migration cleanup (at donor shard) and
+     * cloning documents (at recipient shard).
+     */
+    WriteConcernOptions getDefaultWriteConcern() {
+        ReplicationCoordinator* replCoordinator =
+                mongo::repl::getGlobalReplicationCoordinator();
+        mongo::Status status =
+                replCoordinator->checkIfWriteConcernCanBeSatisfied(DefaultWriteConcern);
+
+        if (status.isOK()) {
+            return DefaultWriteConcern;
+        }
+
+        return WriteConcernOptions(1, WriteConcernOptions::NONE, 0);
+    }
+}
+
 namespace mongo {
 
     MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
@@ -746,6 +771,24 @@ namespace mongo {
      * called to initial a move
      * usually by a mongos
      * this is called on the "from" side
+     *
+     * Format:
+     * {
+     *   moveChunk: "namespace",
+     *   from: "hostAndPort",
+     *   fromShard: "shardName",
+     *   to: "hostAndPort",
+     *   toShard: "shardName",
+     *   min: {},
+     *   max: {},
+     *   maxChunkBytes: numeric,
+     *   shardId: "_id of chunk document in config.chunks",
+     *   configdb: "hostAndPort",
+     *
+     *   // optional
+     *   secondaryThrottle: bool, //defaults to true.
+     *   writeConcern: {} // applies to individual writes.
+     * }
      */
     class MoveChunkCommand : public Command {
     public:
@@ -802,28 +845,33 @@ namespace mongo {
                 to = cmdObj["toShard"].String();
             }
 
-            // if we do a w=2 after every write
-            bool secondaryThrottle = cmdObj["secondaryThrottle"].trueValue();
-            if ( secondaryThrottle ) {
-                const repl::ReplicationCoordinator::Mode replMode =
-                        repl::getGlobalReplicationCoordinator()->getReplicationMode();
-                if (replMode == repl::ReplicationCoordinator::modeReplSet) {
-                    if (repl::theReplSet->config().getMajority() <= 1) {
-                        secondaryThrottle = false;
-                        warning() << "not enough nodes in set to use secondaryThrottle: "
-                                  << " majority: " << repl::theReplSet->config().getMajority()
-                                  << endl;
-                    }
+            // Process secondary throttle settings and assign defaults if necessary.
+            BSONObj secThrottleObj;
+            WriteConcernOptions writeConcern;
+            Status status = writeConcern.parseSecondaryThrottle(cmdObj, &secThrottleObj);
+
+            if (!status.isOK()){
+                if (status.code() != ErrorCodes::WriteConcernNotDefined) {
+                    warning() << status.toString() << endl;
+                    return appendCommandStatus(result, status);
                 }
-                else if (replMode == repl::ReplicationCoordinator::modeNone) {
-                    secondaryThrottle = false;
-                    warning() << "secondaryThrottle selected but no replication" << endl;
+
+                writeConcern = getDefaultWriteConcern();
+            }
+            else {
+                repl::ReplicationCoordinator* replCoordinator =
+                        repl::getGlobalReplicationCoordinator();
+                Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
+                if (!status.isOK()) {
+                    warning() << status.toString() << endl;
+                    return appendCommandStatus(result, status);
                 }
-                else {
-                    // master/slave
-                    secondaryThrottle = false;
-                    warning() << "secondaryThrottle not allowed with master/slave" << endl;
-                }
+            }
+
+            if (writeConcern.shouldWaitForOtherNodes() &&
+                    writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
+                // Don't allow no timeout.
+                writeConcern.wTimeout = kDefaultWTimeoutMs;
             }
 
             // Do inline deletion
@@ -1056,19 +1104,27 @@ namespace mongo {
                 ScopedDbConnection connTo(toShard.getConnString());
                 BSONObj res;
                 bool ok;
+
+                const bool isSecondaryThrottle(writeConcern.shouldWaitForOtherNodes());
+
+                BSONObjBuilder recvChunkStartBuilder;
+                recvChunkStartBuilder.append("_recvChunkStart", ns);
+                recvChunkStartBuilder.append("from", fromShard.getConnString());
+                recvChunkStartBuilder.append("fromShardName", fromShard.getName());
+                recvChunkStartBuilder.append("toShardName", toShard.getName());
+                recvChunkStartBuilder.append("min", min);
+                recvChunkStartBuilder.append("max", max);
+                recvChunkStartBuilder.append("shardKeyPattern", shardKeyPattern);
+                recvChunkStartBuilder.append("configServer", configServer.modelServer());
+                recvChunkStartBuilder.append("secondaryThrottle", isSecondaryThrottle);
+
+                // Follow the same convention in moveChunk.
+                if (isSecondaryThrottle && !secThrottleObj.isEmpty()) {
+                    recvChunkStartBuilder.append("writeConcern", secThrottleObj);
+                }
+
                 try{
-                    ok = connTo->runCommand( "admin" ,
-                                             BSON( "_recvChunkStart" << ns <<
-                                                   "from" << fromShard.getConnString() <<
-                                                   "fromShardName" << fromShard.getName() <<
-                                                   "toShardName" << toShard.getName() <<
-                                                   "min" << min <<
-                                                   "max" << max <<
-                                                   "shardKeyPattern" << shardKeyPattern <<
-                                                   "configServer" << configServer.modelServer() <<
-                                                   "secondaryThrottle" << secondaryThrottle
-                                             ) ,
-                                             res );
+                    ok = connTo->runCommand("admin", recvChunkStartBuilder.done(), res);
                 }
                 catch( DBException& e ){
                     errmsg = str::stream() << "moveChunk could not contact to: shard "
@@ -1501,7 +1557,7 @@ namespace mongo {
                                         min.getOwned(),
                                         max.getOwned(),
                                         shardKeyPattern.getOwned(),
-                                        secondaryThrottle,
+                                        writeConcern,
                                         &errMsg)) {
                     log() << "Error occured while performing cleanup: " << errMsg << endl;
                 }
@@ -1514,7 +1570,7 @@ namespace mongo {
                                           min.getOwned(),
                                           max.getOwned(),
                                           shardKeyPattern.getOwned(),
-                                          secondaryThrottle,
+                                          writeConcern,
                                           NULL, // Don't want to be notified.
                                           &errMsg)) {
                     log() << "could not queue migration cleanup: " << errMsg << endl;
@@ -1728,7 +1784,7 @@ namespace mongo {
                 long long num = Helpers::removeRange( txn,
                                                       range,
                                                       false, /*maxInclusive*/
-                                                      secondaryThrottle, /* secondaryThrottle */
+                                                      writeConcern,
                                                       /*callback*/
                                                       serverGlobalParams.moveParanoia ? &rs : 0,
                                                       true ); /* flag fromMigrate in oplog */
@@ -1760,7 +1816,7 @@ namespace mongo {
             State currentState = getState();
             if (currentState == FAIL || currentState == ABORT) {
                 string errMsg;
-                if (!getDeleter()->queueDelete(ns, min, max, shardKeyPattern, secondaryThrottle,
+                if (!getDeleter()->queueDelete(ns, min, max, shardKeyPattern, writeConcern,
                                                NULL /* notifier */, &errMsg)) {
                     warning() << "Failed to queue delete for migrate abort: " << errMsg << endl;
                 }
@@ -1820,18 +1876,15 @@ namespace mongo {
                         numCloned++;
                         clonedBytes += o.objsize();
 
-                        if ( secondaryThrottle && thisTime > 0 ) {
-                            WriteConcernOptions writeConcern;
-                            writeConcern.wNumNodes = 2;
-                            writeConcern.wTimeout = 60 * 1000;
+                        if (writeConcern.shouldWaitForOtherNodes() && thisTime > 0) {
                             repl::ReplicationCoordinator::StatusAndDuration replStatus =
                                     repl::getGlobalReplicationCoordinator()->awaitReplication(
                                             txn,
                                             cc().getLastOp(),
                                             writeConcern);
                             if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
-                                    warning() << "secondaryThrottle on, but doc insert timed out "
-                                                 "after 60 seconds, continuing";
+                                warning() << "secondaryThrottle on, but doc insert timed out; "
+                                             "continuing";
                             }
                             else {
                                 massertStatusOK(replStatus.status);
@@ -2044,10 +2097,12 @@ namespace mongo {
 
                     // TODO: create a better interface to remove objects directly
                     KeyRange range( ns, id, id, idIndexPattern );
+                    const WriteConcernOptions singleNodeWrite(1, WriteConcernOptions::NONE,
+                            WriteConcernOptions::kNoTimeout);
                     Helpers::removeRange( txn,
                                           range ,
                                           true , /*maxInclusive*/
-                                          false , /* secondaryThrottle */
+                                          singleNodeWrite,
                                           serverGlobalParams.moveParanoia ? &rs : 0 , /*callback*/
                                           true ); /*fromMigrate*/
 
@@ -2212,7 +2267,7 @@ namespace mongo {
         long long clonedBytes;
         long long numCatchup;
         long long numSteady;
-        bool secondaryThrottle;
+        WriteConcernOptions writeConcern;
 
         int replSetMajorityCount;
 
@@ -2238,6 +2293,25 @@ namespace mongo {
         cc().shutdown();
     }
 
+    /**
+     * Command for initiating the recipient side of the migration to start copying data
+     * from the donor shard.
+     *
+     * {
+     *   _recvChunkStart: "namespace",
+     *   congfigServer: "hostAndPort",
+     *   from: "hostAndPort",
+     *   fromShardName: "shardName",
+     *   toShardName: "shardName",
+     *   min: {},
+     *   max: {},
+     *   shardKeyPattern: {},
+     *
+     *   // optional
+     *   secondaryThrottle: bool, // defaults to true
+     *   writeConcern: {} // applies to individual writes.
+     * }
+     */
     class RecvChunkStartCommand : public ChunkCommandHelper {
     public:
         void help(stringstream& h) const { h << "internal"; }
@@ -2304,7 +2378,37 @@ namespace mongo {
             migrateStatus.min = min;
             migrateStatus.max = max;
             migrateStatus.epoch = currentVersion.epoch();
-            migrateStatus.secondaryThrottle = cmdObj["secondaryThrottle"].trueValue();
+
+            // Process secondary throttle settings and assign defaults if necessary.
+            WriteConcernOptions writeConcern;
+            status = writeConcern.parseSecondaryThrottle(cmdObj, NULL);
+
+            if (!status.isOK()){
+                if (status.code() != ErrorCodes::WriteConcernNotDefined) {
+                    warning() << status.toString() << endl;
+                    return appendCommandStatus(result, status);
+                }
+
+                writeConcern = getDefaultWriteConcern();
+            }
+            else {
+                repl::ReplicationCoordinator* replCoordinator =
+                        repl::getGlobalReplicationCoordinator();
+                Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
+                if (!status.isOK()) {
+                    warning() << status.toString() << endl;
+                    return appendCommandStatus(result, status);
+                }
+            }
+
+            if (writeConcern.shouldWaitForOtherNodes() &&
+                    writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
+                // Don't allow no timeout.
+                writeConcern.wTimeout = kDefaultWTimeoutMs;
+            }
+
+            migrateStatus.writeConcern = writeConcern;
+
             if (cmdObj.hasField("shardKeyPattern")) {
                 migrateStatus.shardKeyPattern = cmdObj["shardKeyPattern"].Obj().getOwned();
             } else {
@@ -2321,12 +2425,6 @@ namespace mongo {
                     " chunk range specifiers.  Inferred shard key: " << keya << endl;
 
                 migrateStatus.shardKeyPattern = keya.getOwned();
-            }
-
-            if (migrateStatus.secondaryThrottle &&
-                    !repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
-                warning() << "secondaryThrottle asked for, but no replication is enabled" << endl;
-                migrateStatus.secondaryThrottle = false;
             }
 
             // Set the TO-side migration to active

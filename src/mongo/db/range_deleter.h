@@ -39,6 +39,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/time_support.h"
@@ -138,7 +139,7 @@ namespace mongo {
                          const BSONObj& min,
                          const BSONObj& max,
                          const BSONObj& shardKeyPattern,
-                         bool secondaryThrottle,
+                         const WriteConcernOptions& writeConcern,
                          Notification* notifyDone,
                          std::string* errMsg);
 
@@ -154,7 +155,7 @@ namespace mongo {
                        const BSONObj& min,
                        const BSONObj& max,
                        const BSONObj& shardKeyPattern,
-                       bool secondaryThrottle,
+                       const WriteConcernOptions& writeConcern,
                        std::string* errMsg);
 
         /**
@@ -309,7 +310,7 @@ namespace mongo {
                          const BSONObj& min,
                          const BSONObj& max,
                          const BSONObj& shardKey,
-                         bool secondaryThrottle);
+                         const WriteConcernOptions& writeConcern);
 
         const std::string ns;
 
@@ -324,7 +325,7 @@ namespace mongo {
         // like hash indexes.
         const BSONObj shardKeyPattern;
 
-        const bool secondaryThrottle;
+        const WriteConcernOptions writeConcern;
 
         // Sets of cursors to wait to close until this can be ready
         // for deletion.

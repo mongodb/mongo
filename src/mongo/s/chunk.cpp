@@ -56,6 +56,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 
@@ -355,37 +356,50 @@ namespace mongo {
 
     bool Chunk::moveAndCommit(const Shard& to,
                               long long chunkSize /* bytes */,
-                              bool secondaryThrottle,
+                              const WriteConcernOptions* writeConcern,
                               bool waitForDelete,
                               int maxTimeMS,
-                              BSONObj& res) const
-    {
+                              BSONObj& res) const {
         uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );
 
-        log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") " << _shard.toString() << " -> " << to.toString() << endl;
+        log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") "
+              << _shard.toString() << " -> " << to.toString() << endl;
 
         Shard from = _shard;
-
         ScopedDbConnection fromconn(from.getConnString());
 
-        bool worked = fromconn->runCommand( "admin" ,
-                                            BSON( "moveChunk" << _manager->getns() <<
-                                                  "from" << from.getAddress().toString() <<
-                                                  "to" << to.getAddress().toString() <<
-                                                  // NEEDED FOR 2.0 COMPATIBILITY
-                                                  "fromShard" << from.getName() <<
-                                                  "toShard" << to.getName() <<
-                                                  ///////////////////////////////
-                                                  "min" << _min <<
-                                                  "max" << _max <<
-                                                  "maxChunkSizeBytes" << chunkSize <<
-                                                  "shardId" << genID() <<
-                                                  "configdb" << configServer.modelServer() <<
-                                                  "secondaryThrottle" << secondaryThrottle <<
-                                                  "waitForDelete" << waitForDelete <<
-                                                  LiteParsedQuery::cmdOptionMaxTimeMS << maxTimeMS
-                                                   ) ,
-                                            res);
+        BSONObjBuilder builder;
+        builder.append("moveChunk", _manager->getns());
+        builder.append("from", from.getAddress().toString());
+        builder.append("to", to.getAddress().toString());
+        // NEEDED FOR 2.0 COMPATIBILITY
+        builder.append("fromShard", from.getName());
+        builder.append("toShard", to.getName());
+        ///////////////////////////////
+        builder.append("min", _min);
+        builder.append("max", _max);
+        builder.append("maxChunkSizeBytes", chunkSize);
+        builder.append("shardId", genID());
+        builder.append("configdb", configServer.modelServer());
+
+        // For legacy secondary throttle setting.
+        bool secondaryThrottle = true;
+        if (writeConcern &&
+                writeConcern->wNumNodes <= 1 &&
+                writeConcern->wMode.empty()) {
+            secondaryThrottle = false;
+        }
+
+        builder.append("secondaryThrottle", secondaryThrottle);
+
+        if (secondaryThrottle && writeConcern) {
+            builder.append("writeConcern", writeConcern->toBSON());
+        }
+
+        builder.append("waitForDelete", waitForDelete);
+        builder.append(LiteParsedQuery::cmdOptionMaxTimeMS, maxTimeMS);
+
+        bool worked = fromconn->runCommand("admin", builder.done(), res);
         fromconn.done();
 
         LOG( worked ? 1 : 0 ) << "moveChunk result: " << res << endl;
@@ -450,7 +464,8 @@ namespace mongo {
                 _dataWritten = 0; // we're splitting, so should wait a bit
             }
 
-            bool shouldBalance = grid.shouldBalance( _manager->getns() );
+            const bool shouldBalance = grid.getConfigShouldBalance() &&
+                    grid.getCollShouldBalance(_manager->getns());
 
             log() << "autosplitted " << _manager->getns()
                   << " shard: " << toString()
@@ -489,11 +504,13 @@ namespace mongo {
                 log().stream() << "moving chunk (auto): " << toMove << " to: " << newLocation.toString() << endl;
 
                 BSONObj res;
+
+                WriteConcernOptions noThrottle;
                 massert( 10412 ,
                          str::stream() << "moveAndCommit failed: " << res ,
                          toMove->moveAndCommit( newLocation , 
                                                 MaxChunkSize , 
-                                                false , /* secondaryThrottle - small chunk, no need */
+                                                &noThrottle, /* secondaryThrottle */
                                                 false, /* waitForDelete - small chunk, no need */
                                                 0, /* maxTimeMS - don't time out */
                                                 res ) );

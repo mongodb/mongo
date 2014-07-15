@@ -41,6 +41,7 @@ namespace mongo {
     class Collection;
     class Cursor;
     class OperationContext;
+    struct WriteConcernOptions;
 
     /**
      * db helpers are helper functions and classes that let us easily manipulate the local
@@ -164,8 +165,8 @@ namespace mongo {
          */
         static long long removeRange( OperationContext* txn,
                                       const KeyRange& range,
-                                      bool maxInclusive = false,
-                                      bool secondaryThrottle = false,
+                                      bool maxInclusive,
+                                      const WriteConcernOptions& secondaryThrottle,
                                       RemoveSaver* callback = NULL,
                                       bool fromMigrate = false,
                                       bool onlyRemoveOrphanedDocs = false );
