@@ -22,8 +22,8 @@ SYSCONFIG="/etc/sysconfig/mongod"
 # FIXME: 1.9.x has a --shutdown flag that parses the config file and
 # shuts down the correct running pid, but that's unavailable in 1.8
 # for now.  This can go away when this script stops supporting 1.8.
-DBPATH=`awk -F= '/^dbpath=/{print $2}' "$CONFIGFILE"`
-PIDFILE=`awk -F= '/^dbpath\s=\s/{print $2}' "$CONFIGFILE"`
+DBPATH=`awk -F= '/^dbpath\s*=\s*/{print $2}' "$CONFIGFILE"`
+PIDFILE=`awk -F= '/^pidfilepath\s*=\s*/{print $2}' "$CONFIGFILE"`
 mongod=${MONGOD-/usr/bin/mongod}
 
 MONGO_USER=mongod
