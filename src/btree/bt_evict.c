@@ -753,17 +753,9 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 			continue;
 		cache->evict_file_next = NULL;
 
-		/*
-		 * Skip files without a root page, marked as cache-resident and
-		 * files potentially involved in a bulk-load.  The problem is
-		 * eviction doesn't want to be walking the file as it converts
-		 * to a bulk-loaded object, and empty trees aren't worth trying
-		 * to evict, anyway.
-		 */
+		/* Skip files (currently) marked as unevictable. */
 		btree = dhandle->handle;
-		if (btree->root.page == NULL ||
-		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-		    btree->bulk_load_ok)
+		if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
 			continue;
 
 		/*
@@ -1156,9 +1148,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 			continue;
 
 		btree = dhandle->handle;
-		if (btree->root.page == NULL ||
-		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-		    btree->bulk_load_ok)
+		if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
 			continue;
 
 		file_bytes = file_dirty = file_intl_pages = file_leaf_pages = 0;

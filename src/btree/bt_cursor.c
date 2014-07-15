@@ -440,7 +440,10 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	 * The tree is no longer empty: eviction should pay attention to it,
 	 * and it's no longer possible to bulk-load into it.
 	 */
-	btree->bulk_load_ok = 0;
+	if (btree->bulk_load_ok) {
+		btree->bulk_load_ok = 0;
+		__wt_btree_evictable(session, 1);
+	}
 
 retry:	WT_RET(__cursor_func_init(cbt, 1));
 
@@ -651,7 +654,10 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	 * The tree is no longer empty: eviction should pay attention to it,
 	 * and it's no longer possible to bulk-load into it.
 	 */
-	btree->bulk_load_ok = 0;
+	if (btree->bulk_load_ok) {
+		btree->bulk_load_ok = 0;
+		__wt_btree_evictable(session, 1);
+	}
 
 retry:	WT_RET(__cursor_func_init(cbt, 1));
 
