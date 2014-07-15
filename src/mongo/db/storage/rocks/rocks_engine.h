@@ -129,6 +129,7 @@ namespace mongo {
 
     private:
 
+        rocksdb::Options _dbOptions() const;
         rocksdb::ColumnFamilyOptions _collectionOptions() const;
         rocksdb::ColumnFamilyOptions _indexOptions() const;
 
@@ -149,12 +150,14 @@ namespace mongo {
 
         /**
          * Generate column family descriptors for the metadata column family corresponding to each
-         * Entry in entries
+         * Entry in entries. We need to open these first because the metadata column families
+         * contain the information needed to open the column families representing indexes.
          */
-        CfdVector _generateCfds( const EntryVector& entries, const std::vector<string>& nsVec );
+        CfdVector _generateMetaDataCfds( const EntryVector& entries,
+                                         const std::vector<string>& nsVec ) const;
 
         /**
-         * Helper function to the _generateIndexOrderings method
+         * Helper function to the _createIndexOrderings method
          */
         std::map<string, Ordering> _createIndexOrderingsHelper(
                 const std::vector<std::string>& namespaces );
@@ -167,12 +170,19 @@ namespace mongo {
          * @families a vector containing the name of every column family in the database
          */
         std::map<string, Ordering> _createIndexOrderings( const std::vector<string>& namespaces,
-                                                          const rocksdb::Options& options,
                                                           const string& path,
                                                           rocksdb::DB* const db );
 
-        CfdVector _createCfds ( const string& path, 
-                                const rocksdb::Options& options, 
-                                rocksdb::DB* const db);        
+        /**
+         * Highest level helper function to generate a vector of all ColumnFamilyDescriptors
+         * in the database, with proper rocksdb::Options set for each of them.
+         */
+        CfdVector _createCfds ( const string& path, rocksdb::DB* const db);        
+
+        /**
+         * Create a complete Entry object in _map for every ColumnFamilyDescriptor
+         */
+        void _createEntries( const CfdVector& families, 
+                             const std::vector<rocksdb::ColumnFamilyHandle*> handles );
     };
 }

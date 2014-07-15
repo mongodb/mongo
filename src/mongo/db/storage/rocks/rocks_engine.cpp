@@ -52,246 +52,27 @@ namespace mongo {
 #define ROCK_STATUS_OK(sss) \
     if ( !(sss).ok() ){ error() << "rocks error: " << (sss).ToString(); invariant( false ); }
 
-    /**
-     * Create Entry's for all non-index column families in the database. This method is called by 
-     * the constructor. It is necessary because information about indexes is needed before a
-     * column family representing an index can be opened (specifically, the orderings used in the
-     * comparators for these column families). This information is accessed through the 
-     * RocksCollectionCatalogEntry class for each non-index column family in the database.
-     * Hence, this method.
-     */
-    RocksEngine::EntryVector RocksEngine::_createNonIndexCatalogEntries( 
-                                              const vector<string>& namespaces ) {
-        EntryVector entries;
-
-        for ( unsigned i = 0; i < namespaces.size(); ++i ) {
-            string ns = namespaces[i];
-            string collection = ns;
-            if ( ns.find( '&' ) != string::npos ) {
-                continue;
-            }
-            bool isIndex = ns.find( '$' ) != string::npos;
-            if ( isIndex ) {
-                continue;
-            }
-
-            // TODO is this the best way of doing this?
-            boost::shared_ptr<Entry> entry = _map[collection];
-            if ( !entry ) {
-                _map[collection] = boost::shared_ptr<Entry>( new Entry() );
-                entry = _map[collection];
-            }
-
-            entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
-
-            entries.push_back(entry);
-        }
-
-        return entries;
-    }
-
-    RocksEngine::CfdVector RocksEngine::_generateCfds( const EntryVector& entries, 
-                                                       const vector<string>& nsVec ) {
-        set<string> namespaces( nsVec.begin(), nsVec.end() );
-        
-        CfdVector cfds;
-
-        cfds.push_back( rocksdb::ColumnFamilyDescriptor( rocksdb::kDefaultColumnFamilyName, 
-                                                         _collectionOptions() ) );
-
-        for ( unsigned i = 0; i < entries.size(); ++i ) {
-            string columnFamilyName = entries[i]->collectionEntry->metaDataKey();
-            
-            if ( namespaces.find( columnFamilyName ) == namespaces.end() ) {
-                continue;
-            }
-
-            rocksdb::ColumnFamilyDescriptor cfd( columnFamilyName, _collectionOptions() );
-            cfds.push_back( cfd );
-        }
-
-        return cfds;
-    }
-
-    map<string, Ordering> RocksEngine::_createIndexOrderingsHelper(
-            const vector<string>& namespaces ) {
-        map<string, Ordering> indexOrderings;
-
-        for ( unsigned i = 0; i < namespaces.size(); i++ ) {
-            string ns = namespaces[i];
-            string collection = ns;
-            if ( ns.find( '&' ) != string::npos ) {
-                continue;
-            }
-            bool isIndex = ns.find( '$' ) != string::npos;
-
-            if ( !isIndex ) {
-                continue;
-            }
-
-            collection = ns.substr( 0, ns.find( '$' ) );
-
-            // TODO is this the best way of doing this?
-            boost::shared_ptr<Entry> entry = _map[collection];
-            if ( !entry ) {
-                _map[collection] = boost::shared_ptr<Entry>( new Entry() );
-                entry = _map[collection];
-            }
-
-            string indexName = ns.substr( ns.find( '$' ) + 1 );
-            BSONObj spec = entry->collectionEntry->getIndexSpec(indexName);
-            Ordering order = Ordering::make( spec["key"].Obj().getOwned() );
-
-            indexOrderings.insert( pair<string, Ordering> (indexName, order) );
-        }
-
-        return indexOrderings;
-    }
-
-    map<string, Ordering> RocksEngine::_createIndexOrderings( const vector<string>& namespaces,
-                                                              const rocksdb::Options& options,
-                                                              const string& path,
-                                                              rocksdb::DB* const db ) {
-
-        // first, go through and create RocksCollectionCatalogEntries for all non-indexes
-        EntryVector nonIndexEntries = _createNonIndexCatalogEntries( namespaces );
-
-        // open all the metadata column families so that we can retrieve information about
-        // each index, which is needed in order to open the index column families
-        CfdVector metaDataCfds = _generateCfds( nonIndexEntries, namespaces ); 
-        vector<rocksdb::ColumnFamilyHandle*> metaDataHandles;
-        rocksdb::Status openROStatus = rocksdb::DB::OpenForReadOnly( options, 
-                                                                     path, 
-                                                                     metaDataCfds, 
-                                                                     &metaDataHandles, 
-                                                                     &_db );
-
-        ROCK_STATUS_OK( openROStatus );
-
-        // find all the indexes for this database
-        map<string, Ordering> indexOrderings = _createIndexOrderingsHelper( namespaces );
-
-        // close the database
-        delete db;
-
-        return indexOrderings;
-    } 
-
-    RocksEngine::CfdVector RocksEngine::_createCfds( const string& path, 
-                                                     const rocksdb::Options& options,
-                                                     rocksdb::DB* const db ) {
-        std::vector<rocksdb::ColumnFamilyDescriptor> families;
-
-        std::vector<std::string> namespaces;
-        if ( boost::filesystem::exists( path ) ) {
-            rocksdb::Status status = rocksdb::DB::ListColumnFamilies(options, path, &namespaces);
-            
-            if ( status.IsIOError() ) {
-                // DNE, ok
-            } else {
-                ROCK_STATUS_OK( status );
-            }
-        }
-
-        if ( namespaces.empty() ) {
-            return families;
-        }
-
-        map<string, Ordering> indexOrderings = _createIndexOrderings( namespaces,
-                                                                      options,
-                                                                      path,
-                                                                      _db );
-
-        for ( size_t i = 0; i < namespaces.size(); i++ ) {
-            std::string ns = namespaces[i];
-            bool isIndex = ns.find( '$' ) != string::npos;
-
-            if ( isIndex ) {
-                rocksdb::ColumnFamilyOptions options = _indexOptions();
-                
-                string indexName = ns.substr( ns.find( '$' ) + 1 );
-                invariant( indexOrderings.find( indexName ) != indexOrderings.end() );
-
-                options.comparator =
-                    new RocksIndexEntryComparator( indexOrderings.find( indexName )->second );
-
-                families.push_back( rocksdb::ColumnFamilyDescriptor( ns, options ) );
-
-            } else {
-                families.push_back( rocksdb::ColumnFamilyDescriptor( ns, _collectionOptions() ) );
-            }
-        }
-
-        return families;
-    }
-
     RocksEngine::RocksEngine( const std::string& path )
         : _path( path ), _db( NULL ) {
 
-        rocksdb::Options options;
-
-        // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
-        options.IncreaseParallelism();
-        options.OptimizeLevelStyleCompaction();
-
-        // create the DB if it's not already present
-        options.create_if_missing = true;
-
-        // get the column families out of the database
-        CfdVector families = _createCfds( path, options, _db );
+        // get ColumnFamilyDescriptors for all the column families
+        CfdVector families = _createCfds( path, _db );
 
         if ( families.empty() ) {
-            rocksdb::Status status = rocksdb::DB::Open(options, path, &_db);
-            ROCK_STATUS_OK( status );
+            rocksdb::Status s = rocksdb::DB::Open( _dbOptions(), path, &_db );
+            ROCK_STATUS_OK( s );
             return;
         }
         
+        // Open the database, getting handles for every column family
         std::vector<rocksdb::ColumnFamilyHandle*> handles;
-        rocksdb::Status status = rocksdb::DB::Open(options, path, families, &handles, &_db);
-        ROCK_STATUS_OK( status );
+        rocksdb::Status s = rocksdb::DB::Open( _dbOptions(), path, families, &handles, &_db );
+        ROCK_STATUS_OK( s );
 
         invariant( handles.size() == families.size() );
 
-        std::map<string, int> metadataMap;
-        for ( unsigned i = 0; i < families.size(); i++ ) {
-            string ns = families[i].name;
-            if ( ns.find( '&' ) == string::npos ) {
-                continue;
-            }
-            string collection = ns.substr( 0, ns.find( '&' ) );
-            metadataMap.emplace(collection, i);
-        }
-
-        for ( unsigned i = 0; i < families.size(); i++ ) {
-            string ns = families[i].name;
-            ROCKS_TRACE << "RocksEngine found ns: " << ns;
-            string collection = ns;
-            if ( ns.find( '&' ) != string::npos ) {
-                continue;
-            }
-            bool isIndex = ns.find( '$' ) != string::npos;
-            if ( isIndex ) {
-                collection = ns.substr( 0, ns.find( '$' ) );
-            }
-
-            // TODO is this the best way of doing this?
-            boost::shared_ptr<Entry> entry = _map[collection];
-            invariant( entry );
-
-            if ( isIndex ) {
-                string indexName = ns.substr( ns.find( '$' ) + 1 );
-                ROCKS_TRACE << " got index " << indexName << " for " << collection;
-                entry->indexNameToCF[indexName] = handles[i];
-            }
-            else {
-                entry->cfHandle.reset( handles[i] );
-                entry->metaCfHandle.reset( handles[metadataMap[ns]] );
-                entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i], 
-                            handles[metadataMap[ns]]) );
-                // entry->collectionEntry is set in _createNonIndexCatalogEntries()
-                entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
-            }
-        }
+        // Create an Entry object for every ColumnFamilyHandle
+        _createEntries( families, handles );
     }
 
     RocksEngine::~RocksEngine() {
@@ -478,6 +259,19 @@ namespace mongo {
         return Status::OK();
     }
 
+    rocksdb::Options RocksEngine::_dbOptions() const {
+        rocksdb::Options options;
+
+        // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
+        options.IncreaseParallelism();
+        options.OptimizeLevelStyleCompaction();
+
+        // create the DB if it's not already present
+        options.create_if_missing = true;
+
+        return options;
+    }
+
     rocksdb::ColumnFamilyOptions RocksEngine::_collectionOptions() const {
         return rocksdb::ColumnFamilyOptions();
     }
@@ -486,4 +280,222 @@ namespace mongo {
         return rocksdb::ColumnFamilyOptions();
     }
 
+    /**
+     * Create Entry's for all non-index column families in the database. This method is called by 
+     * the constructor. It is necessary because information about indexes is needed before a
+     * column family representing an index can be opened (specifically, the orderings used in the
+     * comparators for these column families needs to be known). This information is accessed
+     * through the RocksCollectionCatalogEntry class for each non-index column family in the
+     * database. Hence, this method.
+     */
+    RocksEngine::EntryVector RocksEngine::_createNonIndexCatalogEntries( 
+                                              const vector<string>& namespaces ) {
+        EntryVector entries;
+
+        for ( unsigned i = 0; i < namespaces.size(); ++i ) {
+            string ns = namespaces[i];
+            string collection = ns;
+            if ( ns.find( '&' ) != string::npos ) {
+                continue;
+            }
+            bool isIndex = ns.find( '$' ) != string::npos;
+            if ( isIndex ) {
+                continue;
+            }
+
+            boost::shared_ptr<Entry> entry = _map[collection];
+            if ( !entry ) {
+                _map[collection] = boost::shared_ptr<Entry>( new Entry() );
+                entry = _map[collection];
+            }
+
+            // We'll use this RocksCollectionCatalogEntry to open the column families representing
+            // indexes
+            entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
+
+            entries.push_back(entry);
+        }
+
+        return entries;
+    }
+
+    RocksEngine::CfdVector RocksEngine::_generateMetaDataCfds( const EntryVector& entries, 
+                                                               const vector<string>& nsVec ) const {
+        set<string> namespaces( nsVec.begin(), nsVec.end() );
+        
+        CfdVector cfds;
+
+        // the default column family must always be included, as per rocksdb specifications
+        cfds.push_back( rocksdb::ColumnFamilyDescriptor( rocksdb::kDefaultColumnFamilyName, 
+                                                         _collectionOptions() ) );
+
+        for ( unsigned i = 0; i < entries.size(); ++i ) {
+            string columnFamilyName = entries[i]->collectionEntry->metaDataKey();
+            
+            // some column families don't have corresponding metadata column families,
+            // so before blindly opening a metadata column family, we check to see that it exists
+            if ( namespaces.find( columnFamilyName ) == namespaces.end() ) {
+                continue;
+            }
+
+            rocksdb::ColumnFamilyDescriptor cfd( columnFamilyName, _collectionOptions() );
+            cfds.push_back( cfd );
+        }
+
+        return cfds;
+    }
+
+    map<string, Ordering> RocksEngine::_createIndexOrderingsHelper(
+            const vector<string>& namespaces ) {
+        map<string, Ordering> indexOrderings;
+
+        for ( unsigned i = 0; i < namespaces.size(); i++ ) {
+            string ns = namespaces[i];
+            string collection = ns;
+            if ( ns.find( '&' ) != string::npos ) {
+                continue;
+            }
+            bool isIndex = ns.find( '$' ) != string::npos;
+
+            if ( !isIndex ) {
+                continue;
+            }
+
+            collection = ns.substr( 0, ns.find( '$' ) );
+
+            boost::shared_ptr<Entry> entry = _map[collection];
+            if ( !entry ) {
+                _map[collection] = boost::shared_ptr<Entry>( new Entry() );
+                entry = _map[collection];
+            }
+
+            // All of these helper functions lead up to this: generating the Ordering object
+            // for each index, allowing the column families representing these indexes to
+            // eventually be opened
+            string indexName = ns.substr( ns.find( '$' ) + 1 );
+            BSONObj spec = entry->collectionEntry->getIndexSpec(indexName);
+            Ordering order = Ordering::make( spec["key"].Obj().getOwned() );
+
+            indexOrderings.insert( pair<string, Ordering> (indexName, order) );
+        }
+
+        return indexOrderings;
+    }
+
+    map<string, Ordering> RocksEngine::_createIndexOrderings( const vector<string>& namespaces,
+                                                              const string& path,
+                                                              rocksdb::DB* const db ) {
+
+        // first, go through and create RocksCollectionCatalogEntries for all non-indexes
+        EntryVector nonIndexEntries = _createNonIndexCatalogEntries( namespaces );
+
+        // open all the metadata column families so that we can retrieve information about
+        // each index, which is needed in order to open the index column families
+        CfdVector metaDataCfds = _generateMetaDataCfds( nonIndexEntries, namespaces ); 
+        vector<rocksdb::ColumnFamilyHandle*> metaDataHandles;
+        rocksdb::Status openROStatus = rocksdb::DB::OpenForReadOnly( _dbOptions(), 
+                                                                     path, 
+                                                                     metaDataCfds, 
+                                                                     &metaDataHandles, 
+                                                                     &_db );
+
+        ROCK_STATUS_OK( openROStatus );
+
+        // find all the indexes for this database
+        map<string, Ordering> indexOrderings = _createIndexOrderingsHelper( namespaces );
+
+        // close the database
+        delete db;
+
+        return indexOrderings;
+    } 
+
+    RocksEngine::CfdVector RocksEngine::_createCfds( const string& path, rocksdb::DB* const db ) {
+        std::vector<rocksdb::ColumnFamilyDescriptor> families;
+
+        std::vector<std::string> namespaces;
+        if ( boost::filesystem::exists( path ) ) {
+            rocksdb::Status s = rocksdb::DB::ListColumnFamilies(_dbOptions(), path, &namespaces);
+            
+            if ( s.IsIOError() ) {
+                // DNE, ok
+            } else {
+                ROCK_STATUS_OK( s );
+            }
+        }
+
+        if ( namespaces.empty() ) {
+            return families;
+        }
+
+        // Create a mapping from index names to the Ordering object for each index. These Ordering
+        // objects will be used to create RocksIndexEntryComparators to be used with each 
+        // column family representing a namespace
+        map<string, Ordering> indexOrderings = _createIndexOrderings( namespaces, path, _db );
+
+        for ( size_t i = 0; i < namespaces.size(); i++ ) {
+            std::string ns = namespaces[i];
+            bool isIndex = ns.find( '$' ) != string::npos;
+
+            if ( isIndex ) {
+                rocksdb::ColumnFamilyOptions options = _indexOptions();
+                
+                string indexName = ns.substr( ns.find( '$' ) + 1 );
+                invariant( indexOrderings.find( indexName ) != indexOrderings.end() );
+
+                options.comparator =
+                    new RocksIndexEntryComparator( indexOrderings.find( indexName )->second );
+
+                families.push_back( rocksdb::ColumnFamilyDescriptor( ns, options ) );
+
+            } else {
+                families.push_back( rocksdb::ColumnFamilyDescriptor( ns, _collectionOptions() ) );
+            }
+        }
+
+        return families;
+    }
+
+    void RocksEngine::_createEntries( const CfdVector& families, 
+            const vector<rocksdb::ColumnFamilyHandle*> handles ) {
+        std::map<string, int> metadataMap;
+        for ( unsigned i = 0; i < families.size(); i++ ) {
+            string ns = families[i].name;
+            if ( ns.find( '&' ) == string::npos ) {
+                continue;
+            }
+            string collection = ns.substr( 0, ns.find( '&' ) );
+            metadataMap.emplace(collection, i);
+        }
+
+        for ( unsigned i = 0; i < families.size(); i++ ) {
+            string ns = families[i].name;
+            ROCKS_TRACE << "RocksEngine found ns: " << ns;
+            string collection = ns;
+            if ( ns.find( '&' ) != string::npos ) {
+                continue;
+            }
+            bool isIndex = ns.find( '$' ) != string::npos;
+            if ( isIndex ) {
+                collection = ns.substr( 0, ns.find( '$' ) );
+            }
+
+            boost::shared_ptr<Entry> entry = _map[collection];
+            invariant( entry );
+
+            if ( isIndex ) {
+                string indexName = ns.substr( ns.find( '$' ) + 1 );
+                ROCKS_TRACE << " got index " << indexName << " for " << collection;
+                entry->indexNameToCF[indexName] = handles[i];
+            }
+            else {
+                entry->cfHandle.reset( handles[i] );
+                entry->metaCfHandle.reset( handles[metadataMap[ns]] );
+                entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i], 
+                            handles[metadataMap[ns]]) );
+                // entry->collectionEntry is set in _createNonIndexCatalogEntries()
+                entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
+            }
+        }
+    }
 }
