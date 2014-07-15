@@ -219,6 +219,8 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 		ret = __wt_curmetadata_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
 		ret = __wt_curindex_open(session, uri, owner, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "log:"))
+		ret = __wt_curlog_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "statistics:"))
 		ret = __wt_curstat_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "table:"))

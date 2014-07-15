@@ -247,6 +247,13 @@ struct __wt_cursor_json {
 	WT_CONFIG_ITEM value_names;	/* Names of value columns */
 };
 
+struct __wt_cursor_log {
+	WT_CURSOR iface;
+
+	WT_LSN *next_lsn;		/* LSN of next record */
+	uint32_t flags;
+};
+
 struct __wt_cursor_metadata {
 	WT_CURSOR iface;
 

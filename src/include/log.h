@@ -11,22 +11,18 @@
 #define	LOG_ALIGN		128
 #define	WT_LOG_SLOT_BUF_INIT_SIZE	64 * 1024
 
-/*
- * We rely on this structure being aligned at 64 bits by the compiler,
- * if we were paranoid we could add an unused field to ensure the padding
- * is correct.
- */
-struct __wt_lsn {
-	uint32_t	file;		/* Log file number */
-	off_t		offset;		/* Log file offset */
-};
-
 #define	INIT_LSN(l)	do {						\
 	(l)->file = 1;							\
 	(l)->offset = 0;						\
 } while (0)
 
 #define	IS_INIT_LSN(l)	((l)->file == 1 && (l)->offset == 0)
+
+/*
+ * Both of the macros below need to change if the content of __wt_lsn
+ * ever changes.
+ */
+#define	LSN_KEY_FORMAT	"Iq"
 
 #define	MAX_LSN(l)	do {						\
 	(l)->file = UINT32_MAX;						\

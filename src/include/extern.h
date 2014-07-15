@@ -706,6 +706,10 @@ extern int __wt_json_column_init(WT_CURSOR *cursor,
     const char *keyformat,
     const WT_CONFIG_ITEM *idxconf,
     const WT_CONFIG_ITEM *colconf);
+extern int __wt_curlog_open(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[],
+    WT_CURSOR **cursorp);
 extern int __wt_curmetadata_open(WT_SESSION_IMPL *session,
     const char *uri,
     WT_CURSOR *owner,
