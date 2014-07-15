@@ -221,7 +221,7 @@ namespace mongo {
             if (_isSecondaryThrottleSet) {
                 return _secondaryThrottle;
             } else {
-                dassert(deprecated_secondaryThrottle.hasDefault());
+                dassert(secondaryThrottle.hasDefault());
                 return deprecated_secondaryThrottle.getDefault();
             }
         }
@@ -242,7 +242,7 @@ namespace mongo {
         // Calling get*() methods when the member is not set and has no default results in undefined
         // behavior
         BSONObj getMigrationWriteConcern() const {
-            dassert (_isMigrationWriteConcernSet);
+            dassert (_isBalancerWriteConcernSet);
             return _migrationWriteConcern;
         }
 
