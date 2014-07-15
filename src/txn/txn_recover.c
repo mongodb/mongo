@@ -430,23 +430,15 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	 */
 	if (!was_backup) {
 		r.metadata_only = 1;
-		if (IS_INIT_LSN(&r.files[0].ckpt_lsn) ||
-		    LOG_CMP(&r.files[0].ckpt_lsn, &conn->log->first_lsn) < 0)
+		if (IS_INIT_LSN(&r.files[0].ckpt_lsn))
 			WT_ERR(__wt_log_scan(session,
 			    NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
 		else
 			WT_ERR(__wt_log_scan(session,
 			    &r.files[0].ckpt_lsn, 0, __txn_log_recover, &r));
 
-#if 0
-		/*
-		 * With multiple open / close cycles, this no longer holds: we
-		 * can end up with empty log files after multiple recovery
-		 * runs.
-		 */
 		WT_ASSERT(session,
 		    LOG_CMP(&r.ckpt_lsn, &conn->log->first_lsn) >= 0);
-#endif
 	}
 
 	/* Scan the metadata to find the live files and their IDs. */
