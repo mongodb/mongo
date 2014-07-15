@@ -214,8 +214,11 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 	while (--trk >= trk_orig)
 		WT_TRET(__meta_track_apply(session, trk, unroll));
 
-	/* If the operation succeeded, checkpoint the metadata. */
-	if (!unroll && ret == 0 && session->metafile != NULL)
+	/*
+	 * If the operation succeeded and we aren't relying on the log for
+	 * durability, checkpoint the metadata. */
+	if (!unroll && ret == 0 && session->metafile != NULL &&
+	    !S2C(session)->logging)
 		WT_WITH_BTREE(session, session->metafile,
 		    ret = __wt_checkpoint(session, NULL));
 

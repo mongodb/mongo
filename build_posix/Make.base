@@ -6,6 +6,15 @@ ACLOCAL_AMFLAGS = -I build_posix/aclocal
 lib_LTLIBRARIES = libwiredtiger.la
 LDADD = $(lib_LTLIBRARIES)
 
+# The LevelDB libraries prefer to include all of the objects in a single
+# library.  Create a convenience library for them.
+if LEVELDB
+noinst_LTLIBRARIES = libwiredtiger_static.la
+endif
+
+# BEGIN SOURCES, maintained by makemake and dist/filelist
+# END SOURCES
+
 bin_PROGRAMS = wt
 wt_SOURCES =\
 	src/utilities/util_backup.c \
@@ -57,9 +66,6 @@ $(srcdir)/docs/index.html:
 $(srcdir)/docs/man/man1/wt.1: $(srcdir)/docs/index.html
 $(srcdir)/docs/man/man3/wiredtiger.3: $(srcdir)/docs/index.html
 
-clean-local:
-	rm -rf WT_TEST
-
 libwiredtiger_la_LIBADD =
 if HAVE_BUILTIN_EXTENSION_SNAPPY
 libwiredtiger_la_LIBADD += ext/compressors/snappy/libwiredtiger_snappy.la
@@ -67,3 +73,9 @@ endif
 if HAVE_BUILTIN_EXTENSION_ZLIB
 libwiredtiger_la_LIBADD += ext/compressors/zlib/libwiredtiger_zlib.la
 endif
+
+libwiredtiger_static_la_LIBADD=$(libwiredtiger_la_LIBADD)
+libwiredtiger_static_la_SOURCES=$(libwiredtiger_la_SOURCES)
+
+clean-local:
+	rm -rf WT_TEST

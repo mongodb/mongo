@@ -189,8 +189,10 @@ restart:	page = parent->page;
 		}
 
 		/*
-		 * Two versions of the binary search of internal pages: with and
-		 * without application-specified collation.
+		 * Binary search of the internal page.  There are two versions
+		 * (a default loop and an application-specified collation loop),
+		 * because moving the collation test and error handling inside
+		 * the loop costs about 5%.
 		 *
 		 * The 0th key on an internal page is a problem for a couple of
 		 * reasons.  First, we have to force the 0th key to sort less
@@ -201,23 +203,13 @@ restart:	page = parent->page;
 		 * an application key and a 0th key is meaningless (but doing
 		 * the comparison could still incorrectly modify our tracking
 		 * of the leading bytes in each key that we can skip during the
-		 * comparison).
-		 *
-		 * The only way to possibly compare against the 0th key in the
-		 * binary search loop is if base is 0 and limit is 0 or 1; in
-		 * that case, we must exit the loop after doing the 0th key
-		 * comparison, that is, if we are doing the comparison, we're
-		 * descending down the left-hand side of the tree.
+		 * comparison).  For these reasons, skip the 0th key.
 		 */
-		base = 0;
-		indx = 0;		/* -Werror=maybe-uninitialized */
-		limit = pindex->entries;
+		base = 1;
+		limit = pindex->entries - 1;
 		if (btree->collator == NULL)
 			for (; limit != 0; limit >>= 1) {
-				/* If index is 0, skip the comparison. */
-				if ((indx = base + (limit >> 1)) == 0)
-					break;
-
+				indx = base + (limit >> 1);
 				child = pindex->index[indx];
 				__wt_ref_key(
 				    page, child, &item->data, &item->size);
@@ -232,14 +224,11 @@ restart:	page = parent->page;
 				} else if (cmp < 0)
 					skiphigh = match;
 				else
-					break;
+					goto descend;
 			}
 		else
 			for (; limit != 0; limit >>= 1) {
-				/* If index is 0, skip the comparison. */
-				if ((indx = base + (limit >> 1)) == 0)
-					break;
-
+				indx = base + (limit >> 1);
 				child = pindex->index[indx];
 				__wt_ref_key(
 				    page, child, &item->data, &item->size);
@@ -250,23 +239,17 @@ restart:	page = parent->page;
 					base = indx + 1;
 					--limit;
 				} else if (cmp == 0)
-					break;
+					goto descend;
 			}
 
 		/*
-		 * Find the slot used to descend the tree.  If index is 0, it's
-		 * a left-side descent.  Otherwise, if we found an exact match,
-		 * child is already set, if we didn't find an exact match, base
-		 * is the smallest index greater than key, possibly (last + 1).
+		 * Set the slot to descend the tree: child is already set if
+		 * there was an exact match on the page, otherwise, base is
+		 * the smallest index greater than key, possibly (last + 1).
 		 */
-		if (indx == 0)
-			child = pindex->index[0];
-		else if (cmp != 0)
-			child = pindex->index[base - 1];
+		child = pindex->index[base - 1];
 
-descend:	WT_ASSERT(session, child != NULL);
-
-		/*
+descend:	/*
 		 * Swap the parent page for the child page. If the page splits
 		 * while we're retrieving it, restart the search in the parent
 		 * page; otherwise return on error, the swap call ensures we're

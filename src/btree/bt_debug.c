@@ -803,7 +803,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 		WT_RET(__wt_row_leaf_key(session, page, rip, key, 0));
 		__debug_item(ds, "K", key->data, key->size);
 
-		if ((cell = __wt_row_leaf_value(page, rip, NULL)) == NULL)
+		if ((cell = __wt_row_leaf_value_cell(page, rip, NULL)) == NULL)
 			__dmsg(ds, "\tV {}\n");
 		else {
 			__wt_cell_unpack(cell, unpack);

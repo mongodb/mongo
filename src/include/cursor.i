@@ -260,19 +260,21 @@ value:
 		return (0);
 	}
 
+	/* Else, simple values have their location encoded in the WT_ROW. */
+	if (__wt_row_leaf_value(page, rip, vb))
+		return (0);
+
 	/*
-	 * Else, find the value cell and check for empty data.
-	 * Else, use the value from the original disk image.
+	 * Else, take the value from the original page cell (which may be
+	 * empty).
 	 */
-	if ((cell = __wt_row_leaf_value(page, rip, unpack)) == NULL) {
+	if ((cell = __wt_row_leaf_value_cell(page, rip, unpack)) == NULL) {
 		vb->data = "";
 		vb->size = 0;
-	} else {
-		unpack = &_unpack;
-		__wt_cell_unpack(cell, unpack);
-		WT_RET(__wt_page_cell_data_ref(
-		    session, cbt->ref->page, unpack, vb));
+		return (0);
 	}
 
-	return (0);
+	unpack = &_unpack;
+	__wt_cell_unpack(cell, unpack);
+	return (__wt_page_cell_data_ref(session, cbt->ref->page, unpack, vb));
 }

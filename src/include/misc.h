@@ -153,6 +153,15 @@
 #define	WT_PREFIX_MATCH_LEN(str, len, pfx)				\
 	((len) >= strlen(pfx) && WT_PREFIX_MATCH(str, pfx))
 
+/*
+ * Check if a variable string equals a constant string.  Inline the common
+ * case for WiredTiger of a single byte string.  This is required because not
+ * all compilers optimize this case in strcmp (e.g., clang).
+ */
+#define	WT_STREQ(s, cs)							\
+	(sizeof(cs) == 2 ? (s)[0] == (cs)[0] && (s)[1] == '\0' :	\
+	strcmp(s, cs) == 0)
+
 /* Check if a string matches a prefix, and move past it. */
 #define	WT_PREFIX_SKIP(str, pfx)					\
 	((strncmp((str), (pfx), strlen(pfx)) == 0) ?			\

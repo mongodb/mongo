@@ -39,7 +39,7 @@ ENDOFTEXT
 
 check()
 {
-	# Skip auto-generated files, files in which WiredTiger holds no rights.
+	# Skip files in which WiredTiger holds no rights.
 	if `egrep "skip	$1" s_copyright.list > /dev/null`; then
 		return;
 	fi
@@ -68,13 +68,17 @@ check()
 	echo "$1: copyright information is incorrect"
 }
 
-# Search for files, ignoring test/3rdparty.
+# Search for files, skipping some well-known 3rd party directories.
 for i in `cd .. &&
     find [a-z]* -name '*.[chi]' \
         -o -name '*.cxx' -o -name '*.in' -o -name '*.java' -o -name '*.py' |
-    sed -e '/test\/3rdparty\//d' \
-	-e '/^build/d' \
-	-e '/Makefile.in/d' \
+    sed	-e '/Makefile.in/d' \
+	-e '/^build_posix\//d' \
+        -e '/api\/leveldb\/basho\//d' \
+        -e '/api\/leveldb\/hyperleveldb\//d' \
+        -e '/api\/leveldb\/leveldb\//d' \
+        -e '/api\/leveldb\/rocksdb\//d' \
+        -e '/test\/3rdparty\//d' \
 	-e 's/^\.\///'`
 do
 	check $i

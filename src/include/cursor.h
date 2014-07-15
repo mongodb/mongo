@@ -311,7 +311,7 @@ struct __wt_cursor_table {
 #define	WT_CURSOR_PRIMARY(cursor)					\
 	(((WT_CURSOR_TABLE *)cursor)->cg_cursors[0])
 
-#define	WT_CURSOR_RECNO(cursor)	(strcmp((cursor)->key_format, "r") == 0)
+#define	WT_CURSOR_RECNO(cursor)	WT_STREQ((cursor)->key_format, "r")
 
 /*
  * WT_CURSOR_NEEDKEY, WT_CURSOR_NEEDVALUE --
