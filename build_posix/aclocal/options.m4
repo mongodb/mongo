@@ -98,7 +98,7 @@ no)		wt_cv_enable_leveldb=no;;
 basho)		wt_cv_enable_basholeveldb=yes;;
 hyper)		wt_cv_enable_hyperleveldb=yes;;
 rocksdb)	wt_cv_enable_rocksdb=yes;;
-*)		AC_MSG_ERROR([Unknown LevelDB flavor \"$r\"]);;
+*)		AC_MSG_ERROR([Unknown LevelDB configuration "$r"]);;
 esac
 
 AH_TEMPLATE(HAVE_BASHOLEVELDB, [Build the LevelDB API with Basho LevelDB support.])
