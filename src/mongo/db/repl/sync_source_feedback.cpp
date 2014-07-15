@@ -53,6 +53,7 @@ namespace repl {
 
     void SyncSourceFeedback::associateMember(const OID& rid, Member* member) {
         invariant(member);
+        LOG(2) << "Associating RID " << rid << " with member: " << member->fullName();
         boost::unique_lock<boost::mutex> lock(_mtx);
         _handshakeNeeded = true;
         _members[rid] = member;
@@ -132,6 +133,8 @@ namespace repl {
                 ++it) {
             BSONObj res;
             try {
+                LOG(2) << "Sending to " << _connection.get()->toString() << " the replication "
+                        "handshake: " << *it;
                 if (!_connection->runCommand("admin", *it, res)) {
                     massert(17447, "upstream updater is not supported by the member from which we"
                             " are syncing, please update all nodes to 2.6 or later.",
@@ -182,7 +185,8 @@ namespace repl {
         if (ot > _slaveMap[rid]) {
             _slaveMap[rid] = ot;
             _positionChanged = true;
-            LOG(2) << "now last is " << _slaveMap[rid].toString() << endl;
+            LOG(2) << "Updating our knowledge of the replication progress for node with RID " <<
+                    rid << " to be at optime " << ot;
             _cond.notify_all();
         }
     }
@@ -216,7 +220,7 @@ namespace repl {
         array.done();
         BSONObj res;
 
-        LOG(2) << "Sending slave oplog progress to upstream updater";
+        LOG(2) << "Sending slave oplog progress to upstream updater: " << cmd.done();
         bool ok;
         try {
             ok = _connection->runCommand("admin", cmd.obj(), res);
