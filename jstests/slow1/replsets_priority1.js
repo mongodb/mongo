@@ -5,7 +5,7 @@ print("\n\n\nreplsets_priority1.js BEGIN\n");
 
 load("jstests/replsets/rslib.js");
 
-var rs = new ReplSetTest( {name: 'testSet', nodes: 3} );
+var rs = new ReplSetTest( {name: 'testSet', nodes: 3, nodeOptions: {verbose: 2}} );
 var nodes = rs.startSet();
 rs.initiate();
 

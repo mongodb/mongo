@@ -35,12 +35,6 @@
 #include <map>
 #include <limits>
 
-
-#if defined(_WIN32)
-#undef max
-#undef min
-#endif
-
 namespace mongo {
 
     /* must be same type when called, unless both sides are #s 
@@ -402,22 +396,6 @@ dodouble:
         return *s_->_builder;
     }
 
-    // {a: {b:1}} -> {a.b:1}
-    void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const std::string& base="");
-    inline BSONObj nested2dotted(const BSONObj& obj) {
-        BSONObjBuilder b;
-        nested2dotted(b, obj);
-        return b.obj();
-    }
-
-    // {a.b:1} -> {a: {b:1}}
-    void dotted2nested(BSONObjBuilder& b, const BSONObj& obj);
-    inline BSONObj dotted2nested(const BSONObj& obj) {
-        BSONObjBuilder b;
-        dotted2nested(b, obj);
-        return b.obj();
-    }
-
     inline BSONObjIterator BSONObjBuilder::iterator() const {
         const char * s = _b.buf() + _offset;
         const char * e = _b.buf() + _b.len();
@@ -431,11 +409,6 @@ dodouble:
                 return true;
         return false;
     }
-
-    /* WARNING: nested/dotted conversions are not 100% reversible
-     * nested2dotted(dotted2nested({a.b: {c:1}})) -> {a.b.c: 1}
-     * also, dotted2nested ignores order
-     */
 
     typedef std::map<std::string, BSONElement> BSONMap;
     inline BSONMap bson2map(const BSONObj& obj) {

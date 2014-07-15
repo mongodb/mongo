@@ -37,7 +37,94 @@
 #include "mongo/db/storage/mmap_v1/btree/key.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/float_utils.h"
+#include "mongo/util/embedded_builder.h"
 #include "mongo/util/stringutils.h"
+
+namespace mongo {
+    void dotted2nested(BSONObjBuilder& b, const BSONObj& obj) {
+        //use map to sort fields
+        BSONMap sorted = bson2map(obj);
+        EmbeddedBuilder eb(&b);
+        for(BSONMap::const_iterator it=sorted.begin(); it!=sorted.end(); ++it) {
+            eb.appendAs(it->second, it->first);
+        }
+        eb.done();
+    }
+
+    // {a.b:1} -> {a: {b:1}}
+    BSONObj dotted2nested(const BSONObj& obj) {
+        BSONObjBuilder b;
+        dotted2nested(b, obj);
+        return b.obj();
+    }
+
+
+    // {a: {b:1}} -> {a.b:1}
+    void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const string& base="") {
+        BSONObjIterator it(obj);
+        while (it.more()) {
+            BSONElement e = it.next();
+            if (e.type() == Object) {
+                string newbase = base + e.fieldName() + ".";
+                nested2dotted(b, e.embeddedObject(), newbase);
+            }
+            else {
+                string newbase = base + e.fieldName();
+                b.appendAs(e, newbase);
+            }
+        }
+    }
+
+    BSONObj nested2dotted(const BSONObj& obj) {
+        BSONObjBuilder b;
+        nested2dotted(b, obj);
+        return b.obj();
+    }
+
+    FieldCompareResult compareDottedFieldNames( const string& l , const string& r ,
+                                               const LexNumCmp& cmp ) {
+        static int maxLoops = 1024 * 1024;
+
+        size_t lstart = 0;
+        size_t rstart = 0;
+
+        for ( int i=0; i<maxLoops; i++ ) {
+
+            size_t a = l.find( '.' , lstart );
+            size_t b = r.find( '.' , rstart );
+
+            size_t lend = a == string::npos ? l.size() : a;
+            size_t rend = b == string::npos ? r.size() : b;
+
+            const string& c = l.substr( lstart , lend - lstart );
+            const string& d = r.substr( rstart , rend - rstart );
+
+            int x = cmp.cmp( c.c_str(), d.c_str() );
+
+            if ( x < 0 )
+                return LEFT_BEFORE;
+            if ( x > 0 )
+                return RIGHT_BEFORE;
+
+            lstart = lend + 1;
+            rstart = rend + 1;
+
+            if ( lstart >= l.size() ) {
+                if ( rstart >= r.size() )
+                    return SAME;
+                return RIGHT_SUBFIELD;
+            }
+            if ( rstart >= r.size() )
+                return LEFT_SUBFIELD;
+        }
+
+        log() << "compareDottedFieldNames ERROR  l: " << l << " r: " << r << "  TOO MANY LOOPS" << endl;
+        verify(0);
+        return SAME; // will never get here
+    }
+
+
+}
 
 namespace JsobjTests {
 

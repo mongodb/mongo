@@ -216,6 +216,7 @@ namespace repl {
         array.done();
         BSONObj res;
 
+        LOG(2) << "Sending slave oplog progress to upstream updater";
         bool ok;
         try {
             ok = _connection->runCommand("admin", cmd.obj(), res);

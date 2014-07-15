@@ -43,3 +43,5 @@ assert(res.hasWriteError(), "$setOnInsert _id.b - " + res.toString() + tojson(t.
 
 res = t.update( {"_id.a": 4} , { $setOnInsert: { "_id": {a:4, b:1} } } , true );
 assert(res.hasWriteError(), "$setOnInsert _id 3 - " + res.toString() + tojson(t.findOne()));
+
+db.setProfilingLevel( 0 );

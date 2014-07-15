@@ -1,7 +1,7 @@
-// list_collections.cpp
+// list_indexes.cpp
 
 /**
-*    Copyright (C) 2014 MongoDB Inc.
+*    Copyright (C) 2014 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -40,67 +40,63 @@
 
 namespace mongo {
 
-    class CmdListCollections : public Command {
+    class CmdListIndexes : public Command {
     public:
         virtual bool slaveOk() const { return true; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual bool adminOnly() const { return false; }
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
-        virtual void help( stringstream& help ) const { help << "list collections for this db"; }
+        virtual void help( stringstream& help ) const { help << "list indexes for a collection"; }
 
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
+            string ns = parseNs( dbname, cmdObj );
             ActionSet actions;
-            actions.addAction(ActionType::listCollections);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+            actions.addAction(ActionType::listIndexes);
+            out->push_back(Privilege(ResourcePattern::forCollectionName( ns ), actions));
         }
 
-        CmdListCollections() : Command( "listCollections", true ) {}
+        CmdListIndexes() : Command( "listIndexes", true ) {}
 
         bool run(OperationContext* txn,
                  const string& dbname,
-                 BSONObj& jsobj,
+                 BSONObj& cmdObj,
                  int,
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool /*fromRepl*/) {
 
-            Client::ReadContext ctx( txn, dbname );
-            const Database* d = ctx.ctx().db();
-            const DatabaseCatalogEntry* dbEntry = d->getDatabaseCatalogEntry();
+            string ns = parseNs( dbname, cmdObj );
 
-            list<string> names;
-            dbEntry->getCollectionNamespaces( &names );
-
-            names.sort();
-
-            BSONArrayBuilder arr;
-
-            for ( list<string>::const_iterator i = names.begin(); i != names.end(); ++i ) {
-                string ns = *i;
-
-                StringData collection = nsToCollectionSubstring( ns );
-                if ( collection == "system.namespaces" ) {
-                    continue;
-                }
-
-                BSONObjBuilder b;
-                b.append( "name", collection );
-
-                CollectionOptions options =
-                    dbEntry->getCollectionCatalogEntry( txn, ns )->getCollectionOptions(txn);
-                b.append( "options", options.toBSON() );
-
-                arr.append( b.obj() );
+            Lock::DBRead lock( txn->lockState(), dbname );
+            const Database* d = dbHolder().get( txn, dbname );
+            if ( !d ) {
+                errmsg = "no database";
+                return false;
             }
 
-            result.append( "collections", arr.arr() );
+            const DatabaseCatalogEntry* dbEntry = d->getDatabaseCatalogEntry();
+            const CollectionCatalogEntry* cce = dbEntry->getCollectionCatalogEntry( txn, ns );
+            if ( !cce ) {
+                errmsg = "no collection";
+                return false;
+            }
+
+            vector<string> indexNames;
+            cce->getAllIndexes( &indexNames );
+
+            BSONArrayBuilder arr;
+            for ( size_t i = 0; i < indexNames.size(); i++ ) {
+                arr.append( cce->getIndexSpec( indexNames[i] ) );
+            }
+
+            result.append( "indexes", arr.arr() );
 
             return true;
         }
 
-    } cmdListCollections;
+    } cmdListIndexes;
 
 }

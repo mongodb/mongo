@@ -73,7 +73,7 @@ namespace {
 
 }  // namespace
 
-    Status MemberConfig::initialize(const BSONObj& mcfg) {
+    Status MemberConfig::initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagConfig) {
         Status status = bsonCheckOnlyHasFields(
             "replica set member configuration", mcfg, kLegalMemberConfigFieldNames);
         if (!status.isOK())
@@ -206,7 +206,8 @@ namespace {
                                   tag.fieldName() << " field has non-string value of type " <<
                                   typeName(tag.type()));
                 }
-                _tags.push_back(ReplicaSetTag(tag.fieldName(), tag.String()));
+                _tags.push_back(tagConfig->makeTag(tag.fieldNameStringData(),
+                                                   tag.valueStringData()));
             }
         }
         else if (ErrorCodes::NoSuchKey != status) {

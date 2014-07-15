@@ -2,11 +2,8 @@
 /src/mongo/db/modules
 /.jsdbshell
 /.dbshell
-/.sconsign.dblite
-/.sconf_temp
 /perf.data
 /massif.out.*
-.scons
 /smoke-last.json
 
 *~

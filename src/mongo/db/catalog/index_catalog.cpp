@@ -437,13 +437,19 @@ namespace mongo {
         IndexCatalogEntry* entry = _catalog->_entries.find( _indexName );
         invariant( entry == _entry );
 
-        if ( entry ) {
-            _catalog->_dropIndex(_txn, entry);
+        try {
+            if ( entry ) {
+                _catalog->_dropIndex(_txn, entry);
+            }
+            else {
+                _catalog->_deleteIndexFromDisk( _txn,
+                                                _indexName,
+                                                _indexNamespace );
+            }
         }
-        else {
-            _catalog->_deleteIndexFromDisk( _txn,
-                                            _indexName,
-                                            _indexNamespace );
+        catch (const DBException& exc) {
+            error() << "exception while cleaning up in-progress index build: " << exc.what();
+            fassertFailedWithStatus(17493, exc.toStatus());
         }
 
     }
@@ -734,6 +740,8 @@ namespace mongo {
         if ( !entry->isReady() )
             return Status( ErrorCodes::InternalError, "cannot delete not ready index" );
 
+        BackgroundOperation::assertNoBgOpInProgForNs( _collection->ns().ns() );
+
         return _dropIndex(txn, entry);
     }
 
@@ -750,7 +758,6 @@ namespace mongo {
         if ( !entry )
             return Status( ErrorCodes::BadValue, "IndexCatalog::_dropIndex passed NULL" );
 
-        BackgroundOperation::assertNoBgOpInProgForNs( _collection->ns().ns() );
         _checkMagic();
         Status status = _checkUnfinished();
         if ( !status.isOK() )

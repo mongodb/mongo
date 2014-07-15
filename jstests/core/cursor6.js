@@ -98,3 +98,5 @@ check( false );
 check( true );
 
 assert.eq( "BasicCursor", r.find().sort( { a: 1, b: -1, z: 1 } ).hint( { $natural: -1 } ).explain().cursor );
+
+db.setProfilingLevel( 0 );

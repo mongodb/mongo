@@ -2545,6 +2545,29 @@ namespace mongo {
             }
         } cmdListCollections;
 
+        class CmdListIndexes : public PublicGridCommand {
+        public:
+            CmdListIndexes() : PublicGridCommand( "listIndexes" ) {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                string ns = parseNs( dbname, cmdObj );
+                ActionSet actions;
+                actions.addAction(ActionType::listIndexes);
+                out->push_back(Privilege(ResourcePattern::forCollectionName( ns ), actions));
+            }
+
+            bool run(OperationContext* txn, const string& dbName,
+                     BSONObj& cmdObj,
+                     int,
+                     string&,
+                     BSONObjBuilder& result,
+                     bool) {
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                return passthrough( conf, cmdObj, result );
+            }
+        } cmdListIndexes;
+
     } // namespace pub_grid_cmds
 
     void Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder,

@@ -58,7 +58,7 @@ namespace {
         if (nameIter.more())
             bestUser = *nameIter;
 
-        StringData opdb( nsToDatabaseSubstring( c.getNS() ) );
+        std::string opdb( nsToDatabase( c.getNS() ) );
 
         BSONArrayBuilder allUsers(builder.subarrayStart("allUsers"));
         for ( ; nameIter.more(); nameIter.next()) {
