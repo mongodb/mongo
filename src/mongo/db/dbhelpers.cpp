@@ -52,7 +52,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
@@ -306,7 +305,7 @@ namespace mongo {
     long long Helpers::removeRange( OperationContext* txn,
                                     const KeyRange& range,
                                     bool maxInclusive,
-                                    const WriteConcernOptions& writeConcern,
+                                    bool secondaryThrottle,
                                     RemoveSaver* callback,
                                     bool fromMigrate,
                                     bool onlyRemoveOrphanedDocs )
@@ -343,7 +342,7 @@ namespace mongo {
                 Helpers::toKeyFormat( indexKeyPattern.extendRangeBound(range.maxKey,maxInclusive));
 
         LOG(1) << "begin removal of " << min << " to " << max << " in " << ns
-               << " with write concern: " << writeConcern.toBSON() << endl;
+               << (secondaryThrottle ? " (waiting for secondaries)" : "" ) << endl;
 
         Client& c = cc();
 
@@ -436,7 +435,10 @@ namespace mongo {
             // TODO remove once the yielding below that references this timer has been removed
             Timer secondaryThrottleTime;
 
-            if (writeConcern.shouldWaitForOtherNodes() && numDeleted > 0) {
+            if ( secondaryThrottle && numDeleted > 0 ) {
+                WriteConcernOptions writeConcern;
+                writeConcern.wNumNodes = 2;
+                writeConcern.wTimeout = 60 * 1000;
                 repl::ReplicationCoordinator::StatusAndDuration replStatus =
                         repl::getGlobalReplicationCoordinator()->awaitReplication(txn,
                                                                                   c.getLastOp(),
@@ -452,7 +454,7 @@ namespace mongo {
             }
         }
         
-        if (writeConcern.shouldWaitForOtherNodes())
+        if ( secondaryThrottle )
             log() << "Helpers::removeRangeUnlocked time spent waiting for replication: "  
                   << millisWaitingForReplication << "ms" << endl;
         

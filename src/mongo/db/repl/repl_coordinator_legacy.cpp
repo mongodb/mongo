@@ -944,19 +944,5 @@ namespace {
         return repl::getHostsWrittenTo(op);
     }
 
-    Status LegacyReplicationCoordinator::checkIfWriteConcernCanBeSatisfied(
-            const WriteConcernOptions& writeConcern) const {
-        // TODO: rewrite this method with the correct version. Note that this just a
-        // temporary stub for secondary throttle.
-
-        if (getReplicationMode() == ReplicationCoordinator::modeReplSet) {
-            if (writeConcern.wNumNodes > 1 && theReplSet->config().getMajority() <= 1) {
-                return Status(ErrorCodes::CannotSatisfyWriteConcern, "not enough nodes");
-            }
-        }
-
-        return Status::OK();
-    }
-
 } // namespace repl
 } // namespace mongo

@@ -35,8 +35,7 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/concurrency/mutex.h"
 
-#include "mongo/s/config.h"  // DBConfigPtr
-#include "mongo/s/type_settings.h"
+#include "config.h"  // DBConfigPtr
 
 namespace mongo {
 
@@ -108,24 +107,9 @@ namespace mongo {
         bool knowAboutShard( const std::string& name ) const;
 
         /**
-         * Returns true if the balancer should be running.
+         * @return true if the chunk balancing functionality is enabled
          */
-        bool shouldBalance(const SettingsType& balancerSettings) const;
-
-        /**
-         * Retrieve the balancer settings from the config server.
-         */
-        bool getBalancerSettings(SettingsType* settings, string* errMsg) const;
-
-        /**
-         * Returns true if the config server settings indicate that the balancer should be active.
-         */
-        bool getConfigShouldBalance() const;
-
-        /**
-         * Returns true if the given collection can be balanced.
-         */
-        bool getCollShouldBalance(const std::string& ns) const;
+        bool shouldBalance( const std::string& ns = "", BSONObj* balancerDocOut = 0 ) const;
 
         /**
          * 
@@ -165,6 +149,14 @@ namespace mongo {
          * @return whether a give dbname is used for shard "local" databases (e.g., admin or local)
          */
         static bool _isSpecialLocalDB( const std::string& dbName );
+
+        /**
+         * @param balancerDoc bson that may contain a marker to stop the balancer
+         *        format { ... , stopped: [ "true" | "false" ] , ... }
+         * @return true if the marker is present and is set to true
+         */
+        static bool _balancerStopped( const BSONObj& balancerDoc );
+
     };
 
     extern Grid grid;

@@ -275,12 +275,5 @@ namespace repl {
         return legacyResponse;
     }
 
-    Status HybridReplicationCoordinator::checkIfWriteConcernCanBeSatisfied(
-            const WriteConcernOptions& writeConcern) const {
-        Status legacyStatus = _legacy.checkIfWriteConcernCanBeSatisfied(writeConcern);
-        Status implStatus = _impl.checkIfWriteConcernCanBeSatisfied(writeConcern);
-        return legacyStatus;
-    }
-
 } // namespace repl
 } // namespace mongo

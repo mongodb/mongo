@@ -30,7 +30,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 
@@ -69,8 +68,7 @@ namespace mongo {
                                 BSON( "_id" << _min ),
                                 BSON( "_id" << _max ),
                                 BSON( "_id" << 1 ) );
-                mongo::WriteConcernOptions dummyWriteConcern;
-                Helpers::removeRange(&txn, range, false, dummyWriteConcern);
+                Helpers::removeRange( &txn, range );
                 wunit.commit();
             }
 

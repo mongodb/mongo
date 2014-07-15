@@ -189,7 +189,7 @@ namespace mongo {
                                    const BSONObj& min,
                                    const BSONObj& max,
                                    const BSONObj& shardKeyPattern,
-                                   const WriteConcernOptions& writeConcern,
+                                   bool secondaryThrottle,
                                    Notification* notifyDone,
                                    std::string* errMsg) {
         string dummy;
@@ -199,7 +199,7 @@ namespace mongo {
                                                                  min.getOwned(),
                                                                  max.getOwned(),
                                                                  shardKeyPattern.getOwned(),
-                                                                 writeConcern));
+                                                                 secondaryThrottle));
         toDelete->notifyDone = notifyDone;
 
         {
@@ -243,13 +243,10 @@ namespace mongo {
     }
 
 namespace {
-    const int kWTimeoutMillis = 60 * 60 * 1000;
-
-    bool _waitForMajority(OperationContext* txn, std::string* errMsg) {
-        const WriteConcernOptions writeConcern("majority",
-                                               WriteConcernOptions::NONE,
-                                               kWTimeoutMillis);
-
+    bool _waitForReplication(OperationContext* txn, std::string* errMsg) {
+        WriteConcernOptions writeConcern;
+        writeConcern.wMode = "majority";
+        writeConcern.wTimeout = 60 * 60 * 1000;
         repl::ReplicationCoordinator::StatusAndDuration replStatus =
                 repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOp(txn,
                                                                                   writeConcern);
@@ -282,7 +279,7 @@ namespace {
                                  const BSONObj& min,
                                  const BSONObj& max,
                                  const BSONObj& shardKeyPattern,
-                                 const WriteConcernOptions& writeConcern,
+                                 bool secondaryThrottle,
                                  string* errMsg) {
         if (stopRequested()) {
             *errMsg = "deleter is already stopped.";
@@ -317,7 +314,7 @@ namespace {
                   << " cursors in " << ns << " to finish" << endl;
         }
 
-        RangeDeleteEntry taskDetails(ns, min, max, shardKeyPattern, writeConcern);
+        RangeDeleteEntry taskDetails(ns, min, max, shardKeyPattern, secondaryThrottle);
         taskDetails.stats.queueStartTS = jsTime();
 
         Date_t timeSinceLastLog;
@@ -376,7 +373,7 @@ namespace {
 
         if (result) {
             taskDetails.stats.waitForReplStartTS = jsTime();
-            result = _waitForMajority(txn, errMsg);
+            result = _waitForReplication(txn, errMsg);
             taskDetails.stats.waitForReplEndTS = jsTime();
         }
 
@@ -558,7 +555,7 @@ namespace {
                 if (delResult) {
                     nextTask->stats.waitForReplStartTS = jsTime();
 
-                    if (!_waitForMajority(txn.get(), &errMsg)) {
+                    if (!_waitForReplication(txn.get(), &errMsg)) {
                         warning() << "Error encountered while waiting for replication: " << errMsg;
                     }
 
@@ -665,12 +662,12 @@ namespace {
                                        const BSONObj& min,
                                        const BSONObj& max,
                                        const BSONObj& shardKey,
-                                       const WriteConcernOptions& writeConcern):
+                                       bool secondaryThrottle):
                                                ns(ns),
                                                min(min),
                                                max(max),
                                                shardKeyPattern(shardKey),
-                                               writeConcern(writeConcern),
+                                               secondaryThrottle(secondaryThrottle),
                                                notifyDone(NULL) {
     }
 

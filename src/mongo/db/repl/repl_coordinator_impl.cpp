@@ -446,12 +446,5 @@ namespace repl {
         // TODO
         return std::vector<BSONObj>();
     }
-
-    Status ReplicationCoordinatorImpl::checkIfWriteConcernCanBeSatisfied(
-            const WriteConcernOptions& writeConcern) const {
-        // TODO
-        return Status::OK();
-    }
-
 } // namespace repl
 } // namespace mongo

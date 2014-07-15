@@ -38,8 +38,6 @@
 
 namespace mongo {
 
-    class WriteConcernOptions;
-
     /**
      * The balancer is a background task that tries to keep the number of chunks across all servers of the cluster even. Although
      * every mongos will have one balancer running, only one of them will be active at the any given point in time. The balancer
@@ -98,12 +96,12 @@ namespace mongo {
          * Issues chunk migration request, one at a time.
          *
          * @param candidateChunks possible chunks to move
-         * @param writeConcern detailed write concern. NULL means the default write concern.
+         * @param secondaryThrottle wait for secondaries to catch up before pushing more deletes
          * @param waitForDelete wait for deletes to complete after each chunk move
          * @return number of chunks effectively moved
          */
         int _moveChunks(const std::vector<CandidateChunkPtr>* candidateChunks,
-                        const WriteConcernOptions* writeConcern,
+                        bool secondaryThrottle,
                         bool waitForDelete);
 
         /**

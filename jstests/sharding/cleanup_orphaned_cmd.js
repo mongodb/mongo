@@ -82,9 +82,7 @@ assert.eq( 100, coll.find().itcount() );
 jsTest.log( "Cleaning up more orphaned data..." );
 
 var shard0Admin = st.shard0.getDB( "admin" );
-var result = shard0Admin.runCommand({ cleanupOrphaned : coll + "",
-                                      secondaryThrottle: true,
-                                      writeConcern: { w: 1 }});
+var result = shard0Admin.runCommand({ cleanupOrphaned : coll + "" });
 while ( result.ok && result.stoppedAtKey ) {
     printjson( result );
     result = shard0Admin.runCommand({ cleanupOrphaned : coll + "",

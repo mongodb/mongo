@@ -28,7 +28,6 @@
 #include "mongo/s/type_settings.h"
 
 #include "mongo/db/field_parser.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 
@@ -42,9 +41,7 @@ namespace mongo {
     const BSONField<int> SettingsType::chunksize("value");
     const BSONField<bool> SettingsType::balancerStopped("stopped");
     const BSONField<BSONObj> SettingsType::balancerActiveWindow("activeWindow");
-    const BSONField<bool> SettingsType::deprecated_secondaryThrottle("_secondaryThrottle", true);
-    const BSONField<BSONObj> SettingsType::migrationWriteConcern("_secondaryThrottle");
-    const BSONField<bool> SettingsType::waitForDelete("_waitForDelete");
+    const BSONField<bool> SettingsType::secondaryThrottle("_secondaryThrottle");
 
     SettingsType::SettingsType() {
         clear();
@@ -97,12 +94,6 @@ namespace mongo {
                                           " format is { start: \"hh:mm\" , stop: \"hh:mm\" }";
                     return false;
                 }
-
-                if (_isSecondaryThrottleSet && _isMigrationWriteConcernSet) {
-                    *errMsg = stream() << "cannot have both secondary throttle and migration "
-                                       << "write concern set at the same time";
-                    return false;
-                }
             }
             return true;
         }
@@ -121,13 +112,8 @@ namespace mongo {
         if (_isBalancerActiveWindowSet) {
             builder.append(balancerActiveWindow(), _balancerActiveWindow);
         }
-        if (_isSecondaryThrottleSet) {
-            builder.append(deprecated_secondaryThrottle(), _secondaryThrottle);
-        }
+        if (_isSecondaryThrottleSet) builder.append(secondaryThrottle(), _secondaryThrottle);
 
-        if (_isMigrationWriteConcernSet) {
-            builder.append(migrationWriteConcern(), _migrationWriteConcern);
-        }
         return builder.obj();
     }
 
@@ -155,23 +141,9 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isBalancerActiveWindowSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source,
-                                          migrationWriteConcern,
-                                          &_migrationWriteConcern,
-                                          errMsg);
-        _isMigrationWriteConcernSet = fieldState == FieldParser::FIELD_SET;
-
-        if (fieldState == FieldParser::FIELD_INVALID) {
-            fieldState = FieldParser::extract(source, deprecated_secondaryThrottle,
-                                              &_secondaryThrottle, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID) return false;
-            errMsg->clear(); // Note: extract method doesn't clear errMsg.
-            _isSecondaryThrottleSet = fieldState == FieldParser::FIELD_SET;
-        }
-
-        fieldState = FieldParser::extract(source, waitForDelete, &_waitForDelete, errMsg);
+        fieldState = FieldParser::extract(source, secondaryThrottle, &_secondaryThrottle, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWaitForDeleteSet = fieldState == FieldParser::FIELD_SET;
+        _isSecondaryThrottleSet = fieldState == FieldParser::FIELD_SET;
 
         return true;
     }
@@ -190,14 +162,12 @@ namespace mongo {
         _balancerActiveWindow = BSONObj();
         _isBalancerActiveWindowSet = false;
 
+        _shortBalancerSleep = false;
+        _isShortBalancerSleepSet = false;
+
         _secondaryThrottle = false;
         _isSecondaryThrottleSet = false;
 
-        _migrationWriteConcern = BSONObj();
-        _isMigrationWriteConcernSet= false;
-
-        _waitForDelete = false;
-        _isWaitForDeleteSet = false;
     }
 
     void SettingsType::cloneTo(SettingsType* other) const {
@@ -212,49 +182,19 @@ namespace mongo {
         other->_balancerStopped = _balancerStopped;
         other->_isBalancerStoppedSet = _isBalancerStoppedSet;
 
-        other->_balancerActiveWindow = _balancerActiveWindow.copy();
+        other->_balancerActiveWindow = _balancerActiveWindow;
         other->_isBalancerActiveWindowSet = _isBalancerActiveWindowSet;
+
+        other->_shortBalancerSleep = _shortBalancerSleep;
+        other->_isShortBalancerSleepSet = _isShortBalancerSleepSet;
 
         other->_secondaryThrottle = _secondaryThrottle;
         other->_isSecondaryThrottleSet = _isSecondaryThrottleSet;
 
-        other->_migrationWriteConcern = _migrationWriteConcern.copy();
-        other->_isMigrationWriteConcernSet = _isMigrationWriteConcernSet;
-
-        other->_waitForDelete = _waitForDelete;
-        other->_isWaitForDeleteSet = _isWaitForDeleteSet;
     }
 
     std::string SettingsType::toString() const {
         return toBSON().toString();
-    }
-
-    StatusWith<WriteConcernOptions*> SettingsType::extractWriteConcern() const {
-        dassert(_isKeySet);
-        dassert(_key == "balancer");
-
-        const bool isSecondaryThrottle = getSecondaryThrottle();
-        if (!isSecondaryThrottle) {
-            return(StatusWith<WriteConcernOptions*>(
-                                new WriteConcernOptions(1, WriteConcernOptions::NONE, 0)));
-        }
-
-        const BSONObj migrationWOption(isMigrationWriteConcernSet() ?
-                getMigrationWriteConcern() : BSONObj());
-
-        if (migrationWOption.isEmpty()) {
-            // Default setting.
-            return StatusWith<WriteConcernOptions*>(NULL);
-        }
-
-        auto_ptr<WriteConcernOptions> writeConcern(new WriteConcernOptions());
-        Status status = writeConcern->parse(migrationWOption);
-
-        if (!status.isOK()) {
-            return StatusWith<WriteConcernOptions*>(status);
-        }
-
-        return StatusWith<WriteConcernOptions*>(writeConcern.release());
     }
 
 } // namespace mongo

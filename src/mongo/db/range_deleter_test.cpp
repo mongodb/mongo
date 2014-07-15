@@ -35,7 +35,6 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_coordinator_mock.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 
@@ -58,7 +57,6 @@ namespace {
     const int MAX_IMMEDIATE_DELETE_WAIT_SECS = 2;
 
     const mongo::repl::ReplSettings replSettings;
-    const mongo::WriteConcernOptions dummyWriteConcern;
 
     // Should not be able to queue deletes if deleter workers were not started.
     TEST(QueueDelete, CantAfterStop) {
@@ -75,7 +73,7 @@ namespace {
                                          BSON("x" << 120),
                                          BSON("x" << 200),
                                          BSON("x" << 1),
-                                         dummyWriteConcern,
+                                         true,
                                          NULL /* notifier not needed */,
                                          &errMsg));
         ASSERT_FALSE(errMsg.empty());
@@ -95,13 +93,8 @@ namespace {
         env->addCursorId(ns, 345);
 
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(ns,
-                                        BSON("x" << 0),
-                                        BSON("x" << 10),
-                                        BSON("x" << 1),
-                                        dummyWriteConcern,
-                                        &notifyDone,
-                                        NULL /* errMsg not needed */));
+        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1),
+                                        true, &notifyDone, NULL /* errMsg not needed */));
 
         env->waitForNthGetCursor(1u);
 
@@ -136,13 +129,8 @@ namespace {
         env->addCursorId(ns, 345);
 
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(ns,
-                                        BSON("x" << 0),
-                                        BSON("x" << 10),
-                                        BSON("x" << 1),
-                                        dummyWriteConcern,
-                                        &notifyDone,
-                                        NULL /* errMsg not needed */));
+        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10),  BSON("x" << 1),
+                                        true, &notifyDone, NULL /* errMsg not needed */));
 
 
         env->waitForNthGetCursor(1u);
@@ -157,9 +145,9 @@ namespace {
                                       const BSONObj& min,
                                       const BSONObj& max,
                                       const BSONObj& shardKeyPattern,
-                                      const mongo::WriteConcernOptions& secondaryThrottle,
+                                      bool secondaryThrottle,
                                       std::string* errMsg) {
-        deleter->deleteNow(txn,ns, min, max, shardKeyPattern, secondaryThrottle, errMsg);
+        deleter->deleteNow(txn, ns, min, max, shardKeyPattern, secondaryThrottle, errMsg);
     }
 
     // Should not start delete if the set of cursors that were open when the
@@ -183,7 +171,7 @@ namespace {
                                                             BSON("x" << 0),
                                                             BSON("x" << 10),
                                                             BSON("x" << 1),
-                                                            dummyWriteConcern,
+                                                            true,
                                                             &errMsg));
 
         env->waitForNthGetCursor(1u);
@@ -232,7 +220,7 @@ namespace {
                                                             BSON("x" << 0),
                                                             BSON("x" << 10),
                                                             BSON("x" << 1),
-                                                            dummyWriteConcern,
+                                                            true,
                                                             &errMsg));
 
         env->waitForNthGetCursor(1u);
@@ -274,7 +262,7 @@ namespace {
                                         BSON("x" << 10),
                                         BSON("x" << 20),
                                         BSON("x" << 1),
-                                        dummyWriteConcern,
+                                        true,
                                         &notifyDone1,
                                         NULL /* don't care errMsg */));
 
@@ -288,7 +276,7 @@ namespace {
                                         BSON("x" << 20),
                                         BSON("x" << 30),
                                         BSON("x" << 1),
-                                        dummyWriteConcern,
+                                        true,
                                         &notifyDone2,
                                         NULL /* don't care errMsg */));
 
@@ -297,7 +285,7 @@ namespace {
                                         BSON("x" << 30),
                                         BSON("x" << 40),
                                         BSON("x" << 1),
-                                        dummyWriteConcern,
+                                        true,
                                         &notifyDone3,
                                         NULL /* don't care errMsg */));
 
@@ -370,23 +358,13 @@ namespace {
         ASSERT_TRUE(errMsg.empty());
 
         errMsg.clear();
-        ASSERT_FALSE(deleter.queueDelete(ns,
-                                         BSON("x" << 120),
-                                         BSON("x" << 140),
-                                         BSON("x" << 1),
-                                         dummyWriteConcern,
-                                         NULL /* notifier not needed */,
-                                         &errMsg));
+        ASSERT_FALSE(deleter.queueDelete(ns, BSON("x" << 120), BSON("x" << 140),  BSON("x" << 1),
+                                         false, NULL /* notifier not needed */, &errMsg));
         ASSERT_FALSE(errMsg.empty());
 
         errMsg.clear();
-        ASSERT_FALSE(deleter.deleteNow(noTxn,
-                                       ns,
-                                       BSON("x" << 120),
-                                       BSON("x" << 140),
-                                       BSON("x" << 1),
-                                       dummyWriteConcern,
-                                       &errMsg));
+        ASSERT_FALSE(deleter.deleteNow(noTxn, ns, BSON("x" << 120), BSON("x" << 140),
+                                       BSON("x" << 1), false, &errMsg));
         ASSERT_FALSE(errMsg.empty());
 
         ASSERT_FALSE(env->deleteOccured());
@@ -432,13 +410,8 @@ namespace {
         env->addCursorId(ns, 58);
 
         Notification notifyDone;
-        deleter.queueDelete(ns,
-                            BSON("x" << 0),
-                            BSON("x" << 10),
-                            BSON("x" << 1),
-                            dummyWriteConcern,
-                            &notifyDone,
-                            NULL /* errMsg not needed */);
+        deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1),
+                            false, &notifyDone, NULL /* errMsg not needed */);
 
         string errMsg;
         ASSERT_FALSE(deleter.addToBlackList(ns, BSON("x" << 5), BSON("x" << 15), &errMsg));
@@ -475,7 +448,7 @@ namespace {
                                                             BSON("x" << 64),
                                                             BSON("x" << 70),
                                                             BSON("x" << 1),
-                                                            dummyWriteConcern,
+                                                            true,
                                                             &delErrMsg));
 
         env->waitForNthPausedDelete(1u);
@@ -511,13 +484,8 @@ namespace {
         ASSERT_FALSE(deleter.removeFromBlackList(ns, BSON("x" << 1234), BSON("x" << 9000)));
 
         // Range should still be blacklisted
-        ASSERT_FALSE(deleter.deleteNow(noTxn,
-                                       ns,
-                                       BSON("x" << 2000),
-                                       BSON("x" << 4000),
-                                       BSON("x" << 1),
-                                       dummyWriteConcern,
-                                       NULL /* errMsg not needed */));
+        ASSERT_FALSE(deleter.deleteNow(noTxn, ns, BSON("x" << 2000), BSON("x" << 4000), BSON("x" << 1),
+                                       false, NULL /* errMsg not needed */));
 
         deleter.stopWorkers();
     }
@@ -535,25 +503,15 @@ namespace {
         ASSERT_TRUE(errMsg.empty());
 
         errMsg.clear();
-        ASSERT_FALSE(deleter.deleteNow(noTxn,
-                                       ns,
-                                       BSON("x" << 600),
-                                       BSON("x" << 700),
-                                       BSON("x" << 1),
-                                       dummyWriteConcern,
-                                       &errMsg));
+        ASSERT_FALSE(deleter.deleteNow(noTxn, ns, BSON("x" << 600), BSON("x" << 700),
+                                       BSON("x" << 1), false, &errMsg));
         ASSERT_FALSE(errMsg.empty());
 
         ASSERT_TRUE(deleter.removeFromBlackList(ns, BSON("x" << 500), BSON("x" << 801)));
 
         errMsg.clear();
-        ASSERT_TRUE(deleter.deleteNow(noTxn,
-                                      ns,
-                                      BSON("x" << 600),
-                                      BSON("x" << 700),
-                                      BSON("x" << 1),
-                                      dummyWriteConcern,
-                                      &errMsg));
+        ASSERT_TRUE(deleter.deleteNow(noTxn, ns, BSON("x" << 600), BSON("x" << 700),
+                                      BSON("x" << 1), false, &errMsg));
         ASSERT_TRUE(errMsg.empty());
 
         deleter.stopWorkers();
@@ -569,13 +527,8 @@ namespace {
         deleter.addToBlackList("foo.bar", BSON("x" << 100), BSON("x" << 200),
                                NULL /* errMsg not needed */);
 
-        ASSERT_TRUE(deleter.deleteNow(noTxn,
-                                      "test.user",
-                                      BSON("x" << 120),
-                                      BSON("x" << 140),
-                                      BSON("x" << 1),
-                                      dummyWriteConcern,
-                                      NULL /* errMsg not needed */));
+        ASSERT_TRUE(deleter.deleteNow(noTxn, "test.user", BSON("x" << 120), BSON("x" << 140),
+                                      BSON("x" << 1), true, NULL /* errMsg not needed */));
 
         deleter.stopWorkers();
     }

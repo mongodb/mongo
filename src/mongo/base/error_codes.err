@@ -98,8 +98,6 @@ error_code("NotSecondary", 95)
 error_code("OperationFailed", 96)
 error_code("NoProjectionFound", 97)
 error_code("DBPathInUse", 98)
-error_code("WriteConcernNotDefined", 99)
-error_code("CannotSatisfyWriteConcern", 100)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h

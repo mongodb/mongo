@@ -63,7 +63,7 @@ namespace mongo {
         const BSONObj inclusiveLower(taskDetails.min);
         const BSONObj exclusiveUpper(taskDetails.max);
         const BSONObj keyPattern(taskDetails.shardKeyPattern);
-        const WriteConcernOptions writeConcern(taskDetails.writeConcern);
+        const bool secondaryThrottle(taskDetails.secondaryThrottle);
 
         const bool initiallyHaveClient = haveClient();
 
@@ -85,6 +85,8 @@ namespace mongo {
                   << endl;
 
             try {
+                bool throttle = repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                        repl::ReplicationCoordinator::modeReplSet ? secondaryThrottle : false;
                 *deletedDocs =
                         Helpers::removeRange(txn,
                                              KeyRange(ns,
@@ -92,7 +94,7 @@ namespace mongo {
                                                       exclusiveUpper,
                                                       keyPattern),
                                              false, /*maxInclusive*/
-                                             writeConcern,
+                                             throttle,
                                              serverGlobalParams.moveParanoia ? &removeSaver : NULL,
                                              true, /*fromMigrate*/
                                              true); /*onlyRemoveOrphans*/
