@@ -116,9 +116,9 @@ namespace mongo {
         _child->prepareToYield();
     }
 
-    void FetchStage::recoverFromYield() {
+    void FetchStage::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        _child->recoverFromYield();
+        _child->recoverFromYield(opCtx);
     }
 
     void FetchStage::invalidate(const DiskLoc& dl, InvalidationType type) {

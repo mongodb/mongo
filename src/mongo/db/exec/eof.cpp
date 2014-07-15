@@ -54,7 +54,7 @@ namespace mongo {
         ++_commonStats.yields;
     }
 
-    void EOFStage::recoverFromYield() {
+    void EOFStage::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
     }
 

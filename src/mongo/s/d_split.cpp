@@ -146,8 +146,9 @@ namespace mongo {
                 max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
             }
 
-            auto_ptr<Runner> runner(InternalPlanner::indexScan(txn, collection, idx, min, max,
-                                                               false, InternalPlanner::FORWARD));
+            auto_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn, collection, idx,
+                                                                   min, max, false,
+                                                                   InternalPlanner::FORWARD));
 
             // Find the 'missingField' value used to represent a missing document field in a key of
             // this index.
@@ -163,7 +164,7 @@ namespace mongo {
 
             DiskLoc loc;
             BSONObj currKey;
-            while (Runner::RUNNER_ADVANCED == runner->getNext(&currKey, &loc)) {
+            while (Runner::RUNNER_ADVANCED == exec->getNext(&currKey, &loc)) {
                 //check that current key contains non missing elements for all fields in keyPattern
                 BSONObjIterator i( currKey );
                 for( int k = 0; k < keyPatternLength ; k++ ) {
@@ -377,11 +378,12 @@ namespace mongo {
                 long long currCount = 0;
                 long long numChunks = 0;
                 
-                auto_ptr<Runner> runner(InternalPlanner::indexScan(txn, collection, idx, min, max,
+                auto_ptr<PlanExecutor> exec(
+                    InternalPlanner::indexScan(txn, collection, idx, min, max,
                     false, InternalPlanner::FORWARD));
 
                 BSONObj currKey;
-                Runner::RunnerState state = runner->getNext(&currKey, NULL);
+                Runner::RunnerState state = exec->getNext(&currKey, NULL);
                 if (Runner::RUNNER_ADVANCED != state) {
                     errmsg = "can't open a cursor for splitting (desired range is possibly empty)";
                     return false;
@@ -419,7 +421,7 @@ namespace mongo {
                             break;
                         }
 
-                        state = runner->getNext(&currKey, NULL);
+                        state = exec->getNext(&currKey, NULL);
                     }
                     
                     if ( ! forceMedianSplit )
@@ -435,10 +437,10 @@ namespace mongo {
                     currCount = 0;
                     log() << "splitVector doing another cycle because of force, keyCount now: " << keyCount << endl;
 
-                    runner.reset(InternalPlanner::indexScan(txn, collection, idx, min, max,
+                    exec.reset(InternalPlanner::indexScan(txn, collection, idx, min, max,
                                                             false, InternalPlanner::FORWARD));
 
-                    state = runner->getNext(&currKey, NULL);
+                    state = exec->getNext(&currKey, NULL);
                 }
 
                 //
@@ -879,12 +881,12 @@ namespace mongo {
                     BSONObj newmin = Helpers::toKeyFormat( kp.extendRangeBound( chunk.min, false) );
                     BSONObj newmax = Helpers::toKeyFormat( kp.extendRangeBound( chunk.max, false) );
 
-                    auto_ptr<Runner> runner(InternalPlanner::indexScan(txn, collection, idx,
-                                                                       newmin, newmax, false));
+                    auto_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn, collection, idx,
+                                                                           newmin, newmax, false));
 
                     // check if exactly one document found
-                    if (Runner::RUNNER_ADVANCED == runner->getNext(NULL, NULL)) {
-                        if (Runner::RUNNER_EOF == runner->getNext(NULL, NULL)) {
+                    if (Runner::RUNNER_ADVANCED == exec->getNext(NULL, NULL)) {
+                        if (Runner::RUNNER_EOF == exec->getNext(NULL, NULL)) {
                             result.append( "shouldMigrate",
                                            BSON("min" << chunk.min << "max" << chunk.max) );
                             break;

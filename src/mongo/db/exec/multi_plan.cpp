@@ -418,7 +418,7 @@ namespace mongo {
         }
     }
 
-    void MultiPlanStage::recoverFromYield() {
+    void MultiPlanStage::recoverFromYield(OperationContext* opCtx) {
         if (_failure) return;
 
         // this logic is from multi_plan_runner
@@ -426,13 +426,13 @@ namespace mongo {
         // the _bestPlan if we've switched to the backup?
 
         if (bestPlanChosen()) {
-            _candidates[_bestPlanIdx].root->recoverFromYield();
+            _candidates[_bestPlanIdx].root->recoverFromYield(opCtx);
             if (hasBackupPlan()) {
-                _candidates[_backupPlanIdx].root->recoverFromYield();
+                _candidates[_backupPlanIdx].root->recoverFromYield(opCtx);
             }
         }
         else {
-            allPlansRestoreState();
+            allPlansRestoreState(opCtx);
         }
     }
 
@@ -506,9 +506,9 @@ namespace mongo {
         }
     }
 
-    void MultiPlanStage::allPlansRestoreState() {
+    void MultiPlanStage::allPlansRestoreState(OperationContext* opCtx) {
         for (size_t i = 0; i < _candidates.size(); ++i) {
-            _candidates[i].root->recoverFromYield();
+            _candidates[i].root->recoverFromYield(opCtx);
         }
     }
 

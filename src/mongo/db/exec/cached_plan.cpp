@@ -104,13 +104,13 @@ namespace mongo {
         ++_commonStats.yields;
     }
 
-    void CachedPlanStage::recoverFromYield() {
+    void CachedPlanStage::recoverFromYield(OperationContext* opCtx) {
         if (NULL != _backupChildPlan.get()) {
-            _backupChildPlan->recoverFromYield();
+            _backupChildPlan->recoverFromYield(opCtx);
         }
 
         if (! _usingBackupChild) {
-            _mainChildPlan->recoverFromYield();
+            _mainChildPlan->recoverFromYield(opCtx);
         }
         ++_commonStats.unyields;
     }

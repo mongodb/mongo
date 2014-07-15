@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+// THIS FILE IS DEPRECATED -- Runner to be replaced with PlanExecutor.
+
 #pragma once
 
 #include "mongo/base/status.h"

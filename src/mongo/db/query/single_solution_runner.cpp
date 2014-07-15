@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+// THIS FILE IS DEPRECATED -- Runner to be replaced with PlanExecutor.
+
 #include "mongo/db/query/single_solution_runner.h"
 
 #include "mongo/db/diskloc.h"
@@ -69,7 +71,7 @@ namespace mongo {
     }
 
     bool SingleSolutionRunner::restoreState(OperationContext* opCtx) {
-        return _exec->restoreState();
+        return _exec->restoreState(opCtx);
     }
 
     void SingleSolutionRunner::invalidate(const DiskLoc& dl, InvalidationType type) {

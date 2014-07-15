@@ -221,14 +221,14 @@ namespace mongo {
             return Status::OK(); // these checks have already been done
         }
 
-        auto_ptr<Runner> runner(
+        auto_ptr<PlanExecutor> exec(
             InternalPlanner::collectionScan(txn,
                                             db->_indexesName,
                                             db->getCollection(txn, db->_indexesName)));
 
         BSONObj index;
         Runner::RunnerState state;
-        while ( Runner::RUNNER_ADVANCED == (state = runner->getNext(&index, NULL)) ) {
+        while ( Runner::RUNNER_ADVANCED == (state = exec->getNext(&index, NULL)) ) {
             const BSONObj key = index.getObjectField("key");
             const string plugin = IndexNames::findPluginName(key);
             if ( IndexNames::existedBefore24(plugin) )

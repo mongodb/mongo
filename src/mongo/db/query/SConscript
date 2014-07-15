@@ -37,7 +37,6 @@ env.Library(
         "get_executor.cpp",
         "get_runner.cpp",
         "idhack_runner.cpp",
-        "internal_runner.cpp",
         "new_find.cpp",
         "plan_executor.cpp",
         "plan_ranker.cpp",

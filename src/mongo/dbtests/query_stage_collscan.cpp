@@ -281,7 +281,7 @@ namespace QueryStageCollectionScan {
             scan->prepareToYield();
             scan->invalidate(locs[count], INVALIDATION_DELETION);
             remove(coll->docFor(locs[count]));
-            scan->recoverFromYield();
+            scan->recoverFromYield(&_txn);
 
             // Skip over locs[count].
             ++count;
@@ -343,7 +343,7 @@ namespace QueryStageCollectionScan {
             scan->prepareToYield();
             scan->invalidate(locs[count], INVALIDATION_DELETION);
             remove(coll->docFor(locs[count]));
-            scan->recoverFromYield();
+            scan->recoverFromYield(&_txn);
 
             // Skip over locs[count].
             ++count;

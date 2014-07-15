@@ -36,7 +36,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/s/d_logic.h"
 
@@ -74,7 +74,7 @@ namespace {
     };
 }
 
-    boost::shared_ptr<Runner> PipelineD::prepareCursorSource(
+    boost::shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
             OperationContext* txn,
             Collection* collection,
             const intrusive_ptr<Pipeline>& pPipeline,
@@ -104,7 +104,7 @@ namespace {
                 // on secondaries, this is needed.
                 ShardedConnectionInfo::addHook();
             }
-            return boost::shared_ptr<Runner>(); // don't need a cursor
+            return boost::shared_ptr<PlanExecutor>(); // don't need a cursor
         }
 
 
@@ -142,19 +142,19 @@ namespace {
             }
         }
 
-        // Create the Runner.
+        // Create the PlanExecutor.
         //
-        // If we try to create a Runner that includes both the match and the
+        // If we try to create a PlanExecutor that includes both the match and the
         // sort, and the two are incompatible wrt the available indexes, then
-        // we don't get a Runner back.
+        // we don't get a PlanExecutor back.
         //
         // So we try to use both first.  If that fails, try again, without the
         // sort.
         //
-        // If we don't have a sort, jump straight to just creating a Runner
+        // If we don't have a sort, jump straight to just creating a PlanExecutor.
         // without the sort.
         //
-        // If we are able to incorporate the sort into the Runner, remove it
+        // If we are able to incorporate the sort into the PlanExecutor, remove it
         // from the head of the pipeline.
         //
         // LATER - we should be able to find this out before we create the
@@ -164,7 +164,7 @@ namespace {
                                    | QueryPlannerParams::INCLUDE_SHARD_FILTER
                                    | QueryPlannerParams::NO_BLOCKING_SORT
                                    ;
-        boost::shared_ptr<Runner> runner;
+        boost::shared_ptr<PlanExecutor> exec;
         bool sortInRunner = false;
 
         const WhereCallbackReal whereCallback(pExpCtx->opCtx, pExpCtx->ns.db());
@@ -178,10 +178,10 @@ namespace {
                                              projectionForQuery,
                                              &cq,
                                              whereCallback);
-            Runner* rawRunner;
-            if (status.isOK() && getRunner(txn, collection, cq, &rawRunner, runnerOptions).isOK()) {
-                // success: The Runner will handle sorting for us using an index.
-                runner.reset(rawRunner);
+            PlanExecutor* rawExec;
+            if (status.isOK() && getExecutor(txn, collection, cq, &rawExec, runnerOptions).isOK()) {
+                // success: The PlanExecutor will handle sorting for us using an index.
+                exec.reset(rawExec);
                 sortInRunner = true;
 
                 sources.pop_front();
@@ -192,7 +192,7 @@ namespace {
             }
         }
 
-        if (!runner.get()) {
+        if (!exec.get()) {
             const BSONObj noSort;
             CanonicalQuery* cq;
             uassertStatusOK(
@@ -203,18 +203,18 @@ namespace {
                                              &cq,
                                              whereCallback));
 
-            Runner* rawRunner;
-            uassertStatusOK(getRunner(txn, collection, cq, &rawRunner, runnerOptions));
-            runner.reset(rawRunner);
+            PlanExecutor* rawExec;
+            uassertStatusOK(getExecutor(txn, collection, cq, &rawExec, runnerOptions));
+            exec.reset(rawExec);
         }
 
 
-        // DocumentSourceCursor expects a yielding Runner that has had its state saved.
-        runner->saveState();
+        // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved.
+        exec->saveState();
 
-        // Put the Runner into a DocumentSourceCursor and add it to the front of the pipeline.
+        // Put the PlanExecutor into a DocumentSourceCursor and add it to the front of the pipeline.
         intrusive_ptr<DocumentSourceCursor> pSource =
-            DocumentSourceCursor::create(fullName, runner, pExpCtx);
+            DocumentSourceCursor::create(fullName, exec, pExpCtx);
 
         // Note the query, sort, and projection for explain.
         pSource->setQuery(queryObj);
@@ -229,7 +229,7 @@ namespace {
 
         pPipeline->addInitialSource(pSource);
 
-        return runner;
+        return exec;
     }
 
 } // namespace mongo

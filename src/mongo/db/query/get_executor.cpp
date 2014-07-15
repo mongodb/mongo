@@ -93,7 +93,7 @@ namespace mongo {
     }
 
     namespace {
-        // The body is below in the "count hack" section but getRunner calls it.
+        // The body is below in the "count hack" section but getExecutor calls it.
         bool turnIxscanIntoCount(QuerySolution* soln);
     }  // namespace
 
@@ -174,7 +174,7 @@ namespace mongo {
                    << " Using EOF stage: " << unparsedQuery.toString();
             EOFStage* eofStage = new EOFStage();
             WorkingSet* ws = new WorkingSet();
-            *out = new PlanExecutor(ws, eofStage, collection);
+            *out = new PlanExecutor(ws, eofStage, ns);
             return Status::OK();
         }
 

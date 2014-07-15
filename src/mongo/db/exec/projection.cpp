@@ -240,9 +240,9 @@ namespace mongo {
         _child->prepareToYield();
     }
 
-    void ProjectionStage::recoverFromYield() {
+    void ProjectionStage::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        _child->recoverFromYield();
+        _child->recoverFromYield(opCtx);
     }
 
     void ProjectionStage::invalidate(const DiskLoc& dl, InvalidationType type) {

@@ -248,7 +248,7 @@ namespace mongo {
         _indexCursor->savePosition();
     }
 
-    void IndexScan::recoverFromYield() {
+    void IndexScan::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
 
         if (_hitEnd || (NULL == _indexCursor.get())) { return; }

@@ -36,7 +36,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
@@ -117,31 +117,31 @@ namespace mongo {
 
         long long nDeleted = 0;
 
-        Runner* rawRunner;
+        PlanExecutor* rawExec;
         if (_canonicalQuery.get()) {
-            uassertStatusOK(getRunner(_request->getOpCtx(),
-                                      collection,
-                                      _canonicalQuery.release(),
-                                      &rawRunner));
+            uassertStatusOK(getExecutor(_request->getOpCtx(),
+                                        collection,
+                                        _canonicalQuery.release(),
+                                        &rawExec));
         }
         else {
-            CanonicalQuery* ignored;
-            uassertStatusOK(getRunner(_request->getOpCtx(),
-                                      collection,
-                                      ns.ns(),
-                                      _request->getQuery(),
-                                      &rawRunner,
-                                      &ignored));
+            uassertStatusOK(getExecutor(_request->getOpCtx(),
+                                        collection,
+                                        ns.ns(),
+                                        _request->getQuery(),
+                                        &rawExec));
         }
 
-        auto_ptr<Runner> runner(rawRunner);
-        ScopedRunnerRegistration safety(runner.get());
+        auto_ptr<PlanExecutor> exec(rawExec);
+
+        // Concurrently mutating state (by us) so we need to register 'exec'.
+        ScopedExecutorRegistration safety(exec.get());
 
         DiskLoc rloc;
         Runner::RunnerState state;
         CurOp* curOp = _request->getOpCtx()->getCurOp();
         int oldYieldCount = curOp->numYields();
-        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &rloc))) {
+        while (Runner::RUNNER_ADVANCED == (state = exec->getNext(NULL, &rloc))) {
             if (oldYieldCount != curOp->numYields()) {
                 uassert(ErrorCodes::NotMaster,
                         str::stream() << "No longer primary while removing from " << ns.ns(),
@@ -154,10 +154,10 @@ namespace mongo {
 
             // TODO: do we want to buffer docs and delete them in a group rather than
             // saving/restoring state repeatedly?
-            runner->saveState();
+            exec->saveState();
             collection->deleteDocument(
                             _request->getOpCtx(), rloc, false, false, logop ? &toDelete : NULL);
-            runner->restoreState(_request->getOpCtx());
+            exec->restoreState(_request->getOpCtx());
 
             nDeleted++;
 

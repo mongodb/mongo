@@ -288,10 +288,10 @@ namespace mongo {
         }
     }
 
-    void NearStage::recoverFromYield() {
+    void NearStage::recoverFromYield(OperationContext* opCtx) {
         ++_stats->common.unyields;
         if (_nextInterval) {
-            _nextInterval->covering->recoverFromYield();
+            _nextInterval->covering->recoverFromYield(opCtx);
         }
     }
 

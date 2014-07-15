@@ -41,14 +41,14 @@ namespace mongo {
 
     class OperationContext;
     class PseudoRandom;
-    class Runner;
+    class PlanExecutor;
 
     class CollectionCursorCache {
     public:
         CollectionCursorCache( const StringData& ns );
 
         /**
-         * will kill() all Runner instances it has
+         * will kill() all PlanExecutor instances it has
          */
         ~CollectionCursorCache();
 
@@ -62,8 +62,8 @@ namespace mongo {
         void invalidateAll( bool collectionGoingAway );
 
         /**
-         * Broadcast a document invalidation to all relevant Runner(s).  invalidateDocument must
-         * called *before* the provided DiskLoc is about to be deleted or mutated.
+         * Broadcast a document invalidation to all relevant PlanExecutor(s).  invalidateDocument
+         * must called *before* the provided DiskLoc is about to be deleted or mutated.
          */
         void invalidateDocument( const DiskLoc& dl,
                                  InvalidationType type );
@@ -78,16 +78,16 @@ namespace mongo {
         // -----------------
 
         /**
-         * Register a runner so that it can be notified of deletion/invalidation during yields.
-         * Must be called before a runner yields.  If a runner is cached (inside a ClientCursor) it
-         * MUST NOT be registered; the two are mutually exclusive.
+         * Register an executor so that it can be notified of deletion/invalidation during yields.
+         * Must be called before an executor yields.  If an executor is cached (inside a
+         * ClientCursor) it MUST NOT be registered; the two are mutually exclusive.
          */
-        void registerRunner(Runner* runner);
+        void registerExecutor(PlanExecutor* exec);
 
         /**
-         * Remove a runner from the runner registry.
+         * Remove an executor from the registry.
          */
-        void deregisterRunner(Runner* runner);
+        void deregisterExecutor(PlanExecutor* exec);
 
         // -----------------
 
@@ -130,8 +130,8 @@ namespace mongo {
 
         SimpleMutex _mutex;
 
-        typedef unordered_set<Runner*> RunnerSet;
-        RunnerSet _nonCachedRunners;
+        typedef unordered_set<PlanExecutor*> ExecSet;
+        ExecSet _nonCachedExecutors;
 
         typedef std::map<CursorId,ClientCursor*> CursorMap;
         CursorMap _cursors;

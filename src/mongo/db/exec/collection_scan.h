@@ -57,7 +57,7 @@ namespace mongo {
 
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
         virtual void prepareToYield();
-        virtual void recoverFromYield();
+        virtual void recoverFromYield(OperationContext* opCtx);
 
         virtual std::vector<PlanStage*> getChildren() const;
 

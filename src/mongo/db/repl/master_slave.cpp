@@ -253,13 +253,13 @@ namespace repl {
             // check that no items are in sources other than that
             // add if missing
             int n = 0;
-            auto_ptr<Runner> runner(
+            auto_ptr<PlanExecutor> exec(
                 InternalPlanner::collectionScan(txn,
                                                 localSources,
                                                 ctx.db()->getCollection(txn, localSources)));
             BSONObj obj;
             Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+            while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
                 n++;
                 ReplSource tmp(txn, obj);
                 if (tmp.hostName != replSettings.source) {
@@ -298,13 +298,13 @@ namespace repl {
             }
         }
 
-        auto_ptr<Runner> runner(
+        auto_ptr<PlanExecutor> exec(
             InternalPlanner::collectionScan(txn,
                                             localSources,
                                             ctx.db()->getCollection(txn, localSources)));
         BSONObj obj;
         Runner::RunnerState state;
-        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+        while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
             ReplSource tmp(txn, obj);
             if ( tmp.syncedTo.isNull() ) {
                 DBDirectClient c(txn);

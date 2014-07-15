@@ -37,19 +37,19 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/single_solution_runner.h"
 #include "mongo/dbtests/dbtests.h"
 
-namespace QuerySingleSolutionRunner {
+namespace QueryPlanExecutor {
 
-    class SingleSolutionRunnerBase {
+    class PlanExecutorBase {
     public:
-        SingleSolutionRunnerBase() : _client(&_txn) {
-        
+        PlanExecutorBase() : _client(&_txn) {
+
         }
 
-        virtual ~SingleSolutionRunnerBase() {
+        virtual ~PlanExecutorBase() {
             _client.dropCollection(ns());
         }
 
@@ -75,13 +75,12 @@ namespace QuerySingleSolutionRunner {
 
         /**
          * Given a match expression, represented as the BSON object 'filterObj',
-         * create a SingleSolutionRunner capable of executing a simple collection
+         * create a PlanExecutor capable of executing a simple collection
          * scan.
          *
-         * The caller takes ownership of the returned SingleSolutionRunner*.
+         * The caller takes ownership of the returned PlanExecutor*.
          */
-        SingleSolutionRunner* makeCollScanRunner(Client::Context& ctx,
-                                                 BSONObj& filterObj) {
+        PlanExecutor* makeCollScanExec(Client::Context& ctx, BSONObj& filterObj) {
             CollectionScanParams csparams;
             csparams.collection = ctx.db()->getCollection( &_txn, ns() );
             csparams.direction = CollectionScanParams::FORWARD;
@@ -97,13 +96,10 @@ namespace QuerySingleSolutionRunner {
             verify(CanonicalQuery::canonicalize(ns(), filterObj, &cq).isOK());
             verify(NULL != cq);
 
-            // Hand the plan off to the single solution runner.
-            SingleSolutionRunner* ssr = new SingleSolutionRunner(ctx.db()->getCollection(&_txn, ns()),
-                                                                 cq,
-                                                                 new QuerySolution(),
-                                                                 root.release(),
-                                                                 ws.release());
-            return ssr;
+            // Hand the plan off to the executor.
+            PlanExecutor* exec = new PlanExecutor(ws.release(), root.release(), cq,
+                                                  ctx.db()->getCollection(&_txn, ns()));
+            return exec;
         }
 
         /**
@@ -114,13 +110,13 @@ namespace QuerySingleSolutionRunner {
          * @param end -- the lower bound (inclusive) at which to end the
          *   index scan
          *
-         * Returns a SingleSolutionRunner capable of executing an index scan
+         * Returns a PlanExecutor capable of executing an index scan
          * over the specified index with the specified bounds.
          *
-         * The caller takes ownership of the returned SingleSolutionRunner*.
+         * The caller takes ownership of the returned PlanExecutor*.
          */
-        SingleSolutionRunner* makeIndexScanRunner(Client::Context& context,
-                                                  BSONObj& indexSpec, int start, int end) {
+        PlanExecutor* makeIndexScanExec(Client::Context& context,
+                                                BSONObj& indexSpec, int start, int end) {
             // Build the index scan stage.
             IndexScanParams ixparams;
             ixparams.descriptor = getIndex(context.db(), indexSpec);
@@ -140,13 +136,11 @@ namespace QuerySingleSolutionRunner {
             verify(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
             verify(NULL != cq);
 
-            // Hand the plan off to the single solution runner.
-            return new SingleSolutionRunner(coll,
-                                            cq, new QuerySolution(),
-                                            root.release(), ws.release());
+            // Hand the plan off to the executor.
+            return new PlanExecutor(ws.release(), root.release(), cq, coll);
         }
 
-        static const char* ns() { return "unittests.QueryStageSingleSolutionRunner"; }
+        static const char* ns() { return "unittests.QueryPlanExecutor"; }
 
         size_t numCursors() {
             Client::ReadContext ctx(&_txn, ns() );
@@ -156,16 +150,16 @@ namespace QuerySingleSolutionRunner {
             return collection->cursorCache()->numCursors();
         }
 
-        void registerRunner( Runner* runner ) {
+        void registerExec( PlanExecutor* exec ) {
             Client::ReadContext ctx(&_txn, ns());
             Collection* collection = ctx.ctx().db()->getOrCreateCollection( &_txn, ns() );
-            return collection->cursorCache()->registerRunner( runner );
+            collection->cursorCache()->registerExecutor( exec );
         }
 
-        void deregisterRunner( Runner* runner ) {
+        void deregisterExec( PlanExecutor* exec ) {
             Client::ReadContext ctx(&_txn, ns());
             Collection* collection = ctx.ctx().db()->getOrCreateCollection( &_txn, ns() );
-            return collection->cursorCache()->deregisterRunner( runner );
+            collection->cursorCache()->deregisterExecutor( exec );
         }
 
     protected:
@@ -182,9 +176,9 @@ namespace QuerySingleSolutionRunner {
 
     /**
      * Test dropping the collection while the
-     * SingleSolutionRunner is doing a collection scan.
+     * PlanExecutor is doing a collection scan.
      */
-    class DropCollScan : public SingleSolutionRunnerBase {
+    class DropCollScan : public PlanExecutorBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -192,19 +186,19 @@ namespace QuerySingleSolutionRunner {
             insert(BSON("_id" << 2));
 
             BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
-            scoped_ptr<SingleSolutionRunner> ssr(makeCollScanRunner(ctx.ctx(),filterObj));
-            registerRunner(ssr.get());
+            scoped_ptr<PlanExecutor> exec(makeCollScanExec(ctx.ctx(),filterObj));
+            registerExec(exec.get());
 
             BSONObj objOut;
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, ssr->getNext(&objOut, NULL));
+            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, exec->getNext(&objOut, NULL));
             ASSERT_EQUALS(1, objOut["_id"].numberInt());
 
             // After dropping the collection, the runner
             // should be dead.
             dropCollection();
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, ssr->getNext(&objOut, NULL));
+            ASSERT_EQUALS(Runner::RUNNER_DEAD, exec->getNext(&objOut, NULL));
 
-            deregisterRunner(ssr.get());
+            deregisterExec(exec.get());
             ctx.commit();
         }
     };
@@ -213,7 +207,7 @@ namespace QuerySingleSolutionRunner {
      * Test dropping the collection while the
      * SingleSolutionRunner is doing an index scan.
      */
-    class DropIndexScan : public SingleSolutionRunnerBase {
+    class DropIndexScan : public PlanExecutorBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -223,24 +217,24 @@ namespace QuerySingleSolutionRunner {
             BSONObj indexSpec = BSON("a" << 1);
             addIndex(indexSpec);
 
-            scoped_ptr<SingleSolutionRunner> ssr(makeIndexScanRunner(ctx.ctx(), indexSpec, 7, 10));
-            registerRunner(ssr.get());
+            scoped_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.ctx(), indexSpec, 7, 10));
+            registerExec(exec.get());
 
             BSONObj objOut;
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, ssr->getNext(&objOut, NULL));
+            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, exec->getNext(&objOut, NULL));
             ASSERT_EQUALS(7, objOut["a"].numberInt());
 
             // After dropping the collection, the runner
             // should be dead.
             dropCollection();
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, ssr->getNext(&objOut, NULL));
+            ASSERT_EQUALS(Runner::RUNNER_DEAD, exec->getNext(&objOut, NULL));
 
-            deregisterRunner(ssr.get());
+            deregisterExec(exec.get());
             ctx.commit();
         }
     };
 
-    class SnapshotBase : public SingleSolutionRunnerBase {
+    class SnapshotBase : public PlanExecutorBase {
     protected:
         void setupCollection() {
             insert(BSON("_id" << 1 << "a" << 1));
@@ -265,15 +259,15 @@ namespace QuerySingleSolutionRunner {
         }
 
         /**
-         * Given an array of ints, 'expectedIds', and a SingleSolutionRunner,
-         * 'ssr', uses the runner to iterate through the collection. While
+         * Given an array of ints, 'expectedIds', and a PlanExecutor,
+         * 'exec', uses the executor to iterate through the collection. While
          * iterating, asserts that the _id of each successive document equals
          * the respective integer in 'expectedIds'.
          */
-        void checkIds(int* expectedIds, SingleSolutionRunner* ssr) {
+        void checkIds(int* expectedIds, PlanExecutor* exec) {
             BSONObj objOut;
             int idcount = 0;
-            while (Runner::RUNNER_ADVANCED == ssr->getNext(&objOut, NULL)) {
+            while (Runner::RUNNER_ADVANCED == exec->getNext(&objOut, NULL)) {
                 ASSERT_EQUALS(expectedIds[idcount], objOut["_id"].numberInt());
                 ++idcount;
             }
@@ -292,16 +286,16 @@ namespace QuerySingleSolutionRunner {
             setupCollection();
 
             BSONObj filterObj = fromjson("{a: {$gte: 2}}");
-            scoped_ptr<SingleSolutionRunner> ssr(makeCollScanRunner(ctx.ctx(),filterObj));
+            scoped_ptr<PlanExecutor> exec(makeCollScanExec(ctx.ctx(),filterObj));
 
             BSONObj objOut;
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, ssr->getNext(&objOut, NULL));
+            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, exec->getNext(&objOut, NULL));
             ASSERT_EQUALS(2, objOut["a"].numberInt());
 
             forceDocumentMove();
 
             int ids[] = {3, 4, 2};
-            checkIds(ids, ssr.get());
+            checkIds(ids, exec.get());
             ctx.commit();
         }
     };
@@ -320,10 +314,10 @@ namespace QuerySingleSolutionRunner {
             addIndex(indexSpec);
 
             BSONObj filterObj = fromjson("{a: {$gte: 2}}");
-            scoped_ptr<SingleSolutionRunner> ssr(makeIndexScanRunner(ctx.ctx(), indexSpec, 2, 5));
+            scoped_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.ctx(), indexSpec, 2, 5));
 
             BSONObj objOut;
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, ssr->getNext(&objOut, NULL));
+            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, exec->getNext(&objOut, NULL));
             ASSERT_EQUALS(2, objOut["a"].numberInt());
 
             forceDocumentMove();
@@ -331,7 +325,7 @@ namespace QuerySingleSolutionRunner {
             // Since this time we're scanning the _id index,
             // we should not see the moved document again.
             int ids[] = {3, 4};
-            checkIds(ids, ssr.get());
+            checkIds(ids, exec.get());
             ctx.commit();
         }
     };
@@ -343,18 +337,18 @@ namespace QuerySingleSolutionRunner {
         /**
          * Test invalidation of ClientCursor.
          */
-        class Invalidate : public SingleSolutionRunnerBase {
+        class Invalidate : public PlanExecutorBase {
         public:
             void run() {
                 Client::WriteContext ctx(&_txn, ns());
                 insert(BSON("a" << 1 << "b" << 1));
 
                 BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
-                SingleSolutionRunner* ssr = makeCollScanRunner(ctx.ctx(),filterObj);
+                PlanExecutor* exec = makeCollScanExec(ctx.ctx(),filterObj);
 
                 // Make a client cursor from the runner.
                 new ClientCursor(ctx.ctx().db()->getCollection(&_txn, ns()),
-                                 ssr, 0, BSONObj());
+                                 exec, 0, BSONObj());
 
                 // There should be one cursor before invalidation,
                 // and zero cursors after invalidation.
@@ -369,7 +363,7 @@ namespace QuerySingleSolutionRunner {
          * Test that pinned client cursors persist even after
          * invalidation.
          */
-        class InvalidatePinned : public SingleSolutionRunnerBase {
+        class InvalidatePinned : public PlanExecutorBase {
         public:
             void run() {
                 Client::WriteContext ctx(&_txn, ns());
@@ -378,11 +372,11 @@ namespace QuerySingleSolutionRunner {
                 Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
 
                 BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
-                SingleSolutionRunner* ssr = makeCollScanRunner(ctx.ctx(),filterObj);
+                PlanExecutor* exec = makeCollScanExec(ctx.ctx(),filterObj);
 
                 // Make a client cursor from the runner.
                 ClientCursor* cc = new ClientCursor(collection,
-                                                    ssr, 0, BSONObj());
+                                                    exec, 0, BSONObj());
                 ClientCursorPin ccPin(collection,cc->cursorid());
 
                 // If the cursor is pinned, it sticks around,
@@ -393,7 +387,7 @@ namespace QuerySingleSolutionRunner {
 
                 // The invalidation should have killed the runner.
                 BSONObj objOut;
-                ASSERT_EQUALS(Runner::RUNNER_DEAD, ssr->getNext(&objOut, NULL));
+                ASSERT_EQUALS(Runner::RUNNER_DEAD, exec->getNext(&objOut, NULL));
 
                 // Deleting the underlying cursor should cause the
                 // number of cursors to return to 0.
@@ -407,7 +401,7 @@ namespace QuerySingleSolutionRunner {
          * Test that client cursors time out and get
          * deleted.
          */
-        class Timeout : public SingleSolutionRunnerBase {
+        class Timeout : public PlanExecutorBase {
         public:
             void run() {
                 {
@@ -421,10 +415,10 @@ namespace QuerySingleSolutionRunner {
                     Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
 
                     BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
-                    SingleSolutionRunner* ssr = makeCollScanRunner(ctx.ctx(),filterObj);
+                    PlanExecutor* exec = makeCollScanExec(ctx.ctx(),filterObj);
 
                     // Make a client cursor from the runner.
-                    new ClientCursor(collection, ssr, 0, BSONObj());
+                    new ClientCursor(collection, exec, 0, BSONObj());
                 }
 
                 // There should be one cursor before timeout,
@@ -439,7 +433,7 @@ namespace QuerySingleSolutionRunner {
 
     class All : public Suite {
     public:
-        All() : Suite( "query_single_solution_runner" ) { }
+        All() : Suite( "query_plan_executor" ) { }
 
         void setupTests() {
             add<DropCollScan>();
@@ -450,6 +444,6 @@ namespace QuerySingleSolutionRunner {
             add<ClientCursor::InvalidatePinned>();
             add<ClientCursor::Timeout>();
         }
-    }  queryMultiPlanRunnerAll;
+    }  queryPlanExecutorAll;
 
-}  // namespace QuerySingleSolutionRunner
+}  // namespace QueryPlanExecutor

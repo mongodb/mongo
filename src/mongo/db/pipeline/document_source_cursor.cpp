@@ -33,6 +33,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/query/type_explain.h"
 #include "mongo/db/storage_options.h"
@@ -65,29 +66,29 @@ namespace mongo {
     }
 
     void DocumentSourceCursor::dispose() {
-        // Can't call in to Runner or ClientCursor registries from this function since it will be
-        // called when an agg cursor is killed which would cause a deadlock.
-        _runner.reset();
+        // Can't call in to PlanExecutor or ClientCursor registries from this function since it
+        // will be called when an agg cursor is killed which would cause a deadlock.
+        _exec.reset();
         _currentBatch.clear();
     }
 
     void DocumentSourceCursor::loadBatch() {
-        if (!_runner) {
+        if (!_exec) {
             dispose();
             return;
         }
 
-        // We have already validated the sharding version when we constructed the Runner
+        // We have already validated the sharding version when we constructed the PlanExecutor
         // so we shouldn't check it again.
         Lock::DBRead lk(pExpCtx->opCtx->lockState(), _ns);
         Client::Context ctx(pExpCtx->opCtx, _ns, /*doVersion=*/false);
 
-        _runner->restoreState(pExpCtx->opCtx);
+        _exec->restoreState(pExpCtx->opCtx);
 
         int memUsageBytes = 0;
         BSONObj obj;
         Runner::RunnerState state;
-        while ((state = _runner->getNext(&obj, NULL)) == Runner::RUNNER_ADVANCED) {
+        while ((state = _exec->getNext(&obj, NULL)) == Runner::RUNNER_ADVANCED) {
             if (_dependencies) {
                 _currentBatch.push_back(_dependencies->extractFields(obj));
             }
@@ -105,15 +106,15 @@ namespace mongo {
             memUsageBytes += _currentBatch.back().getApproximateSize();
 
             if (memUsageBytes > MaxBytesToReturnToClientAtOnce) {
-                // End this batch and prepare Runner for yielding.
-                _runner->saveState();
+                // End this batch and prepare PlanExecutor for yielding.
+                _exec->saveState();
                 return;
             }
         }
 
-        // If we got here, there won't be any more documents, so destroy the runner. Can't use
+        // If we got here, there won't be any more documents, so destroy the executor. Can't use
         // dispose since we want to keep the _currentBatch.
-        _runner.reset();
+        _exec.reset();
 
         uassert(16028, "collection or index disappeared when cursor yielded",
                 state != Runner::RUNNER_DEAD);
@@ -121,7 +122,7 @@ namespace mongo {
         uassert(17285, "cursor encountered an error: " + WorkingSetCommon::toStatusString(obj),
                 state != Runner::RUNNER_ERROR);
 
-        massert(17286, str::stream() << "Unexpected return from Runner::getNext: " << state,
+        massert(17286, str::stream() << "Unexpected return from PlanExecutor::getNext: " << state,
                 state == Runner::RUNNER_EOF || state == Runner::RUNNER_ADVANCED);
     }
 
@@ -202,17 +203,17 @@ namespace {
             Lock::DBRead lk(pExpCtx->opCtx->lockState(), _ns);
             Client::Context ctx(pExpCtx->opCtx, _ns, /*doVersion=*/ false);
 
-            massert(17392, "No _runner. Were we disposed before explained?",
-                    _runner);
+            massert(17392, "No _exec. Were we disposed before explained?",
+                    _exec);
 
-            _runner->restoreState(pExpCtx->opCtx);
+            _exec->restoreState(pExpCtx->opCtx);
 
             TypeExplain* explainRaw;
-            explainStatus = _runner->getInfo(&explainRaw, NULL);
+            explainStatus = Explain::legacyExplain(_exec.get(), &explainRaw);
             if (explainStatus.isOK())
                 plan.reset(explainRaw);
 
-            _runner->saveState();
+            _exec->saveState();
         }
 
         MutableDocument out;
@@ -237,19 +238,19 @@ namespace {
     }
 
     DocumentSourceCursor::DocumentSourceCursor(const string& ns,
-                                               const boost::shared_ptr<Runner>& runner,
+                                               const boost::shared_ptr<PlanExecutor>& exec,
                                                const intrusive_ptr<ExpressionContext> &pCtx)
         : DocumentSource(pCtx)
         , _docsAddedToBatches(0)
         , _ns(ns)
-        , _runner(runner)
+        , _exec(exec)
     {}
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
             const string& ns,
-            const boost::shared_ptr<Runner>& runner,
+            const boost::shared_ptr<PlanExecutor>& exec,
             const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        return new DocumentSourceCursor(ns, runner, pExpCtx);
+        return new DocumentSourceCursor(ns, exec, pExpCtx);
     }
 
     void DocumentSourceCursor::setProjection(

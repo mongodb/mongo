@@ -15,10 +15,9 @@
  */
 
 /**
- * This file tests db/exec/oplogstart.{h,cpp}. OplogStart is a planner stage
- * used by an InternalRunner. It is responsible for walking the oplog
- * backwards in order to find where the oplog should be replayed from for
- * replication.
+ * This file tests db/exec/oplogstart.{h,cpp}. OplogStart is an execution stage
+ * responsible for walking the oplog backwards in order to find where the oplog should
+ * be replayed from for replication.
  */
 
 #include "mongo/dbtests/dbtests.h"
@@ -27,7 +26,6 @@
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/internal_runner.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/operation_context_impl.h"

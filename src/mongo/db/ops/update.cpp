@@ -466,6 +466,9 @@ namespace mongo {
         // Create the plan executor and setup all deps.
         auto_ptr<PlanExecutor> exec(rawExec);
 
+        // Register executor with the collection cursor cache.
+        const ScopedExecutorRegistration safety(exec.get());
+
         // Get the canonical query which the underlying executor is using. This may be NULL in
         // the case of idhack updates.
         cq = exec->getCanonicalQuery();
@@ -667,7 +670,7 @@ namespace mongo {
             // Restore state after modification
             uassert(17278,
                     "Update could not restore plan executor state after updating a document.",
-                    exec->restoreState());
+                    exec->restoreState(request.getOpCtx()));
 
             // Call logOp if requested.
             if (request.shouldCallLogOp() && !logObj.isEmpty()) {

@@ -41,7 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/scripting/engine.h"
 
@@ -146,18 +146,18 @@ namespace mongo {
                     return 0;
                 }
 
-                Runner* rawRunner;
-                if (!getRunner(txn,collection, cq, &rawRunner).isOK()) {
-                    uasserted(17213, "Can't get runner for query " + query.toString());
+                PlanExecutor* rawExec;
+                if (!getExecutor(txn,collection, cq, &rawExec).isOK()) {
+                    uasserted(17213, "Can't get executor for query " + query.toString());
                     return 0;
                 }
 
-                auto_ptr<Runner> runner(rawRunner);
-                const ScopedRunnerRegistration safety(runner.get());
+                auto_ptr<PlanExecutor> exec(rawExec);
+                const ScopedExecutorRegistration safety(exec.get());
 
                 BSONObj obj;
                 Runner::RunnerState state;
-                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+                while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
                     BSONObj key = getKey(obj , keyPattern , keyFunction , keysize / keynum,
                                          s.get() );
                     keysize += key.objsize();

@@ -83,14 +83,14 @@ namespace repl {
             {
                 const char* localSources = "local.sources";
                 Client::ReadContext ctx(txn, localSources);
-                auto_ptr<Runner> runner(
+                auto_ptr<PlanExecutor> exec(
                     InternalPlanner::collectionScan(txn,
                                                     localSources,
                                                     ctx.ctx().db()->getCollection(txn,
                                                                                   localSources)));
                 BSONObj obj;
                 Runner::RunnerState state;
-                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+                while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
                     src.push_back(obj);
                 }
             }

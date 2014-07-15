@@ -333,7 +333,7 @@ namespace QueryStageCount {
             count.prepareToYield();
 
             // Recover from yield
-            count.recoverFromYield();
+            count.recoverFromYield(&_txn);
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
@@ -388,7 +388,7 @@ namespace QueryStageCount {
             remove(BSON("a" << GTE << 5));
 
             // Recover from yield
-            count.recoverFromYield();
+            count.recoverFromYield(&_txn);
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
@@ -446,7 +446,7 @@ namespace QueryStageCount {
             insert(BSON("a" << 6.5));
 
             // Recover from yield
-            count.recoverFromYield();
+            count.recoverFromYield(&_txn);
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
@@ -501,7 +501,7 @@ namespace QueryStageCount {
             insert(BSON("a" << BSON_ARRAY(10 << 11)));
 
             // Recover from yield
-            count.recoverFromYield();
+            count.recoverFromYield(&_txn);
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
@@ -625,7 +625,7 @@ namespace QueryStageCount {
             remove(BSON("a" << 1 << "b" << 5));
 
             // Recover from yield
-            count.recoverFromYield();
+            count.recoverFromYield(&_txn);
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {

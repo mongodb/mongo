@@ -234,7 +234,7 @@ namespace repl {
     static void syncRollbackFindCommonPoint(OperationContext* txn, DBClientConnection* them, FixUpInfo& fixUpInfo) {
         Client::Context ctx(txn, rsoplog);
 
-        boost::scoped_ptr<Runner> runner(
+        boost::scoped_ptr<PlanExecutor> exec(
                 InternalPlanner::collectionScan(txn,
                                                 rsoplog,
                                                 ctx.db()->getCollection(txn, rsoplog),
@@ -243,7 +243,7 @@ namespace repl {
         BSONObj ourObj;
         DiskLoc ourLoc;
 
-        if (Runner::RUNNER_ADVANCED != runner->getNext(&ourObj, &ourLoc)) {
+        if (Runner::RUNNER_ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
             throw RSFatalException("our oplog empty or unreadable");
         }
 
@@ -304,7 +304,7 @@ namespace repl {
                 theirObj = oplogCursor->nextSafe();
                 theirTime = theirObj["ts"]._opTime();
 
-                if (Runner::RUNNER_ADVANCED != runner->getNext(&ourObj, &ourLoc)) {
+                if (Runner::RUNNER_ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
                     log() << "replSet rollback error RS101 reached beginning of local oplog"
                           << rsLog;
                     log() << "replSet   them:      " << them->toString() << " scanned: "
@@ -331,7 +331,7 @@ namespace repl {
             else {
                 // theirTime < ourTime
                 refetch(fixUpInfo, ourObj);
-                if (Runner::RUNNER_ADVANCED != runner->getNext(&ourObj, &ourLoc)) {
+                if (Runner::RUNNER_ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
                     log() << "replSet rollback error RS101 reached beginning of local oplog"
                           << rsLog;
                     log() << "replSet   them:      " << them->toString() << " scanned: "

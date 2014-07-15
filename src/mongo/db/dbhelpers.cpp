@@ -46,7 +46,7 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
-#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/oplog.h"
@@ -112,15 +112,15 @@ namespace mongo {
         massert(17244, "Could not canonicalize " + query.toString(),
             CanonicalQuery::canonicalize(collection->ns(), query, &cq, whereCallback).isOK());
 
-        Runner* rawRunner;
+        PlanExecutor* rawExec;
         size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
-        massert(17245, "Could not get runner for query " + query.toString(),
-                getRunner(txn, collection, cq, &rawRunner, options).isOK());
+        massert(17245, "Could not get executor for query " + query.toString(),
+                getExecutor(txn, collection, cq, &rawExec, options).isOK());
 
-        auto_ptr<Runner> runner(rawRunner);
+        auto_ptr<PlanExecutor> exec(rawExec);
         Runner::RunnerState state;
         DiskLoc loc;
-        if (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &loc))) {
+        if (Runner::RUNNER_ADVANCED == (state = exec->getNext(NULL, &loc))) {
             return loc;
         }
         return DiskLoc();
@@ -184,11 +184,10 @@ namespace mongo {
     */
     bool Helpers::getSingleton(OperationContext* txn, const char *ns, BSONObj& result) {
         Client::Context context(txn, ns);
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(txn,
-                                                                ns,
-                                                                context.db()->getCollection(txn,
-                                                                                            ns)));
-        Runner::RunnerState state = runner->getNext(&result, NULL);
+        auto_ptr<PlanExecutor> exec(
+            InternalPlanner::collectionScan(txn, ns, context.db()->getCollection(txn, ns)));
+
+        Runner::RunnerState state = exec->getNext(&result, NULL);
         context.getClient()->curop()->done();
         return Runner::RUNNER_ADVANCED == state;
     }
@@ -196,11 +195,10 @@ namespace mongo {
     bool Helpers::getLast(OperationContext* txn, const char *ns, BSONObj& result) {
         Client::Context ctx(txn, ns);
         Collection* coll = ctx.db()->getCollection( txn, ns );
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(txn,
-                                                                ns,
-                                                                coll,
-                                                                InternalPlanner::BACKWARD));
-        Runner::RunnerState state = runner->getNext(&result, NULL);
+        auto_ptr<PlanExecutor> exec(
+            InternalPlanner::collectionScan(txn, ns, coll, InternalPlanner::BACKWARD));
+
+        Runner::RunnerState state = exec->getNext(&result, NULL);
         return Runner::RUNNER_ADVANCED == state;
     }
 
@@ -362,17 +360,18 @@ namespace mongo {
                 IndexDescriptor* desc =
                     collection->getIndexCatalog()->findIndexByKeyPattern( indexKeyPattern.toBSON() );
 
-                auto_ptr<Runner> runner(InternalPlanner::indexScan(txn, collection, desc, min, max,
-                                                                   maxInclusive,
-                                                                   InternalPlanner::FORWARD,
-                                                                   InternalPlanner::IXSCAN_FETCH));
+                auto_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn, collection, desc,
+                                                                       min, max,
+                                                                       maxInclusive,
+                                                                       InternalPlanner::FORWARD,
+                                                                       InternalPlanner::IXSCAN_FETCH));
 
                 DiskLoc rloc;
                 BSONObj obj;
                 Runner::RunnerState state;
                 // This may yield so we cannot touch nsd after this.
-                state = runner->getNext(&obj, &rloc);
-                runner.reset();
+                state = exec->getNext(&obj, &rloc);
+                exec.reset();
                 if (Runner::RUNNER_EOF == state) { break; }
 
                 if (Runner::RUNNER_DEAD == state) {
@@ -520,13 +519,14 @@ namespace mongo {
         bool isLargeChunk = false;
         long long docCount = 0;
 
-        auto_ptr<Runner> runner(InternalPlanner::indexScan(txn, collection, idx, min, max, false));
+        auto_ptr<PlanExecutor> exec(
+            InternalPlanner::indexScan(txn, collection, idx, min, max, false));
         // we can afford to yield here because any change to the base data that we might miss  is
         // already being queued and will be migrated in the 'transferMods' stage
 
         DiskLoc loc;
         Runner::RunnerState state;
-        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &loc))) {
+        while (Runner::RUNNER_ADVANCED == (state = exec->getNext(NULL, &loc))) {
             if ( !isLargeChunk ) {
                 locs->insert( loc );
             }

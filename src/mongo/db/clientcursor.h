@@ -33,7 +33,7 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/query/runner.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/util/background.h"
 #include "mongo/util/net/message.h"
@@ -57,7 +57,7 @@ namespace mongo {
      */
     class ClientCursor : private boost::noncopyable {
     public:
-        ClientCursor(const Collection* collection, Runner* runner,
+        ClientCursor(const Collection* collection, PlanExecutor* exec,
                      int qopts = 0, const BSONObj query = BSONObj());
 
         ClientCursor(const Collection* collection);
@@ -77,7 +77,7 @@ namespace mongo {
          * goes through killing cursors.
          * It removes the responsiilibty of de-registering from ClientCursor.
          * Responsibility for deleting the ClientCursor doesn't change from this call
-         * see Runner::kill.
+         * see PlanExecutor::kill.
          */
         void kill();
 
@@ -115,10 +115,10 @@ namespace mongo {
         OpTime getSlaveReadTill() const { return _slaveReadTill; }
 
         //
-        // Query-specific functionality that may be adapted for the Runner.
+        // Query-specific functionality that may be adapted for the PlanExecutor.
         //
 
-        Runner* getRunner() const { return _runner.get(); }
+        PlanExecutor* getExecutor() const { return _exec.get(); }
         int queryOptions() const { return _queryOptions; }
 
         // Used by ops/query.cpp to stash how many results have been returned by a query.
@@ -129,7 +129,7 @@ namespace mongo {
         /**
          * Is this ClientCursor backed by an aggregation pipeline. Defaults to false.
          *
-         * Agg Runners differ from others in that they manage their own locking internally and
+         * Agg executors differ from others in that they manage their own locking internally and
          * should not be killed or destroyed when the underlying collection is deleted.
          *
          * Note: This should *not* be set for the internal cursor used as input to an aggregation.
@@ -200,7 +200,7 @@ namespace mongo {
         //
         // The underlying execution machinery.
         //
-        scoped_ptr<Runner> _runner;
+        scoped_ptr<PlanExecutor> _exec;
     };
 
     /**

@@ -685,16 +685,4 @@ namespace mongo {
         return getRunner(txn, collection, cq, out);
     }
 
-    ScopedRunnerRegistration::ScopedRunnerRegistration(Runner* runner)
-        : _runner(runner) {
-        // Collection can be null for EOFRunner, or other places where registration is not needed
-        if ( _runner->collection() )
-            _runner->collection()->cursorCache()->registerRunner( runner );
-    }
-
-    ScopedRunnerRegistration::~ScopedRunnerRegistration() {
-        if ( _runner->collection() )
-            _runner->collection()->cursorCache()->deregisterRunner( _runner );
-    }
-
 }  // namespace mongo

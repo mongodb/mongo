@@ -40,8 +40,8 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/query/get_runner.h"
-#include "mongo/db/query/type_explain.h"
+#include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/platform/unordered_map.h"
 
@@ -186,14 +186,14 @@ namespace mongo {
                 return false;
             }
 
-            Runner* rawRunner;
-            if (!getRunner(txn, collection, cq, &rawRunner, 0).isOK()) {
+            PlanExecutor* rawExec;
+            if (!getExecutor(txn, collection, cq, &rawExec, 0).isOK()) {
                 errmsg = "can't get query runner";
                 return false;
             }
 
-            auto_ptr<Runner> runner(rawRunner);
-            const ScopedRunnerRegistration safety(runner.get());
+            auto_ptr<PlanExecutor> exec(rawExec);
+            const ScopedExecutorRegistration safety(exec.get());
 
             double totalDistance = 0;
             BSONObjBuilder resultBuilder(result.subarrayStart("results"));
@@ -201,7 +201,7 @@ namespace mongo {
 
             BSONObj currObj;
             int results = 0;
-            while ((results < numWanted) && Runner::RUNNER_ADVANCED == runner->getNext(&currObj, NULL)) {
+            while ((results < numWanted) && Runner::RUNNER_ADVANCED == exec->getNext(&currObj, NULL)) {
 
                 // Come up with the correct distance.
                 double dist = currObj["$dis"].number() * distanceMultiplier;
@@ -246,13 +246,10 @@ namespace mongo {
             BSONObjBuilder stats(result.subobjStart("stats"));
 
             // Fill in nscanned from the explain.
-            TypeExplain* bareExplain;
-            Status res = runner->getInfo(&bareExplain, NULL);
-            if (res.isOK()) {
-                auto_ptr<TypeExplain> explain(bareExplain);
-                stats.append("nscanned", explain->getNScanned());
-                stats.append("objectsLoaded", explain->getNScannedObjects());
-            }
+            PlanSummaryStats summary;
+            Explain::getSummaryStats(exec.get(), &summary);
+            stats.appendNumber("nscanned", summary.totalKeysExamined);
+            stats.appendNumber("objectsLoaded", summary.totalDocsExamined);
 
             stats.append("avgDistance", totalDistance / results);
             stats.append("maxDistance", farthestDist);

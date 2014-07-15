@@ -186,7 +186,7 @@ namespace QueryStageAnd {
                 }
             }
             size_t memUsageAfter = ah->getMemUsage();
-            ah->recoverFromYield();
+            ah->recoverFromYield(&_txn);
 
             // Invalidating a read object should decrease memory usage.
             ASSERT_LESS_THAN(memUsageAfter, memUsageBefore);
@@ -291,7 +291,7 @@ namespace QueryStageAnd {
             // Look ahead results do not count towards memory usage.
             ASSERT_EQUALS(memUsageBefore, memUsageAfter);
 
-            ah->recoverFromYield();
+            ah->recoverFromYield(&_txn);
 
             // The deleted obj should show up in flagged.
             ASSERT_EQUALS(size_t(1), flagged.size());
@@ -802,7 +802,7 @@ namespace QueryStageAnd {
             ah->prepareToYield();
             ah->invalidate(*data.begin(), INVALIDATION_DELETION);
             remove(coll->docFor(*data.begin()));
-            ah->recoverFromYield();
+            ah->recoverFromYield(&_txn);
 
             // Make sure the nuked obj is actually in the flagged data.
             ASSERT_EQUALS(ws.getFlagged().size(), size_t(1));
@@ -841,7 +841,7 @@ namespace QueryStageAnd {
             ah->prepareToYield();
             ah->invalidate(*it, INVALIDATION_DELETION);
             remove(coll->docFor(*it));
-            ah->recoverFromYield();
+            ah->recoverFromYield(&_txn);
 
             // Get all results aside from the two we killed.
             while (!ah->isEOF()) {

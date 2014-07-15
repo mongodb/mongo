@@ -36,7 +36,7 @@ namespace mongo {
     struct ExpressionContext;
     class OperationContext;
     class Pipeline;
-    class Runner;
+    class PlanExecutor;
 
     /*
       PipelineD is an extension of the Pipeline class, but with additional
@@ -65,13 +65,13 @@ namespace mongo {
          *
          * Must have a ReadContext before entering.
          *
-         * If the returned Runner is non-null, you are responsible for ensuring
+         * If the returned PlanExecutor is non-null, you are responsible for ensuring
          * it receives appropriate invalidate and kill messages.
          *
          * @param pPipeline the logical "this" for this operation
          * @param pExpCtx the expression context for this pipeline
          */
-        static boost::shared_ptr<Runner> prepareCursorSource(
+        static boost::shared_ptr<PlanExecutor> prepareCursorSource(
             OperationContext* txn,
             Collection* collection,
             const intrusive_ptr<Pipeline> &pPipeline,

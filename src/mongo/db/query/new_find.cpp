@@ -38,14 +38,12 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_plan.h"
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/single_solution_runner.h"
-#include "mongo/db/query/type_explain.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -237,15 +235,15 @@ namespace mongo {
             startingResult = cc->pos();
 
             // What gives us results.
-            Runner* runner = cc->getRunner();
+            PlanExecutor* exec = cc->getExecutor();
             const int queryOptions = cc->queryOptions();
 
-            // Get results out of the runner.
-            runner->restoreState(txn);
+            // Get results out of the executor.
+            exec->restoreState(txn);
 
             BSONObj obj;
             Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+            while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
                 // Add result to output buffer.
                 bb.appendBuf((void*)obj.objdata(), obj.objsize());
 
@@ -275,7 +273,7 @@ namespace mongo {
             }
 
             // We save the client cursor when there might be more results, and hence we may receive
-            // another getmore. If we receive a EOF or an error, or the runner is dead, then we know
+            // another getmore. If we receive a EOF or an error, or 'exec' is dead, then we know
             // that we will not be producing more results. We indicate that the cursor is closed by
             // sending a cursorId of 0 back to the client.
             //
@@ -288,16 +286,10 @@ namespace mongo {
             if (Runner::RUNNER_DEAD == state || Runner::RUNNER_ERROR == state) {
                 // Propagate this error to caller.
                 if (Runner::RUNNER_ERROR == state) {
-                    // Stats are helpful when errors occur.
-                    TypeExplain* bareExplain;
-                    Status res = runner->getInfo(&bareExplain, NULL);
-                    if (res.isOK()) {
-                        boost::scoped_ptr<TypeExplain> errorExplain(bareExplain);
-                        error() << "Runner error, stats:\n"
-                                << errorExplain->stats.jsonString(Strict, true);
-                    }
-
-                    uasserted(17406, "getMore runner error: " +
+                    scoped_ptr<PlanStageStats> stats(exec->getStats());
+                    error() << "Runner error, stats: "
+                            << statsToBSON(*stats);
+                    uasserted(17406, "getMore executor error: " +
                               WorkingSetCommon::toStatusString(obj));
                 }
 
@@ -307,7 +299,7 @@ namespace mongo {
                 // In the old system tailable capped cursors would be killed off at the
                 // cursorid level.  If a tailable capped cursor is nuked the cursorid
                 // would vanish.
-                // 
+                //
                 // In the new system they die and are cleaned up later (or time out).
                 // So this is where we get to remove the cursorid.
                 if (0 == numResults) {
@@ -325,7 +317,7 @@ namespace mongo {
 
             if (!saveClientCursor) {
                 ccPin.deleteUnderlying();
-                // cc is now invalid, as is the runner
+                // cc is now invalid, as is the executor
                 cursorid = 0;
                 cc = NULL;
                 QLOG() << "getMore NOT saving client cursor, ended with state "
@@ -335,7 +327,7 @@ namespace mongo {
             else {
                 // Continue caching the ClientCursor.
                 cc->incPos(numResults);
-                runner->saveState();
+                exec->saveState();
                 QLOG() << "getMore saving client cursor ended with state "
                        << Runner::statestr(state)
                        << endl;
@@ -368,7 +360,10 @@ namespace mongo {
     Status getOplogStartHack(OperationContext* txn,
                              Collection* collection,
                              CanonicalQuery* cq,
-                             Runner** runnerOut) {
+                             PlanExecutor** execOut) {
+        invariant(cq);
+        auto_ptr<CanonicalQuery> autoCq(cq);
+
         if ( collection == NULL )
             return Status(ErrorCodes::InternalError,
                           "getOplogStartHack called with a NULL collection" );
@@ -404,14 +399,17 @@ namespace mongo {
         OplogStart* stage = new OplogStart(txn, collection, tsExpr, oplogws);
 
         // Takes ownership of ws and stage.
-        auto_ptr<InternalRunner> runner(new InternalRunner(collection, stage, oplogws));
+        auto_ptr<PlanExecutor> exec(new PlanExecutor(oplogws, stage, collection));
+        exec->registerExecInternalPlan();
 
         // The stage returns a DiskLoc of where to start.
         DiskLoc startLoc;
-        Runner::RunnerState state = runner->getNext(NULL, &startLoc);
+        Runner::RunnerState state = exec->getNext(NULL, &startLoc);
 
         // This is normal.  The start of the oplog is the beginning of the collection.
-        if (Runner::RUNNER_EOF == state) { return getRunner(txn, collection, cq, runnerOut); }
+        if (Runner::RUNNER_EOF == state) {
+            return getExecutor(txn, collection, autoCq.release(), execOut);
+        }
 
         // This is not normal.  An error was encountered.
         if (Runner::RUNNER_ADVANCED != state) {
@@ -430,8 +428,8 @@ namespace mongo {
 
         WorkingSet* ws = new WorkingSet();
         CollectionScan* cs = new CollectionScan(txn, params, ws, cq->root());
-        // Takes ownership of cq, cs, ws.
-        *runnerOut = new SingleSolutionRunner(collection, cq, NULL, cs, ws);
+        // Takes ownership of 'ws', 'cs', and 'cq'.
+        *execOut = new PlanExecutor(ws, cs, autoCq.release(), collection);
         return Status::OK();
     }
 
@@ -505,8 +503,8 @@ namespace mongo {
         QLOG() << "Running query:\n" << cq->toString();
         LOG(2) << "Running query: " << cq->toStringShort();
 
-        // Parse, canonicalize, plan, transcribe, and get a runner.
-        Runner* rawRunner = NULL;
+        // Parse, canonicalize, plan, transcribe, and get a plan executor.
+        PlanExecutor* rawExec = NULL;
 
         // We use this a lot below.
         const LiteParsedQuery& pq = cq->getParsed();
@@ -565,42 +563,46 @@ namespace mongo {
             return "";
         }
 
-        // We'll now try to get the query runner that will execute this query for us. There
-        // are a few cases in which we know upfront which runner we should get and, therefore,
+        // We'll now try to get the query executor that will execute this query for us. There
+        // are a few cases in which we know upfront which executor we should get and, therefore,
         // we shortcut the selection process here.
         //
-        // (a) If the query is over a collection that doesn't exist, we get a special runner
-        // that's is so (a runner) which doesn't return results, the EOFRunner.
+        // (a) If the query is over a collection that doesn't exist, we use an EOFStage.
         //
-        // (b) if the query is a replication's initial sync one, we get a SingleSolutinRunner
-        // that uses a specifically designed stage that skips extents faster (see details in
-        // exec/oplogstart.h)
+        // (b) if the query is a replication's initial sync one, we use a specifically designed
+        // stage that skips extents faster (see details in exec/oplogstart.h).
         //
-        // Otherwise we go through the selection of which runner is most suited to the
+        // Otherwise we go through the selection of which executor is most suited to the
         // query + run-time context at hand.
         Status status = Status::OK();
         if (collection == NULL) {
-            rawRunner = new EOFRunner(cq, cq->ns());
+            LOG(2) << "Collection " << ns << " does not exist."
+                   << " Using EOF stage: " << cq->toStringShort();
+            EOFStage* eofStage = new EOFStage();
+            WorkingSet* ws = new WorkingSet();
+            // Takes ownership of 'cq'.
+            rawExec = new PlanExecutor(ws, eofStage, cq, NULL);
         }
         else if (pq.hasOption(QueryOption_OplogReplay)) {
-            status = getOplogStartHack(txn, collection, cq, &rawRunner);
+            // Takes ownership of 'cq'.
+            status = getOplogStartHack(txn, collection, cq, &rawExec);
         }
         else {
-            // Takes ownership of cq.
             size_t options = QueryPlannerParams::DEFAULT;
             if (shardingState.needCollectionMetadata(pq.ns())) {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
             }
-            status = getRunner(txn, collection, cq, &rawRunner, options);
+            // Takes ownership of 'cq'.
+            status = getExecutor(txn, collection, cq, &rawExec, options);
         }
 
         if (!status.isOK()) {
-            // NOTE: Do not access cq as getRunner has deleted it.
+            // NOTE: Do not access cq as getExecutor has deleted it.
             uasserted(17007, "Unable to execute query: " + status.reason());
         }
 
-        verify(NULL != rawRunner);
-        auto_ptr<Runner> runner(rawRunner);
+        verify(NULL != rawExec);
+        auto_ptr<PlanExecutor> exec(rawExec);
 
         // We freak out later if this changes before we're done with the query.
         const ChunkVersion shardingVersionAtStart = shardingState.getVersion(cq->ns());
@@ -635,30 +637,28 @@ namespace mongo {
         BufBuilder bb(32768);
         bb.skip(sizeof(QueryResult));
 
-        // How many results have we obtained from the runner?
+        // How many results have we obtained from the executor?
         int numResults = 0;
 
         // If we're replaying the oplog, we save the last time that we read.
         OpTime slaveReadTill;
 
-        // Do we save the Runner in a ClientCursor for getMore calls later?
+        // Do we save the PlanExecutor in a ClientCursor for getMore calls later?
         bool saveClientCursor = false;
 
-        // We turn on auto-yielding for the runner here.  The runner registers itself with the
-        // active runners list in ClientCursor.
-        auto_ptr<ScopedRunnerRegistration> safety(new ScopedRunnerRegistration(runner.get()));
+        // The executor registers itself with the active executors list in ClientCursor.
+        auto_ptr<ScopedExecutorRegistration> safety(new ScopedExecutorRegistration(exec.get()));
 
         BSONObj obj;
         Runner::RunnerState state;
         // uint64_t numMisplacedDocs = 0;
 
-        // Have we retrieved info about which plan the runner will
-        // use to execute the query yet?
-        bool gotPlanInfo = false;
-        PlanInfo* rawInfo;
-        boost::scoped_ptr<PlanInfo> planInfo;
+        // Get summary info about which plan the executor is using.
+        PlanSummaryStats stats;
+        Explain::getSummaryStats(exec.get(), &stats);
+        curop.debug().planSummary = stats.summaryStr.c_str();
 
-        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+        while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
             // Add result to output buffer. This is unnecessary if explain info is requested
             if (!isExplain) {
                 bb.appendBuf((void*)obj.objdata(), obj.objsize());
@@ -666,24 +666,6 @@ namespace mongo {
 
             // Count the result.
             ++numResults;
-
-            // In the case of the multi plan runner, we may not be able to
-            // successfully retrieve plan info until after the query starts
-            // to run. This is because the multi plan runner doesn't know what
-            // plan it will end up using until it runs candidates and selects
-            // the best.
-            //
-            // TODO: Do we ever want to output what the MPR is comparing?
-            if (!gotPlanInfo) {
-                Status infoStatus = runner->getInfo(NULL, &rawInfo);
-                if (infoStatus.isOK()) {
-                    gotPlanInfo = true;
-                    planInfo.reset(rawInfo);
-                    // planSummary is really a ThreadSafeString which copies the data from
-                    // the provided pointer.
-                    curop.debug().planSummary = planInfo->planSummary.c_str();
-                }
-            }
 
             // Possibly note slave's position in the oplog.
             if (pq.hasOption(QueryOption_OplogReplay)) {
@@ -712,47 +694,30 @@ namespace mongo {
                        << endl;
                 // If only one result requested assume it's a findOne() and don't save the cursor.
                 if (pq.wantMore() && 1 != pq.getNumToReturn()) {
-                    QLOG() << " runner EOF=" << runner->isEOF() << endl;
-                    saveClientCursor = !runner->isEOF();
+                    QLOG() << " executor EOF=" << exec->isEOF() << endl;
+                    saveClientCursor = !exec->isEOF();
                 }
                 break;
             }
         }
 
-        // Try to get information about the plan which the runner
-        // will use to execute the query, it we don't have it already.
-        if (!gotPlanInfo) {
-            Status infoStatus = runner->getInfo(NULL, &rawInfo);
-            if (infoStatus.isOK()) {
-                gotPlanInfo = true;
-                planInfo.reset(rawInfo);
-                // planSummary is really a ThreadSafeString which copies the data from
-                // the provided pointer.
-                curop.debug().planSummary = planInfo->planSummary.c_str();
-            }
-        }
-
-        // If we cache the runner later, we want to deregister it as it receives notifications
+        // If we cache the executor later, we want to deregister it as it receives notifications
         // anyway by virtue of being cached.
         //
-        // If we don't cache the runner later, we are deleting it, so it must be deregistered.
+        // If we don't cache the executor later, we are deleting it, so it must be deregistered.
         //
-        // So, no matter what, deregister the runner.
+        // So, no matter what, deregister the executor.
         safety.reset();
 
         // Caller expects exceptions thrown in certain cases.
         if (Runner::RUNNER_ERROR == state) {
-            TypeExplain* bareExplain;
-            Status res = runner->getInfo(&bareExplain, NULL);
-            if (res.isOK()) {
-                boost::scoped_ptr<TypeExplain> errorExplain(bareExplain);
-                error() << "Runner error, stats:\n"
-                        << errorExplain->stats.jsonString(Strict, true);
-            }
-            uasserted(17144, "Runner error: " + WorkingSetCommon::toStatusString(obj));
+            scoped_ptr<PlanStageStats> stats(exec->getStats());
+            error() << "Runner error, stats: "
+                    << statsToBSON(*stats);
+            uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
         }
 
-        // Why save a dead runner?
+        // Why save a dead executor?
         if (Runner::RUNNER_DEAD == state) {
             saveClientCursor = false;
         }
@@ -788,9 +753,9 @@ namespace mongo {
         if (isExplain ||
             ctx.ctx().db()->getProfilingLevel() > 0 ||
             elapsedMillis > serverGlobalParams.slowMS) {
-            // Ask the runner to produce explain information.
+            // Ask the executor to produce explain information.
             TypeExplain* bareExplain;
-            Status res = runner->getInfo(&bareExplain, NULL);
+            Status res = Explain::legacyExplain(exec.get(), &bareExplain);
             if (res.isOK()) {
                 explain.reset(bareExplain);
             }
@@ -830,21 +795,21 @@ namespace mongo {
 
         long long ccId = 0;
         if (saveClientCursor) {
-            // We won't use the runner until it's getMore'd.
-            runner->saveState();
+            // We won't use the executor until it's getMore'd.
+            exec->saveState();
 
             // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
             // inserted into a global map by its ctor.
-            ClientCursor* cc = new ClientCursor(collection, runner.get(),
+            ClientCursor* cc = new ClientCursor(collection, exec.get(),
                                                 cq->getParsed().getOptions(),
                                                 cq->getParsed().getFilter());
             ccId = cc->cursorid();
 
-            QLOG() << "caching runner with cursorid " << ccId
+            QLOG() << "caching executor with cursorid " << ccId
                    << " after returning " << numResults << " results" << endl;
 
-            // ClientCursor takes ownership of runner.  Release to make sure it's not deleted.
-            runner.release();
+            // ClientCursor takes ownership of executor.  Release to make sure it's not deleted.
+            exec.release();
 
             // TODO document
             if (pq.hasOption(QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
@@ -865,7 +830,7 @@ namespace mongo {
             cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
         }
         else {
-            QLOG() << "Not caching runner but returning " << numResults << " results.\n";
+            QLOG() << "Not caching executor but returning " << numResults << " results.\n";
         }
 
         // Add the results from the query into the output buffer.

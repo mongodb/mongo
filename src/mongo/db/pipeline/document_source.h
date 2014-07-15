@@ -55,7 +55,7 @@ namespace mongo {
     class ExpressionFieldPath;
     class ExpressionObject;
     class DocumentSourceLimit;
-    class Runner;
+    class PlanExecutor;
 
     class DocumentSource : public IntrusiveCounterUnsigned {
     public:
@@ -334,7 +334,9 @@ namespace mongo {
 
 
     /**
-     * Constructs and returns Documents from the BSONObj objects produced by a supplied Runner.
+     * Constructs and returns Documents from the BSONObj objects produced by a supplied
+     * PlanExecutor.
+     *
      * An object of this type may only be used by one thread, see SERVER-6123.
      */
     class DocumentSourceCursor :
@@ -351,14 +353,14 @@ namespace mongo {
         virtual void dispose();
 
         /**
-         * Create a document source based on a passed-in Runner.
+         * Create a document source based on a passed-in PlanExecutor.
          *
          * This is usually put at the beginning of a chain of document sources
          * in order to fetch data from the database.
          */
         static intrusive_ptr<DocumentSourceCursor> create(
             const std::string& ns,
-            const boost::shared_ptr<Runner>& runner,
+            const boost::shared_ptr<PlanExecutor>& exec,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /*
@@ -402,7 +404,7 @@ namespace mongo {
     private:
         DocumentSourceCursor(
             const std::string& ns,
-            const boost::shared_ptr<Runner>& runner,
+            const boost::shared_ptr<PlanExecutor>& exec,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         void loadBatch();
@@ -418,7 +420,7 @@ namespace mongo {
         long long _docsAddedToBatches; // for _limit enforcement
 
         const std::string _ns;
-        boost::shared_ptr<Runner> _runner; // PipelineRunner holds a weak_ptr to this.
+        boost::shared_ptr<PlanExecutor> _exec; // PipelineRunner holds a weak_ptr to this.
     };
 
 

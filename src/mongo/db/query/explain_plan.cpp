@@ -436,7 +436,7 @@ namespace mongo {
         }
 
         // Common details.
-        bob->append("type", stageTypeString(stats.stageType));
+        bob->append("type", stats.common.stageTypeStr);
         bob->appendNumber("works", stats.common.works);
         bob->appendNumber("yields", stats.common.yields);
         bob->appendNumber("unyields", stats.common.unyields);

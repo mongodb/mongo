@@ -39,7 +39,7 @@ namespace mongo {
     /**
      * Filter indexes retrieved from index catalog by
      * allowed indices in query settings.
-     * Used by getRunner().
+     * Used by getExecutor().
      * This function is public to facilitate testing.
      */
     void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,

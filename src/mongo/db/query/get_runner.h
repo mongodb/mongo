@@ -107,22 +107,4 @@ namespace mongo {
                                const QueryPlannerParams& plannerParams,
                                Runner** out);
 
-    /**
-     * RAII approach to ensuring that runners are deregistered in newRunQuery.
-     *
-     * While retrieving the first batch of results, newRunQuery manually registers the runner with
-     * ClientCursor.  Certain query execution paths, namely $where, can throw an exception.  If we
-     * fail to deregister the runner, we will call invalidate/kill on the
-     * still-registered-yet-deleted runner.
-     *
-     * For any subsequent calls to getMore, the runner is already registered with ClientCursor
-     * by virtue of being cached, so this exception-proofing is not required.
-     */
-    struct ScopedRunnerRegistration {
-        ScopedRunnerRegistration(Runner* runner);
-        ~ScopedRunnerRegistration();
-
-        Runner* const _runner;
-    };
-
 }  // namespace mongo

@@ -104,7 +104,7 @@ namespace mongo {
         unsigned long long n = 0;
         unsigned long long numDropped = 0;
 
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(txn,ns,collection));
+        auto_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn,ns,collection));
 
         std::string idxName = descriptor->indexName();
 
@@ -114,7 +114,7 @@ namespace mongo {
 
         BSONObj js;
         DiskLoc loc;
-        while (Runner::RUNNER_ADVANCED == runner->getNext(&js, &loc)) {
+        while (Runner::RUNNER_ADVANCED == exec->getNext(&js, &loc)) {
             try {
                 if ( !dupsAllowed && dropDups ) {
                     LastError::Disabled led( lastError.get() );
@@ -131,15 +131,15 @@ namespace mongo {
 
                 // TODO: Does exception really imply dropDups exception?
                 if (dropDups) {
-                    bool runnerEOF = runner->isEOF();
-                    runner->saveState();
+                    bool execEOF = exec->isEOF();
+                    exec->saveState();
                     BSONObj toDelete;
                     collection->deleteDocument( txn, loc, false, true, &toDelete );
                     repl::logOp(txn, "d", ns.c_str(), toDelete);
 
-                    if (!runner->restoreState(txn)) {
-                        // Runner got killed somehow.  This probably shouldn't happen.
-                        if (runnerEOF) {
+                    if (!exec->restoreState(txn)) {
+                        // PlanExecutor got killed somehow.  This probably shouldn't happen.
+                        if (execEOF) {
                             // Quote: "We were already at the end.  Normal.
                             // TODO: Why is this normal?
                         }

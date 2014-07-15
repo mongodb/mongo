@@ -83,24 +83,24 @@ namespace mongo {
             static_cast<long long>( fromCollection->dataSize() -
                                     ( toCollection->getRecordStore()->storageSize( txn ) * 2 ) );
 
-        scoped_ptr<Runner> runner( InternalPlanner::collectionScan(txn,
-                                                                   fromNs,
-                                                                   fromCollection,
-                                                                   InternalPlanner::FORWARD ) );
+        scoped_ptr<PlanExecutor> exec( InternalPlanner::collectionScan(txn,
+                                                                       fromNs,
+                                                                       fromCollection,
+                                                                       InternalPlanner::FORWARD ) );
 
 
         while ( true ) {
             BSONObj obj;
-            Runner::RunnerState state = runner->getNext(&obj, NULL);
+            Runner::RunnerState state = exec->getNext(&obj, NULL);
 
             switch( state ) {
             case Runner::RUNNER_EOF:
                 return Status::OK();
             case Runner::RUNNER_DEAD:
                 db->dropCollection( txn, toNs );
-                return Status( ErrorCodes::InternalError, "runner turned dead while iterating" );
+                return Status( ErrorCodes::InternalError, "executor turned dead while iterating" );
             case Runner::RUNNER_ERROR:
-                return Status( ErrorCodes::InternalError, "runner error while iterating" );
+                return Status( ErrorCodes::InternalError, "executor error while iterating" );
             case Runner::RUNNER_ADVANCED:
                 if ( excessSize > 0 ) {
                     excessSize -= ( 4 * obj.objsize() ); // 4x is for padding, power of 2, etc...

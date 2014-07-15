@@ -100,11 +100,11 @@ namespace mongo {
                 unordered_set<DiskLoc, DiskLoc::Hasher> thisPass;
 
 
-                scoped_ptr<Runner> runner(InternalPlanner::indexScan(txn,  collection,
+                scoped_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,  collection,
                                                                      _descriptor, key, key, true));
                 Runner::RunnerState state;
                 DiskLoc loc;
-                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &loc))) {
+                while (Runner::RUNNER_ADVANCED == (state = exec->getNext(NULL, &loc))) {
                     if (hopper.limitReached()) { break; }
                     pair<unordered_set<DiskLoc, DiskLoc::Hasher>::iterator, bool> p
                         = thisPass.insert(loc);

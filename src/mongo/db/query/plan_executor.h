@@ -41,6 +41,25 @@ namespace mongo {
     class PlanStage;
     struct PlanStageStats;
     class WorkingSet;
+    class PlanExecutor;
+
+    /**
+     * RAII approach to ensuring that plan executors are deregistered.
+     *
+     * While retrieving the first batch of results, newRunQuery manually registers the executor with
+     * ClientCursor.  Certain query execution paths, namely $where, can throw an exception.  If we
+     * fail to deregister the executor, we will call invalidate/kill on the
+     * still-registered-yet-deleted executor.
+     *
+     * For any subsequent calls to getMore, the executor is already registered with ClientCursor
+     * by virtue of being cached, so this exception-proofing is not required.
+     */
+    struct ScopedExecutorRegistration {
+        ScopedExecutorRegistration(PlanExecutor* exec);
+        ~ScopedExecutorRegistration();
+
+        PlanExecutor* const _exec;
+    };
 
     /**
      * A PlanExecutor is the abstraction that knows how to crank a tree of stages into execution.
@@ -59,6 +78,12 @@ namespace mongo {
          * nor go through normal planning.
          */
         PlanExecutor(WorkingSet* ws, PlanStage* rt, const Collection* collection);
+
+        /**
+         * Used when we have a NULL collection and no canonical query. In this case,
+         * we need to explicitly pass a namespace to the plan executor.
+         */
+        PlanExecutor(WorkingSet* ws, PlanStage* rt, std::string ns);
 
         /**
          * Used when there is a canonical query but no query solution (e.g. idhack
@@ -96,6 +121,11 @@ namespace mongo {
         CanonicalQuery* getCanonicalQuery() const;
 
         /**
+         * The collection in which this executor is working.
+         */
+        const Collection* collection() const;
+
+        /**
          * Generates a tree of stats objects with a separate lifetime from the execution
          * stage tree wrapped by this PlanExecutor. The caller owns the returned pointer.
          *
@@ -111,7 +141,7 @@ namespace mongo {
         void saveState();
 
         /** TODO document me */
-        bool restoreState();
+        bool restoreState(OperationContext* opCtx);
 
         /** TODO document me */
         void invalidate(const DiskLoc& dl, InvalidationType type);
@@ -127,6 +157,22 @@ namespace mongo {
         bool isEOF();
 
         /**
+         * Register this plan executor with the collection cursor cache so that it
+         * receives event notifications.
+         *
+         * Deregistration happens automatically when this plan executor is destroyed.
+         *
+         * Used just for internal plans:
+         *  -- InternalPlanner::collectionScan(...) (see internal_plans.h)
+         *  -- InternalPlanner::indexScan(...) (see internal_plans.h)
+         *  -- getOplogStartHack(...) (see new_find.cpp)
+         *  -- storeCurrentLocs(...) (see d_migrate.cpp)
+         *
+         * TODO: we probably don't need this for 2.8.
+         */
+        void registerExecInternalPlan();
+
+        /**
          * During the yield, the database we're operating over or any collection we're relying on
          * may be dropped.  When this happens all cursors and runners on that database and
          * collection are killed or deleted in some fashion. (This is how the _killed gets set.)
@@ -140,7 +186,17 @@ namespace mongo {
          */
         Status executePlan();
 
+        /**
+         * Return the NS that the query is running over.
+         */
+        const std::string& ns();
+
     private:
+        /**
+         * Initialize the namespace using either the canonical query or the collection.
+         */
+        void initNs();
+
         // Collection over which this plan executor runs. Used to resolve record ids retrieved by
         // the plan stages. The collection must not be destroyed while there are active plans.
         const Collection* _collection;
@@ -149,6 +205,11 @@ namespace mongo {
         boost::scoped_ptr<WorkingSet> _workingSet;
         boost::scoped_ptr<QuerySolution> _qs;
         std::auto_ptr<PlanStage> _root;
+
+        // Deregisters this executor when it is destroyed.
+        boost::scoped_ptr<ScopedExecutorRegistration> _safety;
+
+        std::string _ns;
 
         // Did somebody drop an index we care about or the namespace we're looking at?  If so,
         // we'll be killed.

@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+// THIS FILE IS DEPRECATED -- Runner to be replaced with PlanExecutor.
+
 #include "mongo/db/query/idhack_runner.h"
 
 #include "mongo/client/dbclientinterface.h"

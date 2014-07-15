@@ -36,8 +36,8 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/fts/fts_command.h"
 #include "mongo/db/fts/fts_util.h"
-#include "mongo/db/query/get_runner.h"
-#include "mongo/db/query/type_explain.h"
+#include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
 
@@ -112,14 +112,15 @@ namespace mongo {
                 return false;
             }
 
-            Runner* rawRunner;
-            Status getRunnerStatus = getRunner(txn, ctx.ctx().db()->getCollection(txn, ns), cq, &rawRunner);
-            if (!getRunnerStatus.isOK()) {
-                errmsg = getRunnerStatus.reason();
+            PlanExecutor* rawExec;
+            Status getExecStatus = getExecutor(
+                txn, ctx.ctx().db()->getCollection(txn, ns), cq, &rawExec);
+            if (!getExecStatus.isOK()) {
+                errmsg = getExecStatus.reason();
                 return false;
             }
 
-            auto_ptr<Runner> runner(rawRunner);
+            auto_ptr<PlanExecutor> exec(rawExec);
 
             BSONArrayBuilder resultBuilder(result.subarrayStart("results"));
 
@@ -129,7 +130,7 @@ namespace mongo {
             int numReturned = 0;
 
             BSONObj obj;
-            while (Runner::RUNNER_ADVANCED == runner->getNext(&obj, NULL)) {
+            while (Runner::RUNNER_ADVANCED == exec->getNext(&obj, NULL)) {
                 if ((resultSize + obj.objsize()) >= BSONObjMaxUserSize) {
                     break;
                 }
@@ -158,13 +159,10 @@ namespace mongo {
             BSONObjBuilder stats(result.subobjStart("stats"));
 
             // Fill in nscanned from the explain.
-            TypeExplain* bareExplain;
-            Status res = runner->getInfo(&bareExplain, NULL);
-            if (res.isOK()) {
-                auto_ptr<TypeExplain> explain(bareExplain);
-                stats.append("nscanned", explain->getNScanned());
-                stats.append("nscannedObjects", explain->getNScannedObjects());
-            }
+            PlanSummaryStats summary;
+            Explain::getSummaryStats(exec.get(), &summary);
+            stats.appendNumber("nscanned", summary.totalKeysExamined);
+            stats.appendNumber("nscannedObjects", summary.totalDocsExamined);
 
             stats.appendNumber( "n" , numReturned );
             stats.append( "timeMicros", (int)comm.micros() );

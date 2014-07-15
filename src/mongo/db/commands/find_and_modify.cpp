@@ -40,7 +40,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
-#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/log.h"
 
@@ -151,17 +151,18 @@ namespace mongo {
                 massert(17383, "Could not canonicalize " + queryOriginal.toString(),
                     CanonicalQuery::canonicalize(ns, queryOriginal, &cq, whereCallback).isOK());
 
-                Runner* rawRunner;
-                massert(17384, "Could not get runner for query " + queryOriginal.toString(),
-                        getRunner(txn, collection, cq, &rawRunner, QueryPlannerParams::DEFAULT).isOK());
+                PlanExecutor* rawExec;
+                massert(17384, "Could not get plan executor for query " + queryOriginal.toString(),
+                        getExecutor(txn, collection, cq, &rawExec, QueryPlannerParams::DEFAULT).isOK());
 
-                auto_ptr<Runner> runner(rawRunner);
+                auto_ptr<PlanExecutor> exec(rawExec);
 
-                // Set up automatic yielding
-                const ScopedRunnerRegistration safety(runner.get());
+                // We need to keep this PlanExecutor registration: we are concurrently modifying
+                // state and may continue doing that with document-level locking (approach is TBD).
+                const ScopedExecutorRegistration safety(exec.get());
 
                 Runner::RunnerState state;
-                if (Runner::RUNNER_ADVANCED == (state = runner->getNext(&doc, NULL))) {
+                if (Runner::RUNNER_ADVANCED == (state = exec->getNext(&doc, NULL))) {
                     found = true;
                 }
             }

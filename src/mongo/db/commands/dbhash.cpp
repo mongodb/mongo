@@ -82,21 +82,21 @@ namespace mongo {
 
         IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex();
 
-        auto_ptr<Runner> runner;
+        auto_ptr<PlanExecutor> exec;
         if ( desc ) {
-            runner.reset(InternalPlanner::indexScan(opCtx,
-                                                    collection,
-                                                    desc,
-                                                    BSONObj(),
-                                                    BSONObj(),
-                                                    false,
-                                                    InternalPlanner::FORWARD,
-                                                    InternalPlanner::IXSCAN_FETCH));
+            exec.reset(InternalPlanner::indexScan(opCtx,
+                                                  collection,
+                                                  desc,
+                                                  BSONObj(),
+                                                  BSONObj(),
+                                                  false,
+                                                  InternalPlanner::FORWARD,
+                                                  InternalPlanner::IXSCAN_FETCH));
         }
         else if ( collection->isCapped() ) {
-            runner.reset(InternalPlanner::collectionScan(opCtx,
-                                                         fullCollectionName,
-                                                         collection));
+            exec.reset(InternalPlanner::collectionScan(opCtx,
+                                                       fullCollectionName,
+                                                       collection));
         }
         else {
             log() << "can't find _id index for: " << fullCollectionName << endl;
@@ -109,8 +109,8 @@ namespace mongo {
         long long n = 0;
         Runner::RunnerState state;
         BSONObj c;
-        verify(NULL != runner.get());
-        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&c, NULL))) {
+        verify(NULL != exec.get());
+        while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&c, NULL))) {
             md5_append( &st , (const md5_byte_t*)c.objdata() , c.objsize() );
             n++;
         }

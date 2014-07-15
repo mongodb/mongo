@@ -28,6 +28,7 @@
 
 #include "mongo/db/query/plan_executor.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
@@ -41,6 +42,17 @@ namespace mongo {
           _workingSet(ws),
           _qs(NULL),
           _root(rt),
+          _killed(false) {
+        initNs();
+    }
+
+    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, std::string ns)
+        : _collection(NULL),
+          _cq(NULL),
+          _workingSet(ws),
+          _qs(NULL),
+          _root(rt),
+          _ns(ns),
           _killed(false) { }
 
     PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, CanonicalQuery* cq,
@@ -50,7 +62,9 @@ namespace mongo {
           _workingSet(ws),
           _qs(NULL),
           _root(rt),
-          _killed(false) { }
+          _killed(false) {
+        initNs();
+    }
 
     PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, QuerySolution* qs,
                                CanonicalQuery* cq, const Collection* collection)
@@ -59,7 +73,19 @@ namespace mongo {
           _workingSet(ws),
           _qs(qs),
           _root(rt),
-          _killed(false) { }
+          _killed(false) {
+        initNs();
+    }
+
+    void PlanExecutor::initNs() {
+        if (NULL != _collection) {
+            _ns = _collection->ns().ns();
+        }
+        else {
+            invariant(NULL != _cq.get());
+            _ns = _cq->getParsed().ns();
+        }
+    }
 
     PlanExecutor::~PlanExecutor() { }
 
@@ -79,13 +105,17 @@ namespace mongo {
         return _root->getStats();
     }
 
+    const Collection* PlanExecutor::collection() const {
+        return _collection;
+    }
+
     void PlanExecutor::saveState() {
         if (!_killed) { _root->prepareToYield(); }
     }
 
-    bool PlanExecutor::restoreState() {
+    bool PlanExecutor::restoreState(OperationContext* opCtx) {
         if (!_killed) {
-            _root->recoverFromYield();
+            _root->recoverFromYield(opCtx);
         }
         return !_killed;
     }
@@ -170,8 +200,13 @@ namespace mongo {
         return _killed || _root->isEOF();
     }
 
+    void PlanExecutor::registerExecInternalPlan() {
+        _safety.reset(new ScopedExecutorRegistration(this));
+    }
+
     void PlanExecutor::kill() {
         _killed = true;
+        _collection = NULL;
     }
 
     Status PlanExecutor::executePlan() {
@@ -189,6 +224,26 @@ namespace mongo {
         }
 
         return Status::OK();
+    }
+
+    const string& PlanExecutor::ns() {
+        return _ns;
+    }
+
+    //
+    // ScopedExecutorRegistration
+    //
+
+    ScopedExecutorRegistration::ScopedExecutorRegistration(PlanExecutor* exec)
+        : _exec(exec) {
+        // Collection can be null for EOFRunner, or other places where registration is not needed
+        if ( _exec->collection() )
+            _exec->collection()->cursorCache()->registerExecutor( exec );
+    }
+
+    ScopedExecutorRegistration::~ScopedExecutorRegistration() {
+        if ( _exec->collection() )
+            _exec->collection()->cursorCache()->deregisterExecutor( _exec );
     }
 
 } // namespace mongo

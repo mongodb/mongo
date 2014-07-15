@@ -189,10 +189,10 @@ namespace mongo {
         }
     }
 
-    void MergeSortStage::recoverFromYield() {
+    void MergeSortStage::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->recoverFromYield();
+            _children[i]->recoverFromYield(opCtx);
         }
     }
 
