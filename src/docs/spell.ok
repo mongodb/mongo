@@ -81,6 +81,7 @@ arg
 autoconf
 automake
 basecfg
+basho
 bdb
 bdbmap
 bigram
@@ -191,6 +192,7 @@ hsearch
 html
 huffman
 hugepage
+hyperleveldb
 iflag
 indices
 init
