@@ -172,9 +172,9 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 
 	cl = NULL;
 	WT_RET(__wt_calloc_def(session, 1, &cl));
-	WT_ERR(__wt_calloc_def(session, 1, &cl->next_lsn));
 	cursor = &cl->iface;
 	*cursor = iface;
+	WT_ERR(__wt_calloc_def(session, 1, &cl->next_lsn));
 	cursor->session = &session->iface;
 
 	/*
