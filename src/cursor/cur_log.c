@@ -14,13 +14,10 @@
 static int
 __curlog_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 {
-	WT_CURSOR_LOG *al, *bl;
 	WT_DECL_RET;
 	WT_LSN alsn, blsn;
 	WT_SESSION_IMPL *session;
 
-	al = (WT_CURSOR_LOG *)a;
-	bl = (WT_CURSOR_LOG *)b;
 	CURSOR_API_CALL(a, session, compare, NULL);
 
 	WT_ASSERT(session, cmpp != NULL);

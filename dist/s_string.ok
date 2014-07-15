@@ -129,6 +129,7 @@ ISSET
 ITEMs
 Inline
 Ippokratis
+Iq
 JPEG
 JSON
 Jyrki
@@ -408,6 +409,7 @@ curconfig
 curdump
 curfile
 curindex
+curlog
 curmetadata
 cursoring
 cursorp
