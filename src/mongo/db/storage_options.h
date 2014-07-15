@@ -42,11 +42,7 @@ namespace mongo {
     struct StorageGlobalParams {
 
         StorageGlobalParams() :
-#ifdef _WIN32
-            dbpath("\\data\\db\\"),
-#else
-            dbpath("/data/db/"),
-#endif
+            dbpath(kDefaultDbPath),
             directoryperdb(false),
             lenForNewNsFiles(16 * 1024 * 1024),
             preallocj(true),
@@ -68,6 +64,9 @@ namespace mongo {
         }
 
         std::string dbpath;
+        static const char* kDefaultDbPath;
+        static const char* kDefaultConfigDbPath;
+
         bool directoryperdb;
         std::string repairpath;
         unsigned lenForNewNsFiles;

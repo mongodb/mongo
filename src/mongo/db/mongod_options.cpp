@@ -161,13 +161,13 @@ namespace mongo {
 
 #ifdef _WIN32
         general_options.addOptionChaining("storage.dbPath", "dbpath", moe::String,
-                "directory for datafiles - defaults to \\data\\db\\")
-                                         .setDefault(moe::Value(std::string("\\data\\db\\")));
+                std::string("directory for datafiles - defaults to ")
+                + storageGlobalParams.kDefaultDbPath);
 
 #else
         general_options.addOptionChaining("storage.dbPath", "dbpath", moe::String,
-                "directory for datafiles - defaults to /data/db/")
-                                         .setDefault(moe::Value(std::string("/data/db")));
+                std::string("directory for datafiles - defaults to ")
+                + storageGlobalParams.kDefaultDbPath);
 
 #endif
         general_options.addOptionChaining("storage.directoryPerDB", "directoryperdb", moe::Switch,
@@ -1064,8 +1064,9 @@ namespace mongo {
                 storageGlobalParams.dur = true;
             }
 
-            if (!params.count("storage.dbPath"))
-                storageGlobalParams.dbpath = "/data/configdb";
+            if (!params.count("storage.dbPath")) {
+                storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
+            }
             replSettings.master = true;
             if (!params.count("replication.oplogSizeMB"))
                 replSettings.oplogSize = 5 * 1024 * 1024;

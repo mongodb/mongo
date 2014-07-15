@@ -35,6 +35,15 @@ namespace mongo {
 
     StorageGlobalParams storageGlobalParams;
 
+#ifdef _WIN32
+    const char* StorageGlobalParams::kDefaultDbPath = "\\data\\db\\";
+    const char* StorageGlobalParams::kDefaultConfigDbPath = "\\data\\configdb\\";
+#else
+    const char* StorageGlobalParams::kDefaultDbPath = "/data/db";
+    const char* StorageGlobalParams::kDefaultConfigDbPath = "/data/configdb";
+#endif
+
+
     bool isJournalingEnabled() {
         return storageGlobalParams.dur;
     }
