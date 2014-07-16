@@ -198,7 +198,7 @@ namespace mongo {
                 }
 
                 _savedAtEnd = false;
-                _savePositionObj = getKey();
+                _savePositionObj = getKey().getOwned();
                 _savePositionLoc = getDiskLoc();
             }
 
@@ -219,9 +219,6 @@ namespace mongo {
                     invariant( !_iterator->Valid() );
                     return;
                 }
-
-                // TODO why is this necessary?
-                _iterator->SeekToFirst();
 
                 // locate takes care of the case where the locate that we are "restoring" has
                 // already been deleted
