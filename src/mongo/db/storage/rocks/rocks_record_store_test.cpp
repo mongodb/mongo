@@ -48,8 +48,7 @@ namespace mongo {
     class MyOperationContext : public OperationContextNoop {
     public:
         MyOperationContext( rocksdb::DB* db )
-            : OperationContextNoop( new RocksRecoveryUnit( db, false ) ) {
-        }
+            : OperationContextNoop( new RocksRecoveryUnit( db, false ) ) { }
     };
 
     rocksdb::DB* getDB() {
@@ -576,6 +575,45 @@ namespace mongo {
                 ASSERT_EQUALS( 0, rs.numRecords() );
                 ASSERT_EQUALS( 0, rs.dataSize() );
             }
+        }
+    }
+
+    TEST( RocksRecordStoreTest, Snapshots1 ) {
+        scoped_ptr<rocksdb::DB> db( getDB() );
+
+        DiskLoc loc;
+        int size = -1;
+
+        {
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), db->DefaultColumnFamily() );
+            string s = "test string";
+            size = s.length() + 1;
+
+            MyOperationContext opCtx( db.get() );
+            {
+                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
+                ASSERT_OK( res.getStatus() );
+                loc = res.getValue();
+            }
+        }
+
+        {
+            MyOperationContext opCtx( db.get() );
+            MyOperationContext opCtx2( db.get() );
+
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), db->DefaultColumnFamily() );
+
+            rs.deleteRecord( &opCtx, loc );
+
+            RecordData recData = rs.dataFor( loc/*, &opCtx */ );
+            ASSERT( !recData.data() && recData.size() == 0 );
+
+            // XXX this test doesn't yet work, but there should be some notion of snapshots,
+            // and the op context that doesn't see the deletion shouldn't know that this data
+            // has been deleted
+            RecordData recData2 = rs.dataFor( loc/*, &opCtx2 */ );
+            ASSERT( recData.data() && recData.size() == size );
         }
     }
 }
