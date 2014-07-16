@@ -38,6 +38,7 @@
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"  // theReplSet
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/log.h"
@@ -179,49 +180,27 @@ namespace repl {
         _cond.notify_all();
     }
 
-    void SyncSourceFeedback::updateMap(const mongo::OID& rid, const OpTime& ot) {
+    void SyncSourceFeedback::forwardSlaveProgress() {
         boost::unique_lock<boost::mutex> lock(_mtx);
-        // only update if ot is newer than what we have already
-        if (ot > _slaveMap[rid]) {
-            _slaveMap[rid] = ot;
-            _positionChanged = true;
-            LOG(2) << "Updating our knowledge of the replication progress for node with RID " <<
-                    rid << " to be at optime " << ot;
-            _cond.notify_all();
-        }
+        _positionChanged = true;
+        _cond.notify_all();
     }
 
     bool SyncSourceFeedback::updateUpstream() {
-        if (theReplSet->isPrimary()) {
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        if (replCoord->getCurrentMemberState().primary()) {
             // primary has no one to update to
             return true;
         }
         BSONObjBuilder cmd;
-        cmd.append("replSetUpdatePosition", 1);
-        // create an array containing objects each member connected to us and for ourself
-        BSONArrayBuilder array (cmd.subarrayStart("optimes"));
-        OID myID = _me["_id"].OID();
         {
             boost::unique_lock<boost::mutex> lock(_mtx);
             if (_handshakeNeeded) {
                 // Don't send updates if there are nodes that haven't yet been handshaked
                 return false;
             }
-            for (map<mongo::OID, OpTime>::const_iterator itr = _slaveMap.begin();
-                    itr != _slaveMap.end(); ++itr) {
-                BSONObjBuilder entry(array.subobjStart());
-                entry.append("_id", itr->first);
-                entry.append("optime", itr->second);
-                if (itr->first == myID) {
-                    entry.append("config", theReplSet->myConfig().asBson());
-                }
-                else {
-                    entry.append("config", _members[itr->first]->config().asBson());
-                }
-                entry.doneFast();
-            }
+            replCoord->prepareReplSetUpdatePositionCommand(&cmd);
         }
-        array.done();
         BSONObj res;
 
         LOG(2) << "Sending slave oplog progress to upstream updater: " << cmd.done();

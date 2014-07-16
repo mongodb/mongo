@@ -33,6 +33,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/fail_point_service.h"
@@ -111,7 +112,8 @@ namespace repl {
     }
 
     void BackgroundSync::notify() {
-        theReplSet->syncSourceFeedback.updateSelfInMap(theReplSet->lastOpTimeWritten);
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        replCoord->setLastOptime(replCoord->getMyRID(), theReplSet->lastOpTimeWritten);
 
         {
             boost::unique_lock<boost::mutex> lock(s_instance->_mutex);

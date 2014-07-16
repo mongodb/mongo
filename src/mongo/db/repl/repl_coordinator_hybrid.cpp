@@ -146,6 +146,18 @@ namespace repl {
         return legacyOID;
     }
 
+    OID HybridReplicationCoordinator::getMyRID() {
+        OID legacyRID = _legacy.getMyRID();
+        _impl.getMyRID();
+        return legacyRID;
+    }
+
+    void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommand(BSONObjBuilder* result) {
+        _legacy.prepareReplSetUpdatePositionCommand(result);
+        BSONObjBuilder implResult;
+        _impl.prepareReplSetUpdatePositionCommand(&implResult);
+    }
+
     void HybridReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
         _legacy.processReplSetGetStatus(result);
         BSONObjBuilder implResult;

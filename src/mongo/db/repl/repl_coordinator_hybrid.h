@@ -94,6 +94,10 @@ namespace repl {
 
         virtual OID getElectionId();
 
+        virtual OID getMyRID();
+
+        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
+
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
         virtual bool setMaintenanceMode(bool activate);

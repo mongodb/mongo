@@ -168,24 +168,25 @@ namespace repl {
 
     void ReplSource::ensureMe() {
         string myname = getHostName();
+        bool exists = false;
         {
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, "local");
+            Client::ReadContext ctx(&txn, "local");
             // local.me is an identifier for a server for getLastError w:2+
-            if (!Helpers::getSingleton(&txn, "local.me", _me) ||
-                !_me.hasField("host") ||
-                _me["host"].String() != myname) {
+            exists = Helpers::getSingleton(&txn, "local.me", _me);
+        }
+        if (!exists || !_me.hasField("host") || _me["host"].String() != myname) {
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, "local");
+            // clean out local.me
+            Helpers::emptyCollection(&txn, "local.me");
 
-                // clean out local.me
-                Helpers::emptyCollection(&txn, "local.me");
-
-                // repopulate
-                BSONObjBuilder b;
-                b.appendOID("_id", 0, true);
-                b.append("host", myname);
-                _me = b.obj();
-                Helpers::putSingleton(&txn, "local.me", _me);
-            }
+            // repopulate
+            BSONObjBuilder b;
+            b.appendOID("_id", 0, true);
+            b.append("host", myname);
+            _me = b.obj();
+            Helpers::putSingleton(&txn, "local.me", _me);
             ctx.commit();
         }
     }
@@ -1254,6 +1255,10 @@ namespace repl {
             LockState lockState;
             Lock::GlobalWrite lk(&lockState);
             replLocalAuth();
+        }
+
+        {
+            ReplSource temp; // Ensures local.me is populated
         }
 
         if ( replSettings.slave ) {

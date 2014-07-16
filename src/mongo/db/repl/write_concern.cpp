@@ -140,6 +140,7 @@ namespace repl {
                 _dirty = true;
 
                 // update write concern tags if this node is primary
+                // TODO(spencer): Move this logic up into the ReplicationCoordinator
                 if (theReplSet && theReplSet->isPrimary()) {
                     const Member* mem = theReplSet->findById(ident.obj["config"]["_id"].Int());
                     if (!mem) {

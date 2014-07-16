@@ -51,6 +51,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/map_util.h"
 
 namespace mongo {
 
@@ -371,32 +372,90 @@ namespace {
 
     Status LegacyReplicationCoordinator::setLastOptime(const OID& rid,
                                                        const OpTime& ts) {
-        BSONObj config;
         {
-            boost::lock_guard<boost::mutex> lock(_ridConfigMapMutex);
-            config = _ridConfigMap[rid];
-        }
-        LOG(2) << "received notification that node with RID " << rid << " and config " << config <<
-                " has reached optime: " << ts.toStringPretty();
-        invariant(!config.isEmpty());
-        std::string oplogNs = getReplicationMode() == modeReplSet?
-                "local.oplog.rs" : "local.oplog.$main";
-        if (!updateSlaveTracking(BSON("_id" << rid), config, oplogNs, ts)) {
-            return Status(ErrorCodes::NodeNotFound,
-                          str::stream() << "could not update node with _id: " 
-                                        << config["_id"].Int()
-                                        << " beacuse it cannot be found in current ReplSetConfig");
+            boost::lock_guard<boost::mutex> lock(_mutex);
+            if (ts <= mapFindWithDefault(_slaveOpTimeMap, rid, OpTime())) {
+                // Only update if ts is newer than what we have already
+                return Status::OK();
+            }
+            BSONObj config = mapFindWithDefault(_ridConfigMap, rid, BSONObj());
+            LOG(2) << "received notification that node with RID " << rid << " and config " << config
+                    << " has reached optime: " << ts.toStringPretty();
+
+            if (rid != getMyRID()) {
+                // TODO(spencer): Remove this invariant for backwards compatibility
+                invariant(!config.isEmpty());
+                std::string oplogNs = getReplicationMode() == modeReplSet?
+                        "local.oplog.rs" : "local.oplog.$main";
+                // This is what updates the progress information used for satisfying write concern
+                // and wakes up threads waiting for replication.  It also updates the tracking for
+                // maintaining local.slaves
+                if (!updateSlaveTracking(BSON("_id" << rid), config, oplogNs, ts)) {
+                    return Status(ErrorCodes::NodeNotFound,
+                                  str::stream() << "could not update node with _id: "
+                                  << config["_id"].Int()
+                                  << " because it cannot be found in current ReplSetConfig");
+                }
+            }
+
+            // This updates the _slaveOpTimeMap which is used for forwarding slave progress
+            // upstream in chained replication.
+            LOG(2) << "Updating our knowledge of the replication progress for node with RID " <<
+                    rid << " to be at optime " << ts;
+            _slaveOpTimeMap[rid] = ts;
+
         }
 
         if (getReplicationMode() == modeReplSet && !getCurrentMemberState().primary()) {
             // pass along if we are not primary
-            theReplSet->syncSourceFeedback.updateMap(rid, ts);
+            theReplSet->syncSourceFeedback.forwardSlaveProgress();
         }
         return Status::OK();
     }
     
     OID LegacyReplicationCoordinator::getElectionId() {
         return theReplSet->getElectionId();
+    }
+
+
+    OID LegacyReplicationCoordinator::getMyRID() {
+        Mode mode = getReplicationMode();
+        if (mode == modeReplSet) {
+            return theReplSet->syncSourceFeedback.getMyRID();
+        } else if (mode == modeMasterSlave) {
+            ReplSource source;
+            return source.getMyRID();
+        }
+        invariant(false); // Don't have an RID if no replication is enabled
+    }
+
+    void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommand(
+            BSONObjBuilder* cmdBuilder) {
+        invariant(getReplicationMode() == modeReplSet);
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        cmdBuilder->append("replSetUpdatePosition", 1);
+        // create an array containing objects each member connected to us and for ourself
+        BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
+        OID myID = getMyRID();
+        {
+            for (SlaveOpTimeMap::const_iterator itr = _slaveOpTimeMap.begin();
+                    itr != _slaveOpTimeMap.end(); ++itr) {
+                const OID& rid = itr->first;
+                const BSONObj& config = mapFindWithDefault(_ridConfigMap, rid, BSONObj());
+                BSONObjBuilder entry(arrayBuilder.subobjStart());
+                entry.append("_id", rid);
+                entry.append("optime", itr->second);
+                // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
+                // we need to keep sending it for 2.6 compatibility.
+                // TODO(spencer): Remove this after 2.8 is released.
+                if (rid == myID) {
+                    entry.append("config", theReplSet->myConfig().asBson());
+                }
+                else {
+                    entry.append("config", config);
+                }
+            }
+        }
     }
 
     void LegacyReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
@@ -914,7 +973,7 @@ namespace {
         LOG(2) << "Received handshake " << handshake << " from node with RID " << remoteID;
 
         {
-            boost::lock_guard<boost::mutex> lock(_ridConfigMapMutex);
+            boost::lock_guard<boost::mutex> lock(_mutex);
             BSONObj configObj = handshake["config"].Obj().getOwned();
             invariant(!configObj.isEmpty());
             _ridConfigMap[remoteID] = configObj;
