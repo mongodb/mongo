@@ -31,7 +31,6 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
-#include <map>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/platform/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -189,8 +189,7 @@ namespace repl {
         boost::scoped_ptr<boost::thread> _topCoordDriverThread;
 
         // Maps nodes in this replication group to the last oplog operation they have committed
-        // TODO(spencer): change to unordered_map
-        typedef std::map<OID, OpTime> SlaveOpTimeMap;
+        typedef unordered_map<OID, OpTime, OID::Hasher> SlaveOpTimeMap;
         SlaveOpTimeMap _slaveOpTimeMap;
 
         // Current ReplicaSet state
