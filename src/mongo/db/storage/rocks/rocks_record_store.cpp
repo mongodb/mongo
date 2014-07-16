@@ -178,13 +178,13 @@ namespace mongo {
     }
 
     void RocksRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
+        // This persistent iterator is necessary since you can't read your own writes
+        boost::scoped_ptr<rocksdb::Iterator> iter( _db->NewIterator( rocksdb::ReadOptions(),
+                                            _columnFamily ) );
+        iter->SeekToFirst();
         while (cappedAndNeedDelete()) {
             invariant(_numRecords > 0);
 
-            
-            boost::scoped_ptr<rocksdb::Iterator> iter( _db->NewIterator( rocksdb::ReadOptions(),
-                                            _columnFamily ) );
-            iter->SeekToFirst();
             invariant ( iter->Valid() );
             rocksdb::Slice slice = iter->key();
             DiskLoc oldest = reinterpret_cast<const DiskLoc*>( slice.data() )[0];
@@ -193,6 +193,7 @@ namespace mongo {
                 uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
 
             deleteRecord(txn, oldest);
+            iter->Next();
         }
     }
 
@@ -400,7 +401,7 @@ namespace mongo {
     }
 
     Status RocksRecordStore::truncate( OperationContext* txn ) {
-        RecordIterator* iter = getIterator( txn );
+        boost::scoped_ptr<RecordIterator> iter(getIterator( txn ));
         while(!iter->isEOF()) {
             DiskLoc loc = iter->getNext();
             deleteRecord(txn, loc);
@@ -604,7 +605,17 @@ namespace mongo {
     void RocksRecordStore::temp_cappedTruncateAfter(OperationContext* txn,
                                                     DiskLoc end,
                                                     bool inclusive) {
-        invariant( !"no temp_cappedTruncateAfter with rocks" );
+        boost::scoped_ptr<RecordIterator> iter(getIterator( txn ));
+        if (iter->isEOF())
+            return;
+        DiskLoc start = iter->curr();
+        if (end < start)
+            invariant(!"Attemped to drop whole collection with capped truncate after");
+        while(!iter->isEOF()) {
+            DiskLoc loc = iter->getNext();
+            if (end < loc)
+                deleteRecord(txn, loc);
+        }
     }
 
     rocksdb::ReadOptions RocksRecordStore::_readOptions( OperationContext* opCtx ) const {
