@@ -114,8 +114,8 @@ reconnect(slave1);
 wait(function() {
     var status = admin_s1.runCommand({replSetGetStatus:1});
     printjson(status);
-    return status.ok == 1 && status.members &&
-      status.members[1].state == 2 || status.members[1].state == 1;
+    return status.ok === 1 && status.members && status.members.length >= 2 &&
+      (status.members[1].state === 2 || status.members[1].state === 1);
   });
 
 

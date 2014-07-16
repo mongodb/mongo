@@ -63,12 +63,15 @@ namespace logger {
         _minimumLoggedSeverity[component] = char(severity.toInt());
         _hasMinimumLoggedSeverity[component] = true;
 
-        // Set severities for unconfigured components to be the same as LogComponent::kDefault.
-        if (component == LogComponent::kDefault) {
-            for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
-                if (!_hasMinimumLoggedSeverity[i]) {
-                    _minimumLoggedSeverity[i] = char(severity.toInt());
-                }
+        // Every unconfigured component will inherit log severity from parent.
+        // Traversing the severity array once works because child components always
+        // come after the parent in the LogComponent::Value enumeration.
+        for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
+            if (!_hasMinimumLoggedSeverity[i]) {
+                LogComponent::Value v = LogComponent::Value(i);
+                LogComponent parentComponent = LogComponent(v).parent();
+                LogSeverity parentSeverity = getMinimumLogSeverity(parentComponent);
+                _minimumLoggedSeverity[i] = char(parentSeverity.toInt());
             }
         }
     }
@@ -83,7 +86,7 @@ namespace logger {
         }
 
         // Set unconfigured severity level to match LogComponent::kDefault.
-        _minimumLoggedSeverity[component] = _minimumLoggedSeverity[LogComponent::kDefault];
+        setMinimumLoggedSeverity(component, getMinimumLogSeverity(component.parent()));
         _hasMinimumLoggedSeverity[component] = false;
     }
 
@@ -94,11 +97,11 @@ namespace logger {
     bool LogComponentSettings::shouldLog(LogComponent component, LogSeverity severity) const {
         dassert(int(component) >= 0 && int(component) < LogComponent::kNumLogComponents);
 
-        // Should match LogComponent::kDefault if minimum severity level is not configured for
+        // Should match parent component if minimum severity level is not configured for
         // component.
         dassert(_hasMinimumLoggedSeverity[component] ||
                   _minimumLoggedSeverity[component] ==
-                      _minimumLoggedSeverity[LogComponent::kDefault]);
+                      _minimumLoggedSeverity[component.parent()]);
 
         return severity >= LogSeverity::cast(_minimumLoggedSeverity[component]);
     }

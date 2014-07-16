@@ -26,24 +26,40 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/query/qlog.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
+
+#include "mongo/logger/logger.h"
 
 namespace mongo {
 
-    MONGO_EXPORT_SERVER_PARAMETER(verboseQueryLogging, bool, false);
+    namespace {
+
+        /**
+         * Updates log severity of 'verboseQueryLogComponent' in global log domain.
+         */
+        bool setVerboseQueryLogging(bool newValue) {
+            bool old = logger::globalLogDomain()->shouldLog(verboseQueryLogComponent,
+                                                            verboseQueryLogSeverity);
+            if (newValue) {
+                logger::globalLogDomain()->setMinimumLoggedSeverity(verboseQueryLogComponent,
+                                                                    verboseQueryLogSeverity);
+            }
+            else {
+                logger::globalLogDomain()->clearMinimumLoggedSeverity(verboseQueryLogComponent);
+            }
+            return old;
+        }
+
+    } // namespace
 
     bool qlogOff() {
-        bool old = verboseQueryLogging;
-        verboseQueryLogging = false;
-        return old;
+        return setVerboseQueryLogging(false);
     }
 
     bool qlogOn() {
-        bool old = verboseQueryLogging;
-        verboseQueryLogging = true;
-        return old;
+        return setVerboseQueryLogging(true);
     }
 
 }  // namespace mongo
