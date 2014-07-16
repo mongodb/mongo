@@ -54,14 +54,17 @@ namespace logger {
 
         _dateFormatter(os, event.getDate());
         os << ' ';
+
+        os << event.getSeverity().toChar();
+        os << ' ';
+
+        LogComponent component = event.getComponent();
+        os << component;
+        os << ' ';
+
         StringData contextName = event.getContextName();
         if (!contextName.empty()) {
             os << '[' << contextName << "] ";
-        }
-
-        LogSeverity severity = event.getSeverity();
-        if (severity >= LogSeverity::Info()) {
-            os << severity << ": ";
         }
 
         StringData msg = event.getMessage();

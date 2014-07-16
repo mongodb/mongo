@@ -70,6 +70,19 @@ namespace logger {
         : _domain(domain),
           _contextName(contextName),
           _severity(severity),
+          _component(LogComponent::kDefault),
+          _os(NULL),
+          _tee(NULL) {
+    }
+
+    LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
+                                       const std::string& contextName,
+                                       LogSeverity severity,
+                                       LogComponent component)
+        : _domain(domain),
+          _contextName(contextName),
+          _severity(severity),
+          _component(component),
           _os(NULL),
           _tee(NULL) {
     }
@@ -80,6 +93,7 @@ namespace logger {
             : _domain(domain),
               _contextName(contextName),
               _severity(labeledLevel),
+              _component(LogComponent::kDefault),
               _os(NULL),
               _tee(NULL) {
 
@@ -90,6 +104,7 @@ namespace logger {
         : _domain(other._domain),
           _contextName(other._contextName),
           _severity(other._severity),
+          _component(other._component),
           _baseMessage(other._baseMessage),
           _os(NULL),
           _tee(NULL) {
@@ -103,7 +118,8 @@ namespace logger {
         if (_os) {
             if ( !_baseMessage.empty() ) _baseMessage.push_back(' ');
             _baseMessage += _os->str();
-            MessageEventEphemeral message(curTimeMillis64(), _severity, _contextName, _baseMessage);
+            MessageEventEphemeral message(curTimeMillis64(), _severity, _component, _contextName,
+                                          _baseMessage);
             _domain->append(message);
             if (_tee) {
                 _os->str("");

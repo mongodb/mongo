@@ -43,6 +43,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 using namespace mongo::logger;
 
@@ -51,6 +52,7 @@ namespace {
 
     // TODO(schwerin): Have logger write to a different log from the global log, so that tests can
     // redirect their global log output for examination.
+    template <typename MessageEventEncoder>
     class LogTest : public unittest::Test {
         friend class LogTestAppender;
     public:
@@ -84,13 +86,16 @@ namespace {
 
         private:
             LogTest *_ltest;
-            MessageEventUnadornedEncoder _encoder;
+            MessageEventEncoder _encoder;
         };
 
         MessageLogDomain::AppenderHandle _appenderHandle;
     };
 
-    TEST_F(LogTest, logContext) {
+    typedef LogTest<MessageEventDetailsEncoder> LogTestDetailsEncoder;
+    typedef LogTest<MessageEventUnadornedEncoder> LogTestUnadornedEncoder;
+
+    TEST_F(LogTestUnadornedEncoder, logContext) {
         logContext("WHA!");
         ASSERT_GREATER_THAN(_logLines.size(), 1U);
         ASSERT_NOT_EQUALS(_logLines[0].find("WHA!"), std::string::npos);
@@ -117,7 +122,7 @@ namespace {
     };
 
     /** Simple tests for detaching appenders. */
-    TEST_F(LogTest, DetachAppender) {
+    TEST_F(LogTestUnadornedEncoder, DetachAppender) {
         MessageLogDomain::AppenderAutoPtr countAppender(new CountAppender);
         MessageLogDomain domain;
 
@@ -146,7 +151,7 @@ namespace {
 
     // Tests that logging while in the midst of logging produces two distinct log messages, with the
     // inner log message appearing before the outer.
-    TEST_F(LogTest, LogstreamBuilderReentrance) {
+    TEST_F(LogTestUnadornedEncoder, LogstreamBuilderReentrance) {
         log() << "Logging A() -- " << A() << " -- done!" << std::endl;
         ASSERT_EQUALS(2U, _logLines.size());
         ASSERT_EQUALS(std::string("Golly!\n"), _logLines[0]);
@@ -172,7 +177,7 @@ namespace {
     // No log component declared at file scope.
     // Component severity configuration:
     //     LogComponent::kDefault: 2
-    TEST_F(LogTest, MongoLogMacroNoFileScopeLogComponent) {
+    TEST_F(LogTestUnadornedEncoder, MongoLogMacroNoFileScopeLogComponent) {
         globalLogDomain()->setMinimumLoggedSeverity(LogSeverity::Debug(2));
 
         LOG(2) << "This is logged";
@@ -211,7 +216,7 @@ namespace {
         // Set MONGO_LOG's default component to componentB.
         MONGO_LOG_DEFAULT_COMPONENT_FILE(componentB);
 
-        TEST_F(LogTest, MongoLogMacroNamespaceScopeLogComponentDeclared) {
+        TEST_F(LogTestUnadornedEncoder, MongoLogMacroNamespaceScopeLogComponentDeclared) {
             globalLogDomain()->setMinimumLoggedSeverity(LogSeverity::Debug(1));
             globalLogDomain()->setMinimumLoggedSeverity(componentB,
                                                         LogSeverity::Debug(2));
@@ -231,7 +236,7 @@ namespace {
     // Component severity configuration:
     //     LogComponent::kDefault: 1
     //     componentA: 2
-    TEST_F(LogTest, MongoLogMacroFunctionScopeLogComponentDeclared) {
+    TEST_F(LogTestUnadornedEncoder, MongoLogMacroFunctionScopeLogComponentDeclared) {
         globalLogDomain()->setMinimumLoggedSeverity(LogSeverity::Debug(1));
         globalLogDomain()->setMinimumLoggedSeverity(componentA, LogSeverity::Debug(2));
 
@@ -322,7 +327,7 @@ namespace {
     // should be written to the log domain.
     //
 
-    TEST_F(LogTest, LogComponentSettingsMinimumLogSeverity) {
+    TEST_F(LogTestUnadornedEncoder, LogComponentSettingsMinimumLogSeverity) {
         LogComponentSettings settings;
         ASSERT_TRUE(settings.hasMinimumLogSeverity(LogComponent::kDefault));
         ASSERT_TRUE(settings.getMinimumLogSeverity(LogComponent::kDefault) == LogSeverity::Log());
@@ -358,7 +363,7 @@ namespace {
     }
 
     // Test for shouldLog() when the minimum logged severity is set only for LogComponent::kDefault.
-    TEST_F(LogTest, LogComponentSettingsShouldLogDefaultLogComponentOnly) {
+    TEST_F(LogTestUnadornedEncoder, LogComponentSettingsShouldLogDefaultLogComponentOnly) {
         LogComponentSettings settings;
 
         // Initial log severity for LogComponent::kDefault is Log().
@@ -390,7 +395,7 @@ namespace {
     // Minimum severity levels:
     // LogComponent::kDefault: 1
     // componentA: 2
-    TEST_F(LogTest, LogComponentSettingsShouldLogSingleComponent) {
+    TEST_F(LogTestUnadornedEncoder, LogComponentSettingsShouldLogSingleComponent) {
         LogComponentSettings settings;
 
         settings.setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Debug(1));
@@ -415,7 +420,7 @@ namespace {
     // LogComponent::kDefault: 1
     // componentA: 2
     // componentB: 0
-    TEST_F(LogTest, LogComponentSettingsShouldLogMultipleComponentsConfigured) {
+    TEST_F(LogTestUnadornedEncoder, LogComponentSettingsShouldLogMultipleComponentsConfigured) {
         LogComponentSettings settings;
 
         settings.setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Debug(1));
@@ -442,7 +447,7 @@ namespace {
     }
 
     // Log component hierarchy.
-    TEST_F(LogTest, LogComponentHierarchy) {
+    TEST_F(LogTestUnadornedEncoder, LogComponentHierarchy) {
         // Parent component is not meaningful for kDefault and kNumLogComponents.
         ASSERT_EQUALS(LogComponent::kNumLogComponents,
                       LogComponent(LogComponent::kDefault).parent());
@@ -470,13 +475,119 @@ namespace {
     }
 
     // Dotted name of component includes names of ancestors.
-    TEST_F(LogTest, LogComponentDottedName) {
+    TEST_F(LogTestUnadornedEncoder, LogComponentDottedName) {
         // Default -> ComponentD -> ComponentE
         ASSERT_EQUALS(componentDefault.getShortName(),
                       LogComponent(LogComponent::kDefault).getDottedName());
         ASSERT_EQUALS(componentD.getShortName(), componentD.getDottedName());
         ASSERT_EQUALS(componentD.getShortName() + "." + componentE.getShortName(),
                       componentE.getDottedName());
+    }
+
+    // Log names of all components should have the same length.
+    TEST_F(LogTestUnadornedEncoder, LogComponentNameForLog) {
+        size_t defaultNameForLogLength = componentDefault.getNameForLog().toString().length();
+        ASSERT_NOT_EQUALS(0U, defaultNameForLogLength);
+        for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
+            LogComponent component = static_cast<LogComponent::Value>(i);
+            ASSERT_EQUALS(defaultNameForLogLength, component.getNameForLog().toString().length());
+        }
+    }
+
+    /**
+     * Verifies that the encoded log line contains string.
+     */
+    void testEncodedLogLine(const MessageEventEphemeral& event,
+                            const std::string& expectedSubstring) {
+        MessageEventDetailsEncoder encoder;
+        std::ostringstream os;
+        ASSERT_TRUE(encoder.encode(event, os));
+        std::string s = os.str();
+        if (s.find(expectedSubstring) == std::string::npos) {
+            FAIL(str::stream() << "encoded log line does not contain substring \""
+                               << expectedSubstring << "\". log line: " << s);
+        }
+    }
+
+    // Log severity should always be logged as a single capital letter.
+    TEST_F(LogTestUnadornedEncoder, MessageEventDetailsEncoderLogSeverity) {
+        Date_t d(curTimeMillis64());
+        StringData ctx("WHAT", StringData::LiteralTag());
+        StringData msg("HUH", StringData::LiteralTag());
+        // Severe is indicated by (F)atal.
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Severe(), ctx, msg), " F ");
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Error(), ctx, msg), " E ");
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Warning(), ctx, msg), " W ");
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Info(), ctx, msg), " I ");
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Log(), ctx, msg), " I ");
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(0), ctx, msg), " I ");
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(1), ctx, msg), " D ");
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(2), ctx, msg), " D ");
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(3), ctx, msg), " D ");
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(4), ctx, msg), " D ");
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(5), ctx, msg), " D ");
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(100), ctx, msg), " D ");
+        // Unknown severity.
+        testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Severe().moreSevere(), ctx, msg),
+                           " U ");
+    }
+
+    // Non-default log component short name should always be logged.
+    TEST_F(LogTestUnadornedEncoder, MessageEventDetailsEncoderLogComponent) {
+        Date_t d(curTimeMillis64());
+        StringData ctx("WHAT", StringData::LiteralTag());
+        StringData msg("HUH", StringData::LiteralTag());
+        for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
+            LogComponent component = static_cast<LogComponent::Value>(i);
+            testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Info(), component, ctx, msg),
+                               str::stream() << " I " << component.getNameForLog() << " [");
+        }
+    }
+
+    // Tests pass through of log component:
+    //     log macros -> LogStreamBuilder -> MessageEventEphemeral -> MessageEventDetailsEncoder
+    TEST_F(LogTestDetailsEncoder, ) {
+        globalLogDomain()->setMinimumLoggedSeverity(LogSeverity::Log());
+
+        // Set MONGO_LOG's default component to componentA.
+        MONGO_LOG_DEFAULT_COMPONENT_LOCAL(componentA);
+
+        // LOG - MongoLogDefaultComponent (set to componentA) should appear in log line.
+        LOG(0) << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(componentA.getNameForLog().toString()),
+                          std::string::npos);
+
+        // Default log component short name should not appear in detailed log line.
+        _logLines.clear();
+        MONGO_LOG_COMPONENT(0, componentDefault) << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(componentDefault.getNameForLog().toString()),
+                          std::string::npos);
+
+        // Non-default log component short name should appear in detailed log line.
+        _logLines.clear();
+        MONGO_LOG_COMPONENT(0, componentA) << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(componentA.getNameForLog().toString()),
+                          std::string::npos);
+
+        // MONGO_LOG_COMPONENT2 - only the first component is sent to LogStreamBuilder.
+        _logLines.clear();
+        MONGO_LOG_COMPONENT2(0, componentA, componentB) << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(componentA.getNameForLog().toString()),
+                          std::string::npos);
+        ASSERT_EQUALS(_logLines[0].find(componentB.getNameForLog().toString()), std::string::npos);
+
+        // MONGO_LOG_COMPONENT3 - only the first component is sent to LogStreamBuilder.
+        _logLines.clear();
+        MONGO_LOG_COMPONENT3(0, componentA, componentB, componentC) << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(componentA.getNameForLog().toString()),
+                          std::string::npos);
+        ASSERT_EQUALS(_logLines[0].find(componentB.getNameForLog().toString()), std::string::npos);
+        ASSERT_EQUALS(_logLines[0].find(componentC.getNameForLog().toString()), std::string::npos);
     }
 
 }  // namespace

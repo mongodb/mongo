@@ -43,6 +43,14 @@ namespace {
 // Lazily evaluated in LogComponent::getDottedName().
 std::string _dottedNames[LogComponent::kNumLogComponents+1];
 
+    /**
+     * Returns StringData created from a string literal
+     */
+    template<size_t N>
+    StringData createStringData(const char (&val)[N]) {
+        return StringData(val, StringData::LiteralTag());
+    }
+
     //
     // Fully initialize _dottedNames before we enter multithreaded execution.
     //
@@ -77,26 +85,30 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
         case kNumLogComponents: return kNumLogComponents;
         default: return kDefault;
         }
-        invariant(0);
+        invariant(false);
+    }
+
+    StringData LogComponent::toStringData() const {
+        switch (_value) {
+        case kDefault: return createStringData("default");
+        case kAccessControl: return createStringData("accessControl");
+        case kCommands: return createStringData("commands");
+        case kIndexing: return createStringData("indexing");
+        case kNetworking: return createStringData("networking");
+        case kQuery: return createStringData("query");
+        case kReplication: return createStringData("replication");
+        case kSharding: return createStringData("sharding");
+        case kStorage: return createStringData("storage");
+        case kJournaling: return createStringData("journaling");
+        case kWrites: return createStringData("writes");
+        case kNumLogComponents: return createStringData("total");
+        // No default. Compiler should complain if there's a log component that's not handled.
+        }
+        invariant(false);
     }
 
     std::string LogComponent::getShortName() const {
-        switch (_value) {
-        case kDefault: return "default";
-        case kAccessControl: return "accessControl";
-        case kCommands: return "commands";
-        case kIndexing: return "indexing";
-        case kNetworking: return "networking";
-        case kQuery: return "query";
-        case kReplication: return "replication";
-        case kSharding: return "sharding";
-        case kStorage: return "storage";
-        case kJournaling: return "journaling";
-        case kWrites: return "writes";
-        case kNumLogComponents: return "total";
-        // No default. Compiler should complain if there's a log component that's not handled.
-        }
-        invariant(0);
+        return toStringData().toString();
     }
 
     std::string LogComponent::getDottedName() const {
@@ -117,6 +129,29 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
             }
         }
         return _dottedNames[_value];
+    }
+
+    StringData LogComponent::getNameForLog() const {
+        switch (_value) {
+        case kDefault:              return createStringData("        ");
+        case kAccessControl:        return createStringData("ACCESS  ");
+        case kCommands:             return createStringData("COMMANDS");
+        case kIndexing:             return createStringData("INDEXING");
+        case kNetworking:           return createStringData("NETWORK ");
+        case kQuery:                return createStringData("QUERY   ");
+        case kReplication:          return createStringData("REPLSETS");
+        case kSharding:             return createStringData("SHARDING");
+        case kStorage:              return createStringData("STORAGE ");
+        case kJournaling:           return createStringData("JOURNAL ");
+        case kWrites:               return createStringData("WRITES  ");
+        case kNumLogComponents:     return createStringData("TOTAL   ");
+        // No default. Compiler should complain if there's a log component that's not handled.
+        }
+        invariant(false);
+    }
+
+    std::ostream& operator<<(std::ostream& os, LogComponent component) {
+        return os << component.getNameForLog();
     }
 
 }  // logger
