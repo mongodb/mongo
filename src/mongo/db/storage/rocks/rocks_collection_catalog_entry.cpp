@@ -207,6 +207,7 @@ namespace mongo {
 
     void RocksCollectionCatalogEntry::createMetaData() {
         string result;
+        // XXX not using a snapshot here
         rocksdb::Status status = _engine->getDB()->Get( rocksdb::ReadOptions(),
                                                         _metaDataKey,
                                                         &result );
@@ -236,6 +237,7 @@ namespace mongo {
 
     bool RocksCollectionCatalogEntry::_getMetaData_inlock( MetaData* out ) const {
         string result;
+        // XXX not using a snapshot here
         rocksdb::Status status = _engine->getDB()->Get( rocksdb::ReadOptions(),
                                                         _metaDataKey,
                                                         &result );

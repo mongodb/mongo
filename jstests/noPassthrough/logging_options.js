@@ -67,6 +67,30 @@ expectedResult = {
 testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/set_verbosity.json" },
                          expectedResult);
 
+// log component verbosity
+jsTest.log("Testing \"systemLog.component.verbosity\" config file option");
+expectedResult = {
+    "parsed" : {
+        "config" : "jstests/libs/config_files/set_component_verbosity.json",
+        "systemLog" : {
+            "verbosity" : 2,
+            "component" : {
+                "accessControl" : {
+                    "verbosity" : 0
+                },
+                "storage" : {
+                    "verbosity" : 3,
+                    "journaling" : {
+                        "verbosity" : 5
+                    }
+                }
+            }
+        }
+    }
+};
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/set_component_verbosity.json" },
+                         expectedResult);
+
 
 
 // Log output testing

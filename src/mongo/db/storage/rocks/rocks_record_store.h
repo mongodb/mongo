@@ -165,7 +165,13 @@ namespace mongo {
             boost::scoped_ptr<rocksdb::Iterator> _iterator;
         };
 
-        RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx ) const;
+        /**
+         * Returns a new ReadOptions struct, containing the snapshot held in opCtx, if opCtx is not
+         * null
+         */
+        rocksdb::ReadOptions _readOptions( OperationContext* opCtx = nullptr ) const;
+
+        static RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx );
 
         DiskLoc _nextId();
         bool cappedAndNeedDelete() const;
@@ -186,7 +192,7 @@ namespace mongo {
         uint64_t _nextIdNum;
         long long _dataSize;
         long long _numRecords;
-        rocksdb::ReadOptions _readOptions;
+        rocksdb::ReadOptions _defaultReadOptions;
         mutable boost::mutex _idLock;
     };
 }

@@ -34,12 +34,14 @@
 #include <string>
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/recovery_unit.h"
 
 namespace rocksdb {
     class DB;
+    class Snapshot;
     class WriteBatch;
 }
 
@@ -70,12 +72,17 @@ namespace mongo {
 
         rocksdb::WriteBatch* writeBatch();
 
+        const rocksdb::Snapshot* snapshot();
+
     private:
         rocksdb::DB* _db; // now owned
         bool _defaultCommit;
 
-        boost::scoped_ptr<rocksdb::WriteBatch> _writeBatch; // owned
+        boost::shared_ptr<rocksdb::WriteBatch> _writeBatch; // owned
         int _depth;
+
+        // bare because we need to call ReleaseSnapshot when we're done with this
+        const rocksdb::Snapshot* _snapshot; // owned
     };
 
 }

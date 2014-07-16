@@ -1,4 +1,4 @@
-// rocks_btree_impl_test.cpp
+// rocks_sorted_data_impl_test.cpp
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -39,7 +39,7 @@
 #include <rocksdb/options.h>
 
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/rocks/rocks_btree_impl.h"
+#include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 #include "mongo/db/storage/rocks/rocks_index_entry_comparator.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
@@ -83,7 +83,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
         {
-            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
 
             BSONObj key = BSON( "" << 1 );
             DiskLoc loc( 5, 16 );
@@ -92,7 +92,7 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
-                    ASSERT( !btree.unindex( &opCtx, key, loc ) );
+                    ASSERT( !sortedData.unindex( &opCtx, key, loc ) );
                 }
             }
 
@@ -100,7 +100,7 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
-                    Status res = btree.insert( &opCtx, key, loc, true );
+                    Status res = sortedData.insert( &opCtx, key, loc, true );
                     ASSERT_OK( res );
                 }
             }
@@ -109,7 +109,7 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
-                    ASSERT( btree.unindex( &opCtx, key, loc ) );
+                    ASSERT( sortedData.unindex( &opCtx, key, loc ) );
                 }
             }
 
@@ -117,7 +117,7 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
-                    btree.unindex( &opCtx, key, loc );
+                    sortedData.unindex( &opCtx, key, loc );
                 }
             }
 
@@ -128,7 +128,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
         {
-            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
 
             BSONObj key = BSON( "" << 1 );
             DiskLoc loc( 5, 16 );
@@ -136,7 +136,7 @@ namespace mongo {
             {
 
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
                 ASSERT( !cursor->locate( key, loc ) );
             }
 
@@ -144,14 +144,14 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
-                    Status res = btree.insert( &opCtx, key, loc, true );
+                    Status res = sortedData.insert( &opCtx, key, loc, true );
                     ASSERT_OK( res );
                 }
             }
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
                 ASSERT( cursor->locate( key, loc ) );
                 ASSERT_EQUALS( key, cursor->getKey() );
                 ASSERT_EQUALS( loc, cursor->getDiskLoc() );
@@ -163,22 +163,22 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
         {
-            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
 
             {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
                 }
             }
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
                 ASSERT( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
@@ -204,21 +204,21 @@ namespace mongo {
         {
             boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = makeColumnFamily( db.get() );
 
-            RocksBtreeImpl btree( db.get(), cfh.get() );
+            RocksSortedDataImpl sortedData( db.get(), cfh.get() );
 
             {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
                 }
             }
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
                 ASSERT_FALSE( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
@@ -231,14 +231,14 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
         {
-            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
 
             {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
                 }
             }
 
@@ -246,14 +246,14 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
 
                 // get a cursor
-                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
 
                 // insert some more stuff
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
                 }
 
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
@@ -272,22 +272,22 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
         {
-            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
 
             {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
                 }
             }
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
                 ASSERT( cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
@@ -336,22 +336,22 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
         {
-            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
 
             {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
                 }
             }
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( &opCtx, 1 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
                 ASSERT( cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
@@ -384,14 +384,14 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
         {
-            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
 
             BSONObj key = BSON( "" << 1 );
             DiskLoc loc( 5, 16 );
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( &opCtx, 0 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 0 ) );
                 ASSERT( !cursor->locate( key, loc ) );
             }
 
@@ -399,14 +399,14 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
-                    Status res = btree.insert( &opCtx, key, loc, true );
+                    Status res = sortedData.insert( &opCtx, key, loc, true );
                     ASSERT_OK( res );
                 }
             }
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( &opCtx, 0 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 0 ) );
                 ASSERT( cursor->locate( key, loc ) );
                 ASSERT_EQUALS( key, cursor->getKey() );
                 ASSERT_EQUALS( loc, cursor->getDiskLoc() );
@@ -420,21 +420,21 @@ namespace mongo {
         {
             boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = makeColumnFamily( db.get() );
 
-            RocksBtreeImpl btree( db.get(), cfh.get() );
+            RocksSortedDataImpl sortedData( db.get(), cfh.get() );
 
             {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "a" << 1 ), DiskLoc(1,1), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "a" << 3 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "a" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "a" << 3 ), DiskLoc(1,1), true ) );
                 }
             }
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( &opCtx, 0 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 0 ) );
                 ASSERT_FALSE( cursor->locate( BSON( "a" << 2 ), DiskLoc(1,1) ) );
                 ASSERT_FALSE( cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
@@ -447,22 +447,22 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
         {
-            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
 
             {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
                 }
             }
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( &opCtx, 0 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 0 ) );
                 ASSERT( cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
@@ -511,22 +511,22 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
         {
-            RocksBtreeImpl btree( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
 
             {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
-                    ASSERT_OK( btree.insert( &opCtx, BSON( "" << 4 ), DiskLoc(1,4), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 4 ), DiskLoc(1,4), true ) );
                 }
             }
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( &opCtx, 0 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 0 ) );
                 ASSERT_FALSE( cursor->locate( BSON( "" << 2 ), DiskLoc(1,2) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );

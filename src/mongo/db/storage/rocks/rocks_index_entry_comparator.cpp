@@ -32,7 +32,7 @@
 #include "mongo/db/storage/rocks/rocks_index_entry_comparator.h"
 
 #include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/rocks/rocks_btree_impl.h"
+#include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 
 namespace mongo {
 

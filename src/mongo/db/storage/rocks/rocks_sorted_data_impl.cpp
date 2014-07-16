@@ -1,4 +1,4 @@
-// rocks_btree_impl.cpp
+// rocks_sorted_data_impl.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/rocks/rocks_btree_impl.h"
+#include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 
 #include <string>
 
@@ -36,6 +36,7 @@
 #include <rocksdb/iterator.h>
 
 #include "mongo/db/storage/rocks/rocks_engine.h"
+#include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 
 namespace mongo {
@@ -58,12 +59,7 @@ namespace mongo {
                     rocksdb::DB* db )
                 : _iterator( iterator ),
                   _direction( direction ),
-                  _cached( false ),
-                  _snapshot( snapshot ),
-                  _db( db ) {
-
-                invariant( ( snapshot == nullptr && db == nullptr )
-                        || ( snapshot != nullptr && db != nullptr ));
+                  _cached( false ) {
 
                 // TODO: maybe don't seek until we know we need to?
                 if ( _forward() )
@@ -73,11 +69,7 @@ namespace mongo {
                 _checkStatus();
             }
 
-            virtual ~RocksCursor() { 
-                if (_snapshot) {
-                    _db->ReleaseSnapshot(_snapshot);
-                }
-            }
+            virtual ~RocksCursor() { } 
 
             int getDirection() const { return _direction; }
 
@@ -254,11 +246,6 @@ namespace mongo {
             mutable bool _savedAtEnd;
             mutable BSONObj _savePositionObj;
             mutable DiskLoc _savePositionLoc;
-
-            // we store the snapshot and database so that we can free the snapshot when we're done
-            // using the cursor
-            const rocksdb::Snapshot* _snapshot; // not owned
-            rocksdb::DB* _db; // not owned
         };
 
     }
@@ -303,23 +290,23 @@ namespace mongo {
         return s;
     }
 
-    // RocksBtreeDataImpl
+    // RocksSortedDataImpl
 
-    RocksBtreeImpl::RocksBtreeImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf )
+    RocksSortedDataImpl::RocksSortedDataImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf )
         : _db( db ), _columnFamily( cf ) {
         invariant( _db );
         invariant( _columnFamily );
     }
 
-    SortedDataBuilderInterface* RocksBtreeImpl::getBulkBuilder(OperationContext* txn,
-                                                          bool dupsAllowed) {
+    SortedDataBuilderInterface* RocksSortedDataImpl::getBulkBuilder(OperationContext* txn,
+                                                                    bool dupsAllowed) {
         invariant( false );
     }
 
-    Status RocksBtreeImpl::insert(OperationContext* txn,
-                                  const BSONObj& key,
-                                  const DiskLoc& loc,
-                                  bool dupsAllowed) {
+    Status RocksSortedDataImpl::insert(OperationContext* txn,
+                                       const BSONObj& key,
+                                       const DiskLoc& loc,
+                                       bool dupsAllowed) {
 
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
@@ -339,23 +326,26 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool RocksBtreeImpl::unindex(OperationContext* txn,
-                                 const BSONObj& key,
-                                 const DiskLoc& loc) {
+    bool RocksSortedDataImpl::unindex(OperationContext* txn,
+                                      const BSONObj& key,
+                                      const DiskLoc& loc) {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         RocksIndexEntry rIndexEntry( key, loc );
         string keyData = rIndexEntry.asString();
 
         string dummy;
-        if ( !_db->KeyMayExist( rocksdb::ReadOptions(), _columnFamily, keyData, &dummy ) )
+        if ( !_db->KeyMayExist( RocksEngine::readOptionsWithSnapshot( txn ), 
+                                _columnFamily,
+                                keyData,
+                                &dummy ) )
             return 0;
 
         ru->writeBatch()->Delete( _columnFamily, keyData );
         return 1; // XXX: fix? does it matter since its so slow to check?
     }
 
-    string RocksBtreeImpl::dupKeyError(const BSONObj& key) const {
+    string RocksSortedDataImpl::dupKeyError(const BSONObj& key) const {
         stringstream ss;
         ss << "E11000 duplicate key error ";
         // TODO figure out how to include index name without dangerous casts
@@ -363,25 +353,29 @@ namespace mongo {
         return ss.str();
     }
 
-    Status RocksBtreeImpl::dupKeyCheck(OperationContext* txn,
-                                       const BSONObj& key,
-                                       const DiskLoc& loc) {
+    Status RocksSortedDataImpl::dupKeyCheck(OperationContext* txn,
+                                            const BSONObj& key,
+                                            const DiskLoc& loc) {
         RocksIndexEntry rIndexEntry( key, loc );
         string keyData = rIndexEntry.asString();
         string dummy;
 
-        rocksdb::Status s =_db->Get( rocksdb::ReadOptions(), _columnFamily, keyData, &dummy );
+        rocksdb::Status s =_db->Get( RocksEngine::readOptionsWithSnapshot( txn ),
+                                      _columnFamily,
+                                      keyData,
+                                      &dummy );
 
         return s.ok() ? Status(ErrorCodes::DuplicateKey, dupKeyError(key)) : Status::OK();
     }
 
-    void RocksBtreeImpl::fullValidate(OperationContext* txn, long long* numKeysOut) {
+    void RocksSortedDataImpl::fullValidate(OperationContext* txn, long long* numKeysOut) {
         // XXX: no key counts
         if ( numKeysOut )
             numKeysOut[0] = -1;
     }
 
-    bool RocksBtreeImpl::isEmpty() {
+    bool RocksSortedDataImpl::isEmpty() {
+        // XXX doesn't use snapshot
         rocksdb::Iterator* it = _db->NewIterator( rocksdb::ReadOptions(), _columnFamily );
 
         it->SeekToFirst();
@@ -392,26 +386,23 @@ namespace mongo {
         return toRet;
     }
 
-    Status RocksBtreeImpl::touch(OperationContext* txn) const {
+    Status RocksSortedDataImpl::touch(OperationContext* txn) const {
         // no-op
         return Status::OK();
     }
 
-    SortedDataInterface::Cursor* RocksBtreeImpl::newCursor(OperationContext* txn, int direction) const {
-        rocksdb::ReadOptions options = rocksdb::ReadOptions();
-        options.snapshot = _db->GetSnapshot();
-        return new RocksCursor( _db->NewIterator( options, _columnFamily ),
-                                                  direction,
-                                                  options.snapshot,
-                                                  _db );
+    SortedDataInterface::Cursor* RocksSortedDataImpl::newCursor(OperationContext* txn, 
+                                                                int direction) const {
+        rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
+        return new RocksCursor( _db->NewIterator( options, _columnFamily ), direction );
     }
 
-    Status RocksBtreeImpl::initAsEmpty(OperationContext* txn) {
+    Status RocksSortedDataImpl::initAsEmpty(OperationContext* txn) {
         // no-op
         return Status::OK();
     }
 
-    RocksRecoveryUnit* RocksBtreeImpl::_getRecoveryUnit( OperationContext* opCtx ) const {
+    RocksRecoveryUnit* RocksSortedDataImpl::_getRecoveryUnit( OperationContext* opCtx ) const {
         return dynamic_cast<RocksRecoveryUnit*>( opCtx->recoveryUnit() );
     }
 

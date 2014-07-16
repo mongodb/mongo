@@ -41,6 +41,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/logger/log_component.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/map_util.h"
@@ -48,6 +49,8 @@
 #include "mongo/util/net/listen.h" // For DEFAULT_MAX_CONN
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
+
+using std::string;
 
 namespace mongo {
 
@@ -99,6 +102,7 @@ namespace {
 #endif // !defined(INTERNAL_NOPRI)
 #endif // defined(SYSLOG_NAMES)
 
+
 } // namespace
 
     Status addGeneralServerOptions(moe::OptionSection* options) {
@@ -148,6 +152,13 @@ namespace {
         // _________________________________________
         // systemLog:          |
         //    verbosity: 5     | 5
+        // systemLog:          |
+        //   component:        |
+        //     verbosity: 5    | 5
+        // systemLog:          |
+        //   component:        |
+        //     Sharding:       |
+        //       verbosity: 5  | 5 (for Sharding only, 0 for default)
         options->addOptionChaining("verbose", "verbose,v", moe::String,
                 "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
                                   .setImplicit(moe::Value(std::string("v")))
@@ -155,6 +166,20 @@ namespace {
 
         options->addOptionChaining("systemLog.verbosity", "", moe::Int, "set verbose level")
                                   .setSources(moe::SourceYAMLConfig);
+
+        // log component hierarchy verbosity levels
+        for (int i = 0; i < int(logger::LogComponent::kNumLogComponents); ++i) {
+            logger::LogComponent component = static_cast<logger::LogComponent::Value>(i);
+            if (component == logger::LogComponent::kDefault) {
+                continue;
+            }
+            options->addOptionChaining("systemLog.component." + component.getDottedName() +
+                                       ".verbosity",
+                                       "", moe::Int,
+                                       "set component verbose level for " +
+                                       component.getDottedName())
+                                      .setSources(moe::SourceYAMLConfig);
+        }
 
         options->addOptionChaining("systemLog.quiet", "quiet", moe::Switch, "quieter output");
 
@@ -630,6 +655,28 @@ namespace {
             }
             logger::globalLogDomain()->setMinimumLoggedSeverity(
                     logger::LogSeverity::Debug(verbosity));
+        }
+
+        // log component hierarchy verbosity levels
+        for (int i = 0; i < int(logger::LogComponent::kNumLogComponents); ++i) {
+            logger::LogComponent component = static_cast<logger::LogComponent::Value>(i);
+            if (component == logger::LogComponent::kDefault) {
+                continue;
+            }
+            const string dottedName = "systemLog.component." + component.getDottedName() +
+                                      ".verbosity";
+            if (params.count(dottedName)) {
+                int verbosity = params[dottedName].as<int>();
+                // Clear existing log level if log level is negative.
+                if (verbosity < 0) {
+                    logger::globalLogDomain()->clearMinimumLoggedSeverity(component);
+                }
+                else {
+                    logger::globalLogDomain()->setMinimumLoggedSeverity(
+                        component,
+                        logger::LogSeverity::Debug(verbosity));
+                }
+            }
         }
 
         if (params.count("enableExperimentalIndexStatsCmd")) {

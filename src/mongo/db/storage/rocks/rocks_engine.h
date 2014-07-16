@@ -51,6 +51,7 @@ namespace rocksdb {
     struct ColumnFamilyOptions;
     class DB;
     struct Options;
+    struct ReadOptions;
 }
 
 namespace mongo {
@@ -111,6 +112,11 @@ namespace mongo {
          * Completely removes a column family. Input pointer is invalid after calling
          */
         void removeColumnFamily( rocksdb::ColumnFamilyHandle*& cfh );
+
+        /**
+         * Returns a ReadOptions object that uses the snapshot contained in opCtx
+         */
+        static rocksdb::ReadOptions readOptionsWithSnapshot( OperationContext* opCtx );
 
         struct Entry {
             boost::scoped_ptr<rocksdb::ColumnFamilyHandle> cfHandle;

@@ -1,4 +1,4 @@
-// rocks_btree_impl.h
+// rocks_sorted_data_impl.h
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -45,15 +45,15 @@ namespace mongo {
 
     class RocksRecoveryUnit;
 
-    class RocksBtreeBuilderImpl : public SortedDataBuilderInterface {
+    class RocksSortedDataBuilderImpl : public SortedDataBuilderInterface {
     public:
         virtual Status addKey(const BSONObj& key, const DiskLoc& loc) = 0;
         virtual unsigned long long commit(bool mayInterrupt) = 0;
     };
 
-    class RocksBtreeImpl : public SortedDataInterface {
+    class RocksSortedDataImpl : public SortedDataInterface {
     public:
-        RocksBtreeImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf );
+        RocksSortedDataImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf );
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
                                                       bool dupsAllowed);
