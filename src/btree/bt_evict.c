@@ -753,7 +753,7 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 			continue;
 		cache->evict_file_next = NULL;
 
-		/* Skip files (currently) marked as unevictable. */
+		/* Skip files that don't allow eviction. */
 		btree = dhandle->handle;
 		if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
 			continue;
