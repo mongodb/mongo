@@ -40,13 +40,21 @@
 namespace mongo {
 
     RocksRecoveryUnit::RocksRecoveryUnit( rocksdb::DB* db, bool defaultCommit )
-        : _db( db ), _defaultCommit( defaultCommit ), _writeBatch(  ), _depth( 0 ) {
+                                       : _db( db ),
+                                       _defaultCommit( defaultCommit ),
+                                       _writeBatch(  ),
+                                       _depth( 0 ), 
+                                       _snapshot( NULL ) {
         _writeBatch.reset( new rocksdb::WriteBatch() );
     }
 
     RocksRecoveryUnit::~RocksRecoveryUnit() {
         if ( _defaultCommit ) {
             commitUnitOfWork();
+        }
+
+        if ( _snapshot ) {
+            _db->ReleaseSnapshot( _snapshot );
         }
     }
 
@@ -106,6 +114,19 @@ namespace mongo {
     rocksdb::WriteBatch* RocksRecoveryUnit::writeBatch() {
         invariant( _writeBatch );
         return _writeBatch.get();
+    }
+
+    // XXX lazily initialized for now
+    // This is lazily initialized for simplicity so long as we still
+    // have database-level locking. If a method needs to access the snapshot, 
+    // and it has not been initialized, then it knows it is the first
+    // method to access the snapshot, and can initialize it before using it.
+    const rocksdb::Snapshot* RocksRecoveryUnit::snapshot() {
+        if ( !_snapshot ) {
+            _snapshot = _db->GetSnapshot();
+        }
+
+        return _snapshot;
     }
 
 }

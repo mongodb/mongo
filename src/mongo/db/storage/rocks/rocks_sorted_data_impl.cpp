@@ -36,6 +36,7 @@
 #include <rocksdb/iterator.h>
 
 #include "mongo/db/storage/rocks/rocks_engine.h"
+#include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 
 namespace mongo {
@@ -58,12 +59,7 @@ namespace mongo {
                     rocksdb::DB* db )
                 : _iterator( iterator ),
                   _direction( direction ),
-                  _cached( false ),
-                  _snapshot( snapshot ),
-                  _db( db ) {
-
-                invariant( ( snapshot == nullptr && db == nullptr )
-                        || ( snapshot != nullptr && db != nullptr ));
+                  _cached( false ) {
 
                 // TODO: maybe don't seek until we know we need to?
                 if ( _forward() )
@@ -73,11 +69,7 @@ namespace mongo {
                 _checkStatus();
             }
 
-            virtual ~RocksCursor() { 
-                if (_snapshot) {
-                    _db->ReleaseSnapshot(_snapshot);
-                }
-            }
+            virtual ~RocksCursor() { } 
 
             int getDirection() const { return _direction; }
 
@@ -254,11 +246,6 @@ namespace mongo {
             mutable bool _savedAtEnd;
             mutable BSONObj _savePositionObj;
             mutable DiskLoc _savePositionLoc;
-
-            // we store the snapshot and database so that we can free the snapshot when we're done
-            // using the cursor
-            const rocksdb::Snapshot* _snapshot; // not owned
-            rocksdb::DB* _db; // not owned
         };
 
     }
@@ -348,7 +335,10 @@ namespace mongo {
         string keyData = rIndexEntry.asString();
 
         string dummy;
-        if ( !_db->KeyMayExist( rocksdb::ReadOptions(), _columnFamily, keyData, &dummy ) )
+        if ( !_db->KeyMayExist( RocksEngine::readOptionsWithSnapshot( txn ), 
+                                _columnFamily,
+                                keyData,
+                                &dummy ) )
             return 0;
 
         ru->writeBatch()->Delete( _columnFamily, keyData );
@@ -370,7 +360,10 @@ namespace mongo {
         string keyData = rIndexEntry.asString();
         string dummy;
 
-        rocksdb::Status s =_db->Get( rocksdb::ReadOptions(), _columnFamily, keyData, &dummy );
+        rocksdb::Status s =_db->Get( RocksEngine::readOptionsWithSnapshot( txn ),
+                                      _columnFamily,
+                                      keyData,
+                                      &dummy );
 
         return s.ok() ? Status(ErrorCodes::DuplicateKey, dupKeyError(key)) : Status::OK();
     }
@@ -382,6 +375,7 @@ namespace mongo {
     }
 
     bool RocksSortedDataImpl::isEmpty() {
+        // XXX doesn't use snapshot
         rocksdb::Iterator* it = _db->NewIterator( rocksdb::ReadOptions(), _columnFamily );
 
         it->SeekToFirst();
@@ -399,12 +393,8 @@ namespace mongo {
 
     SortedDataInterface::Cursor* RocksSortedDataImpl::newCursor(OperationContext* txn, 
                                                                 int direction) const {
-        rocksdb::ReadOptions options = rocksdb::ReadOptions();
-        options.snapshot = _db->GetSnapshot();
-        return new RocksCursor( _db->NewIterator( options, _columnFamily ),
-                                                  direction,
-                                                  options.snapshot,
-                                                  _db );
+        rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
+        return new RocksCursor( _db->NewIterator( options, _columnFamily ), direction );
     }
 
     Status RocksSortedDataImpl::initAsEmpty(OperationContext* txn) {

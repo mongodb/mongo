@@ -50,14 +50,15 @@ namespace mongo {
           _columnFamily( columnFamily ),
           _metadataColumnFamily( metadataColumnFamily ),
           // Set default options (XXX should custom options be persistent?)
-          _readOptions( ) {
+          _defaultReadOptions( ) {
         invariant( _db );
         invariant( _columnFamily );
         invariant( _metadataColumnFamily );
 
         // Get next id
-        boost::scoped_ptr<rocksdb::Iterator> iter( db->NewIterator( rocksdb::ReadOptions(),
-                                            columnFamily ) );
+        // XXX not using a Snapshot here
+        boost::scoped_ptr<rocksdb::Iterator> iter( db->NewIterator( _readOptions(),
+                                                   columnFamily ) );
         iter->SeekToLast();
         if (iter->Valid()) {
             rocksdb::Slice last_slice = iter->key();
@@ -70,18 +71,20 @@ namespace mongo {
 
         // load metadata
         std::string value;
-        if (!_db->Get( rocksdb::ReadOptions(),
-                           _metadataColumnFamily,
-                           rocksdb::Slice("numRecords"),
-                           &value ).ok()) {
+        // XXX not using a Snapshot here
+        if (!_db->Get( _readOptions(),
+                       _metadataColumnFamily,
+                       rocksdb::Slice("numRecords"),
+                       &value ).ok()) {
             _numRecords = 0;
         }
         else
             _numRecords = *((long long *) value.data());
-        if (!_db->Get( rocksdb::ReadOptions(),
-                           _metadataColumnFamily,
-                           rocksdb::Slice("dataSize"),
-                           &value ).ok()) {
+        // XXX not using a Snapshot here
+        if (!_db->Get( _readOptions(),
+                       _metadataColumnFamily,
+                       rocksdb::Slice("dataSize"),
+                       &value ).ok()) {
             _dataSize = 0;
         }
         else
@@ -112,7 +115,8 @@ namespace mongo {
     RecordData RocksRecordStore::dataFor( const DiskLoc& loc) const {
         std::string* value = new std::string();
         rocksdb::Status status;
-        status = _db->Get( _readOptions,
+        // XXX not using a Snapshot here
+        status = _db->Get( _readOptions(),
                            _columnFamily,
                            _makeKey( loc ),
                            value );
@@ -134,10 +138,7 @@ namespace mongo {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         std::string old_value;
-        _db->Get(_readOptions,
-                           _columnFamily,
-                           _makeKey( dl ),
-                           &old_value );
+        _db->Get(_readOptions( txn ), _columnFamily, _makeKey( dl ), &old_value );
         int old_length = old_value.size();
 
         ru->writeBatch()->Delete( _columnFamily,
@@ -199,10 +200,10 @@ namespace mongo {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         std::string old_value;
-        rocksdb::Status status = _db->Get(_readOptions,
-                           _columnFamily,
-                           _makeKey( loc ),
-                           &old_value );
+        rocksdb::Status status = _db->Get(_readOptions( txn ),
+                                          _columnFamily,
+                                          _makeKey( loc ),
+                                          &old_value );
 
         if ( !status.ok() ) {
 
@@ -289,10 +290,7 @@ namespace mongo {
         // get original value
         std::string value;
         rocksdb::Status status;
-        status = _db->Get( _readOptions,
-                           _columnFamily,
-                           key,
-                           &value );
+        status = _db->Get( _readOptions( txn ), _columnFamily, key, &value );
 
         if ( !status.ok() ) {
             if ( status.IsNotFound() )
@@ -411,13 +409,13 @@ namespace mongo {
             return Status( ErrorCodes::BadValue, "Invalid Value" );
         }
         if (optionName.compare("verify_checksums") == 0) {
-            _readOptions.verify_checksums = option.boolean();
+            _defaultReadOptions.verify_checksums = option.boolean();
         }
         else if (optionName.compare("fill_cache") == 0) {
-            _readOptions.fill_cache = option.boolean();
+            _defaultReadOptions.fill_cache = option.boolean();
         }
         else if (optionName.compare("tailing") == 0) {
-            _readOptions.tailing = option.boolean();
+            _defaultReadOptions.tailing = option.boolean();
         }
         else
             return Status( ErrorCodes::BadValue, "Invalid Option" );
@@ -438,7 +436,7 @@ namespace mongo {
         return rocksdb::Slice( reinterpret_cast<const char*>( &loc ), sizeof( loc ) );
     }
 
-    RocksRecoveryUnit* RocksRecordStore::_getRecoveryUnit( OperationContext* opCtx ) const {
+    RocksRecoveryUnit* RocksRecordStore::_getRecoveryUnit( OperationContext* opCtx ) {
         return dynamic_cast<RocksRecoveryUnit*>( opCtx->recoveryUnit() );
     }
 
@@ -477,7 +475,8 @@ namespace mongo {
                                           const CollectionScanParams::Direction& dir )
         : _rs( rs ),
           _dir( dir ),
-          _iterator( _rs->_db->NewIterator( rs->_readOptions,
+          // XXX not using a snapshot here
+          _iterator( _rs->_db->NewIterator( rs->_readOptions(),
                                             rs->_columnFamily ) ) {
         if ( _forward() )
             _iterator->SeekToFirst();
@@ -550,4 +549,11 @@ namespace mongo {
         invariant( !"no temp_cappedTruncateAfter with rocks" );
     }
 
+    rocksdb::ReadOptions RocksRecordStore::_readOptions( OperationContext* opCtx ) const {
+        rocksdb::ReadOptions options( _defaultReadOptions );
+        if ( opCtx ) {
+            options.snapshot = _getRecoveryUnit( opCtx )->snapshot();
+        }
+        return options;
+    }
 }

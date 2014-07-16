@@ -58,6 +58,7 @@ namespace mongo {
         // get ColumnFamilyDescriptors for all the column families
         CfdVector families = _createCfds( path, _db );
 
+        // If there are no column families, then just open the database
         if ( families.empty() ) {
             rocksdb::Status s = rocksdb::DB::Open( _dbOptions(), path, &_db );
             ROCK_STATUS_OK( s );
@@ -81,13 +82,13 @@ namespace mongo {
     }
 
     RecoveryUnit* RocksEngine::newRecoveryUnit( OperationContext* opCtx ) {
-        return new RocksRecoveryUnit( _db, true /* change to false when unit of work hooked up*/ );
+        return new RocksRecoveryUnit( _db, true /* TODO change to false when unit of work hooked up*/ );
     }
 
     void RocksEngine::listDatabases( std::vector<std::string>* out ) const {
         std::set<std::string> dbs;
 
-        // todo: make this faster
+        // TODO: make this faster
         boost::mutex::scoped_lock lk( _mapLock );
         for ( Map::const_iterator i = _map.begin(); i != _map.end(); ++i ) {
             const StringData& ns = i->first;
@@ -118,6 +119,12 @@ namespace mongo {
     }
 
     // non public api
+
+    rocksdb::ReadOptions RocksEngine::readOptionsWithSnapshot( OperationContext* opCtx ) {
+        rocksdb::ReadOptions options = rocksdb::ReadOptions();
+        options.snapshot = dynamic_cast<RocksRecoveryUnit*>( opCtx->recoveryUnit() )->snapshot();
+        return options;
+    }
 
     const RocksEngine::Entry* RocksEngine::getEntry( const StringData& ns ) const {
         boost::mutex::scoped_lock lk( _mapLock );
