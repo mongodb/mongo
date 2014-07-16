@@ -802,6 +802,9 @@ namespace mongo {
 
                     Client::ReadContext ctx( ns );
                     NamespaceDetails *d = nsdetails( ns );
+                    if (d == NULL) {
+                        break;
+                    }
 
                     const IndexDetails *idx = d->findIndexByPrefix( keyPattern ,
                                                                     true ); /* exclude multikeys */
