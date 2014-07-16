@@ -42,18 +42,34 @@ namespace mongo {
     RocksRecordStore::RocksRecordStore( const StringData& ns,
                                         rocksdb::DB* db, // not owned here
                                         rocksdb::ColumnFamilyHandle* columnFamily,
-                                        rocksdb::ColumnFamilyHandle* metadataColumnFamily 
-                                        // TODO capped 
+                                        rocksdb::ColumnFamilyHandle* metadataColumnFamily,
+                                        bool isCapped,
+                                        int64_t cappedMaxSize,
+                                        int64_t cappedMaxDocs,
+                                        CappedDocumentDeleteCallback* cappedDeleteCallback
                                         )
         : RecordStore( ns ),
           _db( db ),
           _columnFamily( columnFamily ),
           _metadataColumnFamily( metadataColumnFamily ),
+          _isCapped( isCapped ),
+          _cappedMaxSize( cappedMaxSize ),
+          _cappedMaxDocs( cappedMaxDocs ),
+          _cappedDeleteCallback( cappedDeleteCallback ),
           // Set default options (XXX should custom options be persistent?)
           _readOptions( ) {
         invariant( _db );
         invariant( _columnFamily );
         invariant( _metadataColumnFamily );
+
+        if (_isCapped) {
+            invariant(_cappedMaxSize > 0);
+            invariant(_cappedMaxDocs == -1 || _cappedMaxDocs > 0);
+        }
+        else {
+            invariant(_cappedMaxSize == -1);
+            invariant(_cappedMaxDocs == -1);
+        }
 
         // Get next id
         boost::scoped_ptr<rocksdb::Iterator> iter( db->NewIterator( rocksdb::ReadOptions(),
@@ -100,7 +116,7 @@ namespace mongo {
     }
 
     bool RocksRecordStore::isCapped() const {
-        return false;
+        return _isCapped;
     }
 
     int64_t RocksRecordStore::storageSize( OperationContext* txn, 
@@ -147,10 +163,46 @@ namespace mongo {
         _increaseDataSize(txn, -old_length);
     }
 
+    bool RocksRecordStore::cappedAndNeedDelete() const {
+        if (!_isCapped)
+            return false;
+
+        if (_dataSize > _cappedMaxSize)
+            return true;
+
+        if ((_cappedMaxDocs != -1) && (numRecords() > _cappedMaxDocs))
+            return true;
+
+        return false;
+    }
+
+    void RocksRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
+        while (cappedAndNeedDelete()) {
+            invariant(_numRecords > 0);
+
+            
+            boost::scoped_ptr<rocksdb::Iterator> iter( _db->NewIterator( rocksdb::ReadOptions(),
+                                            _columnFamily ) );
+            iter->SeekToFirst();
+            invariant ( iter->Valid() );
+            rocksdb::Slice slice = iter->key();
+            DiskLoc oldest = reinterpret_cast<const DiskLoc*>( slice.data() )[0];
+
+            if (_cappedDeleteCallback)
+                uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
+
+            deleteRecord(txn, oldest);
+        }
+    }
+
     StatusWith<DiskLoc> RocksRecordStore::insertRecord( OperationContext* txn,
                                                         const char* data,
                                                         int len,
                                                         bool enforceQuota ) {
+        if (_isCapped && len > _cappedMaxSize) {
+            return StatusWith<DiskLoc>(ErrorCodes::BadValue,
+                                       "object to insert exceeds cappedMaxSize");
+        }
 
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
@@ -163,14 +215,20 @@ namespace mongo {
         _changeNumRecords(txn, true);
         _increaseDataSize(txn, len);
 
+        cappedDeleteAsNeeded(txn);
+
         return StatusWith<DiskLoc>( loc );
     }
 
     StatusWith<DiskLoc> RocksRecordStore::insertRecord( OperationContext* txn,
                                                         const DocWriter* doc,
                                                         bool enforceQuota ) {
-
         const int len = doc->documentSize();
+
+        if (_isCapped && len > _cappedMaxSize) {
+            return StatusWith<DiskLoc>(ErrorCodes::BadValue,
+                                       "object to insert exceeds cappedMaxSize");
+        }
 
         boost::shared_array<char> buf(new char[len]);
         doc->writeDocument(buf.get());
@@ -185,6 +243,8 @@ namespace mongo {
 
         _changeNumRecords(txn, true);
         _increaseDataSize(txn, len);
+
+        cappedDeleteAsNeeded(txn);
 
         return StatusWith<DiskLoc>( loc );
                                                         
@@ -218,13 +278,11 @@ namespace mongo {
 
         _increaseDataSize(txn, len - old_length);
 
+        cappedDeleteAsNeeded(txn);
+
         return StatusWith<DiskLoc>( loc );
     }
 
-    // AFB: will merge operators be compatible with backward iterators?
-    // Wrote this whole implementation of updateWithDamages, only to find out merge_operator
-    // is not compatible with backward_iterator in rocks. Since we need backward_iterators we
-    // can't use the rocks merge_operator functionality... :(
     /* 
     // expects the first sizeof(char*) bytes of value to be damageSource, and the following
     // bytes to be damages

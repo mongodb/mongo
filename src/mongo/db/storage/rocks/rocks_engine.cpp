@@ -200,19 +200,26 @@ namespace mongo {
         if ( _map.find( ns ) != _map.end() )
             return Status( ErrorCodes::NamespaceExists, "collection already exists" );
 
-        if ( options.capped ) {
-            warning() << "RocksEngine doesn't support capped collections yet, using normal";
-        }
-
         if (ns.toString().find('$') != string::npos ||
             ns.toString().find('&') != string::npos ) {
             return Status( ErrorCodes::NamespaceExists, "invalid character in namespace" );
         }
 
+        rocksdb::ColumnFamilyOptions rocksOptions;
+
+        /* AFB: this implementation of capped collections could work if FB implements 
+                FIFO compaction with the number of records 
+        if ( options.capped ) {
+            // XXX capped collections do not yet honor cappedMaxDocs
+            rocksdb::CompactionOptionsFIFO rocksCompactionOptions;
+            rocksCompactionOptions.max_table_files_size = options.cappedSize;
+            rocksOptions.compaction_options_fifo = rocksCompactionOptions;
+        } */
+
         boost::shared_ptr<Entry> entry( new Entry() );
 
         rocksdb::ColumnFamilyHandle* cf;
-        rocksdb::Status status = _db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(),
+        rocksdb::Status status = _db->CreateColumnFamily( rocksOptions,
                                                           ns.toString(),
                                                           &cf );
 
@@ -224,9 +231,24 @@ namespace mongo {
                                                           &cf_meta );
         ROCK_STATUS_OK( status );
 
+        BSONObj optionsObj = options.toBSON();
+        rocksdb::Slice key( "options" );
+        rocksdb::Slice value( optionsObj.objdata(), optionsObj.objsize() );
+        status = _db->Put(rocksdb::WriteOptions(), cf_meta, key, value);
+        ROCK_STATUS_OK( status );
+
         entry->cfHandle.reset( cf );
         entry->metaCfHandle.reset( cf_meta );
-        entry->recordStore.reset( new RocksRecordStore( ns, _db, entry->cfHandle.get(), cf_meta ));
+        if ( options.capped )
+            entry->recordStore.reset( new RocksRecordStore( ns, _db, entry->cfHandle.get(), cf_meta,
+                                    true, options.cappedSize
+                                                     ? options.cappedSize : 4096, // default size
+                                                    options.cappedMaxDocs
+                                                     ? options.cappedMaxDocs : -1 ));
+        else
+            entry->recordStore.reset( new RocksRecordStore( ns, _db, 
+                                                entry->cfHandle.get(), cf_meta ) );
+
         entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
         entry->collectionEntry->createMetaData();
 
@@ -489,10 +511,31 @@ namespace mongo {
                 entry->indexNameToCF[indexName] = handles[i];
             }
             else {
+                if ( ns.compare("default") == 0 )
+                    continue;
+
+                CollectionOptions options;
+                rocksdb::Slice optionsKey( "options" );
+                std::string value;
+                rocksdb::Status status = _db->Get(rocksdb::ReadOptions(), handles[metadataMap[ns]],
+                                        optionsKey, &value);
+
+                ROCK_STATUS_OK( status );
+                BSONObj optionsObj( value.data() );
+                invariant( optionsObj.isValid() );
+                options.parse( optionsObj );
+
                 entry->cfHandle.reset( handles[i] );
                 entry->metaCfHandle.reset( handles[metadataMap[ns]] );
-                entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i], 
-                            handles[metadataMap[ns]]) );
+                if ( options.capped )
+                    entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i], 
+                            handles[metadataMap[ns]], options.capped, options.cappedSize
+                                                     ? options.cappedSize : 4096, // default size
+                                                    options.cappedMaxDocs
+                                                     ? options.cappedMaxDocs : -1) );
+                else
+                    entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i], 
+                            handles[metadataMap[ns]] ) );
                 // entry->collectionEntry is set in _createNonIndexCatalogEntries()
                 entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
             }

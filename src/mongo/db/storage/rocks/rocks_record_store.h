@@ -34,6 +34,7 @@
 #include <rocksdb/options.h>
 
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/capped_callback.h"
 
 namespace rocksdb {
     class ColumnFamilyHandle;
@@ -51,7 +52,11 @@ namespace mongo {
         RocksRecordStore( const StringData& ns,
                           rocksdb::DB* db,
                           rocksdb::ColumnFamilyHandle* columnFamily,
-                          rocksdb::ColumnFamilyHandle* metadataColumnFamily );
+                          rocksdb::ColumnFamilyHandle* metadataColumnFamily,
+                          bool isCapped = false,
+                          int64_t cappedMaxSize = -1,
+                          int64_t cappedMaxDocs = -1,
+                          CappedDocumentDeleteCallback* cappedDeleteCallback = NULL );
 
         virtual ~RocksRecordStore();
 
@@ -133,6 +138,10 @@ namespace mongo {
         virtual void temp_cappedTruncateAfter(OperationContext* txn,
                                               DiskLoc end,
                                               bool inclusive);
+
+        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) { _cappedDeleteCallback = cb; }
+        bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
+        bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
     private:
 
         class Iterator : public RecordIterator {
@@ -159,6 +168,8 @@ namespace mongo {
         RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx ) const;
 
         DiskLoc _nextId();
+        bool cappedAndNeedDelete() const;
+        void cappedDeleteAsNeeded(OperationContext* txn);
         rocksdb::Slice _makeKey( const DiskLoc& loc ) const;
         void _changeNumRecords(OperationContext* txn, bool insert);
         void _increaseDataSize(OperationContext* txn, int amount);
@@ -166,6 +177,11 @@ namespace mongo {
         rocksdb::DB* _db; // not owned
         rocksdb::ColumnFamilyHandle* _columnFamily; // not owned
         rocksdb::ColumnFamilyHandle* _metadataColumnFamily; // not owned
+
+        const bool _isCapped;
+        const int64_t _cappedMaxSize;
+        const int64_t _cappedMaxDocs;
+        CappedDocumentDeleteCallback* _cappedDeleteCallback;
 
         uint64_t _nextIdNum;
         long long _dataSize;
