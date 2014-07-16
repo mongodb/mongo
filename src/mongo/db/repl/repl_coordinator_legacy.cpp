@@ -385,16 +385,13 @@ namespace {
             if (rid != getMyRID()) {
                 // TODO(spencer): Remove this invariant for backwards compatibility
                 invariant(!config.isEmpty());
-                std::string oplogNs = getReplicationMode() == modeReplSet?
-                        "local.oplog.rs" : "local.oplog.$main";
                 // This is what updates the progress information used for satisfying write concern
-                // and wakes up threads waiting for replication.  It also updates the tracking for
-                // maintaining local.slaves
-                if (!updateSlaveTracking(BSON("_id" << rid), config, oplogNs, ts)) {
+                // and wakes up threads waiting for replication.
+                if (!updateSlaveTracking(BSON("_id" << rid), config, ts)) {
                     return Status(ErrorCodes::NodeNotFound,
                                   str::stream() << "could not update node with _id: "
-                                  << config["_id"].Int()
-                                  << " because it cannot be found in current ReplSetConfig");
+                                          << config["_id"].Int()
+                                          << " because it cannot be found in current ReplSetConfig");
                 }
             }
 
@@ -403,7 +400,6 @@ namespace {
             LOG(2) << "Updating our knowledge of the replication progress for node with RID " <<
                     rid << " to be at optime " << ts;
             _slaveOpTimeMap[rid] = ts;
-
         }
 
         if (getReplicationMode() == modeReplSet && !getCurrentMemberState().primary()) {

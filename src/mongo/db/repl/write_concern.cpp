@@ -38,7 +38,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/util/background.h"
 #include "mongo/util/mongoutils/str.h"
 
 //#define REPLDEBUG(x) log() << "replBlock: "  << x << endl;
@@ -49,17 +48,15 @@ namespace repl {
 
     using namespace mongoutils;
 
-    class SlaveTracking : public BackgroundJob { // SERVER-4328 todo review
+    class SlaveTracking { // SERVER-4328 todo review
     public:
-        string name() const { return "SlaveTracking"; }
 
         struct Ident {
 
-            Ident(const BSONObj& r, const BSONObj& config, const string& n) {
+            Ident(const BSONObj& r, const BSONObj& config) {
                 BSONObjBuilder b;
                 b.appendElements( r );
                 b.append( "config" , config );
-                b.append( "ns" , n );
                 obj = b.obj();
             }
 
@@ -71,76 +68,24 @@ namespace repl {
         };
 
         SlaveTracking() : _mutex("SlaveTracking") {
-            _dirty = false;
-            _started = false;
-            _currentlyUpdatingCache = false;
-        }
-
-        void run() {
-            Client::initThread( "slaveTracking" );
-            cc().getAuthorizationSession()->grantInternalAuthorization();
-            while ( ! inShutdown() ) {
-                sleepsecs( 1 );
-
-                if ( ! _dirty )
-                    continue;
-
-                if ( inShutdown() )
-                    return;
-                
-                OperationContextImpl txn;
-
-                if ( lockedForWriting() ) {
-                    // note: there is still a race here
-                    // since we could call fsyncLock between this and the last lock
-                    RARELY log() << "can't update local.slaves because locked for writing" << endl;
-                    continue;
-                }
-
-                list< pair<BSONObj,BSONObj> > todo;
-
-                {
-                    scoped_lock mylk(_mutex);
-
-                    for ( map<Ident,OpTime>::iterator i=_slaves.begin(); i!=_slaves.end(); i++ ) {
-                        BSONObjBuilder temp;
-                        temp.appendTimestamp( "syncedTo" , i->second.asDate() );
-                        todo.push_back( pair<BSONObj,BSONObj>( i->first.obj.getOwned() ,
-                                                               BSON( "$set" << temp.obj() ).getOwned() ) );
-                    }
-                    _dirty = false;
-                }
-                
-                _currentlyUpdatingCache = true;
-                for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ) {
-                    DBDirectClient(&txn).update("local.slaves", i->first, i->second, true);
-                }
-                _currentlyUpdatingCache = false;
-
-                _threadsWaitingForReplication.notify_all();
-            }
         }
 
         void reset() {
-            if ( _currentlyUpdatingCache )
-                return;
             scoped_lock mylk(_mutex);
             _slaves.clear();
         }
 
-        bool update( const BSONObj& rid , const BSONObj config , const string& ns , OpTime last ) {
+        bool update(const BSONObj& rid, const BSONObj config, OpTime last) {
             REPLDEBUG( config << " " << rid << " " << ns << " " << last );
 
-            Ident ident(rid, config, ns);
+            Ident ident(rid, config);
 
             scoped_lock mylk(_mutex);
 
             if (last > _slaves[ident]) {
                 _slaves[ident] = last;
-                _dirty = true;
 
                 // update write concern tags if this node is primary
-                // TODO(spencer): Move this logic up into the ReplicationCoordinator
                 if (theReplSet && theReplSet->isPrimary()) {
                     const Member* mem = theReplSet->findById(ident.obj["config"]["_id"].Int());
                     if (!mem) {
@@ -148,12 +93,6 @@ namespace repl {
                     }
                     ReplSetConfig::MemberCfg cfg = mem->config();
                     cfg.updateGroups(last);
-                }
-
-                if ( ! _started ) {
-                    // start background thread here since we definitely need it
-                    _started = true;
-                    go();
                 }
 
                 _threadsWaitingForReplication.notify_all();
@@ -284,17 +223,13 @@ namespace repl {
         boost::condition _threadsWaitingForReplication;
 
         map<Ident,OpTime> _slaves;
-        bool _dirty;
-        bool _started;
-        bool _currentlyUpdatingCache; // this is not thread safe, but ok for our purposes
 
     } slaveTracking;
 
     bool updateSlaveTracking(const BSONObj& rid,
                              const BSONObj config,
-                             const string& ns,
                              OpTime last) {
-        return slaveTracking.update(rid, config, ns, last);
+        return slaveTracking.update(rid, config, last);
     }
 
     bool opReplicatedEnough( OpTime op , BSONElement w ) {
