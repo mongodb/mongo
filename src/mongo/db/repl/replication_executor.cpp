@@ -369,7 +369,12 @@ namespace {
             else if (_inShutdown) {
                 return std::make_pair(WorkItem(), CallbackHandle());
             }
-            _workAvailable.timed_wait(lk, waitFor);
+            if (waitFor.total_milliseconds() < 0) {
+                _workAvailable.wait(lk);
+            }
+            else {
+                _workAvailable.timed_wait(lk, waitFor);
+            }
         }
         const CallbackHandle cbHandle(_readyQueue.begin());
         const WorkItem work = *cbHandle._iter;
@@ -387,8 +392,8 @@ namespace {
         _readyQueue.splice(_readyQueue.end(), _sleepersQueue, _sleepersQueue.begin(), iter);
         _workAvailable.notify_all();
         if (iter == _sleepersQueue.end()) {
-            //return milliseconds::max();
-            return Milliseconds(std::numeric_limits<boost::int64_t>::max());
+            // indicate no sleeper to wait for
+            return Milliseconds(-1);
         }
         return Milliseconds(iter->readyDate - now);
     }

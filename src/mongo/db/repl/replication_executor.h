@@ -295,8 +295,9 @@ namespace repl {
         std::pair<WorkItem, CallbackHandle> getWork();
 
         /**
-         * Marks as runnable any sleepers whose ready date has passed and returns 0ms; or if there
-         * are none ready, returns the amount of time before the next sleeper will be ready.
+         * Marks as runnable any sleepers whose ready date has passed.
+         * Returns the amount of time before the next sleeper will be ready,
+         * or -1ms if there are no remaining sleepers. 
          */
         Milliseconds scheduleReadySleepers_inlock();
 
