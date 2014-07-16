@@ -40,8 +40,9 @@
 namespace mongo {
 
     OperationContextImpl::OperationContextImpl() {
-        invariant( globalStorageEngine );
-        _recovery.reset(globalStorageEngine->newRecoveryUnit(this));
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        invariant(storageEngine);
+        _recovery.reset(storageEngine->newRecoveryUnit(this));
 
         getGlobalEnvironment()->registerOperationContext(this);
     }

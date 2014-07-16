@@ -34,6 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {
@@ -48,6 +49,10 @@ namespace mongo {
         if (!_registeredOpContexts.empty()) {
             warning() << "Terminating with outstanding operation contexts." << endl;
         }
+    }
+
+    StorageEngine* GlobalEnvironmentMongoD::getGlobalStorageEngine() {
+        return globalStorageEngine;
     }
 
     namespace {

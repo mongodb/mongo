@@ -39,9 +39,10 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -105,7 +106,8 @@ namespace mongo {
 
     Status AuthzManagerExternalStateMongod::getAllDatabaseNames(
                 OperationContext* txn, std::vector<std::string>* dbnames) {
-        globalStorageEngine->listDatabases( dbnames );
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases(dbnames);
         return Status::OK();
     }
 

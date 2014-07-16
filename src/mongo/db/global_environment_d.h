@@ -42,6 +42,8 @@ namespace mongo {
 
         ~GlobalEnvironmentMongoD();
 
+        StorageEngine* getGlobalStorageEngine();
+
         void setKillAllOperations();
 
         void unsetKillAllOperations();

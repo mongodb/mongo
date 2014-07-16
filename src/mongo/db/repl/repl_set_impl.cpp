@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/commands/get_last_error.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
@@ -103,7 +104,8 @@ namespace repl {
 namespace {
     static void dropAllTempCollections(OperationContext* txn) {
         vector<string> dbNames;
-        globalStorageEngine->listDatabases( &dbNames );
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases( &dbNames );
 
         for (vector<string>::const_iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
             // The local db is special because it isn't replicated. It is cleared at startup even on
