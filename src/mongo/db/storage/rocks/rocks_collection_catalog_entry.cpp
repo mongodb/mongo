@@ -180,7 +180,7 @@ namespace mongo {
                                                      indexName );
 
         // Note: this invalidates cfh. Do not use after this call
-        _engine->removeColumnFamily( cfh );
+        _engine->removeColumnFamily( cfh, indexName, ns().ns() );
 
         return Status::OK();
     }

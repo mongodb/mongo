@@ -111,7 +111,8 @@ namespace mongo {
         /**
          * Completely removes a column family. Input pointer is invalid after calling
          */
-        void removeColumnFamily( rocksdb::ColumnFamilyHandle*& cfh );
+        void removeColumnFamily( rocksdb::ColumnFamilyHandle*& cfh, const StringData& indexName,
+                                            const StringData& ns );
 
         /**
          * Returns a ReadOptions object that uses the snapshot contained in opCtx

@@ -164,7 +164,7 @@ namespace mongo {
         invariant( order && "need an ordering to create a comparator for the index" );
 
         string fullName = ns.toString() + string("$") + indexName.toString();
-        rocksdb::ColumnFamilyHandle* cf;
+        rocksdb::ColumnFamilyHandle* cf = NULL;
 
         rocksdb::ColumnFamilyOptions options = rocksdb::ColumnFamilyOptions();
 
@@ -177,7 +177,14 @@ namespace mongo {
         return cf;
     }
 
-    void RocksEngine::removeColumnFamily( rocksdb::ColumnFamilyHandle*& cfh ) {
+    void RocksEngine::removeColumnFamily( rocksdb::ColumnFamilyHandle*& cfh,
+                                            const StringData& indexName,
+                                            const StringData& ns ) {
+        Map::const_iterator i = _map.find( ns );
+        if ( i != _map.end() ) {
+            shared_ptr<Entry> entry = i->second;
+            entry->indexNameToCF.erase(indexName);
+        }
         rocksdb::Status s = _db->DropColumnFamily( cfh );
         invariant( s.ok() );
         delete cfh;
