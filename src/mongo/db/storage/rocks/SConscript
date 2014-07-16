@@ -1,3 +1,5 @@
+# -*- mode: python; -*-
+
 Import("env")
 Import("has_option")
 
@@ -17,7 +19,7 @@ if has_option("rocksdb"):
         LIBDEPS= [
             '$BUILD_DIR/mongo/bson',
             '$BUILD_DIR/mongo/db/catalog/collection_options',
-            '$BUILD_DIR/mongo/db/structure/record_store',
+#            '$BUILD_DIR/mongo/db/structure/record_store',
             '$BUILD_DIR/mongo/foundation',
             '$BUILD_DIR/third_party/shim_snappy',
             ],

@@ -99,10 +99,6 @@ namespace mongo {
                 // don't know if I need this or not
             }
 
-            /**
-             * Always returns a value >= (key, loc), regardless of
-             * the direction of the iterator
-             */
             bool locate(const BSONObj& key, const DiskLoc& loc) {
                 _cached = false;
                 string keyData = RocksIndexEntry( key, loc ).asString();
@@ -112,7 +108,18 @@ namespace mongo {
                     return false;
                 _load();
 
-                return key.woCompare( _cachedKey, BSONObj(), false ) == 0;
+                bool compareResult = key.woCompare( _cachedKey, BSONObj(), false ) == 0;
+
+                // if we can't find the result and we have a reverse iterator, we need to move
+                // forward by one so we're at the first value greater than the what we were
+                // searching for, rather than the first value less than the value we were searching
+                // for
+                if ( !compareResult && !_forward() && !isEOF() ) {
+                    advance();
+                    invariant( !_cached );
+                }
+
+                return compareResult;
             }
 
             void advanceTo(const BSONObj &keyBegin,
@@ -137,15 +144,15 @@ namespace mongo {
                     return;
                 _load();
 
-                bool compareResult = key.woCompare( _cachedKey, BSONObj(), false );
+                bool compareResult = key.woCompare( _cachedKey, BSONObj(), false ) == 0;
 
                 // if we can't find the result and we have a reverse iterator, we need to move
                 // forward by one so we're at the first value greater than the what we were
                 // searching for, rather than the first value less than the value we were searching
                 // for
-                if ( !compareResult && !_forward() ) {
-                    _iterator->Next();
-                    _cached = false;
+                if ( !compareResult && !_forward() && !isEOF() ) {
+                    advance();
+                    invariant( !_cached );
                 }
             }
 
@@ -213,7 +220,11 @@ namespace mongo {
                     return;
                 }
 
+                // TODO why is this necessary?
                 _iterator->SeekToFirst();
+
+                // locate takes care of the case where the locate that we are "restoring" has
+                // already been deleted
                 locate( _savePositionObj, _savePositionLoc );
             }
 

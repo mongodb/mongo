@@ -53,8 +53,7 @@ namespace mongo {
 
     class RocksBtreeImpl : public SortedDataInterface {
     public:
-        RocksBtreeImpl( rocksdb::DB* db,
-                        rocksdb::ColumnFamilyHandle* cf );
+        RocksBtreeImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf );
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
                                                       bool dupsAllowed);
