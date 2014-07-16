@@ -49,6 +49,9 @@ libwiredtiger_leveldb_la_SOURCES = \
 if HAVE_BASHOLEVELDB
 libwiredtiger_leveldb_la_SOURCES += basho/perf_count.cc
 endif
+if HAVE_HYPERLEVELDB
+libwiredtiger_leveldb_la_SOURCES += hyper_wt.cc
+endif
 if HAVE_ROCKSDB
 libwiredtiger_leveldb_la_SOURCES += rocks_wt.cc rocksdb/write_batch.cc
 else
