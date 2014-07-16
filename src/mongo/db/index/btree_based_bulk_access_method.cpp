@@ -143,6 +143,9 @@ namespace mongo {
         builder.reset(_interface->getBulkBuilder(_txn, dupsAllowed));
 
         while (i->more()) {
+            if (mayInterrupt)
+                _txn->checkForInterrupt(/*heedMutex*/ false);
+
             // Get the next datum and add it to the builder.
             BSONObjExternalSorter::Data d = i->next();
             Status status = builder->addKey(d.first, d.second);

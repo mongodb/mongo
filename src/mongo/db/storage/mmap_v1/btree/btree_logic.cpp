@@ -41,6 +41,23 @@ namespace mongo {
 
     MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
 
+    // BtreeLogic::Builder algorithm
+    //
+    // Phase 1:
+    //   Handled by caller. Extracts keys from raw documents and puts them in external sorter
+    //
+    // Phase 2 (the addKeys phase):
+    //   Add all keys to buckets. When a bucket gets full, pop the highest key (setting the
+    //   nextChild pointer of the bucket to the prevChild of the popped key), add the popped key to
+    //   a parent bucket, and create a new right sibling bucket to add the new key to. If the parent
+    //   bucket is full, this same operation is performed on the parent and all full ancestors. If
+    //   we get to the root and it is full, a new root is created above the current root. When
+    //   creating a new right sibling, it is set as its parent's nextChild as all keys in the right
+    //   sibling will be higher than all keys currently in the parent.
+    //
+    // Phase 3 (the commit phase):
+    //   Does nothing. This may go away soon.
+
     //
     // Public Builder logic
     //
@@ -60,18 +77,19 @@ namespace mongo {
           _numAdded(0),
           _txn(txn) {
 
-        // XXX: Due to the way bulk building works, we may already have an empty root bucket that we
-        // must now dispose of. This isn't the case in some unit tests that use the Builder directly
-        // rather than going through an IndexAccessMethod.
-        DiskLoc oldHead = _logic->_headManager->getHead();
-        if (!oldHead.isNull()) {
-            _logic->_headManager->setHead(_txn, DiskLoc());
-            _logic->_recordStore->deleteRecord(_txn, oldHead);
+        // The normal bulk building path calls initAsEmpty, so we already have an empty root bucket.
+        // This isn't the case in some unit tests that use the Builder directly rather than going
+        // through an IndexAccessMethod.
+        _rightLeafLoc = _logic->_headManager->getHead();
+        if (_rightLeafLoc.isNull()) {
+            _rightLeafLoc = _logic->_addBucket(txn);
+            _logic->_headManager->setHead(_txn, _rightLeafLoc);
         }
 
-        _first = _cur = _logic->_addBucket(txn);
-        _b = _getModifiableBucket(_cur);
-        _committed = false;
+        _rightLeaf = _getModifiableBucket(_rightLeafLoc);
+
+        // must be empty when starting
+        invariant(_rightLeaf->n == 0);
     }
 
     template <class BtreeLayout>
@@ -101,10 +119,11 @@ namespace mongo {
             }
         }
 
-        if (!_logic->_pushBack(_b, loc, *key, DiskLoc())) {
-            // bucket was full
-            newBucket();
-            _logic->pushBack(_b, loc, *key, DiskLoc());
+        if (!_logic->_pushBack(_rightLeaf, loc, *key, DiskLoc())) {
+            // bucket was full, so split and try with the new node.
+            _rightLeafLoc = newBucket(_rightLeaf, _rightLeafLoc);
+            _rightLeaf = _getModifiableBucket(_rightLeafLoc);
+            _logic->pushBack(_rightLeaf, loc, *key, DiskLoc());
         }
 
         _keyLast = key;
@@ -115,8 +134,6 @@ namespace mongo {
 
     template <class BtreeLayout>
     unsigned long long BtreeLogic<BtreeLayout>::Builder::commit(bool mayInterrupt) {
-        buildNextLevel(_first, mayInterrupt);
-        _committed = true;
         return _numAdded;
     }
 
@@ -125,76 +142,54 @@ namespace mongo {
     //
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::Builder::newBucket() {
-        DiskLoc newBucketLoc = _logic->_addBucket(_txn);
-        _b->parent = newBucketLoc;
-        _cur = newBucketLoc;
-        _b = _getModifiableBucket(_cur);
-    }
+    DiskLoc BtreeLogic<BtreeLayout>::Builder::newBucket(BucketType* leftSib, DiskLoc leftSibLoc) {
+        invariant(leftSib->n >= 2); // Guaranteed by sufficiently small KeyMax.
 
-    template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::Builder::buildNextLevel(DiskLoc loc, bool mayInterrupt) {
-        for (;;) {
-            if (_getBucket(loc)->parent.isNull()) {
-                // only 1 bucket at this level. we are done.
-                _logic->_headManager->setHead(_txn, loc);
-                break;
-            }
+        if (leftSib->parent.isNull()) {
+            // Making a new root
+            invariant(leftSibLoc == _logic->_headManager->getHead());
+            const DiskLoc newRootLoc = _logic->_addBucket(_txn);
+            leftSib->parent = newRootLoc;
+            _logic->_headManager->setHead(_txn, newRootLoc);
 
-            DiskLoc upLoc = _logic->_addBucket(_txn);
-            DiskLoc upStart = upLoc;
-            BucketType* up = _getModifiableBucket(upLoc);
-
-            DiskLoc xloc = loc;
-            while (!xloc.isNull()) {
-                if (_txn->recoveryUnit()->commitIfNeeded()) {
-                    _b = _getModifiableBucket(_cur);
-                    up = _getModifiableBucket(upLoc);
-                }
-
-                if (mayInterrupt) {
-                    _txn->checkForInterrupt();
-                }
-
-                BucketType* x = _getModifiableBucket(xloc);
-                KeyDataType k;
-                DiskLoc r;
-                _logic->popBack(x, &r, &k);
-                bool keepX = (x->n != 0);
-                DiskLoc keepLoc = keepX ? xloc : x->nextChild;
-
-                if (!_logic->_pushBack(up, r, k, keepLoc)) {
-                    // current bucket full
-                    DiskLoc n = _logic->_addBucket(_txn);
-                    up->parent = n;
-                    upLoc = n;
-                    up = _getModifiableBucket(upLoc);
-                    _logic->pushBack(up, r, k, keepLoc);
-                }
-
-                DiskLoc nextLoc = x->parent;
-                if (keepX) {
-                    x->parent = upLoc;
-                }
-                else {
-                    if (!x->nextChild.isNull()) {
-                        DiskLoc ll = x->nextChild;
-                        _getModifiableBucket(ll)->parent = upLoc;
-                    }
-                    _logic->deallocBucket(_txn, x, xloc);
-                }
-                xloc = nextLoc;
-            }
-
-            loc = upStart;
-            mayCommitProgressDurably();
+            // Set the newRoot's nextChild to point to leftSib for the invariant below.
+            BucketType* newRoot = _getBucket(newRootLoc);
+            *_txn->recoveryUnit()->writing(&newRoot->nextChild) = leftSibLoc;
         }
+
+        DiskLoc parentLoc = leftSib->parent;
+        BucketType* parent = _getModifiableBucket(parentLoc);
+
+        // For the pushBack below to be correct, leftSib must be the right-most child of parent.
+        invariant(parent->nextChild == leftSibLoc);
+
+        // Pull right-most key out of leftSib and move to parent, splitting parent if necessary.
+        // Note that popBack() handles setting leftSib's nextChild to the former prevChildNode of
+        // the popped key.
+        KeyDataType key;
+        DiskLoc val;
+        _logic->popBack(leftSib, &val, &key);
+        if (!_logic->_pushBack(parent, val, key, leftSibLoc)) {
+            // parent is full, so split it.
+            parentLoc = newBucket(parent, parentLoc);
+            parent = _getModifiableBucket(parentLoc);
+            _logic->pushBack(parent, val, key, leftSibLoc);
+            leftSib->parent = parentLoc;
+        }
+
+        // Create a new bucket to the right of leftSib and set its parent pointer and the downward
+        // nextChild pointer from the parent.
+        DiskLoc newBucketLoc = _logic->_addBucket(_txn);
+        BucketType* newBucket = _getBucket(newBucketLoc);
+        *_txn->recoveryUnit()->writing(&newBucket->parent) = parentLoc;
+        *_txn->recoveryUnit()->writing(&parent->nextChild) = newBucketLoc;
+        return newBucketLoc;
     }
 
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::Builder::mayCommitProgressDurably() {
         if (_txn->recoveryUnit()->commitIfNeeded()) {
-            _b = _getModifiableBucket(_cur);
+            _rightLeaf = _getModifiableBucket(_rightLeafLoc);
         }
     }
 
@@ -342,13 +337,20 @@ namespace mongo {
     }
 
     /**
-     * Pull rightmost key from the bucket.  This version requires its right child to be null so it
-     * does not bother returning that value.
+     * Pull rightmost key from the bucket and set its prevChild pointer to be the nextChild for the
+     * whole bucket. It is assumed that caller already has the old value of the nextChild
+     * pointer and is about to add a pointer to it elsewhere in the tree.
+     *
+     * This is only used by BtreeLogic::Builder. Think very hard (and change this comment) before
+     * using it anywhere else.
+     *
+     * WARNING: The keyDataOut that is filled out by this function points to newly unalloced memory
+     * inside of this bucket. It only remains valid until the next write to this bucket.
      */
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::popBack(BucketType* bucket,
                                           DiskLoc* recordLocOut,
-                                          KeyDataType *keyDataOut) {
+                                          KeyDataType* keyDataOut) {
 
         massert(17435,  "n==0 in btree popBack()", bucket->n > 0 );
 
@@ -359,15 +361,13 @@ namespace mongo {
         keyDataOut->assign(kn.data);
         int keysize = kn.data.dataSize();
 
-        massert(17436, "rchild not null in btree popBack()", bucket->nextChild.isNull());
-
-        // Weirdly, we also put the rightmost down pointer in nextchild, even when bucket isn't
-        // full.
+        // The left/prev child of the node we are popping now goes in to the nextChild slot as all
+        // of its keys are greater than all remaining keys in this node.
         bucket->nextChild = kn.prevChildBucket;
         bucket->n--;
-        // This is risky because the key we are returning points to this unalloc'ed memory,
-        // and we are assuming that the last key points to the last allocated
-        // bson region.
+
+        // This is risky because the keyDataOut we filled out above will now point to this newly
+        // unalloced memory. 
         bucket->emptySize += sizeof(KeyHeaderType);
         _unalloc(bucket, keysize);
     }
