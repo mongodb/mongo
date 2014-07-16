@@ -1241,6 +1241,11 @@ def doConfigure(myenv):
         # primary mongo sources as well.
         AddToCCFLAGSIfSupported(myenv, "-Wno-unused-const-variable")
 
+        # Prevents warning about unused but set variables found in boost version 1.49
+        # in boost/date_time/format_date_parser.hpp which does not work for compilers
+        # GCC >= 4.6. Error explained in https://svn.boost.org/trac/boost/ticket/6136 .
+        AddToCCFLAGSIfSupported(myenv, "-Wno-unused-but-set-variable")
+
     # Check if we need to disable null-conversion warnings
     if using_clang():
         def CheckNullConversion(context):

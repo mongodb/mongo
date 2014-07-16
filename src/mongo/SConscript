@@ -254,6 +254,7 @@ env.CppUnitTest('hostandport_test', ['util/net/hostandport_test.cpp'],
 env.Library('network', [
             "util/net/sock.cpp",
             "util/net/socket_poll.cpp",
+            "util/net/ssl_expiration.cpp",
             "util/net/ssl_manager.cpp",
             "util/net/ssl_options.cpp",
             "util/net/httpclient.cpp",
