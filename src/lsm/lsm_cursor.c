@@ -365,6 +365,7 @@ static int
 __clsm_open_cursors(
     WT_CURSOR_LSM *clsm, int update, u_int start_chunk, uint32_t start_id)
 {
+	WT_BTREE *btree;
 	WT_CURSOR *c, **cp, *primary;
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
@@ -613,8 +614,17 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 	    chunk->switch_txn == WT_TXN_NONE) {
 		clsm->primary_chunk = chunk;
 		primary = clsm->cursors[clsm->nchunks - 1];
-		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)(primary))->btree,
-		    __wt_btree_evictable(session, 0));
+		/*
+		 * Disable eviction for the in-memory chunk.  Also clear the
+		 * bulk load flag here, otherwise eviction will be enabled by
+		 * the first update.
+		 */
+		btree = ((WT_CURSOR_BTREE *)(primary))->btree;
+		if (btree->bulk_load_ok) {
+			btree->bulk_load_ok = 0;
+			WT_WITH_BTREE(session, btree,
+			    __wt_btree_evictable(session, 0));
+		}
 	}
 
 	clsm->dsk_gen = lsm_tree->dsk_gen;
