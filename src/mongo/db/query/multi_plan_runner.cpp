@@ -29,6 +29,7 @@
 #include "mongo/db/query/multi_plan_runner.h"
 
 #include <algorithm>
+#include <math.h>
 #include <memory>
 
 #include "mongo/db/client.h"
@@ -398,6 +399,43 @@ namespace mongo {
                     _backupPlan->setYieldPolicy(_policy);
                     break;
                 }
+            }
+        }
+
+        // Logging for tied plans.
+        if (_ranking->tieForBest && NULL != _collection) {
+            // These arrays having two or more entries is implied by 'tieForBest'.
+            invariant(_ranking->scores.size() > 1);
+            invariant(_ranking->candidateOrder.size() > 1);
+
+            size_t winnerIdx = _ranking->candidateOrder[0];
+            size_t runnerUpIdx = _ranking->candidateOrder[1];
+
+            LOG(1) << "Winning plan tied with runner-up."
+                   << " ns: " << _collection->ns()
+                   << " " << _query->toStringShort()
+                   << " winner score: " << _ranking->scores[0]
+                   << " winner summary: "
+                   << getPlanSummary(*_candidates[winnerIdx].solution)
+                   << " runner-up score: " << _ranking->scores[1]
+                   << " runner-up summary: "
+                   << getPlanSummary(*_candidates[runnerUpIdx].solution);
+
+            // There could be more than a 2-way tie, so log the stats for the remaining plans
+            // involved in the tie.
+            static const double epsilon = 1e-10;
+            for (size_t i = 2; i < _ranking->scores.size(); i++) {
+                if (fabs(_ranking->scores[i] - _ranking->scores[0]) >= epsilon) {
+                    break;
+                }
+
+                size_t planIdx = _ranking->candidateOrder[i];
+
+                LOG(1) << "Plan " << i << " involved in multi-way tie."
+                       << " ns: " << _collection->ns()
+                       << " " << _query->toStringShort()
+                       << " score: " << _ranking->scores[i]
+                       << " summary: " << getPlanSummary(*_candidates[planIdx].solution);
             }
         }
 
