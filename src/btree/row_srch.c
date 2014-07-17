@@ -13,23 +13,19 @@
  */
 int
 __wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
-    WT_INSERT_HEAD *inshead, WT_ITEM *srch_key, int insert)
+    WT_ITEM *srch_key, int insert)
 {
 	WT_BTREE *btree;
 	WT_INSERT **insp, *last_ins, *ret_ins;
+	WT_INSERT_HEAD *inshead;
 	WT_ITEM key;
 	size_t match, skiphigh, skiplow;
 	int cmp, i;
 
 	btree = S2BT(session);
 
-	/* If there's no insert chain to search, we're done. */
-	if ((ret_ins = WT_SKIP_LAST(inshead)) == NULL) {
-		cbt->ins = NULL;
-		cbt->next_stack[0] = NULL;
-		return (0);
-	}
-
+	inshead = cbt->ins_head;
+	ret_ins = WT_SKIP_LAST(inshead);
 	key.data = WT_INSERT_KEY(ret_ins);
 	key.size = WT_INSERT_KEY_SIZE(ret_ins);
 
@@ -362,8 +358,11 @@ leaf_match:	cbt->compare = 0;
 
 		cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 	}
-	WT_ERR(
-	    __wt_search_insert(session, cbt, cbt->ins_head, srch_key, insert));
+	if (WT_SKIP_FIRST(cbt->ins_head) == NULL) {
+		cbt->ins = NULL;
+		cbt->next_stack[0] = NULL;
+	} else
+		WT_ERR(__wt_search_insert(session, cbt, srch_key, insert));
 	return (0);
 
 err:	WT_TRET(__wt_page_release(session, child));

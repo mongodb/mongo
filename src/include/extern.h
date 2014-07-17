@@ -510,7 +510,6 @@ extern void __wt_update_obsolete_free( WT_SESSION_IMPL *session,
     WT_UPDATE *upd);
 extern int __wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
-    WT_INSERT_HEAD *inshead,
     WT_ITEM *srch_key,
     int insert);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
