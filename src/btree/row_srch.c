@@ -8,18 +8,18 @@
 #include "wt_internal.h"
 
 /*
- * __wt_search_insert --
- *	Search a row-store insert list, creating a skiplist stack as we go.
+ * __wt_search_insert_append --
+ *	Fast append search of a row-store insert list, creating a skiplist stack
+ * as we go.
  */
-int
-__wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
-    WT_ITEM *srch_key, int insert)
+static inline int
+__wt_search_insert_append(WT_SESSION_IMPL *session,
+    WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, int *appendp)
 {
 	WT_BTREE *btree;
-	WT_INSERT **insp, *last_ins, *ret_ins;
+	WT_INSERT *ret_ins;
 	WT_INSERT_HEAD *inshead;
 	WT_ITEM key;
-	size_t match, skiphigh, skiplow;
 	int cmp, i;
 
 	btree = S2BT(session);
@@ -29,15 +29,8 @@ __wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	key.data = WT_INSERT_KEY(ret_ins);
 	key.size = WT_INSERT_KEY_SIZE(ret_ins);
 
-	/* Fast-path appends. */
-	cmp = -1;
-	if (insert)
-		WT_RET(WT_LEX_CMP(
-		    session, btree->collator, srch_key, &key, cmp));
+	WT_RET(WT_LEX_CMP(session, btree->collator, srch_key, &key, cmp));
 	if (cmp >= 0) {
-		if (btree->appending == 0)
-			btree->appending = 1;
-
 		/*
 		 * !!!
 		 * We may race with another appending thread.
@@ -56,8 +49,30 @@ __wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		}
 		cbt->compare = -cmp;
 		cbt->ins = ret_ins;
-		return (0);
-	}
+		*appendp = 1;
+	} else
+		*appendp = 0;
+	return (0);
+}
+
+/*
+ * __wt_search_insert --
+ *	Search a row-store insert list, creating a skiplist stack as we go.
+ */
+int
+__wt_search_insert(
+    WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key)
+{
+	WT_BTREE *btree;
+	WT_INSERT **insp, *last_ins, *ret_ins;
+	WT_INSERT_HEAD *inshead;
+	WT_ITEM key;
+	size_t match, skiphigh, skiplow;
+	int cmp, i;
+
+	btree = S2BT(session);
+	inshead = cbt->ins_head;
+	cmp = 0;				/* -Wuninitialized */
 
 	/*
 	 * The insert list is a skip list: start at the highest skip level, then
@@ -125,7 +140,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	WT_ROW *rip;
 	size_t match, skiphigh, skiplow;
 	uint32_t base, indx, limit;
-	int cmp, depth;
+	int append, cmp, depth;
 
 	btree = S2BT(session);
 	item = &cbt->search_key;
@@ -361,8 +376,24 @@ leaf_match:	cbt->compare = 0;
 	if (WT_SKIP_FIRST(cbt->ins_head) == NULL) {
 		cbt->ins = NULL;
 		cbt->next_stack[0] = NULL;
-	} else
-		WT_ERR(__wt_search_insert(session, cbt, srch_key, insert));
+	} else {
+		append = 0;
+		if (insert && btree->appending)
+			WT_ERR(__wt_search_insert_append(
+			    session, cbt, srch_key, &append));
+		if (!append) {
+			WT_ERR(__wt_search_insert(session, cbt, srch_key));
+			append =
+			    cbt->compare == -1 && base == page->pg_row_entries;
+		}
+		if (append) {
+			if (!btree->appending)
+				btree->appending = 1;
+		} else {
+			if (btree->appending)
+				btree->appending = 0;
+		}
+	}
 	return (0);
 
 err:	WT_TRET(__wt_page_release(session, child));
