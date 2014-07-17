@@ -692,17 +692,9 @@ namespace mongo {
 
         long long numSystemIndexesEntries = 0;
         {
-            Collection* systemIndexes =
-                _collection->_database->getCollection( txn, _collection->_database->_indexesName );
-            if ( systemIndexes ) {
-                EqualityMatchExpression expr;
-                BSONObj nsBSON = BSON( "ns" << _collection->ns() );
-                invariant( expr.init( "ns", nsBSON.firstElement() ).isOK() );
-                numSystemIndexesEntries = systemIndexes->countTableScan( txn, &expr );
-            }
-            else {
-                // this is ok, 0 is the right number
-            }
+            vector<string> indexNames;
+            _collection->getCatalogEntry()->getAllIndexes( &indexNames );
+            numSystemIndexesEntries = indexNames.size();
         }
 
         if ( haveIdIndex ) {
