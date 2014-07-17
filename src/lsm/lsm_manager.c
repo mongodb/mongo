@@ -69,8 +69,7 @@ __lsm_worker_manager(void *arg)
 	conn = S2C(session);
 	manager = &conn->lsm_manager;
 
-	WT_ASSERT(session, manager->lsm_workers == 0);
-	manager->lsm_workers = 1; /* We are the first worker */
+	WT_ASSERT(session, manager->lsm_workers == 1);
 
 	/* Setup the spin locks for the queues. */
 	WT_ERR(__wt_spin_init(

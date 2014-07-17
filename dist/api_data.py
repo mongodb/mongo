@@ -343,7 +343,7 @@ connection_runtime_config = [
 	Config('eviction_workers', '0', r'''
 	    additional threads to help evict pages from cache''',
 	    min=0, max=20),
-	Config('lsm', '', r'''
+	Config('lsm_manager', '', r'''
 	    configure database wide options for LSM tree management.''',
 	    type='category', subconfig=[
 	    Config('worker_thread_max', '4', r'''
