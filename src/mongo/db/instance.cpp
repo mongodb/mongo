@@ -997,11 +997,10 @@ namespace {
     }
 
 
-    mongo::mutex exitMutex("exit");
-    AtomicUInt numExitCalls = 0;
+    static AtomicUInt32 shutdownInProgress(0);
 
     bool inShutdown() {
-        return numExitCalls > 0;
+        return shutdownInProgress.load() != 0;
     }
 
     static void shutdownServer(OperationContext* txn) {
@@ -1022,6 +1021,8 @@ namespace {
     }
 
     void exitCleanly( ExitCode code ) {
+        shutdownInProgress.store(1);
+
         getGlobalEnvironment()->setKillAllOperations();
 
         repl::getGlobalReplicationCoordinator()->shutdown();
@@ -1051,22 +1052,10 @@ namespace {
         dbexit( code );
     }
 
-    /* not using log() herein in case we are already locked */
     NOINLINE_DECL void dbexit( ExitCode rc, const char *why ) {
         flushForGcov();
 
         audit::logShutdown(currentClient.get());
-        {
-            scoped_lock lk( exitMutex );
-            if ( numExitCalls++ > 0 ) {
-                if ( numExitCalls > 5 ) {
-                    // this means something horrible has happened
-                    ::_exit( rc );
-                }
-                log() << "dbexit: " << why << "; exiting immediately";
-                ::_exit( rc );
-            }
-        }
 
         log() << "dbexit: " << why;
 
@@ -1085,7 +1074,7 @@ namespace {
             return;
         }
 #endif
-        log() << "dbexit: really exiting now";
+
         ::_exit(rc);
     }
 
