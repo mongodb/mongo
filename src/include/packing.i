@@ -282,7 +282,7 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 	case 'r':
 		return (__wt_vsize_uint(pv->u.u));
 	case 'R':
-		return (sizeof (uint64_t));
+		return (sizeof(uint64_t));
 	}
 
 	__wt_err(session, EINVAL, "unknown pack-value type: %c", (int)pv->type);
@@ -377,7 +377,7 @@ __pack_write(
 		WT_RET(__wt_vpack_uint(pp, maxlen, pv->u.u));
 		break;
 	case 'R':
-		WT_SIZE_CHECK(sizeof (uint64_t), maxlen);
+		WT_SIZE_CHECK(sizeof(uint64_t), maxlen);
 		*(uint64_t *)*pp = pv->u.u;
 		*pp += sizeof(uint64_t);
 		break;
@@ -454,7 +454,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 		WT_RET(__wt_vunpack_uint(pp, maxlen, &pv->u.u));
 		break;
 	case 'R':
-		WT_SIZE_CHECK(sizeof (uint64_t), maxlen);
+		WT_SIZE_CHECK(sizeof(uint64_t), maxlen);
 		pv->u.u = *(uint64_t *)*pp;
 		*pp += sizeof(uint64_t);
 		break;
