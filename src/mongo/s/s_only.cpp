@@ -17,6 +17,7 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/client/dbclient_rs.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
@@ -25,6 +26,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/matcher.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
@@ -36,6 +38,14 @@
 
  */
 namespace mongo {
+
+    // Temporary hack for v2.6
+    static ExportedServerParameter<int>
+    reevaluatePerSecParam(ServerParameterSet::getGlobal(),
+                          "internalDBClientRSReselectNodePercentage",
+                          &DBClientReplicaSet::reevaluatePercentage,
+                          true,
+                          true /* ok to change at runtime */);
 
     void* remapPrivateView(void *oldPrivateAddr) {
         log() << "remapPrivateView called in mongos, aborting" << endl;

@@ -144,9 +144,15 @@ namespace {
     // --------------------------------
 
     const size_t DBClientReplicaSet::MAX_RETRY = 3;
+    int DBClientReplicaSet::reevaluatePercentage = 0;
 
-    DBClientReplicaSet::DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout )
-        : _setName( name ), _so_timeout( so_timeout ) {
+    DBClientReplicaSet::DBClientReplicaSet(
+            const string& name,
+            const vector<HostAndPort>& servers,
+            double so_timeout):
+                _setName(name),
+                _so_timeout(so_timeout),
+                _nodeSelectOracle(static_cast<int64_t>(time(0))) {
         ReplicaSetMonitor::createIfNeeded( name, set<HostAndPort>(servers.begin(), servers.end()) );
     }
 
@@ -647,7 +653,7 @@ namespace {
 
     DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
             shared_ptr<ReadPreferenceSetting> readPref) {
-        if (checkLastHost(readPref.get())) {
+        if (!shouldReevaluate() && checkLastHost(readPref.get())) {
 
             LOG( 3 ) << "dbclient_rs selecting compatible last used node " << _lastSlaveOkHost
                                 << endl;
@@ -971,6 +977,14 @@ namespace {
         _getMonitor()->failedHost(_lastSlaveOkHost);
         _lastSlaveOkHost = HostAndPort();
         _lastSlaveOkConn.reset();
+    }
+
+    bool DBClientReplicaSet::shouldReevaluate() {
+        if (_nodeSelectOracle.nextInt32(100) < reevaluatePercentage) {
+            return true;
+        }
+
+        return false;
     }
 
     // trying to optimize for the common dont-care-about-tags case.

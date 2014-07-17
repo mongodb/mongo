@@ -22,6 +22,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/export_macros.h"
+#include "mongo/platform/random.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -44,6 +45,12 @@ namespace mongo {
         using DBClientBase::query;
         using DBClientBase::update;
         using DBClientBase::remove;
+
+        // For internal use only. The desired probability for reevaluating node
+        // selection given a read preference, expressed in percentage. Any value
+        // less than 0 will be treated as 0% and any value greater than 100 will
+        // be treated as 100%.
+        static int reevaluatePercentage;
 
         /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet connections. */
         DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout=0 );
@@ -212,6 +219,13 @@ namespace mongo {
         // Throws a DBException if the monitor doesn't exist and there isn't a cached seed to use.
         ReplicaSetMonitorPtr _getMonitor() const;
 
+        /**
+         * Returns true if this connection should re-evaluate the node selection for
+         * a given read preference, regardless of it's compatibility with the currently
+         * cached connection.
+         */
+        bool shouldReevaluate();
+
         string _setName;
 
         HostAndPort _masterHost;
@@ -236,6 +250,11 @@ namespace mongo {
         // this could be a security issue, as the password is stored in memory
         // not sure if/how we should handle
         std::map<string, BSONObj> _auths; // dbName -> auth parameters
+
+        // For v2.6 only.
+        // Random generator to be used to determine whether this connection object
+        // should re-evaluate node selection from scratch.
+        PseudoRandom _nodeSelectOracle;
 
     protected:
 
