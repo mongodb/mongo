@@ -46,10 +46,7 @@ namespace mongo {
                                                            const CollectionCatalogEntry* collection,
                                                            IndexCatalogEntry* index ) {
         const IndexDescriptor* desc = index->descriptor();
-        const string& type = desc->getAccessMethodName();
         const boost::optional<Ordering> order( Ordering::make( desc->keyPattern() ) );
-
-        invariant( type == "" ); // temp
 
         rocksdb::ColumnFamilyHandle* cf = _engine->getIndexColumnFamily( collection->ns().ns(),
                                                                          desc->indexName(),
