@@ -90,7 +90,8 @@ namespace repl {
                                               Status* result);
 
         // update internal state with heartbeat response
-        virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
+        HeartbeatResultAction updateHeartbeatInfo(Date_t now,
+                                              const HeartbeatInfo& newInfo);
 
         // produce a reply to a status request
         virtual void prepareStatusResponse(Date_t now,
@@ -105,6 +106,9 @@ namespace repl {
 
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn);
+
+        // called with new config; notifies all on change
+        void updateConfig(const ReplicaSetConfig newConfig, const int selfId);
 
     private:
 

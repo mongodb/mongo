@@ -247,7 +247,6 @@ namespace repl {
                                                              std::string& errmsg,
                                                              BSONObjBuilder& result) {
 
-        //TODO: after eric's checkin, add executer stuff and error if cancelled
         string who = cmdObj["who"].String();
         int cfgver = cmdObj["cfgver"].Int();
         OpTime opTime(cmdObj["opTime"].Date());
@@ -540,8 +539,9 @@ namespace repl {
     }
 
     // update internal state with heartbeat response, and run topology checks
-    void TopologyCoordinatorImpl::updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo) {
-
+    HeartbeatResultAction TopologyCoordinatorImpl::updateHeartbeatInfo(
+                                                        Date_t now,
+                                                        const HeartbeatInfo& newInfo) {
         // Fill in the new heartbeat data for the appropriate member
         for (Member *m = _otherMembers.head(); m; m=m->next()) {
             if (m->id() == newInfo.id()) {
@@ -551,7 +551,7 @@ namespace repl {
         }
 
         // Don't bother to make any changes if we are an election candidate
-        if (_busyWithElectSelf) return;
+        if (_busyWithElectSelf) return None;
 
         // ex-checkelectableset begins here
         unsigned int latestOp = _latestKnownOpTime().getSecs();
@@ -585,12 +585,14 @@ namespace repl {
                 (latestOp - highestPriority->hbinfo().opTime.getSecs()) << " seconds behind";
 
             // Are we primary?
+            // TODO: remove isSefl check
             if (isSelf(primary->h())) {
                 // replSetStepDown tries to acquire the same lock
                 // msgCheckNewState takes, so we can't call replSetStepDown on
                 // ourselves.
                 // XXX Eric: schedule relinquish
                 //rs->relinquish();
+                return StepDown;
             }
             else {
                 // We are not primary.  Step down the remote node.
@@ -611,6 +613,7 @@ namespace repl {
                 }
 
 */
+                return StepDown;
             }
         }
 
@@ -641,6 +644,8 @@ namespace repl {
                     log() << "auth problems, relinquishing primary" << rsLog;
                     // XXX Eric: schedule relinquish
                     //rs->relinquish();
+
+                    return StepDown;
                 }
 
                 _blockSync = true;
@@ -672,7 +677,7 @@ namespace repl {
                     if( remotePrimary ) {
                         /* two other nodes think they are primary (asynchronously polled) -- wait for things to settle down. */
                         log() << "replSet info two primaries (transiently)" << rsLog;
-                        return;
+                        return None;
                     }
                     remotePrimary = m;
                 }
@@ -682,7 +687,7 @@ namespace repl {
             if (remotePrimary) {
                 // If it's the same as last time, don't do anything further.
                 if (_currentPrimary == remotePrimary) {
-                    return;
+                    return None;
                 }
                 // Clear last heartbeat message on ourselves (why?)
                 _self->lhb() = "";
@@ -690,7 +695,7 @@ namespace repl {
                 // insanity: this is what actually puts arbiters into ARBITER state
                 if (_currentConfig.self->arbiterOnly) {
                     _changeMemberState(MemberState::RS_ARBITER);
-                    return;
+                    return None;
                 }
 
                 // If we are also primary, this is a problem.  Determine who should step down.
@@ -704,17 +709,18 @@ namespace repl {
                         // XXX Eric: schedule a relinquish
                         //rs->relinquish();
                         // after completion, set currentprimary to remotePrimary.
+                        return StepDown;
                     }
                     else {
                         // else, stick around
                         log() << "another PRIMARY detected but it should step down"
                             " since it was elected earlier than me";
-                        return;
+                        return None;
                     }
                 }
 
                 _currentPrimary = remotePrimary;
-                return;
+                return None;
             }
             /* didn't find anyone who is currently primary */
         }
@@ -729,9 +735,11 @@ namespace repl {
                 log() << "can't see a majority of the set, relinquishing primary" << rsLog;
                 // XXX Eric: schedule a relinquish
                 //rs->relinquish();
+                return StepDown;
+
             }
 
-            return;
+            return None;
         }
 
         // At this point, there is no primary anywhere.  Check to see if we should become an
@@ -743,7 +751,7 @@ namespace repl {
             && (_stepDownUntil <= now)              // stepDown timer has expired
             && (_memberState == MemberState::RS_SECONDARY)) {
             OCCASIONALLY log() << "replSet I don't see a primary and I can't elect myself";
-            return;
+            return None;
         }
 
         // If we can't see a majority, can't become a candidate.
@@ -755,20 +763,21 @@ namespace repl {
             if( last + 60 > now ) ll++;
             LOG(ll) << "replSet can't see a majority, will not try to elect self" << rsLog;
             last = now;
-            return;
+            return None;
         }
 
         // If we can't elect ourselves due to the current electable set;
         // we are in the set if we are within 10 seconds of the latest known op (via heartbeats)
         if (!(_electableSet.find(_self->id()) != _electableSet.end())) {
             // we are too far behind to become primary
-            return;
+            return None;
         }
 
         // All checks passed, become a candidate and start election proceedings.
 
         // don't try to do further elections & such while we are already working on one.
         _busyWithElectSelf = true; 
+        return StartElection;
 
     // XXX: schedule an election
 /*
@@ -787,6 +796,7 @@ namespace repl {
 
 */
         _busyWithElectSelf = false;
+        return None;
     }
 
     bool TopologyCoordinatorImpl::_shouldRelinquish() const {
@@ -1015,6 +1025,9 @@ namespace repl {
                 log() << "replSet info received freeze command but we are primary" << rsLog;
             }
         }
+    }
+
+    void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig newConfig, const int selfId) {
     }
 } // namespace repl
 } // namespace mongo

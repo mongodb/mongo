@@ -154,6 +154,15 @@ namespace repl {
         // Called by the TopologyCoordinator whenever the replica set configuration is updated
         void setCurrentReplicaSetConfig(const TopologyCoordinator::ReplicaSetConfig& newConfig);
 
+        /**
+         * Does a heartbeat for a member of the replica set.
+         * Should be started during (re)configuration or in the heartbeat callback only.
+         */
+        void doMemberHeartbeat(ReplicationExecutor* executor,
+                               const Status& inStatus,
+                               const HostAndPort& hap);
+        void cancelHeartbeats();
+
     private:
 
         // Struct that holds information about clients waiting for replication
@@ -165,6 +174,32 @@ namespace repl {
         bool _opReplicatedEnough_inlock(const OpTime& opTime,
                                         const WriteConcernOptions& writeConcern);
 
+        /**
+         * Processes each heartbeat response.
+         * Also responsible for scheduling additional heartbeats within the timeout if they error,
+         * and on success.
+         */
+        void _handleHeartbeatResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData,
+                                      StatusWith<BSONObj>* outStatus,
+                                      const HostAndPort& hap,
+                                      Date_t firstCallDate,
+                                      int retriesLeft);
+
+        void _trackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle) {
+            // this mutex should not be needed because it is always used during a callback.
+            // boost::mutex::scoped_lock lock(_mutex);
+            _heartbeatHandles.push_back(handle);
+        }
+
+        void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle) {
+            // this mutex should not be needed because it is always used during a callback.
+            // boost::mutex::scoped_lock lock(_mutex);
+            // TODO
+        }
+
+        // Handles to actively queued heartbeats
+        typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
+        HeartbeatHandles _heartbeatHandles;
 
         // Protects all member data of this ReplicationCoordinator
         mutable boost::mutex _mutex;

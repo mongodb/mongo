@@ -82,7 +82,13 @@ namespace repl {
                                                         BSONObjBuilder& result) {
     }
 
-    void TopologyCoordinatorMock::updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo) {}
+    HeartbeatResultAction TopologyCoordinatorMock::updateHeartbeatInfo(Date_t now,
+                                                                   const HeartbeatInfo& newInfo) {
+        return None;
+    }
+
+    void TopologyCoordinatorMock::updateConfig(const ReplicaSetConfig newConfig, const int selfId) {
+    }
 
 } // namespace repl
 } // namespace mongo

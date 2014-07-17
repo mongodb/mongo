@@ -72,7 +72,7 @@ namespace repl {
                                               BSONObjBuilder* resultObj,
                                               Status* result);
 
-        virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
+        virtual HeartbeatResultAction updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
 
         virtual void prepareStatusResponse(Date_t now,
                                            const BSONObj& cmdObj,
@@ -84,6 +84,8 @@ namespace repl {
                                            BSONObjBuilder& result);
 
         virtual void relinquishPrimary(OperationContext* txn);
+
+        virtual void updateConfig(const ReplicaSetConfig newConfig, const int selfId);
 
     };
 

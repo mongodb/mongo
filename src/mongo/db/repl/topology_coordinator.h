@@ -49,6 +49,15 @@ namespace repl {
     class TagSubgroup;
 
     /**
+     * Actions taken based on heartbeat responses
+     */
+    enum HeartbeatResultAction {
+        StepDown,
+        StartElection,
+        None
+    };
+
+    /**
      * Replication Topology Coordinator interface.
      *
      * This object is responsible for managing the topology of the cluster.
@@ -155,7 +164,8 @@ namespace repl {
                                               Status* result) = 0;
 
         // update internal state with heartbeat response
-        virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo) = 0;
+        virtual HeartbeatResultAction updateHeartbeatInfo(Date_t now,
+                                                          const HeartbeatInfo& newInfo) = 0;
 
         // produce a reply to a status request
         virtual void prepareStatusResponse(Date_t now,
@@ -170,6 +180,10 @@ namespace repl {
 
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn) = 0;
+
+        // called with new config; notifies all on change
+        virtual void updateConfig(const ReplicaSetConfig newConfig, const int selfId) = 0;
+
     protected:
         TopologyCoordinator() {}
     };
