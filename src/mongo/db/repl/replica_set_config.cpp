@@ -384,5 +384,52 @@ namespace {
         _majorityNumber = (strictMajority > nonArbiters) ? nonArbiters : strictMajority;
     }
 
+    BSONObj ReplicaSetConfig::toBSON() const {
+        BSONObjBuilder configBuilder;
+        configBuilder.append("_id", _replSetName);
+        configBuilder.append("version", _version);
+
+        BSONArrayBuilder members(configBuilder.subarrayStart("members"));
+        for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
+            members.append(mem->toBSON(getTagConfig()));
+        }
+        members.done();
+
+        BSONObjBuilder settingsBuilder(configBuilder.subobjStart("settings"));
+        settingsBuilder.append("chainingAllowed", _chainingAllowed);
+        settingsBuilder.append("heartbeatTimeoutSecs", _heartbeatTimeoutPeriod.total_seconds());
+
+        BSONObjBuilder gleModes(settingsBuilder.subobjStart("getLastErrorModes"));
+        for (StringMap<ReplicaSetTagPattern>::const_iterator mode =
+                    _customWriteConcernModes.begin();
+                mode != _customWriteConcernModes.end();
+                ++mode) {
+            BSONObjBuilder modeBuilder(gleModes.subobjStart(mode->first));
+            for (ReplicaSetTagPattern::ConstraintIterator itr = mode->second.constraintsBegin();
+                    itr != mode->second.constraintsEnd();
+                    itr++) {
+                modeBuilder.append(_tagConfig.getTagKey(ReplicaSetTag(itr->getKeyIndex(), 0)),
+                                   itr->getMinCount());
+            }
+            modeBuilder.done();
+        }
+        gleModes.done();
+
+        settingsBuilder.append("getLastErrorDefaults", _defaultWriteConcern.toBSON());
+        settingsBuilder.done();
+        return configBuilder.obj();
+    }
+
+     std::vector<std::string> ReplicaSetConfig::getWriteConcernNames() const {
+        std::vector<std::string> names;
+        for (StringMap<ReplicaSetTagPattern>::const_iterator mode =
+                    _customWriteConcernModes.begin();
+                mode != _customWriteConcernModes.end();
+                ++mode) {
+            names.push_back(mode->first);
+        }
+        return names;
+     }
+
 }  // namespace repl
 }  // namespace mongo

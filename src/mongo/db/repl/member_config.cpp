@@ -252,6 +252,27 @@ namespace {
         return Status::OK();
     }
 
+    BSONObj MemberConfig::toBSON(const ReplicaSetTagConfig& tagConfig) const {
+        BSONObjBuilder configBuilder;
+        configBuilder.append("_id", _id);
+        configBuilder.append("host", _host.toString());
+        configBuilder.append("arbiterOnly", _arbiterOnly);
+        configBuilder.append("buildIndexes", _buildIndexes);
+        configBuilder.append("hidden", _hidden);
+        configBuilder.append("priority", _priority);
+
+        BSONObjBuilder tags(configBuilder.subobjStart("tags"));
+        for (std::vector<ReplicaSetTag>::const_iterator tag = _tags.begin();
+                tag != _tags.end();
+                tag++) {
+            tags.append(tagConfig.getTagKey(*tag), tagConfig.getTagValue(*tag));
+        }
+        tags.done();
+
+        configBuilder.append("slaveDelay", _slaveDelay.total_seconds());
+        configBuilder.append("votes", _isVoter? 1 : 0);
+        return configBuilder.obj();
+    }
 
 }  // namespace repl
 }  // namespace mongo

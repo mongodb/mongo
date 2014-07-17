@@ -368,6 +368,162 @@ namespace {
         ASSERT_OK(config.findCustomWriteMode("frim").getStatus());
     }
 
+    bool operator==(const MemberConfig& a, const MemberConfig& b) {
+        // do tag comparisons
+        for (MemberConfig::TagIterator itrA = a.tagsBegin(); itrA != a.tagsEnd(); ++itrA) {
+            if (std::find(b.tagsBegin(), b.tagsEnd(), *itrA) == b.tagsEnd()) {
+                return false;
+            }
+        }
+        return a.getId() == b.getId() &&
+                a.getHostAndPort() == b.getHostAndPort() &&
+                a.getPriority() == b.getPriority() &&
+                a.getSlaveDelay() == b.getSlaveDelay() &&
+                a.isVoter() == b.isVoter() &&
+                a.isArbiter() == b.isArbiter() &&
+                a.isHidden() == b.isHidden() &&
+                a.shouldBuildIndexes() == b.shouldBuildIndexes() &&
+                a.getNumTags() == b.getNumTags();
+    }
+
+    bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
+        // compare WriteConcernModes
+        std::vector<std::string> modeNames = a.getWriteConcernNames();
+        for (std::vector<std::string>::iterator it = modeNames.begin();
+                it != modeNames.end();
+                it++) {
+            ReplicaSetTagPattern patternA = a.findCustomWriteMode(*it).getValue();
+            ReplicaSetTagPattern patternB = b.findCustomWriteMode(*it).getValue();
+            for (ReplicaSetTagPattern::ConstraintIterator itrA = patternA.constraintsBegin();
+                    itrA != patternA.constraintsEnd();
+                    itrA++) {
+                bool same = false;
+                for (ReplicaSetTagPattern::ConstraintIterator itrB = patternB.constraintsBegin();
+                        itrB != patternB.constraintsEnd();
+                        itrB++) {
+                    if (itrA->getKeyIndex() == itrB->getKeyIndex() &&
+                            itrA->getMinCount() == itrB->getMinCount()) {
+                        same = true;
+                        break;
+                    }
+                }
+                if (!same) {
+                    return false;
+                }
+            }
+        }
+
+        // compare the members
+        for (ReplicaSetConfig::MemberIterator memA = a.membersBegin();
+                memA != a.membersEnd();
+                memA++) {
+            bool same = false;
+            for (ReplicaSetConfig::MemberIterator memB = b.membersBegin();
+                    memB != b.membersEnd();
+                    memB++) {
+                if (*memA == *memB) {
+                    same = true;
+                    break;
+                }
+            }
+            if (!same) {
+                return false;
+            }
+        }
+
+        // simple comparisons
+        return a.getReplSetName() == b.getReplSetName() &&
+                a.getConfigVersion() == b.getConfigVersion() &&
+                a.getNumMembers() == b.getNumMembers() &&
+                a.getHeartbeatTimeoutPeriod() == b.getHeartbeatTimeoutPeriod() &&
+                a.getMajorityNumber() == b.getMajorityNumber() &&
+                a.isChainingAllowed() == b.isChainingAllowed() &&
+                a.getDefaultWriteConcern().wNumNodes == b.getDefaultWriteConcern().wNumNodes &&
+                a.getDefaultWriteConcern().wMode == b.getDefaultWriteConcern().wMode;
+    }
+
+    TEST(ReplicaSetConfig, toBSONRoundTripAbility) {
+        ReplicaSetConfig configA;
+        ReplicaSetConfig configB;
+        ASSERT_OK(configA.initialize(
+                          BSON("_id" << "rs0" <<
+                               "version" << 1 <<
+                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                            "host" << "localhost:12345")) <<
+                               "settings" << BSON("heartbeatTimeoutSecs" << 20))));
+        ASSERT_OK(configB.initialize(configA.toBSON()));
+        ASSERT_TRUE(configA == configB);
+    }
+
+    TEST(ReplicaSetConfig, toBSONRoundTripAbilityLarge) {
+        ReplicaSetConfig configA;
+        ReplicaSetConfig configB;
+        ASSERT_OK(configA.initialize(
+                BSON("_id" << "asdf"
+                  << "version" << 9
+                  << "members" << BSON_ARRAY(
+                          BSON("_id" << 0
+                            << "host" << "localhost:12345"
+                            << "arbiterOnly" << true
+                            << "votes" << 1
+                          ) <<
+                          BSON("_id" << 3
+                            << "host" << "localhost:3828"
+                            << "arbiterOnly" << false
+                            << "hidden" << true
+                            << "buildIndexes" << false
+                            << "priority" << 0
+                            << "slaveDelay" << 17
+                            << "votes" << 0
+                            << "tags" << BSON("coast" << "east" << "ssd" << "true")
+                          ) <<
+                          BSON("_id" << 2
+                            << "host" << "foo.com:3828"
+                            << "priority" << 9
+                            << "votes" << 0
+                            << "tags" << BSON("coast" << "west" << "hdd" << "true")
+                          ))
+                  << "settings" << BSON("heartbeatTimeoutSecs" << 20
+                                     << "chainingAllowd" << true
+                                     << "getLastErrorDefaults" << BSON("w" << "majority")
+                                     << "getLastErrorModes" << BSON(
+                                            "disks" << BSON("ssd" << 1 << "hdd" << 1)
+                                            << "coasts" << BSON("coast" << 2)))
+                                     )));
+        ASSERT_OK(configB.initialize(configA.toBSON()));
+        ASSERT_TRUE(configA == configB);
+    }
+
+    TEST(ReplicaSetConfig, toBSONRoundTripAbilityInvalid) {
+        ReplicaSetConfig configA;
+        ReplicaSetConfig configB;
+        ASSERT_OK(configA.initialize(
+                BSON("_id" << ""
+                  << "version" << -3
+                  << "members" << BSON_ARRAY(
+                          BSON("_id" << 0
+                            << "host" << "localhost:12345"
+                            << "arbiterOnly" << true
+                            << "votes" << 0
+                          ) <<
+                          BSON("_id" << 0
+                            << "host" << "localhost:3828"
+                            << "arbiterOnly" << false
+                            << "buildIndexes" << false
+                            << "priority" << 2
+                          ) <<
+                          BSON("_id" << 2
+                            << "host" << "localhost:3828"
+                            << "priority" << 9
+                            << "votes" << 0
+                          ))
+                  << "settings" << BSON("heartbeatTimeoutSecs" << -20))));
+        ASSERT_OK(configB.initialize(configA.toBSON()));
+        ASSERT_NOT_OK(configA.validate());
+        ASSERT_NOT_OK(configB.validate());
+        ASSERT_TRUE(configA == configB);
+    }
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

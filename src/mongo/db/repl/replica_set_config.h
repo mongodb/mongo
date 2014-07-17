@@ -143,6 +143,17 @@ namespace repl {
          */
         const ReplicaSetTagConfig& getTagConfig() const { return _tagConfig; }
 
+        /**
+         * Returns the config as a BSONObj.
+         */
+        BSONObj toBSON() const;
+
+        /**
+         * Returns a vector of strings which are the names of the WriteConcernModes.
+         * Currently used in unit tests to compare two configs.
+         */
+         std::vector<std::string> getWriteConcernNames() const;
+
     private:
         /**
          * Parses the "settings" subdocument of a replica set configuration.

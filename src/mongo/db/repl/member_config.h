@@ -139,6 +139,11 @@ namespace repl {
          */
         TagIterator tagsEnd() const { return _tags.end(); }
 
+        /**
+         * Returns the member config as a BSONObj, using "tagConfig" to generate the tag subdoc.
+         */
+        BSONObj toBSON(const ReplicaSetTagConfig& tagConfig) const;
+
     private:
 
         int _id;
