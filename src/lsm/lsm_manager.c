@@ -320,8 +320,9 @@ __lsm_worker(void *arg) {
 			 * switch fails. Keep trying until we are told to
 			 * shut down.
 			 */
-			if ((ret = __wt_lsm_tree_switch(
-			    session, entry->lsm_tree)) != 0) {
+			WT_WITH_SCHEMA_LOCK(session, ret =
+			    __wt_lsm_tree_switch(session, entry->lsm_tree));
+			if (ret != 0) {
 				__wt_err(session, ret, "Error in LSM switch");
 				ret = 0;
 			}
