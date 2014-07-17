@@ -201,6 +201,17 @@ namespace repl {
         virtual bool canAcceptWritesForDatabase(const StringData& dbName) = 0;
 
         /**
+         * Checks if the current replica set configuration can satisfy the given write concern.
+         *
+         * Things that are taken into consideration include:
+         * 1. If the set has enough members.
+         * 2. If the tag exists.
+         * 3. If there are enough members for the tag specified.
+         */
+        virtual Status checkIfWriteConcernCanBeSatisfied(
+                const WriteConcernOptions& writeConcern) const = 0;
+
+        /*
          * Returns Status::OK() if it is valid for this node to serve reads on the given collection
          * and an errorcode indicating why the node cannot if it cannot.
          */

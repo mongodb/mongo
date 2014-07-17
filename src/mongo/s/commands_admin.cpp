@@ -48,6 +48,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_write.h"
@@ -772,8 +773,9 @@ namespace mongo {
                             continue;
 
                         BSONObj moveResult;
+                        WriteConcernOptions noThrottle;
                         if (!chunk->moveAndCommit(to, Chunk::MaxChunkSize,
-                                false, true, 0, moveResult)) {
+                                                  &noThrottle, true, 0, moveResult)) {
                             warning().stream()
                                       << "Couldn't move chunk " << chunk << " to shard "  << to
                                       << " while sharding collection " << ns << ". Reason: "
@@ -1133,10 +1135,23 @@ namespace mongo {
                     return false;
                 }
 
+                scoped_ptr<WriteConcernOptions> writeConcern(new WriteConcernOptions());
+                Status status = writeConcern->parseSecondaryThrottle(cmdObj, NULL);
+
+                if (!status.isOK()){
+                    if (status.code() != ErrorCodes::WriteConcernNotDefined) {
+                        errmsg = status.toString();
+                        return false;
+                    }
+
+                    // Let the shard decide what write concern to use.
+                    writeConcern.reset();
+                }
+
                 BSONObj res;
                 if (!c->moveAndCommit(to,
                                       maxChunkSizeBytes,
-                                      cmdObj["_secondaryThrottle"].trueValue(),
+                                      writeConcern.get(),
                                       cmdObj["_waitForDelete"].trueValue(),
                                       maxTimeMS.getValue(),
                                       res)) {

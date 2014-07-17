@@ -203,6 +203,10 @@ namespace repl {
         OID myID = _me["_id"].OID();
         {
             boost::unique_lock<boost::mutex> lock(_mtx);
+            if (_handshakeNeeded) {
+                // Don't send updates if there are nodes that haven't yet been handshaked
+                return false;
+            }
             for (map<mongo::OID, OpTime>::const_iterator itr = _slaveMap.begin();
                     itr != _slaveMap.end(); ++itr) {
                 BSONObjBuilder entry(array.subobjStart());

@@ -41,10 +41,21 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/range_deleter_service.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/range_arithmetic.h"
+#include "mongo/s/type_settings.h"
 #include "mongo/util/log.h"
+
+namespace {
+    using mongo::WriteConcernOptions;
+
+    const int kDefaultWTimeoutMs = 60 * 1000;
+    const WriteConcernOptions DefaultWriteConcern("majority",
+                                                  WriteConcernOptions::NONE,
+                                                  kDefaultWTimeoutMs);
+}
 
 namespace mongo {
 
@@ -69,7 +80,7 @@ namespace mongo {
     CleanupResult cleanupOrphanedData( OperationContext* txn,
                                        const NamespaceString& ns,
                                        const BSONObj& startingFromKeyConst,
-                                       bool secondaryThrottle,
+                                       const WriteConcernOptions& secondaryThrottle,
                                        BSONObj* stoppedAtKey,
                                        string* errMsg ) {
 
@@ -153,6 +164,17 @@ namespace mongo {
      * the balancer is off.
      *
      * Safe to call with the balancer on.
+     *
+     * Format:
+     *
+     * {
+     *      cleanupOrphaned: <ns>,
+     *      // optional parameters:
+     *      startingAtKey: { <shardKeyValue> }, // defaults to lowest value
+     *      secondaryThrottle: <bool>, // defaults to true
+     *      // defaults to { w: "majority", wtimeout: 60000 }. Applies to individual writes.
+     *      writeConcern: { <writeConcern options> }
+     * }
      */
     class CleanupOrphanedCommand : public Command {
     public:
@@ -179,7 +201,6 @@ namespace mongo {
         // Input
         static BSONField<string> nsField;
         static BSONField<BSONObj> startingFromKeyField;
-        static BSONField<bool> secondaryThrottleField;
 
         // Output
         static BSONField<BSONObj> stoppedAtKeyField;
@@ -210,12 +231,29 @@ namespace mongo {
                 return false;
             }
 
-            bool secondaryThrottle = true;
-            if ( !FieldParser::extract( cmdObj,
-                                        secondaryThrottleField,
-                                        &secondaryThrottle,
-                                        &errmsg ) ) {
-                return false;
+            WriteConcernOptions writeConcern;
+            Status status = writeConcern.parseSecondaryThrottle(cmdObj, NULL);
+
+            if (!status.isOK()){
+                if (status.code() != ErrorCodes::WriteConcernNotDefined) {
+                    return appendCommandStatus(result, status);
+                }
+
+                writeConcern = DefaultWriteConcern;
+            }
+            else {
+                repl::ReplicationCoordinator* replCoordinator =
+                        repl::getGlobalReplicationCoordinator();
+                Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status);
+                }
+            }
+
+            if (writeConcern.shouldWaitForOtherNodes() &&
+                    writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
+                // Don't allow no timeout.
+                writeConcern.wTimeout = kDefaultWTimeoutMs;
             }
 
             if (!shardingState.enabled()) {
@@ -225,7 +263,7 @@ namespace mongo {
             }
 
             ChunkVersion shardVersion;
-            Status status = shardingState.refreshMetadataNow( ns, &shardVersion );
+            status = shardingState.refreshMetadataNow( ns, &shardVersion );
             if ( !status.isOK() ) {
                 if ( status.code() == ErrorCodes::RemoteChangeDetected ) {
                     warning() << "Shard version in transition detected while refreshing "
@@ -242,7 +280,7 @@ namespace mongo {
             CleanupResult cleanupResult = cleanupOrphanedData( txn,
                                                                NamespaceString( ns ),
                                                                startingFromKey,
-                                                               secondaryThrottle,
+                                                               writeConcern,
                                                                &stoppedAtKey,
                                                                &errmsg );
 
@@ -263,7 +301,6 @@ namespace mongo {
 
     BSONField<string> CleanupOrphanedCommand::nsField( "cleanupOrphaned" );
     BSONField<BSONObj> CleanupOrphanedCommand::startingFromKeyField( "startingFromKey" );
-    BSONField<bool> CleanupOrphanedCommand::secondaryThrottleField( "secondaryThrottle" );
     BSONField<BSONObj> CleanupOrphanedCommand::stoppedAtKeyField( "stoppedAtKey" );
 
     MONGO_INITIALIZER(RegisterCleanupOrphanedCommand)(InitializerContext* context) {

@@ -498,48 +498,75 @@ namespace mongo {
      * Returns whether balancing is enabled, with optional namespace "ns" parameter for balancing on a particular
      * collection.
      */
-    bool Grid::shouldBalance( const string& ns, BSONObj* balancerDocOut ) const {
 
+    bool Grid::shouldBalance(const SettingsType& balancerSettings) const {
         // Allow disabling the balancer for testing
-        if ( MONGO_FAIL_POINT(neverBalance) ) return false;
+        if (MONGO_FAIL_POINT(neverBalance)) return false;
 
-        ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
+        if (balancerSettings.isBalancerStoppedSet() && balancerSettings.getBalancerStopped()) {
+            return false;
+        }
+
+        if (balancerSettings.isBalancerActiveWindowSet()) {
+            boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
+            return _inBalancingWindow(balancerSettings.getBalancerActiveWindow(), now);
+        }
+
+        return true;
+    }
+
+    bool Grid::getBalancerSettings(SettingsType* settings, string* errMsg) const {
         BSONObj balancerDoc;
-        BSONObj collDoc;
+        ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
 
         try {
-            // look for the stop balancer marker
-            balancerDoc = conn->findOne( SettingsType::ConfigNS,
-                                         BSON( SettingsType::key("balancer") ) );
-            if( ns.size() > 0 ) collDoc = conn->findOne(CollectionType::ConfigNS,
-                                                        BSON( CollectionType::ns(ns)));
+            balancerDoc = conn->findOne(SettingsType::ConfigNS,
+                                        BSON(SettingsType::key("balancer")));
             conn.done();
         }
-        catch( DBException& e ){
+        catch (const DBException& ex) {
+            *errMsg = str::stream() << "failed to read balancer settings from " << conn.getHost()
+                                    << ": " << causedBy(ex);
+            return false;
+        }
+
+        return settings->parseBSON(balancerDoc, errMsg);
+    }
+
+    bool Grid::getConfigShouldBalance() const {
+        SettingsType balSettings;
+        string errMsg;
+
+        if (!getBalancerSettings(&balSettings, &errMsg)) {
+            warning() << errMsg;
+            return false;
+        }
+
+        if (!balSettings.isKeySet()) {
+            // Balancer settings doc does not exist. Default to yes.
+            return true;
+        }
+
+        return shouldBalance(balSettings);
+    }
+
+    bool Grid::getCollShouldBalance(const std::string& ns) const {
+        BSONObj collDoc;
+        ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
+
+        try {
+            collDoc = conn->findOne(CollectionType::ConfigNS, BSON(CollectionType::ns(ns)));
+            conn.done();
+        }
+        catch (const DBException& e){
             conn.kill();
             warning() << "could not determine whether balancer should be running, error getting"
-                "config data from " << conn.getHost() << causedBy( e ) << endl;
+                      << "config data from " << conn.getHost() << causedBy(e) << endl;
             // if anything goes wrong, we shouldn't try balancing
             return false;
         }
 
-        if ( balancerDocOut )
-            *balancerDocOut = balancerDoc;
-
-        boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
-        if ( _balancerStopped( balancerDoc ) || ! _inBalancingWindow( balancerDoc , now ) ) {
-            return false;
-        }
-
-        if( collDoc["noBalance"].trueValue() ) return false;
-        return true;
-    }
-
-    bool Grid::_balancerStopped( const BSONObj& balancerDoc ) {
-        // check the 'stopped' marker maker
-        // if present, it is a simple bool
-        BSONElement stoppedElem = balancerDoc[SettingsType::balancerStopped()];
-        return stoppedElem.trueValue();
+        return !collDoc[CollectionType::noBalance()].trueValue();
     }
 
     bool Grid::_inBalancingWindow( const BSONObj& balancerDoc , const boost::posix_time::ptime& now ) {

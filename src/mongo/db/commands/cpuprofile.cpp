@@ -135,7 +135,7 @@ namespace mongo {
                                            std::string &errmsg,
                                            BSONObjBuilder &result,
                                            bool fromRepl ) {
-            Lock::DBWrite dbXLock(db);
+            Lock::DBWrite dbXLock(txn->lockState(), db);
             // The lock here is just to prevent concurrency, nothing will write.
             Client::Context ctx(txn, db);
 
@@ -154,7 +154,7 @@ namespace mongo {
                                           std::string &errmsg,
                                           BSONObjBuilder &result,
                                           bool fromRepl ) {
-            Lock::DBWrite dbXLock(db);
+            Lock::DBWrite dbXLock(txn->lockState(), db);
             WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, db);
 

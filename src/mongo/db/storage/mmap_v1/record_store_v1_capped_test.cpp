@@ -29,10 +29,13 @@
  */
 
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
+#include "mongo/db/storage/mmap_v1/record_store_v1_capped_iterator.h"
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/mmap_v1/record.h"
+#include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_test_help.h"
+
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -554,5 +557,209 @@ namespace {
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
+    }
+
+    //
+    // The CappedRecordStoreV1QueryStage tests some nitty-gritty capped
+    //  collection details.  Ported and polished from pdfiletests.cpp.
+    //
+
+    class CollscanHelper {
+    public:
+        CollscanHelper(int nExtents)
+            : md(new DummyRecordStoreV1MetaData( true, 0 )),
+              rs(&txn, &cb, ns(), md, &em, false)
+        {
+            LocAndSize recs[] = {
+                {}
+            };
+            LocAndSize drecs[8];
+            ASSERT_LESS_THAN(nExtents, 8);
+            for (int j = 0; j < nExtents; ++j) {
+                drecs[j].loc = DiskLoc(j, 1000);
+                drecs[j].size = 1000;
+            }
+            drecs[nExtents].loc = DiskLoc();
+            drecs[nExtents].size = 0;
+
+            md->setCapExtent(&txn, DiskLoc(0, 0));
+            md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid()); // unlooped
+            initializeV1RS(&txn, recs, drecs, &em, md);
+        }
+
+        // Insert bypasses standard alloc/insert routines to use the extent we want.
+        // TODO: Directly declare resulting record store state instead of procedurally creating it
+        DiskLoc insert( const DiskLoc& ext, int i ) {
+            // Copied verbatim.
+            BSONObjBuilder b;
+            b.append( "a", i );
+            BSONObj o = b.done();
+            int len = o.objsize();
+            Extent *e = em.getExtent(ext);
+            e = txn.recoveryUnit()->writing(e);
+            int ofs;
+            if ( e->lastRecord.isNull() ) {
+                ofs = ext.getOfs() + ( e->_extentData - (char *)e );
+            }
+            else {
+                ofs = e->lastRecord.getOfs()
+                + em.recordForV1(e->lastRecord)->lengthWithHeaders();
+            }
+            DiskLoc dl( ext.a(), ofs );
+            Record *r = em.recordForV1(dl);
+            r = (Record*) txn.recoveryUnit()->writingPtr(r, Record::HeaderSize + len);
+            r->lengthWithHeaders() = Record::HeaderSize + len;
+            r->extentOfs() = e->myLoc.getOfs();
+            r->nextOfs() = DiskLoc::NullOfs;
+            r->prevOfs() = e->lastRecord.isNull() ? DiskLoc::NullOfs : e->lastRecord.getOfs();
+            memcpy( r->data(), o.objdata(), len );
+            if ( e->firstRecord.isNull() )
+                e->firstRecord = dl;
+            else
+                txn.recoveryUnit()->writingInt(em.recordForV1(e->lastRecord)->nextOfs()) = ofs;
+            e->lastRecord = dl;
+            return dl;
+        }
+
+        // TODO: Directly assert the desired record store state instead of just walking it
+        void walkAndCount (int expectedCount) {
+            // Walk the collection going forward.
+            {
+                CappedRecordStoreV1Iterator it(&txn, &rs, DiskLoc(), false,
+                                               CollectionScanParams::FORWARD);
+
+                int resultCount = 0;
+                while (!it.isEOF()) {
+                    ++resultCount;
+                    it.getNext();
+                }
+
+                ASSERT_EQUALS(resultCount, expectedCount);
+            }
+
+            // Walk the collection going backwards.
+            {
+                CappedRecordStoreV1Iterator it(&txn, &rs, DiskLoc(), false,
+                                               CollectionScanParams::BACKWARD);
+
+                int resultCount = expectedCount;
+                while (!it.isEOF()) {
+                    --resultCount;
+                    it.getNext();
+                }
+
+                ASSERT_EQUALS(resultCount, 0);
+            }
+        }
+
+        static const char *ns() { return "unittests.QueryStageCollectionScanCapped"; }
+
+        OperationContextNoop txn;
+        DummyRecordStoreV1MetaData* md;
+        DummyExtentManager em;
+
+    private:
+        DummyCappedDocumentDeleteCallback cb;
+        CappedRecordStoreV1 rs;
+    };
+
+
+    TEST(CappedRecordStoreV1QueryStage, CollscanCappedBase) {
+        CollscanHelper h(1);
+        h.walkAndCount(0);
+    }
+
+    TEST(CappedRecordStoreV1QueryStage, CollscanEmptyLooped) {
+        CollscanHelper h(1);
+        h.md->setCapFirstNewRecord( &h.txn, DiskLoc() );
+        h.walkAndCount(0);
+    }
+
+    TEST(CappedRecordStoreV1QueryStage, CollscanEmptyMultiExtentLooped) {
+        CollscanHelper h(3);
+        h.md->setCapFirstNewRecord( &h.txn, DiskLoc() );
+        h.walkAndCount(0);
+    }
+
+    TEST(CappedRecordStoreV1QueryStage, CollscanSingle) {
+        CollscanHelper h(1);
+
+        h.md->setCapFirstNewRecord(&h.txn, h.insert( h.md->capExtent(), 0 ));
+        h.walkAndCount(1);
+    }
+
+    TEST(CappedRecordStoreV1QueryStage, CollscanNewCapFirst) {
+        CollscanHelper h(1);
+        DiskLoc x = h.insert(h.md->capExtent(), 0 );
+        h.md->setCapFirstNewRecord( &h.txn, x );
+        h.insert(h.md->capExtent(), 1 );
+        h.walkAndCount(2);
+    }
+
+    TEST(CappedRecordStoreV1QueryStage, CollscanNewCapMiddle) {
+        CollscanHelper h(1);
+        h.insert(h.md->capExtent(), 0 );
+        h.md->setCapFirstNewRecord(&h.txn, h.insert( h.md->capExtent(), 1 ) );
+        h.insert( h.md->capExtent(), 2 );
+        h.walkAndCount(3);
+    }
+
+    TEST(CappedRecordStoreV1QueryStage, CollscanFirstExtent) {
+        CollscanHelper h(2);
+        h.insert(h.md->capExtent(), 0 );
+        h.insert(h.md->lastExtent(&h.txn), 1 );
+        h.md->setCapFirstNewRecord(&h.txn, h.insert( h.md->capExtent(), 2 ) );
+        h.insert( h.md->capExtent(), 3 );
+        h.walkAndCount(4);
+    }
+
+    TEST(CappedRecordStoreV1QueryStage, CollscanLastExtent) {
+        CollscanHelper h(2);
+        h.md->setCapExtent( &h.txn, h.md->lastExtent(&h.txn) );
+        h.insert( h.md->capExtent(), 0 );
+        h.insert( h.md->firstExtent(&h.txn), 1 );
+        h.md->setCapFirstNewRecord( &h.txn, h.insert( h.md->capExtent(), 2 ) );
+        h.insert( h.md->capExtent(), 3 );
+        h.walkAndCount(4);
+    }
+
+    TEST(CappedRecordStoreV1QueryStage, CollscanMidExtent) {
+        CollscanHelper h(3);
+        h.md->setCapExtent( &h.txn, h.em.getExtent(h.md->firstExtent(&h.txn))->xnext );
+        h.insert( h.md->capExtent(), 0 );
+        h.insert( h.md->lastExtent(&h.txn), 1 );
+        h.insert( h.md->firstExtent(&h.txn), 2 );
+        h.md->setCapFirstNewRecord( &h.txn, h.insert( h.md->capExtent(), 3 ) );
+        h.insert( h.md->capExtent(), 4 );
+        h.walkAndCount(5);
+    }
+
+    TEST(CappedRecordStoreV1QueryStage, CollscanAloneInExtent) {
+        CollscanHelper h(3);
+        h.md->setCapExtent( &h.txn, h.em.getExtent(h.md->firstExtent(&h.txn))->xnext );
+        h.insert( h.md->lastExtent(&h.txn), 0 );
+        h.insert( h.md->firstExtent(&h.txn), 1 );
+        h.md->setCapFirstNewRecord( &h.txn, h.insert( h.md->capExtent(), 2 ) );
+        h.walkAndCount(3);
+    }
+
+    TEST(CappedRecordStoreV1QueryStage, CollscanFirstInExtent) {
+        CollscanHelper h(3);
+        h.md->setCapExtent( &h.txn, h.em.getExtent(h.md->firstExtent(&h.txn))->xnext );
+        h.insert( h.md->lastExtent(&h.txn), 0 );
+        h.insert( h.md->firstExtent(&h.txn), 1 );
+        h.md->setCapFirstNewRecord( &h.txn, h.insert( h.md->capExtent(), 2 ) );
+        h.insert( h.md->capExtent(), 3 );
+        h.walkAndCount(4);
+    }
+
+    TEST(CappedRecordStoreV1QueryStage, CollscanLastInExtent) {
+        CollscanHelper h(3);
+        h.md->setCapExtent( &h.txn, h.em.getExtent(h.md->firstExtent(&h.txn))->xnext );
+        h.insert( h.md->capExtent(), 0 );
+        h.insert( h.md->lastExtent(&h.txn), 1 );
+        h.insert( h.md->firstExtent(&h.txn), 2 );
+        h.md->setCapFirstNewRecord( &h.txn, h.insert( h.md->capExtent(), 3 ) );
+        h.walkAndCount(4);
     }
 }
