@@ -230,7 +230,7 @@ namespace mongo {
                     return;
                 _cached = true;
                 rocksdb::Slice slice = _iterator->key();
-                _cachedKey = BSONObj( slice.data() );
+                _cachedKey = BSONObj( slice.data() ).getOwned();
                 _cachedLoc = reinterpret_cast<const DiskLoc*>( slice.data() + _cachedKey.objsize() )[0];
             }
 
