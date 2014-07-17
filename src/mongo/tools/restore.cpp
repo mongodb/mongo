@@ -436,6 +436,13 @@ public:
         processFileAndMetadata(root, ns);
     }
 
+    static std::string getMessageAboutBrokenDBUserRestore(const StringData& serverBinVersion) {
+        return str::stream() << "Running mongorestore with --drop, --db, and "
+                "--restoreDbUsersAndRoles flags has erroneous behavior when the target server "
+                "version is between 2.6.0 and 2.6.3 (see SERVER-14212). Detected server version " <<
+                serverBinVersion << ". Aborting.";
+    }
+
     /**
      * 1) Drop collection if --drop was specified.  For system.users or system.roles collections,
      * however, you don't want to remove all the users/roles up front as some of them may be needed
@@ -554,14 +561,27 @@ public:
             } else {
                 // Use _mergeAuthzCollections command to move into admin.system.users the user
                 // docs that were restored into the temp user collection
+                BSONObjBuilder cmdBuilder;
+                cmdBuilder.append("_mergeAuthzCollections", 1);
+                cmdBuilder.append("tempUsersCollection", mongoRestoreGlobalParams.tempUsersColl);
+                cmdBuilder.append("drop", mongoRestoreGlobalParams.drop);
+                cmdBuilder.append("writeConcern", BSON("w" << mongoRestoreGlobalParams.w));
+                if (versionCmp(_serverBinVersion, "2.6.4") < 0) {
+                    uassert(18528,
+                            getMessageAboutBrokenDBUserRestore(_serverBinVersion),
+                            !mongoRestoreGlobalParams.drop ||
+                                    toolGlobalParams.db.empty() ||
+                                    toolGlobalParams.db == "admin");
+                } else {
+                    // If we're doing a db-specific restore of the "admin" db, we want user data for
+                    // *all* databases restored, not just the admin db, so we pass "" as the "db"
+                    // param to _mergeAuthzCollections
+                    cmdBuilder.append("db",
+                                      toolGlobalParams.db == "admin" ? "" : toolGlobalParams.db);
+                }
+
                 BSONObj res;
-                conn().runCommand("admin",
-                                  BSON("_mergeAuthzCollections" << 1 <<
-                                       "tempUsersCollection" <<
-                                               mongoRestoreGlobalParams.tempUsersColl <<
-                                       "drop" << mongoRestoreGlobalParams.drop <<
-                                       "writeConcern" << BSON("w" << mongoRestoreGlobalParams.w)),
-                                  res);
+                conn().runCommand("admin", cmdBuilder.done(), res);
                 uassert(17412,
                         mongoutils::str::stream() << "Cannot restore users because the "
                                 "_mergeAuthzCollections command failed: " << res.toString(),
@@ -573,14 +593,26 @@ public:
         if (_curns == "admin.system.roles") {
             // Use _mergeAuthzCollections command to move into admin.system.roles the role
             // docs that were restored into the temp roles collection
+            BSONObjBuilder cmdBuilder;
+            cmdBuilder.append("_mergeAuthzCollections", 1);
+            cmdBuilder.append("tempRolesCollection", mongoRestoreGlobalParams.tempRolesColl);
+            cmdBuilder.append("drop", mongoRestoreGlobalParams.drop);
+            cmdBuilder.append("writeConcern", BSON("w" << mongoRestoreGlobalParams.w));
+            if (versionCmp(_serverBinVersion, "2.6.4") < 0) {
+                uassert(18529,
+                        getMessageAboutBrokenDBUserRestore(_serverBinVersion),
+                        !mongoRestoreGlobalParams.drop ||
+                                toolGlobalParams.db.empty() ||
+                                toolGlobalParams.db == "admin");
+            } else {
+                // If we're doing a db-specific restore of the "admin" db, we want role data for
+                // *all* databases restored, not just the admin db, so we pass "" as the "db"
+                // param to _mergeAuthzCollections
+                cmdBuilder.append("db", toolGlobalParams.db == "admin" ? "" : toolGlobalParams.db);
+            }
+
             BSONObj res;
-            conn().runCommand("admin",
-                              BSON("_mergeAuthzCollections" << 1 <<
-                                   "tempRolesCollection" <<
-                                           mongoRestoreGlobalParams.tempRolesColl <<
-                                   "drop" << mongoRestoreGlobalParams.drop <<
-                                   "writeConcern" << BSON("w" << mongoRestoreGlobalParams.w)),
-                              res);
+            conn().runCommand("admin", cmdBuilder.done(), res);
             uassert(17413,
                     mongoutils::str::stream() << "Cannot restore roles because the "
                             "_mergeAuthzCollections command failed: " << res.toString(),
