@@ -102,9 +102,9 @@ int main(void)
 	int i, ret;
 	char k[MAX_KEYS][16], v[MAX_KEYS][16];
 
-	if ((ret = wiredtiger_open(home, NULL,
-	    "create,cache_size=100MB,async=(enabled=true,ops_max=10,threads=2)",
-	    &wt_conn)) != 0) {
+#define	CONN_CONFIG "create,cache_size=100MB," \
+    "async=(enabled=true,ops_max=10,threads=2)"
+	if ((ret = wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 		return (ret);
