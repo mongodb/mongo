@@ -532,7 +532,8 @@ __lsm_tree_open(
 	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
 	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
 
-	WT_ERR(__lsm_tree_start_worker(session, lsm_tree));
+	if (0)
+		WT_ERR(__lsm_tree_start_worker(session, lsm_tree));
 	*treep = lsm_tree;
 
 	if (0) {
@@ -795,6 +796,9 @@ err:	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 	 */
 	if (ret != 0)
 		WT_PANIC_RET(session, ret, "Failed doing LSM switch");
+	else
+		WT_RET(__wt_lsm_push_entry(
+		    session, WT_LSM_WORK_FLUSH, lsm_tree));
 	return (ret);
 }
 

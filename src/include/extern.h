@@ -996,6 +996,7 @@ extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t open_flags);
 extern void *__wt_lsm_merge_worker(void *vargs);
+extern int __wt_lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     WT_LSM_CHUNK *chunk,

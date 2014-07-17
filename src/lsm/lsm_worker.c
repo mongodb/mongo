@@ -9,7 +9,6 @@
 
 static int __lsm_bloom_create(
     WT_SESSION_IMPL *, WT_LSM_TREE *, WT_LSM_CHUNK *, u_int);
-static int __lsm_bloom_work(WT_SESSION_IMPL *, WT_LSM_TREE *);
 static int __lsm_discard_handle(WT_SESSION_IMPL *, const char *, const char *);
 static int __lsm_free_chunks(WT_SESSION_IMPL *, WT_LSM_TREE *);
 
@@ -124,7 +123,7 @@ __wt_lsm_merge_worker(void *vargs)
 
 		/* Try to create a Bloom filter. */
 		if (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) &&
-		    __lsm_bloom_work(session, lsm_tree) == 0)
+		    __wt_lsm_bloom_work(session, lsm_tree) == 0)
 			progress = 1;
 
 		/* If we didn't create a Bloom filter, try to merge. */
@@ -195,12 +194,12 @@ err:		__wt_err(session, ret, "LSM merge worker failed");
 }
 
 /*
- * __lsm_bloom_work --
+ * __wt_lsm_bloom_work --
  *	Try to create a Bloom filter for the newest on-disk chunk that doesn't
  *	have one.
  */
-static int
-__lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+int
+__wt_lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
@@ -370,6 +369,11 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	__wt_txn_release_snapshot(session);
 
 	WT_ERR(__wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointed"));
+	/*
+	 * Schedule a bloom filter create for our newly flushed chunk */
+	if (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF))
+		WT_ERR(__wt_lsm_push_entry(
+		    session, WT_LSM_WORK_BLOOM, lsm_tree));
 err:	return (ret);
 }
 

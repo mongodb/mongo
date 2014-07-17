@@ -316,6 +316,11 @@ __lsm_worker(void *arg) {
 		    session, WT_LSM_WORK_SWITCH, &entry)) == 0 &&
 		    entry != NULL) {
 			/*
+			 * TODO: The TREE_WORKING flag needs to evolve to be
+			 * compatible with global manager threads.
+			 */
+			F_SET(entry->lsm_tree, WT_LSM_TREE_WORKING);
+			/*
 			 * Don't exit the switch thread because a single
 			 * switch fails. Keep trying until we are told to
 			 * shut down.
@@ -338,9 +343,12 @@ __lsm_worker(void *arg) {
 			if (entry->flags == WT_LSM_WORK_FLUSH) {
 				WT_ERR(__lsm_get_chunk_to_flush(
 				    session, entry->lsm_tree, &chunk));
-				WT_ERR(__wt_lsm_checkpoint_chunk(session,
-				    entry->lsm_tree, chunk, &flushed));
+				if (chunk != NULL)
+					WT_ERR(__wt_lsm_checkpoint_chunk(
+					    session, entry->lsm_tree,
+					    chunk, &flushed));
 			} else if (entry->flags == WT_LSM_WORK_BLOOM) {
+				__wt_lsm_bloom_work(session, entry->lsm_tree);
 			}
 		}
 		/* Flag an error if the pop failed. */
@@ -358,10 +366,13 @@ __lsm_worker(void *arg) {
 		}
 		/* Flag an error if the pop failed. */
 		WT_ERR(ret);
+		__wt_free(session, entry);
+		entry = NULL;
 	}
 
 	if (ret != 0) {
-err:		__wt_err(session, ret, "Error in LSM switch thread");
+err:		__wt_free(session, entry);
+		__wt_err(session, ret, "Error in LSM switch thread");
 	}
 	--manager->lsm_workers;
 	__wt_free(session, cookie);
