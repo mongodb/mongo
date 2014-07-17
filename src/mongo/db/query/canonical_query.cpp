@@ -820,7 +820,9 @@ namespace mongo {
         mongoutils::str::stream ss;
         ss << "query: " << _pq->getFilter().toString()
            << " sort: " << _pq->getSort().toString()
-           << " projection: " << _pq->getProj().toString();
+           << " projection: " << _pq->getProj().toString()
+           << " skip: " << _pq->getSkip()
+           << " limit: " << _pq->getNumToReturn();
         return ss;
     }
 
