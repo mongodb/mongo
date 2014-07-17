@@ -278,10 +278,7 @@ leaf_only:
 	 * Binary search of the leaf page.  There are two versions (a default
 	 * loop and an application-specified collation loop), because moving
 	 * the collation test and error handling inside the loop costs about 5%.
-	 *
-	 * The page might be empty, reset the comparison value.
 	 */
-	cmp = -1;
 	base = 0;
 	limit = page->pg_row_entries;
 	if (btree->collator == NULL)
@@ -299,7 +296,7 @@ leaf_only:
 			} else if (cmp < 0)
 				skiphigh = match;
 			else
-				break;
+				goto leaf_match;
 		}
 	else
 		for (; limit != 0; limit >>= 1) {
@@ -313,17 +310,16 @@ leaf_only:
 				base = indx + 1;
 				--limit;
 			} else if (cmp == 0)
-				break;
+				goto leaf_match;
 		}
 
 	/*
-	 * The best case is finding an exact match in the page's WT_ROW slot
-	 * array, which is probable for any read-mostly workload.  In that
-	 * case, we're not doing any kind of insert, all we can do is update
-	 * an existing entry.  Check that case and get out fast.
+	 * The best case is finding an exact match in the leaf page's WT_ROW
+	 * array, probable for any read-mostly workload.  Check that case and
+	 * get out fast.
 	 */
-	if (cmp == 0) {
-		cbt->compare = 0;
+	if (0) {
+leaf_match:	cbt->compare = 0;
 		cbt->ref = child;
 
 		/*
@@ -338,41 +334,34 @@ leaf_only:
 	 * We didn't find an exact match in the WT_ROW array.
 	 *
 	 * Base is the smallest index greater than key and may be the 0th index
-	 * or the (last + 1) index.  Set the WT_ROW reference to be the largest
-	 * index less than the key if that's possible (if base is the 0th index
-	 * it means the application is inserting a key before any key found on
-	 * the page).
-	 */
-	rip = page->pg_row_d;
-	if (base == 0)
-		cbt->compare = 1;
-	else {
-		rip += base - 1;
-		cbt->compare = -1;
-	}
-
-	/*
+	 * or the (last + 1) index.  Set the slot to be the largest index less
+	 * than the key if that's possible (if base is the 0th index it means
+	 * the application is inserting a key before any key found on the page).
+	 *
 	 * It's still possible there is an exact match, but it's on an insert
-	 * list.  Figure out which insert chain to search, and do the initial
-	 * setup of the return information for the insert chain (we'll correct
-	 * it as needed depending on what we find.)
+	 * list.  Figure out which insert chain to search and then set up the
+	 * return information assuming we'll find nothing in the insert list
+	 * (we'll correct as needed inside the search routine, depending on
+	 * what we find).
 	 *
 	 * If inserting a key smaller than any key found in the WT_ROW array,
-	 * use the extra slot of the insert array, otherwise insert lists map
-	 * one-to-one to the WT_ROW array.
+	 * use the extra slot of the insert array, otherwise the insert array
+	 * maps one-to-one to the WT_ROW array.
 	 */
-	cbt->slot = WT_ROW_SLOT(page, rip);
 	if (base == 0) {
+		cbt->compare = 1;
+		cbt->ref = child;
+		cbt->slot = WT_ROW_SLOT(page, page->pg_row_d);
+
 		F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
 		cbt->ins_head = WT_ROW_INSERT_SMALLEST(page);
-	} else
-		cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
+	} else {
+		cbt->compare = -1;
+		cbt->ref = child;
+		cbt->slot = WT_ROW_SLOT(page, page->pg_row_d + (base - 1));
 
-	/*
-	 * Search the insert list for a match; __wt_search_insert sets the
-	 * return insert information appropriately.
-	 */
-	cbt->ref = child;
+		cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
+	}
 	WT_ERR(
 	    __wt_search_insert(session, cbt, cbt->ins_head, srch_key, insert));
 	return (0);
