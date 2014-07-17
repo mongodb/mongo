@@ -35,7 +35,8 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/concurrency/mutex.h"
 
-#include "config.h"  // DBConfigPtr
+#include "mongo/s/config.h"  // DBConfigPtr
+#include "mongo/s/type_settings.h"
 
 namespace mongo {
 
@@ -107,9 +108,29 @@ namespace mongo {
         bool knowAboutShard( const std::string& name ) const;
 
         /**
-         * @return true if the chunk balancing functionality is enabled
+         * Returns true if the balancer should be running. Caller is responsible
+         * for making sure settings has the balancer key.
          */
-        bool shouldBalance( const std::string& ns = "", BSONObj* balancerDocOut = 0 ) const;
+        bool shouldBalance(const SettingsType& balancerSettings) const;
+
+        /**
+         * Retrieve the balancer settings from the config server. Returns false if an error
+         * occurred while retrieving the document. If the balancer settings document does not
+         * exist, it is not considered as an error, but the "key" property of the settings
+         * output parameter will not be set.
+         */
+        bool getBalancerSettings(SettingsType* settings, string* errMsg) const;
+
+        /**
+         * Returns true if the config server settings indicate that the balancer should be active.
+         */
+        bool getConfigShouldBalance() const;
+
+        /**
+         * Returns true if the given collection can be balanced based on the config.collections
+         * document.
+         */
+        bool getCollShouldBalance(const std::string& ns) const;
 
         /**
          * 
@@ -149,14 +170,6 @@ namespace mongo {
          * @return whether a give dbname is used for shard "local" databases (e.g., admin or local)
          */
         static bool _isSpecialLocalDB( const std::string& dbName );
-
-        /**
-         * @param balancerDoc bson that may contain a marker to stop the balancer
-         *        format { ... , stopped: [ "true" | "false" ] , ... }
-         * @return true if the marker is present and is set to true
-         */
-        static bool _balancerStopped( const BSONObj& balancerDoc );
-
     };
 
     extern Grid grid;

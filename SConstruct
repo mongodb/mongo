@@ -329,6 +329,19 @@ elif windows:
                type = 'choice', default = None,
                choices = win_version_min_choices.keys())
 
+    # Someday get rid of --32 and --64 for windows and use these with a --msvc-target-arch flag
+    # that mirrors msvc-host-arch.
+    msvc_arch_choices = ['x86', 'i386', 'amd64', 'emt64', 'x86_64', 'ia64']
+
+    add_option("msvc-host-arch", "host architecture for ms toolchain", 1, True,
+               type="choice", choices=msvc_arch_choices)
+
+    add_option("msvc-script",
+               "msvc toolchain setup script, pass no argument to suppress script execution",
+               1, True)
+
+    add_option("msvc-version", "select msvc version", 1, True)
+
 add_option('cache',
            "Use an object cache rather than a per-build variant directory (experimental)",
            0, False)
@@ -428,33 +441,70 @@ v8suffix = '' if v8version == '3.12' else '-' + v8version
 
 usePCH = has_option( "usePCH" )
 
+# We defer building the env until we have determined whether we want certain values. Some values
+# in the env actually have semantics for 'None' that differ from being absent, so it is better
+# to build it up via a dict, and then construct the Environment in one shot with kwargs.
+#
 # Yes, BUILD_ROOT vs BUILD_DIR is confusing. Ideally, BUILD_DIR would actually be called
 # VARIANT_DIR, and at some point we should probably do that renaming. Until we do though, we
 # also need an Environment variable for the argument to --build-dir, which is the parent of all
 # variant dirs. For now, we call that BUILD_ROOT. If and when we s/BUILD_DIR/VARIANT_DIR/g,
 # then also s/BUILD_ROOT/BUILD_DIR/g.
-env = Environment( BUILD_ROOT=buildDir,
-                   BUILD_DIR=get_variant_dir(),
-                   DIST_ARCHIVE_SUFFIX='.tgz',
-                   EXTRAPATH=get_option("extrapath"),
-                   MODULE_BANNERS=[],
-                   ARCHIVE_ADDITION_DIR_MAP={},
-                   ARCHIVE_ADDITIONS=[],
-                   MSVS_ARCH=msarch ,
-                   PYTHON=utils.find_python(),
-                   SERVER_ARCHIVE='${SERVER_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
-                   TARGET_ARCH=msarch ,
-                   tools=["default", "gch", "jsheader", "mergelib", "unittest"],
-                   UNITTEST_ALIAS='unittests',
-                   # TODO: Move unittests.txt to $BUILD_DIR, but that requires
-                   # changes to MCI.
-                   UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
-                   PYSYSPLATFORM=os.sys.platform,
-                   PCRE_VERSION='8.30',
-                   CONFIGUREDIR=sconsDataDir.Dir('sconf_temp'),
-                   CONFIGURELOG=sconsDataDir.File('config.log'),
-                   INSTALL_DIR=installDir,
-                   )
+envDict = dict(BUILD_ROOT=buildDir,
+               BUILD_DIR=get_variant_dir(),
+               DIST_ARCHIVE_SUFFIX='.tgz',
+               EXTRAPATH=get_option("extrapath"),
+               MODULE_BANNERS=[],
+               ARCHIVE_ADDITION_DIR_MAP={},
+               ARCHIVE_ADDITIONS=[],
+               PYTHON=utils.find_python(),
+               SERVER_ARCHIVE='${SERVER_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
+               tools=["default", "gch", "jsheader", "mergelib", "unittest"],
+               UNITTEST_ALIAS='unittests',
+               # TODO: Move unittests.txt to $BUILD_DIR, but that requires
+               # changes to MCI.
+               UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
+               PYSYSPLATFORM=os.sys.platform,
+               PCRE_VERSION='8.30',
+               CONFIGUREDIR=sconsDataDir.Dir('sconf_temp'),
+               CONFIGURELOG=sconsDataDir.File('config.log'),
+               INSTALL_DIR=installDir,
+               )
+
+if windows:
+    if msarch:
+        envDict['TARGET_ARCH'] = msarch
+
+    # We can't set this to None without disturbing the autodetection,
+    # so only set it conditionally.
+    if has_option('msvc-host-arch'):
+        envDict['HOST_ARCH'] = get_option('msvc-host-arch')
+
+    msvc_version = get_option('msvc-version')
+    msvc_script = get_option('msvc-script')
+
+    if msvc_version:
+        if msvc_script:
+            print("Passing --msvc-version with --msvc-script is not meaningful")
+            Exit(1)
+        envDict['MSVC_VERSION'] = msvc_version
+
+    # The python None value is meaningful to MSVC_USE_SCRIPT; we want to interpret
+    # --msvc-script= with no argument as meaning 'None', so check explicitly against None so
+    # that '' is not interpreted as false.
+    if msvc_script is not None:
+        if has_option('msvc-host-arch'):
+            print("Passing --msvc-host-arch with --msvc-script is not meaningful")
+            Exit(1)
+        if msarch:
+            print("Passing --32 or --64 with --msvc-script is not meaningful")
+            Exit(1)
+        if msvc_script == "":
+            msvc_script = None
+        envDict['MSVC_USE_SCRIPT'] = msvc_script
+
+env = Environment(**envDict)
+del envDict
 
 if has_option("cache"):
     EnsureSConsVersion( 2, 3, 0 )

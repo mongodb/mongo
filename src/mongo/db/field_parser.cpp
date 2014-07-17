@@ -111,7 +111,7 @@ namespace mongo {
     {
         if (elem.eoo()) {
             if (field.hasDefault()) {
-                *out = field.getDefault();
+                *out = field.getDefault().getOwned();
                 return FIELD_DEFAULT;
             }
             else {
