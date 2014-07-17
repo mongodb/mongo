@@ -23,9 +23,11 @@ __wt_search_insert_append(WT_SESSION_IMPL *session,
 	int cmp, i;
 
 	btree = S2BT(session);
+	*appendp = 0;
 
 	inshead = cbt->ins_head;
-	ins = WT_SKIP_LAST(inshead);
+	if ((ins = WT_SKIP_LAST(inshead)) == NULL)
+		return (0);
 	key.data = WT_INSERT_KEY(ins);
 	key.size = WT_INSERT_KEY_SIZE(ins);
 
@@ -50,8 +52,7 @@ __wt_search_insert_append(WT_SESSION_IMPL *session,
 		cbt->compare = -cmp;
 		cbt->ins = ins;
 		*appendp = 1;
-	} else
-		*appendp = 0;
+	}
 	return (0);
 }
 
@@ -284,6 +285,40 @@ descend:	/*
 
 leaf_only:
 	page = child->page;
+	cbt->ref = child;
+
+	/*
+	 * When inserting a new record, if there's a history of appending to
+	 * a page, fast-check for a page append into an existing insert list.
+	 * (We could do a more general page append check, but an insert list
+	 * will exist as soon as any record is appended to the page, there's
+	 * little point in optimizing for the first insert.)
+	 */
+	if (insert && btree->appending) {
+		if (page->pg_row_entries == 0) {
+			cbt->slot = WT_ROW_SLOT(page, page->pg_row_d);
+
+			F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
+			cbt->ins_head = WT_ROW_INSERT_SMALLEST(page);
+		} else {
+			cbt->slot = WT_ROW_SLOT(page,
+			    page->pg_row_d + (page->pg_row_entries - 1));
+
+			cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
+		}
+
+		WT_ERR(
+		    __wt_search_insert_append(session, cbt, srch_key, &append));
+		if (append)
+			return (0);
+		btree->appending = 0;
+
+		/*
+		 * Don't leave the insert list head set, code external to the
+		 * search uses it.
+		 */
+		cbt->ins_head = NULL;
+	}
 
 	/*
 	 * Binary search of the leaf page.  There are two versions (a default
@@ -331,7 +366,6 @@ leaf_only:
 	 */
 	if (0) {
 leaf_match:	cbt->compare = 0;
-		cbt->ref = child;
 		cbt->slot = WT_ROW_SLOT(page, rip);
 		return (0);
 	}
@@ -356,46 +390,54 @@ leaf_match:	cbt->compare = 0;
 	 */
 	if (base == 0) {
 		cbt->compare = 1;
-		cbt->ref = child;
 		cbt->slot = WT_ROW_SLOT(page, page->pg_row_d);
 
 		F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
 		cbt->ins_head = WT_ROW_INSERT_SMALLEST(page);
 	} else {
 		cbt->compare = -1;
-		cbt->ref = child;
 		cbt->slot = WT_ROW_SLOT(page, page->pg_row_d + (base - 1));
 
 		cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 	}
+
+	/*
+	 * We track when we've previously appended to a page and in that case,
+	 * do a fast check for an append before the full page/skiplist search,
+	 * both here and in the internal page search.
+	 *
+	 * A search of an internal page can only turn the append flag off: any
+	 * search of an internal page that doesn't move past the end of the page
+	 * turns the append flag off, so a search inside the tree always turns
+	 * off fast-append checks.
+	 *
+	 * If the internal page search left the append flag on, we do the fast-
+	 * append check before searching the leaf page.  If the check fails, we
+	 * turn the append flag off, and proceed with the page/skiplist search.
+	 *
+	 * The code here turns the append flag on for future searches.  If we're
+	 * doing an insert, there's no insert list and the page is empty, we're
+	 * appending to the page (this is where we end up for empty pages).  If
+	 * we ended up past the end of an insert list, past the end of a page,
+	 * we're appending to the page.  In both of those cases, turn the append
+	 * flag on.  Note we will turn the append flag on even if this leaf page
+	 * is in the middle of a tree; it's wasted, a subsequent internal page
+	 * search will turn it off again.
+	 */
 	if (WT_SKIP_FIRST(cbt->ins_head) == NULL) {
 		cbt->ins = NULL;
 		cbt->next_stack[0] = NULL;
+		if (!insert)				/* Common path. */
+			return (0);
+
+		if (page->pg_row_entries == 0)
+			btree->appending = 1;
 	} else {
-		/*
-		 * We track when we've previously appended to a page and in that
-		 * case, do a fast check for an append before the full skiplist
-		 * search, both here and in the internal page search.  A search
-		 * of an internal page can only turn the fast-append flag off:
-		 * any search of an internal page that doesn't move past the end
-		 * of the page turns the append flag off, so a search inside the
-		 * tree will always turn off fast-append checks.
-		 *
-		 * This check isn't as good: inserting past the end of a page
-		 * (even if that page appears in the middle of the tree), turns
-		 * the fast-append flag back on.  It's wasted effort, though,
-		 * the next internal page search will turn it off again.
-		 */
-		append = 0;
-		if (insert && btree->appending)
-			WT_ERR(__wt_search_insert_append(
-			    session, cbt, srch_key, &append));
-		if (!append) {
-			WT_ERR(__wt_search_insert(session, cbt, srch_key));
-			append =
-			    cbt->compare == -1 && base == page->pg_row_entries;
-		}
-		if (append) {
+		WT_ERR(__wt_search_insert(session, cbt, srch_key));
+		if (!insert)				/* Common path. */
+			return (0);
+
+		if (cbt->compare == -1 && base == page->pg_row_entries) {
 			if (!btree->appending)
 				btree->appending = 1;
 		} else {
