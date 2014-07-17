@@ -332,11 +332,6 @@ leaf_only:
 	if (0) {
 leaf_match:	cbt->compare = 0;
 		cbt->ref = child;
-
-		/*
-		 * Safe: if the page had entries, rip will be set in the loop
-		 * above, if the page has no entries, then cmp will not be 0.
-		 */
 		cbt->slot = WT_ROW_SLOT(page, rip);
 		return (0);
 	}
