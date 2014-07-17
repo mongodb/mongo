@@ -377,6 +377,20 @@ leaf_match:	cbt->compare = 0;
 		cbt->ins = NULL;
 		cbt->next_stack[0] = NULL;
 	} else {
+		/*
+		 * We track when we've previously appended to a page and in that
+		 * case, do a fast check for an append before the full skiplist
+		 * search, both here and in the internal page search.  A search
+		 * of an internal page can only turn the fast-append flag off:
+		 * any search of an internal page that doesn't move past the end
+		 * of the page turns the append flag off, so a search inside the
+		 * tree will always turn off fast-append checks.
+		 *
+		 * This check isn't as good: inserting past the end of a page
+		 * (even if that page appears in the middle of the tree), turns
+		 * the fast-append flag back on.  It's wasted effort, though,
+		 * the next internal page search will turn it off again.
+		 */
 		append = 0;
 		if (insert && btree->appending)
 			WT_ERR(__wt_search_insert_append(
