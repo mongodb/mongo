@@ -427,7 +427,7 @@ namespace repl {
         // we have items we are writing that aren't from a point-in-time.  thus best not to come
         // online until we get to that point in freshness.
         log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong() << rsLog;
-        setMinValid(newMinValid);
+        setMinValid(txn, newMinValid);
 
         // any full collection resyncs required?
         if (!fixUpInfo.collectionsToResync.empty()) {
@@ -473,7 +473,7 @@ namespace repl {
                 else {
                     log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong()
                           << rsLog;
-                    setMinValid(newMinValid);
+                    setMinValid(txn, newMinValid);
                 }
             }
             catch (DBException& e) {
@@ -669,7 +669,7 @@ namespace repl {
         }
 
         // reset cached lastoptimewritten and h value
-        loadLastOpTimeWritten();
+        loadLastOpTimeWritten(txn);
 
         // done
         if (warn)

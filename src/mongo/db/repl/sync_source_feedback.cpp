@@ -40,7 +40,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"  // theReplSet
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -70,26 +70,25 @@ namespace repl {
         return authenticateInternalUser(_connection.get());
     }
 
-    void SyncSourceFeedback::ensureMe() {
+    void SyncSourceFeedback::ensureMe(OperationContext* txn) {
         string myname = getHostName();
         {
-            OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, "local");
+            Client::WriteContext ctx(txn, "local");
 
             // local.me is an identifier for a server for getLastError w:2+
-            if (!Helpers::getSingleton(&txn, "local.me", _me) ||
+            if (!Helpers::getSingleton(txn, "local.me", _me) ||
                 !_me.hasField("host") ||
                 _me["host"].String() != myname) {
 
                 // clean out local.me
-                Helpers::emptyCollection(&txn, "local.me");
+                Helpers::emptyCollection(txn, "local.me");
 
                 // repopulate
                 BSONObjBuilder b;
                 b.appendOID("_id", 0, true);
                 b.append("host", myname);
                 _me = b.obj();
-                Helpers::putSingleton(&txn, "local.me", _me);
+                Helpers::putSingleton(txn, "local.me", _me);
             }
             ctx.commit();
             // _me is used outside of a read lock, so we must copy it out of the mmap

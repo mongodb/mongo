@@ -291,7 +291,8 @@ namespace mongo {
                 //
 
                 ChunkVersion latestShardVersion;
-                shardingState.refreshMetadataIfNeeded( request.getTargetingNS(),
+                shardingState.refreshMetadataIfNeeded( _txn,
+                                                       request.getTargetingNS(),
                                                        requestMetadata->getShardVersion(),
                                                        &latestShardVersion );
 

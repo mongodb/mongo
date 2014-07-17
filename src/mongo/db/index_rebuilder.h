@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     // This is a job that's only run at startup. It finds all incomplete indices and 
     // finishes rebuilding them. After they complete rebuilding, the thread terminates. 
     class IndexRebuilder : public BackgroundJob {
@@ -49,7 +51,7 @@ namespace mongo {
          * Check each collection in the passed in list to see if it has any in-progress index
          * builds that need to be retried.  If so, calls retryIndexBuild.
          */
-        void checkNS(const std::list<std::string>& nsToCheck);
+        void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck);
     };
 
     extern IndexRebuilder indexRebuilder;

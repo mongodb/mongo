@@ -119,7 +119,7 @@ namespace repl {
                                     const char* db );
 
         // populates _me so that it can be passed to oplogreader for handshakes
-        void ensureMe();
+        void ensureMe(OperationContext* txn);
 
         void forceResync(OperationContext* txn, const char *requester);
 
@@ -142,16 +142,17 @@ namespace repl {
 
         typedef std::vector< shared_ptr< ReplSource > > SourceVector;
         static void loadAll(OperationContext* txn, SourceVector&);
-        explicit ReplSource(BSONObj);
+
+        explicit ReplSource(OperationContext* txn, BSONObj);
         // This is not the constructor you are looking for. Always prefer the version that takes
         // a BSONObj.  This is public only as a hack so that the ReplicationCoordinator can find
         // out the process's RID in master/slave setups.
-        ReplSource();
+        ReplSource(OperationContext* txn);
 
         /* -1 = error */
         int sync(int& nApplied);
 
-        void save(); // write ourself to local.sources
+        void save(OperationContext* txn); // write ourself to local.sources
 
         // make a jsobj from our member fields of the form
         //   { host: ..., source: ..., syncedTo: ... }

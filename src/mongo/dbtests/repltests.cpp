@@ -57,30 +57,28 @@ namespace ReplTests {
     class Base {
     protected:
         mutable OperationContextImpl _txn;
-        Lock::GlobalWrite _lk;
         WriteUnitOfWork _wunit;
 
         mutable DBDirectClient _client;
-        Client::Context _context;
 
     public:
-        Base() : _lk(_txn.lockState()),
-                  _wunit( _txn.recoveryUnit()),
-                 _client(&_txn),
-                 _context(&_txn, ns()) {
+        Base() : _wunit( _txn.recoveryUnit()),
+                 _client(&_txn) {
 
             oldRepl();
             ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
             replSettings.replSet = "";
             replSettings.oplogSize = 5 * 1024 * 1024;
             replSettings.master = true;
-            createOplog();
+            createOplog(&_txn);
 
+            Client::WriteContext ctx(&_txn, ns());
 
-            Collection* c = _context.db()->getCollection( &_txn, ns() );
+            Collection* c = ctx.ctx().db()->getCollection(&_txn, ns());
             if ( ! c ) {
-                c = _context.db()->createCollection( &_txn, ns() );
+                c = ctx.ctx().db()->createCollection(&_txn, ns());
             }
+
             c->getIndexCatalog()->ensureHaveIdIndex(&_txn);
         }
         ~Base() {
@@ -187,7 +185,7 @@ namespace ReplTests {
                 BSONObjBuilder b;
                 b.append("host", "localhost");
                 b.appendTimestamp("syncedTo", 0);
-                ReplSource a(b.obj());
+                ReplSource a(&txn, b.obj());
                 for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i ) {
                     if ( 0 ) {
                         mongo::unittest::log() << "op: " << *i << endl;
@@ -274,9 +272,6 @@ namespace ReplTests {
             b.appendOID( "_id", &id );
             b.appendElements( fromjson( json ) );
             return b.obj();
-        }
-        Database* db() {
-            return _context.db();
         }
     };
 
@@ -1431,10 +1426,14 @@ namespace ReplTests {
             bool threw = false;
             BSONObj o = BSON("ns" << ns() << "o" << BSON("foo" << "bar") << "o2" << BSON("_id" << "in oplog" << "foo" << "bar"));
 
+            Lock::GlobalWrite lk(_txn.lockState());
+
             // this should fail because we can't connect
             try {
                 Sync badSource("localhost:123");
-                badSource.getMissingDoc(&_txn, db(), o);
+
+                Client::Context ctx(&_txn, ns());
+                badSource.getMissingDoc(&_txn, ctx.db(), o);
             }
             catch (DBException&) {
                 threw = true;

@@ -84,7 +84,7 @@ namespace repl {
         }
     }
 
-    void ReplSetImpl::goStale(const Member* stale, const BSONObj& oldest) {
+    void ReplSetImpl::goStale(OperationContext* txn, const Member* stale, const BSONObj& oldest) {
         log() << "replSet error RS102 too stale to catch up, at least from "
               << stale->fullName() << rsLog;
         log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
@@ -94,26 +94,25 @@ namespace repl {
               << rsLog;
 
         // reset minvalid so that we can't become primary prematurely
-        setMinValid(oldest);
+        setMinValid(txn, oldest);
 
         sethbmsg("error RS102 too stale to catch up");
         changeState(MemberState::RS_RECOVERING);
     }
 
 namespace {
-    void dropAllTempCollections() {
+    static void dropAllTempCollections(OperationContext* txn) {
         vector<string> dbNames;
         globalStorageEngine->listDatabases( &dbNames );
 
-        OperationContextImpl txn;
         for (vector<string>::const_iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
             // The local db is special because it isn't replicated. It is cleared at startup even on
             // replica set members.
             if (*it == "local")
                 continue;
 
-            Client::Context ctx(&txn, *it);
-            ctx.db()->clearTmpCollections(&txn);
+            Client::Context ctx(txn, *it);
+            ctx.db()->clearTmpCollections(txn);
         }
     }
 }
@@ -142,7 +141,7 @@ namespace {
         // This must be done after becoming primary but before releasing the write lock. This adds
         // the dropCollection entries for every temp collection to the opLog since we want it to be
         // replicated to secondaries.
-        dropAllTempCollections();
+        dropAllTempCollections(&txn);
     }
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
@@ -383,7 +382,7 @@ namespace {
         b.append("me", myConfig().h.toString());
     }
 
-    void ReplSetImpl::init(ReplSetSeedList& replSetSeedList) {
+    void ReplSetImpl::init(OperationContext* txn, ReplSetSeedList& replSetSeedList) {
         mgr = new Manager(this);
 
         _cfg = 0;
@@ -396,7 +395,7 @@ namespace {
 
         LOG(1) << "replSet beginning startup..." << rsLog;
 
-        loadConfig();
+        loadConfig(txn);
 
         unsigned sss = replSetSeedList.seedSet.size();
         for (Member *m = head(); m; m = m->next()) {
@@ -448,11 +447,10 @@ namespace {
         _indexPrefetchConfig(PREFETCH_ALL) {
     }
 
-    void ReplSetImpl::loadLastOpTimeWritten(bool quiet) {
-        OperationContextImpl txn; // XXX?
-        Lock::DBRead lk(txn.lockState(), rsoplog);
+    void ReplSetImpl::loadLastOpTimeWritten(OperationContext* txn, bool quiet) {
+        Lock::DBRead lk(txn->lockState(), rsoplog);
         BSONObj o;
-        if (Helpers::getLast(&txn, rsoplog, o)) {
+        if (Helpers::getLast(txn, rsoplog, o)) {
             lastH = o["h"].numberLong();
             lastOpTimeWritten = o["ts"]._opTime();
             uassert(13290, "bad replSet oplog entry?", quiet || !lastOpTimeWritten.isNull());
@@ -470,9 +468,11 @@ namespace {
 
     // call after constructing to start - returns fairly quickly after launching its threads
     void ReplSetImpl::_go() {
+        OperationContextImpl txn;
+
         indexRebuilder.wait();
         try {
-            loadLastOpTimeWritten();
+            loadLastOpTimeWritten(&txn);
         }
         catch (std::exception& e) {
             log() << "replSet error fatal couldn't query the local " << rsoplog
@@ -487,7 +487,7 @@ namespace {
         bool meEnsured = false;
         while (!inShutdown() && !meEnsured) {
             try {
-                theReplSet->syncSourceFeedback.ensureMe();
+                theReplSet->syncSourceFeedback.ensureMe(&txn);
                 meEnsured = true;
             }
             catch (const DBException& e) {
@@ -513,7 +513,7 @@ namespace {
 
     // @param reconf true if this is a reconfiguration and not an initial load of the configuration.
     // @return true if ok; throws if config really bad; false if config doesn't include self
-    bool ReplSetImpl::initFromConfig(ReplSetConfig& c, bool reconf) {
+    bool ReplSetImpl::initFromConfig(OperationContext* txn, ReplSetConfig& c, bool reconf) {
         // NOTE: haveNewConfig() writes the new config to disk before we get here.  So
         //       we cannot error out at this point, except fatally.  Check errors earlier.
         lock lk(this);
@@ -580,7 +580,7 @@ namespace {
                 log() << "replSet info self not present in the repl set configuration:" << rsLog;
                 log() << c.toString() << rsLog;
 
-                loadConfig();  // redo config from scratch
+                loadConfig(txn);  // redo config from scratch
                 return false; 
             }
             uassert(13302, "replSet error self appears twice in the repl set configuration", me<=1);
@@ -718,7 +718,7 @@ namespace {
     }
 
     // Our own config must be the first one.
-    bool ReplSetImpl::_loadConfigFinish(vector<ReplSetConfig*>& cfgs) {
+    bool ReplSetImpl::_loadConfigFinish(OperationContext* txn, vector<ReplSetConfig*>& cfgs) {
         int v = -1;
         ReplSetConfig *highest = 0;
         int myVersion = -2000;
@@ -734,18 +734,18 @@ namespace {
         }
         verify(highest);
 
-        if (!initFromConfig(*highest))
+        if (!initFromConfig(txn, *highest))
             return false;
 
         if (highest->version > myVersion && highest->version >= 0) {
             log() << "replSet got config version " << highest->version
                   << " from a remote, saving locally" << rsLog;
-            highest->saveConfigLocally(BSONObj());
+            highest->saveConfigLocally(txn, BSONObj());
         }
         return true;
     }
 
-    void ReplSetImpl::loadConfig() {
+    void ReplSetImpl::loadConfig(OperationContext* txn) {
         startupStatus = LOADINGCONFIG;
         startupStatusMsg.set("loading " + rsConfigNs + " config (LOADINGCONFIG)");
         LOG(1) << "loadConfig() " << rsConfigNs << endl;
@@ -841,7 +841,7 @@ namespace {
                     continue;
                 }
 
-                if (!_loadConfigFinish(configs.mutableVector())) {
+                if (!_loadConfigFinish(txn, configs.mutableVector())) {
                     log() << "replSet info Couldn't load config yet. Sleeping 20sec and will try "
                              "again." << rsLog;
                     sleepsecs(20);
@@ -871,19 +871,17 @@ namespace {
     const char* ReplSetImpl::_initialSyncFlagString = "doingInitialSync";
     const BSONObj ReplSetImpl::_initialSyncFlag(BSON(_initialSyncFlagString << true));
 
-    void ReplSetImpl::clearInitialSyncFlag() {
-        OperationContextImpl txn; // XXX?
-        Lock::DBWrite lk(txn.lockState(), "local");
-        WriteUnitOfWork wunit(txn.recoveryUnit());
-        Helpers::putSingleton(&txn, "local.replset.minvalid", BSON("$unset" << _initialSyncFlag));
+    void ReplSetImpl::clearInitialSyncFlag(OperationContext* txn) {
+        Lock::DBWrite lk(txn->lockState(), "local");
+        WriteUnitOfWork wunit(txn->recoveryUnit());
+        Helpers::putSingleton(txn, "local.replset.minvalid", BSON("$unset" << _initialSyncFlag));
         wunit.commit();
     }
 
-    void ReplSetImpl::setInitialSyncFlag() {
-        OperationContextImpl txn; // XXX?
-        Lock::DBWrite lk(txn.lockState(), "local");
-        WriteUnitOfWork wunit(txn.recoveryUnit());
-        Helpers::putSingleton(&txn, "local.replset.minvalid", BSON("$set" << _initialSyncFlag));
+    void ReplSetImpl::setInitialSyncFlag(OperationContext* txn) {
+        Lock::DBWrite lk(txn->lockState(), "local");
+        WriteUnitOfWork wunit(txn->recoveryUnit());
+        Helpers::putSingleton(txn, "local.replset.minvalid", BSON("$set" << _initialSyncFlag));
         wunit.commit();
     }
 
@@ -897,24 +895,22 @@ namespace {
         return false;
     }
 
-    void ReplSetImpl::setMinValid(BSONObj obj) {
+    void ReplSetImpl::setMinValid(OperationContext* txn, BSONObj obj) {
         BSONObjBuilder builder;
         BSONObjBuilder subobj(builder.subobjStart("$set"));
         subobj.appendTimestamp("ts", obj["ts"].date());
         subobj.done();
 
-        OperationContextImpl txn; // XXX?
-        Lock::DBWrite lk(txn.lockState(), "local");
-        WriteUnitOfWork wunit(txn.recoveryUnit());
-        Helpers::putSingleton(&txn, "local.replset.minvalid", builder.obj());
+        Lock::DBWrite lk(txn->lockState(), "local");
+        WriteUnitOfWork wunit(txn->recoveryUnit());
+        Helpers::putSingleton(txn, "local.replset.minvalid", builder.obj());
         wunit.commit();
     }
 
-    OpTime ReplSetImpl::getMinValid() {
-        OperationContextImpl txn; // XXX?
-        Lock::DBRead lk(txn.lockState(), "local.replset.minvalid");
+    OpTime ReplSetImpl::getMinValid(OperationContext* txn) {
+        Lock::DBRead lk(txn->lockState(), "local.replset.minvalid");
         BSONObj mv;
-        if (Helpers::getSingleton(&txn, "local.replset.minvalid", mv)) {
+        if (Helpers::getSingleton(txn, "local.replset.minvalid", mv)) {
             return mv["ts"]._opTime();
         }
         return OpTime();

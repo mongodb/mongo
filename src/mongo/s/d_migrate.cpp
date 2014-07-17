@@ -1049,7 +1049,7 @@ namespace mongo {
                 // TODO: The above checks should be removed, we should only have one refresh
                 // mechanism.
                 ChunkVersion startingVersion;
-                Status status = shardingState.refreshMetadataNow( ns, &startingVersion );
+                Status status = shardingState.refreshMetadataNow(txn, ns, &startingVersion );
 
                 if (!status.isOK()) {
                     errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
@@ -2362,7 +2362,7 @@ namespace mongo {
             // We force the remote refresh here to make the behavior consistent and predictable,
             // generally we'd refresh anyway, and to be paranoid.
             ChunkVersion currentVersion;
-            Status status = shardingState.refreshMetadataNow( ns, &currentVersion );
+            Status status = shardingState.refreshMetadataNow(txn, ns, &currentVersion );
 
             if ( !status.isOK() ) {
                 errmsg = str::stream() << "cannot start recv'ing chunk "

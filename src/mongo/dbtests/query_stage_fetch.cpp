@@ -76,7 +76,7 @@ namespace QueryStageFetch {
 
         static const char* ns() { return "unittests.QueryStageFetch"; }
 
-    private:
+    protected:
         OperationContextImpl _txn;
         DBDirectClient _client;
     };
@@ -88,13 +88,12 @@ namespace QueryStageFetch {
     class FetchStageAlreadyFetched : public QueryStageFetchBase {
     public:
         void run() {
-            OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&txn, ns());
+            Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
-                coll = db->createCollection(&txn, ns());
+                coll = db->createCollection(&_txn, ns());
             }
             WorkingSet ws;
 
@@ -148,13 +147,12 @@ namespace QueryStageFetch {
     class FetchStageFilter : public QueryStageFetchBase {
     public:
         void run() {
-            OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&txn, ns());
+            Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
-                coll = db->createCollection(&txn, ns());
+                coll = db->createCollection(&_txn, ns());
             }
             WorkingSet ws;
 

@@ -36,7 +36,7 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/master_slave.h"
@@ -419,7 +419,8 @@ namespace {
         if (mode == modeReplSet) {
             return theReplSet->syncSourceFeedback.getMyRID();
         } else if (mode == modeMasterSlave) {
-            ReplSource source;
+            OperationContextImpl txn;
+            ReplSource source(&txn);
             return source.getMyRID();
         }
         invariant(false); // Don't have an RID if no replication is enabled
@@ -614,7 +615,7 @@ namespace {
 
             log() << "replSet replSetReconfig [2]" << rsLog;
 
-            theReplSet->haveNewConfig(*newConfig, true);
+            theReplSet->haveNewConfig(txn, *newConfig, true);
             ReplSet::startupStatusMsg.set("replSetReconfig'd");
         }
         catch(const DBException& e) {
@@ -753,11 +754,11 @@ namespace {
 
             log() << "replSet replSetInitiate all members seem up" << rsLog;
 
-            createOplog();
+            createOplog(txn);
 
             Lock::GlobalWrite lk(txn->lockState());
             BSONObj comment = BSON( "msg" << "initiating set");
-            newConfig->saveConfigLocally(comment);
+            newConfig->saveConfigLocally(txn, comment);
             log() << "replSet replSetInitiate config now saved locally.  "
                 "Should come online in about a minute." << rsLog;
             resultObj->append("info",

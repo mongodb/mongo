@@ -274,7 +274,9 @@ namespace repl {
         return lastOp;
     }
 
-    BSONObj SyncTail::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
+    BSONObj SyncTail::oplogApplication(OperationContext* txn,
+                                       const BSONObj& applyGTEObj,
+                                       const BSONObj& minValidObj) {
         return oplogApplySegment(applyGTEObj, minValidObj, multiSyncApply);
     }
 
@@ -296,6 +298,7 @@ namespace repl {
     void SyncTail::oplogApplication() {
         while( 1 ) {
             OpQueue ops;
+            OperationContextImpl txn;
 
             Timer batchTimer;
             int lastTimeChecked = 0;
@@ -332,8 +335,6 @@ namespace repl {
                     // become primary
                     if (!theReplSet->isSecondary()) {
                         OpTime minvalid;
-
-                        OperationContextImpl txn;
                         theReplSet->tryToGoLiveAsASecondary(&txn, minvalid);
                     }
 
@@ -385,7 +386,7 @@ namespace repl {
             // Set minValid to the last op to be applied in this next batch.
             // This will cause this node to go into RECOVERING state
             // if we should crash and restart before updating the oplog
-            theReplSet->setMinValid(lastOp);
+            theReplSet->setMinValid(&txn, lastOp);
 
             if (BackgroundSync::get()->isAssumingPrimary()) {
                 LOG(1) << "about to apply batch up to optime: "
@@ -492,7 +493,7 @@ namespace repl {
             while (!ops->empty()) {
                 const BSONObj& op = ops->front();
                 // this updates theReplSet->lastOpTimeWritten
-                _logOpObjRS(op);
+                _logOpObjRS(&txn, op);
                 ops->pop_front();
              }
             wunit.commit();

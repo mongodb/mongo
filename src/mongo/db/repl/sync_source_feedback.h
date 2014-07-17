@@ -36,6 +36,9 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    class OperationContext;
+
 namespace repl {
 
     class Member;
@@ -53,7 +56,7 @@ namespace repl {
         void associateMember(const OID& rid, Member* member);
 
         /// Ensures local.me is populated and populates it if not.
-        void ensureMe();
+        void ensureMe(OperationContext* txn);
 
         /// Notifies the SyncSourceFeedbackThread to wake up and send a handshake up the replication
         /// chain, upon receiving a handshake.

@@ -118,29 +118,28 @@ namespace repl {
     /** write an op to the oplog that is already built.
         todo : make _logOpRS() call this so we don't repeat ourself?
         */
-    void _logOpObjRS(const BSONObj& op) {
-        OperationContextImpl txn;
-        Lock::DBWrite lk(txn.lockState(), "local");
+    void _logOpObjRS(OperationContext* txn, const BSONObj& op) {
+        Lock::DBWrite lk(txn->lockState(), "local");
         // XXX soon this needs to be part of an outer WUOW not its own.
         // We can't do this yet due to locking limitations.
-        WriteUnitOfWork wunit(txn.recoveryUnit());
+        WriteUnitOfWork wunit(txn->recoveryUnit());
 
         const OpTime ts = op["ts"]._opTime();
         long long h = op["h"].numberLong();
 
         {
             if ( localOplogRSCollection == 0 ) {
-                Client::Context ctx(&txn, rsoplog);
+                Client::Context ctx(txn, rsoplog);
 
                 localDB = ctx.db();
                 verify( localDB );
-                localOplogRSCollection = localDB->getCollection( &txn, rsoplog );
+                localOplogRSCollection = localDB->getCollection(txn, rsoplog);
                 massert(13389,
                         "local.oplog.rs missing. did you drop it? if so restart server",
                         localOplogRSCollection);
             }
-            Client::Context ctx(&txn, rsoplog, localDB);
-            checkOplogInsert( localOplogRSCollection->insertDocument( &txn, op, false ) );
+            Client::Context ctx(txn, rsoplog, localDB);
+            checkOplogInsert(localOplogRSCollection->insertDocument(txn, op, false));
 
             /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
                      this code (or code in now() maybe) should be improved.
@@ -459,9 +458,8 @@ namespace repl {
         }
     }
 
-    void createOplog() {
-        OperationContextImpl txn;
-        Lock::GlobalWrite lk(txn.lockState());
+    void createOplog(OperationContext* txn) {
+        Lock::GlobalWrite lk(txn->lockState());
 
         const char * ns = "local.oplog.$main";
 
@@ -470,13 +468,13 @@ namespace repl {
         if( rs )
             ns = rsoplog;
 
-        Client::Context ctx(&txn, ns);
-        Collection* collection = ctx.db()->getCollection( &txn, ns );
+        Client::Context ctx(txn, ns);
+        Collection* collection = ctx.db()->getCollection(txn, ns );
 
         if ( collection ) {
 
             if (replSettings.oplogSize != 0) {
-                int o = (int)(collection->getRecordStore()->storageSize(&txn) / ( 1024 * 1024 ) );
+                int o = (int)(collection->getRecordStore()->storageSize(txn) / ( 1024 * 1024 ) );
                 int n = (int)(replSettings.oplogSize / (1024 * 1024));
                 if ( n != o ) {
                     stringstream ss;
@@ -488,7 +486,7 @@ namespace repl {
 
             if( rs ) return;
 
-            initOpTimeFromOplog(&txn, ns);
+            initOpTimeFromOplog(txn, ns);
             return;
         }
 
@@ -527,10 +525,10 @@ namespace repl {
         options.cappedSize = sz;
         options.autoIndexId = CollectionOptions::NO;
 
-        WriteUnitOfWork wunit(txn.recoveryUnit());
-        invariant( ctx.db()->createCollection( &txn, ns, options ) );
+        WriteUnitOfWork wunit(txn->recoveryUnit());
+        invariant(ctx.db()->createCollection(txn, ns, options));
         if( !rs )
-            logOp( &txn, "n", "", BSONObj() );
+            logOp(txn, "n", "", BSONObj() );
         wunit.commit();
 
         /* sync here so we don't get any surprising lag later when we try to sync */
