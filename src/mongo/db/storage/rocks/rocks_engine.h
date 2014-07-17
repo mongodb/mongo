@@ -88,6 +88,9 @@ namespace mongo {
                                        bool preserveClonedFilesOnFailure = false,
                                        bool backupOriginalFiles = false );
 
+        // This executes a shutdown in rocks, so this rocksdb must not be used after this call
+        virtual void cleanShutdown(OperationContext* txn);
+
         // rocks specific api
 
         rocksdb::DB* getDB() { return _db; }

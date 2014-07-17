@@ -77,8 +77,6 @@ namespace mongo {
     }
 
     RocksEngine::~RocksEngine() {
-        _map = Map();
-        delete _db;
     }
 
     RecoveryUnit* RocksEngine::newRecoveryUnit( OperationContext* opCtx ) {
@@ -115,7 +113,29 @@ namespace mongo {
                                         const std::string& dbName,
                                         bool preserveClonedFilesOnFailure,
                                         bool backupOriginalFiles ) {
-        return Status::OK();
+        boost::mutex::scoped_lock lk( _mapLock );
+        rocksdb::Status s = RepairDB( dbName, rocksdb::Options() );
+        if ( s.ok() )
+            return Status::OK();
+        else
+            return Status( ErrorCodes::InternalError, "Repair Failed: " + s.ToString() );
+    }
+
+    void RocksEngine::cleanShutdown(OperationContext* txn) {
+        boost::mutex::scoped_lock lk( _mapLock );
+        for ( Map::const_iterator i = _map.begin(); i != _map.end(); ++i ) {
+            boost::shared_ptr<Entry> entry = i->second;
+            for ( StringMap< rocksdb::ColumnFamilyHandle* >::const_iterator j = 
+                    entry->indexNameToCF.begin();
+                    j != entry->indexNameToCF.end(); ++j ) {
+                rocksdb::ColumnFamilyHandle* index_handle = j->second;
+                delete index_handle;
+            }
+            entry->metaCfHandle.reset();
+            entry->cfHandle.reset();
+        }
+        _map = Map();
+        delete _db;
     }
 
     // non public api
