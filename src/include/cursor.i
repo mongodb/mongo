@@ -23,27 +23,27 @@ __cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
 static inline void
 __cursor_pos_clear(WT_CURSOR_BTREE *cbt)
 {
-	/* Our caller should have released any page held by this cursor. */
-	cbt->ref = NULL;
-
 	/*
-	 * Set the on-page slot to an impossible value larger than any possible
-	 * slot (it's used to validate the search function's return).
+	 * Most of the cursor's location information that needs to be set on
+	 * successful return is always set by a successful return, for example,
+	 * we don't initialize the compare return value because it's always
+	 * set by the row-store search.  The other stuff gets cleared here,
+	 * and it's a minimal set of things we need to clear. It would be a
+	 * lot simpler to clear everything, but we call this function a lot.
 	 */
-	cbt->slot = UINT32_MAX;
+	cbt->recno = 0;
 
-	cbt->ins_head = NULL;
 	cbt->ins = NULL;
+	cbt->ins_head = NULL;
 	cbt->ins_stack[0] = NULL;
-	/* We don't bother clearing the insert stack, that's more expensive. */
-
-	cbt->recno = 0;				/* Illegal value */
-
-	cbt->compare = 2;			/* Illegal value */
 
 	cbt->cip_saved = NULL;
 	cbt->rip_saved = NULL;
 
+	/*
+	 * Don't clear the active flag, it's owned by the cursor enter/leave
+	 * functions.
+	 */
 	F_CLR(cbt, ~WT_CBT_ACTIVE);
 }
 

@@ -190,8 +190,10 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 			return (0);
 
 		/*
-		 * Check if searched returned a valid slot (the likely failure
-		 * here is an empty page, the search function doesn't check).
+		 * Check if searched returned a valid slot (the failure mode is
+		 * an empty page, the search function doesn't check, and so the
+		 * more exact test is "page->pg_row_entries == 0", but this test
+		 * mirrors the column-store test).
 		 */
 		if (cbt->slot >= page->pg_row_entries)
 			return (0);
