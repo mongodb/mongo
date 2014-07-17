@@ -93,7 +93,7 @@ __curlog_search(WT_CURSOR *cursor)
 
 	WT_ERR(__wt_cursor_get_key((WT_CURSOR *)cl, &key.file, &key.offset));
 	WT_ERR(__wt_log_scan(session, &key, WT_LOGSCAN_ONE,
-	    __curlog_logrec, &cl));
+	    __curlog_logrec, cl));
 	WT_STAT_FAST_CONN_INCR(session, cursor_search);
 	WT_STAT_FAST_DATA_INCR(session, cursor_search);
 
