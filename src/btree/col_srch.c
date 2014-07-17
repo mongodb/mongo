@@ -28,7 +28,7 @@ __wt_col_search(WT_SESSION_IMPL *session,
 
 	btree = S2BT(session);
 
-	__cursor_search_clear(cbt);
+	__cursor_pos_clear(cbt);
 
 	/*
 	 * In the service of eviction splits, we're only searching a single leaf

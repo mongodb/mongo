@@ -17,11 +17,11 @@ __cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
 }
 
 /*
- * __cursor_search_clear --
- *	Reset the cursor's state for a search.
+ * __cursor_pos_clear --
+ *	Reset the cursor's location.
  */
 static inline void
-__cursor_search_clear(WT_CURSOR_BTREE *cbt)
+__cursor_pos_clear(WT_CURSOR_BTREE *cbt)
 {
 	/* Our caller should have released any page held by this cursor. */
 	cbt->ref = NULL;
@@ -148,22 +148,21 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 }
 
 /*
- * __cursor_error_resolve --
- *	Resolve the cursor's state for return on error.
+ * __cursor_reset --
+ *	Reset the cursor.
  */
 static inline int
-__cursor_error_resolve(WT_CURSOR_BTREE *cbt)
+__cursor_reset(WT_CURSOR_BTREE *cbt)
 {
+	WT_DECL_RET;
+
 	/*
-	 * On error, we can't iterate, so clear the cursor's position and
-	 * release any page references we're holding.
+	 * The cursor is leaving the API, and no longer holds any position,
+	 * generally called to clean up the cursor after an error.
 	 */
-	WT_RET(__curfile_leave(cbt));
-
-	/* Clear the cursor's search state. */
-	__cursor_search_clear(cbt);
-
-	return (0);
+	ret = __curfile_leave(cbt);
+	__cursor_pos_clear(cbt);
+	return (ret);
 }
 
 /*

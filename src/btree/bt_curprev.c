@@ -555,6 +555,6 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 	}
 
 err:	if (ret != 0)
-		WT_TRET(__cursor_error_resolve(cbt));
+		WT_TRET(__cursor_reset(cbt));
 	return (ret);
 }
