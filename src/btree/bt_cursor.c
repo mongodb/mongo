@@ -190,8 +190,10 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 			return (0);
 
 		/*
-		 * Check if searched returned a valid slot (the likely failure
-		 * here is an empty page, the search function doesn't check).
+		 * Check if searched returned a valid slot (the failure mode is
+		 * an empty page, the search function doesn't check, and so the
+		 * more exact test is "page->pg_row_entries == 0", but this test
+		 * mirrors the column-store test).
 		 */
 		if (cbt->slot >= page->pg_row_entries)
 			return (0);
@@ -268,7 +270,6 @@ __cursor_row_modify(
 int
 __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 {
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -276,10 +277,7 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 	WT_STAT_FAST_CONN_INCR(session, cursor_reset);
 	WT_STAT_FAST_DATA_INCR(session, cursor_reset);
 
-	ret = __curfile_leave(cbt);
-	__cursor_search_clear(cbt);
-
-	return (ret);
+	return (__cursor_reset(cbt));
 }
 
 /*
@@ -325,7 +323,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		ret = WT_NOTFOUND;
 
 err:	if (ret != 0)
-		WT_TRET(__cursor_error_resolve(cbt));
+		WT_TRET(__cursor_reset(cbt));
 	return (ret);
 }
 
@@ -405,7 +403,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	}
 
 err:	if (ret != 0)
-		WT_TRET(__cursor_error_resolve(cbt));
+		WT_TRET(__cursor_reset(cbt));
 	if (exactp != NULL && (ret == 0 || ret == WT_NOTFOUND))
 		*exactp = exact;
 	return (ret);
@@ -501,7 +499,7 @@ err:	if (ret == WT_RESTART)
 	if (ret == 0)
 		WT_TRET(__curfile_leave(cbt));
 	if (ret != 0)
-		WT_TRET(__cursor_error_resolve(cbt));
+		WT_TRET(__cursor_reset(cbt));
 	return (ret);
 }
 
@@ -547,7 +545,7 @@ err:	if (ret == WT_RESTART)
 		goto retry;
 	WT_TRET(__curfile_leave(cbt));
 	if (ret != 0)
-		WT_TRET(__cursor_error_resolve(cbt));
+		WT_TRET(__cursor_reset(cbt));
 	return (ret);
 }
 
@@ -620,7 +618,7 @@ err:	if (ret == WT_RESTART)
 		ret = 0;
 
 	if (ret != 0)
-		WT_TRET(__cursor_error_resolve(cbt));
+		WT_TRET(__cursor_reset(cbt));
 
 	return (ret);
 }
@@ -707,7 +705,7 @@ err:	if (ret == WT_RESTART)
 		WT_TRET(__wt_kv_return(session, cbt, cbt->modify_update));
 
 	if (ret != 0)
-		WT_TRET(__cursor_error_resolve(cbt));
+		WT_TRET(__cursor_reset(cbt));
 	return (ret);
 }
 
@@ -745,7 +743,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 		WT_ERR(__wt_btcur_search_near(cbt, 0));
 
 err:	if (ret != 0)
-		WT_TRET(__cursor_error_resolve(cbt));
+		WT_TRET(__cursor_reset(cbt));
 	return (ret);
 }
 

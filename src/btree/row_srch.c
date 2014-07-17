@@ -148,7 +148,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	rip = NULL;
 	match = 0;				/* -Wuninitialized */
 
-	__cursor_search_clear(cbt);
+	__cursor_pos_clear(cbt);
 
 	/*
 	 * The row-store search routine uses a different comparison API.
@@ -467,7 +467,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	btree = S2BT(session);
 
-	__cursor_search_clear(cbt);
+	__cursor_pos_clear(cbt);
 
 restart:
 	/* Walk the internal pages of the tree. */

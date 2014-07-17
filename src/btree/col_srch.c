@@ -28,7 +28,7 @@ __wt_col_search(WT_SESSION_IMPL *session,
 
 	btree = S2BT(session);
 
-	__cursor_search_clear(cbt);
+	__cursor_pos_clear(cbt);
 
 	/*
 	 * In the service of eviction splits, we're only searching a single leaf
@@ -110,10 +110,17 @@ descend:	WT_ASSERT(session, child != NULL);
 		btree->maximum_depth = depth;
 
 leaf_only:
+	page = child->page;
 	cbt->ref = child;
 	cbt->recno = recno;
 	cbt->compare = 0;
-	page = child->page;
+
+	/*
+	 * Set the on-page slot to an impossible value larger than any possible
+	 * slot (it's used to interpret the search function's return after the
+	 * search returns an insert list for a page that has no entries).
+	 */
+	cbt->slot = UINT32_MAX;
 
 	/*
 	 * Search the leaf page.  We do not check in the search path for a
