@@ -91,10 +91,10 @@ namespace {
         ASSERT_EQUALS(settings.getChunksize(), 1);
 
         BSONObj objBalancer = BSON(SettingsType::key("balancer") <<
-                           SettingsType::balancerStopped(true) <<
-                           SettingsType::balancerActiveWindow(BSON("start" << "23:00" <<
-                                                                   "stop" << "6:00" )) <<
-                           SettingsType::secondaryThrottle(true));
+                                   SettingsType::balancerStopped(true) <<
+                                   SettingsType::balancerActiveWindow(BSON("start" << "23:00" <<
+                                                                           "stop" << "6:00" )) <<
+                                   SettingsType::migrationWriteConcern(BSON("w" << 2)));
         ASSERT(settings.parseBSON(objBalancer, &errMsg));
         ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(settings.isValid(NULL));
@@ -102,7 +102,28 @@ namespace {
         ASSERT_EQUALS(settings.getBalancerStopped(), true);
         ASSERT_EQUALS(settings.getBalancerActiveWindow(), BSON("start" << "23:00" <<
                                                                "stop" << "6:00" ));
-        ASSERT_EQUALS(settings.getSecondaryThrottle(), true);
+        ASSERT(settings.getSecondaryThrottle());
+        ASSERT_EQUALS(0, settings.getMigrationWriteConcern().woCompare(BSON("w" << 2)));
+    }
+
+    TEST(Validity, ValidWithDeprecatedThrottle) {
+        SettingsType settings;
+        BSONObj objChunksize = BSON(SettingsType::key("chunksize") <<
+                                    SettingsType::chunksize(1));
+        string errMsg;
+        ASSERT(settings.parseBSON(objChunksize, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
+        ASSERT_TRUE(settings.isValid(NULL));
+        ASSERT_EQUALS(settings.getKey(), "chunksize");
+        ASSERT_EQUALS(settings.getChunksize(), 1);
+
+        BSONObj objBalancer = BSON(SettingsType::key("balancer") <<
+                                   SettingsType::deprecated_secondaryThrottle(true));
+        ASSERT(settings.parseBSON(objBalancer, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
+        ASSERT_TRUE(settings.isValid(NULL));
+        ASSERT_EQUALS(settings.getKey(), "balancer");
+        ASSERT(settings.getSecondaryThrottle());
     }
 
     TEST(Validity, BadType) {

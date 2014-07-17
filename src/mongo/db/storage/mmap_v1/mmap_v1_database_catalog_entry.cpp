@@ -42,11 +42,12 @@
 #include "mongo/db/pdfile_version.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
-#include "mongo/db/structure/catalog/namespace_details_collection_entry.h"
-#include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
-#include "mongo/db/structure/record_store_v1_capped.h"
-#include "mongo/db/structure/record_store_v1_simple.h"
+#include "mongo/db/storage/mmap_v1/btree/btree_interface.h"
+#include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
+#include "mongo/db/storage/mmap_v1/catalog/namespace_details_collection_entry.h"
+#include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
+#include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
+#include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
 
 namespace mongo {
 
@@ -444,7 +445,7 @@ namespace mongo {
 
     void MMAPV1DatabaseCatalogEntry::_lazyInit( OperationContext* txn ) {
         // this is sort of insane
-        // it's because the whole structure is highly recursive
+        // it's because the whole storage/mmap_v1 is highly recursive
 
         _namespaceIndex.init( txn );
 
@@ -682,13 +683,13 @@ namespace mongo {
             rs = entry->recordStore.get();
         }
 
-        std::auto_ptr<BtreeInterface> btree(
-            BtreeInterface::getInterface(entry->headManager(),
-                                         rs,
-                                         entry->ordering(),
-                                         entry->descriptor()->indexNamespace(),
-                                         entry->descriptor()->version(),
-                                         &BtreeBasedAccessMethod::invalidateCursors));
+        std::auto_ptr<SortedDataInterface> btree(
+            getMMAPV1Interface(entry->headManager(),
+                               rs,
+                               entry->ordering(),
+                               entry->descriptor()->indexNamespace(),
+                               entry->descriptor()->version(),
+                               &BtreeBasedAccessMethod::invalidateCursors));
 
         if (IndexNames::HASHED == type)
             return new HashAccessMethod( entry, btree.release() );

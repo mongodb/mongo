@@ -381,6 +381,8 @@ namespace {
             boost::lock_guard<boost::mutex> lock(_ridConfigMapMutex);
             config = _ridConfigMap[rid];
         }
+        LOG(2) << "received notification that node with RID " << rid << " and config " << config <<
+                " has reached optime: " << ts.toStringPretty();
         invariant(!config.isEmpty());
         std::string oplogNs = getReplicationMode() == modeReplSet?
                 "local.oplog.rs" : "local.oplog.$main";
@@ -393,8 +395,6 @@ namespace {
 
         if (getReplicationMode() == modeReplSet && !getCurrentMemberState().primary()) {
             // pass along if we are not primary
-            LOG(2) << "received notification that " << config << " has reached optime: "
-                   << ts.toStringPretty();
             theReplSet->syncSourceFeedback.updateMap(rid, ts);
         }
         return Status::OK();
@@ -576,6 +576,31 @@ namespace {
         return Status::OK();
     }
 
+    static HostAndPort someHostAndPortForMe() {
+        const char* ips = serverGlobalParams.bind_ip.c_str();
+        while (*ips) {
+            std::string ip;
+            const char* comma = strchr(ips, ',');
+            if (comma) {
+                ip = std::string(ips, comma - ips);
+                ips = comma + 1;
+            }
+            else {
+                ip = std::string(ips);
+                ips = "";
+            }
+            HostAndPort h = HostAndPort(ip, serverGlobalParams.port);
+            if (!h.isLocalHost()) {
+                return h;
+            }
+        }
+
+        std::string h = getHostName();
+        verify(!h.empty());
+        verify(h != "localhost");
+        return HostAndPort(h, serverGlobalParams.port);
+    }
+
     Status LegacyReplicationCoordinator::processReplSetInitiate(OperationContext* txn,
                                                                 const BSONObj& givenConfig,
                                                                 BSONObjBuilder* resultObj) {
@@ -644,8 +669,9 @@ namespace {
                 BSONObjBuilder b;
                 b.append("_id", name);
                 BSONObjBuilder members;
-                members.append("0", BSON( "_id" << 0 << "host" << HostAndPort::me().toString() ));
-                resultObj->append("me", HostAndPort::me().toString());
+                HostAndPort me = someHostAndPortForMe();
+                members.append("0", BSON( "_id" << 0 << "host" << me.toString() ));
+                resultObj->append("me", me.toString());
                 for( unsigned i = 0; i < seeds.size(); i++ ) {
                     members.append(BSONObjBuilder::numStr(i+1),
                                    BSON( "_id" << i+1 << "host" << seeds[i].toString()));
@@ -890,10 +916,13 @@ namespace {
 
     bool LegacyReplicationCoordinator::processHandshake(const OID& remoteID,
                                                         const BSONObj& handshake) {
+        LOG(2) << "Received handshake " << handshake << " from node with RID " << remoteID;
 
         {
             boost::lock_guard<boost::mutex> lock(_ridConfigMapMutex);
-            _ridConfigMap[remoteID] = handshake["config"].Obj().getOwned();
+            BSONObj configObj = handshake["config"].Obj().getOwned();
+            invariant(!configObj.isEmpty());
+            _ridConfigMap[remoteID] = configObj;
         }
 
         if (getReplicationMode() != modeReplSet || !handshake.hasField("member")) {
@@ -913,6 +942,20 @@ namespace {
 
     vector<BSONObj> LegacyReplicationCoordinator::getHostsWrittenTo(const OpTime& op) {
         return repl::getHostsWrittenTo(op);
+    }
+
+    Status LegacyReplicationCoordinator::checkIfWriteConcernCanBeSatisfied(
+            const WriteConcernOptions& writeConcern) const {
+        // TODO: rewrite this method with the correct version. Note that this just a
+        // temporary stub for secondary throttle.
+
+        if (getReplicationMode() == ReplicationCoordinator::modeReplSet) {
+            if (writeConcern.wNumNodes > 1 && theReplSet->config().getMajority() <= 1) {
+                return Status(ErrorCodes::CannotSatisfyWriteConcern, "not enough nodes");
+            }
+        }
+
+        return Status::OK();
     }
 
 } // namespace repl

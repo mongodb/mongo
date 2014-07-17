@@ -29,11 +29,11 @@
 #pragma once
 
 #include <algorithm>
-#include "bson/bsonobj.h"
-#include "bson/bsontypes.h"
-#include "bson/bsonmisc.h"
-#include "bson/oid.h"
-#include "util/intrusive_counter.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/oid.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/bson/optime.h"
 
 

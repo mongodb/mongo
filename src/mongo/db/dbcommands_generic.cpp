@@ -338,8 +338,8 @@ namespace mongo {
                                            std::vector<Privilege>* out) {} // No auth required
         CmdForceError() : Command("forceerror") {}
         bool run(OperationContext* txn, const string& dbnamne, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            uassert( 10038 , "forced error", false);
-            return true;
+            setLastError(10038, "forced error");
+            return false;
         }
     } cmdForceError;
 

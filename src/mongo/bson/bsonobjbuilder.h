@@ -40,11 +40,10 @@
 #include <limits>
 
 #include "mongo/base/parse_number.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bson_builder_base.h"
 #include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/export_macros.h"
 
 #if defined(_DEBUG) && defined(MONGO_EXPOSE_MACROS)
@@ -61,7 +60,7 @@ namespace mongo {
     /** Utility for creating a BSONObj.
         See also the BSON() and BSON_ARRAY() macros.
     */
-    class MONGO_CLIENT_API BSONObjBuilder : public BSONBuilderBase, private boost::noncopyable {
+    class MONGO_CLIENT_API BSONObjBuilder : boost::noncopyable {
     public:
         /** @param initsize this is just a hint as to the final size of the object */
         BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize + sizeof(unsigned)), _offset( sizeof(unsigned) ), _s( this ) , _tracker(0) , _doneCalled(false) {
@@ -711,10 +710,10 @@ namespace mongo {
         bool _doneCalled;
 
         static const std::string numStrs[100]; // cache of 0 to 99 inclusive
-        static bool numStrsReady; // for static init safety. see comments in db/jsobj.cpp
+        static bool numStrsReady; // for static init safety
     };
 
-    class BSONArrayBuilder : public BSONBuilderBase, private boost::noncopyable {
+    class BSONArrayBuilder : boost::noncopyable {
     public:
         BSONArrayBuilder() : _i(0), _b() {}
         BSONArrayBuilder( BufBuilder &_b ) : _i(0), _b(_b) {}
@@ -760,31 +759,6 @@ namespace mongo {
 
         void doneFast() { _b.doneFast(); }
 
-        BSONArrayBuilder& append(const StringData& name, int n) {
-            fill( name );
-            append( n );
-            return *this;
-        }
-
-        BSONArrayBuilder& append(const StringData& name, long long n) {
-            fill( name );
-            append( n );
-            return *this;
-        }
-
-        BSONArrayBuilder& append(const StringData& name, double n) {
-            fill( name );
-            append( n );
-            return *this;
-        }
-
-        template <typename T>
-        BSONArrayBuilder& append(const StringData& name, const T& x) {
-            fill( name );
-            append( x );
-            return *this;
-        }
-
         template < class T >
         BSONArrayBuilder& append( const std::list< T >& vals );
 
@@ -794,40 +768,6 @@ namespace mongo {
         // These two just use next position
         BufBuilder &subobjStart() { return _b.subobjStart( num() ); }
         BufBuilder &subarrayStart() { return _b.subarrayStart( num() ); }
-
-        // These fill missing entries up to pos. if pos is < next pos is ignored
-        BufBuilder &subobjStart(int pos) {
-            fill(pos);
-            return _b.subobjStart( num() );
-        }
-        BufBuilder &subarrayStart(int pos) {
-            fill(pos);
-            return _b.subarrayStart( num() );
-        }
-
-        // These should only be used where you really need interface compatibility with BSONObjBuilder
-        // Currently they are only used by update.cpp and it should probably stay that way
-        BufBuilder &subobjStart( const StringData& name ) {
-            fill( name );
-            return _b.subobjStart( num() );
-        }
-
-        BufBuilder &subarrayStart( const StringData& name ) {
-            fill( name );
-            return _b.subarrayStart( num() );
-        }
-
-        BSONArrayBuilder& appendArray( const StringData& name, const BSONObj& subObj ) {
-            fill( name );
-            _b.appendArray( num(), subObj );
-            return *this;
-        }
-
-        BSONArrayBuilder& appendAs( const BSONElement &e, const StringData& name) {
-            fill( name );
-            append( e );
-            return *this;
-        }
 
         BSONArrayBuilder& appendTimestamp(unsigned int sec, unsigned int inc) {
             _b.appendTimestamp(num(), sec, inc);
@@ -839,13 +779,38 @@ namespace mongo {
             return *this;
         }
 
-        BSONArrayBuilder& appendTimestamp(unsigned long long ts) {
-            _b.appendTimestamp(num(), ts);
+        BSONArrayBuilder& appendBinData(int len, BinDataType type, const void* data) {
+            _b.appendBinData(num(), len, type, data);
             return *this;
         }
 
-        BSONArrayBuilder& append(const StringData& s) {
-            _b.append(num(), s);
+        BSONArrayBuilder& appendCode(const StringData& code) {
+            _b.appendCode(num(), code);
+            return *this;
+        }
+
+        BSONArrayBuilder& appendCodeWScope(const StringData& code, const BSONObj& scope) {
+            _b.appendCodeWScope(num(), code, scope);
+            return *this;
+        }
+
+        BSONArrayBuilder& appendTimeT(time_t dt) {
+            _b.appendTimeT(num(), dt);
+            return *this;
+        }
+
+        BSONArrayBuilder& appendDate(Date_t dt) {
+            _b.appendDate(num(), dt);
+            return *this;
+        }
+
+        BSONArrayBuilder& appendBool(bool val) {
+            _b.appendBool(num(), val);
+            return *this;
+        }
+
+        BSONArrayBuilder& appendTimestamp(unsigned long long ts) {
+            _b.appendTimestamp(num(), ts);
             return *this;
         }
 
@@ -859,29 +824,6 @@ namespace mongo {
         BufBuilder& bb() { return _b.bb(); }
 
     private:
-        // These two are undefined privates to prevent their accidental
-        // use as we don't support unsigned ints in BSON
-        BSONObjBuilder& append(const StringData& fieldName, unsigned int val);
-        BSONObjBuilder& append(const StringData& fieldName, unsigned long long val);
-
-        void fill( const StringData& name ) {
-            long int n;
-            Status status = parseNumberFromStringWithBase( name, 10, &n );
-            uassert( 13048,
-                     (std::string)"can't append to array using std::string field name: " + name.toString(),
-                     status.isOK() );
-            fill(n);
-        }
-
-        void fill (int upTo){
-            // if this is changed make sure to update error message and jstests/set7.js
-            const int maxElems = 1500000;
-            BOOST_STATIC_ASSERT(maxElems < (BSONObjMaxUserSize/10));
-            uassert(15891, "can't backfill array to larger than 1,500,000 elements", upTo <= maxElems);
-
-            while( _i < upTo )
-                appendNull();
-        }
 
         std::string num() { return _b.numStr(_i++); }
         int _i;
@@ -943,6 +885,13 @@ namespace mongo {
     template < class T >
     inline BSONArrayBuilder& BSONArrayBuilder::append( const std::set< T >& vals ) {
         return _appendArrayIt< std::set< T > >( *this, vals );
+    }
+    
+    template <typename T> 
+    inline BSONFieldValue<BSONObj> BSONField<T>::query(const char * q, const T& t) const {
+        BSONObjBuilder b;
+        b.append( q , t );
+        return BSONFieldValue<BSONObj>( _name , b.obj() );
     }
 
 

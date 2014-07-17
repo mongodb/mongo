@@ -110,17 +110,42 @@
  * halts.
  */
 #define ASSERT_THROWS(EXPRESSION, EXCEPTION_TYPE)                       \
-    do {                                                                \
-        bool threw = false;                                             \
-        ::mongo::unittest::TestAssertion _testAssertion( __FILE__, __LINE__ ); \
-        try {                                                            \
-            EXPRESSION;                                               \
-        } catch ( const EXCEPTION_TYPE& ) { threw = true; }            \
-        if (!threw)                                                     \
-            _testAssertion.fail("Expected expression " #EXPRESSION      \
-                                " to throw " #EXCEPTION_TYPE " but it threw nothing."); \
-    } while( false )
+    ASSERT_THROWS_PRED(EXPRESSION,                                      \
+                       EXCEPTION_TYPE,                                  \
+                       ::mongo::stdx::bind(::mongo::unittest::alwaysTrue))
 
+/**
+ * Behaves like ASSERT_THROWS, above, but also fails if calling what() on the thrown exception
+ * does not return a string equal to EXPECTED_WHAT.
+ */
+#define ASSERT_THROWS_WHAT(EXPRESSION, EXCEPTION_TYPE, EXPECTED_WHAT) \
+    ASSERT_THROWS_PRED(EXPRESSION, \
+                       EXCEPTION_TYPE, \
+                       ::mongo::stdx::bind(std::equal_to<std::string>(), (EXPECTED_WHAT), \
+                                           ::mongo::stdx::bind(&EXCEPTION_TYPE::what, \
+                                                               ::mongo::stdx::placeholders::_1)))
+
+/**
+ * Behaves like ASSERT_THROWS, above, but also fails if PREDICATE(ex) for the throw exception, ex,
+ * is false.
+ */
+#define ASSERT_THROWS_PRED(EXPRESSION, EXCEPTION_TYPE, PREDICATE) do {  \
+        ::mongo::unittest::TestAssertion _testAssertion( __FILE__, __LINE__ ); \
+        try {                                                           \
+            EXPRESSION;                                                 \
+            _testAssertion.fail("Expected expression " #EXPRESSION      \
+                                " to throw " #EXCEPTION_TYPE            \
+                                " but it threw nothing.");              \
+        } catch (const EXCEPTION_TYPE& ex) {                            \
+            if (!(PREDICATE(ex))) {                                     \
+                _testAssertion.fail("Expected " #EXPRESSION             \
+                                    " to throw an exception of type "   \
+                                    #EXCEPTION_TYPE                     \
+                                    " where " #PREDICATE                \
+                                    "(ex) was true, but it was false."); \
+            }                                                           \
+        }                                                               \
+    } while (false)
 
 /**
  * Construct a single test, named "TEST_NAME" within the test case "CASE_NAME".
@@ -480,6 +505,9 @@ namespace mongo {
          * Return a list of suite names.
          */
         std::vector<std::string> getAllSuiteNames();
+
+
+        inline bool alwaysTrue() { return true; }
 
     }  // namespace unittest
 }  // namespace mongo

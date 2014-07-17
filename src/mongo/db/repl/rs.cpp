@@ -39,13 +39,9 @@
 #include "mongo/db/repl/repl_set_impl.h"
 #include "mongo/db/server_parameters.h"
 
-using namespace std;
-
 namespace mongo {
 namespace repl {
     
-    using namespace bson;
-
     ReplSet *theReplSet = 0;
 
     // This is a bitmask with the first bit set. It's used to mark connections that should be kept

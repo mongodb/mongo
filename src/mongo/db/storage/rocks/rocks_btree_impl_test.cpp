@@ -126,7 +126,7 @@ namespace mongo {
             DiskLoc loc( 5, 16 );
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( 1 ) );
                 ASSERT( !cursor->locate( key, loc ) );
             }
 
@@ -140,7 +140,7 @@ namespace mongo {
             }
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( 1 ) );
                 ASSERT( cursor->locate( key, loc ) );
                 ASSERT_EQUALS( key, cursor->getKey() );
                 ASSERT_EQUALS( loc, cursor->getDiskLoc() );
@@ -166,7 +166,7 @@ namespace mongo {
             }
 
             {
-                scoped_ptr<BtreeInterface::Cursor> cursor( btree.newCursor( 1 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( btree.newCursor( 1 ) );
                 ASSERT( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );

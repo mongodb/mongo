@@ -26,9 +26,9 @@
  * it in the license file.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/preprocessor/cat.hpp> // like the ## operator but works with __LINE__

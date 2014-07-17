@@ -472,12 +472,14 @@ namespace mongo {
                     shouldLog = true;
                 }
             }
-            catch ( UserException& ue ) {
+            catch (const UserException& ue) {
+                setLastError(ue.getCode(), ue.getInfo().msg.c_str());
                 LOG(3) << " Caught Assertion in " << opToString(op) << ", continuing "
                        << ue.toString() << endl;
                 debug.exceptionInfo = ue.getInfo();
             }
-            catch ( AssertionException& e ) {
+            catch (const AssertionException& e) {
+                setLastError(e.getCode(), e.getInfo().msg.c_str());
                 LOG(3) << " Caught Assertion in " << opToString(op) << ", continuing "
                        << e.toString() << endl;
                 debug.exceptionInfo = e.getInfo();
@@ -561,7 +563,7 @@ namespace mongo {
         DbMessage d(m);
         NamespaceString ns(d.getns());
         uassertStatusOK( userAllowedWriteNS( ns ) );
-        op.debug().ns = ns.ns();
+        op.debug().ns = ns.ns().c_str();
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
 
@@ -619,7 +621,7 @@ namespace mongo {
         NamespaceString ns(d.getns());
         uassertStatusOK( userAllowedWriteNS( ns ) );
 
-        op.debug().ns = ns.ns();
+        op.debug().ns = ns.ns().c_str();
         int flags = d.pullInt();
         bool justOne = flags & RemoveOption_JustOne;
         bool broadcast = flags & RemoveOption_Broadcast;
@@ -841,11 +843,12 @@ namespace mongo {
             try {
                 checkAndInsert(txn, ctx, ns, objs[i]);
                 txn->recoveryUnit()->commitIfNeeded();
-            } catch (const UserException&) {
+            } catch (const UserException& ex) {
                 if (!keepGoing || i == objs.size()-1){
                     globalOpCounters.incInsertInWriteLock(i);
                     throw;
                 }
+                setLastError(ex.getCode(), ex.getInfo().msg.c_str());
                 // otherwise ignore and keep going
             }
         }

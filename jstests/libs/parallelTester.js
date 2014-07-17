@@ -156,7 +156,13 @@ if ( typeof _threadInject != "undefined" ){
         
         // some tests can't be run in parallel with each other
         var serialTestsArr = [ parallelFilesDir + "/fsync.js",
-                               parallelFilesDir + "/auth1.js"
+                               parallelFilesDir + "/auth1.js",
+
+                               // These tests expect the profiler to be on or off at specific points
+                               // during the test run.
+                               parallelFilesDir + "/cursor6.js",
+                               parallelFilesDir + "/profile2.js",
+                               parallelFilesDir + "/updatee.js"
                               ];
         var serialTests = makeKeys( serialTestsArr );
         

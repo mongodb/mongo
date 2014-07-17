@@ -30,7 +30,7 @@
 #include <iosfwd>
 #include <string>
 
-#include "bson/util/builder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 
@@ -77,14 +77,6 @@ namespace mongo {
          * assign to it or re-initialize it.
          */
         Status initialize(const StringData& s);
-
-        /**
-         * Returns a HostAndPort based on the contents of serverGlobalParams.bind_ip and
-         * serverGlobalParams.port.
-         *
-         * TODO: Move to serverGlobalParams?
-         */
-        static HostAndPort me();
 
         bool operator<(const HostAndPort& r) const;
         bool operator==(const HostAndPort& r) const;

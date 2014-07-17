@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/bson_serializable.h"
 

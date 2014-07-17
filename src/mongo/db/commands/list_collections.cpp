@@ -74,13 +74,20 @@ namespace mongo {
             list<string> names;
             dbEntry->getCollectionNamespaces( &names );
 
+            names.sort();
+
             BSONArrayBuilder arr;
 
             for ( list<string>::const_iterator i = names.begin(); i != names.end(); ++i ) {
                 string ns = *i;
 
+                StringData collection = nsToCollectionSubstring( ns );
+                if ( collection == "system.namespaces" ) {
+                    continue;
+                }
+
                 BSONObjBuilder b;
-                b.append( "name", nsToCollectionSubstring( ns ) );
+                b.append( "name", collection );
 
                 CollectionOptions options =
                     dbEntry->getCollectionCatalogEntry( txn, ns )->getCollectionOptions(txn);

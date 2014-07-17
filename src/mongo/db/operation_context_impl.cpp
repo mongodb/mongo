@@ -66,7 +66,7 @@ namespace mongo {
         return &getCurOp()->setMessage(msg, name, progressMeterTotal, secondsBetween);
     }
 
-    const char* OperationContextImpl::getNS() const {
+    string OperationContextImpl::getNS() const {
         return getCurOp()->getNS();
     }
 

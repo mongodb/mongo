@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
 #include <stack>
 
 #include "mongo/client/dbclientinterface.h"

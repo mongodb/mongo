@@ -53,8 +53,6 @@ namespace repl {
 
     MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
 
-    using namespace bson;
-
 namespace {
     /**
      * Returns true if there is no data on this server. Useful when starting replication.

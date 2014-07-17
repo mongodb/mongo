@@ -30,7 +30,6 @@
 
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/global_optime.h"
-#include "mongo/db/structure/catalog/namespace.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -154,11 +153,11 @@ namespace mongo {
         if ( !NamespaceString::validCollectionName( coll ) )
             return Status( ErrorCodes::BadValue, "invalid collection name" );
 
-        if ( db.size() + 1 /* dot */ + coll.size() > Namespace::MaxNsColletionLen )
+        if ( db.size() + 1 /* dot */ + coll.size() > NamespaceString::MaxNsCollectionLen )
             return Status( ErrorCodes::BadValue,
                            str::stream()
                              << "fully qualified namespace " << db << '.' << coll << " is too long "
-                             << "(max is " << Namespace::MaxNsColletionLen << " bytes)" );
+                             << "(max is " << NamespaceString::MaxNsCollectionLen << " bytes)" );
 
         // check spceial areas
 

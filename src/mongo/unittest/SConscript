@@ -2,14 +2,8 @@
 
 Import("env")
 
-# TODO(sverch): 'lasterror' should not be required by 'foundation'.  Even if it is it should be
-# depended on directly rather than here, but we currently have a triangle dependency between
-# 'network', 'foundation' and 'lasterror'.  assert_util.cpp depends on lasterror.cpp which depends
-# on sock.cpp which depends on assert_util.cpp.  Eventually we want to have an assertion library
-# that does not depend on internal server code, and then this can go away.
 env.Library("unittest", ['unittest.cpp', 'temp_dir.cpp'],
             LIBDEPS=['$BUILD_DIR/mongo/foundation',
-                     '$BUILD_DIR/mongo/lasterror',
                      '$BUILD_DIR/mongo/util/options_parser/options_parser',
             ])
 

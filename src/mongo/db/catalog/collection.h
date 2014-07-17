@@ -35,13 +35,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/catalog/collection_cursor_cache.h"
+#include "mongo/db/catalog/collection_info_cache.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/structure/capped_callback.h"
-#include "mongo/db/structure/record_store.h"
-#include "mongo/db/catalog/collection_info_cache.h"
+#include "mongo/db/storage/capped_callback.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
@@ -54,8 +54,6 @@ namespace mongo {
     class OperationContext;
 
     class RecordIterator;
-    class FlatIterator;
-    class CappedIterator;
 
     class OpDebug;
 
@@ -293,8 +291,6 @@ namespace mongo {
         mutable CollectionCursorCache _cursorCache;
 
         friend class Database;
-        friend class FlatIterator;
-        friend class CappedIterator;
         friend class IndexCatalog;
         friend class NamespaceDetails;
     };

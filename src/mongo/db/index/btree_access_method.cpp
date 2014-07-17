@@ -39,7 +39,7 @@
 namespace mongo {
 
     // Standard Btree implementation below.
-    BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState, BtreeInterface* btree )
+    BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree )
         : BtreeBasedAccessMethod(btreeState, btree) {
 
         // The key generation wants these values.

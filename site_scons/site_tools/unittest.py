@@ -5,7 +5,7 @@ def exists(env):
     return True
 
 def register_unit_test(env, test):
-    env._UnitTestList('$UNITTEST_LIST', test)
+    env['UNITTEST_LIST_ENV']._UnitTestList('$UNITTEST_LIST', test)
     env.Alias('$UNITTEST_ALIAS', test)
 
 def unit_test_list_builder_action(env, target, source):
@@ -37,6 +37,10 @@ def build_cpp_unit_test(env, target, source, **kwargs):
     return result
 
 def generate(env):
+    # Capture the top level env so we can use it to generate the unit test list file
+    # indepenently of which environment CppUnitTest was called in. Otherwise we will get "Two
+    # different env" warnings for the unit_test_list_builder_action.
+    env['UNITTEST_LIST_ENV'] = env;
     unit_test_list_builder = env.Builder(
         action=env.Action(unit_test_list_builder_action, "Generating $TARGET"),
         multi=True)

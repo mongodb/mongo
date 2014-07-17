@@ -32,6 +32,8 @@
 
 #include "mongo/shell/bench.h"
 
+#include <pcrecpp.h>
+
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/namespace_string.h"

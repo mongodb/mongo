@@ -58,8 +58,6 @@
 namespace mongo {
 namespace repl {
 
-    using namespace bson;
-
     MONGO_EXPORT_STARTUP_SERVER_PARAMETER(maxSyncSourceLagSecs, int, 30);
     MONGO_INITIALIZER(maxSyncSourceLagSecsCheck) (InitializerContext*) {
         if (maxSyncSourceLagSecs < 1) {

@@ -130,6 +130,7 @@ assert.commandWorked(s.getDB('admin').runCommand({ moveChunk: "test.foo",
                                                    find: { x: 10 },
                                                    to: other._id,
                                                    _secondaryThrottle: true,
+                                                   writeConcern: { w: 2 },
                                                    _waitForDelete: true }));
 assert.eq( 100 , t.count() , "C3" )
 

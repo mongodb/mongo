@@ -9,6 +9,7 @@ Optionally replaces zero codes in source code with new distinct values.
 import os
 import re
 import utils
+import sys
 from collections import defaultdict, namedtuple
 from optparse import OptionParser
 
@@ -51,7 +52,7 @@ def parseSourceFiles( callback ):
     patterns = [
         re.compile( r"[umsgf]asser(?:t|ted) *\( *(\d+)" ) ,
         re.compile( r"(?:User|Msg|MsgAssertion)Exception *\( *(\d+)" ),
-        re.compile( r"fassertFailed(?:NoTrace)? *\( *(\d+)" )
+        re.compile( r"fassertFailed(?:NoTrace|WithStatus)? *\( *(\d+)" )
     ]
 
     bad = [ re.compile( r"^\s*assert *\(" ) ]
@@ -306,6 +307,7 @@ def main():
         replaceBadCodes(errors, next)
     else:
         print ERROR_HELP
+        sys.exit(1)
 
 
 ERROR_HELP = """

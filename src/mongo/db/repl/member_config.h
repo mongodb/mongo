@@ -68,8 +68,13 @@ namespace repl {
 
         /**
          * Initializes this MemberConfig from the contents of "mcfg".
+         *
+         * If "mcfg" describes any tags, builds ReplicaSetTags for this
+         * configuration using "tagConfig" as the tag's namespace. This may
+         * have the effect of altering "tagConfig" when "mcfg" describes a
+         * tag not previously added to "tagConfig".
          */
-        Status initialize(const BSONObj& mcfg);
+        Status initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagConfig);
 
         /**
          * Performs basic consistency checks on the member configuration.

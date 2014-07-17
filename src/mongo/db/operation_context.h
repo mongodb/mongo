@@ -91,9 +91,11 @@ namespace mongo {
                                           int secondsBetween = 3) = 0;
 
         /**
-         * Delegates to CurOp, but is included here to break dependencies
+         * Delegates to CurOp, but is included here to break dependencies.
+         *
+         * TODO: We return a string because of hopefully transient CurOp thread-unsafe insanity.
          */
-        virtual const char * getNS() const = 0;
+        virtual string getNS() const = 0;
 
         /**
          * Returns the client under which this context runs.

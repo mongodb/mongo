@@ -547,7 +547,7 @@ DB.prototype.getPrevError = function(){
     return this.runCommand( { getpreverror : 1 } );
 }
 
-DB.prototype.getCollectionNames = function(){
+DB.prototype._getCollectionNamesSystemNamespaces = function(){
     var all = [];
 
     var nsLength = this._name.length + 1;
@@ -563,6 +563,39 @@ DB.prototype.getCollectionNames = function(){
     }
     
     return all.sort();
+}
+
+
+DB.prototype._getCollectionNamesCommand = function() {
+    var res = this.runCommand( "listCollections" );
+    if ( res.code == 59 ) {
+        // command doesn't exist, old mongod
+        return null;
+    }
+
+    if ( !res.ok ) {
+        if ( res.errmsg && res.errmsg.startsWith( "no such cmd" ) ) {
+            return null;
+        }
+
+        throw Error( "listCollections failed: " + tojson( res ) );
+    }
+
+    var all = [];
+    for ( var i = 0; i < res.collections.length; i++ ) {
+        var name = res.collections[i].name;
+        all.push( name );
+    }
+
+    return all;
+}
+
+DB.prototype.getCollectionNames = function(){
+    var res = this._getCollectionNamesCommand();
+    if ( res ) {
+        return res;
+    }
+    return this._getCollectionNamesSystemNamespaces();
 }
 
 DB.prototype.tojson = function(){

@@ -25,6 +25,15 @@ namespace {
         ASSERT_THROWS(throwSomething(), ::std::exception);
     }
 
+    class MyException {
+    public:
+        std::string what() const { return "whatever"; }
+    };
+
+    TEST(UnitTestSelfTest, TestAssertThrowsWhatSuccess) {
+        ASSERT_THROWS_WHAT(throw MyException(), MyException, "whatever");
+    }
+
     TEST(UnitTestSelfTest, TestSuccessfulNumericComparisons) {
         ASSERT_EQUALS(1LL, 1.0);
         ASSERT_NOT_EQUALS(1LL, 0.5);
