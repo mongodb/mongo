@@ -17,7 +17,7 @@ __wt_search_insert_append(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, int *appendp)
 {
 	WT_BTREE *btree;
-	WT_INSERT *ret_ins;
+	WT_INSERT *ins;
 	WT_INSERT_HEAD *inshead;
 	WT_ITEM key;
 	int cmp, i;
@@ -25,9 +25,9 @@ __wt_search_insert_append(WT_SESSION_IMPL *session,
 	btree = S2BT(session);
 
 	inshead = cbt->ins_head;
-	ret_ins = WT_SKIP_LAST(inshead);
-	key.data = WT_INSERT_KEY(ret_ins);
-	key.size = WT_INSERT_KEY_SIZE(ret_ins);
+	ins = WT_SKIP_LAST(inshead);
+	key.data = WT_INSERT_KEY(ins);
+	key.size = WT_INSERT_KEY_SIZE(ins);
 
 	WT_RET(WT_LEX_CMP(session, btree->collator, srch_key, &key, cmp));
 	if (cmp >= 0) {
@@ -42,13 +42,13 @@ __wt_search_insert_append(WT_SESSION_IMPL *session,
 		 * serialized insert function.
 		 */
 		for (i = WT_SKIP_MAXDEPTH - 1; i >= 0; i--) {
-			cbt->ins_stack[i] = (i == 0) ? &ret_ins->next[0] :
+			cbt->ins_stack[i] = (i == 0) ? &ins->next[0] :
 			    (inshead->tail[i] != NULL) ?
 			    &inshead->tail[i]->next[i] : &inshead->head[i];
 			cbt->next_stack[i] = NULL;
 		}
 		cbt->compare = -cmp;
-		cbt->ins = ret_ins;
+		cbt->ins = ins;
 		*appendp = 1;
 	} else
 		*appendp = 0;
@@ -64,7 +64,7 @@ __wt_search_insert(
     WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key)
 {
 	WT_BTREE *btree;
-	WT_INSERT **insp, *last_ins, *ret_ins;
+	WT_INSERT *ins, **insp, *last_ins;
 	WT_INSERT_HEAD *inshead;
 	WT_ITEM key;
 	size_t match, skiphigh, skiplow;
@@ -79,9 +79,9 @@ __wt_search_insert(
 	 * go as far as possible at each level before stepping down to the next.
 	 */
 	match = skiphigh = skiplow = 0;
-	last_ins = ret_ins = NULL;
+	ins = last_ins = NULL;
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0;) {
-		if ((ret_ins = *insp) == NULL) {
+		if ((ins = *insp) == NULL) {
 			cbt->next_stack[i] = NULL;
 			cbt->ins_stack[i--] = insp--;
 			continue;
@@ -91,26 +91,26 @@ __wt_search_insert(
 		 * Comparisons may be repeated as we drop down skiplist levels;
 		 * don't repeat comparisons, they might be expensive.
 		 */
-		if (ret_ins != last_ins) {
-			last_ins = ret_ins;
-			key.data = WT_INSERT_KEY(ret_ins);
-			key.size = WT_INSERT_KEY_SIZE(ret_ins);
+		if (ins != last_ins) {
+			last_ins = ins;
+			key.data = WT_INSERT_KEY(ins);
+			key.size = WT_INSERT_KEY_SIZE(ins);
 			match = WT_MIN(skiplow, skiphigh);
 			WT_RET(WT_LEX_CMP_SKIP(session,
 			    btree->collator, srch_key, &key, cmp, &match));
 		}
 
 		if (cmp > 0) {			/* Keep going at this level */
-			insp = &ret_ins->next[i];
+			insp = &ins->next[i];
 			skiplow = match;
 		} else if (cmp < 0) {		/* Drop down a level */
-			cbt->next_stack[i] = ret_ins;
+			cbt->next_stack[i] = ins;
 			cbt->ins_stack[i--] = insp--;
 			skiphigh = match;
 		} else
 			for (; i >= 0; i--) {
-				cbt->next_stack[i] = ret_ins->next[i];
-				cbt->ins_stack[i] = &ret_ins->next[i];
+				cbt->next_stack[i] = ins->next[i];
+				cbt->ins_stack[i] = &ins->next[i];
 			}
 	}
 
@@ -119,7 +119,7 @@ __wt_search_insert(
 	 * choice; update the compare field to its new value.
 	 */
 	cbt->compare = -cmp;
-	cbt->ins = ret_ins;
+	cbt->ins = ins;
 	return (0);
 }
 
