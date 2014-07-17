@@ -388,14 +388,13 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 	    checkpoint, NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 
 	/*
-	 * Flush any pages in this checkpoint from the cache - we are about to
-	 * re-write the checkpoint which will mean that cached pages no
-	 * longer have valid contents.
-	 * This is especially noticeable with memory mapped files - since
-	 * changes to the underlying file are visible to the in memory
-	 * pages.
+	 * Flush any pages in this checkpoint from the cache (we are about to
+	 * re-write the checkpoint which will mean cached pages no longer have
+	 * valid contents).  This is especially noticeable with memory mapped
+	 * files, since changes to the underlying file are visible to the in
+	 * memory pages.
 	 */
-	WT_ERR(__wt_checkpoint_close(session));
+	WT_ERR(__wt_bt_cache_op(session, NULL, WT_SYNC_DISCARD));
 
 	/*
 	 * We lock checkpoint handles that we are overwriting, so the handle
