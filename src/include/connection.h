@@ -202,6 +202,8 @@ struct __wt_connection_impl {
 	uint32_t	 async_size;	/* Async op array size */
 	uint32_t	 async_workers;	/* Number of async workers */
 
+	WT_LSM_MANAGER	lsm_manager;	/* LSM worker thread information */
+
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	pthread_t	 stat_tid;	/* Statistics log thread */
 	int		 stat_tid_set;	/* Statistics log thread set */

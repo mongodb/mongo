@@ -485,10 +485,18 @@ static int
 __lsm_tree_open(
     WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 
+	conn = S2C(session);
+	lsm_tree = NULL;
+
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+
+	/* Start the LSM manager thread if it isn't running. */
+	if (WT_ATOMIC_CAS(conn->lsm_manager.lsm_workers, 0, 1))
+		WT_RET(__wt_lsm_manager_start(session));
 
 	/* Make sure no one beat us to it. */
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
@@ -498,7 +506,7 @@ __lsm_tree_open(
 		}
 
 	/* Try to open the tree. */
-	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
+	WT_ERR(__wt_calloc_def(session, 1, &lsm_tree));
 	WT_ERR(__wt_rwlock_alloc(session, "lsm tree", &lsm_tree->rwlock));
 	WT_ERR(__wt_cond_alloc(session, "lsm ckpt", 0, &lsm_tree->work_cond));
 	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
@@ -535,7 +543,7 @@ err:		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 
 /*
  * __wt_lsm_tree_get --
- *	get an LSM tree structure for the given name.
+ *	Get an LSM tree structure for the given name.
  */
 int
 __wt_lsm_tree_get(WT_SESSION_IMPL *session,

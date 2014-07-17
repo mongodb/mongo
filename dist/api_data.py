@@ -343,6 +343,17 @@ connection_runtime_config = [
 	Config('eviction_workers', '0', r'''
 	    additional threads to help evict pages from cache''',
 	    min=0, max=20),
+	Config('lsm', '', r'''
+	    configure database wide options for LSM tree management.''',
+	    type='category', subconfig=[
+	    Config('worker_thread_max', '4', r'''
+	        Configure a set of threads to manage merging LSM trees in
+			the database.''',
+	        min='3', max='20'),
+	    Config('merge', 'true', r'''
+	        merge LSM chunks where possible''',
+	        type='boolean')
+		]),
 	Config('shared_cache', '', r'''
 	    shared cache configuration options. A database should configure
 	    either a cache_size or a shared_cache not both''',
@@ -743,9 +754,6 @@ methods = {
 	        If the value is not an absolute path name, the files are created
 	        relative to the database home'''),
 	    ]),
-	Config('lsm_merge', 'true', r'''
-	    merge LSM chunks where possible''',
-	    type='boolean'),
 	Config('mmap', 'true', r'''
 	    Use memory mapping to access files when possible''',
 	    type='boolean'),

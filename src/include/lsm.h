@@ -79,6 +79,54 @@ struct __wt_lsm_chunk {
 } WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
 /*
+ * Different types of work units. Used by LSM worker threads to choose which
+ * type of work they will execute, and by work units to define which action
+ * is required.
+ */
+#define	WT_LSM_WORK_BLOOM	0x01
+#define	WT_LSM_WORK_FLUSH	0x02
+#define	WT_LSM_WORK_MERGE	0x04
+#define	WT_LSM_WORK_SWITCH	0x08
+
+/*
+ * WT_LSM_WORK_UNIT --
+ *	A definition of maintenance that an LSM tree needs done.
+ */
+struct __wt_lsm_work_unit {
+	STAILQ_ENTRY(__wt_lsm_work_unit) q;	/* Worker unit queue */
+	uint32_t flags;				/* The type of operation */
+	WT_LSM_TREE *lsm_tree;
+};
+
+/*
+ * WT_LSM_MANAGER --
+ *	A structure that holds resources used to manage any LSM trees in a
+ *	database.
+ */
+struct __wt_lsm_manager {
+	/*
+	 * Queues of work units for LSM worker threads. We maintain three
+	 * queues, to allow us to keep each queue FIFO, rather than needing
+	 * to manage the order of work by shuffling the queue order.
+	 * One queue for switches - since switches should never wait for other
+	 *   work to be done.
+	 * One queue for application requested work. For example flushing
+	 *   and creating bloom filters.
+	 * One queue that is managed by the LSM manager thread. It's populated
+	 * with pending merges.
+	 */
+	STAILQ_HEAD(__wt_lsm_work_switch_qh, __wt_lsm_work_unit)  switchqh;
+	STAILQ_HEAD(__wt_lsm_work_app_qh, __wt_lsm_work_unit)	  appqh;
+	STAILQ_HEAD(__wt_lsm_work_manager_qh, __wt_lsm_work_unit) managerqh;
+	WT_SPINLOCK	switch_lock;	/* Lock for switch queue */
+	WT_SPINLOCK	app_lock;	/* Lock for application queue */
+	WT_SPINLOCK	manager_lock;	/* Lock for manager queue */
+	uint32_t	lsm_workers;	/* Current number of LSM workers */
+	uint32_t	lsm_workers_max;
+	pthread_t	*lsm_worker_tids;
+
+};
+/*
  * WT_LSM_TREE --
  *	An LSM tree.
  */
@@ -172,6 +220,8 @@ struct __wt_lsm_worker_cookie {
  *	State for an LSM worker thread.
  */
 struct __wt_lsm_worker_args {
-	WT_LSM_TREE *lsm_tree;
+	WT_LSM_TREE *lsm_tree;	/* TODO: remove - hangover from old code. */
+	WT_SESSION_IMPL *session;
 	u_int id;
+	uint32_t flags;
 };
