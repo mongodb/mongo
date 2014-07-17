@@ -50,6 +50,7 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/runner_yield_policy.h"
+#include "mongo/db/query/type_explain.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
@@ -566,9 +567,12 @@ namespace mongo {
         // update if we throw a page fault exception below, and we rely on these counters
         // reflecting only the actions taken locally. In particlar, we must have the no-op
         // counter reset so that we can meaningfully comapre it with numMatched above.
-        opDebug->nscanned = 0;
-        opDebug->nscannedObjects = 0;
         opDebug->nModified = 0;
+
+        // -1 for these fields means we don't have a value. Once the update completes, we
+        // request these values from the plan executor.
+        opDebug->nscanned = -1;
+        opDebug->nscannedObjects = -1;
 
         // Get the cached document from the update driver.
         mutablebson::Document& doc = driver->getDocument();
@@ -631,14 +635,7 @@ namespace mongo {
                 continue;
             }
 
-            // We count how many documents we scanned even though we may skip those that are
-            // deemed duplicated. The final 'numMatched' and 'nscanned' numbers may differ for
-            // that reason.
-            // TODO: Do we want to pull this out of the underlying query plan?
-            opDebug->nscanned++;
-
             // Found a matching document
-            opDebug->nscannedObjects++;
             numMatched++;
 
             // Ask the driver to apply the mods. It may be that the driver can apply those "in
@@ -792,6 +789,30 @@ namespace mongo {
 
             // Opportunity for journaling to write during the update.
             getDur().commitIfNeeded();
+        }
+
+        // Runner is still alive, so we should still have a database and curop. We use
+        // these below to get the profiling level and the elapsed milliseconds for this update.
+        invariant(cc().database());
+        invariant(cc().curop());
+
+        // If profiling is enabled or this update has taken longer than slowMs, then get
+        // debug information from the query runner.
+        if (cc().database()->getProfilingLevel() > 0 ||
+            cc().curop()->elapsedMillis() > serverGlobalParams.slowMS) {
+            TypeExplain* rawExplain;
+            Status infoStatus = runner->getInfo(&rawExplain, NULL);
+            if (infoStatus.isOK()) {
+                // We successfully got explain info from the runner. Copy the relevant
+                // fields into 'opDebug'.
+                scoped_ptr<TypeExplain> explain(rawExplain);
+                if (explain->isNScannedSet()) {
+                    opDebug->nscanned = explain->getNScanned();
+                }
+                if (explain->isNScannedObjectsSet()) {
+                    opDebug->nscannedObjects = explain->getNScannedObjects();
+                }
+            }
         }
 
         // TODO: Can this be simplified?
