@@ -95,6 +95,7 @@ namespace mongo {
                     warning() << *errMsg << endl;
 
                     if (!initiallyHaveClient) {
+                        // unregister self from list of curret ops.
                         cc().shutdown();
                     }
 
@@ -115,6 +116,7 @@ namespace mongo {
                                         << ", cause by:" << causedBy(ex);
 
                 if (!initiallyHaveClient) {
+                    // unregister self from list of curret ops.
                     cc().shutdown();
                 }
 
@@ -125,29 +127,45 @@ namespace mongo {
         if (replSet) {
             Timer elapsedTime;
             ReplTime lastOpApplied = cc().getLastOp().asDate();
-            while (!opReplicatedEnough(lastOpApplied,
-                                       BSON("w" << "majority").firstElement())) {
-                if (elapsedTime.seconds() >= 3600) {
-                    *errMsg = str::stream() << "rangeDeleter timed out after "
-                                            << elapsedTime.seconds() << " seconds while waiting"
-                                            << " for deletions to be replicated to majority nodes";
+            try {
+                while (!opReplicatedEnough(lastOpApplied,
+                                           BSON("w" << "majority").firstElement())) {
+                    if (elapsedTime.seconds() >= 3600) {
+                        *errMsg = str::stream() << "rangeDeleter timed out after "
+                                                << elapsedTime.seconds() << " seconds while "
+                                                << "waiting for deletions to be replicated "
+                                                << "to majority nodes";
 
-                    if (!initiallyHaveClient) {
-                        cc().shutdown();
+                        if (!initiallyHaveClient) {
+                            // unregister self from list of curret ops.
+                            cc().shutdown();
+                        }
+
+                        return false;
                     }
 
-                    return false;
+                    sleepsecs(1);
                 }
 
-                sleepsecs(1);
+                LOG(elapsedTime.seconds() < 30 ? 1 : 0)
+                    << "rangeDeleter took " << elapsedTime.seconds() << " seconds "
+                    << " waiting for deletes to be replicated to majority nodes" << endl;
             }
+            catch (const DBException& excep) {
+                *errMsg = str::stream() << "rangeDeleter encountered an exception while "
+                        << "waiting for deletes to replicated: " << excep.toString();
 
-            LOG(elapsedTime.seconds() < 30 ? 1 : 0)
-                << "rangeDeleter took " << elapsedTime.seconds() << " seconds "
-                << " waiting for deletes to be replicated to majority nodes" << endl;
+                if (!initiallyHaveClient) {
+                    // unregister self from list of curret ops.
+                    cc().shutdown();
+                }
+
+                return false;
+            }
         }
 
         if (!initiallyHaveClient) {
+            // unregister self from list of curret ops.
             cc().shutdown();
         }
 
