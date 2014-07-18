@@ -49,12 +49,12 @@ namespace mongo {
         class RocksCursor : public SortedDataInterface::Cursor {
         public:
             // constructor that doesn't take a snapshot
-            RocksCursor( rocksdb::Iterator* iterator, bool direction ):
+            RocksCursor( rocksdb::Iterator* iterator, int direction ):
                 RocksCursor( iterator, direction, nullptr, nullptr ) { }
 
             // constructor that takes a snapshot
             RocksCursor( rocksdb::Iterator* iterator,
-                    bool direction,
+                    int direction,
                     const rocksdb::Snapshot* snapshot,
                     rocksdb::DB* db )
                 : _iterator( iterator ),
@@ -236,7 +236,7 @@ namespace mongo {
 
             scoped_ptr<rocksdb::Iterator> _iterator;
             OperationContext* _txn; // not owned
-            bool _direction;
+            int _direction;
 
             mutable bool _cached;
             mutable BSONObj _cachedKey;
