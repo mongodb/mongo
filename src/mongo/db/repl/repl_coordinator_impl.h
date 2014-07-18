@@ -169,6 +169,14 @@ namespace repl {
         void doMemberHeartbeat(ReplicationExecutor* executor,
                                const Status& inStatus,
                                const HostAndPort& hap);
+
+        /**
+         * Cancels all heartbeats.
+         *
+         * This is only called during the callback when there is a new config.
+         * At this time no new heartbeats can be scheduled due to the serialization
+         * of calls via the executor.
+         */
         void cancelHeartbeats();
 
     private:
@@ -193,17 +201,9 @@ namespace repl {
                                       Date_t firstCallDate,
                                       int retriesLeft);
 
-        void _trackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle) {
-            // this mutex should not be needed because it is always used during a callback.
-            // boost::mutex::scoped_lock lock(_mutex);
-            _heartbeatHandles.push_back(handle);
-        }
+        void _trackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle);
 
-        void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle) {
-            // this mutex should not be needed because it is always used during a callback.
-            // boost::mutex::scoped_lock lock(_mutex);
-            // TODO
-        }
+        void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle);
 
         // Handles to actively queued heartbeats.
         typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;

@@ -360,6 +360,7 @@ namespace repl {
         int64_t _totalEventWaiters;
         bool _inShutdown;
         threadpool::ThreadPool _networkWorkers;
+        uint64_t _nextId;
     };
 
     /**
@@ -368,18 +369,27 @@ namespace repl {
     class ReplicationExecutor::EventHandle {
         friend class ReplicationExecutor;
     public:
-        EventHandle() : _generation(0) {}
+        EventHandle() : _generation(0), _id(0) {}
 
         /**
          * Returns true if the handle is valid, meaning that it identifies
          */
-        bool isValid() const { return _generation != 0; }
+        bool isValid() const { return _id != 0; }
+
+        bool operator==(const EventHandle &other) const {
+            return (_id == other._id);
+        }
+
+        bool operator!=(const EventHandle &other) const {
+            return !(*this == other);
+        }
 
     private:
-        explicit EventHandle(const EventList::iterator& iter);
+        EventHandle(const EventList::iterator& iter, const uint64_t id);
 
         EventList::iterator _iter;
         uint64_t _generation;
+        uint64_t _id;
     };
 
     /**
@@ -389,6 +399,15 @@ namespace repl {
         friend class ReplicationExecutor;
     public:
         CallbackHandle() : _generation(0) {}
+
+        bool operator==(const CallbackHandle &other) const {
+            return (_finishedEvent == other._finishedEvent);
+        }
+
+        bool operator!=(const CallbackHandle &other) const {
+            return !(*this == other);
+        }
+
     private:
         explicit CallbackHandle(const WorkQueue::iterator& iter);
 

@@ -493,8 +493,36 @@ namespace repl {
         // TODO
     }
 
+    void ReplicationCoordinatorImpl::_trackHeartbeatHandle(
+                                            const ReplicationExecutor::CallbackHandle& handle) {
+        // this mutex should not be needed because it is always used during a callback.
+        // boost::mutex::scoped_lock lock(_mutex);
+        _heartbeatHandles.push_back(handle);
+    }
+
+    void ReplicationCoordinatorImpl::_untrackHeartbeatHandle(
+                                            const ReplicationExecutor::CallbackHandle& handle) {
+        // this mutex should not be needed because it is always used during a callback.
+        // boost::mutex::scoped_lock lock(_mutex);
+        HeartbeatHandles::iterator it = std::find(_heartbeatHandles.begin(),
+                                                  _heartbeatHandles.end(),
+                                                  handle);
+        invariant(it != _heartbeatHandles.end());
+
+        _heartbeatHandles.erase(it);
+
+    }
+
     void ReplicationCoordinatorImpl::cancelHeartbeats() {
-        // TODO
+        // this mutex should not be needed because it is always used during a callback.
+        //boost::mutex::scoped_lock lock(_mutex);
+        HeartbeatHandles::const_iterator it = _heartbeatHandles.begin();
+        const HeartbeatHandles::const_iterator end = _heartbeatHandles.end();
+        for( ; it != end; ++it ) {
+            _replExecutor->cancel(*it);
+        }
+
+        _heartbeatHandles.clear();
     }
 
 } // namespace repl

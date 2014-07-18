@@ -393,6 +393,59 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
     }
 
+    TEST(ReplicationExecutor, CallbackHandleComparison) {
+        NetworkInterfaceMock* net = new NetworkInterfaceMock;
+        net->simulatedNetworkLatency(5);
+        ReplicationExecutor executor(net);
+        Status status(ErrorCodes::InternalError, "");
+        const ReplicationExecutor::RemoteCommandRequest request(
+                HostAndPort("lazy", 27017),
+                "admin",
+                BSON("cmd" << 1));
+        ReplicationExecutor::CallbackHandle cbHandle1 = unittest::assertGet(
+                executor.scheduleRemoteCommand(
+                        request,
+                        stdx::bind(setStatusOnRemoteCommandCompletion,
+                                   stdx::placeholders::_1,
+                                   request,
+                                   &status)));
+        ReplicationExecutor::CallbackHandle cbHandle2 = unittest::assertGet(
+                executor.scheduleRemoteCommand(
+                        request,
+                        stdx::bind(setStatusOnRemoteCommandCompletion,
+                                   stdx::placeholders::_1,
+                                   request,
+                                   &status)));
+
+        // test equality
+        ASSERT_TRUE(cbHandle1 == cbHandle1);
+        ASSERT_TRUE(cbHandle2 == cbHandle2);
+        ASSERT_FALSE(cbHandle1 != cbHandle1);
+        ASSERT_FALSE(cbHandle2 != cbHandle2);
+
+        // test inequality
+        ASSERT_TRUE(cbHandle1 != cbHandle2);
+        ASSERT_TRUE(cbHandle2 != cbHandle1);
+        ASSERT_FALSE(cbHandle1 == cbHandle2);
+        ASSERT_FALSE(cbHandle2 == cbHandle1);
+
+        ReplicationExecutor::CallbackHandle cbHandle1Copy = cbHandle1;
+        ASSERT_TRUE(cbHandle1 == cbHandle1Copy);
+        ASSERT_TRUE(cbHandle1Copy == cbHandle1);
+        ASSERT_FALSE(cbHandle1Copy != cbHandle1);
+        ASSERT_FALSE(cbHandle1 != cbHandle1Copy);
+
+        std::vector<ReplicationExecutor::CallbackHandle> cbs;
+        cbs.push_back(cbHandle1);
+        cbs.push_back(cbHandle2);
+        ASSERT(cbHandle1 != cbHandle2);
+        std::vector<ReplicationExecutor::CallbackHandle>::iterator foundHandle =
+                                                          std::find(cbs.begin(),
+                                                                    cbs.end(),
+                                                                    cbHandle1);
+        ASSERT_TRUE(cbs.end() != foundHandle);
+        ASSERT_TRUE(cbHandle1 == *foundHandle);
+    }
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
