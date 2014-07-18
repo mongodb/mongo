@@ -55,13 +55,13 @@ namespace repl {
 
     void TopologyCoordinatorMock::relinquishPrimary(OperationContext* txn) {}
 
-    bool TopologyCoordinatorMock::prepareRequestVoteResponse(const BSONObj& cmdObj,
+    void TopologyCoordinatorMock::prepareRequestVoteResponse(const Date_t now,
+                                                             const BSONObj& cmdObj,
                                                              std::string& errmsg,
-                                                             BSONObjBuilder& result) {
-        return true;
-    }
+                                                             BSONObjBuilder& result) {}
 
-    void TopologyCoordinatorMock::prepareElectCmdResponse(const BSONObj& cmdObj,
+    void TopologyCoordinatorMock::prepareElectCmdResponse(const Date_t now,
+                                                          const BSONObj& cmdObj,
                                                           BSONObjBuilder& result) {}
 
     void TopologyCoordinatorMock::prepareHeartbeatResponse(const ReplicationExecutor::CallbackData&,
@@ -71,7 +71,24 @@ namespace repl {
                                                            Status* result) {
     }
 
-    void TopologyCoordinatorMock::updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo) {}
+    void TopologyCoordinatorMock::prepareStatusResponse(Date_t now,
+                                                        const BSONObj& cmdObj,
+                                                        BSONObjBuilder& result,
+                                                        unsigned uptime) {
+    }
+
+    void TopologyCoordinatorMock::prepareFreezeResponse(Date_t now,
+                                                        const BSONObj& cmdObj,
+                                                        BSONObjBuilder& result) {
+    }
+
+    HeartbeatResultAction TopologyCoordinatorMock::updateHeartbeatInfo(Date_t now,
+                                                                   const HeartbeatInfo& newInfo) {
+        return None;
+    }
+
+    void TopologyCoordinatorMock::updateConfig(const ReplicaSetConfig newConfig, const int selfId) {
+    }
 
 } // namespace repl
 } // namespace mongo

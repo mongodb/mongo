@@ -42,6 +42,9 @@ namespace {
     stdx::function<void ()> makeNoExcept(const stdx::function<void ()> &fn);
 }  // namespace
 
+    const ReplicationExecutor::Milliseconds ReplicationExecutor::kNoTimeout(-1);
+    const Date_t ReplicationExecutor::kNoExpirationDate(-1);
+
     ReplicationExecutor::ReplicationExecutor(NetworkInterface* netInterface) :
         _networkInterface(netInterface),
         _totalEventWaiters(0),
@@ -369,7 +372,12 @@ namespace {
             else if (_inShutdown) {
                 return std::make_pair(WorkItem(), CallbackHandle());
             }
-            _workAvailable.timed_wait(lk, waitFor);
+            if (waitFor.total_milliseconds() < 0) {
+                _workAvailable.wait(lk);
+            }
+            else {
+                _workAvailable.timed_wait(lk, waitFor);
+            }
         }
         const CallbackHandle cbHandle(_readyQueue.begin());
         const WorkItem work = *cbHandle._iter;
@@ -387,8 +395,8 @@ namespace {
         _readyQueue.splice(_readyQueue.end(), _sleepersQueue, _sleepersQueue.begin(), iter);
         _workAvailable.notify_all();
         if (iter == _sleepersQueue.end()) {
-            //return milliseconds::max();
-            return Milliseconds(std::numeric_limits<boost::int64_t>::max());
+            // indicate no sleeper to wait for
+            return Milliseconds(-1);
         }
         return Milliseconds(iter->readyDate - now);
     }
@@ -436,10 +444,14 @@ namespace {
     ReplicationExecutor::RemoteCommandRequest::RemoteCommandRequest(
             const HostAndPort& theTarget,
             const std::string& theDbName,
-            const BSONObj& theCmdObj) :
+            const BSONObj& theCmdObj,
+            const Milliseconds timeoutMillis) :
         target(theTarget),
         dbname(theDbName),
         cmdObj(theCmdObj) {
+        expirationDate = timeoutMillis == kNoTimeout ? kNoExpirationDate :
+                                                       Date_t(curTimeMillis64() +
+                                                              timeoutMillis.total_milliseconds());
     }
 
     ReplicationExecutor::RemoteCommandCallbackData::RemoteCommandCallbackData(

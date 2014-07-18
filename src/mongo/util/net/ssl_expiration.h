@@ -1,8 +1,4 @@
-/** @file jsobj.h
-    BSON classes
-*/
-
-/*    Copyright 2009 10gen Inc.
+/*    Copyright 2014 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -29,29 +25,34 @@
  *    then also delete it in the license file.
  */
 
-/**
-   BSONObj and its helpers
-
-   "BSON" stands for "binary JSON" -- ie a binary way to represent objects that would be
-   represented in JSON (plus a few extensions useful for databases & other languages).
-
-   http://www.bsonspec.org/
-*/
-
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/util/background.h"
+#include "mongo/util/time_support.h"
 
-#include "mongo/bson/util/builder.h"
-#include "mongo/bson/optime.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsonobjiterator.h"
-#include "mongo/bson/ordering.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bson_db.h"
+namespace mongo {
 
+    class CertificateExpirationMonitor : public PeriodicTask {
+    public:
+        explicit CertificateExpirationMonitor(Date_t date);
+
+        /**
+         * Gets the PeriodicTask's name.
+         * @return CertificateExpirationMonitor's name.
+         */
+        virtual std::string taskName() const;
+
+        /**
+         * Wakes up every minute as it is a PeriodicTask.
+         * Checks once a day if the server certificate has expired
+         * or will expire in the next 30 days and sends a warning 
+         * to the log accordingly.
+         */
+        virtual void taskDoWork();
+
+    private:
+        const Date_t _certExpiration;
+        Date_t _lastCheckTime;
+    };
+
+}  // namespace mongo

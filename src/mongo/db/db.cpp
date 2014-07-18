@@ -70,8 +70,8 @@
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_coordinator_hybrid.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
-#include "mongo/db/repl/repl_coordinator_legacy.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
@@ -828,12 +828,6 @@ MONGO_INITIALIZER(SetGlobalConfigExperiment)(InitializerContext* context) {
 }
 
 namespace {
-    // TODO(spencer): Remove this startup parameter once the new ReplicationCoordinator is fully
-    // working
-    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useNewReplCoordinator, bool, false);
-} // namespace
-
-namespace {
     repl::ReplSettings replSettings;
 } // namespace
 
@@ -843,14 +837,8 @@ namespace mongo {
     }
 } // namespace mongo
 
-MONGO_INITIALIZER(CreateReplicationCoordinator)(InitializerContext* context) {
-    if (useNewReplCoordinator) {
-        repl::setGlobalReplicationCoordinator(
-                new repl::ReplicationCoordinatorImpl(replSettings));
-    } else {
-        repl::setGlobalReplicationCoordinator(
-                new repl::LegacyReplicationCoordinator(replSettings));
-    }
+MONGO_INITIALIZER(CreateReplicationManager)(InitializerContext* context) {
+    repl::setGlobalReplicationCoordinator(new repl::HybridReplicationCoordinator(replSettings));
     return Status::OK();
 }
 

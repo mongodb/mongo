@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsonobjiterator.h"
-#include "mongo/bson/bson-inl.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

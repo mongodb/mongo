@@ -45,8 +45,6 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/text.h"
 
-using namespace bson;
-
 namespace mongo {
 
     MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);

@@ -57,8 +57,36 @@ namespace repl {
         return curTimeMillis64();
     }
 
+    namespace {
+        // Duplicated in real impl
+        StatusWith<int> getTimeoutMillis(Date_t expDate) {
+            // check for timeout
+            int timeout = 0;
+            if (expDate != ReplicationExecutor::kNoExpirationDate) {
+                Date_t nowDate = curTimeMillis64();
+                timeout = expDate >= nowDate ? expDate - nowDate :
+                                               ReplicationExecutor::kNoTimeout.total_milliseconds();
+                if (timeout < 0 ) {
+                    return StatusWith<int>(ErrorCodes::ExceededTimeLimit,
+                                               str::stream() << "Went to run command,"
+                                               " but it was too late. Expiration was set to "
+                                                             << expDate);
+                }
+            }
+            return StatusWith<int>(timeout);
+        }
+    } //namespace
+
     StatusWith<BSONObj> NetworkInterfaceMock::runCommand(
             const ReplicationExecutor::RemoteCommandRequest& request) {
+        if (_simulatedNetworkLatencyMillis) {
+            sleepmillis(_simulatedNetworkLatencyMillis);
+        }
+
+        StatusWith<int> toStatus = getTimeoutMillis(request.expirationDate);
+        if (!toStatus.isOK())
+            return StatusWith<BSONObj>(toStatus.getStatus());
+
         return mapFindWithDefault(
                 _responses,
                 request,
@@ -80,6 +108,10 @@ namespace repl {
             const StatusWith<BSONObj>& response) {
 
         return _responses.insert(std::make_pair(request, response)).second;
+    }
+
+    void NetworkInterfaceMock::simulatedNetworkLatency(int millis) {
+        _simulatedNetworkLatencyMillis = millis;
     }
 
 }  // namespace repl

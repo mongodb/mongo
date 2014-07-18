@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/chunk_version.h"
 

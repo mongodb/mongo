@@ -45,7 +45,8 @@ namespace mongo {
 namespace repl {
 
     TopologyCoordinatorImpl::TopologyCoordinatorImpl() :
-        _startupStatus(PRESTART), _busyWithElectSelf(false), _blockSync(false)
+        _startupStatus(PRESTART), _busyWithElectSelf(false), _blockSync(false),
+        _maintenanceModeCalls(0)
     {
     }
 
@@ -60,7 +61,7 @@ namespace repl {
     void TopologyCoordinatorImpl::setLastReceived(const OpTime& optime) {
         _lastReceived = optime;
     }
-    
+
     HostAndPort TopologyCoordinatorImpl::getSyncSourceAddress() const {
         return _syncSource->h();
     }
@@ -239,19 +240,169 @@ namespace repl {
         }
     }
 
-    // produce a reply to a RAFT-style RequestVote RPC; this is MongoDB ReplSetFresh command
-    bool TopologyCoordinatorImpl::prepareRequestVoteResponse(const BSONObj& cmdObj, 
-                                                         std::string& errmsg, 
-                                                         BSONObjBuilder& result) {
-        // TODO
+    // Produce a reply to a RAFT-style RequestVote RPC; this is MongoDB ReplSetFresh command
+    // The caller should validate that the message is for the correct set, and has the required data
+    void TopologyCoordinatorImpl::prepareRequestVoteResponse(const Date_t now,
+                                                             const BSONObj& cmdObj,
+                                                             std::string& errmsg,
+                                                             BSONObjBuilder& result) {
+
+        string who = cmdObj["who"].String();
+        int cfgver = cmdObj["cfgver"].Int();
+        OpTime opTime(cmdObj["opTime"].Date());
+
+        bool weAreFresher = false;
+        if( _currentConfig.version > cfgver ) {
+            log() << "replSet member " << who << " is not yet aware its cfg version "
+                  << cfgver << " is stale" << rsLog;
+            result.append("info", "config version stale");
+            weAreFresher = true;
+        }
+        // check not only our own optime, but any other member we can reach
+        else if( opTime < _commitOkayThrough ||
+                 opTime < _latestKnownOpTime())  {
+            weAreFresher = true;
+        }
+        result.appendDate("opTime", _lastApplied.asDate());
+        result.append("fresher", weAreFresher);
+
+        bool doVeto = _shouldVeto(cmdObj, errmsg);
+        result.append("veto",doVeto);
+        if (doVeto) {
+            result.append("errmsg", errmsg);
+        }
+    }
+
+    bool TopologyCoordinatorImpl::_shouldVeto(const BSONObj& cmdObj, string& errmsg) const {
+        // don't veto older versions
+        if (cmdObj["id"].eoo()) {
+            // they won't be looking for the veto field
+            return false;
+        }
+
+        unsigned id = cmdObj["id"].Int();
+        const Member* primary = _currentPrimary;
+        const Member* hopeful = _getConstMember(id);
+        const Member* highestPriority = _getHighestPriorityElectable();
+
+        if (!hopeful) {
+            errmsg = str::stream() << "replSet couldn't find member with id " << id;
+            return true;
+        }
+
+        if (_currentPrimary && (_commitOkayThrough >= hopeful->hbinfo().opTime)) {
+            // hbinfo is not updated, so we have to check the primary's last optime separately
+            errmsg = str::stream() << "I am already primary, " << hopeful->fullName() <<
+                " can try again once I've stepped down";
+            return true;
+        }
+
+        if (_currentPrimary &&
+                (hopeful->hbinfo().id() != primary->hbinfo().id()) &&
+                (primary->hbinfo().opTime >= hopeful->hbinfo().opTime)) {
+            // other members might be aware of more up-to-date nodes
+            errmsg = str::stream() << hopeful->fullName() <<
+                " is trying to elect itself but " << primary->fullName() <<
+                " is already primary and more up-to-date";
+            return true;
+        }
+
+        if (highestPriority &&
+            highestPriority->config().priority > hopeful->config().priority) {
+            errmsg = str::stream() << hopeful->fullName() << " has lower priority than " <<
+                highestPriority->fullName();
+            return true;
+        }
+
+        if (!_electableSet.count(id)) {
+            errmsg = str::stream() << "I don't think " << hopeful->fullName() <<
+                " is electable";
+            return true;
+        }
+
         return false;
     }
 
-    // produce a reply to a recevied electCmd
-    void TopologyCoordinatorImpl::prepareElectCmdResponse(const BSONObj& cmdObj, 
+    namespace {
+        const size_t LeaseTime = 3;
+    } // namespace
+
+    // produce a reply to a received electCmd
+    void TopologyCoordinatorImpl::prepareElectCmdResponse(const Date_t now,
+                                                          const BSONObj& cmdObj,
                                                           BSONObjBuilder& result) {
-        // TODO
-        
+
+        //TODO: after eric's checkin, add executer stuff and error if cancelled
+        DEV log() << "replSet received elect msg " << cmdObj.toString() << rsLog;
+        else LOG(2) << "replSet received elect msg " << cmdObj.toString() << rsLog;
+
+        string setName = cmdObj["setName"].String();
+        unsigned whoid = cmdObj["whoid"].Int();
+        int cfgver = cmdObj["cfgver"].Int();
+        OID round = cmdObj["round"].OID();
+        int myver = _currentConfig.version;
+
+        const Member* primary = _currentPrimary;
+        const Member* hopeful = _getConstMember(whoid);
+        const Member* highestPriority = _getHighestPriorityElectable();
+
+        int vote = 0;
+        if( setName != _currentConfig.replSetName ) {
+            log() << "replSet error received an elect request for '" << setName
+                  << "' but our setName name is '" << _currentConfig.replSetName << "'" << rsLog;
+        }
+        else if( myver < cfgver ) {
+            // we are stale.  don't vote
+        }
+        else if( myver > cfgver ) {
+            // they are stale!
+            log() << "replSet electCmdReceived info got stale version # during election" << rsLog;
+            vote = -10000;
+        }
+        else if( !hopeful ) {
+            log() << "replSet electCmdReceived couldn't find member with id " << whoid << rsLog;
+            vote = -10000;
+        }
+        else if( primary && _memberState == MemberState::RS_PRIMARY ) {
+            log() << "I am already primary, " << hopeful->fullName()
+                  << " can try again once I've stepped down" << rsLog;
+            vote = -10000;
+        }
+        else if (primary) {
+            log() << hopeful->fullName() << " is trying to elect itself but " <<
+                  primary->fullName() << " is already primary" << rsLog;
+            vote = -10000;
+        }
+        else if( highestPriority &&
+                 highestPriority->config().priority > hopeful->config().priority) {
+            log() << hopeful->fullName() << " has lower priority than "
+                  << highestPriority->fullName();
+            vote = -10000;
+        }
+        else {
+            try {
+                if( _lastVote.when + LeaseTime >= now && _lastVote.who != whoid ) {
+                    LOG(1) << "replSet not voting yea for " << whoid
+                           << " voted for " << _lastVote.who << ' ' << now-_lastVote.when
+                           << " secs ago" << rsLog;
+                    //TODO: remove exception, and change control flow?
+                    throw VoteException();
+                }
+                _lastVote.when = now;
+                _lastVote.who = whoid;
+                vote = _currentConfig.self->votes;
+                dassert( hopeful->id() == whoid );
+                log() << "replSet info voting yea for " <<  hopeful->fullName()
+                      << " (" << whoid << ')' << rsLog;
+            }
+            catch(VoteException&) {
+                log() << "replSet voting no for " << hopeful->fullName()
+                      << " already voted for another" << rsLog;
+            }
+        }
+
+        result.append("vote", vote);
+        result.append("round", round);
     }
 
     // produce a reply to a heartbeat
@@ -388,8 +539,9 @@ namespace repl {
     }
 
     // update internal state with heartbeat response, and run topology checks
-    void TopologyCoordinatorImpl::updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo) {
-
+    HeartbeatResultAction TopologyCoordinatorImpl::updateHeartbeatInfo(
+                                                        Date_t now,
+                                                        const HeartbeatInfo& newInfo) {
         // Fill in the new heartbeat data for the appropriate member
         for (Member *m = _otherMembers.head(); m; m=m->next()) {
             if (m->id() == newInfo.id()) {
@@ -399,7 +551,7 @@ namespace repl {
         }
 
         // Don't bother to make any changes if we are an election candidate
-        if (_busyWithElectSelf) return;
+        if (_busyWithElectSelf) return None;
 
         // ex-checkelectableset begins here
         unsigned int latestOp = _latestKnownOpTime().getSecs();
@@ -433,12 +585,14 @@ namespace repl {
                 (latestOp - highestPriority->hbinfo().opTime.getSecs()) << " seconds behind";
 
             // Are we primary?
+            // TODO: remove isSefl check
             if (isSelf(primary->h())) {
                 // replSetStepDown tries to acquire the same lock
                 // msgCheckNewState takes, so we can't call replSetStepDown on
                 // ourselves.
                 // XXX Eric: schedule relinquish
                 //rs->relinquish();
+                return StepDown;
             }
             else {
                 // We are not primary.  Step down the remote node.
@@ -459,6 +613,7 @@ namespace repl {
                 }
 
 */
+                return StepDown;
             }
         }
 
@@ -489,6 +644,8 @@ namespace repl {
                     log() << "auth problems, relinquishing primary" << rsLog;
                     // XXX Eric: schedule relinquish
                     //rs->relinquish();
+
+                    return StepDown;
                 }
 
                 _blockSync = true;
@@ -520,7 +677,7 @@ namespace repl {
                     if( remotePrimary ) {
                         /* two other nodes think they are primary (asynchronously polled) -- wait for things to settle down. */
                         log() << "replSet info two primaries (transiently)" << rsLog;
-                        return;
+                        return None;
                     }
                     remotePrimary = m;
                 }
@@ -530,7 +687,7 @@ namespace repl {
             if (remotePrimary) {
                 // If it's the same as last time, don't do anything further.
                 if (_currentPrimary == remotePrimary) {
-                    return;
+                    return None;
                 }
                 // Clear last heartbeat message on ourselves (why?)
                 _self->lhb() = "";
@@ -538,7 +695,7 @@ namespace repl {
                 // insanity: this is what actually puts arbiters into ARBITER state
                 if (_currentConfig.self->arbiterOnly) {
                     _changeMemberState(MemberState::RS_ARBITER);
-                    return;
+                    return None;
                 }
 
                 // If we are also primary, this is a problem.  Determine who should step down.
@@ -552,17 +709,18 @@ namespace repl {
                         // XXX Eric: schedule a relinquish
                         //rs->relinquish();
                         // after completion, set currentprimary to remotePrimary.
+                        return StepDown;
                     }
                     else {
                         // else, stick around
                         log() << "another PRIMARY detected but it should step down"
                             " since it was elected earlier than me";
-                        return;
+                        return None;
                     }
                 }
 
                 _currentPrimary = remotePrimary;
-                return;
+                return None;
             }
             /* didn't find anyone who is currently primary */
         }
@@ -577,9 +735,11 @@ namespace repl {
                 log() << "can't see a majority of the set, relinquishing primary" << rsLog;
                 // XXX Eric: schedule a relinquish
                 //rs->relinquish();
+                return StepDown;
+
             }
 
-            return;
+            return None;
         }
 
         // At this point, there is no primary anywhere.  Check to see if we should become an
@@ -591,7 +751,7 @@ namespace repl {
             && (_stepDownUntil <= now)              // stepDown timer has expired
             && (_memberState == MemberState::RS_SECONDARY)) {
             OCCASIONALLY log() << "replSet I don't see a primary and I can't elect myself";
-            return;
+            return None;
         }
 
         // If we can't see a majority, can't become a candidate.
@@ -603,20 +763,21 @@ namespace repl {
             if( last + 60 > now ) ll++;
             LOG(ll) << "replSet can't see a majority, will not try to elect self" << rsLog;
             last = now;
-            return;
+            return None;
         }
 
         // If we can't elect ourselves due to the current electable set;
         // we are in the set if we are within 10 seconds of the latest known op (via heartbeats)
         if (!(_electableSet.find(_self->id()) != _electableSet.end())) {
             // we are too far behind to become primary
-            return;
+            return None;
         }
 
         // All checks passed, become a candidate and start election proceedings.
 
         // don't try to do further elections & such while we are already working on one.
         _busyWithElectSelf = true; 
+        return StartElection;
 
     // XXX: schedule an election
 /*
@@ -633,9 +794,9 @@ namespace repl {
         
     }
 
-
 */
         _busyWithElectSelf = false;
+        return None;
     }
 
     bool TopologyCoordinatorImpl::_shouldRelinquish() const {
@@ -733,6 +894,140 @@ namespace repl {
              it != _stateChangeCallbacks.end(); ++it) {
             (*it)(_memberState);
         }
+    }
+
+    void TopologyCoordinatorImpl::prepareStatusResponse(Date_t now,
+                                                        const BSONObj& cmdObj,
+                                                        BSONObjBuilder& result,
+                                                        unsigned uptime) {
+        // output for each member
+        vector<BSONObj> membersOut;
+        MemberState myState = _memberState;
+
+        // add self
+        {
+            BSONObjBuilder bb;
+            bb.append("_id", (int) _self->id());
+            bb.append("name", _self->fullName());
+            bb.append("health", 1.0);
+            bb.append("state", (int)myState.s);
+            bb.append("stateStr", myState.toString());
+            bb.append("uptime", uptime);
+            if (!_self->config().arbiterOnly) {
+                bb.appendTimestamp("optime", _lastApplied.asDate());
+                bb.appendDate("optimeDate", _lastApplied.getSecs() * 1000LL);
+            }
+
+            if (_maintenanceModeCalls) {
+                bb.append("maintenanceMode", _maintenanceModeCalls);
+            }
+
+            std::string s = _getHbmsg();
+            if( !s.empty() )
+                bb.append("infoMessage", s);
+
+            if (myState == MemberState::RS_PRIMARY) {
+                bb.append("electionTime", _electionTime);
+                bb.appendDate("electionDate", _electionTime.asDate());
+            }
+            bb.append("self", true);
+            membersOut.push_back(bb.obj());
+        }
+
+        // add other members
+        Member* m = _otherMembers.head();
+        while( m ) {
+            BSONObjBuilder bb;
+            bb.append("_id", (int) m->id());
+            bb.append("name", m->fullName());
+            double h = m->hbinfo().health;
+            bb.append("health", h);
+            bb.append("state", (int) m->state().s);
+            if( h == 0 ) {
+                // if we can't connect the state info is from the past
+                // and could be confusing to show
+                bb.append("stateStr", "(not reachable/healthy)");
+            }
+            else {
+                bb.append("stateStr", m->state().toString());
+            }
+            bb.append("uptime",
+                     (unsigned) (m->hbinfo().upSince ? (time(0)-m->hbinfo().upSince) : 0));
+            if (!m->config().arbiterOnly) {
+                bb.appendTimestamp("optime", m->hbinfo().opTime.asDate());
+                bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
+            }
+            bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
+            bb.appendTimeT("lastHeartbeatRecv", m->hbinfo().lastHeartbeatRecv);
+            bb.append("pingMs", m->hbinfo().ping);
+            string s = m->lhb();
+            if( !s.empty() )
+                bb.append("lastHeartbeatMessage", s);
+
+            if (m->hbinfo().authIssue) {
+                bb.append("authenticated", false);
+            }
+
+            string syncingTo = m->hbinfo().syncingTo;
+            if (!syncingTo.empty()) {
+                bb.append("syncingTo", syncingTo);
+            }
+
+            if (m->state() == MemberState::RS_PRIMARY) {
+                bb.appendTimestamp("electionTime", m->hbinfo().electionTime.asDate());
+                bb.appendDate("electionDate", m->hbinfo().electionTime.getSecs() * 1000LL);
+            }
+
+            membersOut.push_back(bb.obj());
+            m = m->next();
+        }
+
+        // sort members bson
+        sort(membersOut.begin(), membersOut.end());
+
+        result.append("set", _currentConfig.replSetName);
+        result.appendTimeT("date", now);
+        result.append("myState", myState.s);
+
+        // Add sync source info
+        if ( _syncSource &&
+            (myState != MemberState::RS_PRIMARY) &&
+            (myState != MemberState::RS_SHUNNED) ) {
+            result.append("syncingTo", _syncSource->fullName());
+        }
+
+        result.append("members", membersOut);
+        /* TODO: decide where this lands
+        if( replSetBlind )
+            result.append("blind",true); // to avoid confusion if set...
+                                         // normally never set except for testing.
+        */
+    }
+    void TopologyCoordinatorImpl::prepareFreezeResponse(Date_t now,
+                                                        const BSONObj& cmdObj,
+                                                        BSONObjBuilder& result) {
+        int secs = (int) cmdObj.firstElement().numberInt();
+
+        if (secs == 0) {
+            _stepDownUntil = now;
+            log() << "replSet info 'unfreezing'" << rsLog;
+            result.append("info","unfreezing");
+        }
+        else {
+            if( secs == 1 )
+                result.append("warning", "you really want to freeze for only 1 second?");
+
+            if (_memberState != MemberState::RS_PRIMARY) {
+                _stepDownUntil = now + secs;
+                log() << "replSet info 'freezing' for " << secs << " seconds" << rsLog;
+            }
+            else {
+                log() << "replSet info received freeze command but we are primary" << rsLog;
+            }
+        }
+    }
+
+    void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig newConfig, const int selfId) {
     }
 } // namespace repl
 } // namespace mongo

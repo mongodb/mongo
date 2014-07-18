@@ -29,9 +29,8 @@
 #pragma once
 
 namespace mongo {
-namespace bson {
     class BSONObjBuilder;
-} // namespace bson
+
 namespace repl {
 
     class ReplSetConfig;

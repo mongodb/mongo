@@ -368,6 +368,31 @@ namespace {
         ASSERT_OK(status1);
     }
 
+    TEST(ReplicationExecutor, RemoteCommandWithTimeout) {
+        NetworkInterfaceMock* net = new NetworkInterfaceMock;
+        net->simulatedNetworkLatency(5);
+        ReplicationExecutor executor(net);
+        Status status(ErrorCodes::InternalError, "");
+        const ReplicationExecutor::RemoteCommandRequest request(
+                HostAndPort("lazy", 27017),
+                "admin",
+                BSON("sleep" << 1),
+                ReplicationExecutor::Milliseconds(1));
+        ReplicationExecutor::CallbackHandle cbHandle = unittest::assertGet(
+                executor.scheduleRemoteCommand(
+                        request,
+                        stdx::bind(setStatusOnRemoteCommandCompletion,
+                                   stdx::placeholders::_1,
+                                   request,
+                                   &status)));
+        sleepmillis(2);
+        boost::thread executorThread(stdx::bind(&ReplicationExecutor::run, &executor));
+        executor.wait(cbHandle);
+        executor.shutdown();
+        executorThread.join();
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
+    }
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

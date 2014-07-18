@@ -300,10 +300,11 @@ namespace mongo {
                 }
             }
 
-            const bool idChanged = updatedFields.findConflicts(&idFieldRef, NULL);
+            const bool checkIdField = (updatedFields.empty() && !original.isEmpty()) ||
+                                      updatedFields.findConflicts(&idFieldRef, NULL);
 
             // Add _id to fields to check since it too is immutable
-            if (idChanged)
+            if (checkIdField)
                 changedImmutableFields.keepShortest(&idFieldRef);
             else if (changedImmutableFields.empty()) {
                 // Return early if nothing changed which is immutable
@@ -730,9 +731,6 @@ namespace mongo {
         // creates the base of the update for the inserterd doc (because upsert was true)
         if (cq) {
             uassertStatusOK(driver->populateDocumentWithQueryFields(cq, doc));
-            // Validate the base doc, as taken from the query -- no fields means validate all.
-            FieldRefSet noFields;
-            uassertStatusOK(validate(BSONObj(), noFields, doc, NULL, driver->modOptions()));
             if (!driver->isDocReplacement()) {
                 opDebug->fastmodinsert = true;
                 // We need all the fields from the query to compare against for validation below.
@@ -750,8 +748,7 @@ namespace mongo {
         }
 
         // Apply the update modifications and then log the update as an insert manually.
-        FieldRefSet updatedFields;
-        status = driver->update(StringData(), &doc, NULL, &updatedFields);
+        status = driver->update(StringData(), &doc);
         if (!status.isOK()) {
             uasserted(16836, status.reason());
         }
@@ -760,15 +757,17 @@ namespace mongo {
         uassertStatusOK(ensureIdAndFirst(doc));
 
         // Validate that the object replacement or modifiers resulted in a document
-        // that contains all the immutable keys and can be stored.
+        // that contains all the immutable keys and can be stored if it isn't coming
+        // from a migration or via replication.
         if (!(request.isFromReplication() || request.isFromMigration())){
             const std::vector<FieldRef*>* immutableFields = NULL;
             if (lifecycle)
                 immutableFields = lifecycle->getImmutableFields();
 
+            FieldRefSet noFields;
             // This will only validate the modified fields if not a replacement.
             uassertStatusOK(validate(original,
-                                     updatedFields,
+                                     noFields,
                                      doc,
                                      immutableFields,
                                      driver->modOptions()) );

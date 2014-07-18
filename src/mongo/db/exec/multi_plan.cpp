@@ -33,6 +33,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 #include <algorithm>
+#include <math.h>
 
 // for updateCache
 #include "mongo/db/catalog/collection.h"
@@ -221,6 +222,43 @@ namespace mongo {
                     _backupPlanIdx = ix;
                     break;
                 }
+            }
+        }
+
+        // Logging for tied plans.
+        if (ranking->tieForBest && NULL != _collection) {
+            // These arrays having two or more entries is implied by 'tieForBest'.
+            invariant(ranking->scores.size() > 1);
+            invariant(ranking->candidateOrder.size() > 1);
+
+            size_t winnerIdx = ranking->candidateOrder[0];
+            size_t runnerUpIdx = ranking->candidateOrder[1];
+
+            LOG(1) << "Winning plan tied with runner-up."
+                   << " ns: " << _collection->ns()
+                   << " " << _query->toStringShort()
+                   << " winner score: " << ranking->scores[0]
+                   << " winner summary: "
+                   << getPlanSummary(*_candidates[winnerIdx].solution)
+                   << " runner-up score: " << ranking->scores[1]
+                   << " runner-up summary: "
+                   << getPlanSummary(*_candidates[runnerUpIdx].solution);
+
+            // There could be more than a 2-way tie, so log the stats for the remaining plans
+            // involved in the tie.
+            static const double epsilon = 1e-10;
+            for (size_t i = 2; i < ranking->scores.size(); i++) {
+                if (fabs(ranking->scores[i] - ranking->scores[0]) >= epsilon) {
+                    break;
+                }
+
+                size_t planIdx = ranking->candidateOrder[i];
+
+                LOG(1) << "Plan " << i << " involved in multi-way tie."
+                       << " ns: " << _collection->ns()
+                       << " " << _query->toStringShort()
+                       << " score: " << ranking->scores[i]
+                       << " summary: " << getPlanSummary(*_candidates[planIdx].solution);
             }
         }
 

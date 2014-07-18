@@ -28,32 +28,26 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
-#include <vector>
-
 #include "mongo/base/status.h"
-#include "mongo/bson/optime.h"
-#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_coordinator.h"
-#include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
-#include "mongo/platform/unordered_map.h"
-#include "mongo/util/net/hostandport.h"
+#include "mongo/db/repl/repl_coordinator_impl.h"
+#include "mongo/db/repl/repl_coordinator_legacy.h"
 
 namespace mongo {
 namespace repl {
 
-    class ReplicationCoordinatorImpl : public ReplicationCoordinator {
-        MONGO_DISALLOW_COPYING(ReplicationCoordinatorImpl);
+    /**
+     * An implementation of ReplicationCoordinator that will evolve with ReplicationCoordinatorImpl
+     * to aid in the transition from LegacyReplicationCoordinator to ReplicationCoordinatorImpl and
+     * to verify the correctness of ReplicationCoordinatorImpl.
+     */
+    class HybridReplicationCoordinator : public ReplicationCoordinator {
+        MONGO_DISALLOW_COPYING(HybridReplicationCoordinator);
 
     public:
 
-        ReplicationCoordinatorImpl(const ReplSettings& settings);
-        virtual ~ReplicationCoordinatorImpl();
-
-        // ================== Members of public ReplicationCoordinator API ===================
+        HybridReplicationCoordinator(const ReplSettings& settings);
+        virtual ~HybridReplicationCoordinator();
 
         virtual void startReplication(TopologyCoordinator* topCoord,
                                       ReplicationExecutor::NetworkInterface* network);
@@ -87,7 +81,7 @@ namespace repl {
 
         virtual bool isMasterForReportingPurposes();
 
-        virtual bool canAcceptWritesForDatabase(const StringData& database);
+        virtual bool canAcceptWritesForDatabase(const StringData& dbName);
 
         virtual Status checkIfWriteConcernCanBeSatisfied(
                 const WriteConcernOptions& writeConcern) const;
@@ -111,8 +105,7 @@ namespace repl {
 
         virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj);
 
-        virtual Status processHeartbeat(const BSONObj& cmdObj, 
-                                        BSONObjBuilder* resultObj);
+        virtual Status processHeartbeat(const BSONObj& cmdObj, BSONObjBuilder* resultObj);
 
         virtual Status processReplSetReconfig(OperationContext* txn,
                                               const ReplSetReconfigArgs& args,
@@ -146,93 +139,9 @@ namespace repl {
 
         virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
 
-        // ================== Members of replication code internal API ===================
-
-        // Called by the TopologyCoordinator whenever this node's replica set state transitions
-        void setCurrentMemberState(const MemberState& newState);
-
-        // Called by the TopologyCoordinator whenever the replica set configuration is updated
-        void setCurrentReplicaSetConfig(const TopologyCoordinator::ReplicaSetConfig& newConfig);
-
-        /**
-         * Does a heartbeat for a member of the replica set.
-         * Should be started during (re)configuration or in the heartbeat callback only.
-         */
-        void doMemberHeartbeat(ReplicationExecutor* executor,
-                               const Status& inStatus,
-                               const HostAndPort& hap);
-        void cancelHeartbeats();
-
     private:
-
-        // Struct that holds information about clients waiting for replication
-        struct WaiterInfo;
-
-        /*
-         * Returns true if the given writeConcern is satisfied up to "optime"
-         */
-        bool _opReplicatedEnough_inlock(const OpTime& opTime,
-                                        const WriteConcernOptions& writeConcern);
-
-        /**
-         * Processes each heartbeat response.
-         * Also responsible for scheduling additional heartbeats within the timeout if they error,
-         * and on success.
-         */
-        void _handleHeartbeatResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData,
-                                      StatusWith<BSONObj>* outStatus,
-                                      const HostAndPort& hap,
-                                      Date_t firstCallDate,
-                                      int retriesLeft);
-
-        void _trackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle) {
-            // this mutex should not be needed because it is always used during a callback.
-            // boost::mutex::scoped_lock lock(_mutex);
-            _heartbeatHandles.push_back(handle);
-        }
-
-        void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle) {
-            // this mutex should not be needed because it is always used during a callback.
-            // boost::mutex::scoped_lock lock(_mutex);
-            // TODO
-        }
-
-        // Handles to actively queued heartbeats
-        typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
-        HeartbeatHandles _heartbeatHandles;
-
-        // Protects all member data of this ReplicationCoordinator
-        mutable boost::mutex _mutex;
-
-        // list of information about clients waiting on replication.  Does *not* own the
-        // WaiterInfos.
-        std::vector<WaiterInfo*> _replicationWaiterList;
-
-        // Set to true when we are in the process of shutting down replication
-        bool _inShutdown;
-
-        // Parsed command line arguments related to replication
-        ReplSettings _settings;
-
-        // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator
-        boost::scoped_ptr<TopologyCoordinator> _topCoord;
-
-        // Pointer to the ReplicationExecutor owned by this ReplicationCoordinator
-        boost::scoped_ptr<ReplicationExecutor> _replExecutor;
-
-        // Thread that drives actions in the topology coordinator
-        boost::scoped_ptr<boost::thread> _topCoordDriverThread;
-
-        // Maps nodes in this replication group to the last oplog operation they have committed
-        typedef unordered_map<OID, OpTime, OID::Hasher> SlaveOpTimeMap;
-        SlaveOpTimeMap _slaveOpTimeMap;
-
-        // Current ReplicaSet state
-        MemberState _currentState;
-
-        // The current ReplicaSet configuration object, including the information about tag groups
-        // that is used to satisfy write concern requests with named gle modes.
-        TopologyCoordinatorImpl::ReplicaSetConfig _rsConfig;
+        LegacyReplicationCoordinator _legacy;
+        ReplicationCoordinatorImpl _impl;
     };
 
 } // namespace repl

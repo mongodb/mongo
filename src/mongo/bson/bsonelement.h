@@ -44,15 +44,10 @@ namespace mongo {
     class BSONObj;
     class BSONElement;
     class BSONObjBuilder;
-}
 
-namespace bson {
-    typedef mongo::BSONElement be;
-    typedef mongo::BSONObj bo;
-    typedef mongo::BSONObjBuilder bob;
-}
-
-namespace mongo {
+    typedef BSONElement be;
+    typedef BSONObj bo;
+    typedef BSONObjBuilder bob;
 
     /* l and r MUST have same type when called: check that first. */
     int compareElementValues(const BSONElement& l, const BSONElement& r);
@@ -643,5 +638,8 @@ namespace mongo {
         fieldNameSize_ = 0;
         totalSize = 1;
     }
+
+    // TODO(SERVER-14596): move to a better place; take a StringData.
+    std::string escape( const std::string& s , bool escape_slash=false);
 
 }
