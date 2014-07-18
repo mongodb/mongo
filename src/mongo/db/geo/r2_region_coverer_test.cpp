@@ -31,7 +31,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/platform/random.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/geo/geoquery.h" // TODO: Move GeometryContainer out of geoquery.h
+#include "mongo/db/geo/geometry_container.h"
 
 namespace {
 

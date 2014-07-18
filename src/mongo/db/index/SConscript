@@ -11,9 +11,8 @@ env.Library(
         LIBDEPS=[
             '$BUILD_DIR/mongo/bson',
             '$BUILD_DIR/mongo/db/fts/base',
-            '$BUILD_DIR/mongo/geometry',
-            '$BUILD_DIR/mongo/geoparser',
-            '$BUILD_DIR/mongo/geoquery',
+            '$BUILD_DIR/mongo/db/geo/geometry',
+            '$BUILD_DIR/mongo/db/geo/geoparser',
             '$BUILD_DIR/mongo/index_names',
             '$BUILD_DIR/third_party/s2/s2',
         ],

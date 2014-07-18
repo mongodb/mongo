@@ -24,6 +24,7 @@ env.SConscript(['base/SConscript',
                 'db/catalog/SConscript',
                 'db/commands/SConscript',
                 'db/concurrency/SConscript',
+                'db/geo/SConscript',
                 'db/exec/SConscript',
                 'db/fts/SConscript',
                 'db/index/SConscript',
@@ -179,8 +180,9 @@ env.Library('expressions',
 
 env.Library('expressions_geo',
             ['db/matcher/expression_geo.cpp',
-             'db/matcher/expression_parser_geo.cpp'],
-            LIBDEPS=['expressions','geoquery','geoparser'] )
+             'db/matcher/expression_parser_geo.cpp',
+             'db/geo/geo_query.cpp'],
+            LIBDEPS=['expressions','db/geo/geometry','db/geo/geoparser'] )
 
 env.Library('expressions_text',
             ['db/matcher/expression_text.cpp',
@@ -488,8 +490,6 @@ coredbEnv.Library("coredb", [
                            'db/commands/server_status_core',
                            'db/common',
                            'server_parameters',
-                           'geoparser',
-                           'geoquery',
                            'expressions',
                            'expressions_geo',
                            'expressions_text',
@@ -835,27 +835,6 @@ if has_option( 'use-cpu-profiler' ):
 
 env.Library("defaultversion", "s/default_version.cpp")
 
-# Geo
-env.Library("geometry", [ "db/geo/hash.cpp", "db/geo/shapes.cpp", ], 
-            LIBDEPS = [ "bson",
-                        "$BUILD_DIR/third_party/s2/s2" ])
-env.Library("geoparser", [ "db/geo/geoparser.cpp", ],
-            LIBDEPS = [ "bson",
-                        "geometry",
-                        '$BUILD_DIR/third_party/s2/s2' ])
-env.Library("geoquery", [ "db/geo/geoquery.cpp", "db/geo/r2_region_coverer.cpp", ],
-            LIBDEPS = [ "bson",
-                        "geometry",
-                        "geoparser",
-                        '$BUILD_DIR/third_party/s2/s2' ])
-
-env.CppUnitTest("hash_test", [ "db/geo/hash_test.cpp" ], 
-                LIBDEPS = ["geometry", "db/common" ]) # db/common needed for field parsing
-env.CppUnitTest("geoparser_test", [ "db/geo/geoparser_test.cpp" ], 
-                LIBDEPS = ["geoparser", "db/common" ]) # db/common needed for field parsing
-env.CppUnitTest("r2_region_coverer_test", [ "db/geo/r2_region_coverer_test.cpp" ],
-                LIBDEPS = [ "geoquery", "db/common" ]) # db/common needed for field parsing
-
 env.CppUnitTest(
     target="index_filter_commands_test",
     source=[
@@ -925,8 +904,6 @@ serveronlyLibdeps = ["coreshard",
                      "db/concurrency/lock_mgr",
                      "db/ops/update_driver",
                      "defaultversion",
-                     "geoparser",
-                     "geoquery",
                      "global_optime",
                      "index_key_validate",
                      "index_set",

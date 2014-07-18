@@ -52,6 +52,12 @@ namespace mongo {
         if ( !geometry.parseFrom( e.Obj() ) )
                 return false;
 
+        // Project this geometry into the CRS of the query
+        if (!geometry.supportsProject(_query->getGeometry().getNativeCRS()))
+            return false;
+
+        geometry.projectInto(_query->getGeometry().getNativeCRS());
+
         if (GeoQuery::WITHIN == _query->getPred()) {
             return _query->getGeometry().contains(geometry);
         }

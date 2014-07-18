@@ -62,7 +62,7 @@ namespace mongo {
                                          cos(deg2rad(std::max(-89.0, y - maxDistDegrees))));
     }
 
-    void checkEarthBounds(const Point &p);
+    bool isValidLngLat(double lng, double lat);
     bool linesIntersect(const Point& pA, const Point& pB, const Point& pC, const Point& pD);
     bool circleContainsBox(const Circle& circle, const Box& box);
     bool circleInteriorContainsBox(const Circle& circle, const Box& box);
@@ -254,17 +254,19 @@ namespace mongo {
         SPHERE
     };
 
+    // TODO: Make S2 less integral to these types - additional S2 shapes should be an optimization
+    // when our CRS is not projected, i.e. SPHERE for now.
+    // Generic shapes (Point, Line, Polygon) should hold the raw coordinate data - right now oldXXX
+    // is a misnomer - this is the *original* data and the S2 transformation just an optimization.
+
     struct PointWithCRS {
 
-        PointWithCRS() : crs(UNSET), flatUpgradedToSphere(false) {}
+        PointWithCRS() : crs(UNSET) {}
 
         S2Point point;
         S2Cell cell;
         Point oldPoint;
         CRS crs;
-        // If crs is FLAT, we might be able to upgrade the point to SPHERE if it's a valid SPHERE
-        // point (lng/lat in bounds).  In this case, we can use FLAT data with SPHERE predicates.
-        bool flatUpgradedToSphere;
     };
 
     struct LineWithCRS {
@@ -342,6 +344,15 @@ namespace mongo {
             // Only polygons (and multiPolygons) support containment.
             return (polygons.vector().size() > 0 || multiPolygons.vector().size() > 0);
         }
+    };
+
+    //
+    // Projection functions - we don't project types other than points for now
+    //
+
+    struct ShapeProjection {
+        static bool supportsProject(const PointWithCRS& point, const CRS crs);
+        static void projectInto(PointWithCRS* point, CRS crs);
     };
 
 }  // namespace mongo

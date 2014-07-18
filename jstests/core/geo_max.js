@@ -44,6 +44,8 @@ assert.eq(test.t.find({loc:{$near:[ 180, 0]}}, {_id:0}).limit(2).toArray(), [{lo
 assert.eq(test.t.find({loc:{$near:[-180, 0]}}, {_id:0}).limit(2).toArray(), [{loc: [-180, 0]}, {loc: [-179.999, 0]}])
 
 // These will need to change when SERVER-1760 is fixed
+printjson(test.t.find({loc:{$nearSphere:[ 180, 0]}}, {_id:0}).limit(2).explain());
 assert.eq(test.t.find({loc:{$nearSphere:[ 180, 0]}}, {_id:0}).limit(2).toArray(), [{loc: [ 180, 0]}, {loc: [ 179.999, 0]}])
+printjson(test.t.find({loc:{$nearSphere:[-180, 0]}}, {_id:0}).limit(2).explain());
 assert.eq(test.t.find({loc:{$nearSphere:[-180, 0]}}, {_id:0}).limit(2).toArray(), [{loc: [-180, 0]}, {loc: [-179.999, 0]}])
 

@@ -65,6 +65,8 @@ env.CppUnitTest(
 env.Library(
     target="index_bounds",
     source=[
+        "expression_index.cpp",
+        "expression_index_knobs.cpp",
         "index_bounds.cpp",
         "index_bounds_builder.cpp",
         "interval.cpp",
@@ -75,6 +77,7 @@ env.Library(
         "$BUILD_DIR/mongo/expressions_geo",
         "$BUILD_DIR/mongo/index_names",
         "$BUILD_DIR/mongo/mongohasher",
+        "$BUILD_DIR/mongo/server_parameters",
     ],
 )
 

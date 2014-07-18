@@ -625,7 +625,7 @@ namespace {
         testGetPlanCacheKey("{a: {$near: [0,0], $maxDistance:0.3 }}", "{}", "{}",
                             "gnanrfl");
         testGetPlanCacheKey("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}", "{}", "{}",
-                            "gnansfl");
+                            "gnanssp");
         testGetPlanCacheKey("{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0,0]},"
                             "$maxDistance:100}}}", "{}", "{}",
                             "gnanrsp");

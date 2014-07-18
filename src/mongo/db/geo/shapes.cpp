@@ -563,11 +563,8 @@ namespace mongo {
     }
 
     // Technically lat/long bounds, not really tied to earth radius.
-    void checkEarthBounds(const Point &p) {
-        uassert(14808, str::stream() << "point " << p.toString()
-                                     << " must be in earth-like bounds of long "
-                                     << ": [-180, 180], lat : [-90, 90] ",
-                p.x >= -180 && p.x <= 180 && p.y >= -90 && p.y <= 90);
+    bool isValidLngLat(double lng, double lat) {
+        return abs(lng) <= 180 && abs(lat) <= 90;
     }
 
     double distance(const Point& p1, const Point &p2) {
@@ -748,6 +745,46 @@ namespace mongo {
         // 3. Otherwise they intersect on a portion of both shapes.
         // Edges intersects
         return edgesIntersectsWithBox(polygon.points(), box);
+    }
+
+    bool ShapeProjection::supportsProject(const PointWithCRS& point, const CRS crs) {
+
+        // Can always trivially project or project from SPHERE->FLAT
+        if (point.crs == crs || point.crs == SPHERE)
+            return true;
+
+        invariant(point.crs == FLAT);
+        // If crs is FLAT, we might be able to upgrade the point to SPHERE if it's a valid SPHERE
+        // point (lng/lat in bounds).  In this case, we can use FLAT data with SPHERE predicates.
+        return isValidLngLat(point.oldPoint.x, point.oldPoint.y);
+    }
+
+    void ShapeProjection::projectInto(PointWithCRS* point, CRS crs) {
+        dassert(supportsProject(*point, crs));
+
+        if (point->crs == crs)
+            return;
+
+        if (FLAT == point->crs) {
+            invariant(SPHERE == crs);
+
+            // Note that it's (lat, lng) for S2 but (lng, lat) for MongoDB.
+            S2LatLng latLng =
+                S2LatLng::FromDegrees(point->oldPoint.y, point->oldPoint.x).Normalized();
+            dassert(latLng.is_valid());
+            point->point = latLng.ToPoint();
+            point->cell = S2Cell(point->point);
+            point->crs = SPHERE;
+        }
+        else {
+            invariant(SPHERE == point->crs);
+            invariant(FLAT == crs);
+
+            // Just remove the additional spherical information
+            point->point = S2Point();
+            point->cell = S2Cell();
+            point->crs = FLAT;
+        }
     }
 
 }  // namespace mongo
