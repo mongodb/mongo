@@ -48,7 +48,7 @@ namespace mongo {
 
         class RocksCursor : public SortedDataInterface::Cursor {
         public:
-            RocksCursor( rocksdb::Iterator* iterator, bool direction )
+            RocksCursor( rocksdb::Iterator* iterator, int direction )
                 : _iterator( iterator ),
                   _direction( direction ),
                   _cached( false ) {
@@ -236,7 +236,7 @@ namespace mongo {
 
             scoped_ptr<rocksdb::Iterator> _iterator;
             OperationContext* _txn; // not owned
-            bool _direction;
+            int _direction;
 
             mutable bool _cached;
             mutable BSONObj _cachedKey;

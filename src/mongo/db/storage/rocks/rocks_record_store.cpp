@@ -608,12 +608,9 @@ namespace mongo {
         boost::scoped_ptr<RecordIterator> iter(getIterator( txn ));
         if (iter->isEOF())
             return;
-        DiskLoc start = iter->curr();
-        if (end < start)
-            invariant(!"Attemped to drop whole collection with capped truncate after");
         while(!iter->isEOF()) {
             DiskLoc loc = iter->getNext();
-            if (end < loc)
+            if (end < loc || (inclusive && end == loc))
                 deleteRecord(txn, loc);
         }
     }
