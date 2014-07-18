@@ -76,7 +76,7 @@ namespace repl {
         /* ok to call if already connected */
         bool connect(const std::string& hostname);
 
-        bool connect(const std::string& hostname, const BSONObj& me);
+        bool connect(const std::string& hostname, const OID& myRID);
 
         bool connect(const mongo::OID& rid, const int from, const std::string& to);
 

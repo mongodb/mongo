@@ -37,6 +37,7 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_coordinator.h"
+#include "mongo/db/repl/repl_coordinator_external_state.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
@@ -51,7 +52,9 @@ namespace repl {
 
     public:
 
-        ReplicationCoordinatorImpl(const ReplSettings& settings);
+        // Takes ownership of the passed in ReplicationCoordinatorExternalState.
+        ReplicationCoordinatorImpl(const ReplSettings& settings,
+                                   ReplicationCoordinatorExternalState* externalState);
         virtual ~ReplicationCoordinatorImpl();
 
         // ================== Members of public ReplicationCoordinator API ===================
@@ -153,7 +156,7 @@ namespace repl {
 
         // ================== Members of replication code internal API ===================
 
-        // Called by the TopologyCoordinator whenever this node's replica set state transitions
+        // Called by the TopologyCoordinator whenever this node's replica set state transitions.
         void setCurrentMemberState(const MemberState& newState);
 
         // Called by the TopologyCoordinator whenever the replica set configuration is updated
@@ -170,11 +173,11 @@ namespace repl {
 
     private:
 
-        // Struct that holds information about clients waiting for replication
+        // Struct that holds information about clients waiting for replication.
         struct WaiterInfo;
 
         /*
-         * Returns true if the given writeConcern is satisfied up to "optime"
+         * Returns true if the given writeConcern is satisfied up to "optime".
          */
         bool _opReplicatedEnough_inlock(const OpTime& opTime,
                                         const WriteConcernOptions& writeConcern);
@@ -202,37 +205,44 @@ namespace repl {
             // TODO
         }
 
-        // Handles to actively queued heartbeats
+        // Handles to actively queued heartbeats.
         typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
         HeartbeatHandles _heartbeatHandles;
 
-        // Protects all member data of this ReplicationCoordinator
+        // Protects all member data of this ReplicationCoordinator.
         mutable boost::mutex _mutex;
 
         // list of information about clients waiting on replication.  Does *not* own the
         // WaiterInfos.
         std::vector<WaiterInfo*> _replicationWaiterList;
 
-        // Set to true when we are in the process of shutting down replication
+        // Set to true when we are in the process of shutting down replication.
         bool _inShutdown;
 
-        // Parsed command line arguments related to replication
+        // Parsed command line arguments related to replication.
         ReplSettings _settings;
 
-        // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator
+        // Our RID, used to identify us to our sync source when sending replication progress
+        // updates upstream.  Set once at startup and then never modified again.
+        OID _myRID;
+
+        // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
         boost::scoped_ptr<TopologyCoordinator> _topCoord;
 
-        // Pointer to the ReplicationExecutor owned by this ReplicationCoordinator
+        // Pointer to the ReplicationExecutor owned by this ReplicationCoordinator.
         boost::scoped_ptr<ReplicationExecutor> _replExecutor;
+
+        // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
+        boost::scoped_ptr<ReplicationCoordinatorExternalState> _externalState;
 
         // Thread that drives actions in the topology coordinator
         boost::scoped_ptr<boost::thread> _topCoordDriverThread;
 
-        // Maps nodes in this replication group to the last oplog operation they have committed
+        // Maps nodes in this replication group to the last oplog operation they have committed.
         typedef unordered_map<OID, OpTime, OID::Hasher> SlaveOpTimeMap;
         SlaveOpTimeMap _slaveOpTimeMap;
 
-        // Current ReplicaSet state
+        // Current ReplicaSet state.
         MemberState _currentState;
 
         // The current ReplicaSet configuration object, including the information about tag groups

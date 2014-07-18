@@ -99,6 +99,7 @@ namespace repl {
 
         std::set<std::string> incompleteCloneDbs;
 
+        /// TODO(spencer): Remove this once the LegacyReplicationCoordinator is gone.
         BSONObj _me;
 
         void resyncDrop( OperationContext* txn, const std::string& db );
@@ -119,6 +120,7 @@ namespace repl {
                                     const char* db );
 
         // populates _me so that it can be passed to oplogreader for handshakes
+        /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
         void ensureMe(OperationContext* txn);
 
         void forceResync(OperationContext* txn, const char *requester);
@@ -127,6 +129,7 @@ namespace repl {
         OplogReader oplogReader;
 
         // Returns the RID for this process.  ensureMe() must have been called before this can be.
+        /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
         OID getMyRID() const { return _me["_id"].OID(); }
 
         void applyOperation(OperationContext* txn, Database* db, const BSONObj& op);

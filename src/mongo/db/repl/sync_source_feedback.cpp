@@ -105,7 +105,7 @@ namespace repl {
             BSONObjBuilder cmd;
             cmd.append("replSetUpdatePosition", 1);
             BSONObjBuilder sub (cmd.subobjStart("handshake"));
-            sub.appendAs(_me["_id"], "handshake");
+            sub.append("handshake", getGlobalReplicationCoordinator()->getMyRID());
             sub.append("member", theReplSet->selfId());
             sub.append("config", theReplSet->myConfig().asBson());
             sub.doneFast();

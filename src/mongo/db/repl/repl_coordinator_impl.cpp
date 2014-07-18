@@ -73,8 +73,9 @@ namespace repl {
         boost::condition_variable* condVar;
     };
 
-    ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(const ReplSettings& settings) :
-            _inShutdown(false), _settings(settings) {}
+    ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
+            const ReplSettings& settings, ReplicationCoordinatorExternalState* externalState) :
+                    _inShutdown(false), _settings(settings), _externalState(externalState) {}
 
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
@@ -84,6 +85,8 @@ namespace repl {
         if (!isReplEnabled()) {
             return;
         }
+
+        _myRID = _externalState->ensureMe();
 
         _topCoord.reset(topCoord);
         _topCoord->registerConfigChangeCallback(
@@ -331,8 +334,7 @@ namespace repl {
 
 
     OID ReplicationCoordinatorImpl::getMyRID() {
-        // TODO
-        return OID();
+        return _myRID;
     }
 
     void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
