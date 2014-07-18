@@ -57,7 +57,7 @@ namespace repl {
         static const Seconds kDefaultHeartbeatTimeoutPeriod;
 
         ReplicaSetConfig();
-
+        std::string asBson() { return ""; }
         /**
          * Initializes this ReplicaSetConfig from the contents of "cfg".
          */
@@ -84,7 +84,7 @@ namespace repl {
         /**
          * Gets the number of members in this configuration.
          */
-        size_t getNumMembers() const { return _members.size(); }
+        int getNumMembers() const { return _members.size(); }
 
         /**
          * Gets a begin iterator over the MemberConfigs stored in this ReplicaSetConfig.
@@ -95,6 +95,11 @@ namespace repl {
          * Gets an end iterator over the MemberConfigs stored in this ReplicaSetConfig.
          */
         MemberIterator membersEnd() const { return _members.end(); }
+
+        /**
+         * Access a MemberConfig element by index.
+         */
+        const MemberConfig& getMemberAt(size_t i) const;
 
         /**
          * Gets the default write concern for the replica set described by this configuration.
@@ -111,7 +116,7 @@ namespace repl {
          * Gets the number of nodes that constitutes a "majority" in this replica set,
          * for purposes of replicating data.
          */
-        size_t getMajorityNumber() const { return _majorityNumber; }
+        int getMajorityNumber() const { return _majorityNumber; }
 
         /**
          * Returns true if automatic (not explicitly set) chaining is allowed.
@@ -156,7 +161,7 @@ namespace repl {
         WriteConcernOptions _defaultWriteConcern;
         Seconds _heartbeatTimeoutPeriod;
         bool _chainingAllowed;
-        size_t _majorityNumber;
+        int _majorityNumber;
         ReplicaSetTagConfig _tagConfig;
         StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
     };

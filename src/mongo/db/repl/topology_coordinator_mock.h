@@ -85,7 +85,7 @@ namespace repl {
 
         virtual void relinquishPrimary(OperationContext* txn);
 
-        virtual void updateConfig(const ReplicaSetConfig newConfig, const int selfId);
+        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex);
 
     };
 

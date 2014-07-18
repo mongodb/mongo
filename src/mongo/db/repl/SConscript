@@ -20,13 +20,19 @@ env.CppUnitTest('replication_executor_test',
                 LIBDEPS=['replication_executor',
                          'replmocks'])
 
+env.Library('topology_coordinator_impl',
+            'topology_coordinator_impl.cpp',
+            LIBDEPS=['replica_set_config',
+                     'replication_executor'])
+
 env.Library('repl_coordinator_impl',
             'repl_coordinator_impl.cpp',
             LIBDEPS=['$BUILD_DIR/mongo/db/common',
                      '$BUILD_DIR/mongo/foundation',
                      '$BUILD_DIR/mongo/server_options_core',
                      'repl_coordinator_interface',
-                     'replication_executor',
+                     'replica_set_config',
+                     'replication_executor'
                  ])
 
 env.CppUnitTest('repl_coordinator_impl_test',

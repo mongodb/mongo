@@ -276,7 +276,7 @@ namespace {
 
     void ReplSetImpl::msgUpdateHBInfo(HeartbeatInfo h) {
         for (Member *m = _members.head(); m; m=m->next()) {
-            if (m->id() == h.id()) {
+            if (static_cast<int>(m->id()) == h.id()) {
                 m->_hbinfo.updateFromLastPoll(h);
                 return;
             }

@@ -37,6 +37,7 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_coordinator.h"
+#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/platform/unordered_map.h"
@@ -156,7 +157,7 @@ namespace repl {
         void setCurrentMemberState(const MemberState& newState);
 
         // Called by the TopologyCoordinator whenever the replica set configuration is updated
-        void setCurrentReplicaSetConfig(const TopologyCoordinator::ReplicaSetConfig& newConfig);
+        void setCurrentReplicaSetConfig(const ReplicaSetConfig& newConfig);
 
         /**
          * Does a heartbeat for a member of the replica set.
@@ -236,7 +237,7 @@ namespace repl {
 
         // The current ReplicaSet configuration object, including the information about tag groups
         // that is used to satisfy write concern requests with named gle modes.
-        TopologyCoordinatorImpl::ReplicaSetConfig _rsConfig;
+        ReplicaSetConfig _rsConfig;
     };
 
 } // namespace repl

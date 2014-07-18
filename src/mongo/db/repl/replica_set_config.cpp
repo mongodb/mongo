@@ -344,6 +344,11 @@ namespace {
         return Status::OK();
     }
 
+    const MemberConfig& ReplicaSetConfig::getMemberAt(size_t i) const { 
+        invariant(i < _members.size());
+        return _members[i]; 
+    }
+
     ReplicaSetTag ReplicaSetConfig::findTag(const StringData& key, const StringData& value) const {
         return _tagConfig.findTag(key, value);
     }
@@ -364,9 +369,9 @@ namespace {
     }
 
     void ReplicaSetConfig::_calculateMajorityNumber() {
-        const size_t total = getNumMembers();
-        const size_t strictMajority = total/2+1;
-        const size_t nonArbiters = total - std::count_if(
+        const int total = getNumMembers();
+        const int strictMajority = total/2+1;
+        const int nonArbiters = total - std::count_if(
                 _members.begin(),
                 _members.end(),
                 stdx::bind(&MemberConfig::isArbiter, stdx::placeholders::_1));

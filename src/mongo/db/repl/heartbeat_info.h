@@ -42,8 +42,8 @@ namespace repl {
     class HeartbeatInfo {
     public:
         HeartbeatInfo();
-        HeartbeatInfo(unsigned id);
-        unsigned id() const { return _id; }
+        HeartbeatInfo(int id);
+        int id() const { return _id; }
         MemberState hbstate;
         double health;
         time_t upSince;
@@ -79,7 +79,7 @@ namespace repl {
          */
         void updateFromLastPoll(const HeartbeatInfo& newInfo);
     private:
-        unsigned _id;
+        int _id;
     };
 
 } // namespace repl

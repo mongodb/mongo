@@ -46,12 +46,12 @@ namespace {
         ASSERT_OK(config.validate());
         ASSERT_EQUALS("rs0", config.getReplSetName());
         ASSERT_EQUALS(1, config.getConfigVersion());
-        ASSERT_EQUALS(1U, config.getNumMembers());
+        ASSERT_EQUALS(1, config.getNumMembers());
         ASSERT_EQUALS(0, config.membersBegin()->getId());
         ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
         ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
         ASSERT_EQUALS(10, config.getHeartbeatTimeoutPeriod().total_seconds());
-        ASSERT_EQUALS(1U, config.getMajorityNumber());
+        ASSERT_EQUALS(1, config.getMajorityNumber());
         ASSERT_TRUE(config.isChainingAllowed());
     }
 

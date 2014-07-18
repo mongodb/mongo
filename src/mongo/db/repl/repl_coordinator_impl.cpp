@@ -185,7 +185,7 @@ namespace repl {
         int numNodes;
         if (!writeConcern.wMode.empty()) {
             fassert(18524, writeConcern.wMode == "majority"); // TODO(spencer): handle tags
-            numNodes = _rsConfig.majorityNumber;
+            numNodes = _rsConfig.getMajorityNumber();
         } else {
             numNodes = writeConcern.wNumNodes;
         }
@@ -418,13 +418,23 @@ namespace repl {
         return Status::OK();
     }
 
-    void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(
-            const TopologyCoordinator::ReplicaSetConfig& newConfig) {
+    void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(const ReplicaSetConfig& newConfig) {
         invariant(getReplicationMode() == modeReplSet);
         boost::lock_guard<boost::mutex> lk(_mutex);
         _rsConfig = newConfig;
 
         // TODO: Cancel heartbeats, start new ones
+
+// TODO(SERVER-14591): instead of this, use WriteConcernOptions and store in replcoord; 
+// in getLastError command, fetch the defaults via a getter in replcoord.
+// replcoord is responsible for replacing its gledefault with a new config's.
+/*        
+        if (getLastErrorDefault || !c.getLastErrorDefaults.isEmpty()) {
+            // see comment in dbcommands.cpp for getlasterrordefault
+            getLastErrorDefault = new BSONObj(c.getLastErrorDefaults);
+        }
+*/
+
     }
 
     Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const BSONArray& updates,
