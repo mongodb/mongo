@@ -49,6 +49,7 @@
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/storage_options.h"
@@ -365,6 +366,8 @@ namespace mongo {
                 Collection* collection = ctx.ctx().db()->getCollection( ns );
                 if ( !collection ) break;
 
+                int oldYieldCount = c.curop()->numYields();
+
                 IndexDescriptor* desc =
                     collection->getIndexCatalog()->findIndexByKeyPattern( indexKeyPattern.toBSON() );
 
@@ -382,6 +385,13 @@ namespace mongo {
                 state = runner->getNext(&obj, &rloc);
                 runner.reset();
                 if (Runner::RUNNER_EOF == state) { break; }
+
+                int newYieldCount = c.curop()->numYields();
+                if (oldYieldCount != newYieldCount && !_isMaster()) {
+                    warning() << "current node is not primary anymore, "
+                              << "aborting removeRange" << endl;
+                    return numDeleted;
+                }
 
                 if ( onlyRemoveOrphanedDocs ) {
                     // Do a final check in the write lock to make absolutely sure that our
