@@ -44,9 +44,10 @@ namespace mongo {
         BSONObjIterator lhsIt(lhs.key());
         BSONObjIterator rhsIt(rhs.key());
 
+        // Iterate through both BSONObjects, comparing individual elements one by one
         for (unsigned mask = 1; lhsIt.more(); mask <<= 1) {
             // XXX: commented this out since we found cases where lhs and rhs are not of the
-            //      same length. THis seems to be allowed in mmap
+            //      same length. Is this a horrible decision? It seems to be allowed in mmap
             // invariant(rhsIt.more());
 
             const BSONElement l = lhsIt.next();
@@ -77,7 +78,10 @@ namespace mongo {
             }
 
         }
+        // XXX we commented this out for the same reason that we commented out the invariant at 
+        // the beginning of the for loop. Is that okay?
         // invariant(!rhsIt.more());
+ 
         if (rhsIt.more())
             return 1;
 
@@ -97,10 +101,14 @@ namespace mongo {
                                                         const vector<bool>& suffixInclusive,
                                                         const int cursorDirection) {
 
-        // See comment above for why this is done.
+        // Read the comments in the header file for why this is done.
+        // The basic idea is that we use the field name to store a byte which indicates whether
+        // each field in the query object is inclusive and exclusive, and if it is exclusive, in
+        // which direction.
         const char exclusiveByte = (cursorDirection == 1
-                ? IndexEntryComparison::greater
-                : IndexEntryComparison::less);
+                                    ? IndexEntryComparison::greater
+                                    : IndexEntryComparison::less);
+
         const StringData exclusiveFieldName(&exclusiveByte, 1);
 
         BSONObjBuilder bb;

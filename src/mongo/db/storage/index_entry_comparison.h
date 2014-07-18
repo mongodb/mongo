@@ -130,7 +130,7 @@ namespace mongo {
          *
          * @param keySuffix a vector of BSONElements. The first prefixLen elements in keySuffix are
          * ignored, while the remaining elements make up the remainder of the query (following the
-         * first prefixLen elements of keyPrefix). Must have at least prefixLen - 1 elements.
+         * first prefixLen elements of keyPrefix).
          *
          * @param suffixInclusive a vector of booleans, of the same length as keySuffix. Elements
          * less than prefixLen are ignored, while for all other indexes i, suffixInclusive[i] is
@@ -157,7 +157,9 @@ namespace mongo {
             greater = 'g',
         };
 
+        // Ordering is used in comparison() to compare BSONElements
         const Ordering _order;
+
     }; // struct IndexEntryComparison
 
 } // namespace mongo
