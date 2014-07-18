@@ -250,7 +250,7 @@ namespace mongo {
 
     }
 
-    // RocksIndexEntry
+    // RocksIndexEntry***********
     
     RocksIndexEntry::RocksIndexEntry( const BSONObj& key, const DiskLoc loc, bool stripFieldNames )
         : IndexKeyEntry( key, loc ) {
@@ -264,31 +264,25 @@ namespace mongo {
             }
             _key = b.obj();
         }
-
-        keySlice = rocksdb::Slice( _key.objdata(), _key.objsize() );
-        locSlice = rocksdb::Slice( reinterpret_cast<char*>( &_loc ), sizeof( DiskLoc ) );
     }
 
     RocksIndexEntry::RocksIndexEntry( const rocksdb::Slice& slice )
         : IndexKeyEntry( BSONObj(), DiskLoc() ) {
-
-        _key = BSONObj( slice.data() );
-
+        _key = BSONObj( slice.data() ).getOwned();
         _loc = reinterpret_cast<const DiskLoc*>( slice.data() + _key.objsize() )[0];
-
-        keySlice = rocksdb::Slice( _key.objdata(), _key.objsize() );
-        locSlice = rocksdb::Slice( reinterpret_cast<char*>( &_loc ), sizeof( DiskLoc ) );
     }
 
     string RocksIndexEntry::asString() const {
         string s( size(), 1 );
-        memcpy( const_cast<char*>( s.c_str() ), keySlice.data(), keySlice.size() );
-        memcpy( const_cast<char*>( s.c_str() + keySlice.size() ),
-                locSlice.data(), locSlice.size() );
+        memcpy( const_cast<char*>( s.c_str() ), _key.objdata(), _key.objsize() );
+
+        const char* locData = reinterpret_cast<const char*>( &_loc );
+        memcpy( const_cast<char*>( s.c_str() + _key.objsize() ), locData, sizeof( DiskLoc ) );
+
         return s;
     }
 
-    // RocksSortedDataImpl
+    // RocksSortedDataImpl***********
 
     RocksSortedDataImpl::RocksSortedDataImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf )
         : _db( db ), _columnFamily( cf ) {

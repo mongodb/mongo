@@ -104,8 +104,11 @@ namespace mongo {
 
     /**
      * Extends the functionality of IndexKeyEntry to better interact with the rocksdb api.
-     * Namely, it is necessary to support conversion to and from a rocksdb::Slice and 
-     * rocksdb::SliceParts.
+     * Namely, it is necessary to support conversion to and from a rocksdb::Slice. This class also
+     * handles the necessary conversion to and from a BSONObj-DiskLoc pair and the string
+     * representation of such a pair. This is important because these BSONObj-DiskLoc pairs are
+     * used as keys in the column families which represent indexes (see comment for the 
+     * RocksSortedDataImpl class for more information) 
      */
     struct RocksIndexEntry: public IndexKeyEntry {
 
@@ -130,9 +133,5 @@ namespace mongo {
         string asString() const;
 
         int size() const { return _key.objsize() + sizeof( DiskLoc ); }
-
-        rocksdb::Slice keySlice;
-        rocksdb::Slice locSlice;
-        //rocksdb::Slice _sliced[2];
     };
 }
