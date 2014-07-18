@@ -125,6 +125,7 @@ struct __wt_lsm_manager {
 	uint32_t	lsm_workers;	/* Current number of LSM workers */
 	uint32_t	lsm_workers_max;
 	pthread_t	*lsm_worker_tids;
+	WT_SESSION_IMPL	**lsm_worker_sessions;
 
 };
 /*
