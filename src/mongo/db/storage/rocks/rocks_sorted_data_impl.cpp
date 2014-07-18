@@ -48,15 +48,7 @@ namespace mongo {
 
         class RocksCursor : public SortedDataInterface::Cursor {
         public:
-            // constructor that doesn't take a snapshot
-            RocksCursor( rocksdb::Iterator* iterator, bool direction ):
-                RocksCursor( iterator, direction, nullptr, nullptr ) { }
-
-            // constructor that takes a snapshot
-            RocksCursor( rocksdb::Iterator* iterator,
-                    bool direction,
-                    const rocksdb::Snapshot* snapshot,
-                    rocksdb::DB* db )
+            RocksCursor( rocksdb::Iterator* iterator, bool direction )
                 : _iterator( iterator ),
                   _direction( direction ),
                   _cached( false ) {
@@ -92,27 +84,9 @@ namespace mongo {
             }
 
             bool locate(const BSONObj& key, const DiskLoc& loc) {
-                _cached = false;
-                string keyData = RocksIndexEntry( key, loc ).asString();
-                _iterator->Seek( keyData );
-                _checkStatus();
-                if ( !_iterator->Valid() )
-                    return false;
-                _load();
-
-                bool compareResult = key.woCompare( _cachedKey, BSONObj(), false ) == 0;
-
-                // if we can't find the result and we have a reverse iterator, we need to move
-                // forward by one so we're at the first value greater than the what we were
-                // searching for, rather than the first value less than the value we were searching
-                // for
-                if ( !compareResult && !_forward() && !isEOF() ) {
-                    advance();
-                    invariant( !_cached );
-                }
-
-                return compareResult;
+                return _locate( RocksIndexEntry( key, loc ) );
             }
+
 
             void advanceTo(const BSONObj &keyBegin,
                            int keyBeginLen,
@@ -128,24 +102,7 @@ namespace mongo {
                                          keyEndInclusive,
                                          _forward() );
 
-                _cached = false;
-                string keyData = RocksIndexEntry( key, DiskLoc(), false).asString();
-                _iterator->Seek( keyData );
-                _checkStatus();
-                if ( !_iterator->Valid() )
-                    return;
-                _load();
-
-                bool compareResult = key.woCompare( _cachedKey, BSONObj(), false ) == 0;
-
-                // if we can't find the result and we have a reverse iterator, we need to move
-                // forward by one so we're at the first value greater than the what we were
-                // searching for, rather than the first value less than the value we were searching
-                // for
-                if ( !compareResult && !_forward() && !isEOF() ) {
-                    advance();
-                    invariant( !_cached );
-                }
+                _locate( RocksIndexEntry( key, DiskLoc(), false ) );
             }
 
             /**
@@ -176,10 +133,11 @@ namespace mongo {
             }
 
             void advance() {
-                if ( _forward() )
+                if ( _forward() ) {
                     _iterator->Next();
-                else
+                } else {
                     _iterator->Prev();
+                }
                 _cached = false;
             }
 
@@ -212,22 +170,64 @@ namespace mongo {
                     return;
                 }
 
-                // locate takes care of the case where the locate that we are "restoring" has
+                // locate takes care of the case where the position that we are restoring has
                 // already been deleted
                 locate( _savePositionObj, _savePositionLoc );
             }
 
         private:
 
+            /**
+             * locate function which takes in a RocksIndexEntry. This logic is abstracted out into a
+             * helper so that its possible to choose whether or not to pass a RocksIndexEntry with
+             * the key fields stripped.
+             */
+            bool _locate( const RocksIndexEntry rie ) {
+                _cached = false;
+                string keyData = rie.asString();
+                _iterator->Seek( keyData );
+                _checkStatus();
+                if ( !_iterator->Valid() )
+                    return false;
+                _load();
+
+                // because considerFieldNames is false, it doesn't matter if we stripped the
+                // fieldnames or not when constructing rie
+                bool compareResult = rie.key().woCompare( _cachedKey, BSONObj(), false ) == 0;
+
+                // if we can't find the result and we have a reverse iterator, we need to call
+                // advance() so that we're at the first value less than (to the left of) what we
+                // were searching for, rather than the first value greater than (to the right of)
+                // the value we were searching for
+                if ( !compareResult && !_forward() && !isEOF() ) {
+                    if ( isEOF() ) {
+                        _iterator->SeekToLast();
+                    } else {
+                        advance();
+                    }
+                    invariant( !_cached );
+                }
+
+                return compareResult;
+            }
+
             bool _forward() const { return _direction > 0; }
 
             void _checkStatus() {
-                // todo: Fix me
+                // TODO: Fix me
                 invariant( _iterator->status().ok() );
             }
+
+            /**
+             * Loads the cached key and diskloc. Do not call if isEOF() is true
+             */
             void _load() const {
-                if ( _cached )
+                invariant( !isEOF() );
+
+                if ( _cached ) {
                     return;
+                }
+
                 _cached = true;
                 rocksdb::Slice slice = _iterator->key();
                 _cachedKey = BSONObj( slice.data() ).getOwned();
@@ -256,8 +256,6 @@ namespace mongo {
         : IndexKeyEntry( key, loc ) {
 
         if ( stripFieldNames && _key.firstElement().fieldName()[0] ) {
-            // XXX move this to comparator
-            // need to strip
             BSONObjBuilder b;
             BSONObjIterator i( _key );
             while ( i.more() ) {
@@ -267,8 +265,8 @@ namespace mongo {
             _key = b.obj();
         }
 
-        _sliced[0] = rocksdb::Slice( _key.objdata(), _key.objsize() );
-        _sliced[1] = rocksdb::Slice( reinterpret_cast<char*>( &_loc ), sizeof( DiskLoc ) );
+        keySlice = rocksdb::Slice( _key.objdata(), _key.objsize() );
+        locSlice = rocksdb::Slice( reinterpret_cast<char*>( &_loc ), sizeof( DiskLoc ) );
     }
 
     RocksIndexEntry::RocksIndexEntry( const rocksdb::Slice& slice )
@@ -278,15 +276,15 @@ namespace mongo {
 
         _loc = reinterpret_cast<const DiskLoc*>( slice.data() + _key.objsize() )[0];
 
-        _sliced[0] = rocksdb::Slice( _key.objdata(), _key.objsize() );
-        _sliced[1] = rocksdb::Slice( reinterpret_cast<char*>( &_loc ), sizeof( DiskLoc ) );
+        keySlice = rocksdb::Slice( _key.objdata(), _key.objsize() );
+        locSlice = rocksdb::Slice( reinterpret_cast<char*>( &_loc ), sizeof( DiskLoc ) );
     }
 
     string RocksIndexEntry::asString() const {
         string s( size(), 1 );
-        memcpy( const_cast<char*>( s.c_str() ), _sliced[0].data(), _sliced[0].size() );
-        memcpy( const_cast<char*>( s.c_str() + _sliced[0].size() ),
-                _sliced[1].data(), _sliced[1].size() );
+        memcpy( const_cast<char*>( s.c_str() ), keySlice.data(), keySlice.size() );
+        memcpy( const_cast<char*>( s.c_str() + keySlice.size() ),
+                locSlice.data(), locSlice.size() );
         return s;
     }
 
@@ -313,15 +311,13 @@ namespace mongo {
         if ( !dupsAllowed ) {
             // XXX: this is slow
             Status status = dupKeyCheck( txn, key, loc );
-            if ( !status.isOK() )
+            if ( !status.isOK() ) {
                 return status;
+            }
         }
 
         RocksIndexEntry rIndexEntry( key, loc );
-
-        ru->writeBatch()->Put( _columnFamily,
-                               rIndexEntry.asString(),
-                               emptyByteSlice );
+        ru->writeBatch()->Put( _columnFamily, rIndexEntry.asString(), emptyByteSlice );
 
         return Status::OK();
     }
@@ -331,18 +327,16 @@ namespace mongo {
                                       const DiskLoc& loc) {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
-        RocksIndexEntry rIndexEntry( key, loc );
-        string keyData = rIndexEntry.asString();
+        string keyData = RocksIndexEntry( key, loc ).asString();
 
         string dummy;
-        if ( !_db->KeyMayExist( RocksEngine::readOptionsWithSnapshot( txn ), 
-                                _columnFamily,
-                                keyData,
-                                &dummy ) )
-            return 0;
+        rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
+        if ( !_db->KeyMayExist( options,_columnFamily, keyData, &dummy ) ) {
+            return false;
+        }
 
         ru->writeBatch()->Delete( _columnFamily, keyData );
-        return 1; // XXX: fix? does it matter since its so slow to check?
+        return true; // XXX: fix? does it matter since its so slow to check?
     }
 
     string RocksSortedDataImpl::dupKeyError(const BSONObj& key) const {
@@ -360,10 +354,8 @@ namespace mongo {
         string keyData = rIndexEntry.asString();
         string dummy;
 
-        rocksdb::Status s =_db->Get( RocksEngine::readOptionsWithSnapshot( txn ),
-                                      _columnFamily,
-                                      keyData,
-                                      &dummy );
+        rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
+        rocksdb::Status s =_db->Get( options, _columnFamily, keyData, &dummy );
 
         return s.ok() ? Status(ErrorCodes::DuplicateKey, dupKeyError(key)) : Status::OK();
     }

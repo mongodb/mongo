@@ -51,6 +51,14 @@ namespace mongo {
         virtual unsigned long long commit(bool mayInterrupt) = 0;
     };
 
+    /**
+     * Rocks implementation of the SortedDataInterface. Each index is stored as a single column
+     * family. Each mapping from a BSONObj to a DiskLoc is stored as the key of a key-value pair
+     * in the column family. Consequently, each value in the database is simply an empty string.
+     * This is done to take advantage of the fact that RocksDB can take a custom comparator to use
+     * when ordering keys. We use a custom comparator which orders keys based first upon the
+     * BSONObj in the key, and uses the DiskLoc as a tiebreaker.   
+     */
     class RocksSortedDataImpl : public SortedDataInterface {
     public:
         RocksSortedDataImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf );
@@ -63,13 +71,9 @@ namespace mongo {
                               const DiskLoc& loc,
                               bool dupsAllowed);
 
-        virtual bool unindex(OperationContext* txn,
-                             const BSONObj& key,
-                             const DiskLoc& loc);
+        virtual bool unindex(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
 
-        virtual Status dupKeyCheck(OperationContext* txn,
-                                   const BSONObj& key,
-                                   const DiskLoc& loc);
+        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
 
         virtual void fullValidate(OperationContext* txn, long long* numKeysOut);
 
@@ -86,8 +90,11 @@ namespace mongo {
 
         RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx ) const;
 
-        rocksdb::DB* _db;
-        rocksdb::ColumnFamilyHandle* _columnFamily;
+        rocksdb::DB* _db; // not owned
+
+        // Each index is stored as a single column family, so this stores the handle to the
+        // relevant column family
+        rocksdb::ColumnFamilyHandle* _columnFamily; // not owned
 
         /**
          * Creates an error code message out of a key
@@ -97,14 +104,16 @@ namespace mongo {
 
     /**
      * Extends the functionality of IndexKeyEntry to better interact with the rocksdb api.
-     * Namely, it is necessary to support conversion from and to a rocksdb::Slice and 
+     * Namely, it is necessary to support conversion to and from a rocksdb::Slice and 
      * rocksdb::SliceParts.
      */
     struct RocksIndexEntry: public IndexKeyEntry {
 
         /**
-         * Constructs a RocksIndexEntry. Currently (7/7/14), strips field names from key,
-         * but this may change
+         * Constructs a RocksIndexEntry. Currently, (7/18/14) the stripFieldNames boolean exists
+         * solely to construct RocksIndexEntry's that have been created by the
+         * IndexEntryComparison::makeQueryObject method, since this is the only case where it is
+         * desirable to keep the field names.
          */
         RocksIndexEntry( const BSONObj& key, const DiskLoc loc, bool stripFieldNames = true );
 
@@ -116,14 +125,14 @@ namespace mongo {
         ~RocksIndexEntry() { }
 
         /**
-         * Returns a string representation of _sliced
+         * Returns a string representation of this
          */
         string asString() const;
 
-        rocksdb::SliceParts sliceParts() const { return rocksdb::SliceParts( _sliced, 2 ); }
-
         int size() const { return _key.objsize() + sizeof( DiskLoc ); }
 
-        rocksdb::Slice _sliced[2];
+        rocksdb::Slice keySlice;
+        rocksdb::Slice locSlice;
+        //rocksdb::Slice _sliced[2];
     };
 }
