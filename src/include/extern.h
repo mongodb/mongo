@@ -922,7 +922,9 @@ extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_lsm_manager_start(WT_SESSION_IMPL *session);
-extern int __wt_lsm_push_entry( WT_SESSION_IMPL *session,
+extern int __wt_lsm_manager_clear_tree( WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_manager_push_entry( WT_SESSION_IMPL *session,
     uint32_t type,
     WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
@@ -995,13 +997,13 @@ extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     int *),
     const char *cfg[],
     uint32_t open_flags);
-extern void *__wt_lsm_merge_worker(void *vargs);
 extern int __wt_lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     WT_LSM_CHUNK *chunk,
     int *flushed);
-extern void *__wt_lsm_checkpoint_worker(void *arg);
+extern int __wt_lsm_free_chunks(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree);
 extern int __wt_meta_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *,
     const char *[]),

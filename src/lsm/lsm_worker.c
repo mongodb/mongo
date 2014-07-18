@@ -10,7 +10,6 @@
 static int __lsm_bloom_create(
     WT_SESSION_IMPL *, WT_LSM_TREE *, WT_LSM_CHUNK *, u_int);
 static int __lsm_discard_handle(WT_SESSION_IMPL *, const char *, const char *);
-static int __lsm_free_chunks(WT_SESSION_IMPL *, WT_LSM_TREE *);
 
 /*
  * __lsm_copy_chunks --
@@ -29,7 +28,7 @@ __lsm_copy_chunks(WT_SESSION_IMPL *session,
 	cookie->nchunks = 0;
 
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
 		return (__wt_lsm_tree_unlock(session, lsm_tree));
 
 	/* Take a copy of the current state of the LSM tree. */
@@ -80,117 +79,6 @@ __lsm_unpin_chunks(WT_SESSION_IMPL *session, WT_LSM_WORKER_COOKIE *cookie)
 	}
 	/* Ensure subsequent calls don't double decrement. */
 	cookie->nchunks = 0;
-}
-
-/*
- * __wt_lsm_merge_worker --
- *	The merge worker thread for an LSM tree, responsible for merging
- *	on-disk trees.
- */
-void *
-__wt_lsm_merge_worker(void *vargs)
-{
-	WT_DECL_RET;
-	WT_LSM_WORKER_ARGS *args;
-	WT_LSM_TREE *lsm_tree;
-	WT_SESSION_IMPL *session;
-	u_int aggressive, chunk_wait, id, old_aggressive, stallms;
-	int progress;
-
-	args = vargs;
-	lsm_tree = args->lsm_tree;
-	id = args->id;
-	session = lsm_tree->worker_sessions[id];
-	__wt_free(session, args);
-
-	aggressive = chunk_wait = stallms = 0;
-
-	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-		/*
-		 * Help out with switching chunks in case the checkpoint worker
-		 * is busy.
-		 */
-		if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-			WT_WITH_SCHEMA_LOCK(session, ret =
-			    __wt_lsm_tree_switch(session, lsm_tree));
-			WT_ERR(ret);
-		}
-
-		progress = 0;
-
-		/* Clear any state from previous worker thread iterations. */
-		session->dhandle = NULL;
-
-		/* Try to create a Bloom filter. */
-		if (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) &&
-		    __wt_lsm_bloom_work(session, lsm_tree) == 0)
-			progress = 1;
-
-		/* If we didn't create a Bloom filter, try to merge. */
-		if ((id != 0 || progress == 0) &&
-		    __wt_lsm_merge(session, lsm_tree, id, aggressive) == 0)
-			progress = 1;
-
-		/* Clear any state from previous worker thread iterations. */
-		WT_CLEAR_BTREE_IN_SESSION(session);
-
-		/*
-		 * Only have one thread freeing old chunks, and only if there
-		 * are chunks to free.
-		 */
-		if (id == 0 && lsm_tree->nold_chunks > 0 &&
-		    __lsm_free_chunks(session, lsm_tree) == 0)
-			progress = 1;
-
-		if (progress)
-			stallms = 0;
-		else if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
-		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-			if (WT_ATOMIC_ADD(lsm_tree->merge_idle, 1) ==
-			    lsm_tree->merge_threads &&
-			    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING |
-			    WT_LSM_TREE_MERGING))
-				F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING |
-				    WT_LSM_TREE_MERGING);
-
-			/* Poll 10 times per second. */
-			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
-			    session, lsm_tree->work_cond, 100000));
-
-			(void)WT_ATOMIC_SUB(lsm_tree->merge_idle, 1);
-
-			/*
-			 * Randomize the tracking of stall time so that with
-			 * multiple LSM trees open, they don't all get
-			 * aggressive in lock-step.
-			 */
-			stallms += __wt_random() % 200;
-
-			/*
-			 * Get aggressive if more than enough chunks for a
-			 * merge should have been created while we waited.
-			 * Use 10 seconds as a default if we don't have an
-			 * estimate.
-			 */
-			chunk_wait = stallms / (lsm_tree->chunk_fill_ms == 0 ?
-			    10000 : lsm_tree->chunk_fill_ms);
-			old_aggressive = aggressive;
-			aggressive = chunk_wait / lsm_tree->merge_min;
-
-			if (aggressive > old_aggressive)
-				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-				     "LSM merge got aggressive (%u), "
-				     "%u / %" PRIu64,
-				     aggressive, stallms,
-				     lsm_tree->chunk_fill_ms));
-		}
-	}
-
-	if (0) {
-err:		__wt_err(session, ret, "LSM merge worker failed");
-	}
-
-	return (NULL);
 }
 
 /*
@@ -372,81 +260,9 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	/*
 	 * Schedule a bloom filter create for our newly flushed chunk */
 	if (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF))
-		WT_ERR(__wt_lsm_push_entry(
+		WT_ERR(__wt_lsm_manager_push_entry(
 		    session, WT_LSM_WORK_BLOOM, lsm_tree));
 err:	return (ret);
-}
-
-/*
- * __wt_lsm_checkpoint_worker --
- *	A worker thread for an LSM tree, responsible for flushing new chunks to
- *	disk.
- */
-void *
-__wt_lsm_checkpoint_worker(void *arg)
-{
-	WT_DECL_RET;
-	WT_LSM_CHUNK *chunk;
-	WT_LSM_TREE *lsm_tree;
-	WT_LSM_WORKER_COOKIE cookie;
-	WT_SESSION_IMPL *session;
-	u_int i, j;
-	int flushed;
-	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
-
-	lsm_tree = arg;
-	session = lsm_tree->ckpt_session;
-
-	WT_CLEAR(cookie);
-
-	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-		if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_lsm_tree_switch(session, lsm_tree));
-			WT_ERR(ret);
-		}
-
-		WT_ERR(__lsm_copy_chunks(session, lsm_tree, &cookie, 0));
-
-		/* Write checkpoints in all completed files. */
-		for (i = 0, j = 0; i < cookie.nchunks; i++) {
-			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
-				goto err;
-
-			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
-				break;
-
-			chunk = cookie.chunk_array[i];
-			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
-			    F_ISSET(chunk, WT_LSM_CHUNK_STABLE))
-				continue;
-
-			WT_ERR(__wt_lsm_checkpoint_chunk(
-			    session, lsm_tree, chunk, &flushed));
-			if (flushed)
-				++j;
-		}
-		__lsm_unpin_chunks(session, &cookie);
-		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
-		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-			if (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL))
-				F_CLR(lsm_tree, WT_LSM_TREE_FLUSH_ALL);
-			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
-			    session, lsm_tree->work_cond, 100000));
-		}
-	}
-
-err:	__lsm_unpin_chunks(session, &cookie);
-	__wt_free(session, cookie.chunk_array);
-	/*
-	 * The thread will only exit with failure if we run out of memory or
-	 * there is some other system driven failure. We can't keep going
-	 * after such a failure - ensure WiredTiger shuts down.
-	 */
-	if (ret != 0 && ret != WT_NOTFOUND)
-		WT_PANIC_MSG(session, ret,
-		    "Shutting down LSM checkpoint utility thread");
-	return (NULL);
 }
 
 /*
@@ -617,17 +433,20 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 }
 
 /*
- * __lsm_free_chunks --
+ * __wt_lsm_free_chunks --
  *	Try to drop chunks from the tree that are no longer required.
  */
-static int
-__lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+int
+__wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORKER_COOKIE cookie;
 	u_int i, skipped;
 	int progress;
+
+	if (lsm_tree->nold_chunks == 0)
+		return (0);
 
 	/*
 	 * Take a copy of the current state of the LSM tree and look for chunks

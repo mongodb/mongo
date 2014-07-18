@@ -84,16 +84,17 @@ struct __wt_lsm_chunk {
  * is required.
  */
 #define	WT_LSM_WORK_BLOOM	0x01
-#define	WT_LSM_WORK_FLUSH	0x02
-#define	WT_LSM_WORK_MERGE	0x04
-#define	WT_LSM_WORK_SWITCH	0x08
+#define	WT_LSM_WORK_DROP	0x02
+#define	WT_LSM_WORK_FLUSH	0x04
+#define	WT_LSM_WORK_MERGE	0x08
+#define	WT_LSM_WORK_SWITCH	0x10
 
 /*
  * WT_LSM_WORK_UNIT --
  *	A definition of maintenance that an LSM tree needs done.
  */
 struct __wt_lsm_work_unit {
-	STAILQ_ENTRY(__wt_lsm_work_unit) q;	/* Worker unit queue */
+	TAILQ_ENTRY(__wt_lsm_work_unit) q;	/* Worker unit queue */
 	uint32_t flags;				/* The type of operation */
 	WT_LSM_TREE *lsm_tree;
 };
@@ -115,9 +116,9 @@ struct __wt_lsm_manager {
 	 * One queue that is managed by the LSM manager thread. It's populated
 	 * with pending merges.
 	 */
-	STAILQ_HEAD(__wt_lsm_work_switch_qh, __wt_lsm_work_unit)  switchqh;
-	STAILQ_HEAD(__wt_lsm_work_app_qh, __wt_lsm_work_unit)	  appqh;
-	STAILQ_HEAD(__wt_lsm_work_manager_qh, __wt_lsm_work_unit) managerqh;
+	TAILQ_HEAD(__wt_lsm_work_switch_qh, __wt_lsm_work_unit)  switchqh;
+	TAILQ_HEAD(__wt_lsm_work_app_qh, __wt_lsm_work_unit)	  appqh;
+	TAILQ_HEAD(__wt_lsm_work_manager_qh, __wt_lsm_work_unit) managerqh;
 	WT_SPINLOCK	switch_lock;	/* Lock for switch queue */
 	WT_SPINLOCK	app_lock;	/* Lock for application queue */
 	WT_SPINLOCK	manager_lock;	/* Lock for manager queue */
@@ -191,7 +192,7 @@ struct __wt_lsm_tree {
 #define	WT_LSM_TREE_NEED_SWITCH	0x08	/* A new chunk should be created */
 #define	WT_LSM_TREE_OPEN	0x10	/* The tree is open */
 #define	WT_LSM_TREE_THROTTLE	0x20	/* Throttle updates */
-#define	WT_LSM_TREE_WORKING	0x40	/* Workers are active */
+#define	WT_LSM_TREE_ACTIVE	0x40	/* Workers are active */
 	uint32_t flags;
 };
 

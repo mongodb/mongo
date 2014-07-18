@@ -29,9 +29,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	TAILQ_INIT(&conn->lsmqh);		/* WT_LSM_TREE list */
 
 	/* Setup the LSM work queues. */
-	STAILQ_INIT(&conn->lsm_manager.switchqh);
-	STAILQ_INIT(&conn->lsm_manager.appqh);
-	STAILQ_INIT(&conn->lsm_manager.managerqh);
+	TAILQ_INIT(&conn->lsm_manager.switchqh);
+	TAILQ_INIT(&conn->lsm_manager.appqh);
+	TAILQ_INIT(&conn->lsm_manager.managerqh);
 
 	/* Configuration. */
 	WT_RET(__wt_conn_config_init(session));

@@ -295,7 +295,7 @@ __wt_lsm_merge(
 #define	LSM_MERGE_CHECK_INTERVAL	1000
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		if (insert_count % LSM_MERGE_CHECK_INTERVAL == 0) {
-			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
 				WT_ERR(EINTR);
 			/*
 			 * Help out with switching chunks in case the
@@ -415,6 +415,10 @@ __wt_lsm_merge(
 
 	/* Update the throttling while holding the tree lock. */
 	__wt_lsm_tree_throttle(session, lsm_tree, 1);
+
+	/* Schedule a pass to discard old chunks */
+	WT_ERR(__wt_lsm_manager_push_entry(
+	    session, WT_LSM_WORK_DROP, lsm_tree));
 
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
