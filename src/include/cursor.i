@@ -17,33 +17,33 @@ __cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
 }
 
 /*
- * __cursor_search_clear --
- *	Reset the cursor's state for a search.
+ * __cursor_pos_clear --
+ *	Reset the cursor's location.
  */
 static inline void
-__cursor_search_clear(WT_CURSOR_BTREE *cbt)
+__cursor_pos_clear(WT_CURSOR_BTREE *cbt)
 {
-	/* Our caller should have released any page held by this cursor. */
-	cbt->ref = NULL;
-
 	/*
-	 * Set the on-page slot to an impossible value larger than any possible
-	 * slot (it's used to validate the search function's return).
+	 * Most of the cursor's location information that needs to be set on
+	 * successful return is always set by a successful return, for example,
+	 * we don't initialize the compare return value because it's always
+	 * set by the row-store search.  The other stuff gets cleared here,
+	 * and it's a minimal set of things we need to clear. It would be a
+	 * lot simpler to clear everything, but we call this function a lot.
 	 */
-	cbt->slot = UINT32_MAX;
+	cbt->recno = 0;
 
-	cbt->ins_head = NULL;
 	cbt->ins = NULL;
+	cbt->ins_head = NULL;
 	cbt->ins_stack[0] = NULL;
-	/* We don't bother clearing the insert stack, that's more expensive. */
-
-	cbt->recno = 0;				/* Illegal value */
-
-	cbt->compare = 2;			/* Illegal value */
 
 	cbt->cip_saved = NULL;
 	cbt->rip_saved = NULL;
 
+	/*
+	 * Don't clear the active flag, it's owned by the cursor enter/leave
+	 * functions.
+	 */
 	F_CLR(cbt, ~WT_CBT_ACTIVE);
 }
 
@@ -148,22 +148,21 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 }
 
 /*
- * __cursor_error_resolve --
- *	Resolve the cursor's state for return on error.
+ * __cursor_reset --
+ *	Reset the cursor.
  */
 static inline int
-__cursor_error_resolve(WT_CURSOR_BTREE *cbt)
+__cursor_reset(WT_CURSOR_BTREE *cbt)
 {
+	WT_DECL_RET;
+
 	/*
-	 * On error, we can't iterate, so clear the cursor's position and
-	 * release any page references we're holding.
+	 * The cursor is leaving the API, and no longer holds any position,
+	 * generally called to clean up the cursor after an error.
 	 */
-	WT_RET(__curfile_leave(cbt));
-
-	/* Clear the cursor's search state. */
-	__cursor_search_clear(cbt);
-
-	return (0);
+	ret = __curfile_leave(cbt);
+	__cursor_pos_clear(cbt);
+	return (ret);
 }
 
 /*

@@ -50,8 +50,7 @@ restart:
 		if (cbt->btree->type == BTREE_ROW) {
 			key.data = WT_INSERT_KEY(current);
 			key.size = WT_INSERT_KEY_SIZE(current);
-			WT_RET(__wt_search_insert(
-			    session, cbt, cbt->ins_head, &key, 0));
+			WT_RET(__wt_search_insert(session, cbt, &key));
 		} else
 			cbt->ins = __col_insert_search(cbt->ins_head,
 			    cbt->ins_stack, cbt->next_stack,
@@ -556,6 +555,6 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 	}
 
 err:	if (ret != 0)
-		WT_TRET(__cursor_error_resolve(cbt));
+		WT_TRET(__cursor_reset(cbt));
 	return (ret);
 }
