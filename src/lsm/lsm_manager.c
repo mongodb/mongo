@@ -63,7 +63,15 @@ int
 __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_DECL_RET;
+	WT_LSM_MANAGER *manager;
+	WT_LSM_WORK_UNIT *entry;
+	WT_SESSION *wt_session;
+	WT_SESSION_IMPL *session;
 
+	session = conn->default_session;
+	manager = &conn->lsm_manager;
+
+	fprintf(stderr, "Starting manager shutdown\n");
 	/* Wait for the server to notice and wrap up. */
 	while (F_ISSET(conn, WT_CONN_SERVER_LSM))
 		__wt_yield();
@@ -71,10 +79,33 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	/* Clean up open LSM handles. */
 	ret = __wt_lsm_tree_close_all(conn->default_session);
 
-	/*
-	 * TODO: Clean up any resources, this needs to be re-cyclable, since
-	 * the server might be stopped/started as part of a reconfigure.
-	 */
+	WT_TRET(__wt_thread_join(session, manager->lsm_worker_tids[0]));
+	manager->lsm_worker_tids[0] = 0;
+	wt_session = &manager->lsm_worker_sessions[0]->iface;
+	WT_TRET(wt_session->close(wt_session, NULL));
+	manager->lsm_worker_sessions[0] = NULL;
+
+	__wt_spin_destroy(session, &manager->switch_lock);
+	__wt_spin_destroy(session, &manager->app_lock);
+	__wt_spin_destroy(session, &manager->manager_lock);
+
+	/* Release memory from any operations left on the queue. */
+	while ((entry = TAILQ_FIRST(&manager->switchqh)) != NULL) {
+		TAILQ_REMOVE(&manager->switchqh, entry, q);
+		__wt_free(session, entry);
+	}
+	while ((entry = TAILQ_FIRST(&manager->appqh)) != NULL) {
+		TAILQ_REMOVE(&manager->appqh, entry, q);
+		__wt_free(session, entry);
+	}
+	while ((entry = TAILQ_FIRST(&manager->managerqh)) != NULL) {
+		TAILQ_REMOVE(&manager->managerqh, entry, q);
+		__wt_free(session, entry);
+	}
+	__wt_free(session, manager->lsm_worker_tids);
+	__wt_free(session, manager->lsm_worker_sessions);
+	fprintf(stderr, "Finished manager shutdown\n");
+
 	return (ret);
 }
 
@@ -93,12 +124,13 @@ __lsm_worker_manager(void *arg)
 	WT_LSM_WORKER_ARGS *worker_args;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session, *worker_session;
-	int queued;
+	int queued, pass_sleep;
 	u_int i;
 
 	session = (WT_SESSION_IMPL *)arg;
 	conn = S2C(session);
 	manager = &conn->lsm_manager;
+	pass_sleep = 10000;
 
 	WT_ASSERT(session, manager->lsm_workers == 1);
 
@@ -129,22 +161,27 @@ __lsm_worker_manager(void *arg)
 	    __lsm_worker, worker_args));
 
 	/* Start a generic worker thread. */
-	WT_ERR(__wt_open_session(
-	    conn, 1, NULL, "isolation=read-uncommitted", &worker_session));
-	worker_session->name = "lsm-worker-1";
-	manager->lsm_worker_sessions[2] = worker_session;
-	/* Freed by the worker thread when it shuts down */
-	WT_ERR(__wt_calloc_def(session, 1, &worker_args));
-	worker_args->session = worker_session;
-	worker_args->id = manager->lsm_workers++;
-	worker_args->flags =
-	    WT_LSM_WORK_BLOOM |
-	    WT_LSM_WORK_DROP |
-	    WT_LSM_WORK_FLUSH |
-	    WT_LSM_WORK_MERGE |
-	    WT_LSM_WORK_SWITCH;
-	WT_ERR(__wt_thread_create(session, &manager->lsm_worker_tids[2],
-	    __lsm_worker, worker_args));
+	for (; manager->lsm_workers < 3; // manager->lsm_workers_max;
+	    manager->lsm_workers++) {
+		WT_ERR(__wt_open_session(conn, 1, NULL,
+		    "isolation=read-uncommitted", &worker_session));
+		worker_session->name = "lsm-worker-1";
+		manager->lsm_worker_sessions[manager->lsm_workers] =
+		    worker_session;
+		/* Freed by the worker thread when it shuts down */
+		WT_ERR(__wt_calloc_def(session, 1, &worker_args));
+		worker_args->session = worker_session;
+		worker_args->id = manager->lsm_workers;
+		worker_args->flags =
+		    WT_LSM_WORK_BLOOM |
+		    WT_LSM_WORK_DROP |
+		    WT_LSM_WORK_FLUSH |
+		    WT_LSM_WORK_MERGE |
+		    WT_LSM_WORK_SWITCH;
+		WT_ERR(__wt_thread_create(session,
+		    &manager->lsm_worker_tids[manager->lsm_workers],
+		    __lsm_worker, worker_args));
+	}
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		if (TAILQ_EMPTY(&conn->lsmqh)) {
@@ -195,11 +232,13 @@ __lsm_worker_manager(void *arg)
 				     lsm_tree->chunk_fill_ms));
 #endif
 		}
-		/* Don't busy loop if we aren't finding work. */
-		if (queued == 0)
-			__wt_sleep(0, 1000);
-		/* Don't get greedy adding merges. */
-		__wt_sleep(0, 100000);
+		/* Don't busy loop finding work. */
+		if (!TAILQ_EMPTY(&manager->managerqh))
+			pass_sleep += 100;
+		else if (pass_sleep > 1000)
+			pass_sleep -= 1000;
+
+		__wt_sleep(0, pass_sleep);
 	}
 
 	/*
@@ -239,32 +278,40 @@ __wt_lsm_manager_clear_tree(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_LSM_MANAGER *manager;
-	WT_LSM_WORK_UNIT *entry;
+	WT_LSM_WORK_UNIT *current, *next;
 
 	manager = &S2C(session)->lsm_manager;
 	/* Clear out the tree from the switch queue */
 	__wt_spin_lock(session, &manager->switch_lock);
 
-	TAILQ_FOREACH(entry, &manager->switchqh, q) {
-		if (entry->lsm_tree != lsm_tree)
+	/* Structure the loop so that it's safe to free as we iterate */
+	for (current = TAILQ_FIRST(&manager->switchqh);
+	    current != NULL; current = next) {
+		next = TAILQ_NEXT(current, q);
+		if (current->lsm_tree != lsm_tree)
 			continue;
-		TAILQ_REMOVE(&manager->switchqh, entry, q);
+		TAILQ_REMOVE(&manager->switchqh, current, q);
+		__wt_free(session, current);
 	}
 	__wt_spin_unlock(session, &manager->switch_lock);
 	/* Clear out the tree from the application queue */
 	__wt_spin_lock(session, &manager->app_lock);
-	TAILQ_FOREACH(entry, &manager->appqh, q) {
-		if (entry->lsm_tree != lsm_tree)
+	for (current = TAILQ_FIRST(&manager->appqh);
+	    current != NULL; current = next) {
+		next = TAILQ_NEXT(current, q);
+		if (current->lsm_tree != lsm_tree)
 			continue;
-		TAILQ_REMOVE(&manager->appqh, entry, q);
+		TAILQ_REMOVE(&manager->appqh, current, q);
 	}
 	__wt_spin_unlock(session, &manager->app_lock);
 	/* Clear out the tree from the manager queue */
 	__wt_spin_lock(session, &manager->manager_lock);
-	TAILQ_FOREACH(entry, &manager->managerqh, q) {
-		if (entry->lsm_tree != lsm_tree)
+	for (current = TAILQ_FIRST(&manager->managerqh);
+	    current != NULL; current = next) {
+		next = TAILQ_NEXT(current, q);
+		if (current->lsm_tree != lsm_tree)
 			continue;
-		TAILQ_REMOVE(&manager->managerqh, entry, q);
+		TAILQ_REMOVE(&manager->managerqh, current, q);
 	}
 	__wt_spin_unlock(session, &manager->manager_lock);
 	return (0);
