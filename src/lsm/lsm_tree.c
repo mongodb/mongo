@@ -101,7 +101,6 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 	}
 
-	/* TODO: Shut down the LSM manager threads. */
 	return (ret);
 }
 

@@ -47,9 +47,34 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_thread_create(session, &manager->lsm_worker_tids[0],
 	    __lsm_worker_manager, worker_session));
 
+	F_SET(S2C(session), WT_CONN_SERVER_LSM);
+
 	if (0) {
 err:		__wt_free(session, manager->lsm_worker_tids);
 	}
+	return (ret);
+}
+
+/*
+ * __wt_lsm_manager_destroy --
+ *	Destroy the LSM manager threads and subsystem.
+ */
+int
+__wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
+{
+	WT_DECL_RET;
+
+	/* Wait for the server to notice and wrap up. */
+	while (F_ISSET(conn, WT_CONN_SERVER_LSM))
+		__wt_yield();
+
+	/* Clean up open LSM handles. */
+	ret = __wt_lsm_tree_close_all(conn->default_session);
+
+	/*
+	 * TODO: Clean up any resources, this needs to be re-cyclable, since
+	 * the server might be stopped/started as part of a reconfigure.
+	 */
 	return (ret);
 }
 
@@ -174,7 +199,7 @@ __lsm_worker_manager(void *arg)
 		if (queued == 0)
 			__wt_sleep(0, 1000);
 		/* Don't get greedy adding merges. */
-		__wt_sleep(1, 0);
+		__wt_sleep(0, 100000);
 	}
 
 	/*
@@ -199,6 +224,7 @@ __lsm_worker_manager(void *arg)
 	if (ret != 0) {
 err:		__wt_err(session, ret, "LSM worker manager thread error");
 	}
+	F_CLR(conn, WT_CONN_SERVER_LSM);
 	return (NULL);
 }
 

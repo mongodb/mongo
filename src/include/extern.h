@@ -922,6 +922,7 @@ extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_lsm_manager_start(WT_SESSION_IMPL *session);
+extern int __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_lsm_manager_clear_tree( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_manager_push_entry( WT_SESSION_IMPL *session,
