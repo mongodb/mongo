@@ -51,6 +51,7 @@ namespace mongo {
 
 namespace repl {
 
+    class ReplSetHeartbeatArgs;
     class TopologyCoordinator;
 
     /**
@@ -316,7 +317,8 @@ namespace repl {
          * Handles an incoming heartbeat command. Adds BSON to 'resultObj'; 
          * returns a Status with either OK or an error message.
          */
-        virtual Status processHeartbeat(const BSONObj& cmdObj, BSONObjBuilder* resultObj) = 0;
+        virtual Status processHeartbeat(const ReplSetHeartbeatArgs& args,
+                                        BSONObjBuilder* resultObj) = 0;
 
         /**
          * Arguments for the replSetReconfig command.

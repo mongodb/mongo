@@ -35,6 +35,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs.h"
@@ -450,7 +451,7 @@ namespace repl {
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorImpl::processHeartbeat(const BSONObj& cmdObj, 
+    Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& args,
                                                         BSONObjBuilder* resultObj) {
         Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");
         CBHStatus cbh = _replExecutor->scheduleWork(
@@ -458,7 +459,7 @@ namespace repl {
                        _topCoord.get(),
                        stdx::placeholders::_1,
                        Date_t(curTimeMillis64()),
-                       cmdObj,
+                       args,
                        _settings.ourSetName(),
                        resultObj,
                        &result));

@@ -193,9 +193,9 @@ namespace repl {
         return legacyResponse;
     }
 
-    Status HybridReplicationCoordinator::processHeartbeat(const BSONObj& cmdObj, 
+    Status HybridReplicationCoordinator::processHeartbeat(const ReplSetHeartbeatArgs& args,
                                                           BSONObjBuilder* resultObj) {
-        Status legacyStatus = _legacy.processHeartbeat(cmdObj, resultObj);
+        Status legacyStatus = _legacy.processHeartbeat(args, resultObj);
         BSONObjBuilder implResult;
         return legacyStatus;
     }

@@ -34,6 +34,7 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/util/concurrency/list.h"
@@ -88,7 +89,7 @@ namespace repl {
         // produces a reply to a heartbeat
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
                                               Date_t now,
-                                              const BSONObj& cmdObj, 
+                                              const ReplSetHeartbeatArgs& args,
                                               const std::string& ourSetName,
                                               BSONObjBuilder* resultObj,
                                               Status* result);

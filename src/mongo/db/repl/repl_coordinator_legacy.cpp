@@ -41,6 +41,7 @@
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replset_commands.h"
@@ -502,18 +503,17 @@ namespace {
         return theReplSet->setMaintenanceMode(txn, activate);
     }
 
-    Status LegacyReplicationCoordinator::processHeartbeat(const BSONObj& cmdObj, 
+    Status LegacyReplicationCoordinator::processHeartbeat(const ReplSetHeartbeatArgs& args,
                                                           BSONObjBuilder* resultObj) {
-        if( cmdObj["pv"].Int() != 1 ) {
+        if (args.getProtocolVersion() != 1) {
             return Status(ErrorCodes::BadValue, "incompatible replset protocol version");
         }
 
         {
-            string s = string(cmdObj.getStringField("replSetHeartbeat"));
-            if (_settings.ourSetName() != s) {
+            if (_settings.ourSetName() != args.getSetName()) {
                 log() << "replSet set names do not match, our cmdline: " << _settings.replSet
                       << rsLog;
-                log() << "replSet s: " << s << rsLog;
+                log() << "replSet s: " << args.getSetName() << rsLog;
                 resultObj->append("mismatch", true);
                 return Status(ErrorCodes::BadValue, "repl set names do not match");
             }
@@ -521,16 +521,15 @@ namespace {
 
         resultObj->append("rs", true);
         if( (theReplSet == 0) || (theReplSet->startupStatus == ReplSetImpl::LOADINGCONFIG) ) {
-            string from( cmdObj.getStringField("from") );
-            if( !from.empty() ) {
+            if (!args.getSenderHost().empty()) {
                 scoped_lock lck( _settings.discoveredSeeds_mx );
-                _settings.discoveredSeeds.insert(from);
+                _settings.discoveredSeeds.insert(args.getSenderHost().toString());
             }
             resultObj->append("hbmsg", "still initializing");
             return Status::OK();
         }
 
-        if( theReplSet->name() != cmdObj.getStringField("replSetHeartbeat") ) {
+        if (theReplSet->name() != args.getSetName()) {
             resultObj->append("mismatch", true);
             return Status(ErrorCodes::BadValue, "repl set names do not match (2)");
         }
@@ -553,17 +552,15 @@ namespace {
 
         int v = theReplSet->config().version;
         resultObj->append("v", v);
-        if( v > cmdObj["v"].Int() )
+        if (v > args.getConfigVersion())
             *resultObj << "config" << theReplSet->config().asBson();
 
         Member* from = NULL;
-        if (cmdObj.hasField("fromId")) {
-            if (v == cmdObj["v"].Int()) {
-                from = theReplSet->getMutableMember(cmdObj["fromId"].Int());
-            }
+        if (v == args.getConfigVersion() && args.getSenderId() != -1) {
+            from = theReplSet->getMutableMember(args.getSenderId());
         }
         if (!from) {
-            from = theReplSet->findByName(cmdObj.getStringField("from"));
+            from = theReplSet->findByName(args.getSenderHost().toString());
             if (!from) {
                 return Status::OK();
             }

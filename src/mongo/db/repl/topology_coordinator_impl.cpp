@@ -31,6 +31,8 @@
 #include "mongo/db/repl/topology_coordinator_impl.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/isself.h"
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
@@ -442,7 +444,7 @@ namespace repl {
     void TopologyCoordinatorImpl::prepareHeartbeatResponse(
             const ReplicationExecutor::CallbackData& data,
             Date_t now,
-            const BSONObj& cmdObj,
+            const ReplSetHeartbeatArgs& args,
             const std::string& ourSetName,
             BSONObjBuilder* resultObj,
             Status* result) {
@@ -451,13 +453,13 @@ namespace repl {
             return;
         }
 
-        if( cmdObj["pv"].Int() != 1 ) {
+        if (args.getProtocolVersion() != 1) {
             *result = Status(ErrorCodes::BadValue, "incompatible replset protocol version");
             return;
         }
 
         // Verify that replica set names match
-        std::string rshb = std::string(cmdObj.getStringField("replSetHeartbeat"));
+        std::string rshb = std::string(args.getSetName());
         if (ourSetName != rshb) {
             *result = Status(ErrorCodes::BadValue, "repl set names do not match");
             log() << "replSet set names do not match, ours: " << ourSetName <<
@@ -477,7 +479,7 @@ namespace repl {
 */
 
         // Verify that the config's replset name matches
-        if (_currentConfig.getReplSetName() != cmdObj.getStringField("replSetHeartbeat")) {
+        if (_currentConfig.getReplSetName() != args.getSetName()) {
             *result = Status(ErrorCodes::BadValue, "repl set names do not match (2)");
             resultObj->append("mismatch", true);
             return; 
@@ -507,15 +509,13 @@ namespace repl {
         long long v = _currentConfig.getConfigVersion();
         resultObj->append("v", v);
         // Deliver new config if caller's version is older than ours
-        if( v > cmdObj["v"].Long() )
+        if (v > args.getConfigVersion())
             *resultObj << "config" << _currentConfig.asBson();
 
         // Resolve the caller's id in our Member list
         int from = -1;
-        if (cmdObj.hasField("fromId")) {
-            if (v == cmdObj["v"].Int()) {
-                from = _getMemberIndex(cmdObj["fromId"].Int());
-            }
+        if (v == args.getConfigVersion() && args.getSenderId() != -1) {
+            from = _getMemberIndex(args.getSenderId());
         }
         if (from == -1) {
             // Can't find the member, so we leave out the stateDisagreement field

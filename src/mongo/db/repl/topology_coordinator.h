@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
@@ -114,7 +115,7 @@ namespace repl {
         // produce a reply to a heartbeat
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
                                               Date_t now,
-                                              const BSONObj& cmdObj, 
+                                              const ReplSetHeartbeatArgs& args,
                                               const std::string& ourSetName,
                                               BSONObjBuilder* resultObj,
                                               Status* result) = 0;
