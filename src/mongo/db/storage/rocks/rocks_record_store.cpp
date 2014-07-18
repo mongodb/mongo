@@ -138,8 +138,8 @@ namespace mongo {
                            value );
 
         if ( !status.ok() ) {
-            if ( status.IsNotFound() )
-                return RecordData( NULL, 0 );
+            // if ( status.IsNotFound() )
+            //     return RecordData( NULL, 0 );
 
             log() << "rocks Get failed, blowing up: " << status.ToString();
             invariant( false );

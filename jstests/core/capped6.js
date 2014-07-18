@@ -7,7 +7,7 @@ db._dbCommand( { create: "capped6", capped: true, size: 1000, $nExtents: 11, aut
 tzz = db.capped6;
 
 function debug( x ) {
-    print( x );
+//    print( x );
 }
 
 /**
@@ -41,6 +41,7 @@ for( i = 0; i < 500; ++i, c += "-" ) {
     // The a values are strings of increasing length.
     val[ i ] = { a: c };
 }
+
 var oldMax = Random.randInt( 500 );
 var max = 0;
 
@@ -50,15 +51,17 @@ var max = 0;
  * 'captrunc' requests.
  */
 function doTest() {
-    for( var i = max; i < oldMax; ++i ) {print(i);
+    for( var i = max; i < oldMax; ++i ) {
         tzz.insert( val[ i ] );
     }
     max = oldMax;
     count = tzz.count();
+
     var min = 1;
     if ( Random.rand() > 0.3 ) {
         min = Random.randInt( count ) + 1;
     }
+
     // Iteratively remove a random number of documents until we have no more
     // than 'min' documents.
     while( count > min ) {
@@ -82,7 +85,7 @@ function doTest() {
 
 // Repeatedly add up to 'oldMax' documents and then truncate the newest
 // documents.  Newer documents take up more space than older documents.
-for( var i = 0; i < 10; ++i ) {print(i);
+for( var i = 0; i < 10; ++i ) {
     doTest();
 }
 
