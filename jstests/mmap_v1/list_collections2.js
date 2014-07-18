@@ -1,4 +1,4 @@
-// Test the listCollections command
+// Test the listCollections command and system.namespaces
 
 mydb = db.getSisterDB( "list_collections1" );
 mydb.dropDatabase();
@@ -19,5 +19,11 @@ assert.eq( bar.name, mydb.bar.getName() );
 assert.eq( foo.name, mydb.foo.getName() );
 
 assert( mydb.bar.temp, tojson( bar ) );
+
+assert.eq( mydb._getCollectionNamesSystemNamespaces(),
+           mydb._getCollectionNamesCommand() );
+
+assert.eq( mydb.getCollectionNames(),
+           mydb._getCollectionNamesCommand() );
 
 mydb.dropDatabase();
