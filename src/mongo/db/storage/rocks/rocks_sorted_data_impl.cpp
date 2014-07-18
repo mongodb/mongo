@@ -48,13 +48,13 @@ namespace mongo {
 
         class RocksCursor : public SortedDataInterface::Cursor {
         public:
-            RocksCursor( rocksdb::Iterator* iterator, int direction )
+            RocksCursor( rocksdb::Iterator* iterator, bool forward )
                 : _iterator( iterator ),
-                  _direction( direction ),
+                  _forward( forward ),
                   _cached( false ) {
 
                 // TODO: maybe don't seek until we know we need to?
-                if ( _forward() )
+                if ( _forward )
                     _iterator->SeekToFirst();
                 else
                     _iterator->SeekToLast();
@@ -63,7 +63,9 @@ namespace mongo {
 
             virtual ~RocksCursor() { } 
 
-            int getDirection() const { return _direction; }
+            int getDirection() const { 
+                return _forward ? 1 : -1;
+            }
 
             bool isEOF() const {
                 return !_iterator->Valid();
@@ -100,7 +102,7 @@ namespace mongo {
                                          afterKey,
                                          keyEnd,
                                          keyEndInclusive,
-                                         _forward() );
+                                         getDirection() );
 
                 _locate( RocksIndexEntry( key, DiskLoc(), false ) );
             }
@@ -133,7 +135,7 @@ namespace mongo {
             }
 
             void advance() {
-                if ( _forward() ) {
+                if ( _forward ) {
                     _iterator->Next();
                 } else {
                     _iterator->Prev();
@@ -156,7 +158,7 @@ namespace mongo {
                 _cached = false;
 
                 if ( _savedAtEnd ) {
-                    if ( _forward() ) {
+                    if ( _forward ) {
                         _iterator->SeekToLast();
                     } else {
                         _iterator->SeekToFirst();
@@ -199,7 +201,7 @@ namespace mongo {
                 // advance() so that we're at the first value less than (to the left of) what we
                 // were searching for, rather than the first value greater than (to the right of)
                 // the value we were searching for
-                if ( !compareResult && !_forward() && !isEOF() ) {
+                if ( !compareResult && !_forward && !isEOF() ) {
                     if ( isEOF() ) {
                         _iterator->SeekToLast();
                     } else {
@@ -210,8 +212,6 @@ namespace mongo {
 
                 return compareResult;
             }
-
-            bool _forward() const { return _direction > 0; }
 
             void _checkStatus() {
                 // TODO: Fix me
@@ -236,7 +236,7 @@ namespace mongo {
 
             scoped_ptr<rocksdb::Iterator> _iterator;
             OperationContext* _txn; // not owned
-            int _direction;
+            const bool _forward;
 
             mutable bool _cached;
             mutable BSONObj _cachedKey;
@@ -379,8 +379,9 @@ namespace mongo {
 
     SortedDataInterface::Cursor* RocksSortedDataImpl::newCursor(OperationContext* txn, 
                                                                 int direction) const {
+        invariant( direction == 1 || direction == -1 && "invalid value for direction" );
         rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
-        return new RocksCursor( _db->NewIterator( options, _columnFamily ), direction );
+        return new RocksCursor( _db->NewIterator( options, _columnFamily ), direction == 1 );
     }
 
     Status RocksSortedDataImpl::initAsEmpty(OperationContext* txn) {

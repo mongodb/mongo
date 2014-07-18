@@ -391,7 +391,7 @@ namespace mongo {
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 0 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, -1 ) );
                 ASSERT( !cursor->locate( key, loc ) );
             }
 
@@ -406,7 +406,7 @@ namespace mongo {
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 0 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, -1 ) );
                 ASSERT( cursor->locate( key, loc ) );
                 ASSERT_EQUALS( key, cursor->getKey() );
                 ASSERT_EQUALS( loc, cursor->getDiskLoc() );
@@ -434,7 +434,7 @@ namespace mongo {
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 0 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, -1 ) );
                 ASSERT_FALSE( cursor->locate( BSON( "a" << 2 ), DiskLoc(1,1) ) );
                 ASSERT_FALSE( cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
@@ -462,7 +462,7 @@ namespace mongo {
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 0 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, -1 ) );
                 ASSERT( cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
@@ -526,7 +526,7 @@ namespace mongo {
 
             {
                 MyOperationContext opCtx( db.get() );
-                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 0 ) );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, -1 ) );
                 ASSERT_FALSE( cursor->locate( BSON( "" << 2 ), DiskLoc(1,2) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
