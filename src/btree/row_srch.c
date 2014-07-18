@@ -117,10 +117,12 @@ __wt_search_insert(
 
 	/*
 	 * For every insert element we review, we're getting closer to a better
-	 * choice; update the compare field to its new value.
+	 * choice; update the compare field to its new value.  If we went past
+	 * the last item in the list, return the last one: that is used to
+	 * decide whether we are positioned in a skiplist.
 	 */
 	cbt->compare = -cmp;
-	cbt->ins = ins;
+	cbt->ins = (ins != NULL) ? ins : last_ins;
 	return (0);
 }
 
