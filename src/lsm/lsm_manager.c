@@ -71,7 +71,9 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	session = conn->default_session;
 	manager = &conn->lsm_manager;
 
-	fprintf(stderr, "Starting manager shutdown\n");
+	if (manager->lsm_worker_tids == NULL)
+		return (0);
+
 	/* Wait for the server to notice and wrap up. */
 	while (F_ISSET(conn, WT_CONN_SERVER_LSM))
 		__wt_yield();
@@ -79,15 +81,12 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	/* Clean up open LSM handles. */
 	ret = __wt_lsm_tree_close_all(conn->default_session);
 
+	/* If the manager was never started, don't stop it. */
 	WT_TRET(__wt_thread_join(session, manager->lsm_worker_tids[0]));
 	manager->lsm_worker_tids[0] = 0;
 	wt_session = &manager->lsm_worker_sessions[0]->iface;
 	WT_TRET(wt_session->close(wt_session, NULL));
 	manager->lsm_worker_sessions[0] = NULL;
-
-	__wt_spin_destroy(session, &manager->switch_lock);
-	__wt_spin_destroy(session, &manager->app_lock);
-	__wt_spin_destroy(session, &manager->manager_lock);
 
 	/* Release memory from any operations left on the queue. */
 	while ((entry = TAILQ_FIRST(&manager->switchqh)) != NULL) {
@@ -102,9 +101,13 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 		TAILQ_REMOVE(&manager->managerqh, entry, q);
 		__wt_free(session, entry);
 	}
+
+	__wt_spin_destroy(session, &manager->switch_lock);
+	__wt_spin_destroy(session, &manager->app_lock);
+	__wt_spin_destroy(session, &manager->manager_lock);
+
 	__wt_free(session, manager->lsm_worker_tids);
 	__wt_free(session, manager->lsm_worker_sessions);
-	fprintf(stderr, "Finished manager shutdown\n");
 
 	return (ret);
 }
