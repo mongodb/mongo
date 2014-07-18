@@ -45,7 +45,9 @@ namespace mongo {
         BSONObjIterator rhsIt(rhs.key());
 
         for (unsigned mask = 1; lhsIt.more(); mask <<= 1) {
-            invariant(rhsIt.more());
+            // XXX: commented this out since we found cases where lhs and rhs are not of the
+            //      same length. THis seems to be allowed in mmap
+            // invariant(rhsIt.more());
 
             const BSONElement l = lhsIt.next();
             const BSONElement r = rhsIt.next();
@@ -75,7 +77,9 @@ namespace mongo {
             }
 
         }
-        invariant(!rhsIt.more());
+        // invariant(!rhsIt.more());
+        if (rhsIt.more())
+            return 1;
 
         // This means just look at the key, not the loc.
         if (lhs.loc().isNull() || rhs.loc().isNull())
