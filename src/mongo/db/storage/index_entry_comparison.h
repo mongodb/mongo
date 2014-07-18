@@ -28,14 +28,22 @@
 
 #pragma once
 
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/diskloc.h"
+
 namespace mongo {
 
     /**
      * This represents a single item in an index. This is intended to (possibly) be used by 
      * implementations of the SortedDataInterface interface. An index item simply consists of a key
-     *  and a disk location, but this could be subclassed to perform more complex tasks.
+     * and a disk location, but this could be subclassed to perform more complex tasks.
      */
     struct IndexKeyEntry {
+    public:
         IndexKeyEntry(const BSONObj& key, DiskLoc loc) : _key(key), _loc(loc) {}
         virtual ~IndexKeyEntry() { }
         
@@ -49,20 +57,40 @@ namespace mongo {
     }; // struct IndexKeyEntry
 
     /**
-     * As the name suggests, this is used to compare two different IndexKeyEntry instances. The 
-     * existense of compound indexes necessitates some complicated logic. This is meant to
+     * As the name suggests, this class is used to compare two different IndexKeyEntry instances.
+     * The existense of compound indexes necessitates some complicated logic. This is meant to
      * support the implementation of the SortedDataInterface::customLocate() and
      * SortedDataInterface::advanceTo() methods, which require fine-grained control over whether the
      * ranges of various keys comprising a compound index are inclusive or exclusive.
      */
-    struct IndexEntryComparison {
-        IndexEntryComparison(Ordering order) : order(order) {}
+    class IndexEntryComparison {
+    public:
+        IndexEntryComparison(Ordering order) : _order(order) {}
 
-        bool operator() (const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const {
-            // implementing in memcmp style to ease reuse of this code.
-            return comparison(lhs, rhs) < 0;
-        }
+        bool operator() (const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const;
 
+        /**
+         * This function requires quite a bit of explanation:
+         * 
+         * This functino compares two IndexKeyEntry objects which have been stripped of their field
+         * names. Either lhs or rhs represents the lower bound of a query, meaning that either lhs
+         * or rhs must be the result of a call to makeQueryObject(). 
+         *
+         * Ex: lhs's key is {"": 5, "": "foo"}, and it represents the lower bound of a range query.
+         * If rhs's key is {"": 4, "": "foo"}, then the function will return :w
+         */
+        int comparison(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const;
+        
+        /**
+         * Preps a query for compare(). Strips fieldNames if there are any.
+         */
+        static BSONObj makeQueryObject(const BSONObj& keyPrefix,
+                                       int prefixLen,
+                                       bool prefixExclusive,
+                                       const vector<const BSONElement*>& keySuffix,
+                                       const vector<bool>& suffixInclusive,
+                                       const int cursorDirection);
+    private:
         // Due to the limitations in the std::set API we need to use the same type (IndexKeyEntry)
         // for both the stored data and the "query". We cheat and encode extra information in the
         // first byte of the field names in the query. This works because all stored objects should
@@ -73,101 +101,7 @@ namespace mongo {
             greater = 'g',
         };
 
-        // This should behave the same as customBSONCmp from btree_logic.cpp.
-        int comparison(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const {
-            BSONObjIterator lhsIt(lhs.key());
-            BSONObjIterator rhsIt(rhs.key());
-            
-            for (unsigned mask = 1; lhsIt.more(); mask <<= 1) {
-                invariant(rhsIt.more());
-
-                const BSONElement l = lhsIt.next();
-                const BSONElement r = rhsIt.next();
-
-                if (int cmp = l.woCompare(r, /*compareFieldNames=*/false)) {
-                    invariant(cmp != std::numeric_limits<int>::min()); // can't be negated
-                    return order.descending(mask)
-                             ? -cmp
-                             : cmp;
-                }
-
-                // Here is where the weirdness begins. We sometimes want to fudge the comparison
-                // when a key == the query to implement exclusive ranges.
-                BehaviorIfFieldIsEqual lEqBehavior = BehaviorIfFieldIsEqual(l.fieldName()[0]);
-                BehaviorIfFieldIsEqual rEqBehavior = BehaviorIfFieldIsEqual(r.fieldName()[0]);
-
-                if (lEqBehavior) {
-                    // lhs is the query, rhs is the stored data
-                    invariant(rEqBehavior == normal);
-                    return lEqBehavior == less ? -1 : 1;
-                }
-
-                if (rEqBehavior) {
-                    // rhs is the query, lhs is the stored data, so reverse the returns
-                    invariant(lEqBehavior == normal);
-                    return lEqBehavior == less ? 1 : -1;
-                }
-                
-            }
-            invariant(!rhsIt.more());
-
-            // This means just look at the key, not the loc.
-            if (lhs.loc().isNull() || rhs.loc().isNull())
-                return 0;
-
-            return lhs.loc().compare(rhs.loc()); // is supposed to ignore ordering
-        }
-        
-        /**
-         * Preps a query for compare(). Strips fieldNames if there are any.
-         */
-        static BSONObj makeQueryObject(const BSONObj& keyPrefix,
-                                       int prefixLen,
-                                       bool prefixExclusive,
-                                       const vector<const BSONElement*>& keySuffix,
-                                       const vector<bool>& suffixInclusive,
-                                       const int cursorDirection) {
-
-            // See comment above for why this is done.
-            const char exclusiveByte = (cursorDirection == 1
-                                            ? IndexEntryComparison::greater
-                                            : IndexEntryComparison::less);
-            const StringData exclusiveFieldName(&exclusiveByte, 1);
-
-            BSONObjBuilder bb;
-
-            // handle the prefix
-            if (prefixLen > 0) {
-                BSONObjIterator it(keyPrefix);
-                for (int i = 0; i < prefixLen; i++) {
-                    invariant(it.more());
-                    const BSONElement e = it.next();
-
-                    if (prefixExclusive && i == prefixLen - 1) {
-                        bb.appendAs(e, exclusiveFieldName);
-                    }
-                    else {
-                        bb.appendAs(e, StringData());
-                    }
-                }
-            }
-
-            // Handle the suffix. Note that the useful parts of the suffix start at index prefixLen
-            // rather than at 0.
-            invariant(keySuffix.size() == suffixInclusive.size());
-            for (size_t i = prefixLen; i < keySuffix.size(); i++) {
-                if (suffixInclusive[i]) {
-                    bb.appendAs(*keySuffix[i], StringData());
-                }
-                else {
-                    bb.appendAs(*keySuffix[i], exclusiveFieldName);
-                }
-            }
-
-            return bb.obj();
-        }
-
-        const Ordering order;
+        const Ordering _order;
     }; // struct IndexEntryComparison
 
 } // namespace mongo

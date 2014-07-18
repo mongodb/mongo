@@ -273,7 +273,7 @@ namespace mongo {
     }
 
     string RocksIndexEntry::asString() const {
-        string s( size(), 1 );
+        string s( _size(), 1 );
         memcpy( const_cast<char*>( s.c_str() ), _key.objdata(), _key.objsize() );
 
         const char* locData = reinterpret_cast<const char*>( &_loc );

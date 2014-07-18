@@ -60,6 +60,7 @@ namespace mongo {
      * BSONObj in the key, and uses the DiskLoc as a tiebreaker.   
      */
     class RocksSortedDataImpl : public SortedDataInterface {
+        MONGO_DISALLOW_COPYING( RocksSortedDataImpl );
     public:
         RocksSortedDataImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf );
 
@@ -110,8 +111,8 @@ namespace mongo {
      * used as keys in the column families which represent indexes (see comment for the 
      * RocksSortedDataImpl class for more information) 
      */
-    struct RocksIndexEntry: public IndexKeyEntry {
-
+    class RocksIndexEntry: public IndexKeyEntry {
+    public:
         /**
          * Constructs a RocksIndexEntry. Currently, (7/18/14) the stripFieldNames boolean exists
          * solely to construct RocksIndexEntry's that have been created by the
@@ -132,6 +133,7 @@ namespace mongo {
          */
         string asString() const;
 
-        int size() const { return _key.objsize() + sizeof( DiskLoc ); }
+    private:
+        int _size() const { return _key.objsize() + sizeof( DiskLoc ); }
     };
 }
