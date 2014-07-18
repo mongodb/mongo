@@ -37,6 +37,9 @@ namespace mongo {
     }
 
     // This should behave the same as customBSONCmp from btree_logic.cpp.
+    //
+    // Reading the comment in the .h file is HIGHLY recommended if you need to understand what this
+    // function is doing
     int IndexEntryComparison::comparison(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const {
         BSONObjIterator lhsIt(lhs.key());
         BSONObjIterator rhsIt(rhs.key());
@@ -81,6 +84,8 @@ namespace mongo {
         return lhs.loc().compare(rhs.loc()); // is supposed to ignore ordering
     }
 
+    // Reading the comment in the .h file is HIGHLY recommended if you need to understand what this
+    // function is doing
     BSONObj IndexEntryComparison::makeQueryObject(const BSONObj& keyPrefix,
                                                         int prefixLen,
                                                         bool prefixExclusive,

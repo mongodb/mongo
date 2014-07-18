@@ -70,19 +70,74 @@ namespace mongo {
         bool operator() (const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const;
 
         /**
-         * This function requires quite a bit of explanation:
+         * Returns -1 if lhs < rhs, 1 if lhs > rhs, and 0 otherwise.
          * 
-         * This functino compares two IndexKeyEntry objects which have been stripped of their field
+         * This function requires much more explanation than that, however:
+         * 
+         * This function compares two IndexKeyEntry objects which have been stripped of their field
          * names. Either lhs or rhs represents the lower bound of a query, meaning that either lhs
-         * or rhs must be the result of a call to makeQueryObject(). 
+         * or rhs must be the result of a call to makeQueryObject(). The comparison function simply
+         * compares the BSONObjects in each IndexKeyEntry, and uses the DiskLoc's as a tiebreaker.
          *
          * Ex: lhs's key is {"": 5, "": "foo"}, and it represents the lower bound of a range query.
-         * If rhs's key is {"": 4, "": "foo"}, then the function will return :w
+         * If rhs's key is {"": 4, "": "foo"}, then the function will return 1, because the left
+         * hand side's first element is greater than the rhs's. 
+         *
+         * Another ex: lhs's key is {"": 5, "": "foo"}, and rhs's key is {"": 5, "": "zzz"}. The
+         * function will return -1, because rhs's second element is greater than lhs's. 
+         *
+         * So far, this is all very reasonable. However, suppose that lhs and rhs both have the key
+         * {"": 5, "": "foo"}. A general-purpose comparison function might return 0 in this
+         * instance to indicate that the two objects are equal (assuming that lhs and rhs have the
+         * same DiskLoc as well). However, either lhs or rhs represents the lower bound of a query,
+         * so if comparison() always returned zero in this case, then the lower bound of the query
+         * would always be defined as an exclusive lower bound across all the elements in the
+         * BSONObject. This is not desirable behavior. Rather, it may be necessary to specify the
+         * first element as an inclusive range, the second one as an exclusive range, etc. Clearly,
+         * some way of specifying whether each element in the query object is inclusive or exclusive
+         * is needed.
+         *
+         * Recall that the BSONObjects in both lhs and rhs have been stripped of their field names.
+         * Consequently, the query object could store information about each element's inclusive/
+         * exclusive properties in the field names for these elements. This is exactly what is done
+         * by the makeQueryObject method: the BSONObject it returns uses its field names to
+         * describe what a given field's behavior should be if it is being compared to a field with
+         * an equal value. An 'l' indicates that the query should be considered less than the other
+         * object, a 'g' indicates that the query should be considered greater than the other
+         * object,and a null byte indicates that the query should be considered equal to the other
+         * object.
+         *
+         * Here are a few examples to illustrate this point:
+         *
+         * {"": 5, "": "foo"} == {"": 5, "": "foo"}
+         * {"g": 5, "": "foo"} > {"": 5, "": "foo"}
+         * {"l": 5, "": "foo"} < {"": 5, "": "foo"}
          */
         int comparison(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const;
         
         /**
+         * See the comment above comparison() for some important details.
          * Preps a query for compare(). Strips fieldNames if there are any.
+         * 
+         * @param keyPrefix a BSONObj representing the beginning of a query
+         * 
+         * @param prefixLen the number of fields, beginning with the first and ending with the 
+         * prefixLen'th, in keyPrefix to use as part of the query. Must be >= 0 and < the number of
+         * elements in keyPrefix.
+         *     
+         * @param prefixExclusive true if the first prefixLen elements in the query are exclusive,
+         * and false otherwise
+         *
+         * @param keySuffix a vector of BSONElements. The first prefixLen elements in keySuffix are
+         * ignored, while the remaining elements make up the remainder of the query (following the
+         * first prefixLen elements of keyPrefix). Must have at least prefixLen - 1 elements.
+         *
+         * @param suffixInclusive a vector of booleans, of the same length as keySuffix. Elements
+         * less than prefixLen are ignored, while for all other indexes i, suffixInclusive[i] is
+         * true iff keySuffix[i] is an inclusive part of the range.
+         *
+         * @param cursorDirection an int which indicates the cursor direction. 1 indicates a forward
+         * cursor, and -1 indicates a reverse cursor.
          */
         static BSONObj makeQueryObject(const BSONObj& keyPrefix,
                                        int prefixLen,
@@ -90,8 +145,9 @@ namespace mongo {
                                        const vector<const BSONElement*>& keySuffix,
                                        const vector<bool>& suffixInclusive,
                                        const int cursorDirection);
+
     private:
-        // Due to the limitations in the std::set API we need to use the same type (IndexKeyEntry)
+        // Due to the limitations of various APIs, we need to use the same type (IndexKeyEntry)
         // for both the stored data and the "query". We cheat and encode extra information in the
         // first byte of the field names in the query. This works because all stored objects should
         // have all field names empty, so their first bytes are '\0'.
