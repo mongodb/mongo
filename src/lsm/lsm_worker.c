@@ -449,6 +449,12 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		return (0);
 
 	/*
+	 * Make sure only a single thread is freeing the old chunk array
+	 * at any time.
+	 */
+	if (!WT_ATOMIC_CAS(lsm_tree->freeing_old_chunks, 0, 1))
+		return (0);
+	/*
 	 * Take a copy of the current state of the LSM tree and look for chunks
 	 * to drop.  We do it this way to avoid holding the LSM tree lock while
 	 * doing I/O or waiting on the schema lock.
@@ -552,6 +558,7 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 err:	__lsm_unpin_chunks(session, &cookie);
 	__wt_free(session, cookie.chunk_array);
+	lsm_tree->freeing_old_chunks = 0;
 
 	/* Returning non-zero means there is no work to do. */
 	if (!progress)

@@ -186,6 +186,7 @@ struct __wt_lsm_tree {
 	WT_LSM_CHUNK **old_chunks;	/* Array of old LSM chunks */
 	size_t old_alloc;		/* Space allocated for old chunks */
 	u_int nold_chunks;		/* Number of old chunks */
+	int freeing_old_chunks;		/* Whether chunks are being freed */
 
 #define	WT_LSM_TREE_COMPACTING	0x01	/* Tree is being compacted */
 #define	WT_LSM_TREE_FLUSH_ALL	0x02	/* All chunks should be flushed */

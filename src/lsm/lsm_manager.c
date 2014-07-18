@@ -164,7 +164,7 @@ __lsm_worker_manager(void *arg)
 	    __lsm_worker, worker_args));
 
 	/* Start a generic worker thread. */
-	for (; manager->lsm_workers < 3; // manager->lsm_workers_max;
+	for (; manager->lsm_workers < manager->lsm_workers_max;
 	    manager->lsm_workers++) {
 		WT_ERR(__wt_open_session(conn, 1, NULL,
 		    "isolation=read-uncommitted", &worker_session));
@@ -248,7 +248,7 @@ __lsm_worker_manager(void *arg)
 	 * Wait for the rest of the LSM workers to shutdown. Start at index
 	 * one - since we (the manager) are at index 0.
 	 */
-	for (i = 1; i < manager->lsm_workers; i++) {
+	for (i = 1; i <= manager->lsm_workers; i++) {
 		/*
 		 * Join any worker we're stopping.
 		 * After the thread is stopped, close its session.
