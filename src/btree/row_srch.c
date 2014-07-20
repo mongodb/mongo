@@ -147,8 +147,6 @@ __wt_row_search(WT_SESSION_IMPL *session,
 
 	btree = S2BT(session);
 	item = &cbt->search_key;
-	rip = NULL;
-	match = 0;				/* -Wuninitialized */
 
 	__cursor_pos_clear(cbt);
 
