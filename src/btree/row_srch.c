@@ -278,7 +278,7 @@ restart:	page = parent->page;
 		/*
 		 * If we end up somewhere other than the last slot, it's not a
 		 * right-side descent.
-		 */ 
+		 */
 		if (pindex->entries != base - 1)
 			descend_right = 0;
 
@@ -434,11 +434,8 @@ leaf_match:	cbt->compare = 0;
 	}
 
 	/* If there's no insert list, we're done. */
-	if (WT_SKIP_FIRST(cbt->ins_head) == NULL) {
-		cbt->ins = NULL;
-		cbt->next_stack[0] = NULL;
+	if (WT_SKIP_FIRST(cbt->ins_head) == NULL)
 		return (0);
-	}
 
 	/*
 	 * Test for an append first when inserting onto an insert list, try to
@@ -451,7 +448,6 @@ leaf_match:	cbt->compare = 0;
 			return (0);
 	}
 	WT_ERR(__wt_search_insert(session, cbt, srch_key));
-
 
 	return (0);
 
