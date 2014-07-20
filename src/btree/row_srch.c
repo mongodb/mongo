@@ -14,7 +14,7 @@
  */
 static inline int
 __wt_search_insert_append(WT_SESSION_IMPL *session,
-    WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, int *appendp)
+    WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, int *donep)
 {
 	WT_BTREE *btree;
 	WT_INSERT *ins;
@@ -23,7 +23,7 @@ __wt_search_insert_append(WT_SESSION_IMPL *session,
 	int cmp, i;
 
 	btree = S2BT(session);
-	*appendp = 0;
+	*donep = 0;
 
 	inshead = cbt->ins_head;
 	if ((ins = WT_SKIP_LAST(inshead)) == NULL)
@@ -51,7 +51,7 @@ __wt_search_insert_append(WT_SESSION_IMPL *session,
 		}
 		cbt->compare = -cmp;
 		cbt->ins = ins;
-		*appendp = 1;
+		*donep = 1;
 	}
 	return (0);
 }
