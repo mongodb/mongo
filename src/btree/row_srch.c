@@ -143,7 +143,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	WT_ROW *rip;
 	size_t match, skiphigh, skiplow;
 	uint32_t base, indx, limit;
-	int append, cmp, depth;
+	int append_check, cmp, depth, descend_right, done;
 
 	btree = S2BT(session);
 	item = &cbt->search_key;
@@ -161,6 +161,17 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	 * compare as we descend the tree.
 	 */
 	skiphigh = skiplow = 0;
+
+	/*
+	 * If a cursor repeatedly appends to the tree, compare the search key
+	 * against the last key on each internal page during insert before
+	 * doing the full binary search.
+	 *
+	 * Track if the descent is to the right-side of the tree, used to set
+	 * the cursor's append history.
+	 */
+	append_check = insert && cbt->append_tree;
+	descend_right = 1;
 
 	/*
 	 * In the service of eviction splits, we're only searching a single leaf
@@ -191,7 +202,7 @@ restart:	page = parent->page;
 		}
 
 		/* Fast-path appends. */
-		if (insert && btree->appending) {
+		if (append_check) {
 			child = pindex->index[pindex->entries - 1];
 			__wt_ref_key(page, child, &item->data, &item->size);
 			WT_ERR(WT_LEX_CMP(
@@ -199,7 +210,8 @@ restart:	page = parent->page;
 			if (cmp >= 0)
 				goto descend;
 
-			btree->appending = 0;
+			/* A failed append check turns off append checks. */
+			append_check = 0;
 		}
 
 		/*
@@ -263,6 +275,13 @@ restart:	page = parent->page;
 		 */
 		child = pindex->index[base - 1];
 
+		/*
+		 * If we end up somewhere other than the last slot, it's not a
+		 * right-side descent.
+		 */ 
+		if (pindex->entries != base - 1)
+			descend_right = 0;
+
 descend:	/*
 		 * Swap the parent page for the child page. If the page splits
 		 * while we're retrieving it, restart the search in the parent
@@ -290,13 +309,25 @@ leaf_only:
 	cbt->ref = child;
 
 	/*
-	 * When inserting a new record, if there's a history of appending to
-	 * a page, fast-check for a page append into an existing insert list.
-	 * (We could do a more general page append check, but an insert list
-	 * will exist as soon as any record is appended to the page, there's
-	 * little point in optimizing for the first insert.)
+	 * In the case of a right-side tree descent during an insert, do a fast
+	 * check for an append to the page, try to catch cursors appending data
+	 * into the tree.
+	 *
+	 * It's tempting to make this test more rigorous: if a cursor inserts
+	 * randomly into a two-level tree (a root referencing a single child
+	 * that's empty except for an insert list), the right-side descent flag
+	 * will be set and this comparison wasted.  The problem resolves itself
+	 * as the tree grows larger: either we're no longer doing right-side
+	 * descent, or we'll avoid additional comparisons in internal pages,
+	 * making up for the wasted comparison here.  Similarly, the cursor's
+	 * history is set any time it's an insert and a right-side descent,
+	 * both to avoid a complicated/expensive test, and, in the case of
+	 * multiple threads appending to the tree, we want to mark them all as
+	 * appending, even if this test doesn't work.
 	 */
-	if (insert && btree->appending) {
+	if (insert && descend_right) {
+		cbt->append_tree = 1;
+
 		if (page->pg_row_entries == 0) {
 			cbt->slot = WT_ROW_SLOT(page, page->pg_row_d);
 
@@ -310,10 +341,9 @@ leaf_only:
 		}
 
 		WT_ERR(
-		    __wt_search_insert_append(session, cbt, srch_key, &append));
-		if (append)
+		    __wt_search_insert_append(session, cbt, srch_key, &done));
+		if (done)
 			return (0);
-		btree->appending = 0;
 
 		/*
 		 * Don't leave the insert list head set, code external to the
@@ -403,50 +433,26 @@ leaf_match:	cbt->compare = 0;
 		cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 	}
 
-	/*
-	 * We track when we've previously appended to a page and in that case,
-	 * do a fast check for an append before the full page/skiplist search,
-	 * both here and in the internal page search.
-	 *
-	 * A search of an internal page can only turn the append flag off: any
-	 * search of an internal page that doesn't move past the end of the page
-	 * turns the append flag off, so a search inside the tree always turns
-	 * off fast-append checks.
-	 *
-	 * If the internal page search left the append flag on, we do the fast-
-	 * append check before searching the leaf page.  If the check fails, we
-	 * turn the append flag off, and proceed with the page/skiplist search.
-	 *
-	 * The code here turns the append flag on for future searches.  If we're
-	 * doing an insert, there's no insert list and the page is empty, we're
-	 * appending to the page (this is where we end up for empty pages).  If
-	 * we ended up past the end of an insert list, past the end of a page,
-	 * we're appending to the page.  In both of those cases, turn the append
-	 * flag on.  Note we will turn the append flag on even if this leaf page
-	 * is in the middle of a tree; it's wasted, a subsequent internal page
-	 * search will turn it off again.
-	 */
+	/* If there's no insert list, we're done. */
 	if (WT_SKIP_FIRST(cbt->ins_head) == NULL) {
 		cbt->ins = NULL;
 		cbt->next_stack[0] = NULL;
-		if (!insert)				/* Common path. */
-			return (0);
-
-		if (page->pg_row_entries == 0)
-			btree->appending = 1;
-	} else {
-		WT_ERR(__wt_search_insert(session, cbt, srch_key));
-		if (!insert)				/* Common path. */
-			return (0);
-
-		if (cbt->compare == -1 && base == page->pg_row_entries) {
-			if (!btree->appending)
-				btree->appending = 1;
-		} else {
-			if (btree->appending)
-				btree->appending = 0;
-		}
+		return (0);
 	}
+
+	/*
+	 * Test for an append first when inserting onto an insert list, try to
+	 * catch cursors repeatedly inserting at a single point.
+	 */
+	if (insert) {
+		WT_ERR(
+		    __wt_search_insert_append(session, cbt, srch_key, &done));
+		if (done)
+			return (0);
+	}
+	WT_ERR(__wt_search_insert(session, cbt, srch_key));
+
+
 	return (0);
 
 err:	WT_TRET(__wt_page_release(session, child));
