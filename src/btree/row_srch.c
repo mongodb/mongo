@@ -451,7 +451,8 @@ leaf_match:	cbt->compare = 0;
 
 	return (0);
 
-err:	WT_TRET(__wt_page_release(session, child));
+err:	if (leaf != NULL)
+		WT_TRET(__wt_page_release(session, child));
 	return (ret);
 }
 
