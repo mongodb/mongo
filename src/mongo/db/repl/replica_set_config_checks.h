@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,15 +26,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/repl/repl_coordinator_external_state.h"
+#include "mongo/base/status_with.h"
 
 namespace mongo {
 namespace repl {
 
-    ReplicationCoordinatorExternalState::ReplicationCoordinatorExternalState() {}
-    ReplicationCoordinatorExternalState::~ReplicationCoordinatorExternalState() {}
+    class ReplicationCoordinatorExternalState;
+    class ReplicaSetConfig;
 
-} // namespace repl
-} // namespace mongo
+    /**
+     * Validates that "newConfig" is a legal initial configuration that can be
+     * initiated by the current node (identified via "externalState").
+     *
+     * Returns the index of the current node's member configuration in "newConfig",
+     * on success, and an indicative error on failure.
+     */
+    StatusWith<int> validateConfigForInitiate(
+            ReplicationCoordinatorExternalState* externalState,
+            const ReplicaSetConfig& newConfig);
+
+    /**
+     * Validates that "newConfig" is a legal successor configuration to "oldConfig" that can be
+     * initiated by the current node (identified via "externalState").
+     *
+     * Returns the index of the current node's member configuration in "newConfig",
+     * on success, and an indicative error on failure.
+     */
+    StatusWith<int> validateConfigForReconfig(
+            ReplicationCoordinatorExternalState* externalState,
+            const ReplicaSetConfig& oldConfig,
+            const ReplicaSetConfig& newConfig);
+
+}  // namespace repl
+}  // namespace mongo

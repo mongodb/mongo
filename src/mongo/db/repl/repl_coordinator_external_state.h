@@ -32,6 +32,9 @@
 #include "mongo/bson/oid.h"
 
 namespace mongo {
+
+    struct HostAndPort;
+
 namespace repl {
 
     /**
@@ -53,6 +56,11 @@ namespace repl {
          * to use as our RID, stores it in local.me, and returns it.
          */
         virtual OID ensureMe() = 0;
+
+        /**
+         * Returns true if "host" is one of the network identities of this node.
+         */
+        virtual bool isSelf(const HostAndPort& host) = 0;
     };
 
 } // namespace repl

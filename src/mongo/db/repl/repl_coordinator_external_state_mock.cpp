@@ -26,7 +26,11 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/repl/repl_coordinator_external_state_mock.h"
+
+#include "mongo/util/sequence_util.h"
 
 namespace mongo {
 namespace repl {
@@ -36,6 +40,14 @@ namespace repl {
 
     OID ReplicationCoordinatorExternalStateMock::ensureMe() {
         return OID::gen();
+    }
+
+    bool ReplicationCoordinatorExternalStateMock::isSelf(const HostAndPort& host) {
+        return sequenceContains(_selfHosts, host);
+    }
+
+    void ReplicationCoordinatorExternalStateMock::addSelf(const HostAndPort& host) {
+        _selfHosts.push_back(host);
     }
 
 } // namespace repl

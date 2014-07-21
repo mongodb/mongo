@@ -27,7 +27,10 @@ env.Library('topology_coordinator_impl',
                      'replication_executor'])
 
 env.Library('repl_coordinator_impl',
-            'repl_coordinator_impl.cpp',
+            [
+                'repl_coordinator_impl.cpp',
+                'replica_set_config_checks.cpp',
+            ],
             LIBDEPS=['$BUILD_DIR/mongo/db/common',
                      '$BUILD_DIR/mongo/fail_point',
                      '$BUILD_DIR/mongo/foundation',
@@ -41,6 +44,13 @@ env.CppUnitTest('repl_coordinator_impl_test',
                 'repl_coordinator_impl_test.cpp',
                 LIBDEPS=['repl_coordinator_impl',
                          'replmocks'])
+
+env.CppUnitTest('replica_set_config_checks_test',
+                'replica_set_config_checks_test.cpp',
+                LIBDEPS=[
+                    'repl_coordinator_impl',
+                    'replmocks'
+                ])
 
 env.Library('repl_coordinator_interface',
             ['repl_coordinator.cpp',

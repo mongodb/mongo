@@ -28,6 +28,8 @@
  
 #include "mongo/platform/basic.h"
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 
 #include <string>
@@ -36,6 +38,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/util/net/sock.h"
 
 namespace mongo {
@@ -73,6 +76,10 @@ namespace repl {
             ctx.commit();
         }
         return myRID;
+    }
+
+    bool ReplicationCoordinatorExternalStateImpl::isSelf(const HostAndPort& host) {
+        return repl::isSelf(host);
     }
 
 } // namespace repl

@@ -41,6 +41,7 @@ namespace repl {
         ReplicationCoordinatorExternalStateImpl();
         virtual ~ReplicationCoordinatorExternalStateImpl();
         virtual OID ensureMe();
+        virtual bool isSelf(const HostAndPort& host);
     };
 
 } // namespace repl
