@@ -47,7 +47,9 @@ namespace repl {
          * Creates the initial oplog entry: applies applyGTEObj and writes it to the oplog.  Then
          * this runs oplogApplySegment allowing recloning documents.
          */
-        BSONObj oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj);
+        BSONObj oplogApplication(OperationContext* txn,
+                                 const BSONObj& applyGTEObj,
+                                 const BSONObj& minValidObj);
     };
 
 } // namespace repl

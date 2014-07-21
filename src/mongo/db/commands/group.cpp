@@ -134,7 +134,7 @@ namespace mongo {
 
             Collection* collection = db->getCollection( txn, ns );
 
-            const WhereCallbackReal whereCallback(StringData(db->name()));
+            const WhereCallbackReal whereCallback(txn, StringData(db->name()));
 
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;

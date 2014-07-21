@@ -45,7 +45,9 @@ namespace repl {
 
     /* initial oplog application, during initial sync, after cloning.
     */
-    BSONObj InitialSync::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
+    BSONObj InitialSync::oplogApplication(OperationContext* txn,
+                                          const BSONObj& applyGTEObj,
+                                          const BSONObj& minValidObj) {
         if (replSetForceInitialSyncFailure > 0) {
             log() << "replSet test code invoked, forced InitialSync failure: "
                   << replSetForceInitialSyncFailure << rsLog;
@@ -54,9 +56,8 @@ namespace repl {
         }
 
         // create the initial oplog entry
-        OperationContextImpl txn;
-        syncApply(&txn, applyGTEObj);
-        _logOpObjRS(applyGTEObj);
+        syncApply(txn, applyGTEObj);
+        _logOpObjRS(txn, applyGTEObj);
 
         return oplogApplySegment(applyGTEObj, minValidObj, multiInitialSyncApply);
     }

@@ -68,7 +68,10 @@ namespace repl {
 
     void ReplSetImpl::syncDoInitialSync() {
         static const int maxFailedAttempts = 10;
-        createOplog();
+
+        OperationContextImpl txn;
+        createOplog(&txn);
+
         int failedAttempts = 0;
         while ( failedAttempts < maxFailedAttempts ) {
             try {
@@ -133,20 +136,17 @@ namespace repl {
         return true;
     }
 
-    void _logOpObjRS(const BSONObj& op);
+    static void emptyOplog(OperationContext* txn) {
+        Client::WriteContext ctx(txn, rsoplog);
 
-    static void emptyOplog() {
-        OperationContextImpl txn;
-        Client::WriteContext ctx(&txn, rsoplog);
-
-        Collection* collection = ctx.ctx().db()->getCollection(&txn, rsoplog);
+        Collection* collection = ctx.ctx().db()->getCollection(txn, rsoplog);
 
         // temp
         if( collection->numRecords() == 0 )
             return; // already empty, ok.
 
         LOG(1) << "replSet empty oplog" << rsLog;
-        uassertStatusOK( collection->truncate(&txn) );
+        uassertStatusOK( collection->truncate(txn) );
         ctx.commit();
     }
 
@@ -283,7 +283,7 @@ namespace repl {
      *                 this function syncs to this value (inclusive)
      * @return if applying the oplog succeeded
      */
-    bool ReplSetImpl::_syncDoInitialSync_applyToHead( SyncTail& syncer, OplogReader* r,
+    bool ReplSetImpl::_syncDoInitialSync_applyToHead( OperationContext* txn, SyncTail& syncer, OplogReader* r,
                                                       const Member* source, const BSONObj& lastOp ,
                                                       BSONObj& minValid ) {
         /* our cloned copy will be strange until we apply oplog events that occurred
@@ -317,12 +317,12 @@ namespace repl {
         // apply startingTS..mvoptime portion of the oplog
         {
             try {
-                minValid = syncer.oplogApplication(lastOp, minValid);
+                minValid = syncer.oplogApplication(txn, lastOp, minValid);
             }
             catch (const DBException&) {
                 log() << "replSet initial sync failed during oplog application phase" << rsLog;
 
-                emptyOplog(); // otherwise we'll be up!
+                emptyOplog(txn); // otherwise we'll be up!
 
                 lastOpTimeWritten = OpTime();
                 lastH = 0;
@@ -403,12 +403,12 @@ namespace repl {
             log() << "fastsync: skipping database clone" << rsLog;
 
             // prime oplog
-            init.oplogApplication(lastOp, lastOp);
+            init.oplogApplication(&txn, lastOp, lastOp);
             return;
         }
         else {
             // Add field to minvalid document to tell us to restart initial sync if we crash
-            theReplSet->setInitialSyncFlag();
+            theReplSet->setInitialSyncFlag(&txn);
 
             sethbmsg("initial sync drop all databases", 0);
             dropAllDatabasesExceptLocal(&txn);
@@ -427,7 +427,7 @@ namespace repl {
             sethbmsg("initial sync data copy, starting syncup",0);
 
             log() << "oplog sync 1 of 3" << endl;
-            if ( ! _syncDoInitialSync_applyToHead( init, &r , source , lastOp , minValid ) ) {
+            if (!_syncDoInitialSync_applyToHead(&txn, init, &r, source, lastOp, minValid)) {
                 return;
             }
 
@@ -437,7 +437,7 @@ namespace repl {
             // that were "from the future" compared with minValid. During this second application,
             // nothing should need to be recloned.
             log() << "oplog sync 2 of 3" << endl;
-            if (!_syncDoInitialSync_applyToHead(tail, &r , source , lastOp , minValid)) {
+            if (!_syncDoInitialSync_applyToHead(&txn, tail, &r, source, lastOp, minValid)) {
                 return;
             }
             // data should now be consistent
@@ -453,7 +453,7 @@ namespace repl {
         }
 
         log() << "oplog sync 3 of 3" << endl;
-        if (!_syncDoInitialSync_applyToHead(tail, &r, source, lastOp, minValid)) {
+        if (!_syncDoInitialSync_applyToHead(&txn, tail, &r, source, lastOp, minValid)) {
             return;
         }
         
@@ -479,10 +479,10 @@ namespace repl {
 
             // Initial sync is now complete.  Flag this by setting minValid to the last thing
             // we synced.
-            theReplSet->setMinValid(minValid);
+            theReplSet->setMinValid(&txn, minValid);
 
             // Clear the initial sync flag.
-            theReplSet->clearInitialSyncFlag();
+            theReplSet->clearInitialSyncFlag(&txn);
             cx.commit();
         }
         {

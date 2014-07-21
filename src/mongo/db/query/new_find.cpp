@@ -496,7 +496,7 @@ namespace mongo {
         // Parse the qm into a CanonicalQuery.
         CanonicalQuery* cq;
         Status canonStatus = CanonicalQuery::canonicalize(
-                                q, &cq, WhereCallbackReal(StringData(ctx.ctx().db()->name())));
+                            q, &cq, WhereCallbackReal(txn, StringData(ctx.ctx().db()->name())));
         if (!canonStatus.isOK()) {
             uasserted(17287, str::stream() << "Can't canonicalize query: " << canonStatus.toString());
         }

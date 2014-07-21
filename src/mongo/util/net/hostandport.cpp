@@ -86,8 +86,15 @@ namespace mongo {
         return ss.str();
     }
 
-    void HostAndPort::append( StringBuilder& ss ) const {
-        ss << host() << ':' << port();
+    void HostAndPort::append(StringBuilder& ss) const {
+        // wrap ipv6 addresses in []s for roundtrip-ability
+        if (host().find(':') != std::string::npos) {
+            ss << '[' << host() << ']';
+        }
+        else {
+            ss << host();
+        }
+        ss << ':' << port();
     }
 
     bool HostAndPort::empty() const {
@@ -95,8 +102,40 @@ namespace mongo {
     }
 
     Status HostAndPort::initialize(const StringData& s) {
-        const size_t colonPos = s.rfind(':');
-        const StringData hostPart = s.substr(0, colonPos);
+        size_t colonPos = s.rfind(':');
+        StringData hostPart = s.substr(0, colonPos);
+
+        // handle ipv6 hostPart (which we require to be wrapped in []s)
+        const size_t openBracketPos = s.find('[');
+        const size_t closeBracketPos = s.find(']');
+        if (openBracketPos != std::string::npos) {
+            if (openBracketPos != 0) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "'[' present, but not first character in "
+                                            << s.toString());
+            }
+            if (closeBracketPos == std::string::npos) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "ipv6 address is missing closing ']' in hostname in "
+                                            << s.toString());
+            }
+
+            hostPart = s.substr(openBracketPos+1, closeBracketPos-openBracketPos-1);
+            // prevent accidental assignment of port to the value of the final portion of hostPart
+            if (colonPos < closeBracketPos) {
+                colonPos = std::string::npos;
+            }
+            else if (colonPos != closeBracketPos+1) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "Extraneous characters between ']' and pre-port ':'"
+                                            << " in " << s.toString());
+            }
+        }
+        else if (closeBracketPos != std::string::npos) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "']' present without '[' in " << s.toString());
+        }
+
         if (hostPart.empty()) {
             return Status(ErrorCodes::FailedToParse, str::stream() <<
                           "Empty host component parsing HostAndPort from \"" <<

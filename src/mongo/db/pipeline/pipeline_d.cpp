@@ -167,7 +167,7 @@ namespace {
         boost::shared_ptr<Runner> runner;
         bool sortInRunner = false;
 
-        const WhereCallbackReal whereCallback(pExpCtx->ns.db());
+        const WhereCallbackReal whereCallback(pExpCtx->opCtx, pExpCtx->ns.db());
 
         if (sortStage) {
             CanonicalQuery* cq;

@@ -98,7 +98,8 @@ namespace mongo {
          *     and deadlocks may occur with shard-as-a-config.  Therefore, nothing here guarantees
          *     that 'latestShardVersion' is indeed the current one on return.
          */
-        Status refreshMetadataIfNeeded( const std::string& ns,
+        Status refreshMetadataIfNeeded( OperationContext* txn,
+                                        const std::string& ns,
                                         const ChunkVersion& reqShardVersion,
                                         ChunkVersion* latestShardVersion );
 
@@ -124,7 +125,9 @@ namespace mongo {
          * @return !OK if something else went wrong during reload
          * @return latestShardVersion the version that is now stored for this collection
          */
-        Status refreshMetadataNow( const std::string& ns, ChunkVersion* latestShardVersion );
+        Status refreshMetadataNow(OperationContext* txn,
+                                  const std::string& ns,
+                                  ChunkVersion* latestShardVersion);
 
         void appendInfo( BSONObjBuilder& b );
 
@@ -269,7 +272,8 @@ namespace mongo {
          * Refreshes collection metadata by asking the config server for the latest information.
          * May or may not be based on a requested version.
          */
-        Status doRefreshMetadata( const std::string& ns,
+        Status doRefreshMetadata( OperationContext* txn,
+                                  const std::string& ns,
                                   const ChunkVersion& reqShardVersion,
                                   bool useRequestedVersion,
                                   ChunkVersion* latestShardVersion );

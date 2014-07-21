@@ -75,7 +75,9 @@ namespace repl {
         /**
          * Runs oplogApplySegment without allowing recloning documents.
          */
-        virtual BSONObj oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj);
+        virtual BSONObj oplogApplication(OperationContext* txn,
+                                         const BSONObj& applyGTEObj,
+                                         const BSONObj& minValidObj);
 
         void oplogApplication();
         bool peek(BSONObj* obj);

@@ -171,7 +171,7 @@ namespace mongo {
             CanonicalQuery* cq;
 
             const NamespaceString nss(dbname);
-            const WhereCallbackReal whereCallback(nss.db());
+            const WhereCallbackReal whereCallback(txn, nss.db());
 
             if (!CanonicalQuery::canonicalize(ns,
                                               rewritten,

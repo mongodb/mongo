@@ -421,22 +421,19 @@ namespace mongo {
         }
     } // namespace
 
-    UpdateResult update(OperationContext* txn,
-                        Database* db,
+    UpdateResult update(Database* db,
                         const UpdateRequest& request,
                         OpDebug* opDebug) {
 
         UpdateExecutor executor(&request, opDebug);
-        return executor.execute(txn, db);
+        return executor.execute(db);
     }
 
-    UpdateResult update(
-            OperationContext* txn,
-            Database* db,
-            const UpdateRequest& request,
-            OpDebug* opDebug,
-            UpdateDriver* driver,
-            CanonicalQuery* cq) {
+    UpdateResult update(Database* db,
+                        const UpdateRequest& request,
+                        OpDebug* opDebug,
+                        UpdateDriver* driver,
+                        CanonicalQuery* cq) {
 
         LOG(3) << "processing update : " << request;
 
@@ -444,7 +441,7 @@ namespace mongo {
         const NamespaceString& nsString = request.getNamespaceString();
         UpdateLifecycle* lifecycle = request.getLifecycle();
 
-        Collection* collection = db->getCollection(txn, nsString.ns());
+        Collection* collection = db->getCollection(request.getOpCtx(), nsString.ns());
 
         validateUpdate(nsString.ns().c_str(), request.getUpdates(), request.getQuery());
 
@@ -459,8 +456,9 @@ namespace mongo {
 
         PlanExecutor* rawExec;
         Status status = cq ?
-            getExecutor(txn, collection, cqHolder.release(), &rawExec) :
-            getExecutor(txn, collection, nsString.ns(), request.getQuery(), &rawExec);
+            getExecutor(request.getOpCtx(), collection, cqHolder.release(), &rawExec) :
+            getExecutor(request.getOpCtx(), collection, nsString.ns(), request.getQuery(), &rawExec);
+
         uassert(17243,
                 "could not get executor" + request.getQuery().toString() + "; " + causedBy(status),
                 status.isOK());
@@ -628,7 +626,7 @@ namespace mongo {
                 // If a set of modifiers were all no-ops, we are still 'in place', but there is
                 // no work to do, in which case we want to consider the object unchanged.
                 if (!damages.empty() ) {
-                    collection->updateDocumentWithDamages( txn, loc, source, damages );
+                    collection->updateDocumentWithDamages(request.getOpCtx(), loc, source, damages);
                     docWasModified = true;
                     opDebug->fastmod = true;
                 }
@@ -647,7 +645,7 @@ namespace mongo {
                         str::stream() << "Resulting document after update is larger than "
                                       << BSONObjMaxUserSize,
                         newObj.objsize() <= BSONObjMaxUserSize);
-                StatusWith<DiskLoc> res = collection->updateDocument(txn,
+                StatusWith<DiskLoc> res = collection->updateDocument(request.getOpCtx(),
                                                                      loc,
                                                                      newObj,
                                                                      true,
@@ -674,7 +672,7 @@ namespace mongo {
             // Call logOp if requested.
             if (request.shouldCallLogOp() && !logObj.isEmpty()) {
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request.isMulti());
-                repl::logOp(txn, "u", nsString.ns().c_str(), logObj , &idQuery,
+                repl::logOp(request.getOpCtx(), "u", nsString.ns().c_str(), logObj, &idQuery,
                       NULL, request.isFromMigration());
             }
 
@@ -687,7 +685,7 @@ namespace mongo {
             }
 
             // Opportunity for journaling to write during the update.
-            txn->recoveryUnit()->commitIfNeeded();
+            request.getOpCtx()->recoveryUnit()->commitIfNeeded();
         }
 
         // Get summary information about the plan.
@@ -775,9 +773,9 @@ namespace mongo {
 
         // Only create the collection if the doc will be inserted.
         if (!collection) {
-            collection = db->getCollection(txn, request.getNamespaceString().ns());
+            collection = db->getCollection(request.getOpCtx(), request.getNamespaceString().ns());
             if (!collection) {
-                collection = db->createCollection(txn, request.getNamespaceString().ns());
+                collection = db->createCollection(request.getOpCtx(), request.getNamespaceString().ns());
             }
         }
 
@@ -787,13 +785,18 @@ namespace mongo {
                 str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
                 newObj.objsize() <= BSONObjMaxUserSize);
 
-        StatusWith<DiskLoc> newLoc = collection->insertDocument(txn,
+        StatusWith<DiskLoc> newLoc = collection->insertDocument(request.getOpCtx(),
                                                                 newObj,
                                                                 !request.isGod() /*enforceQuota*/);
         uassertStatusOK(newLoc.getStatus());
         if (request.shouldCallLogOp()) {
-            repl::logOp(txn, "i", nsString.ns().c_str(), newObj,
-                           NULL, NULL, request.isFromMigration());
+            repl::logOp(request.getOpCtx(),
+                        "i",
+                        nsString.ns().c_str(),
+                        newObj,
+                        NULL,
+                        NULL,
+                        request.isFromMigration());
         }
 
         opDebug->nMatched = 1;

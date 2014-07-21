@@ -36,7 +36,7 @@ namespace repl {
 
     class ReplSet : public ReplSetImpl {
     public:
-        static ReplSet* make(ReplSetSeedList& replSetSeedList);
+        static ReplSet* make(OperationContext* txn, ReplSetSeedList& replSetSeedList);
         virtual ~ReplSet() {}
 
         // for the replSetStepDown command
@@ -78,7 +78,7 @@ namespace repl {
          * The slaves are updated when they get a heartbeat indicating the new
          * config.  The comment is a no-op.
          */
-        void haveNewConfig(ReplSetConfig& c, bool comment);
+        void haveNewConfig(OperationContext* txn, ReplSetConfig& c, bool comment);
 
         /**
          * Pointer assignment isn't necessarily atomic, so this needs to assure

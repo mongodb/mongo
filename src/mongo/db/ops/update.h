@@ -46,8 +46,7 @@ namespace mongo {
      *
      * Caller must hold the appropriate database locks.
      */
-    UpdateResult update(OperationContext* txn, 
-                        Database* db, 
+    UpdateResult update(Database* db, 
                         const UpdateRequest& request, 
                         OpDebug* opDebug);
 
@@ -59,8 +58,7 @@ namespace mongo {
      *
      * TODO: Move this into a private method of UpdateExecutor.
      */
-    UpdateResult update(OperationContext* txn,
-                        Database* db,
+    UpdateResult update(Database* db,
                         const UpdateRequest& request,
                         OpDebug* opDebug,
                         UpdateDriver* driver,

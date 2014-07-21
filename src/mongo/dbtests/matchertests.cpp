@@ -222,7 +222,7 @@ namespace MatcherTests {
             Client::ReadContext ctx(&txn, "unittests.matchertests");
 
             M m(BSON("$where" << "function(){ return this.a == 1; }"),
-                WhereCallbackReal(StringData("unittests")));
+                WhereCallbackReal(&txn, StringData("unittests")));
             ASSERT( m.matches( BSON( "a" << 1 ) ) );
             ASSERT( !m.matches( BSON( "a" << 2 ) ) );
         }

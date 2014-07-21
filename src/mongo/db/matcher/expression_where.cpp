@@ -43,7 +43,15 @@ namespace mongo {
 
     class WhereMatchExpression : public MatchExpression {
     public:
-        WhereMatchExpression() : MatchExpression( WHERE ){ _func = 0; }
+        WhereMatchExpression(OperationContext* txn)
+            : MatchExpression(WHERE),
+              _txn(txn) {
+
+            invariant(_txn != NULL);
+
+            _func = 0;
+        }
+
         virtual ~WhereMatchExpression(){}
 
         Status init(const StringData& dbName, const StringData& theCode, const BSONObj& scope);
@@ -55,9 +63,9 @@ namespace mongo {
         }
 
         virtual MatchExpression* shallowClone() const {
-            WhereMatchExpression* e = new WhereMatchExpression();
+            WhereMatchExpression* e = new WhereMatchExpression(_txn);
             e->init(_dbName, _code, _userScope);
-            if ( getTag() ) {
+            if (getTag()) {
                 e->setTag(getTag()->clone());
             }
             return e;
@@ -72,12 +80,16 @@ namespace mongo {
         virtual void resetTag() { setTag(NULL); }
 
     private:
+
         string _dbName;
         string _code;
         BSONObj _userScope;
 
         auto_ptr<Scope> _scope;
         ScriptingFunction _func;
+
+        // Not owned. See comments insde WhereCallbackReal for the lifetime of this pointer.
+        OperationContext* _txn;
     };
 
     Status WhereMatchExpression::init( const StringData& dbName,
@@ -98,6 +110,7 @@ namespace mongo {
 
         const string userToken = ClientBasic::getCurrent()->getAuthorizationSession()
                                                           ->getAuthenticatedUserNamesToken();
+
         _scope = globalScriptEngine->getPooledScope(_dbName, "where" + userToken);
         _func = _scope->createFunction( _code.c_str() );
 
@@ -159,8 +172,9 @@ namespace mongo {
             _userScope == realOther->_userScope;
     }
 
-    WhereCallbackReal::WhereCallbackReal(const StringData& dbName)
-        : _dbName(dbName) {
+    WhereCallbackReal::WhereCallbackReal(OperationContext* txn, const StringData& dbName)
+        : _txn(txn),
+          _dbName(dbName) {
 
     }
 
@@ -169,7 +183,7 @@ namespace mongo {
             return StatusWithMatchExpression(ErrorCodes::BadValue,
                                              "no globalScriptEngine in $where parsing");
 
-        auto_ptr<WhereMatchExpression> exp(new WhereMatchExpression());
+        auto_ptr<WhereMatchExpression> exp(new WhereMatchExpression(_txn));
         if (where.type() == String || where.type() == Code) {
             Status s = exp->init(_dbName, where.valuestr(), BSONObj());
             if (!s.isOK())

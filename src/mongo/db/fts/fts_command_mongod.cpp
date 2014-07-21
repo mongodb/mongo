@@ -106,7 +106,7 @@ namespace mongo {
                                                  limit,
                                                  BSONObj(),
                                                  &cq,
-                                                 WhereCallbackReal(StringData(dbname)));
+                                                 WhereCallbackReal(txn, StringData(dbname)));
             if (!canonicalizeStatus.isOK()) {
                 errmsg = canonicalizeStatus.reason();
                 return false;
