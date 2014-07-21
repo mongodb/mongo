@@ -47,6 +47,7 @@ namespace repl {
     class MemberHeartbeatData;
     struct MemberState;
     class ReplicaSetConfig;
+    class ReplSetHeartbeatResponse;
     class TagSubgroup;
 
     /**
@@ -117,7 +118,7 @@ namespace repl {
                                               Date_t now,
                                               const ReplSetHeartbeatArgs& args,
                                               const std::string& ourSetName,
-                                              BSONObjBuilder* resultObj,
+                                              ReplSetHeartbeatResponse* response,
                                               Status* result) = 0;
 
         // update internal state with heartbeat response corresponding to 'id'

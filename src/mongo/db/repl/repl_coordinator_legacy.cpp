@@ -42,6 +42,7 @@
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replset_commands.h"
@@ -499,7 +500,7 @@ namespace {
     }
 
     Status LegacyReplicationCoordinator::processHeartbeat(const ReplSetHeartbeatArgs& args,
-                                                          BSONObjBuilder* resultObj) {
+                                                          ReplSetHeartbeatResponse* response) {
         if (args.getProtocolVersion() != 1) {
             return Status(ErrorCodes::BadValue, "incompatible replset protocol version");
         }
@@ -509,46 +510,49 @@ namespace {
                 log() << "replSet set names do not match, our cmdline: " << _settings.replSet
                       << rsLog;
                 log() << "replSet s: " << args.getSetName() << rsLog;
-                resultObj->append("mismatch", true);
+                response->noteMismatched();
                 return Status(ErrorCodes::BadValue, "repl set names do not match");
             }
         }
 
-        resultObj->append("rs", true);
+        response->noteReplSet();
         if( (theReplSet == 0) || (theReplSet->startupStatus == ReplSetImpl::LOADINGCONFIG) ) {
             if (!args.getSenderHost().empty()) {
                 scoped_lock lck( _settings.discoveredSeeds_mx );
                 _settings.discoveredSeeds.insert(args.getSenderHost().toString());
             }
-            resultObj->append("hbmsg", "still initializing");
+            response->setHbMsg("still initializing");
             return Status::OK();
         }
 
         if (theReplSet->name() != args.getSetName()) {
-            resultObj->append("mismatch", true);
+            response->noteMismatched();
             return Status(ErrorCodes::BadValue, "repl set names do not match (2)");
         }
-        resultObj->append("set", theReplSet->name());
+        response->setSetName(theReplSet->name());
 
         MemberState currentState = theReplSet->state();
-        resultObj->append("state", currentState.s);
+        response->setState(currentState.s);
         if (currentState == MemberState::RS_PRIMARY) {
-            resultObj->appendDate("electionTime", theReplSet->getElectionTime().asDate());
+            response->setElectionTime(theReplSet->getElectionTime().asDate());
         }
 
-        resultObj->append("e", theReplSet->iAmElectable());
-        resultObj->append("hbmsg", theReplSet->hbmsg());
-        resultObj->append("time", (long long) time(0));
-        resultObj->appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
+        response->setElectable(theReplSet->iAmElectable());
+        response->setHbMsg(theReplSet->hbmsg());
+        response->setTime((long long) time(0));
+        response->setOpTime(theReplSet->lastOpTimeWritten.asDate());
         const Member *syncTarget = BackgroundSync::get()->getSyncTarget();
         if (syncTarget) {
-            resultObj->append("syncingTo", syncTarget->fullName());
+            response->setSyncingTo(syncTarget->fullName());
         }
 
         int v = theReplSet->config().version;
-        resultObj->append("v", v);
-        if (v > args.getConfigVersion())
-            *resultObj << "config" << theReplSet->config().asBson();
+        response->setVersion(v);
+        if (v > args.getConfigVersion()) {
+            ReplicaSetConfig config;
+            fassert(18635, config.initialize(theReplSet->config().asBson()));
+            response->setConfig(config);
+        }
 
         Member* from = NULL;
         if (v == args.getConfigVersion() && args.getSenderId() != -1) {
@@ -563,7 +567,7 @@ namespace {
 
         // if we thought that this node is down, let it know
         if (!from->hbinfo().up()) {
-            resultObj->append("stateDisagreement", true);
+            response->noteStateDisagreement();
         }
 
         // note that we got a heartbeat from this node

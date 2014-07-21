@@ -91,7 +91,7 @@ namespace repl {
                                               Date_t now,
                                               const ReplSetHeartbeatArgs& args,
                                               const std::string& ourSetName,
-                                              BSONObjBuilder* resultObj,
+                                              ReplSetHeartbeatResponse* response,
                                               Status* result);
 
         // updates internal state with heartbeat response

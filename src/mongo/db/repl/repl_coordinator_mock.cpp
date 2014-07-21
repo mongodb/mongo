@@ -173,7 +173,7 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorMock::processHeartbeat(const ReplSetHeartbeatArgs& args,
-                                                      BSONObjBuilder* resultObj) {
+                                                        ReplSetHeartbeatResponse* response) {
         return Status::OK();
     }
 

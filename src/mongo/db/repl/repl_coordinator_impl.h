@@ -129,7 +129,7 @@ namespace repl {
         virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj);
 
         virtual Status processHeartbeat(const ReplSetHeartbeatArgs& args,
-                                        BSONObjBuilder* resultObj);
+                                        ReplSetHeartbeatResponse* response);
 
         virtual Status processReplSetReconfig(OperationContext* txn,
                                               const ReplSetReconfigArgs& args,

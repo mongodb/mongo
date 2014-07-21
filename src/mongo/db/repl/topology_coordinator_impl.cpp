@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
@@ -446,7 +447,7 @@ namespace repl {
             Date_t now,
             const ReplSetHeartbeatArgs& args,
             const std::string& ourSetName,
-            BSONObjBuilder* resultObj,
+            ReplSetHeartbeatResponse* response,
             Status* result) {
         if (data.status == ErrorCodes::CallbackCanceled) {
             *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
@@ -464,12 +465,12 @@ namespace repl {
             *result = Status(ErrorCodes::BadValue, "repl set names do not match");
             log() << "replSet set names do not match, ours: " << ourSetName <<
                 "; remote node's: " << rshb;
-            resultObj->append("mismatch", true);
+            response->noteMismatched();
             return;
         }
 
         // This is a replica set
-        resultObj->append("rs", true);
+        response->noteReplSet();
 
 /*
         if( cmdObj["checkEmpty"].trueValue() ) {
@@ -481,36 +482,34 @@ namespace repl {
         // Verify that the config's replset name matches
         if (_currentConfig.getReplSetName() != args.getSetName()) {
             *result = Status(ErrorCodes::BadValue, "repl set names do not match (2)");
-            resultObj->append("mismatch", true);
+            response->noteMismatched();
             return; 
         }
-        resultObj->append("set", _currentConfig.getReplSetName());
+        response->setSetName(_currentConfig.getReplSetName());
 
-        resultObj->append("state", _memberState.s);
+        response->setState(_memberState.s);
         if (_memberState == MemberState::RS_PRIMARY) {
-            resultObj->appendDate("electionTime", _electionTime.asDate());
+            response->setElectionTime(_electionTime.asDate());
         }
 
         // Are we electable
-        resultObj->append("e",
-                          _electableSet.find(_selfConfig().getId()) != 
-                          _electableSet.end());
+        response->setElectable(_electableSet.find(_selfConfig().getId()) != _electableSet.end());
         // Heartbeat status message
-        resultObj->append("hbmsg", _getHbmsg());
-        resultObj->append("time", now);
-        resultObj->appendDate("opTime", _lastApplied.asDate());
+        response->setHbMsg(_getHbmsg());
+        response->setTime(now);
+        response->setOpTime(_lastApplied.asDate());
 
         if (_syncSourceIndex != -1) {
-            resultObj->append("syncingTo", 
-                              _currentConfig.getMemberAt(_syncSourceIndex)
-                              .getHostAndPort().toString());
+            response->setSyncingTo(
+                    _currentConfig.getMemberAt(_syncSourceIndex).getHostAndPort().toString());
         }
 
         long long v = _currentConfig.getConfigVersion();
-        resultObj->append("v", v);
+        response->setVersion(v);
         // Deliver new config if caller's version is older than ours
-        if (v > args.getConfigVersion())
-            *resultObj << "config" << _currentConfig.asBson();
+        if (v > args.getConfigVersion()) {
+            response->setConfig(_currentConfig);
+        }
 
         // Resolve the caller's id in our Member list
         int from = -1;
@@ -525,7 +524,7 @@ namespace repl {
 
         // if we thought that this node is down, let it know
         if (!_hbdata[from].up()) {
-            resultObj->append("stateDisagreement", true);
+            response->noteStateDisagreement();
         }
 
         // note that we got a heartbeat from this node

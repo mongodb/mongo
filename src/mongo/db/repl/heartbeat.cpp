@@ -39,6 +39,7 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_set_health_poll_task.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/server.h"
@@ -79,6 +80,7 @@ namespace {
         }
         return false;
     }
+    
 } // namespace
 
     /* { replSetHeartbeat : <setname> } */
@@ -131,8 +133,10 @@ namespace {
                 result.append("hasData", replHasDatabases(txn));
             }
 
-            status = getGlobalReplicationCoordinator()->processHeartbeat(args, 
-                                                                         &result);
+            ReplSetHeartbeatResponse response;
+            status = getGlobalReplicationCoordinator()->processHeartbeat(args, &response);
+            if (status.isOK())
+                response.addToBSON(&result);
             return appendCommandStatus(result, status);
         }
     } cmdReplSetHeartbeat;

@@ -30,8 +30,7 @@ env.CppUnitTest('replication_executor_test',
 env.Library('topology_coordinator_impl',
             ['topology_coordinator_impl.cpp',
              'member_heartbeat_data.cpp'],
-            LIBDEPS=['replica_set_config',
-                     'replication_executor',
+            LIBDEPS=['replication_executor',
                      'repl_settings'])
 
 env.Library('repl_coordinator_impl',
@@ -44,8 +43,7 @@ env.Library('repl_coordinator_impl',
                      '$BUILD_DIR/mongo/foundation',
                      '$BUILD_DIR/mongo/server_options_core',
                      'repl_coordinator_interface',
-                     'repl_set_heartbeat_args',
-                     'replica_set_config',
+                     'replica_set_messages',
                      'replication_executor'
                  ])
 
@@ -82,9 +80,11 @@ env.Library('replmocks',
                 'replication_executor',
             ])
 
-env.Library('replica_set_config',
+env.Library('replica_set_messages',
             [
                 'member_config.cpp',
+                'repl_set_heartbeat_args.cpp',
+                'repl_set_heartbeat_response.cpp',
                 'replica_set_config.cpp',
                 'replica_set_tag.cpp',
             ],
@@ -94,18 +94,10 @@ env.Library('replica_set_config',
                 '$BUILD_DIR/mongo/db/common',
             ])
 
-env.Library('repl_set_heartbeat_args',
-            [
-                'repl_set_heartbeat_args.cpp',
-            ],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/bson',
-            ])
-
 env.CppUnitTest('replica_set_config_test',
                 [
                     'member_config_test.cpp',
                     'replica_set_config_test.cpp',
                     'replica_set_tag_test.cpp',
                 ],
-                LIBDEPS=['replica_set_config'])
+                LIBDEPS=['replica_set_messages'])

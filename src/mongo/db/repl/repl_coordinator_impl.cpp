@@ -36,6 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs.h"
@@ -447,7 +448,7 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& args,
-                                                        BSONObjBuilder* resultObj) {
+                                                        ReplSetHeartbeatResponse* response) {
         Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");
         CBHStatus cbh = _replExecutor->scheduleWork(
             stdx::bind(&TopologyCoordinator::prepareHeartbeatResponse,
@@ -456,7 +457,7 @@ namespace repl {
                        Date_t(curTimeMillis64()),
                        args,
                        _settings.ourSetName(),
-                       resultObj,
+                       response,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
