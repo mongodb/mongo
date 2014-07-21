@@ -1056,7 +1056,7 @@ namespace repl {
 
     }
 
-    // TODO:Better story for heartbeat message handling.
+    // TODO(emilkie): Better story for heartbeat message handling.
     void TopologyCoordinatorImpl::_sethbmsg(const std::string& s, int logLevel) {
         static time_t lastLogged;
         _hbmsgTime = time(0);
