@@ -1192,19 +1192,20 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(ImpersonationSessionGuard);
     public:
         ImpersonationSessionGuard(AuthorizationSession* authSession,
-                                  bool fieldIsPresent, 
-                                  const std::vector<UserName> &parsedUserNames) :
+                                  bool fieldIsPresent,
+                                  const std::vector<UserName> &parsedUserNames,
+                                  const std::vector<RoleName> &parsedRoleNames):
             _authSession(authSession), _impersonation(false) {
             if (fieldIsPresent) {
-                massert(17317, "impersonation unexpectedly active", 
+                massert(17317, "impersonation unexpectedly active",
                         !authSession->isImpersonating());
-                authSession->setImpersonatedUserNames(parsedUserNames);
+                authSession->setImpersonatedUserData(parsedUserNames, parsedRoleNames);
                 _impersonation = true;
             }
         }
         ~ImpersonationSessionGuard() {
             if (_impersonation) {
-                _authSession->clearImpersonatedUserNames();
+                _authSession->clearImpersonatedUserData();
             }
         }
     private:
@@ -1252,19 +1253,34 @@ namespace mongo {
             return;
         }
 
-        // Handle command option impersonatedUsers.
+        // Handle command option impersonatedUsers and impersonatedRoles.
         // This must come before _checkAuthorization(), as there is some command parsing logic
-        // in that code path that must not see the impersonated user array element.
+        // in that code path that must not see the impersonated user and roles array elements.
         std::vector<UserName> parsedUserNames;
+        std::vector<RoleName> parsedRoleNames;
         AuthorizationSession* authSession = client.getAuthorizationSession();
-        bool fieldIsPresent = false;
-        audit::parseAndRemoveImpersonatedUserField(cmdObj,
-                                                   authSession,
-                                                   &parsedUserNames,
-                                                   &fieldIsPresent);
-        ImpersonationSessionGuard impersonationSession(authSession, 
-                                                       fieldIsPresent, 
-                                                       parsedUserNames);
+        bool rolesFieldIsPresent = false;
+        bool usersFieldIsPresent = false;
+        audit::parseAndRemoveImpersonatedRolesField(cmdObj,
+                                                    authSession,
+                                                    &parsedRoleNames,
+                                                    &rolesFieldIsPresent);
+        audit::parseAndRemoveImpersonatedUsersField(cmdObj,
+                                                    authSession,
+                                                    &parsedUserNames,
+                                                    &usersFieldIsPresent);
+        if (rolesFieldIsPresent != usersFieldIsPresent) {
+            // If there is a version mismatch between the mongos and the mongod,
+            // the mongos may fail to pass the role information, causing an error.
+            Status s(ErrorCodes::IncompatibleAuditMetadata,
+                    "Audit metadata does not include both user and role information.");
+            appendCommandStatus(result, s);
+            return;
+        }
+        ImpersonationSessionGuard impersonationSession(authSession,
+                                                       usersFieldIsPresent,
+                                                       parsedUserNames,
+                                                       parsedRoleNames);
 
         Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
         if (!status.isOK()) {

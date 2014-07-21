@@ -88,6 +88,9 @@ namespace mongo {
         // Gets an iterator over the names of all authenticated users stored in this manager.
         UserNameIterator getAuthenticatedUserNames();
 
+        // Gets an iterator over the roles of all authenticated users stored in this manager.
+        RoleNameIterator getAuthenticatedRoleNames();
+
         // Returns a std::string representing all logged-in users on the current session.
         // WARNING: this std::string will contain NUL bytes so don't call c_str()!
         std::string getAuthenticatedUserNamesToken();
@@ -185,18 +188,21 @@ namespace mongo {
         bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
                                                const ActionSet& actions);
 
-        // Replaces the vector of UserNames that a system user is impersonating with a new vector.
-        // The auditing system adds these to each audit record in the log.
-        void setImpersonatedUserNames(const std::vector<UserName>& names);
+        // Replaces the data for users that a system user is impersonating with new data.
+        // The auditing system adds these users and their roles to each audit record in the log.
+        void setImpersonatedUserData(std::vector<UserName> usernames, std::vector<RoleName> roles);
 
-        // Returns an iterator to a vector of impersonated usernames.  
-        UserNameIterator getImpersonatedUserNames() const;
+        // Gets an iterator over the names of all users that the system user is impersonating.
+        UserNameIterator getImpersonatedUserNames();
 
-        // Clears the vector of impersonated UserNames.
-        void clearImpersonatedUserNames();
+        // Gets an iterator over the roles of all users that the system user is impersonating.
+        RoleNameIterator getImpersonatedRoleNames();
+
+        // Clears the data for impersonated users.
+        void clearImpersonatedUserData();
 
         // Tells whether impersonation is active or not.  This state is set when
-        // setImpersonatedUserNames is called and cleared when clearImpersonatedUserNames is 
+        // setImpersonatedUserData is called and cleared when clearImpersonatedUserData is
         // called.
         bool isImpersonating() const;
 
@@ -206,6 +212,11 @@ namespace mongo {
         // up-to-date information. May require a read lock on the "admin" db to read the user data.
         void _refreshUserInfoAsNeeded(OperationContext* txn);
 
+        // Builds a vector of all roles held by users who are authenticated on this connection. The
+        // vector is stored in _authenticatedRoleNames. This function is called when users are
+        // logged in or logged out, as well as when the user cache is determined to be out of date.
+        void _buildAuthenticatedRolesVector();
+
         // Checks if this connection is authorized for the given Privilege, ignoring whether or not
         // we should even be doing authorization checks in general.  Note: this may acquire a read
         // lock on the admin database (to update out-of-date user privilege information).
@@ -213,12 +224,16 @@ namespace mongo {
 
         scoped_ptr<AuthzSessionExternalState> _externalState;
 
-        // All Users who have been authenticated on this connection
+        // All Users who have been authenticated on this connection.
         UserSet _authenticatedUsers;
+        // The roles of the authenticated users. This vector is generated when the authenticated
+        // users set is changed.
+        std::vector<RoleName> _authenticatedRoleNames;
 
-        // A vector of impersonated UserNames.  These are used in the auditing system.
-        // They are not used for authz checks.
+        // A vector of impersonated UserNames and a vector of those users' RoleNames.
+        // These are used in the auditing system. They are not used for authz checks.
         std::vector<UserName> _impersonatedUserNames;
+        std::vector<RoleName> _impersonatedRoleNames;
         bool _impersonationFlag;
     };
 
