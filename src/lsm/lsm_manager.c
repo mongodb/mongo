@@ -78,9 +78,11 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	WT_LSM_WORK_UNIT *entry;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
+	uint64_t removed;
 
 	session = conn->default_session;
 	manager = &conn->lsm_manager;
+	removed = 0;
 
 	if (manager->lsm_worker_tids == NULL)
 		return (0);
@@ -102,16 +104,21 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	/* Release memory from any operations left on the queue. */
 	while ((entry = TAILQ_FIRST(&manager->switchqh)) != NULL) {
 		TAILQ_REMOVE(&manager->switchqh, entry, q);
+		++removed;
 		__lsm_manager_free_work_unit(session, entry);
 	}
 	while ((entry = TAILQ_FIRST(&manager->appqh)) != NULL) {
 		TAILQ_REMOVE(&manager->appqh, entry, q);
+		++removed;
 		__lsm_manager_free_work_unit(session, entry);
 	}
 	while ((entry = TAILQ_FIRST(&manager->managerqh)) != NULL) {
 		TAILQ_REMOVE(&manager->managerqh, entry, q);
+		++removed;
 		__lsm_manager_free_work_unit(session, entry);
 	}
+
+	WT_STAT_FAST_CONN_INCRV(session, lsm_work_units_discarded, removed);
 
 	__wt_spin_destroy(session, &manager->switch_lock);
 	__wt_spin_destroy(session, &manager->app_lock);
@@ -256,10 +263,10 @@ __lsm_worker_manager(void *arg)
 	}
 
 	/*
-	 * Wait for the rest of the LSM workers to shutdown. Start at index
+	 * Wait for the rest of the LSM workers to shutdown. Stop at index
 	 * one - since we (the manager) are at index 0.
 	 */
-	for (i = 1; i <= manager->lsm_workers; i++) {
+	for (i = 1; i < manager->lsm_workers; i++) {
 		/*
 		 * Join any worker we're stopping.
 		 * After the thread is stopped, close its session.
@@ -293,8 +300,10 @@ __wt_lsm_manager_clear_tree(
 {
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORK_UNIT *current, *next;
+	uint64_t removed;
 
 	manager = &S2C(session)->lsm_manager;
+	removed = 0;
 
 	/* Clear out the tree from the switch queue */
 	__wt_spin_lock(session, &manager->switch_lock);
@@ -305,6 +314,7 @@ __wt_lsm_manager_clear_tree(
 		next = TAILQ_NEXT(current, q);
 		if (current->lsm_tree != lsm_tree)
 			continue;
+		++removed;
 		TAILQ_REMOVE(&manager->switchqh, current, q);
 		__lsm_manager_free_work_unit(session, current);
 	}
@@ -316,6 +326,7 @@ __wt_lsm_manager_clear_tree(
 		next = TAILQ_NEXT(current, q);
 		if (current->lsm_tree != lsm_tree)
 			continue;
+		++removed;
 		TAILQ_REMOVE(&manager->appqh, current, q);
 		__lsm_manager_free_work_unit(session, current);
 	}
@@ -327,10 +338,12 @@ __wt_lsm_manager_clear_tree(
 		next = TAILQ_NEXT(current, q);
 		if (current->lsm_tree != lsm_tree)
 			continue;
+		++removed;
 		TAILQ_REMOVE(&manager->managerqh, current, q);
 		__lsm_manager_free_work_unit(session, current);
 	}
 	__wt_spin_unlock(session, &manager->manager_lock);
+	WT_STAT_FAST_CONN_INCRV(session, lsm_work_units_discarded, removed);
 	return (0);
 }
 
@@ -402,6 +415,8 @@ __lsm_manager_pop_entry(
 		__wt_spin_unlock(session, &manager->app_lock);
 		break;
 	}
+	if (entry != NULL)
+		WT_STAT_FAST_CONN_INCR(session, lsm_work_units_done);
 	*entryp = entry;
 	return (0);
 }
@@ -423,6 +438,7 @@ __wt_lsm_manager_push_entry(
 	entry->flags = type;
 	entry->lsm_tree = lsm_tree;
 	(void)WT_ATOMIC_ADD(lsm_tree->queue_ref, 1);
+	WT_STAT_FAST_CONN_INCR(session, lsm_work_units_created);
 
 	switch (type) {
 	case WT_LSM_WORK_SWITCH:
@@ -490,7 +506,6 @@ __lsm_worker(void *arg) {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
-	WT_LSM_MANAGER *manager;
 	WT_LSM_WORK_UNIT *entry;
 	WT_LSM_WORKER_ARGS *cookie;
 	WT_SESSION_IMPL *session;
@@ -499,7 +514,6 @@ __lsm_worker(void *arg) {
 	cookie = (WT_LSM_WORKER_ARGS *)arg;
 	session = cookie->session;
 	conn = S2C(session);
-	manager = &conn->lsm_manager;
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/* Don't busy wait if there aren't any LSM trees. */
@@ -524,6 +538,8 @@ __lsm_worker(void *arg) {
 				__wt_err(session, ret, "Error in LSM switch");
 				ret = 0;
 			}
+			__lsm_manager_free_work_unit(session, entry);
+			entry = NULL;
 		}
 		/* Flag an error if the pop failed. */
 		WT_ERR(ret);
@@ -551,6 +567,13 @@ __lsm_worker(void *arg) {
 			} else if (entry->flags == WT_LSM_WORK_BLOOM) {
 				__wt_lsm_bloom_work(session, entry->lsm_tree);
 			}
+			/*
+			 * If we completed some work from the application
+			 * queue, go back and check on the switch queue.
+			 */
+			__lsm_manager_free_work_unit(session, entry);
+			entry = NULL;
+			continue;
 		}
 		/* Flag an error if the pop failed. */
 		WT_ERR(ret);
@@ -578,7 +601,6 @@ err:		__lsm_manager_free_work_unit(session, entry);
 		__wt_err(session, ret,
 		    "Error in LSM worker thread %d", cookie->id);
 	}
-	--manager->lsm_workers;
 	__wt_free(session, cookie);
 	return (NULL);
 }

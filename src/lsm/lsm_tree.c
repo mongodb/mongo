@@ -68,8 +68,6 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 static int
 __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-	u_int i;
-
 	/* Stop any active merges. */
 	F_CLR(lsm_tree, WT_LSM_TREE_ACTIVE);
 
@@ -77,12 +75,6 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_RET(__wt_lsm_manager_clear_tree(session, lsm_tree));
 
 	/* Wait for all LSM operations that were in flight to finish. */
-	for (i = 0; i < lsm_tree->nchunks; ) {
-		if (lsm_tree->chunk[i]->refcnt == 0)
-			i++;
-		else
-			__wt_yield();
-	}
 	while (lsm_tree->refcnt > 1 || lsm_tree->queue_ref > 0)
 		__wt_yield();
 	return (0);
