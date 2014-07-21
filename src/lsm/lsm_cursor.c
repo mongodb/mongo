@@ -1498,10 +1498,11 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
 	if (0) {
-err:		if (lsm_tree != NULL)
-			__wt_lsm_tree_release(session, lsm_tree);
-		if (cursor != NULL)
+err:		__wt_lsm_tree_release(session, lsm_tree);
+		if (clsm != NULL) {
+			clsm->lsm_tree = NULL;
 			WT_TRET(__clsm_close(cursor));
+		}
 	}
 
 	return (ret);
