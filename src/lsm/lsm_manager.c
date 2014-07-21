@@ -60,8 +60,8 @@ __lsm_manager_free_work_unit(WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT *entry)
 {
 	if (entry == NULL)
 		return (0);
-	WT_ASSERT(session, entry->lsm_tree->refcnt > 1);
-	(void)WT_ATOMIC_SUB(entry->lsm_tree->refcnt, 1);
+	WT_ASSERT(session, entry->lsm_tree->queue_ref > 0);
+	(void)WT_ATOMIC_SUB(entry->lsm_tree->queue_ref, 1);
 	__wt_free(session, entry);
 	return (0);
 }
@@ -422,7 +422,7 @@ __wt_lsm_manager_push_entry(
 	WT_RET(__wt_calloc_def(session, 1, &entry));
 	entry->flags = type;
 	entry->lsm_tree = lsm_tree;
-	(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
+	(void)WT_ATOMIC_ADD(lsm_tree->queue_ref, 1);
 
 	switch (type) {
 	case WT_LSM_WORK_SWITCH:
@@ -459,7 +459,7 @@ __lsm_get_chunk_to_flush(
 
 	*chunkp = NULL;
 
-	WT_ASSERT(session, lsm_tree->refcnt > 1);
+	WT_ASSERT(session, lsm_tree->queue_ref > 0);
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
 		return (__wt_lsm_tree_unlock(session, lsm_tree));
@@ -541,8 +541,10 @@ __lsm_worker(void *arg) {
 					WT_ERR(__wt_lsm_checkpoint_chunk(
 					    session, entry->lsm_tree,
 					    chunk, &flushed));
-					WT_ASSERT(session, chunk->refcnt > 0);
-					(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+					WT_ASSERT(
+					    session, chunk->refcnt > 0);
+					(void)WT_ATOMIC_SUB(
+					    chunk->refcnt, 1);
 				}
 			} else if (entry->flags == WT_LSM_WORK_DROP) {
 				__wt_lsm_free_chunks(session, entry->lsm_tree);

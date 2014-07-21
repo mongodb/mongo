@@ -83,7 +83,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		else
 			__wt_yield();
 	}
-	while (lsm_tree->refcnt > 1)
+	while (lsm_tree->refcnt > 1 && lsm_tree->queue_ref > 0)
 		__wt_yield();
 	return (0);
 }
@@ -444,8 +444,15 @@ __lsm_tree_open(
 	/* Set the generation number so cursors are opened on first usage. */
 	lsm_tree->dsk_gen = 1;
 
-	/* Now the tree is setup, make it visible to others. */
+	/*
+	 * Setup reference counting. Use separate reference counts for tree
+	 * handles and queue entries, so that queue entries don't interfere
+	 * with getting handles exclusive.
+	 */
 	lsm_tree->refcnt = 1;
+	lsm_tree->queue_ref = 0;
+
+	/* Now the tree is setup, make it visible to others. */
 	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
 	F_SET(lsm_tree, WT_LSM_TREE_ACTIVE | WT_LSM_TREE_OPEN);
 
@@ -661,15 +668,19 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	uint32_t nchunks, new_id;
+	int first_switch;
 
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
+	nchunks = lsm_tree->nchunks;
+
+	first_switch = nchunks == 0 ? 1 : 0;
 	/*
 	 * Check if a switch is still needed: we may have raced while waiting
 	 * for a lock.
 	 */
 	chunk = NULL;
-	if ((nchunks = lsm_tree->nchunks) != 0 &&
+	if (!first_switch &&
 	    (chunk = lsm_tree->chunk[nchunks - 1]) != NULL &&
 	    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
 	    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
@@ -711,7 +722,7 @@ err:	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 	 */
 	if (ret != 0)
 		WT_PANIC_RET(session, ret, "Failed doing LSM switch");
-	else
+	else if (!first_switch)
 		WT_RET(__wt_lsm_manager_push_entry(
 		    session, WT_LSM_WORK_FLUSH, lsm_tree));
 	return (ret);

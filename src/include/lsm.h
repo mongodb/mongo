@@ -141,6 +141,7 @@ struct __wt_lsm_tree {
 	const char *collator_name;
 
 	int refcnt;			/* Number of users of the tree */
+	int queue_ref;
 	WT_RWLOCK *rwlock;
 	WT_CONDVAR *work_cond;		/* Used to notify worker of activity */
 	TAILQ_ENTRY(__wt_lsm_tree) q;
