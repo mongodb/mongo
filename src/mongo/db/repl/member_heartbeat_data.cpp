@@ -1,11 +1,11 @@
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
 *    as published by the Free Software Foundation.
 *
-*    This program is distributed in the hope that it will be useful,
+*    This program is distributed in the hope that it will be useful,b
 *    but WITHOUT ANY WARRANTY; without even the implied warranty of
 *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 *    GNU Affero General Public License for more details.
@@ -26,42 +26,41 @@
 *    it in the license file.
 */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <iosfwd>
-
-#include "mongo/db/repl/heartbeat_info.h"
-#include "mongo/util/net/hostandport.h"
+#include "mongo/db/repl/member_heartbeat_data.h"
 
 namespace mongo {
 namespace repl {
 
-    /*
-     * This class is a container for holding the transient heartbeat info for each member 
-     * in the config.  It also holds a copy of the HostAndPort and allows quick access to it.
-     * This class will be eliminated in the next few weeks to be replaced by a refactored
-     * HeartbeatInfo class, so don't scrutinize too closely.
-     */
+    unsigned int MemberHeartbeatData::numPings;
 
-    class NewMember {
-    public:
-        NewMember(HostAndPort hap, int id, int configIndex) :
-            _configIndex(configIndex),
-            _hap(hap),
-            _hbinfo(id) {
-        }
+    MemberHeartbeatData::MemberHeartbeatData(int configIndex) :
+        _configIndex(configIndex),
+        _state(MemberState::RS_UNKNOWN), 
+        _health(-1), 
+        _upSince(0),
+        _lastHeartbeat(0),
+        _lastHeartbeatRecv(0),
+        _skew(INT_MIN), 
+        _authIssue(false), 
+        _ping(0) { 
+    }
 
-        string fullName() const { return hap().toString(); }
-        int configIndex() const { return _configIndex; }
-        const HeartbeatInfo& hbinfo() const { return _hbinfo; }
-        HeartbeatInfo& get_hbinfo() { return _hbinfo; }
-        const HostAndPort& hap() const { return _hap; }
+    void MemberHeartbeatData::updateFrom(const MemberHeartbeatData& newInfo) {
+        _state = newInfo.getState();
+        _health = newInfo.getHealth();
+        _upSince = newInfo.getUpSince();
+        _lastHeartbeat = newInfo.getLastHeartbeat();
+        _lastHeartbeatMsg = newInfo.getLastHeartbeatMsg();
+        _syncSource = newInfo.getSyncSource();
+        _opTime = newInfo.getOpTime();
+        _skew = newInfo.getSkew();
+        _authIssue = newInfo.hasAuthIssue();
+        _ping = newInfo.getPing();
+        _electionTime = newInfo.getElectionTime();
+    }
 
-    private:
-        int _configIndex;
-        HostAndPort _hap;
-        HeartbeatInfo _hbinfo;
-    };
 
 } // namespace repl
 } // namespace mongo

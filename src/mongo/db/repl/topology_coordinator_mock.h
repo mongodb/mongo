@@ -72,7 +72,9 @@ namespace repl {
                                               BSONObjBuilder* resultObj,
                                               Status* result);
 
-        virtual HeartbeatResultAction updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
+        virtual HeartbeatResultAction updateHeartbeatData(Date_t now,
+                                                          const MemberHeartbeatData& newInfo,
+                                                          int id);
 
         virtual void prepareStatusResponse(Date_t now,
                                            const BSONObj& cmdObj,

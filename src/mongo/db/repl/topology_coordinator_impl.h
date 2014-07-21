@@ -32,7 +32,7 @@
 #include <vector>
 
 #include "mongo/bson/optime.h"
-#include "mongo/db/repl/new_member.h"
+#include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/topology_coordinator.h"
@@ -92,8 +92,9 @@ namespace repl {
                                               Status* result);
 
         // update internal state with heartbeat response
-        HeartbeatResultAction updateHeartbeatInfo(Date_t now,
-                                              const HeartbeatInfo& newInfo);
+        HeartbeatResultAction updateHeartbeatData(Date_t now,
+                                                  const MemberHeartbeatData& newInfo,
+                                                  int id);
 
         // produce a reply to a status request
         virtual void prepareStatusResponse(Date_t now,
@@ -194,7 +195,7 @@ namespace repl {
         const MemberConfig& _selfConfig();  // Helper shortcut to self config
 
         ReplicaSetConfig _currentConfig; // The current config, including a vector of MemberConfigs
-        std::vector<NewMember> _members; // all members of the set
+        std::vector<MemberHeartbeatData> _hbdata; // heartbeat data for each member
 
         // Time when stepDown command expires
         Date_t _stepDownUntil;

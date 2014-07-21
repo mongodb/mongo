@@ -82,8 +82,10 @@ namespace repl {
                                                         BSONObjBuilder& result) {
     }
 
-    HeartbeatResultAction TopologyCoordinatorMock::updateHeartbeatInfo(Date_t now,
-                                                                   const HeartbeatInfo& newInfo) {
+    HeartbeatResultAction 
+    TopologyCoordinatorMock::updateHeartbeatData(Date_t now,
+                                                 const MemberHeartbeatData& newInfo,
+                                                 int id) {
         return None;
     }
 

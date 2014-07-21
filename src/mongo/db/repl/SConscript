@@ -21,7 +21,8 @@ env.CppUnitTest('replication_executor_test',
                          'replmocks'])
 
 env.Library('topology_coordinator_impl',
-            'topology_coordinator_impl.cpp',
+            ['topology_coordinator_impl.cpp',
+             'member_heartbeat_data.cpp'],
             LIBDEPS=['replica_set_config',
                      'replication_executor'])
 

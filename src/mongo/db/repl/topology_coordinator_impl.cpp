@@ -32,7 +32,6 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/isself.h"
-#include "mongo/db/repl/new_member.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs_sync.h" // maxSyncSourceLagSecs
@@ -69,7 +68,7 @@ namespace repl {
 
     HostAndPort TopologyCoordinatorImpl::getSyncSourceAddress() const {
         invariant(_syncSourceIndex >= 0);
-        return _members[_syncSourceIndex].hap();
+        return _currentConfig.getMemberAt(_syncSourceIndex).getHostAndPort();
     }
 
     void TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now) {
@@ -88,7 +87,7 @@ namespace repl {
 */
 
         // wait for 2N pings before choosing a sync target
-        int needMorePings = _members.size()*2 - HeartbeatInfo::numPings;
+        int needMorePings = _hbdata.size()*2 - HeartbeatInfo::numPings;
 
         if (needMorePings > 0) {
             OCCASIONALLY log() << "waiting for " << needMorePings 
@@ -108,7 +107,7 @@ namespace repl {
         // maxSyncSourceLagSecs seconds behind.
         OpTime primaryOpTime;
         if (_currentPrimaryIndex != -1)
-            primaryOpTime = _members[_currentPrimaryIndex].hbinfo().opTime;
+            primaryOpTime = _hbdata[_currentPrimaryIndex].getOpTime();
         else
             // choose a time that will exclude no candidates, since we don't see a primary
             primaryOpTime = OpTime(maxSyncSourceLagSecs, 0);
@@ -128,52 +127,53 @@ namespace repl {
         // nodes, in case those are the only ones we can reach.
         // This loop attempts to set 'closestIndex'.
         for (int attempts = 0; attempts < 2; ++attempts) {
-            for (std::vector<NewMember>::const_iterator it = _members.begin(); 
-                 it != _members.end(); 
+            for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); 
+                 it != _hbdata.end(); 
                  ++it) {
                 // Don't consider ourselves.
-                if (it->configIndex() == _selfIndex) {
+                if (it->getConfigIndex() == _selfIndex) {
                     continue;
                 }
                 // Candidate must be up to be considered.
-                if (!it->hbinfo().up()) {
+                if (!it->up()) {
                     continue;
                 }
                 // Candidate must be PRIMARY or SECONDARY state to be considered.
-                if (!it->hbinfo().hbstate.readable()) {
+                if (!it->getState().readable()) {
                     continue;
                 }
                 // Candidate must build indexes if we build indexes, to be considered.
                 if (_selfConfig().shouldBuildIndexes()) {
-                    if (!_currentConfig.getMemberAt(it->configIndex()).shouldBuildIndexes()) {
+                    if (!_currentConfig.getMemberAt(it->getConfigIndex()).shouldBuildIndexes()) {
                         continue;
                     }
                 }
 
-                if (it->hbinfo().hbstate == MemberState::RS_SECONDARY) {
+                if (it->getState() == MemberState::RS_SECONDARY) {
                     // only consider secondaries that are ahead of where we are
-                    if (it->hbinfo().opTime <= _lastApplied)
+                    if (it->getOpTime() <= _lastApplied)
                         continue;
                     // omit secondaries that are excessively behind, on the first attempt at least.
                     if (attempts == 0 &&
-                        it->hbinfo().opTime < oldestSyncOpTime)
+                        it->getOpTime() < oldestSyncOpTime)
                         continue;
                 }
 
                 // omit nodes that are more latent than anything we've already considered
                 if ((closestIndex != -1) &&
-                    (it->hbinfo().ping > _members[closestIndex].hbinfo().ping))
+                    (it->getPing() > _hbdata[closestIndex].getPing()))
                     continue;
 
                 if (attempts == 0 &&
                     (_selfConfig().getSlaveDelay() < 
-                     _currentConfig.getMemberAt(it->configIndex()).getSlaveDelay()
-                     || _currentConfig.getMemberAt(it->configIndex()).isHidden())) {
+                     _currentConfig.getMemberAt(it->getConfigIndex()).getSlaveDelay()
+                     || _currentConfig.getMemberAt(it->getConfigIndex()).isHidden())) {
                     continue; // skip this one in the first attempt
                 }
 
                 std::map<HostAndPort,Date_t>::iterator vetoed = 
-                    _syncSourceBlacklist.find(it->hap());
+                    _syncSourceBlacklist.find(
+                        _currentConfig.getMemberAt(it->getConfigIndex()).getHostAndPort());
                 if (vetoed != _syncSourceBlacklist.end()) {
                     // Do some veto housekeeping
 
@@ -181,8 +181,8 @@ namespace repl {
                     // if it was, skip.
                     if (vetoed->second >= now) {
                         if (now % 5 == 0) {
-                            log() << "replSet not trying to sync from " << (*vetoed).first
-                                  << ", it is vetoed for " << ((*vetoed).second - now) 
+                            log() << "replSet not trying to sync from " << vetoed->first
+                                  << ", it is vetoed for " << (vetoed->second - now) 
                                   << " more seconds" << rsLog;
                         }
                         continue;
@@ -191,7 +191,7 @@ namespace repl {
                     // fall through, this is a valid candidate now
                 }
                 // This candidate has passed all tests; set 'closestIndex'
-                closestIndex = it->configIndex();
+                closestIndex = it->getConfigIndex();
             }
             if (closestIndex != -1) break; // no need for second attempt
         }
@@ -200,7 +200,8 @@ namespace repl {
             return;
         }
 
-        sethbmsg( str::stream() << "syncing to: " << _members[closestIndex].fullName(), 0);
+        sethbmsg( str::stream() << "syncing to: " << 
+                  _currentConfig.getMemberAt(closestIndex).getHostAndPort().toString(), 0);
         _syncSourceIndex = closestIndex;
     }
     
@@ -316,21 +317,24 @@ namespace repl {
         }
 
         if ((_currentPrimaryIndex != -1) && 
-            (_commitOkayThrough >= _members[hopefulIndex].hbinfo().opTime)) {
+            (_commitOkayThrough >= _hbdata[hopefulIndex].getOpTime())) {
             // hbinfo is not updated, so we have to check the primary's last optime separately
             errmsg = str::stream() << "I am already primary, " << 
-                _members[hopefulIndex].fullName() << " can try again once I've stepped down";
+                _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() << 
+                " can try again once I've stepped down";
             return true;
         }
 
         if (_currentPrimaryIndex != -1 &&
-                (_members[hopefulIndex].hbinfo().id() != 
-                 _members[_currentPrimaryIndex].hbinfo().id()) &&
-                (_members[_currentPrimaryIndex].hbinfo().opTime >= 
-                 _members[hopefulIndex].hbinfo().opTime)) {
+            (_currentConfig.getMemberAt(hopefulIndex).getId() != 
+             _currentConfig.getMemberAt(_currentPrimaryIndex).getId()) &&
+            (_hbdata[_currentPrimaryIndex].getOpTime() >= 
+             _hbdata[hopefulIndex].getOpTime())) {
             // other members might be aware of more up-to-date nodes
-            errmsg = str::stream() << _members[hopefulIndex].fullName() <<
-                " is trying to elect itself but " << _members[_currentPrimaryIndex].fullName() <<
+            errmsg = str::stream() << 
+                _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() <<
+                " is trying to elect itself but " << 
+                _currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort().toString() <<
                 " is already primary and more up-to-date";
             return true;
         }
@@ -338,13 +342,16 @@ namespace repl {
         if ((highestPriorityIndex != -1) &&
             _currentConfig.getMemberAt(highestPriorityIndex).getPriority() > 
             _currentConfig.getMemberAt(hopefulIndex).getPriority()) {
-            errmsg = str::stream() << _members[hopefulIndex].fullName() << 
-                " has lower priority than " << _members[highestPriorityIndex].fullName();
+            errmsg = str::stream() << 
+                _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() << 
+                " has lower priority than " << 
+                _currentConfig.getMemberAt(highestPriorityIndex).getHostAndPort().toString();
             return true;
         }
 
         if (!_electableSet.count(id)) {
-            errmsg = str::stream() << "I don't think " << _members[hopefulIndex].fullName() <<
+            errmsg = str::stream() << "I don't think "
+                << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() <<
                 " is electable";
             return true;
         }
@@ -393,20 +400,24 @@ namespace repl {
             vote = -10000;
         }
         else if ( _currentPrimaryIndex != -1 && _memberState == MemberState::RS_PRIMARY ) {
-            log() << "I am already primary, " << _members[hopefulIndex].fullName()
+            log() << "I am already primary, " 
+                  << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString()
                   << " can try again once I've stepped down" << rsLog;
             vote = -10000;
         }
         else if (_currentPrimaryIndex != -1) {
-            log() << _members[hopefulIndex].fullName() << " is trying to elect itself but " <<
-                _members[_currentPrimaryIndex].fullName() << " is already primary" << rsLog;
+            log() << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() 
+                  << " is trying to elect itself but " <<
+                _currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort().toString() 
+                  << " is already primary" << rsLog;
             vote = -10000;
         }
         else if ((highestPriorityIndex != -1) &&
                  _currentConfig.getMemberAt(highestPriorityIndex).getPriority() > 
                  _currentConfig.getMemberAt(hopefulIndex).getPriority()) {
-            log() << _members[hopefulIndex].fullName() << " has lower priority than "
-                  << _members[highestPriorityIndex].fullName();
+            log() << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString()
+                  << " has lower priority than "
+                  << _currentConfig.getMemberAt(highestPriorityIndex).getHostAndPort().toString();
             vote = -10000;
         }
         else {
@@ -421,12 +432,14 @@ namespace repl {
                 _lastVote.when = now;
                 _lastVote.who = whoid;
                 vote = _selfConfig().isVoter() ? 1 : 0;
-                invariant( _members[hopefulIndex].hbinfo().id() == whoid );
-                log() << "replSet info voting yea for " << _members[hopefulIndex].fullName()
+                invariant( _currentConfig.getMemberAt(hopefulIndex).getId() == whoid );
+                log() << "replSet info voting yea for " << 
+                    _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString()
                       << " (" << whoid << ')' << rsLog;
             }
             catch(VoteException&) {
-                log() << "replSet voting no for " << _members[hopefulIndex].fullName()
+                log() << "replSet voting no for " 
+                      <<  _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() 
                       << " already voted for another" << rsLog;
             }
         }
@@ -497,7 +510,9 @@ namespace repl {
         resultObj->appendDate("opTime", _lastApplied.asDate());
 
         if (_syncSourceIndex != -1) {
-            resultObj->append("syncingTo", _members[_syncSourceIndex].fullName());
+            resultObj->append("syncingTo", 
+                              _currentConfig.getMemberAt(_syncSourceIndex)
+                              .getHostAndPort().toString());
         }
 
         long long v = _currentConfig.getConfigVersion();
@@ -520,12 +535,12 @@ namespace repl {
         }
 
         // if we thought that this node is down, let it know
-        if (!_members[from].hbinfo().up()) {
+        if (!_hbdata[from].up()) {
             resultObj->append("stateDisagreement", true);
         }
 
         // note that we got a heartbeat from this node
-        _members[from].get_hbinfo().lastHeartbeatRecv = now;
+        _hbdata[from].setLastHeartbeatRecv(now);
         *result = Status::OK();
     }
 
@@ -543,15 +558,14 @@ namespace repl {
     }
 
     // update internal state with heartbeat response, and run topology checks
-    HeartbeatResultAction TopologyCoordinatorImpl::updateHeartbeatInfo(
-                                                        Date_t now,
-                                                        const HeartbeatInfo& newInfo) {
+    HeartbeatResultAction TopologyCoordinatorImpl::updateHeartbeatData(
+        Date_t now, const MemberHeartbeatData& newInfo, int id) {
         // Fill in the new heartbeat data for the appropriate member
-        for (std::vector<NewMember>::iterator it = _members.begin(); 
-             it != _members.end(); 
+        for (std::vector<MemberHeartbeatData>::iterator it = _hbdata.begin(); 
+             it != _hbdata.end(); 
              ++it) {
-            if (it->hbinfo().id() == newInfo.id()) {
-                it->get_hbinfo().updateFromLastPoll(newInfo);
+            if (_currentConfig.getMemberAt(it->getConfigIndex()).getId() == id) {
+                it->updateFrom(newInfo);
                 break;
             }
         }
@@ -586,17 +600,21 @@ namespace repl {
                 // if we're stepping down to allow another member to become primary, we
                 // better have another member (latestOp), and it should be up-to-date
                 (latestOp != 0) && 
-                _members[highestPriorityIndex].hbinfo().opTime.getSecs() >= latestOp - 10) {
-                log() << "stepping down " << 
-                    _members[_currentPrimaryIndex].fullName() << " (priority " <<
-                    _currentConfig.getMemberAt(_currentPrimaryIndex).getPriority() << "), " << 
-                    _members[highestPriorityIndex].fullName() << " is priority " << 
-                    _currentConfig.getMemberAt(highestPriorityIndex).getPriority() << " and " <<
-                    (latestOp - _members[highestPriorityIndex].hbinfo().opTime.getSecs()) << 
-                    " seconds behind";
+                _hbdata[highestPriorityIndex].getOpTime().getSecs() >= latestOp - 10) {
+                log() << "stepping down "
+                      << _currentConfig.getMemberAt(_currentPrimaryIndex)
+                    .getHostAndPort().toString() << " (priority " 
+                      << _currentConfig.getMemberAt(_currentPrimaryIndex).getPriority() << "), " 
+                      << _currentConfig.getMemberAt(highestPriorityIndex)
+                    .getHostAndPort().toString() 
+                      << " is priority " 
+                      << _currentConfig.getMemberAt(highestPriorityIndex).getPriority() 
+                      << " and " 
+                      << (latestOp - _hbdata[highestPriorityIndex].getOpTime().getSecs()) 
+                      << " seconds behind";
 
                 // Are we primary?
-                if (isSelf(_members[_currentPrimaryIndex].hap())) {
+                if (isSelf(_currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort())) {
                     // replSetStepDown tries to acquire the same lock
                     // msgCheckNewState takes, so we can't call replSetStepDown on
                     // ourselves.
@@ -632,15 +650,15 @@ namespace repl {
         {
             int down = 0, authIssue = 0, total = 0;
 
-            for (std::vector<NewMember>::const_iterator it = _members.begin(); 
-                 it != _members.end(); 
+            for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); 
+                 it != _hbdata.end(); 
                  ++it) {
                 total++;
 
                 // all authIssue servers will also be not up
-                if (!it->hbinfo().up()) {
+                if (!it->up()) {
                     down++;
-                    if (it->hbinfo().authIssue) {
+                    if (it->hasAuthIssue()) {
                         authIssue++;
                     }
                 }
@@ -672,8 +690,8 @@ namespace repl {
 
         // If a remote is primary, check that it is still up.
         if (_currentPrimaryIndex != -1 && _currentPrimaryIndex != _selfIndex) {
-            if (!_members[_currentPrimaryIndex].hbinfo().up() || 
-                !_members[_currentPrimaryIndex].hbinfo().hbstate.primary()) {
+            if (!_hbdata[_currentPrimaryIndex].up() || 
+                !_hbdata[_currentPrimaryIndex].getState().primary()) {
                 _currentPrimaryIndex = -1;
             }
         }
@@ -682,20 +700,20 @@ namespace repl {
         // not what currentPrimary is.
         {
             int remotePrimaryIndex = -1;
-            for (std::vector<NewMember>::const_iterator it = _members.begin(); 
-                 it != _members.end(); 
+            for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); 
+                 it != _hbdata.end(); 
                  ++it) {
-                if (it->configIndex() == _selfIndex) {
+                if (it->getConfigIndex() == _selfIndex) {
                     continue;
                 }
 
-                if( it->hbinfo().hbstate.primary() && it->hbinfo().up() ) {
+                if( it->getState().primary() && it->up() ) {
                     if (remotePrimaryIndex != -1) {
                         /* two other nodes think they are primary (asynchronously polled) -- wait for things to settle down. */
                         log() << "replSet info two primaries (transiently)" << rsLog;
                         return None;
                     }
-                    remotePrimaryIndex = it->configIndex();
+                    remotePrimaryIndex = it->getConfigIndex();
                 }
             }
 
@@ -715,7 +733,7 @@ namespace repl {
 
                 // If we are also primary, this is a problem.  Determine who should step down.
                 if (_memberState == MemberState::RS_PRIMARY) {
-                    OpTime remoteElectionTime = _members[remotePrimaryIndex].hbinfo().electionTime;
+                    OpTime remoteElectionTime = _hbdata[remotePrimaryIndex].getElectionTime();
                     log() << "replset: another primary seen with election time " 
                           << remoteElectionTime; 
                     // Step down whoever has the older election time.
@@ -820,11 +838,11 @@ namespace repl {
 
     bool TopologyCoordinatorImpl::_aMajoritySeemsToBeUp() const {
         int vUp = 0;
-        for (std::vector<NewMember>::const_iterator it = _members.begin(); 
-             it != _members.end(); 
+        for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); 
+             it != _hbdata.end(); 
              ++it) {
-            if (it->hbinfo().up()) {
-                vUp += _currentConfig.getMemberAt(it->configIndex()).isVoter() ? 1 : 0;
+            if (it->up()) {
+                vUp += _currentConfig.getMemberAt(it->getConfigIndex()).isVoter() ? 1 : 0;
             }
         }
 
@@ -848,16 +866,16 @@ namespace repl {
     OpTime TopologyCoordinatorImpl::_latestKnownOpTime() const {
         OpTime latest(0,0);
 
-        for (std::vector<NewMember>::const_iterator it = _members.begin(); 
-             it != _members.end(); 
+        for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); 
+             it != _hbdata.end(); 
              ++it) {
 
-            if (!it->hbinfo().up()) {
+            if (!it->up()) {
                 continue;
             }
 
-            if (it->hbinfo().opTime > latest) {
-                latest = it->hbinfo().opTime;
+            if (it->getOpTime() > latest) {
+                latest = it->getOpTime();
             }
         }
 
@@ -907,14 +925,14 @@ namespace repl {
         vector<BSONObj> membersOut;
         MemberState myState = _memberState;
 
-        for (std::vector<NewMember>::const_iterator it = _members.begin(); 
-             it != _members.end(); 
+        for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); 
+             it != _hbdata.end(); 
              ++it) {
-            if (it->configIndex() == _selfIndex) {
+            if (it->getConfigIndex() == _selfIndex) {
                 // add self
                 BSONObjBuilder bb;
                 bb.append("_id", _selfConfig().getId());
-                bb.append("name", _members[_selfIndex].fullName());
+                bb.append("name", _selfConfig().getHostAndPort().toString());
                 bb.append("health", 1.0);
                 bb.append("state", static_cast<int>(myState.s));
                 bb.append("stateStr", myState.toString());
@@ -942,44 +960,46 @@ namespace repl {
             else {
                 // add non-self member
                 BSONObjBuilder bb;
-                bb.append("_id", it->hbinfo().id());
-                bb.append("name", it->fullName());
-                double h = it->hbinfo().health;
+                bb.append("_id", _currentConfig.getMemberAt(it->getConfigIndex()).getId());
+                bb.append("name", _currentConfig.getMemberAt(it->getConfigIndex())
+                          .getHostAndPort().toString());
+                double h = it->getHealth();
                 bb.append("health", h);
-                bb.append("state", static_cast<int>(it->hbinfo().hbstate.s));
+                bb.append("state", static_cast<int>(it->getState().s));
                 if( h == 0 ) {
                     // if we can't connect the state info is from the past
                     // and could be confusing to show
                     bb.append("stateStr", "(not reachable/healthy)");
                 }
                 else {
-                    bb.append("stateStr", it->hbinfo().hbstate.toString());
+                    bb.append("stateStr", it->getState().toString());
                 }
                 bb.append("uptime",
-                          (unsigned) (it->hbinfo().upSince ? (now-it->hbinfo().upSince) : 0));
-                if (!_currentConfig.getMemberAt(it->configIndex()).isArbiter()) {
-                    bb.appendTimestamp("optime", it->hbinfo().opTime.asDate());
-                    bb.appendDate("optimeDate", it->hbinfo().opTime.getSecs() * 1000LL);
+                          static_cast<unsigned int> ((it->getUpSince() ? 
+                                                      (now - it->getUpSince()) : 0)));
+                if (!_currentConfig.getMemberAt(it->getConfigIndex()).isArbiter()) {
+                    bb.appendTimestamp("optime", it->getOpTime().asDate());
+                    bb.appendDate("optimeDate", it->getOpTime().getSecs() * 1000LL);
                 }
-                bb.appendTimeT("lastHeartbeat", it->hbinfo().lastHeartbeat);
-                bb.appendTimeT("lastHeartbeatRecv", it->hbinfo().lastHeartbeatRecv);
-                bb.append("pingMs", it->hbinfo().ping);
-                std::string s = it->hbinfo().lastHeartbeatMsg;
+                bb.appendTimeT("lastHeartbeat", it->getLastHeartbeat());
+                bb.appendTimeT("lastHeartbeatRecv", it->getLastHeartbeatRecv());
+                bb.append("pingMs", it->getPing().total_milliseconds());
+                std::string s = it->getLastHeartbeatMsg();
                 if( !s.empty() )
                     bb.append("lastHeartbeatMessage", s);
 
-                if (it->hbinfo().authIssue) {
+                if (it->hasAuthIssue()) {
                     bb.append("authenticated", false);
                 }
 
-                std::string syncingTo = it->hbinfo().syncingTo;
-                if (!syncingTo.empty()) {
-                    bb.append("syncingTo", syncingTo);
+                std::string syncSource = it->getSyncSource();
+                if (!syncSource.empty()) {
+                    bb.append("syncingTo", syncSource);
                 }
 
-                if (it->hbinfo().hbstate == MemberState::RS_PRIMARY) {
-                    bb.appendTimestamp("electionTime", it->hbinfo().electionTime.asDate());
-                    bb.appendDate("electionDate", it->hbinfo().electionTime.getSecs() * 1000LL);
+                if (it->getState() == MemberState::RS_PRIMARY) {
+                    bb.appendTimestamp("electionTime", it->getElectionTime().asDate());
+                    bb.appendDate("electionDate", it->getElectionTime().getSecs() * 1000LL);
                 }
                 membersOut.push_back(bb.obj());
             }
@@ -996,7 +1016,8 @@ namespace repl {
         if ((_syncSourceIndex != -1) && 
             (myState != MemberState::RS_PRIMARY) &&
             (myState != MemberState::RS_SHUNNED) ) {
-            result.append("syncingTo", _members[_syncSourceIndex].fullName());
+            result.append("syncingTo", _currentConfig.getMemberAt(_syncSourceIndex)
+                          .getHostAndPort().toString());
         }
 
         result.append("members", membersOut);
@@ -1030,13 +1051,13 @@ namespace repl {
         }
     }
 
-    // This function installs a new config object and recreates NewMember objects that reflect
-    // the new config.
+    // This function installs a new config object and recreates MemberHeartbeatData objects 
+    // that reflect the new config.
     void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig, int selfIndex) {
         invariant(selfIndex < newConfig.getNumMembers());
         _currentConfig = newConfig;        
 
-        _members.clear();
+        _hbdata.clear();
         _selfIndex = selfIndex;
 
         int index = 0;
@@ -1044,7 +1065,7 @@ namespace repl {
              it != _currentConfig.membersEnd();
              ++it, ++index) {
             // C++11: use emplace_back()
-            _members.push_back(NewMember(it->getHostAndPort(), it->getId(), index));
+            _hbdata.push_back(MemberHeartbeatData(index));
         }
 
         // call registered callbacks for config changes

@@ -43,7 +43,7 @@ namespace mongo {
 
 namespace repl {
 
-    class HeartbeatInfo;
+    class MemberHeartbeatData;
     class NewMember;
     struct MemberState;
     class ReplicaSetConfig;
@@ -117,9 +117,10 @@ namespace repl {
                                               BSONObjBuilder* resultObj,
                                               Status* result) = 0;
 
-        // update internal state with heartbeat response
-        virtual HeartbeatResultAction updateHeartbeatInfo(Date_t now,
-                                                          const HeartbeatInfo& newInfo) = 0;
+        // update internal state with heartbeat response corresponding to 'id'
+        virtual HeartbeatResultAction updateHeartbeatData(Date_t now,
+                                                          const MemberHeartbeatData& newInfo,
+                                                          int id) = 0;
 
         // produce a reply to a status request
         virtual void prepareStatusResponse(Date_t now,
