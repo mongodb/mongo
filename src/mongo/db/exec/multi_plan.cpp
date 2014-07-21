@@ -72,11 +72,6 @@ namespace mongo {
             // 
             // delete _candidates[_bestPlanIdx].solution; // (owned by containing runner)
 
-            if (hasBackupPlan()) {
-                delete _candidates[_backupPlanIdx].solution;
-                delete _candidates[_backupPlanIdx].root;
-            }
-
             // Clean up the losing candidates.
             clearCandidates();
         }
@@ -152,9 +147,7 @@ namespace mongo {
         }
 
         if (hasBackupPlan() && PlanStage::ADVANCED == state) {
-            QLOG() << "Best plan had a blocking sort, became unblocked, deleting backup plan\n";
-            delete _candidates[_backupPlanIdx].solution;
-            delete _candidates[_backupPlanIdx].root;
+            QLOG() << "Best plan had a blocking stage, became unblocked\n";
             _backupPlanIdx = kNoSuchPlan;
         }
 
@@ -321,7 +314,6 @@ namespace mongo {
         // Traverse candidate plans in order or score
         for (size_t ix = 0; ix < _candidates.size(); ix++) {
             if (ix == (size_t)_bestPlanIdx) { continue; }
-            if (ix == (size_t)_backupPlanIdx) { continue; }
 
             delete _candidates[ix].root;
             delete _candidates[ix].solution;
