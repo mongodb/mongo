@@ -53,7 +53,8 @@ namespace mongo {
         _metaDataKey = string("metadata-") + ns.toString();
     }
 
-    CollectionOptions RocksCollectionCatalogEntry::getCollectionOptions( OperationContext* txn ) const {
+    CollectionOptions RocksCollectionCatalogEntry::getCollectionOptions( OperationContext* txn )
+        const {
         // TODO: put more options in here?
         return CollectionOptions();
     }
@@ -181,6 +182,7 @@ namespace mongo {
 
         // Note: this invalidates cfh. Do not use after this call
         _engine->removeColumnFamily( cfh, indexName, ns().ns() );
+        invariant( cfh == nullptr );
 
         return Status::OK();
     }
@@ -243,8 +245,7 @@ namespace mongo {
                                                         &result );
         invariant( !status.IsNotFound() );
         invariant( status.ok() );
-        BSONObj obj( result.c_str() );
-        out->parse( obj );
+        out->parse( BSONObj( result.c_str() ) );
         return true;
     }
 

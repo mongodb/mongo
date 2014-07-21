@@ -119,21 +119,38 @@ namespace mongo {
              * Removes information about an index from the MetaData. Returns true if an index
              * called name existed and was deleted, and false otherwise
              */
-            bool eraseIndex ( const StringData& name );
+            bool eraseIndex( const StringData& name );
 
             std::string ns;
             std::vector<IndexMetaData> indexes;
         };
 
     private:
+        /**
+         * This class works by storing metadata in a column family with a specific name.
+         * For example, at one point the name of the metadata column family was the namespace,
+         * prefixed with "metadata-". The _getMetaData method reads the MetaData struct from the
+         * specific column family
+         */
+        // XXX is this a bad signature? Would it be better to return an Optional<MetaData> ?
         bool _getMetaData( MetaData* out ) const;
+
+        /**
+         * Same as _getMetaData(), but with the relevant lock already acquired
+         */
         bool _getMetaData_inlock( MetaData* out ) const;
 
+        /**
+         * Writes a MetaData to the metadata column family
+         */
         void _putMetaData_inlock( const MetaData& in );
 
-        RocksEngine* _engine;
+        RocksEngine* _engine; // not owned
+
+        // the name of the column family which holds the metadata
         string _metaDataKey;
 
+        // lock which must be acquired before
         mutable boost::mutex _metaDataLock;
 
         static const int _maxAllowedIndexes = 64; // for compatability for now, could be higher
