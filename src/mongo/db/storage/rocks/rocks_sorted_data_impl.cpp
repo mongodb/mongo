@@ -255,7 +255,7 @@ namespace mongo {
     RocksIndexEntry::RocksIndexEntry( const BSONObj& key, const DiskLoc loc, bool stripFieldNames )
         : IndexKeyEntry( key, loc ) {
 
-        if ( stripFieldNames && _key.firstElement().fieldName()[0] ) {
+        if ( stripFieldNames ) {
             BSONObjBuilder b;
             BSONObjIterator i( _key );
             while ( i.more() ) {
@@ -273,11 +273,9 @@ namespace mongo {
     }
 
     string RocksIndexEntry::asString() const {
-        string s( _size(), 1 );
-        memcpy( const_cast<char*>( s.c_str() ), _key.objdata(), _key.objsize() );
+        string s( _key.objdata(), _key.objsize() );
 
-        const char* locData = reinterpret_cast<const char*>( &_loc );
-        memcpy( const_cast<char*>( s.c_str() + _key.objsize() ), locData, sizeof( DiskLoc ) );
+        s.append( reinterpret_cast<const char*>( &_loc ), sizeof( DiskLoc ) );
 
         return s;
     }
@@ -303,7 +301,6 @@ namespace mongo {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         if ( !dupsAllowed ) {
-            // XXX: this is slow
             Status status = dupKeyCheck( txn, key, loc );
             if ( !status.isOK() ) {
                 return status;
@@ -344,14 +341,14 @@ namespace mongo {
     Status RocksSortedDataImpl::dupKeyCheck(OperationContext* txn,
                                             const BSONObj& key,
                                             const DiskLoc& loc) {
-        RocksIndexEntry rIndexEntry( key, loc );
-        string keyData = rIndexEntry.asString();
-        string dummy;
+        boost::scoped_ptr<SortedDataInterface::Cursor> cursor( newCursor( txn, 1 ) );
+        cursor->locate( key, DiskLoc() );
 
-        rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
-        rocksdb::Status s =_db->Get( options, _columnFamily, keyData, &dummy );
+        if ( cursor->isEOF() )
+            return Status::OK();
 
-        return s.ok() ? Status(ErrorCodes::DuplicateKey, dupKeyError(key)) : Status::OK();
+        return cursor->getDiskLoc() == loc ? Status::OK() : 
+                Status(ErrorCodes::DuplicateKey, dupKeyError(key));
     }
 
     void RocksSortedDataImpl::fullValidate(OperationContext* txn, long long* numKeysOut) {
