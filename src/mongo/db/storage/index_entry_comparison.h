@@ -38,7 +38,7 @@
 namespace mongo {
 
     /**
-     * This represents a single item in an index. This is intended to (possibly) be used by 
+     * This represents a single item in an index. This is intended to (possibly) be used by
      * implementations of the SortedDataInterface interface. An index item simply consists of a key
      * and a disk location, but this could be subclassed to perform more complex tasks.
      */
@@ -46,7 +46,7 @@ namespace mongo {
     public:
         IndexKeyEntry(const BSONObj& key, DiskLoc loc) : _key(key), _loc(loc) {}
         virtual ~IndexKeyEntry() { }
-        
+
         virtual const BSONObj& key() const { return _key; }
         virtual DiskLoc loc() const { return _loc; }
 
@@ -71,9 +71,9 @@ namespace mongo {
 
         /**
          * Returns -1 if lhs < rhs, 1 if lhs > rhs, and 0 otherwise.
-         * 
+         *
          * This function requires much more explanation than that, however:
-         * 
+         *
          * This function compares two IndexKeyEntry objects which have been stripped of their field
          * names. Either lhs or rhs represents the lower bound of a query, meaning that either lhs
          * or rhs must be the result of a call to makeQueryObject(). The comparison function simply
@@ -81,10 +81,10 @@ namespace mongo {
          *
          * Ex: lhs's key is {"": 5, "": "foo"}, and it represents the lower bound of a range query.
          * If rhs's key is {"": 4, "": "foo"}, then the function will return 1, because the left
-         * hand side's first element is greater than the rhs's. 
+         * hand side's first element is greater than the rhs's.
          *
          * Another ex: lhs's key is {"": 5, "": "foo"}, and rhs's key is {"": 5, "": "zzz"}. The
-         * function will return -1, because rhs's second element is greater than lhs's. 
+         * function will return -1, because rhs's second element is greater than lhs's.
          *
          * So far, this is all very reasonable. However, suppose that lhs and rhs both have the key
          * {"": 5, "": "foo"}. A general-purpose comparison function might return 0 in this
@@ -114,17 +114,17 @@ namespace mongo {
          * {"l": 5, "": "foo"} < {"": 5, "": "foo"}
          */
         int comparison(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const;
-        
+
         /**
          * See the comment above comparison() for some important details.
          * Preps a query for compare(). Strips fieldNames if there are any.
-         * 
+         *
          * @param keyPrefix a BSONObj representing the beginning of a query
-         * 
-         * @param prefixLen the number of fields, beginning with the first and ending with the 
+         *
+         * @param prefixLen the number of fields, beginning with the first and ending with the
          * prefixLen'th, in keyPrefix to use as part of the query. Must be >= 0 and < the number of
          * elements in keyPrefix.
-         *     
+         *
          * @param prefixExclusive true if the first prefixLen elements in the query are exclusive,
          * and false otherwise
          *

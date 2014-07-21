@@ -78,10 +78,10 @@ namespace mongo {
             }
 
         }
-        // XXX we commented this out for the same reason that we commented out the invariant at 
+        // XXX we commented this out for the same reason that we commented out the invariant at
         // the beginning of the for loop. Is that okay?
         // invariant(!rhsIt.more());
- 
+
         if (rhsIt.more())
             return 1;
 
