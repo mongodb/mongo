@@ -89,7 +89,9 @@ namespace mongo {
         /**
          * Validatess query shape from command object and returns canonical query.
          */
-        static Status canonicalize(const std::string& ns, const BSONObj& cmdObj,
+        static Status canonicalize(OperationContext* txn,
+                                   const std::string& ns,
+                                   const BSONObj& cmdObj,
                                    CanonicalQuery** canonicalQueryOut);
 
     private:
@@ -141,7 +143,10 @@ namespace mongo {
          * Clears collection's plan cache.
          * If query shape is provided, clears plans for that single query shape only.
          */
-        static Status clear(PlanCache* planCache, const std::string& ns, const BSONObj& cmdObj);
+        static Status clear(OperationContext* txn,
+                            PlanCache* planCache,
+                            const std::string& ns,
+                            const BSONObj& cmdObj);
     };
 
     /**
@@ -166,8 +171,11 @@ namespace mongo {
         /**
          * Displays the cached plans for a query shape.
          */
-        static Status list(const PlanCache& planCache, const std::string& ns,
-                           const BSONObj& cmdObj, BSONObjBuilder* bob);
+        static Status list(OperationContext* txn,
+                           const PlanCache& planCache,
+                           const std::string& ns,
+                           const BSONObj& cmdObj,
+                           BSONObjBuilder* bob);
     };
 
 }  // namespace mongo

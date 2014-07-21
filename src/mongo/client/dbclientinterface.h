@@ -35,6 +35,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
 #include "mongo/client/export_macros.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logger/log_severity.h"

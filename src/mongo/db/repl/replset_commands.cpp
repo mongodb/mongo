@@ -40,8 +40,6 @@
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/write_concern.h"
 
-using namespace bson;
-
 namespace mongo {
 namespace repl {
 

@@ -41,6 +41,17 @@
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
+    typedef std::map<std::string, BSONElement> BSONMap;
+    BSONMap bson2map(const BSONObj& obj) {
+        BSONMap m;
+        BSONObjIterator it(obj);
+        while (it.more()) {
+            BSONElement e = it.next();
+            m[e.fieldName()] = e;
+        }
+        return m;
+    }
+
     void dotted2nested(BSONObjBuilder& b, const BSONObj& obj) {
         //use map to sort fields
         BSONMap sorted = bson2map(obj);

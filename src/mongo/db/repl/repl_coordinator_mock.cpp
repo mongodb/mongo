@@ -131,6 +131,13 @@ namespace repl {
         return OID();
     }
 
+    OID ReplicationCoordinatorMock::getMyRID() {
+        return OID();
+    }
+
+    void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
+            BSONObjBuilder* cmdBuilder) {}
+
     void ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
         //TODO
     }

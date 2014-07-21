@@ -38,7 +38,6 @@
 namespace mongo {
 namespace repl {
 
-    using namespace bson;
     using namespace html;
 
     class ReplSetHandler : public DbWebHandler {

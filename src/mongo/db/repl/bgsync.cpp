@@ -31,8 +31,10 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/fail_point_service.h"
@@ -111,7 +113,8 @@ namespace repl {
     }
 
     void BackgroundSync::notify() {
-        theReplSet->syncSourceFeedback.updateSelfInMap(theReplSet->lastOpTimeWritten);
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        replCoord->setLastOptime(replCoord->getMyRID(), theReplSet->lastOpTimeWritten);
 
         {
             boost::unique_lock<boost::mutex> lock(s_instance->_mutex);
@@ -151,6 +154,8 @@ namespace repl {
     }
 
     void BackgroundSync::_producerThread() {
+        OperationContextImpl txn;
+
         MemberState state = theReplSet->state();
 
         // we want to pause when the state changes to primary
@@ -178,16 +183,16 @@ namespace repl {
             start();
         }
 
-        produce();
+        produce(&txn);
     }
 
-    void BackgroundSync::produce() {
+    void BackgroundSync::produce(OperationContext* txn) {
         // this oplog reader does not do a handshake because we don't want the server it's syncing
         // from to track how far it has synced
         OplogReader r;
         OpTime lastOpTimeFetched;
         // find a target to sync from the last op time written
-        getOplogReader(r);
+        getOplogReader(txn, r);
 
         // no server found
         {
@@ -363,7 +368,7 @@ namespace repl {
         return true;
     }
 
-    void BackgroundSync::getOplogReader(OplogReader& r) {
+    void BackgroundSync::getOplogReader(OperationContext* txn, OplogReader& r) {
         const Member *target = NULL, *stale = NULL;
         BSONObj oldest;
 
@@ -417,7 +422,7 @@ namespace repl {
 
         // the only viable sync target was stale
         if (stale) {
-            theReplSet->goStale(stale, oldest);
+            theReplSet->goStale(txn, stale, oldest);
             sleepsecs(120);
         }
 

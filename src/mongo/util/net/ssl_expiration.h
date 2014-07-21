@@ -1,5 +1,4 @@
-/**
- *    Copyright (C) 2013 10gen Inc.
+/*    Copyright 2014 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,37 +25,34 @@
  *    then also delete it in the license file.
  */
 
-#include <string>
+#pragma once
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/util/background.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-    class OperationContext;
+    class CertificateExpirationMonitor : public PeriodicTask {
+    public:
+        explicit CertificateExpirationMonitor(Date_t date);
 
-    /**
-     * Merges a chunks in the specified [minKey, maxKey) range of the specified namespace.
-     * Updates the local and remote metadata by expanding the bounds of the first chunk in the
-     * range, dropping the others, and incrementing the minor version of the shard to the next
-     * higher version.  Returns true on success.
-     *
-     * Fails with errMsg if the 'epoch' was set and has changed (indicating the range is no longer
-     * valid), or if the range does not exactly start and stop on chunks owned by this shard, or
-     * if the chunks in this range are not contiguous.
-     *
-     * WARNING: On network failure, it is possible that the chunks in our local metadata may not
-     * match the remote metadata, however the key ranges protected will be the same.  All metadata
-     * operations are responsible for updating the metadata before performing any actions.
-     *
-     * Locking note:
-     *     + Takes a distributed lock over the namespace
-     *     + Cannot be called with any other locks held
-     */
-    bool mergeChunks( OperationContext* txn,
-                      const NamespaceString& nss,
-                      const BSONObj& minKey,
-                      const BSONObj& maxKey,
-                      const OID& epoch,
-                      std::string* errMsg );
-}
+        /**
+         * Gets the PeriodicTask's name.
+         * @return CertificateExpirationMonitor's name.
+         */
+        virtual std::string taskName() const;
+
+        /**
+         * Wakes up every minute as it is a PeriodicTask.
+         * Checks once a day if the server certificate has expired
+         * or will expire in the next 30 days and sends a warning 
+         * to the log accordingly.
+         */
+        virtual void taskDoWork();
+
+    private:
+        const Date_t _certExpiration;
+        Date_t _lastCheckTime;
+    };
+
+}  // namespace mongo

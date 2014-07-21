@@ -58,8 +58,6 @@
 namespace mongo {
 namespace repl {
 
-    using namespace bson;
-
     MONGO_EXPORT_STARTUP_SERVER_PARAMETER(maxSyncSourceLagSecs, int, 30);
     MONGO_INITIALIZER(maxSyncSourceLagSecsCheck) (InitializerContext*) {
         if (maxSyncSourceLagSecs < 1) {
@@ -95,7 +93,7 @@ namespace repl {
             return false;
         }
 
-        minvalid = getMinValid();
+        minvalid = getMinValid(txn);
         if( minvalid <= lastOpTimeWritten ) {
             golive=true;
         }
@@ -225,13 +223,12 @@ namespace repl {
         tail.oplogApplication();
     }
 
-    bool ReplSetImpl::resync(string& errmsg) {
+    bool ReplSetImpl::resync(OperationContext* txn, string& errmsg) {
         changeState(MemberState::RS_RECOVERING);
 
-        OperationContextImpl txn;
-        Client::Context ctx(&txn, "local");
+        Client::Context ctx(txn, "local");
 
-        ctx.db()->dropCollection(&txn, "local.oplog.rs");
+        ctx.db()->dropCollection(txn, "local.oplog.rs");
         {
             boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
             theReplSet->initialSyncRequested = true;

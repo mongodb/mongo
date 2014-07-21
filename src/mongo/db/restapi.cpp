@@ -51,7 +51,6 @@ namespace mongo {
 
     bool getInitialSyncCompleted();
 
-    using namespace bson;
     using namespace html;
 
     class RESTHandler : public DbWebHandler {

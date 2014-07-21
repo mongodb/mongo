@@ -329,6 +329,17 @@ namespace repl {
         return OID();
     }
 
+
+    OID ReplicationCoordinatorImpl::getMyRID() {
+        // TODO
+        return OID();
+    }
+
+    void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
+            BSONObjBuilder* cmdBuilder) {
+        // TODO
+    }
+
     void ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* result) {
         // TODO
     }
@@ -412,6 +423,8 @@ namespace repl {
         invariant(getReplicationMode() == modeReplSet);
         boost::lock_guard<boost::mutex> lk(_mutex);
         _rsConfig = newConfig;
+
+        // TODO: Cancel heartbeats, start new ones
     }
 
     Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const BSONArray& updates,
@@ -451,6 +464,25 @@ namespace repl {
             const WriteConcernOptions& writeConcern) const {
         // TODO
         return Status::OK();
+    }
+
+    void ReplicationCoordinatorImpl::doMemberHeartbeat(ReplicationExecutor* executor,
+                                                       const Status& inStatus,
+                                                       const HostAndPort& hap) {
+        // TODO
+    }
+
+    void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
+                                const ReplicationExecutor::RemoteCommandCallbackData& cbData,
+                                StatusWith<BSONObj>* outStatus,
+                                const HostAndPort& hap,
+                                Date_t firstCallDate,
+                                int retriesLeft) {
+        // TODO
+    }
+
+    void ReplicationCoordinatorImpl::cancelHeartbeats() {
+        // TODO
     }
 
 } // namespace repl

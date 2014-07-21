@@ -31,7 +31,6 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
-#include <map>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/platform/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -100,6 +100,10 @@ namespace repl {
 
         virtual OID getElectionId();
 
+        virtual OID getMyRID();
+
+        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
+
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
         virtual bool setMaintenanceMode(bool activate);
@@ -154,6 +158,15 @@ namespace repl {
         // Called by the TopologyCoordinator whenever the replica set configuration is updated
         void setCurrentReplicaSetConfig(const TopologyCoordinator::ReplicaSetConfig& newConfig);
 
+        /**
+         * Does a heartbeat for a member of the replica set.
+         * Should be started during (re)configuration or in the heartbeat callback only.
+         */
+        void doMemberHeartbeat(ReplicationExecutor* executor,
+                               const Status& inStatus,
+                               const HostAndPort& hap);
+        void cancelHeartbeats();
+
     private:
 
         // Struct that holds information about clients waiting for replication
@@ -165,6 +178,32 @@ namespace repl {
         bool _opReplicatedEnough_inlock(const OpTime& opTime,
                                         const WriteConcernOptions& writeConcern);
 
+        /**
+         * Processes each heartbeat response.
+         * Also responsible for scheduling additional heartbeats within the timeout if they error,
+         * and on success.
+         */
+        void _handleHeartbeatResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData,
+                                      StatusWith<BSONObj>* outStatus,
+                                      const HostAndPort& hap,
+                                      Date_t firstCallDate,
+                                      int retriesLeft);
+
+        void _trackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle) {
+            // this mutex should not be needed because it is always used during a callback.
+            // boost::mutex::scoped_lock lock(_mutex);
+            _heartbeatHandles.push_back(handle);
+        }
+
+        void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle) {
+            // this mutex should not be needed because it is always used during a callback.
+            // boost::mutex::scoped_lock lock(_mutex);
+            // TODO
+        }
+
+        // Handles to actively queued heartbeats
+        typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
+        HeartbeatHandles _heartbeatHandles;
 
         // Protects all member data of this ReplicationCoordinator
         mutable boost::mutex _mutex;
@@ -189,8 +228,7 @@ namespace repl {
         boost::scoped_ptr<boost::thread> _topCoordDriverThread;
 
         // Maps nodes in this replication group to the last oplog operation they have committed
-        // TODO(spencer): change to unordered_map
-        typedef std::map<OID, OpTime> SlaveOpTimeMap;
+        typedef unordered_map<OID, OpTime, OID::Hasher> SlaveOpTimeMap;
         SlaveOpTimeMap _slaveOpTimeMap;
 
         // Current ReplicaSet state

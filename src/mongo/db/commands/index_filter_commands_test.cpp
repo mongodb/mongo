@@ -33,6 +33,7 @@
 #include "mongo/db/commands/index_filter_commands.h"
 
 #include "mongo/db/json.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
@@ -181,35 +182,39 @@ namespace {
     TEST(IndexFilterCommandsTest, ClearFiltersInvalidParameter) {
         QuerySettings empty;
         PlanCache planCache;
+        OperationContextNoop txn;
+
         // If present, query has to be an object.
-        ASSERT_NOT_OK(ClearFilters::clear(&empty, &planCache, ns, fromjson("{query: 1234}")));
+        ASSERT_NOT_OK(ClearFilters::clear(&txn, &empty, &planCache, ns, fromjson("{query: 1234}")));
         // If present, sort must be an object.
-        ASSERT_NOT_OK(ClearFilters::clear(&empty, &planCache, ns,
+        ASSERT_NOT_OK(ClearFilters::clear(&txn, &empty, &planCache, ns,
                                         fromjson("{query: {a: 1}, sort: 1234}")));
         // If present, projection must be an object.
-        ASSERT_NOT_OK(ClearFilters::clear(&empty, &planCache, ns,
+        ASSERT_NOT_OK(ClearFilters::clear(&txn, &empty, &planCache, ns,
                                         fromjson("{query: {a: 1}, projection: 1234}")));
         // Query must pass canonicalization.
-        ASSERT_NOT_OK(ClearFilters::clear(&empty, &planCache, ns,
+        ASSERT_NOT_OK(ClearFilters::clear(&txn, &empty, &planCache, ns,
                                         fromjson("{query: {a: {$no_such_op: 1}}}")));
         // Sort present without query is an error.
-        ASSERT_NOT_OK(ClearFilters::clear(&empty, &planCache, ns, fromjson("{sort: {a: 1}}")));
+        ASSERT_NOT_OK(ClearFilters::clear(&txn, &empty, &planCache, ns, fromjson("{sort: {a: 1}}")));
         // Projection present without query is an error.
-        ASSERT_NOT_OK(ClearFilters::clear(&empty, &planCache, ns,
+        ASSERT_NOT_OK(ClearFilters::clear(&txn, &empty, &planCache, ns,
                                         fromjson("{projection: {_id: 0, a: 1}}")));
     }
 
     TEST(IndexFilterCommandsTest, ClearNonexistentHint) {
         QuerySettings querySettings;
         PlanCache planCache;
-        ASSERT_OK(SetFilter::set(&querySettings, &planCache, ns,
+        OperationContextNoop txn;
+
+        ASSERT_OK(SetFilter::set(&txn, &querySettings, &planCache, ns,
             fromjson("{query: {a: 1}, indexes: [{a: 1}]}")));
         vector<BSONObj> filters = getFilters(querySettings);
         ASSERT_EQUALS(filters.size(), 1U);
 
         // Clear nonexistent hint.
         // Command should succeed and cache should remain unchanged.
-        ASSERT_OK(ClearFilters::clear(&querySettings, &planCache, ns, fromjson("{query: {b: 1}}")));
+        ASSERT_OK(ClearFilters::clear(&txn, &querySettings, &planCache, ns, fromjson("{query: {b: 1}}")));
         filters = getFilters(querySettings);
         ASSERT_EQUALS(filters.size(), 1U);
     }
@@ -221,46 +226,49 @@ namespace {
     TEST(IndexFilterCommandsTest, SetFilterInvalidParameter) {
         QuerySettings empty;
         PlanCache planCache;
-        ASSERT_NOT_OK(SetFilter::set(&empty, &planCache, ns, fromjson("{}")));
+        OperationContextNoop txn;
+
+        ASSERT_NOT_OK(SetFilter::set(&txn, &empty, &planCache, ns, fromjson("{}")));
         // Missing required query field.
-        ASSERT_NOT_OK(SetFilter::set(&empty, &planCache, ns, fromjson("{indexes: [{a: 1}]}")));
+        ASSERT_NOT_OK(SetFilter::set(&txn, &empty, &planCache, ns, fromjson("{indexes: [{a: 1}]}")));
         // Missing required indexes field.
-        ASSERT_NOT_OK(SetFilter::set(&empty, &planCache, ns, fromjson("{query: {a: 1}}")));
+        ASSERT_NOT_OK(SetFilter::set(&txn, &empty, &planCache, ns, fromjson("{query: {a: 1}}")));
         // Query has to be an object.
-        ASSERT_NOT_OK(SetFilter::set(&empty, &planCache, ns,
+        ASSERT_NOT_OK(SetFilter::set(&txn, &empty, &planCache, ns,
             fromjson("{query: 1234, indexes: [{a: 1}, {b: 1}]}")));
         // Indexes field has to be an array.
-        ASSERT_NOT_OK(SetFilter::set(&empty, &planCache, ns,
+        ASSERT_NOT_OK(SetFilter::set(&txn, &empty, &planCache, ns,
                                    fromjson("{query: {a: 1}, indexes: 1234}")));
         // Array indexes field cannot empty.
-        ASSERT_NOT_OK(SetFilter::set(&empty, &planCache, ns,
+        ASSERT_NOT_OK(SetFilter::set(&txn, &empty, &planCache, ns,
                                    fromjson("{query: {a: 1}, indexes: []}")));
         // Elements in indexes have to be objects.
-        ASSERT_NOT_OK(SetFilter::set(&empty, &planCache, ns,
+        ASSERT_NOT_OK(SetFilter::set(&txn, &empty, &planCache, ns,
                                    fromjson("{query: {a: 1}, indexes: [{a: 1}, 99]}")));
         // Objects in indexes cannot be empty.
-        ASSERT_NOT_OK(SetFilter::set(&empty, &planCache, ns,
+        ASSERT_NOT_OK(SetFilter::set(&txn, &empty, &planCache, ns,
                                    fromjson("{query: {a: 1}, indexes: [{a: 1}, {}]}")));
         // If present, sort must be an object.
-        ASSERT_NOT_OK(SetFilter::set(&empty, &planCache, ns,
+        ASSERT_NOT_OK(SetFilter::set(&txn, &empty, &planCache, ns,
             fromjson("{query: {a: 1}, sort: 1234, indexes: [{a: 1}, {b: 1}]}")));
         // If present, projection must be an object.
-        ASSERT_NOT_OK(SetFilter::set(&empty, &planCache, ns,
+        ASSERT_NOT_OK(SetFilter::set(&txn, &empty, &planCache, ns,
             fromjson("{query: {a: 1}, projection: 1234, indexes: [{a: 1}, {b: 1}]}")));
         // Query must pass canonicalization.
-        ASSERT_NOT_OK(SetFilter::set(&empty, &planCache, ns,
+        ASSERT_NOT_OK(SetFilter::set(&txn, &empty, &planCache, ns,
             fromjson("{query: {a: {$no_such_op: 1}}, indexes: [{a: 1}, {b: 1}]}")));
     }
 
     TEST(IndexFilterCommandsTest, SetAndClearFilters) {
         QuerySettings querySettings;
         PlanCache planCache;
+        OperationContextNoop txn;
 
         // Inject query shape into plan cache.
         addQueryShapeToPlanCache(&planCache, "{a: 1, b: 1}", "{a: -1}", "{_id: 0, a: 1}");
         ASSERT_TRUE(planCacheContains(planCache, "{a: 1, b: 1}", "{a: -1}", "{_id: 0, a: 1}"));
 
-        ASSERT_OK(SetFilter::set(&querySettings, &planCache, ns,
+        ASSERT_OK(SetFilter::set(&txn, &querySettings, &planCache, ns,
             fromjson("{query: {a: 1, b: 1}, sort: {a: -1}, projection: {_id: 0, a: 1}, "
                      "indexes: [{a: 1}]}")));
         vector<BSONObj> filters = getFilters(querySettings);
@@ -276,20 +284,20 @@ namespace {
 
         // Replacing the hint for the same query shape ({a: 1, b: 1} and {b: 2, a: 3}
         // share same shape) should not change the query settings size.
-        ASSERT_OK(SetFilter::set(&querySettings, &planCache, ns,
+        ASSERT_OK(SetFilter::set(&txn, &querySettings, &planCache, ns,
             fromjson("{query: {b: 2, a: 3}, sort: {a: -1}, projection: {_id: 0, a: 1}, "
                      "indexes: [{a: 1, b: 1}]}")));
         filters = getFilters(querySettings);
         ASSERT_EQUALS(filters.size(), 1U);
 
         // Add hint for different query shape.
-        ASSERT_OK(SetFilter::set(&querySettings, &planCache, ns,
+        ASSERT_OK(SetFilter::set(&txn, &querySettings, &planCache, ns,
                                  fromjson("{query: {b: 1}, indexes: [{b: 1}]}")));
         filters = getFilters(querySettings);
         ASSERT_EQUALS(filters.size(), 2U);
 
         // Add hint for 3rd query shape. This is to prepare for ClearHint tests.
-        ASSERT_OK(SetFilter::set(&querySettings, &planCache, ns,
+        ASSERT_OK(SetFilter::set(&txn, &querySettings, &planCache, ns,
                                  fromjson("{query: {a: 1}, indexes: [{a: 1}]}")));
         filters = getFilters(querySettings);
         ASSERT_EQUALS(filters.size(), 3U);
@@ -299,7 +307,7 @@ namespace {
         addQueryShapeToPlanCache(&planCache, "{b: 1}", "{}", "{}");
 
         // Clear single hint.
-        ASSERT_OK(ClearFilters::clear(&querySettings, &planCache, ns,
+        ASSERT_OK(ClearFilters::clear(&txn, &querySettings, &planCache, ns,
                                     fromjson("{query: {a: 1}}")));
         filters = getFilters(querySettings);
         ASSERT_EQUALS(filters.size(), 2U);
@@ -309,7 +317,7 @@ namespace {
         ASSERT_TRUE(planCacheContains(planCache, "{b: 1}", "{}", "{}"));
 
         // Clear all filters
-        ASSERT_OK(ClearFilters::clear(&querySettings, &planCache, ns, fromjson("{}")));
+        ASSERT_OK(ClearFilters::clear(&txn, &querySettings, &planCache, ns, fromjson("{}")));
         filters = getFilters(querySettings);
         ASSERT_TRUE(filters.empty());
 

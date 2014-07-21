@@ -88,7 +88,7 @@ namespace mongo {
         if (!CanonicalQuery::isSimpleIdQuery(unparsedQuery) ||
             !collection->getIndexCatalog()->findIdIndex()) {
 
-            const WhereCallbackReal whereCallback(collection->ns().db());
+            const WhereCallbackReal whereCallback(txn, collection->ns().db());
             Status status = CanonicalQuery::canonicalize(
                         collection->ns(), unparsedQuery, outCanonicalQuery, whereCallback);
             if (!status.isOK())
@@ -516,7 +516,7 @@ namespace mongo {
                           Runner** out) {
         verify(collection);
 
-        const WhereCallbackReal whereCallback(collection->ns().db());
+        const WhereCallbackReal whereCallback(txn, collection->ns().db());
 
         CanonicalQuery* cq;
         uassertStatusOK(CanonicalQuery::canonicalize(collection->ns().ns(),
@@ -573,7 +573,7 @@ namespace mongo {
             }
         }
 
-        const WhereCallbackReal whereCallback(collection->ns().db());
+        const WhereCallbackReal whereCallback(txn, collection->ns().db());
 
         // If there are no suitable indices for the distinct hack bail out now into regular planning
         // with no projection.

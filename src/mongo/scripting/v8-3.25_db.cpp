@@ -748,10 +748,16 @@ namespace mongo {
         v8::Local<v8::Object> it = args.This();
         verify(scope->DBRefFT()->HasInstance(it));
 
-        argumentCheck(args.Length() == 2, "DBRef needs 2 arguments")
+        argumentCheck(args.Length() >= 2 && args.Length() <= 3, "DBRef needs 2 or 3 arguments")
         argumentCheck(args[0]->IsString(), "DBRef 1st parameter must be a string")
         it->ForceSet(scope->v8StringData("$ref"), args[0]);
         it->ForceSet(scope->v8StringData("$id"),  args[1]);
+
+        if (args.Length() == 3) {
+            argumentCheck(args[2]->IsString(), "DBRef 3rd parameter must be a string")
+            it->ForceSet(scope->v8StringData("$db"), args[2]);
+        }
+
         return it;
     }
 

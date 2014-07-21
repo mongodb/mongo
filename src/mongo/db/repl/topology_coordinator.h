@@ -49,6 +49,15 @@ namespace repl {
     class TagSubgroup;
 
     /**
+     * Actions taken based on heartbeat responses
+     */
+    enum HeartbeatResultAction {
+        StepDown,
+        StartElection,
+        None
+    };
+
+    /**
      * Replication Topology Coordinator interface.
      *
      * This object is responsible for managing the topology of the cluster.
@@ -137,12 +146,15 @@ namespace repl {
         virtual void signalDrainComplete() = 0;
 
         // produce a reply to a RAFT-style RequestVote RPC
-        virtual bool prepareRequestVoteResponse(const BSONObj& cmdObj, 
+        virtual void prepareRequestVoteResponse(const Date_t now,
+                                                const BSONObj& cmdObj,
                                                 std::string& errmsg, 
                                                 BSONObjBuilder& result) = 0; 
 
         // produce a reply to a received electCmd
-        virtual void prepareElectCmdResponse(const BSONObj& cmdObj, BSONObjBuilder& result) = 0;
+        virtual void prepareElectCmdResponse(const Date_t now,
+                                             const BSONObj& cmdObj,
+                                             BSONObjBuilder& result) = 0;
 
         // produce a reply to a heartbeat
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
@@ -152,10 +164,26 @@ namespace repl {
                                               Status* result) = 0;
 
         // update internal state with heartbeat response
-        virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo) = 0;
+        virtual HeartbeatResultAction updateHeartbeatInfo(Date_t now,
+                                                          const HeartbeatInfo& newInfo) = 0;
+
+        // produce a reply to a status request
+        virtual void prepareStatusResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result,
+                                           unsigned uptime) = 0;
+
+        // produce a reply to a freeze request
+        virtual void prepareFreezeResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result) = 0;
 
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn) = 0;
+
+        // called with new config; notifies all on change
+        virtual void updateConfig(const ReplicaSetConfig newConfig, const int selfId) = 0;
+
     protected:
         TopologyCoordinator() {}
     };

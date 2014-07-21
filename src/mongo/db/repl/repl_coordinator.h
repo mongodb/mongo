@@ -244,6 +244,18 @@ namespace repl {
         virtual OID getElectionId() = 0;
 
         /**
+         * Returns the RID for this node.  The RID is used to identify this node to our sync source
+         * when sending updates about our replication progress.
+         */
+        virtual OID getMyRID() = 0;
+
+        /**
+         * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
+         * be sent to this node's sync source to update it about our progress in replication.
+         */
+        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
+
+        /**
          * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.
          */
         virtual void processReplSetGetStatus(BSONObjBuilder* result) = 0;

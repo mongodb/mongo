@@ -67,9 +67,11 @@ namespace {
     /**
      * Retrieves a collection's query settings and plan cache from the database.
      */
-    Status getQuerySettingsAndPlanCache(OperationContext* txn, Database* db, const string& ns,
-                                        QuerySettings** querySettingsOut,
-                                        PlanCache** planCacheOut) {
+    static Status getQuerySettingsAndPlanCache(OperationContext* txn,
+                                               Database* db,
+                                               const string& ns,
+                                               QuerySettings** querySettingsOut,
+                                               PlanCache** planCacheOut) {
         invariant(db);
 
         Collection* collection = db->getCollection(txn, ns);
@@ -238,12 +240,15 @@ namespace mongo {
             // No collection - do nothing.
             return Status::OK();
         }
-        return clear(querySettings, planCache, ns, cmdObj);
+        return clear(txn, querySettings, planCache, ns, cmdObj);
     }
 
     // static
-    Status ClearFilters::clear(QuerySettings* querySettings, PlanCache* planCache,
-                             const std::string& ns, const BSONObj& cmdObj) {
+    Status ClearFilters::clear(OperationContext* txn,
+                               QuerySettings* querySettings,
+                               PlanCache* planCache,
+                               const std::string& ns,
+                               const BSONObj& cmdObj) {
         invariant(querySettings);
 
         // According to the specification, the planCacheClearFilters command runs in two modes:
@@ -252,7 +257,7 @@ namespace mongo {
         //   command arguments.
         if (cmdObj.hasField("query")) {
             CanonicalQuery* cqRaw;
-            Status status = PlanCacheCommand::canonicalize(ns, cmdObj, &cqRaw);
+            Status status = PlanCacheCommand::canonicalize(txn, ns, cmdObj, &cqRaw);
             if (!status.isOK()) {
                 return status;
             }
@@ -281,7 +286,7 @@ namespace mongo {
         querySettings->clearAllowedIndices();
 
         const NamespaceString nss(ns);
-        const WhereCallbackReal whereCallback(nss.db());
+        const WhereCallbackReal whereCallback(txn, nss.db());
 
         // Remove corresponding entries from plan cache.
         // Admin hints affect the planning process directly. If there were
@@ -328,12 +333,15 @@ namespace mongo {
         if (!status.isOK()) {
             return status;
         }
-        return set(querySettings, planCache, ns, cmdObj);
+        return set(txn, querySettings, planCache, ns, cmdObj);
     }
 
     // static
-    Status SetFilter::set(QuerySettings* querySettings, PlanCache* planCache,
-                        const string& ns, const BSONObj& cmdObj) {
+    Status SetFilter::set(OperationContext* txn,
+                          QuerySettings* querySettings,
+                          PlanCache* planCache,
+                          const string& ns,
+                          const BSONObj& cmdObj) {
         // indexes - required
         BSONElement indexesElt = cmdObj.getField("indexes");
         if (indexesElt.eoo()) {
@@ -362,7 +370,7 @@ namespace mongo {
         }
 
         CanonicalQuery* cqRaw;
-        Status status = PlanCacheCommand::canonicalize(ns, cmdObj, &cqRaw);
+        Status status = PlanCacheCommand::canonicalize(txn, ns, cmdObj, &cqRaw);
         if (!status.isOK()) {
             return status;
         }

@@ -48,11 +48,11 @@ namespace repl {
     // Create a new capped collection for the oplog if it doesn't yet exist.
     // This will be either local.oplog.rs (replica sets) or local.oplog.$main (master/slave)
     // If the collection already exists, set the 'last' OpTime if master/slave (side effect!)
-    void createOplog();
+    void createOplog(OperationContext* txn);
 
     // This poorly-named function writes an op into the replica-set oplog;
     // used internally by replication secondaries after they have applied an op
-    void _logOpObjRS(const BSONObj& op);
+    void _logOpObjRS(OperationContext* txn, const BSONObj& op);
 
     const char rsoplog[] = "local.oplog.rs";
 

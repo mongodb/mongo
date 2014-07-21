@@ -56,7 +56,6 @@
 
 using namespace std;
 using namespace mongo;
-using namespace bson;
 
 int dummy;
 unsigned recSizeKB;

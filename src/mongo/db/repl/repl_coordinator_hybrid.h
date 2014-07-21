@@ -30,23 +30,27 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/repl/repl_coordinator.h"
+#include "mongo/db/repl/repl_coordinator_impl.h"
+#include "mongo/db/repl/repl_coordinator_legacy.h"
 
 namespace mongo {
 namespace repl {
 
     /**
-     * An implementation of ReplicationCoordinator that simply delegates to existing code.
+     * An implementation of ReplicationCoordinator that will evolve with ReplicationCoordinatorImpl
+     * to aid in the transition from LegacyReplicationCoordinator to ReplicationCoordinatorImpl and
+     * to verify the correctness of ReplicationCoordinatorImpl.
      */
-    class LegacyReplicationCoordinator : public ReplicationCoordinator {
-        MONGO_DISALLOW_COPYING(LegacyReplicationCoordinator);
+    class HybridReplicationCoordinator : public ReplicationCoordinator {
+        MONGO_DISALLOW_COPYING(HybridReplicationCoordinator);
 
     public:
 
-        LegacyReplicationCoordinator(const ReplSettings& settings);
-        virtual ~LegacyReplicationCoordinator();
+        HybridReplicationCoordinator(const ReplSettings& settings);
+        virtual ~HybridReplicationCoordinator();
 
-        virtual void startReplication(TopologyCoordinator*,
-                                      ReplicationExecutor::NetworkInterface*);
+        virtual void startReplication(TopologyCoordinator* topCoord,
+                                      ReplicationExecutor::NetworkInterface* network);
 
         virtual void shutdown();
 
@@ -140,29 +144,8 @@ namespace repl {
         virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
 
     private:
-        Status _stepDownHelper(bool force,
-                               const Milliseconds& initialWaitTime,
-                               const Milliseconds& stepdownTime,
-                               const Milliseconds& postStepdownWaitTime);
-
-        Status _checkReplEnabledForCommand(BSONObjBuilder* result);
-
-        // Mutex that protects the _ridConfigMap and the _slaveOpTimeMap;
-        boost::mutex _mutex;
-
-        // Map from RID to member config object
-        std::map<OID, BSONObj> _ridConfigMap;
-
-        // Maps nodes in this replication group to the last oplog operation they have committed
-        // TODO(spencer): change to unordered_map
-        typedef std::map<OID, OpTime> SlaveOpTimeMap;
-        SlaveOpTimeMap _slaveOpTimeMap;
-
-        // Rollback id. used to check if a rollback happened during some interval of time
-        // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.
-        int _rbid;
-
-        ReplSettings _settings;
+        LegacyReplicationCoordinator _legacy;
+        ReplicationCoordinatorImpl _impl;
     };
 
 } // namespace repl

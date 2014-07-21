@@ -162,16 +162,17 @@ namespace mongo {
 #ifdef _WIN32
         boost::filesystem::path currentPath = boost::filesystem::current_path();
 
-        std::string defaultPath = currentPath.root_name().string() + "\\data\\db\\";
+        std::string defaultPath = currentPath.root_name().string()
+                                  + storageGlobalParams.kDefaultDbPath;
         general_options.addOptionChaining("storage.dbPath", "dbpath", moe::String,
-                "directory for datafiles - defaults to \\data\\db\\ which is " + defaultPath + 
-                " based on the current working drive")
-                                         .setDefault(moe::Value(defaultPath));
+                std::string("directory for datafiles - defaults to ")
+                + storageGlobalParams.kDefaultDbPath
+                + " which is " + defaultPath + " based on the current working drive");
 
 #else
         general_options.addOptionChaining("storage.dbPath", "dbpath", moe::String,
-                "directory for datafiles - defaults to /data/db/")
-                                         .setDefault(moe::Value(std::string("/data/db")));
+                std::string("directory for datafiles - defaults to ")
+                + storageGlobalParams.kDefaultDbPath);
 
 #endif
         general_options.addOptionChaining("storage.directoryPerDB", "directoryperdb", moe::Switch,
@@ -1113,8 +1114,9 @@ namespace mongo {
                 storageGlobalParams.dur = true;
             }
 
-            if (!params.count("storage.dbPath"))
-                storageGlobalParams.dbpath = "/data/configdb";
+            if (!params.count("storage.dbPath")) {
+                storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
+            }
             replSettings.master = true;
             if (!params.count("replication.oplogSizeMB"))
                 replSettings.oplogSize = 5 * 1024 * 1024;
@@ -1163,6 +1165,16 @@ namespace mongo {
                       << "Please use --journal if you want durability." << endl;
             log() << endl;
         }
+
+#ifdef _WIN32
+        // If dbPath is a default value, prepend with drive name so log entries are explicit
+        if (storageGlobalParams.dbpath == storageGlobalParams.kDefaultDbPath
+            || storageGlobalParams.dbpath == storageGlobalParams.kDefaultConfigDbPath) {
+            boost::filesystem::path currentPath = boost::filesystem::current_path();
+            storageGlobalParams.dbpath = currentPath.root_name().string()
+                                         + storageGlobalParams.dbpath;
+        }
+#endif
 
         setGlobalReplSettings(replSettings);
         return Status::OK();

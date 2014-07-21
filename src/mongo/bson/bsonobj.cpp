@@ -38,6 +38,52 @@ namespace mongo {
     using namespace std;
     /* BSONObj ------------------------------------------------------------*/
 
+        // deep (full) equality
+    bool BSONObj::equal(const BSONObj &rhs) const {
+        BSONObjIterator i(*this);
+        BSONObjIterator j(rhs);
+        BSONElement l,r;
+        do {
+            // so far, equal...
+            l = i.next();
+            r = j.next();
+            if ( l.eoo() )
+                return r.eoo();
+        } while( l == r );
+        return false;
+    }
+
+    void BSONObj::_assertInvalid() const {
+        StringBuilder ss;
+        int os = objsize();
+        ss << "BSONObj size: " << os << " (0x" << integerToHex( os ) << ") is invalid. "
+           << "Size must be between 0 and " << BSONObjMaxInternalSize
+           << "(" << ( BSONObjMaxInternalSize/(1024*1024) ) << "MB)";
+        try {
+            BSONElement e = firstElement();
+            ss << " First element: " << e.toString();
+        }
+        catch ( ... ) { }
+        massert( 10334 , ss.str() , 0 );
+    }
+
+    BSONObj BSONObj::copy() const {
+        Holder *h = (Holder*) malloc(objsize() + sizeof(unsigned));
+        h->zero();
+        memcpy(h->data, objdata(), objsize());
+        return BSONObj(h);
+    }
+
+    BSONObj BSONObj::getOwned() const {
+        if ( isOwned() )
+            return *this;
+        return copy();
+    }
+
+    BSONObjIterator BSONObj::begin() const {
+        return BSONObjIterator(*this);
+    }
+
     string BSONObj::md5() const {
         md5digest d;
         md5_state_t st;
@@ -588,5 +634,235 @@ namespace mongo {
             p++;
         }
     }
+
+    void BSONObj::getFields(unsigned n, const char **fieldNames, BSONElement *fields) const { 
+        BSONObjIterator i(*this);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            const char *p = e.fieldName();
+            for( unsigned i = 0; i < n; i++ ) {
+                if( strcmp(p, fieldNames[i]) == 0 ) {
+                    fields[i] = e;
+                    break;
+                }
+            }
+        }
+    }
+
+    BSONElement BSONObj::getField(const StringData& name) const {
+        BSONObjIterator i(*this);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            if ( name == e.fieldName() )
+                return e;
+        }
+        return BSONElement();
+    }
+
+    int BSONObj::getIntField(const StringData& name) const {
+        BSONElement e = getField(name);
+        return e.isNumber() ? (int) e.number() : std::numeric_limits< int >::min();
+    }
+
+    bool BSONObj::getBoolField(const StringData& name) const {
+        BSONElement e = getField(name);
+        return e.type() == Bool ? e.boolean() : false;
+    }
+
+    const char * BSONObj::getStringField(const StringData& name) const {
+        BSONElement e = getField(name);
+        return e.type() == String ? e.valuestr() : "";
+    }
+
+    bool BSONObj::isValid() const {
+        int x = objsize();
+        return x > 0 && x <= BSONObjMaxInternalSize;
+    }
+
+    bool BSONObj::getObjectID(BSONElement& e) const {
+        BSONElement f = getField("_id");
+        if( !f.eoo() ) {
+            e = f;
+            return true;
+        }
+        return false;
+    }
+
+    BSONObj BSONObj::removeField(const StringData& name) const {
+        BSONObjBuilder b;
+        BSONObjIterator i(*this);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            const char *fname = e.fieldName();
+            if ( name != fname )
+                b.append(e);
+        }
+        return b.obj();
+    }
+
+    std::string BSONObj::hexDump() const {
+        std::stringstream ss;
+        const char *d = objdata();
+        int size = objsize();
+        for( int i = 0; i < size; ++i ) {
+            ss.width( 2 );
+            ss.fill( '0' );
+            ss << std::hex << (unsigned)(unsigned char)( d[ i ] ) << std::dec;
+            if ( ( d[ i ] >= '0' && d[ i ] <= '9' ) || ( d[ i ] >= 'A' && d[ i ] <= 'z' ) )
+                ss << '\'' << d[ i ] << '\'';
+            if ( i != size - 1 )
+                ss << ' ';
+        }
+        return ss.str();
+    }
+
+
+    void BSONObj::elems(std::vector<BSONElement> &v) const {
+        BSONObjIterator i(*this);
+        while( i.more() )
+            v.push_back(i.next());
+    }
+
+    void BSONObj::elems(std::list<BSONElement> &v) const {
+        BSONObjIterator i(*this);
+        while( i.more() )
+            v.push_back(i.next());
+    }
+
+    /* return has eoo() true if no match
+       supports "." notation to reach into embedded objects
+    */
+    BSONElement BSONObj::getFieldDotted(const StringData& name) const {
+        BSONElement e = getField(name);
+        if (e.eoo()) {
+            size_t dot_offset = name.find('.');
+            if (dot_offset != std::string::npos) {
+                StringData left = name.substr(0, dot_offset);
+                StringData right = name.substr(dot_offset + 1);
+                BSONObj sub = getObjectField(left);
+                return sub.isEmpty() ? BSONElement() : sub.getFieldDotted(right);
+            }
+        }
+
+        return e;
+    }
+
+    BSONObj BSONObj::getObjectField(const StringData& name) const {
+        BSONElement e = getField(name);
+        BSONType t = e.type();
+        return t == Object || t == Array ? e.embeddedObject() : BSONObj();
+    }
+
+    int BSONObj::nFields() const {
+        int n = 0;
+        BSONObjIterator i(*this);
+        while ( i.moreWithEOO() ) {
+            BSONElement e = i.next();
+            if ( e.eoo() )
+                break;
+            n++;
+        }
+        return n;
+    }
+
+    BSONObj::BSONObj() {
+        /* little endian ordering here, but perhaps that is ok regardless as BSON is spec'd
+           to be little endian external to the system. (i.e. the rest of the implementation of bson,
+           not this part, fails to support big endian)
+        */
+        static char p[] = { /*size*/5, 0, 0, 0, /*eoo*/0 };
+        _objdata = p;
+    }
+
+    std::string BSONObj::toString( bool isArray, bool full ) const {
+        if ( isEmpty() ) return (isArray ? "[]" : "{}");
+        StringBuilder s;
+        toString(s, isArray, full);
+        return s.str();
+    }
+    void BSONObj::toString( StringBuilder& s,  bool isArray, bool full, int depth ) const {
+        if ( isEmpty() ) {
+            s << (isArray ? "[]" : "{}");
+            return;
+        }
+
+        s << ( isArray ? "[ " : "{ " );
+        BSONObjIterator i(*this);
+        bool first = true;
+        while ( 1 ) {
+            massert( 10327 ,  "Object does not end with EOO", i.moreWithEOO() );
+            BSONElement e = i.next( true );
+            massert( 10328 ,  "Invalid element size", e.size() > 0 );
+            massert( 10329 ,  "Element too large", e.size() < ( 1 << 30 ) );
+            int offset = (int) (e.rawdata() - this->objdata());
+            massert( 10330 ,  "Element extends past end of object",
+                     e.size() + offset <= this->objsize() );
+            bool end = ( e.size() + offset == this->objsize() );
+            if ( e.eoo() ) {
+                massert( 10331 ,  "EOO Before end of object", end );
+                break;
+            }
+            if ( first )
+                first = false;
+            else
+                s << ", ";
+            e.toString( s, !isArray, full, depth );
+        }
+        s << ( isArray ? " ]" : " }" );
+    }
+
+    std::ostream& operator<<( std::ostream &s, const BSONObj &o ) {
+        return s << o.toString();
+    }
+    
+    StringBuilder& operator<<( StringBuilder &s, const BSONObj &o ) {
+        o.toString( s );
+        return s;
+    }
+
+    template <class T>
+    void BSONObj::Vals(std::vector<T>& v) const {
+        BSONObjIterator i(*this);
+        while( i.more() ) {
+            T t;
+            i.next().Val(t);
+            v.push_back(t);
+        }
+    }
+    template <class T>
+    void BSONObj::Vals(std::list<T>& v) const {
+        BSONObjIterator i(*this);
+        while( i.more() ) {
+            T t;
+            i.next().Val(t);
+            v.push_back(t);
+        }
+    }
+
+    template <class T>
+    void BSONObj::vals(std::vector<T>& v) const {
+        BSONObjIterator i(*this);
+        while( i.more() ) {
+            try {
+                T t;
+                i.next().Val(t);
+                v.push_back(t);
+            }
+            catch(...) { }
+        }
+    }
+    template <class T>
+    void BSONObj::vals(std::list<T>& v) const {
+        BSONObjIterator i(*this);
+        while( i.more() ) {
+            try {
+                T t;
+                i.next().Val(t);
+                v.push_back(t);
+            }
+            catch(...) { }
+        }
+    }
+
 
 } // namespace mongo

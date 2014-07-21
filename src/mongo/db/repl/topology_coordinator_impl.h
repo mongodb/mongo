@@ -72,12 +72,15 @@ namespace repl {
         virtual void signalDrainComplete();
 
         // produce a reply to a RAFT-style RequestVote RPC; this is MongoDB ReplSetFresh command
-        virtual bool prepareRequestVoteResponse(const BSONObj& cmdObj, 
+        virtual void prepareRequestVoteResponse(const Date_t now,
+                                                const BSONObj& cmdObj,
                                                 std::string& errmsg, 
                                                 BSONObjBuilder& result);
 
         // produce a reply to a received electCmd
-        virtual void prepareElectCmdResponse(const BSONObj& cmdObj, BSONObjBuilder& result);
+        virtual void prepareElectCmdResponse(const Date_t now,
+                                             const BSONObj& cmdObj,
+                                             BSONObjBuilder& result);
 
         // produce a reply to a heartbeat
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
@@ -87,12 +90,31 @@ namespace repl {
                                               Status* result);
 
         // update internal state with heartbeat response
-        virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
+        HeartbeatResultAction updateHeartbeatInfo(Date_t now,
+                                              const HeartbeatInfo& newInfo);
+
+        // produce a reply to a status request
+        virtual void prepareStatusResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result,
+                                           unsigned uptime);
+
+        // produce a reply to a freeze request
+        virtual void prepareFreezeResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result);
 
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn);
 
+        // called with new config; notifies all on change
+        void updateConfig(const ReplicaSetConfig newConfig, const int selfId);
+
     private:
+
+        // Determines if we will veto the member in the "fresh" command response
+        // If we veto, the errmsg will be filled in with a reason
+        bool _shouldVeto(const BSONObj& cmdObj, string& errmsg) const;
 
         // Logic to determine if we should step down as primary
         bool _shouldRelinquish() const;
@@ -171,6 +193,9 @@ namespace repl {
         // Block syncing -- in case we fail auth when heartbeating other nodes
         bool _blockSync;
 
+        // The number of calls we have had to enter maintenance mode
+        int _maintenanceModeCalls;
+
 
         // Functions to call when a reconfig is finished.  We pass the new config object.
         std::vector<ConfigChangeCallbackFn> _configChangeCallbacks;
@@ -206,6 +231,13 @@ namespace repl {
                         heartbeatConnRetries==r.heartbeatConnRetries);
             }
         } _heartbeatOptions;
+
+        // Last vote info from the election
+        struct LastVote {
+            LastVote() : when(0), who(0xffffffff) { }
+            Date_t when;
+            unsigned who;
+        } _lastVote;
 
 
     };

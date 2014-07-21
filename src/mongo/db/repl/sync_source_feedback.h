@@ -36,6 +36,9 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    class OperationContext;
+
 namespace repl {
 
     class Member;
@@ -53,19 +56,20 @@ namespace repl {
         void associateMember(const OID& rid, Member* member);
 
         /// Ensures local.me is populated and populates it if not.
-        void ensureMe();
+        void ensureMe(OperationContext* txn);
 
-        /// Passes handshake up the replication chain, upon receiving a handshake.
+        /// Notifies the SyncSourceFeedbackThread to wake up and send a handshake up the replication
+        /// chain, upon receiving a handshake.
         void forwardSlaveHandshake();
 
-        void updateSelfInMap(const OpTime& ot) {
-            updateMap(_me["_id"].OID(), ot);
-        }
-
-        /// Updates the _slaveMap to be forwarded to the sync target.
-        void updateMap(const mongo::OID& rid, const OpTime& ot);
+        /// Notifies the SyncSourceFeedbackThread to wake up and send an update upstream of slave
+        /// replication progress.
+        void forwardSlaveProgress();
 
         std::string name() const { return "SyncSourceFeedbackThread"; }
+
+        /// Returns the RID for this process.  ensureMe() must have been called before this can be.
+        OID getMyRID() const { return _me["_id"].OID(); }
 
         /// Loops forever, passing updates when they are present.
         void run();
@@ -110,8 +114,6 @@ namespace repl {
         boost::scoped_ptr<DBClientConnection> _connection;
         // protects cond and maps and the indicator bools
         boost::mutex _mtx;
-        // contains the most recent optime of each member syncing to us
-        std::map<mongo::OID, OpTime> _slaveMap;
         typedef std::map<mongo::OID, Member*> OIDMemberMap;
         // contains a pointer to each member, which we can look up by oid
         OIDMemberMap _members;

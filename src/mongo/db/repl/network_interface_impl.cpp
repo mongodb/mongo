@@ -45,12 +45,38 @@ namespace repl {
         return curTimeMillis64();
     }
 
+    namespace {
+        // Duplicated in mock impl
+        StatusWith<int> getTimeoutMillis(Date_t expDate) {
+            // check for timeout
+            int timeout = 0;
+            if (expDate != ReplicationExecutor::kNoExpirationDate) {
+                Date_t nowDate = curTimeMillis64();
+                timeout = expDate >= nowDate ? expDate - nowDate :
+                                               ReplicationExecutor::kNoTimeout.total_milliseconds();
+                if (timeout < 0 ) {
+                    return StatusWith<int>(ErrorCodes::ExceededTimeLimit,
+                                               str::stream() << "Went to run command,"
+                                               " but it was too late. Expiration was set to "
+                                                             << expDate);
+                }
+            }
+            return StatusWith<int>(timeout);
+        }
+    } //namespace
+
     StatusWith<BSONObj> NetworkInterfaceImpl::runCommand(
             const ReplicationExecutor::RemoteCommandRequest& request) {
 
         try {
             BSONObj output;
-            ScopedDbConnection conn(request.target.toString());
+
+            StatusWith<int> timeoutStatus = getTimeoutMillis(request.expirationDate);
+            if (!timeoutStatus.isOK())
+                return StatusWith<BSONObj>(timeoutStatus.getStatus());
+
+            int timeout = timeoutStatus.getValue();
+            ScopedDbConnection conn(request.target.toString(), timeout);
             conn->runCommand(request.dbname, request.cmdObj, output);
             conn.done();
             return StatusWith<BSONObj>(output);

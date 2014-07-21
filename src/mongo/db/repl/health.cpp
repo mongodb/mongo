@@ -53,7 +53,6 @@ namespace repl {
     mutex ScopedConn::mapMutex("ScopedConn::mapMutex");
 
     using namespace html;
-    using namespace bson;
 
     static RamLog * _rsLog = RamLog::get("rs");
     Tee* rsLog = _rsLog;

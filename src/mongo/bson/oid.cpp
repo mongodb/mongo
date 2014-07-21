@@ -50,6 +50,12 @@ namespace mongo {
         boost::hash_combine(seed, z);
     }
 
+    size_t OID::Hasher::operator() (const OID& oid) const {
+        size_t seed = 0;
+        oid.hash_combine(seed);
+        return seed;
+    }
+
     // machine # before folding in the process id
     OID::MachineAndPid OID::ourMachine;
 

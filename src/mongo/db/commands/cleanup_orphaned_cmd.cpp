@@ -263,7 +263,7 @@ namespace mongo {
             }
 
             ChunkVersion shardVersion;
-            status = shardingState.refreshMetadataNow( ns, &shardVersion );
+            status = shardingState.refreshMetadataNow(txn, ns, &shardVersion);
             if ( !status.isOK() ) {
                 if ( status.code() == ErrorCodes::RemoteChangeDetected ) {
                     warning() << "Shard version in transition detected while refreshing "
