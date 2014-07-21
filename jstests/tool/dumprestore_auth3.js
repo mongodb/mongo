@@ -36,6 +36,7 @@ function runTest(shutdownServer) {
     admindb.createUser({user: 'root', pwd: 'pass', roles: ['root']});
     admindb.createUser({user: 'backup', pwd: 'pass', roles: ['backup']});
     admindb.createUser({user: 'restore', pwd: 'pass', roles: ['restore']});
+    admindb.createRole({role: "dummyRole", roles: [], privileges:[]});
     db.createUser({user: 'user', pwd: 'pass', roles: jsTest.basicUserRoles});
     db.createRole({role: 'role', roles: [], privileges:[]});
     var backupActions = ['find'];
@@ -46,6 +47,8 @@ function runTest(shutdownServer) {
 
     var userCount = db.getUsers().length;
     var rolesCount = db.getRoles().length;
+    var adminUsersCount = admindb.getUsers().length;
+    var adminRolesCount = admindb.getRoles().length;
     var systemUsersCount = admindb.system.users.count();
     var systemVersionCount = admindb.system.version.count();
 
@@ -54,7 +57,9 @@ function runTest(shutdownServer) {
     assert.eq(1, db.bar.findOne().a);
     assert.eq(userCount, db.getUsers().length, "setup");
     assert.eq(rolesCount, db.getRoles().length, "setup2");
-    assert.eq(systemUsersCount, admindb.system.users.count(), "setup3");
+    assert.eq(adminUsersCount, admindb.getUsers().length, "setup3");
+    assert.eq(adminRolesCount, admindb.getRoles().length, "setup4");
+    assert.eq(systemUsersCount, admindb.system.users.count(), "setup5");
     assert.eq(systemVersionCount, admindb.system.version.count(),"system version");
     assert.eq(1, admindb.system.users.count({user: "restore"}), "Restore user is missing");
     assert.eq(1, admindb.system.users.count({user: "backup"}), "Backup user is missing");
@@ -84,10 +89,12 @@ function runTest(shutdownServer) {
     // Re-create user data
     db.createUser({user: 'user', pwd: 'password', roles: jsTest.basicUserRoles});
     db.createRole({role: 'role', roles: [], privileges:[]});
+    userCount = 1;
+    rolesCount = 1;
 
     assert.eq(1, db.bar.findOne().a);
-    assert.eq(1, db.getUsers().length, "didn't create user");
-    assert.eq(1, db.getRoles().length, "didn't create role");
+    assert.eq(userCount, db.getUsers().length, "didn't create user");
+    assert.eq(rolesCount, db.getRoles().length, "didn't create role");
 
     jsTestLog("Dump foo database *with* user data "+shutMessage);
     mongod = runTool("mongodump", mongod, shutdownServer, {out: dumpDir,
@@ -121,8 +128,8 @@ function runTest(shutdownServer) {
 
     assert.soon(function() { return db.bar.findOne(); }, "no data after restore");
     assert.eq(1, db.bar.findOne().a);
-    assert.eq(1, db.getUsers().length, "didn't restore users");
-    assert.eq(1, db.getRoles().length, "didn't restore roles");
+    assert.eq(userCount, db.getUsers().length, "didn't restore users");
+    assert.eq(rolesCount, db.getRoles().length, "didn't restore roles");
     assert.eq(1, admindb.system.users.count({user: "restore", db: "admin"}), "Restore user is missing");
     assert.docEq(versionDoc,
                  db.getSiblingDB('admin').system.version.findOne(),
@@ -144,13 +151,13 @@ function runTest(shutdownServer) {
     admindb = mongod.getDB('admin');
 
     assert.soon(function() { return db.bar.findOne(); }, "no data after restore");
-    // Admin users not restored: SERVER-14212
-    //assert.eq(1, admindb.system.users.count({user: "restore"}), "Restore user is missing");
+    assert.eq(adminUsersCount, admindb.getUsers().length, "Admin users were dropped");
+    assert.eq(adminRolesCount, admindb.getRoles().length, "Admin roles were dropped");
     assert.eq(1, db.bar.findOne().a);
-    assert.eq(1, db.getUsers().length, "didn't restore users");
-    assert.eq("user", db.getUsers()[0].user, "didn't update user");
-    assert.eq(1, db.getRoles().length, "didn't restore roles");
-    assert.eq("role", db.getRoles()[0].role, "didn't update role");
+    assert.eq(userCount, db.getUsers().length, "didn't restore users");
+    assert.eq("user", db.getUser('user').user, "didn't update user");
+    assert.eq(rolesCount, db.getRoles().length, "didn't restore roles");
+    assert.eq("role", db.getRole('role').role, "didn't update role");
     assert.docEq(versionDoc,
                  db.getSiblingDB('admin').system.version.findOne(),
                  "version doc was changed by restore");
@@ -160,6 +167,7 @@ function runTest(shutdownServer) {
     // Make a user in another database to make sure it is properly captured
     db.getSiblingDB('bar').createUser({user: "user", pwd: 'pwd', roles: []});
     db.getSiblingDB('admin').createUser({user: "user", pwd: 'pwd', roles: []});
+    adminUsersCount += 1;
     mongod = runTool("mongodump", mongod, shutdownServer, {out: dumpDir, db: "admin"});
     db = mongod.getDB('foo');
 
@@ -178,20 +186,19 @@ function runTest(shutdownServer) {
 
     assert.soon(function() { return db.bar.findOne(); }, "no data after restore");
     assert.eq(1, db.bar.findOne().a);
-    assert.eq(1, db.getUsers().length, "didn't restore users");
-    assert.eq("user", db.getUsers()[0].user, "didn't restore user");
-    assert.eq(1, db.getRoles().length, "didn't restore roles");
-    assert.eq("role", db.getRoles()[0].role, "didn't restore role");
-    assert.eq(1, db.getUsers().length, "didn't restore users for bar database");
-    assert.eq("user", db.getUsers()[0].user, "didn't restore user for bar database");
-    assert.eq(1, admindb.getUsers().length, "didn't restore users for admin database");
-    assert.eq("user", admindb.getUsers()[0].user, "didn't restore user for admin database");
-    assert.eq(3, admindb.system.users.count(), "has the wrong # of users for the whole server");
-    assert.eq(1, admindb.system.roles.count(), "has the wrong # of roles for the whole server");
+    assert.eq(userCount, db.getUsers().length, "didn't restore users");
+    assert.eq("user", db.getUser('user').user, "didn't restore user");
+    assert.eq(rolesCount, db.getRoles().length, "didn't restore roles");
+    assert.eq("role", db.getRole('role').role, "didn't restore role");
+    assert.eq(1, otherdb.getUsers().length, "didn't restore users for bar database");
+    assert.eq("user", otherdb.getUsers()[0].user, "didn't restore user for bar database");
+    assert.eq(adminUsersCount, admindb.getUsers().length, "didn't restore users for admin database");
+    assert.eq("user", admindb.getUser("user").user, "didn't restore user for admin database");
+    assert.eq(6, admindb.system.users.count(), "has the wrong # of users for the whole server");
+    assert.eq(2, admindb.system.roles.count(), "has the wrong # of roles for the whole server");
     assert.docEq(versionDoc,
                  db.getSiblingDB('admin').system.version.findOne(),
                  "version doc was changed by restore");
-
 
     jsTestLog("Dump all databases "+shutMessage);
     mongod = runTool("mongodump", mongod, shutdownServer, {out: dumpDir});

@@ -92,7 +92,7 @@ namespace mongo {
          *
          * Returns the number of documents deleted.
          */
-        long long execute(OperationContext* txn, Database* db);
+        long long execute(Database* db);
 
     private:
         /// Unowned pointer to the request object that this executor will process.

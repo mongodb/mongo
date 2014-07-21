@@ -62,10 +62,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    UpdateResult UpdateExecutor::execute(OperationContext* txn, Database* db) {
+    UpdateResult UpdateExecutor::execute(Database* db) {
         uassertStatusOK(prepare());
-        return update(txn,
-                      db,
+        return update(db,
                       *_request,
                       _opDebug,
                       &_driver,
@@ -85,7 +84,8 @@ namespace mongo {
         }
 
         CanonicalQuery* cqRaw;
-        const WhereCallbackReal whereCallback(_request->getNamespaceString().db());
+        const WhereCallbackReal whereCallback(
+                                    _request->getOpCtx(), _request->getNamespaceString().db());
 
         Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
                                                      _request->getQuery(),

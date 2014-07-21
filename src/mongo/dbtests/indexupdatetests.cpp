@@ -469,19 +469,18 @@ namespace IndexUpdateTests {
     class HelpersEnsureIndexInterruptDisallowed : public IndexBuildBase {
     public:
         void run() {
-            OperationContextImpl txn;
-            WriteUnitOfWork wunit (txn.recoveryUnit());
+            WriteUnitOfWork wunit (_txn.recoveryUnit());
             // Insert some documents.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
                 _client.insert( _ns, BSON( "a" << i ) );
             }
             // Initialize curop.
-            txn.getCurOp()->reset();
+            _txn.getCurOp()->reset();
             // Request an interrupt.
             getGlobalEnvironment()->setKillAllOperations();
             // The call is not interrupted.
-            Helpers::ensureIndex( &txn, collection(), BSON( "a" << 1 ), false, "a_1" );
+            Helpers::ensureIndex( &_txn, collection(), BSON( "a" << 1 ), false, "a_1" );
             // only want to interrupt the index build
             wunit.commit();
             getGlobalEnvironment()->unsetKillAllOperations();

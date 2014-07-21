@@ -57,11 +57,14 @@ namespace repl {
 
         virtual void signalDrainComplete();
 
-        virtual bool prepareRequestVoteResponse(const BSONObj& cmdObj, 
+        virtual void prepareRequestVoteResponse(const Date_t now,
+                                                const BSONObj& cmdObj,
                                                 std::string& errmsg, 
                                                 BSONObjBuilder& result);
 
-        virtual void prepareElectCmdResponse(const BSONObj& cmdObj, BSONObjBuilder& result);
+        virtual void prepareElectCmdResponse(const Date_t now,
+                                             const BSONObj& cmdObj,
+                                             BSONObjBuilder& result);
 
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
                                               Date_t now,
@@ -69,9 +72,20 @@ namespace repl {
                                               BSONObjBuilder* resultObj,
                                               Status* result);
 
-        virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
+        virtual HeartbeatResultAction updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
+
+        virtual void prepareStatusResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result,
+                                           unsigned uptime);
+
+        virtual void prepareFreezeResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result);
 
         virtual void relinquishPrimary(OperationContext* txn);
+
+        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex);
 
     };
 

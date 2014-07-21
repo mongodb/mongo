@@ -138,7 +138,10 @@ namespace mongo {
          * Namespace argument ns is ignored if we are clearing the entire cache.
          * Removes corresponding entries from plan cache.
          */
-        static Status clear(QuerySettings* querySettings, PlanCache* planCache, const std::string& ns,
+        static Status clear(OperationContext* txn,
+                            QuerySettings* querySettings,
+                            PlanCache* planCache,
+                            const std::string& ns,
                             const BSONObj& cmdObj);
     };
 
@@ -167,7 +170,10 @@ namespace mongo {
          * Sets index filter for a query shape.
          * Removes entry for query shape from plan cache.
          */
-        static Status set(QuerySettings* querySettings, PlanCache* planCache, const std::string& ns,
+        static Status set(OperationContext* txn,
+                          QuerySettings* querySettings,
+                          PlanCache* planCache,
+                          const std::string& ns,
                           const BSONObj& cmdObj);
     };
 

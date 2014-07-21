@@ -98,10 +98,10 @@ namespace repl {
         // Production thread
         void _producerThread();
         // Adds elements to the list, up to maxSize.
-        void produce();
+        void produce(OperationContext* txn);
         // Check if rollback is necessary
         bool isRollbackRequired(OplogReader& r);
-        void getOplogReader(OplogReader& r);
+        void getOplogReader(OperationContext* txn, OplogReader& r);
         // Evaluate if the current sync target is still good
         bool shouldChangeSyncTarget();
         // check lastOpTimeWritten against the remote's earliest op, filling in remoteOldestOp.

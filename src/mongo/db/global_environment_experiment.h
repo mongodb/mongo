@@ -34,11 +34,17 @@
 namespace mongo {
 
     class OperationContext;
+    class StorageEngine;
 
     class GlobalEnvironmentExperiment {
         MONGO_DISALLOW_COPYING(GlobalEnvironmentExperiment);
     public:
         virtual ~GlobalEnvironmentExperiment() { }
+
+        /**
+         * Return the storage engine instance we're using.
+         */
+        virtual StorageEngine* getGlobalStorageEngine() = 0;
 
         //
         // Global operation management.  This may not belong here and there may be too many methods
@@ -130,8 +136,8 @@ namespace mongo {
     GlobalEnvironmentExperiment* getGlobalEnvironment();
 
     /**
-     * Sets the GlobalEnvironmentExperiment.  If 'globalEnvironment' is NULL, un-sets and deletes the current
-     * GlobalEnvironmentExperiment.
+     * Sets the GlobalEnvironmentExperiment.  If 'globalEnvironment' is NULL, un-sets and deletes
+     * the current GlobalEnvironmentExperiment.
      *
      * Takes ownership of 'globalEnvironment'.
      */

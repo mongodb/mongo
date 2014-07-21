@@ -32,7 +32,9 @@
 #include <vector>
 
 #include "mongo/bson/optime.h"
+#include "mongo/db/repl/new_member.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/util/concurrency/list.h"
 #include "mongo/util/time_support.h"
@@ -53,7 +55,7 @@ namespace repl {
         virtual void setCommitOkayThrough(const OpTime& optime);
         virtual void setLastReceived(const OpTime& optime);
 
-        // Looks up _syncSource's address and returns it, for use by the Applier
+        // Looks up syncSource's address and returns it, for use by the Applier
         virtual HostAndPort getSyncSourceAddress() const;
         // Chooses and sets a new sync source, based on our current knowledge of the world
         virtual void chooseNewSyncSource(Date_t now); // this is basically getMemberToSyncTo()
@@ -72,12 +74,15 @@ namespace repl {
         virtual void signalDrainComplete();
 
         // produce a reply to a RAFT-style RequestVote RPC; this is MongoDB ReplSetFresh command
-        virtual bool prepareRequestVoteResponse(const BSONObj& cmdObj, 
+        virtual void prepareRequestVoteResponse(const Date_t now,
+                                                const BSONObj& cmdObj,
                                                 std::string& errmsg, 
                                                 BSONObjBuilder& result);
 
         // produce a reply to a received electCmd
-        virtual void prepareElectCmdResponse(const BSONObj& cmdObj, BSONObjBuilder& result);
+        virtual void prepareElectCmdResponse(const Date_t now,
+                                             const BSONObj& cmdObj,
+                                             BSONObjBuilder& result);
 
         // produce a reply to a heartbeat
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
@@ -87,12 +92,34 @@ namespace repl {
                                               Status* result);
 
         // update internal state with heartbeat response
-        virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
+        HeartbeatResultAction updateHeartbeatInfo(Date_t now,
+                                              const HeartbeatInfo& newInfo);
+
+        // produce a reply to a status request
+        virtual void prepareStatusResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result,
+                                           unsigned uptime);
+
+        // produce a reply to a freeze request
+        virtual void prepareFreezeResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result);
 
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn);
 
+        // update internal config with new config (already validated)
+        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex);
+
     private:
+
+        // Determines if we will veto the member in the "fresh" command response
+        // If we veto, the errmsg will be filled in with a reason
+        bool _shouldVeto(const BSONObj& cmdObj, string& errmsg) const;
+
+        // Returns the index of the member with the matching id, or -1 if none match.
+        int _getMemberIndex(int id) const; 
 
         // Logic to determine if we should step down as primary
         bool _shouldRelinquish() const;
@@ -109,8 +136,8 @@ namespace repl {
         // Begin election proceedings
         void _electSelf(Date_t now);
 
-        // Scans the electable set and returns the highest priority member
-        const Member* _getHighestPriorityElectable() const;
+        // Scans the electable set and returns the highest priority member index
+        int _getHighestPriorityElectableIndex() const;
 
         // Change _memberState, if state is different from _memberState.
         // Call all registered callbacks for state changes.
@@ -139,10 +166,10 @@ namespace repl {
         std::set<unsigned int> _electableSet;
 
         // the member we currently believe is primary, if one exists
-        const Member *_currentPrimary;
+        int _currentPrimaryIndex;
         // the member we are currently syncing from
         // NULL if no sync source (we are primary, or we cannot connect to anyone yet)
-        const Member* _syncSource; 
+        int _syncSourceIndex; 
         // These members are not chosen as sync sources for a period of time, due to connection
         // issues with them
         std::map<HostAndPort, Date_t> _syncSourceBlacklist;
@@ -163,7 +190,11 @@ namespace repl {
         // Flag to prevent re-entering election code
         bool _busyWithElectSelf;
 
-        ReplicaSetConfig _currentConfig;
+        int _selfIndex; // this node's index in _members and _currentConfig
+        const MemberConfig& _selfConfig();  // Helper shortcut to self config
+
+        ReplicaSetConfig _currentConfig; // The current config, including a vector of MemberConfigs
+        std::vector<NewMember> _members; // all members of the set
 
         // Time when stepDown command expires
         Date_t _stepDownUntil;
@@ -171,18 +202,15 @@ namespace repl {
         // Block syncing -- in case we fail auth when heartbeating other nodes
         bool _blockSync;
 
+        // The number of calls we have had to enter maintenance mode
+        int _maintenanceModeCalls;
+
 
         // Functions to call when a reconfig is finished.  We pass the new config object.
         std::vector<ConfigChangeCallbackFn> _configChangeCallbacks;
 
         // Functions to call when a state change happens.  We pass the new state.
         std::vector<StateChangeCallbackFn> _stateChangeCallbacks;
-
-        Member* _self;
-        List1<Member> _otherMembers; // all members of the set EXCEPT _self.
-
-        Member* _getMutableMember(unsigned int id);
-        const Member* _getConstMember(unsigned int id) const;
 
         // do these need settors?  the current code has no way to change these values.
         struct HeartbeatOptions {
@@ -206,6 +234,13 @@ namespace repl {
                         heartbeatConnRetries==r.heartbeatConnRetries);
             }
         } _heartbeatOptions;
+
+        // Last vote info from the election
+        struct LastVote {
+            LastVote() : when(0), who(0xffffffff) { }
+            Date_t when;
+            unsigned who;
+        } _lastVote;
 
 
     };

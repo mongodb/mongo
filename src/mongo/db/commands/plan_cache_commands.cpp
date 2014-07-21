@@ -157,7 +157,9 @@ namespace mongo {
     }
 
     // static
-    Status PlanCacheCommand::canonicalize(const string& ns, const BSONObj& cmdObj,
+    Status PlanCacheCommand::canonicalize(OperationContext* txn,
+                                          const string& ns,
+                                          const BSONObj& cmdObj,
                                           CanonicalQuery** canonicalQueryOut) {
         // query - required
         BSONElement queryElt = cmdObj.getField("query");
@@ -196,7 +198,7 @@ namespace mongo {
         CanonicalQuery* cqRaw;
 
         const NamespaceString nss(ns);
-        const WhereCallbackReal whereCallback(nss.db());
+        const WhereCallbackReal whereCallback(txn, nss.db());
 
         Status result = CanonicalQuery::canonicalize(
                             ns, queryObj, sortObj, projObj, &cqRaw, whereCallback);
@@ -273,11 +275,14 @@ namespace mongo {
             // No collection - nothing to do. Return OK status.
             return Status::OK();
         }
-        return clear(planCache, ns, cmdObj);
+        return clear(txn, planCache, ns, cmdObj);
     }
 
     // static
-    Status PlanCacheClear::clear(PlanCache* planCache, const string& ns, const BSONObj& cmdObj) {
+    Status PlanCacheClear::clear(OperationContext* txn,
+                                 PlanCache* planCache,
+                                 const string& ns,
+                                 const BSONObj& cmdObj) {
         invariant(planCache);
 
         // According to the specification, the planCacheClear command runs in two modes:
@@ -286,7 +291,7 @@ namespace mongo {
         //   command arguments.
         if (cmdObj.hasField("query")) {
             CanonicalQuery* cqRaw;
-            Status status = PlanCacheCommand::canonicalize(ns, cmdObj, &cqRaw);
+            Status status = PlanCacheCommand::canonicalize(txn, ns, cmdObj, &cqRaw);
             if (!status.isOK()) {
                 return status;
             }
@@ -346,14 +351,17 @@ namespace mongo {
             plansBuilder.doneFast();
             return Status::OK();
         }
-        return list(*planCache, ns, cmdObj, bob);
+        return list(txn, *planCache, ns, cmdObj, bob);
     }
 
     // static
-    Status PlanCacheListPlans::list(const PlanCache& planCache, const std::string& ns,
-                                    const BSONObj& cmdObj, BSONObjBuilder* bob) {
+    Status PlanCacheListPlans::list(OperationContext* txn,
+                                    const PlanCache& planCache,
+                                    const std::string& ns,
+                                    const BSONObj& cmdObj,
+                                    BSONObjBuilder* bob) {
         CanonicalQuery* cqRaw;
-        Status status = canonicalize(ns, cmdObj, &cqRaw);
+        Status status = canonicalize(txn, ns, cmdObj, &cqRaw);
         if (!status.isOK()) {
             return status;
         }

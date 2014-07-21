@@ -69,6 +69,7 @@ namespace mongo {
         Status initializeUserCredentialsFromUserDocument(User* user, const BSONObj& privDoc) const;
 
         Status initializeUserRolesFromUserDocument(const BSONObj& doc, User* user) const;
+        Status initializeUserIndirectRolesFromUserDocument(const BSONObj& doc, User* user) const;
         Status initializeUserPrivilegesFromUserDocument(const BSONObj& doc, User* user) const;
     };
 

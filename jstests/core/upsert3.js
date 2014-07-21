@@ -50,3 +50,9 @@ res = t.update( {_id: {a:1, b:1}, "_id.a": 1} , {y: 1} , true );
 assert.writeOK(res);
 assert.docEq({_id: {a: 1, b: 1}, y: 1}, t.findOne(), "_id-4")
 t.drop()
+
+// make sure query doesn't error when creating doc for insert, 
+// since it missing the rest of the dbref fields. SERVER-14024
+res = t.update( {_id:1, "foo.$id":1}, {$set : {foo:DBRef("a", 1)}}, {upsert:true} );
+assert.writeOK(res);
+assert.docEq({_id: 1, foo:DBRef("a", 1)}, t.findOne())

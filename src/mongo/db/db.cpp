@@ -70,8 +70,8 @@
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_coordinator_hybrid.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
-#include "mongo/db/repl/repl_coordinator_legacy.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
@@ -331,7 +331,9 @@ namespace mongo {
         WriteUnitOfWork wunit(txn.recoveryUnit());
 
         vector< string > dbNames;
-        globalStorageEngine->listDatabases( &dbNames );
+
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases( &dbNames );
 
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
             string dbName = *i;
@@ -348,7 +350,7 @@ namespace mongo {
                 ctx.db()->clearTmpCollections(&txn);
 
             if ( storageGlobalParams.repair ) {
-                fassert(18506, globalStorageEngine->repairDatabase(&txn, dbName));
+                fassert(18506, storageEngine->repairDatabase(&txn, dbName));
             }
             else if (!ctx.db()->getDatabaseCatalogEntry()->currentFilesCompatible(&txn)) {
                 log() << "****";
@@ -467,7 +469,8 @@ namespace mongo {
                 }
 
                 Date_t start = jsTime();
-                int numFiles = globalStorageEngine->flushAllFiles( true );
+                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+                int numFiles = storageEngine->flushAllFiles( true );
                 time_flushing = (int) (jsTime() - start);
 
                 _flushed(time_flushing);
@@ -828,12 +831,6 @@ MONGO_INITIALIZER(SetGlobalConfigExperiment)(InitializerContext* context) {
 }
 
 namespace {
-    // TODO(spencer): Remove this startup parameter once the new ReplicationCoordinator is fully
-    // working
-    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useNewReplCoordinator, bool, false);
-} // namespace
-
-namespace {
     repl::ReplSettings replSettings;
 } // namespace
 
@@ -843,14 +840,8 @@ namespace mongo {
     }
 } // namespace mongo
 
-MONGO_INITIALIZER(CreateReplicationCoordinator)(InitializerContext* context) {
-    if (useNewReplCoordinator) {
-        repl::setGlobalReplicationCoordinator(
-                new repl::ReplicationCoordinatorImpl(replSettings));
-    } else {
-        repl::setGlobalReplicationCoordinator(
-                new repl::LegacyReplicationCoordinator(replSettings));
-    }
+MONGO_INITIALIZER(CreateReplicationManager)(InitializerContext* context) {
+    repl::setGlobalReplicationCoordinator(new repl::HybridReplicationCoordinator(replSettings));
     return Status::OK();
 }
 

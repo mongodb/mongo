@@ -79,7 +79,7 @@ namespace {
     }
 
     /* comment MUST only be set when initiating the set by the initiator */
-    void ReplSetConfig::saveConfigLocally(bo comment) {
+    void ReplSetConfig::saveConfigLocally(OperationContext* txn, bo comment) {
         checkRsConfig();
 
         BSONObj newConfigBSON = asBson();
@@ -87,17 +87,16 @@ namespace {
         log() << "replSet info saving a newer config version to local.system.replset: "
               << newConfigBSON << rsLog;
         {
-            OperationContextImpl txn;
-            Client::WriteContext cx(&txn, rsConfigNs);
+            Client::WriteContext cx(txn, rsConfigNs);
 
             //theReplSet->lastOpTimeWritten = ??;
             //rather than above, do a logOp()? probably
-            Helpers::putSingletonGod(&txn,
+            Helpers::putSingletonGod(txn,
                                      rsConfigNs.c_str(),
                                      newConfigBSON,
                                      false/*logOp=false; local db so would work regardless...*/);
             if( !comment.isEmpty() && (!theReplSet || theReplSet->isPrimary()) )
-                logOpInitiate(&txn, comment);
+                logOpInitiate(txn, comment);
             cx.commit();
         }
         log() << "replSet saveConfigLocally done" << rsLog;

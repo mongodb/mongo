@@ -33,6 +33,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 #include <algorithm>
+#include <math.h>
 
 // for updateCache
 #include "mongo/db/catalog/collection.h"
@@ -70,11 +71,6 @@ namespace mongo {
             // eventually, plan stages may own their query solutions.
             // 
             // delete _candidates[_bestPlanIdx].solution; // (owned by containing runner)
-
-            if (hasBackupPlan()) {
-                delete _candidates[_backupPlanIdx].solution;
-                delete _candidates[_backupPlanIdx].root;
-            }
 
             // Clean up the losing candidates.
             clearCandidates();
@@ -151,9 +147,7 @@ namespace mongo {
         }
 
         if (hasBackupPlan() && PlanStage::ADVANCED == state) {
-            QLOG() << "Best plan had a blocking sort, became unblocked, deleting backup plan\n";
-            delete _candidates[_backupPlanIdx].solution;
-            delete _candidates[_backupPlanIdx].root;
+            QLOG() << "Best plan had a blocking stage, became unblocked\n";
             _backupPlanIdx = kNoSuchPlan;
         }
 
@@ -224,6 +218,43 @@ namespace mongo {
             }
         }
 
+        // Logging for tied plans.
+        if (ranking->tieForBest && NULL != _collection) {
+            // These arrays having two or more entries is implied by 'tieForBest'.
+            invariant(ranking->scores.size() > 1);
+            invariant(ranking->candidateOrder.size() > 1);
+
+            size_t winnerIdx = ranking->candidateOrder[0];
+            size_t runnerUpIdx = ranking->candidateOrder[1];
+
+            LOG(1) << "Winning plan tied with runner-up."
+                   << " ns: " << _collection->ns()
+                   << " " << _query->toStringShort()
+                   << " winner score: " << ranking->scores[0]
+                   << " winner summary: "
+                   << getPlanSummary(*_candidates[winnerIdx].solution)
+                   << " runner-up score: " << ranking->scores[1]
+                   << " runner-up summary: "
+                   << getPlanSummary(*_candidates[runnerUpIdx].solution);
+
+            // There could be more than a 2-way tie, so log the stats for the remaining plans
+            // involved in the tie.
+            static const double epsilon = 1e-10;
+            for (size_t i = 2; i < ranking->scores.size(); i++) {
+                if (fabs(ranking->scores[i] - ranking->scores[0]) >= epsilon) {
+                    break;
+                }
+
+                size_t planIdx = ranking->candidateOrder[i];
+
+                LOG(1) << "Plan " << i << " involved in multi-way tie."
+                       << " ns: " << _collection->ns()
+                       << " " << _query->toStringShort()
+                       << " score: " << ranking->scores[i]
+                       << " summary: " << getPlanSummary(*_candidates[planIdx].solution);
+            }
+        }
+
         // Store the choice we just made in the cache. In order to do so,
         //   1) the query must be of a type that is safe to cache, and
         //   2) two or more plans cannot have tied for the win. Caching in the
@@ -283,7 +314,6 @@ namespace mongo {
         // Traverse candidate plans in order or score
         for (size_t ix = 0; ix < _candidates.size(); ix++) {
             if (ix == (size_t)_bestPlanIdx) { continue; }
-            if (ix == (size_t)_backupPlanIdx) { continue; }
 
             delete _candidates[ix].root;
             delete _candidates[ix].solution;

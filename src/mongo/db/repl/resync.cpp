@@ -79,7 +79,7 @@ namespace repl {
                     errmsg = "primaries cannot resync";
                     return false;
                 }
-                return theReplSet->resync(errmsg);
+                return theReplSet->resync(txn, errmsg);
             }
 
             // below this comment pertains only to master/slave replication

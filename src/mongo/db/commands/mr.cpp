@@ -977,7 +977,7 @@ namespace mongo {
                                         _db.count(_config.incLong, BSONObj(), QueryOption_SlaveOk)));
 
             const NamespaceString nss(_config.incLong);
-            const WhereCallbackReal whereCallback(nss.db());
+            const WhereCallbackReal whereCallback(_txn, nss.db());
 
             CanonicalQuery* cq;
             verify(CanonicalQuery::canonicalize(_config.incLong,
@@ -1317,7 +1317,7 @@ namespace mongo {
                         scoped_ptr<Client::Context> ctx(new Client::Context(txn, config.ns, false));
 
                         const NamespaceString nss(config.ns);
-                        const WhereCallbackReal whereCallback(nss.db());
+                        const WhereCallbackReal whereCallback(txn, nss.db());
 
                         CanonicalQuery* cq;
                         if (!CanonicalQuery::canonicalize(config.ns,

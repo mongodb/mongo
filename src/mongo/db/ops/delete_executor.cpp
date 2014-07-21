@@ -66,7 +66,8 @@ namespace mongo {
         }
 
         CanonicalQuery* cqRaw;
-        const WhereCallbackReal whereCallback(_request->getNamespaceString().db());
+        const WhereCallbackReal whereCallback(
+                                    _request->getOpCtx(), _request->getNamespaceString().db());
 
         Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
                                                      _request->getQuery(),
@@ -80,7 +81,7 @@ namespace mongo {
         return status;
     }
 
-    long long DeleteExecutor::execute(OperationContext* txn, Database* db) {
+    long long DeleteExecutor::execute(Database* db) {
         uassertStatusOK(prepare());
         uassert(17417,
                 mongoutils::str::stream() <<
@@ -100,7 +101,7 @@ namespace mongo {
             }
         }
 
-        Collection* collection = db->getCollection(txn, ns.ns());
+        Collection* collection = db->getCollection(_request->getOpCtx(), ns.ns());
         if (NULL == collection) {
             return 0;
         }
@@ -118,11 +119,14 @@ namespace mongo {
 
         Runner* rawRunner;
         if (_canonicalQuery.get()) {
-            uassertStatusOK(getRunner(txn, collection, _canonicalQuery.release(), &rawRunner));
+            uassertStatusOK(getRunner(_request->getOpCtx(),
+                                      collection,
+                                      _canonicalQuery.release(),
+                                      &rawRunner));
         }
         else {
             CanonicalQuery* ignored;
-            uassertStatusOK(getRunner(txn,
+            uassertStatusOK(getRunner(_request->getOpCtx(),
                                       collection,
                                       ns.ns(),
                                       _request->getQuery(),
@@ -135,7 +139,7 @@ namespace mongo {
 
         DiskLoc rloc;
         Runner::RunnerState state;
-        CurOp* curOp = txn->getCurOp();
+        CurOp* curOp = _request->getOpCtx()->getCurOp();
         int oldYieldCount = curOp->numYields();
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &rloc))) {
             if (oldYieldCount != curOp->numYields()) {
@@ -151,8 +155,9 @@ namespace mongo {
             // TODO: do we want to buffer docs and delete them in a group rather than
             // saving/restoring state repeatedly?
             runner->saveState();
-            collection->deleteDocument(txn, rloc, false, false, logop ? &toDelete : NULL );
-            runner->restoreState(txn);
+            collection->deleteDocument(
+                            _request->getOpCtx(), rloc, false, false, logop ? &toDelete : NULL);
+            runner->restoreState(_request->getOpCtx());
 
             nDeleted++;
 
@@ -163,7 +168,8 @@ namespace mongo {
                 }
                 else {
                     bool replJustOne = true;
-                    repl::logOp(txn, "d", ns.ns().c_str(), toDelete, 0, &replJustOne);
+                    repl::logOp(
+                            _request->getOpCtx(), "d", ns.ns().c_str(), toDelete, 0, &replJustOne);
                 }
             }
 
@@ -172,7 +178,7 @@ namespace mongo {
             }
 
             if (!_request->isGod()) {
-                txn->recoveryUnit()->commitIfNeeded();
+                _request->getOpCtx()->recoveryUnit()->commitIfNeeded();
             }
 
             if (debug && _request->isGod() && nDeleted == 100) {

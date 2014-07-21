@@ -44,9 +44,19 @@ namespace mongo {
 namespace repl {
 
     class HeartbeatInfo;
-    class Member;
+    class NewMember;
     struct MemberState;
+    class ReplicaSetConfig;
     class TagSubgroup;
+
+    /**
+     * Actions taken based on heartbeat responses
+     */
+    enum HeartbeatResultAction {
+        StepDown,
+        StartElection,
+        None
+    };
 
     /**
      * Replication Topology Coordinator interface.
@@ -58,54 +68,6 @@ namespace repl {
     class TopologyCoordinator {
         MONGO_DISALLOW_COPYING(TopologyCoordinator);
     public:
-
-        // TODO(spencer): Move this and ReplicaSetConfig out of TopologyCoordinator
-        class MemberConfig {
-        public:
-        MemberConfig() :
-            _id(-1),
-                votes(1),
-                priority(1.0),
-                arbiterOnly(false),
-                slaveDelay(0),
-                hidden(false),
-                buildIndexes(true) { }
-            int _id;              /* ordinal */
-            unsigned votes;       /* how many votes this node gets. default 1. */
-            HostAndPort h;
-            double priority;      /* 0 means can never be primary */
-            bool arbiterOnly;
-            int slaveDelay;       /* seconds.  */
-            bool hidden;          /* if set, don't advertise to drivers in isMaster. */
-                                  /* for non-primaries (priority 0) */
-            bool buildIndexes;    /* if false, do not create any non-_id indexes */
-            std::map<std::string,std::string> tags;     /* tagging for data center, rack, etc. */
-        private:
-            std::set<TagSubgroup*> _groups; // the subgroups this member belongs to
-        };
-
-        struct ReplicaSetConfig {
-            // TODO(spencer): make sure it is safe to copy this
-            std::vector<MemberConfig> members;
-            std::string replSetName;
-            int version;
-            MemberConfig* self;
-
-            /**
-             * If replication can be chained. If chaining is disallowed, it can still be explicitly
-             * enabled via the replSetSyncFrom command, but it will not happen automatically.
-             */
-            bool chainingAllowed;
-
-            // Number of nodes needed for w:majority writes
-            int majorityNumber;
-
-            BSONObj asBson() const;
-
-            // Calculate majority number based on current config and store in majorityNumber;
-            // done as part of reconfig.
-            void calculateMajorityNumber();
-        };
 
         virtual ~TopologyCoordinator() {}
         
@@ -137,12 +99,15 @@ namespace repl {
         virtual void signalDrainComplete() = 0;
 
         // produce a reply to a RAFT-style RequestVote RPC
-        virtual bool prepareRequestVoteResponse(const BSONObj& cmdObj, 
+        virtual void prepareRequestVoteResponse(const Date_t now,
+                                                const BSONObj& cmdObj,
                                                 std::string& errmsg, 
                                                 BSONObjBuilder& result) = 0; 
 
         // produce a reply to a received electCmd
-        virtual void prepareElectCmdResponse(const BSONObj& cmdObj, BSONObjBuilder& result) = 0;
+        virtual void prepareElectCmdResponse(const Date_t now,
+                                             const BSONObj& cmdObj,
+                                             BSONObjBuilder& result) = 0;
 
         // produce a reply to a heartbeat
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
@@ -152,10 +117,26 @@ namespace repl {
                                               Status* result) = 0;
 
         // update internal state with heartbeat response
-        virtual void updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo) = 0;
+        virtual HeartbeatResultAction updateHeartbeatInfo(Date_t now,
+                                                          const HeartbeatInfo& newInfo) = 0;
+
+        // produce a reply to a status request
+        virtual void prepareStatusResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result,
+                                           unsigned uptime) = 0;
+
+        // produce a reply to a freeze request
+        virtual void prepareFreezeResponse(Date_t now,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder& result) = 0;
 
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn) = 0;
+
+        // called with new config; notifies all on change
+        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex) = 0;
+
     protected:
         TopologyCoordinator() {}
     };

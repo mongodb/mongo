@@ -113,7 +113,7 @@ namespace mongo {
             PlanStage* childStage = buildStages(txn, collection, qsol, pn->children[0], ws);
             if (NULL == childStage) { return NULL; }
 
-            ProjectionStageParams params(WhereCallbackReal(collection->ns().db()));
+            ProjectionStageParams params(WhereCallbackReal(txn, collection->ns().db()));
             params.projObj = pn->projection;
 
             // Stuff the right data into the params depending on what proj impl we use.

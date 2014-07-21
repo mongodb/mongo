@@ -28,8 +28,8 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/chunk.h"  // needed for genID
@@ -51,7 +51,8 @@ namespace mongo {
 
     static bool isEmptyChunk( const ChunkType& );
 
-    bool mergeChunks( const NamespaceString& nss,
+    bool mergeChunks( OperationContext* txn,
+                      const NamespaceString& nss,
                       const BSONObj& minKey,
                       const BSONObj& maxKey,
                       const OID& epoch,
@@ -91,7 +92,7 @@ namespace mongo {
         //
 
         ChunkVersion shardVersion;
-        Status status = shardingState.refreshMetadataNow( nss.ns(), &shardVersion );
+        Status status = shardingState.refreshMetadataNow(txn, nss.ns(), &shardVersion);
 
         if ( !status.isOK() ) {
 
@@ -291,9 +292,8 @@ namespace mongo {
         //
 
         {
-            OperationContextImpl txn; // XXX?
-            Lock::DBWrite writeLk(txn.lockState(), nss.ns());
-            shardingState.mergeChunks(&txn, nss.ns(), minKey, maxKey, mergeVersion);
+            Lock::DBWrite writeLk(txn->lockState(), nss.ns());
+            shardingState.mergeChunks(txn, nss.ns(), minKey, maxKey, mergeVersion);
         }
 
         //

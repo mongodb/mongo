@@ -32,6 +32,10 @@
 
 namespace mongo {
 
+    StorageEngine* GlobalEnvironmentNoop::getGlobalStorageEngine() {
+        return NULL;
+    }
+
     void GlobalEnvironmentNoop::setKillAllOperations() { }
 
     void GlobalEnvironmentNoop::unsetKillAllOperations() { }

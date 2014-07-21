@@ -46,13 +46,13 @@ namespace mongo {
                             bool logop,
                             bool god) {
         NamespaceString nsString(ns);
-        DeleteRequest request(nsString);
+        DeleteRequest request(txn, nsString);
         request.setQuery(pattern);
         request.setMulti(!justOne);
         request.setUpdateOpLog(logop);
         request.setGod(god);
         DeleteExecutor executor(&request);
-        return executor.execute(txn, db);
+        return executor.execute(db);
     }
 
 }  // namespace mongo

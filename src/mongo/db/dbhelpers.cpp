@@ -107,7 +107,7 @@ namespace mongo {
             return DiskLoc();
 
         CanonicalQuery* cq;
-        const WhereCallbackReal whereCallback(collection->ns().db());
+        const WhereCallbackReal whereCallback(txn, collection->ns().db());
 
         massert(17244, "Could not canonicalize " + query.toString(),
             CanonicalQuery::canonicalize(collection->ns(), query, &cq, whereCallback).isOK());
@@ -216,7 +216,7 @@ namespace mongo {
         Client::Context context(txn, ns);
 
         const NamespaceString requestNs(ns);
-        UpdateRequest request(requestNs);
+        UpdateRequest request(txn, requestNs);
 
         request.setQuery(id);
         request.setUpdates(o);
@@ -226,7 +226,7 @@ namespace mongo {
         UpdateLifecycleImpl updateLifecycle(true, requestNs);
         request.setLifecycle(&updateLifecycle);
 
-        update(txn, context.db(), request, &debug);
+        update(context.db(), request, &debug);
     }
 
     void Helpers::putSingleton(OperationContext* txn, const char *ns, BSONObj obj) {
@@ -234,7 +234,7 @@ namespace mongo {
         Client::Context context(txn, ns);
 
         const NamespaceString requestNs(ns);
-        UpdateRequest request(requestNs);
+        UpdateRequest request(txn, requestNs);
 
         request.setUpdates(obj);
         request.setUpsert();
@@ -242,7 +242,7 @@ namespace mongo {
         UpdateLifecycleImpl updateLifecycle(true, requestNs);
         request.setLifecycle(&updateLifecycle);
 
-        update(txn, context.db(), request, &debug);
+        update(context.db(), request, &debug);
 
         context.getClient()->curop()->done();
     }
@@ -252,14 +252,14 @@ namespace mongo {
         Client::Context context(txn, ns);
 
         const NamespaceString requestNs(ns);
-        UpdateRequest request(requestNs);
+        UpdateRequest request(txn, requestNs);
 
         request.setGod();
         request.setUpdates(obj);
         request.setUpsert();
         request.setUpdateOpLog(logTheOp);
 
-        update(txn, context.db(), request, &debug);
+        update(context.db(), request, &debug);
 
         context.getClient()->curop()->done();
     }
