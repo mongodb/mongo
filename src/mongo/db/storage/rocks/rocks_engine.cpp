@@ -397,7 +397,7 @@ namespace mongo {
         for ( unsigned i = 0; i < namespaces.size(); i++ ) {
             string ns = namespaces[i];
             string collection = ns;
-            if ( ns.find( '&' ) != string::npos || ns.find( '$' ) != string::npos ) {
+            if ( ns.find( '&' ) != string::npos || ns.find( '$' ) == string::npos ) {
                 continue;
             }
 
@@ -527,8 +527,7 @@ namespace mongo {
                 string indexName = ns.substr( ns.find( '$' ) + 1 );
                 ROCKS_TRACE << " got index " << indexName << " for " << collection;
                 entry->indexNameToCF[indexName] = handles[i];
-            }
-            else {
+            } else {
                 if ( ns.compare("default") == 0 )
                     continue;
 
