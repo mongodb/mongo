@@ -282,8 +282,11 @@ namespace mongo {
             return Status( ErrorCodes::NamespaceNotFound, "can't find collection to drop" );
         Entry* entry = _map[ns].get();
 
+        for ( auto it = entry->indexNameToCF.begin(); it != entry->indexNameToCF.end(); ++it ) {
+            entry->collectionEntry->removeIndex( opCtx, it->first );
+        }
+
         entry->recordStore.reset( NULL );
-        entry->collectionEntry->dropAllIndexes();
         entry->collectionEntry->dropMetaData();
         entry->collectionEntry.reset( NULL );
 
