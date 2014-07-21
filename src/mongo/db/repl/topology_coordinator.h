@@ -89,7 +89,8 @@ namespace repl {
         // Add function pointer to callback list; call function when config changes
         // Applier needs to know when things like chainingAllowed or slaveDelay change. 
         // ReplCoord needs to know when things like the tag sets change.
-        typedef stdx::function<void (const ReplicaSetConfig& config)> ConfigChangeCallbackFn;
+        typedef stdx::function<void (const ReplicaSetConfig& config, int myIndex)>
+                ConfigChangeCallbackFn;
         virtual void registerConfigChangeCallback(const ConfigChangeCallbackFn& fn) = 0;
         // ReplCoord needs to know the state to implement certain public functions
         typedef stdx::function<void (const MemberState& newMemberState)> StateChangeCallbackFn;

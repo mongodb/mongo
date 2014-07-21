@@ -41,11 +41,16 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
 namespace repl {
+
+    namespace {
+        typedef StatusWith<ReplicationExecutor::CallbackHandle> CBHStatus;
+    } //namespace
 
     struct ReplicationCoordinatorImpl::WaiterInfo {
 
@@ -74,8 +79,14 @@ namespace repl {
     };
 
     ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
-            const ReplSettings& settings, ReplicationCoordinatorExternalState* externalState) :
-                    _inShutdown(false), _settings(settings), _externalState(externalState) {}
+                                            const ReplSettings& settings,
+                                            ReplicationCoordinatorExternalState* externalState) :
+            _inShutdown(false),
+            _settings(settings),
+            _externalState(externalState),
+            _thisMembersConfigIndex(-1) {
+
+    }
 
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
@@ -92,7 +103,8 @@ namespace repl {
         _topCoord->registerConfigChangeCallback(
                 stdx::bind(&ReplicationCoordinatorImpl::setCurrentReplicaSetConfig,
                            this,
-                           stdx::placeholders::_1));
+                           stdx::placeholders::_1,
+                           stdx::placeholders::_2));
         _topCoord->registerStateChangeCallback(
                 stdx::bind(&ReplicationCoordinatorImpl::setCurrentMemberState,
                            this,
@@ -371,7 +383,7 @@ namespace repl {
     Status ReplicationCoordinatorImpl::processHeartbeat(const BSONObj& cmdObj, 
                                                         BSONObjBuilder* resultObj) {
         Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = _replExecutor->scheduleWork(
+        CBHStatus cbh = _replExecutor->scheduleWork(
             stdx::bind(&TopologyCoordinator::prepareHeartbeatResponse,
                        _topCoord.get(),
                        stdx::placeholders::_1,
@@ -420,12 +432,15 @@ namespace repl {
         return Status::OK();
     }
 
-    void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(const ReplicaSetConfig& newConfig) {
+    void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(const ReplicaSetConfig& newConfig,
+                                                                int myIndex) {
         invariant(getReplicationMode() == modeReplSet);
         boost::lock_guard<boost::mutex> lk(_mutex);
         _rsConfig = newConfig;
+        _thisMembersConfigIndex = myIndex;
 
-        // TODO: Cancel heartbeats, start new ones
+        cancelHeartbeats();
+        _startHeartbeats();
 
 // TODO(SERVER-14591): instead of this, use WriteConcernOptions and store in replcoord; 
 // in getLastError command, fetch the defaults via a getter in replcoord.
@@ -478,15 +493,98 @@ namespace repl {
         return Status::OK();
     }
 
-    void ReplicationCoordinatorImpl::doMemberHeartbeat(ReplicationExecutor* executor,
-                                                       const Status& inStatus,
+    MONGO_FP_DECLARE(rsHeartbeatRequestNoopByMember);
+
+    namespace {
+        // decide where these live, see TopologyCoordinator::HeartbeatOptions
+        const int heartbeatFrequencyMillis = 2 * 1000; // 2 seconds
+        const int heartbeatTimeoutDefaultMillis = 10 * 1000; // 10 seconds
+        const int heartbeatRetries = 2;
+    } //namespace
+
+
+    void ReplicationCoordinatorImpl::doMemberHeartbeat(ReplicationExecutor::CallbackData cbData,
                                                        const HostAndPort& hap) {
-        // TODO
+
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+
+        // Are we blind, or do we have a failpoint setup to ignore this member?
+        bool dontHeartbeatMember = false; // TODO: replSetBlind should be here as the default
+
+        MONGO_FAIL_POINT_BLOCK(rsHeartbeatRequestNoopByMember, member) {
+            const StringData& stopMember = member.getData()["member"].valueStringData();
+            HostAndPort ignoreHAP;
+            Status status = ignoreHAP.initialize(stopMember);
+            // Ignore
+            if (status.isOK()) {
+                if (hap == ignoreHAP) {
+                    dontHeartbeatMember = true;
+                }
+            } else {
+                log() << "replset: Bad member for rsHeartbeatRequestNoopByMember failpoint "
+                       <<  member.getData() << ". 'member' failed to parse into HostAndPort -- "
+                       << status;
+            }
+        }
+
+        if (dontHeartbeatMember) {
+            // Don't issue real heartbeats, just call start again after the timeout.
+            ReplicationExecutor::CallbackFn restartCB = stdx::bind(
+                                                &ReplicationCoordinatorImpl::doMemberHeartbeat,
+                                                this,
+                                                stdx::placeholders::_1,
+                                                hap);
+            CBHStatus status = _replExecutor->scheduleWorkAt(
+                                        Date_t(curTimeMillis64() + heartbeatFrequencyMillis),
+                                        restartCB);
+            if (!status.isOK()) {
+                log() << "replset: aborting heartbeats for " << hap << " due to scheduling error"
+                       << " -- "<< status;
+                return;
+             }
+            _trackHeartbeatHandle(status.getValue());
+            return;
+        }
+
+        // Compose heartbeat command message
+        BSONObj hbCommandBSON;
+        {
+            // take lock to build request
+            boost::lock_guard<boost::mutex> lock(_mutex);
+            BSONObjBuilder cmdBuilder;
+            const MemberConfig me = _rsConfig.getMemberAt(_thisMembersConfigIndex);
+            cmdBuilder.append("replSetHeartbeat", _rsConfig.getReplSetName());
+            cmdBuilder.append("v", _rsConfig.getConfigVersion());
+            cmdBuilder.append("pv", 1);
+            cmdBuilder.append("checkEmpty", false);
+            cmdBuilder.append("from", me.getHostAndPort().toString());
+            cmdBuilder.append("fromId", me.getId());
+            hbCommandBSON = cmdBuilder.done();
+        }
+        const ReplicationExecutor::RemoteCommandRequest request(hap, "admin", hbCommandBSON);
+
+        ReplicationExecutor::RemoteCommandCallbackFn callback = stdx::bind(
+                                       &ReplicationCoordinatorImpl::_handleHeartbeatResponse,
+                                       this,
+                                       stdx::placeholders::_1,
+                                       hap,
+                                       curTimeMillis64(),
+                                       heartbeatRetries);
+
+
+        CBHStatus status = _replExecutor->scheduleRemoteCommand(request, callback);
+        if (!status.isOK()) {
+            log() << "replset: aborting heartbeats for " << hap << " due to scheduling error"
+                   << status;
+            return;
+         }
+        _trackHeartbeatHandle(status.getValue());
     }
 
     void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
                                 const ReplicationExecutor::RemoteCommandCallbackData& cbData,
-                                StatusWith<BSONObj>* outStatus,
                                 const HostAndPort& hap,
                                 Date_t firstCallDate,
                                 int retriesLeft) {
@@ -523,6 +621,27 @@ namespace repl {
         }
 
         _heartbeatHandles.clear();
+    }
+
+    void ReplicationCoordinatorImpl::_startHeartbeats() {
+        ReplicaSetConfig::MemberIterator it = _rsConfig.membersBegin();
+        ReplicaSetConfig::MemberIterator end = _rsConfig.membersBegin();
+
+        for(;it != end; it++) {
+            HostAndPort host = it->getHostAndPort();
+            CBHStatus status = _replExecutor->scheduleWork(
+                                    stdx::bind(
+                                            &ReplicationCoordinatorImpl::doMemberHeartbeat,
+                                            this,
+                                            stdx::placeholders::_1,
+                                            host));
+            if (!status.isOK()) {
+                log() << "replset: cannot start heartbeats for "
+                      << host << " due to scheduling error -- "<< status;
+                continue;
+             }
+            _trackHeartbeatHandle(status.getValue());
+        }
     }
 
 } // namespace repl

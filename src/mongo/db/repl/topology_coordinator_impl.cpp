@@ -1051,7 +1051,7 @@ namespace repl {
         for (std::vector<ConfigChangeCallbackFn>::const_iterator it = 
                  _configChangeCallbacks.begin();
              it != _configChangeCallbacks.end(); ++it) {
-            (*it)(_currentConfig);
+            (*it)(_currentConfig, selfIndex);
         }
 
     }

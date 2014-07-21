@@ -160,14 +160,13 @@ namespace repl {
         void setCurrentMemberState(const MemberState& newState);
 
         // Called by the TopologyCoordinator whenever the replica set configuration is updated
-        void setCurrentReplicaSetConfig(const ReplicaSetConfig& newConfig);
+        void setCurrentReplicaSetConfig(const ReplicaSetConfig& newConfig, int myIndex);
 
         /**
          * Does a heartbeat for a member of the replica set.
          * Should be started during (re)configuration or in the heartbeat callback only.
          */
-        void doMemberHeartbeat(ReplicationExecutor* executor,
-                               const Status& inStatus,
+        void doMemberHeartbeat(ReplicationExecutor::CallbackData cbData,
                                const HostAndPort& hap);
 
         /**
@@ -196,7 +195,6 @@ namespace repl {
          * and on success.
          */
         void _handleHeartbeatResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData,
-                                      StatusWith<BSONObj>* outStatus,
                                       const HostAndPort& hap,
                                       Date_t firstCallDate,
                                       int retriesLeft);
@@ -205,7 +203,12 @@ namespace repl {
 
         void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle);
 
-        // Handles to actively queued heartbeats.
+        /**
+         * Start a heartbeat for each member in the current config
+         */
+        void _startHeartbeats();
+
+        // Handles to actively queued heartbeats
         typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
         HeartbeatHandles _heartbeatHandles;
 
@@ -248,6 +251,9 @@ namespace repl {
         // The current ReplicaSet configuration object, including the information about tag groups
         // that is used to satisfy write concern requests with named gle modes.
         ReplicaSetConfig _rsConfig;
+
+        // This member's index position in the current config.
+        int _thisMembersConfigIndex;
     };
 
 } // namespace repl
