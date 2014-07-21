@@ -31,7 +31,7 @@
 
 #include <string>
 
-//#include <rocksdb/options.h>
+#include <rocksdb/options.h>
 
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/capped_callback.h"
@@ -75,7 +75,7 @@ namespace mongo {
 
         // CRUD related
 
-        virtual RecordData dataFor( const DiskLoc& loc) const;
+        virtual RecordData dataFor( const DiskLoc& loc ) const;
 
         virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl );
 
@@ -104,8 +104,7 @@ namespace mongo {
                                              const DiskLoc& start = DiskLoc(),
                                              bool tailable = false,
                                              const CollectionScanParams::Direction& dir =
-                                             CollectionScanParams::FORWARD
-                                             ) const;
+                                             CollectionScanParams::FORWARD ) const;
 
         virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;
 
