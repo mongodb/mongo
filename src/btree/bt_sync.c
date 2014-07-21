@@ -270,11 +270,11 @@ err:		/* On error, clear any left-over tree walk. */
 }
 
 /*
- * __wt_bt_cache_force_write --
+ * __wt_cache_force_write --
  *	Dirty the root page of the tree so it gets written.
  */
 int
-__wt_bt_cache_force_write(WT_SESSION_IMPL *session)
+__wt_cache_force_write(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
@@ -290,11 +290,11 @@ __wt_bt_cache_force_write(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_bt_cache_op --
+ * __wt_cache_op --
  *	Cache operations.
  */
 int
-__wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
+__wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 {
 	WT_DECL_RET;
 	WT_BTREE *btree;

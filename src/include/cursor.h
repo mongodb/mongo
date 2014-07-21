@@ -170,6 +170,8 @@ struct __wt_cursor_btree {
 	 */
 	uint8_t v;			/* Fixed-length return value */
 
+	uint8_t	append_tree;		/* Cursor appended to the tree */
+
 #define	WT_CBT_ACTIVE		0x01	/* Active in the tree */
 #define	WT_CBT_ITERATE_APPEND	0x02	/* Col-store: iterating append list */
 #define	WT_CBT_ITERATE_NEXT	0x04	/* Next iteration configuration */

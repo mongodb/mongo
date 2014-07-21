@@ -469,7 +469,7 @@ __backup_list_all_append(WT_SESSION_IMPL *session, const char *cfg[])
 	cb = session->bkp_cursor;
 
 	/* Ignore files in the process of being bulk-loaded. */
-	if (F_ISSET(S2BT(session), WT_BTREE_SPECIAL_FLAGS) == WT_BTREE_BULK)
+	if (F_ISSET(S2BT(session), WT_BTREE_BULK))
 		return (0);
 
 	/* Add the file to the list of files to be copied. */

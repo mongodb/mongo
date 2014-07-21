@@ -392,10 +392,8 @@ extern int __wt_bt_salvage(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase,
     const char *cfg[]);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst);
-extern int __wt_bt_cache_force_write(WT_SESSION_IMPL *session);
-extern int __wt_bt_cache_op(WT_SESSION_IMPL *session,
-    WT_CKPT *ckptbase,
-    int op);
+extern int __wt_cache_force_write(WT_SESSION_IMPL *session);
+extern int __wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op);
 extern int __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify_dsk_image(WT_SESSION_IMPL *session,
@@ -510,11 +508,9 @@ extern WT_UPDATE *__wt_update_obsolete_check(WT_SESSION_IMPL *session,
 extern void __wt_update_obsolete_free( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_UPDATE *upd);
-extern int __wt_search_insert(WT_SESSION_IMPL *session,
+extern int __wt_search_insert( WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
-    WT_INSERT_HEAD *inshead,
-    WT_ITEM *srch_key,
-    int insert);
+    WT_ITEM *srch_key);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_ITEM *srch_key,
     WT_REF *leaf,

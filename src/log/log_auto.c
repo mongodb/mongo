@@ -56,7 +56,7 @@ __wt_logop_col_put_pack(
 	WT_RET(__wt_struct_size(session, &size, fmt,
 	    optype, 0, fileid, recno, value));
 
-	size += __wt_vsize_uint(size) - 1;
+	__wt_struct_size_adjust(session, &size);
 	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
@@ -114,7 +114,7 @@ __wt_logop_col_remove_pack(
 	WT_RET(__wt_struct_size(session, &size, fmt,
 	    optype, 0, fileid, recno));
 
-	size += __wt_vsize_uint(size) - 1;
+	__wt_struct_size_adjust(session, &size);
 	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
@@ -169,7 +169,7 @@ __wt_logop_col_truncate_pack(
 	WT_RET(__wt_struct_size(session, &size, fmt,
 	    optype, 0, fileid, start, stop));
 
-	size += __wt_vsize_uint(size) - 1;
+	__wt_struct_size_adjust(session, &size);
 	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
@@ -226,7 +226,7 @@ __wt_logop_row_put_pack(
 	WT_RET(__wt_struct_size(session, &size, fmt,
 	    optype, 0, fileid, key, value));
 
-	size += __wt_vsize_uint(size) - 1;
+	__wt_struct_size_adjust(session, &size);
 	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
@@ -285,7 +285,7 @@ __wt_logop_row_remove_pack(
 	WT_RET(__wt_struct_size(session, &size, fmt,
 	    optype, 0, fileid, key));
 
-	size += __wt_vsize_uint(size) - 1;
+	__wt_struct_size_adjust(session, &size);
 	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
@@ -341,7 +341,7 @@ __wt_logop_row_truncate_pack(
 	WT_RET(__wt_struct_size(session, &size, fmt,
 	    optype, 0, fileid, start, stop, mode));
 
-	size += __wt_vsize_uint(size) - 1;
+	__wt_struct_size_adjust(session, &size);
 	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,

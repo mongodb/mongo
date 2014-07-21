@@ -285,16 +285,14 @@ public:
 #endif
 
 #ifdef HAVE_HYPERLEVELDB
-  virtual Status LiveBackup(const Slice& name) {
-    return Status::NotSupported("sorry!");
-  }
-  virtual void GetReplayTimestamp(std::string* timestamp) {}
-  virtual void AllowGarbageCollectBeforeTimestamp(const std::string& timestamp) {}
-  virtual bool ValidateTimestamp(const std::string& timestamp) {}
-  virtual int CompareTimestamps(const std::string& lhs, const std::string& rhs) {}
+  virtual Status LiveBackup(const Slice& name);
+  virtual void GetReplayTimestamp(std::string* timestamp);
+  virtual void AllowGarbageCollectBeforeTimestamp(const std::string& timestamp);
+  virtual bool ValidateTimestamp(const std::string& timestamp);
+  virtual int CompareTimestamps(const std::string& lhs, const std::string& rhs);
   virtual Status GetReplayIterator(const std::string& timestamp,
-             leveldb::ReplayIterator** iter) { return Status::NotSupported("sorry!"); }
-  virtual void ReleaseReplayIterator(leveldb::ReplayIterator* iter) {}
+             leveldb::ReplayIterator** iter);
+  virtual void ReleaseReplayIterator(leveldb::ReplayIterator* iter);
 #endif
 
 #ifdef HAVE_ROCKSDB
