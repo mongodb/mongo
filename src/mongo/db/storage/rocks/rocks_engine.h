@@ -105,8 +105,12 @@ namespace mongo {
         Status dropCollection( OperationContext* opCtx,
                                const StringData& ns );
 
-        // will create if doesn't exist
-        // collection has to exist first though
+        /** 
+         * Will create if doesn't exist. The collection has to exist first, though.
+         * The ordering argument is only used if the column family does not exist. If the
+         * column family does not exist, then ordering must be a non-empty optional, containing
+         * the Ordering for the index.
+         */
         rocksdb::ColumnFamilyHandle* getIndexColumnFamily(
                               const StringData& ns,
                               const StringData& indexName,
@@ -127,8 +131,8 @@ namespace mongo {
             boost::scoped_ptr<rocksdb::ColumnFamilyHandle> metaCfHandle;
             boost::scoped_ptr<RocksCollectionCatalogEntry> collectionEntry;
             boost::scoped_ptr<RocksRecordStore> recordStore;
-            // These ColumnFamilyHandle must be deleted by removeIndex
-            StringMap< rocksdb::ColumnFamilyHandle* > indexNameToCF;
+            // These ColumnFamilyHandles must be deleted by removeIndex
+            StringMap<rocksdb::ColumnFamilyHandle*> indexNameToCF;
         };
 
         Entry* getEntry( const StringData& ns );

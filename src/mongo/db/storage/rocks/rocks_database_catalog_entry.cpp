@@ -49,7 +49,7 @@ namespace mongo {
         // TODO(XXX): make this fast
         std::list<std::string> lst;
         getCollectionNamespaces( &lst );
-        return lst.emptry();
+        return lst.empty();
     }
 
     void RocksDatabaseCatalogEntry::appendExtraStats( OperationContext* opCtx,
