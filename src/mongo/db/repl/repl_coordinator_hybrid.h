@@ -148,9 +148,9 @@ namespace repl {
                                                              const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj);
 
-        virtual bool processHandshake(const OperationContext* txn,
-                                      const OID& remoteID,
-                                      const BSONObj& handshake);
+        virtual Status processHandshake(const OperationContext* txn,
+                                        const OID& remoteID,
+                                        const BSONObj& handshake);
 
         virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
 

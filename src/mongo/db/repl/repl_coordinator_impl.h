@@ -159,9 +159,9 @@ namespace repl {
                                                              const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj);
 
-        virtual bool processHandshake(const OperationContext* txn,
-                                      const OID& remoteID,
-                                      const BSONObj& handshake);
+        virtual Status processHandshake(const OperationContext* txn,
+                                        const OID& remoteID,
+                                        const BSONObj& handshake);
 
         virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
 
@@ -258,9 +258,16 @@ namespace repl {
         // Thread that drives actions in the topology coordinator
         boost::scoped_ptr<boost::thread> _topCoordDriverThread;
 
-        // Maps nodes in this replication group to the last oplog operation they have committed.
-        typedef unordered_map<OID, OpTime, OID::Hasher> SlaveOpTimeMap;
-        SlaveOpTimeMap _slaveOpTimeMap;
+        struct SlaveInfo {
+            OpTime opTime; // Our last known OpTime that this slave has replicated to.
+            HostAndPort hostAndPort; // Client address of the slave.
+            int memberID; // ID of the node in the replica set config, or -1 if we're not a replSet.
+            SlaveInfo() : memberID(-1) {}
+        };
+        // Maps nodes in this replication group to information known about it such as its
+        // replication progress and its ID in the replica set config.
+        typedef unordered_map<OID, SlaveInfo, OID::Hasher> SlaveInfoMap;
+        SlaveInfoMap _slaveInfoMap;
 
         // Current ReplicaSet state.
         MemberState _currentState;

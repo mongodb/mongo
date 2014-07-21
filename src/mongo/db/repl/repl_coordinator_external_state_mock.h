@@ -31,7 +31,6 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/bson/oid.h"
 #include "mongo/db/repl/repl_coordinator_external_state.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -45,6 +44,7 @@ namespace repl {
         virtual ~ReplicationCoordinatorExternalStateMock();
         virtual OID ensureMe();
         virtual bool isSelf(const HostAndPort& host);
+        virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
 
         /**
          * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"

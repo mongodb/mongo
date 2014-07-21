@@ -150,6 +150,7 @@ namespace repl {
     }
 
     ReplicationCoordinator::Mode ReplicationCoordinatorImpl::getReplicationMode() const {
+        // TODO(spencer): This should be checking if you have a config
         if (_settings.usingReplSets()) {
             return modeReplSet;
         } else if (_settings.slave || _settings.master) {
@@ -177,7 +178,7 @@ namespace repl {
         // TODO(spencer): pass info upstream if we're not primary
         boost::lock_guard<boost::mutex> lk(_mutex);
 
-        OpTime& slaveOpTime = _slaveOpTimeMap[rid];
+        OpTime& slaveOpTime = _slaveInfoMap[rid].opTime;
         if (slaveOpTime < ts) {
             slaveOpTime = ts;
             // TODO(spencer): update write concern tags if we're a replSet
@@ -206,9 +207,9 @@ namespace repl {
             numNodes = writeConcern.wNumNodes;
         }
 
-        for (SlaveOpTimeMap::iterator it = _slaveOpTimeMap.begin();
-                it != _slaveOpTimeMap.end(); ++it) {
-            const OpTime& slaveTime = it->second;
+        for (SlaveInfoMap::iterator it = _slaveInfoMap.begin();
+                it != _slaveInfoMap.end(); ++it) {
+            const OpTime& slaveTime = it->second.opTime;
             if (slaveTime >= opId) {
                 --numNodes;
             }
@@ -479,17 +480,46 @@ namespace repl {
 
     Status ReplicationCoordinatorImpl::processReplSetUpdatePositionHandshake(
             const OperationContext* txn,
-            const BSONObj& handshake,
+            const BSONObj& cmdObj,
             BSONObjBuilder* resultObj) {
-        // TODO
+        OID rid = cmdObj["handshake"].OID();
+        Status status = processHandshake(txn, rid, cmdObj);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // TODO(spencer): if we aren't primary, pass the handshake along
+        // _syncSourceFeedback.forwardSlaveHandshake();
         return Status::OK();
     }
 
-    bool ReplicationCoordinatorImpl::processHandshake(const OperationContext*,
-                                                      const OID& remoteID,
-                                                      const BSONObj& handshake) {
-        // TODO
-        return false;
+    Status ReplicationCoordinatorImpl::processHandshake(const OperationContext* txn,
+                                                        const OID& remoteID,
+                                                        const BSONObj& handshake) {
+        LOG(2) << "Received handshake " << handshake << " from node with RID " << remoteID;
+
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        SlaveInfo& slaveInfo = _slaveInfoMap[remoteID];
+        if (getReplicationMode() == modeReplSet) {
+            if (!handshake.hasField("member")) {
+                return Status(ErrorCodes::ProtocolError,
+                              str::stream() << "Handshake object did not contain \"member\" field. "
+                                      "Handshake: " << handshake);
+            }
+            int memberID = handshake["member"].Int();
+            const MemberConfig* member = _rsConfig.findMemberByID(memberID);
+            if (!member) {
+                return Status(ErrorCodes::NodeNotFound,
+                              str::stream() << "Node with replica set member ID " << memberID <<
+                                      " could not be found in replica set config during handshake");
+            }
+            slaveInfo.memberID = memberID;
+            slaveInfo.hostAndPort = member->getHostAndPort();
+        } else {
+            slaveInfo.memberID = -1;
+            slaveInfo.hostAndPort = _externalState->getClientHostAndPort(txn);
+        }
+        return Status::OK();
     }
 
     void ReplicationCoordinatorImpl::waitUpToOneSecondForOptimeChange(const OpTime& ot) {

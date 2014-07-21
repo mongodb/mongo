@@ -399,9 +399,9 @@ namespace repl {
 
         /**
          * Handles an incoming replSetUpdatePosition command that contains a handshake.
-         * returns Status::OK() if the handshake processes properly, ErrorCodes::NodeNotFound
-         * if the handshaking node cannot be found in the config, or any of the normal replset
+         * returns the same codes as processHandshake below, as well as any of the normal replset
          * command ErrorCodes.
+         * TODO(spencer): Remove this method in favor of just using processHandshake
          */
         virtual Status processReplSetUpdatePositionHandshake(const OperationContext* txn,
                                                              const BSONObj& handshake,
@@ -413,12 +413,14 @@ namespace repl {
          * to update local.slaves and to forward the node's replication progress upstream when this
          * node is being chained through.
          *
-         * Returns true if it was able to associate the 'remoteID' and 'handshake' and false
-         * otherwise.
+         * Returns ErrorCodes::ProtocolError if the handshake is missing required fields and
+         * ErrorCodes::NodeNotFound if no replica set member is found with the given member ID.
+         *
+         * TODO(spencer): Remove remoteID arg and get it from the handshake instead.
          */
-        virtual bool processHandshake(const OperationContext* txn,
-                                      const OID& remoteID,
-                                      const BSONObj& handshake) = 0;
+        virtual Status processHandshake(const OperationContext* txn,
+                                        const OID& remoteID,
+                                        const BSONObj& handshake) = 0;
 
         /**
          * Returns once the oplog's most recent entry changes or after one second, whichever

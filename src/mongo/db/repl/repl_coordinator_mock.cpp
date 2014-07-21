@@ -226,11 +226,10 @@ namespace repl {
         return Status::OK();
     }
 
-    bool ReplicationCoordinatorMock::processHandshake(const OperationContext* txn,
-                                                      const OID& remoteID,
-                                                      const BSONObj& handshake) {
-        // TODO
-        return false;
+    Status ReplicationCoordinatorMock::processHandshake(const OperationContext* txn,
+                                                        const OID& remoteID,
+                                                        const BSONObj& handshake) {
+        return Status::OK();
     }
 
     void ReplicationCoordinatorMock::waitUpToOneSecondForOptimeChange(const OpTime& ot) {

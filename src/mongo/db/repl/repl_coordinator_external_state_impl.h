@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/bson/oid.h"
 #include "mongo/db/repl/repl_coordinator_external_state.h"
 
 namespace mongo {
@@ -42,6 +41,7 @@ namespace repl {
         virtual ~ReplicationCoordinatorExternalStateImpl();
         virtual OID ensureMe();
         virtual bool isSelf(const HostAndPort& host);
+        virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
     };
 
 } // namespace repl

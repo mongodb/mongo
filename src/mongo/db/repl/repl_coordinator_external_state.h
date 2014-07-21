@@ -29,11 +29,12 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/bson/oid.h"
 
 namespace mongo {
 
     struct HostAndPort;
+    class OID;
+    class OperationContext;
 
 namespace repl {
 
@@ -61,6 +62,12 @@ namespace repl {
          * Returns true if "host" is one of the network identities of this node.
          */
         virtual bool isSelf(const HostAndPort& host) = 0;
+
+        /**
+         * Returns the HostAndPort of the remote client connected to us that initiated the operation
+         * represented by "txn".
+         */
+        virtual HostAndPort getClientHostAndPort(const OperationContext* txn) = 0;
     };
 
 } // namespace repl

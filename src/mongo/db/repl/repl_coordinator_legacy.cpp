@@ -994,21 +994,21 @@ namespace {
         }
 
         OID rid = cmdObj["handshake"].OID();
-        if (!processHandshake(txn, rid, cmdObj)) {
-            return Status(ErrorCodes::NodeNotFound,
-                          "node could not be found in replica set config during handshake");
+        status = processHandshake(txn, rid, cmdObj);
+        if (!status.isOK()) {
+            return status;
         }
 
-        // if we aren't primary, pass the handshake along
-        if (!theReplSet->isPrimary()) {
+        // if we're a replset and aren't primary, pass the handshake along
+        if (theReplSet && !theReplSet->isPrimary()) {
             theReplSet->syncSourceFeedback.forwardSlaveHandshake();
         }
         return Status::OK();
     }
 
-    bool LegacyReplicationCoordinator::processHandshake(const OperationContext* txn,
-                                                        const OID& remoteID,
-                                                        const BSONObj& handshake) {
+    Status LegacyReplicationCoordinator::processHandshake(const OperationContext* txn,
+                                                          const OID& remoteID,
+                                                          const BSONObj& handshake) {
         LOG(2) << "Received handshake " << handshake << " from node with RID " << remoteID;
 
         boost::lock_guard<boost::mutex> lock(_mutex);
@@ -1021,8 +1021,14 @@ namespace {
         }
         _ridConfigMap[remoteID] = configObj;
 
-        if (getReplicationMode() != modeReplSet || !handshake.hasField("member")) {
-            return false;
+        if (getReplicationMode() != modeReplSet) {
+            return Status::OK();
+        }
+
+        if (!handshake.hasField("member")) {
+            return Status(ErrorCodes::ProtocolError,
+                          str::stream() << "Handshake object did not contain \"member\" field.  "
+                                  "Handshake" << handshake);
         }
 
         int memberID = handshake["member"].Int();
@@ -1031,12 +1037,14 @@ namespace {
         // in that case, the Member will no longer be in theReplSet's _members List and member
         // will be NULL
         if (!member) {
-            return false;
+            return Status(ErrorCodes::NodeNotFound,
+                          str::stream() << "Node with replica set member ID " << memberID <<
+                                  " could not be found in replica set config during handshake");
         }
 
         _ridMemberMap[remoteID] = member;
         theReplSet->syncSourceFeedback.forwardSlaveHandshake();
-        return true;
+        return Status::OK();
     }
 
     void LegacyReplicationCoordinator::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
