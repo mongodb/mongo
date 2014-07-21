@@ -105,7 +105,7 @@ namespace mongo {
         Status dropCollection( OperationContext* opCtx,
                                const StringData& ns );
 
-        /** 
+        /**
          * Will create if doesn't exist. The collection has to exist first, though.
          * The ordering argument is only used if the column family does not exist. If the
          * column family does not exist, then ordering must be a non-empty optional, containing
@@ -155,7 +155,7 @@ namespace mongo {
         Map _map;
 
         // private methods that should only be called from the RocksEngine constructor
-        
+
         /**
          * Create Entry's for all non-index column families. See larger comment in .cpp for why
          * this is necessary
@@ -173,7 +173,7 @@ namespace mongo {
          * the database. These Entry structs do not need to be fully initialized, but the
          * collectionEntry field must be.
          *
-         * @param nsVec a vector containing all the namespaces in this database 
+         * @param nsVec a vector containing all the namespaces in this database
          */
         CfdVector _generateMetaDataCfds( const EntryVector& entries,
                                          const std::vector<string>& nsVec ) const;
@@ -181,7 +181,7 @@ namespace mongo {
         /**
          * Helper function to the _createIndexOrderings method
          *
-         * @param namespaces a vector containing all the namespaces in this database 
+         * @param namespaces a vector containing all the namespaces in this database
          */
         std::map<string, Ordering> _createIndexOrderingsHelper(
                 const std::vector<std::string>& namespaces );
@@ -191,7 +191,7 @@ namespace mongo {
          * needed to properly open column families representing indexes, because an Ordering for
          * each such index is needed in order to create the comparator for the column family.
          *
-         * @param namespaces a vector containing all the namespaces in this database 
+         * @param namespaces a vector containing all the namespaces in this database
          * @param path a path to the database files for the rocksdb database
          * @param an uninitialized pointer to a rocksdb database
          */
@@ -206,19 +206,19 @@ namespace mongo {
          * @param path a path to the database files for the rocksdb database
          * @param an uninitialized pointer to a rocksdb database
          */
-        CfdVector _createCfds ( const string& path, rocksdb::DB* const db);        
+        CfdVector _createCfds ( const string& path, rocksdb::DB* const db);
 
         /**
          * Create a complete Entry object in _map for every ColumnFamilyDescriptor. Assumes that, if
-         * the collectionEntry field should be initialized, that is already has been prior to this 
-         * function call. 
+         * the collectionEntry field should be initialized, that is already has been prior to this
+         * function call.
          *
          * @param families A vector of column family descriptors for every column family in the
          * database
-         * @param handles A vector of column family handles for every column family in the 
+         * @param handles A vector of column family handles for every column family in the
          * database
          */
-        void _createEntries( const CfdVector& families, 
+        void _createEntries( const CfdVector& families,
                              const std::vector<rocksdb::ColumnFamilyHandle*> handles );
     };
 }

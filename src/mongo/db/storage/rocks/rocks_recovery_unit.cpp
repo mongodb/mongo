@@ -43,7 +43,7 @@ namespace mongo {
                                        : _db( db ),
                                        _defaultCommit( defaultCommit ),
                                        _writeBatch(  ),
-                                       _depth( 0 ), 
+                                       _depth( 0 ),
                                        _snapshot( NULL ) {
         _writeBatch.reset( new rocksdb::WriteBatch() );
     }
@@ -118,7 +118,7 @@ namespace mongo {
 
     // XXX lazily initialized for now
     // This is lazily initialized for simplicity so long as we still
-    // have database-level locking. If a method needs to access the snapshot, 
+    // have database-level locking. If a method needs to access the snapshot,
     // and it has not been initialized, then it knows it is the first
     // method to access the snapshot, and can initialize it before using it.
     const rocksdb::Snapshot* RocksRecoveryUnit::snapshot() {

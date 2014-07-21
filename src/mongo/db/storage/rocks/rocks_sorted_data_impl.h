@@ -57,7 +57,7 @@ namespace mongo {
      * in the column family. Consequently, each value in the database is simply an empty string.
      * This is done to take advantage of the fact that RocksDB can take a custom comparator to use
      * when ordering keys. We use a custom comparator which orders keys based first upon the
-     * BSONObj in the key, and uses the DiskLoc as a tiebreaker.   
+     * BSONObj in the key, and uses the DiskLoc as a tiebreaker.
      */
     class RocksSortedDataImpl : public SortedDataInterface {
         MONGO_DISALLOW_COPYING( RocksSortedDataImpl );
@@ -108,8 +108,8 @@ namespace mongo {
      * Namely, it is necessary to support conversion to and from a rocksdb::Slice. This class also
      * handles the necessary conversion to and from a BSONObj-DiskLoc pair and the string
      * representation of such a pair. This is important because these BSONObj-DiskLoc pairs are
-     * used as keys in the column families which represent indexes (see comment for the 
-     * RocksSortedDataImpl class for more information) 
+     * used as keys in the column families which represent indexes (see comment for the
+     * RocksSortedDataImpl class for more information)
      */
     class RocksIndexEntry: public IndexKeyEntry {
     public:
@@ -122,7 +122,7 @@ namespace mongo {
         RocksIndexEntry( const BSONObj& key, const DiskLoc loc, bool stripFieldNames = true );
 
         /**
-         * Constructs a RocksIndexEntry from a Slice. 
+         * Constructs a RocksIndexEntry from a Slice.
          */
         RocksIndexEntry( const rocksdb::Slice& slice );
 

@@ -346,7 +346,7 @@ namespace mongo {
     TEST( RocksRecordStoreTest, Stats1 ) {
         scoped_ptr<rocksdb::DB> db( getDB() );
 
-        RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), 
+        RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(),
                                                     db->DefaultColumnFamily() );
         string s = "eliot was here";
 
@@ -380,7 +380,7 @@ namespace mongo {
         {
             scoped_ptr<rocksdb::DB> db( getDB() );
 
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), 
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(),
                                                       db->DefaultColumnFamily() );
 
             {
@@ -399,7 +399,7 @@ namespace mongo {
         {
             scoped_ptr<rocksdb::DB> db( getDBPersist() );
 
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), 
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(),
                                                       db->DefaultColumnFamily() );
 
             ASSERT_EQUALS( (long long) s.size() + 1, rs.dataSize() );
@@ -409,7 +409,7 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
-                    StatusWith<DiskLoc> res = rs.updateRecord( &opCtx, loc, s1.c_str(), 
+                    StatusWith<DiskLoc> res = rs.updateRecord( &opCtx, loc, s1.c_str(),
                                                                         s1.size() + 1, -1, NULL );
                     ASSERT_OK( res.getStatus() );
                 }
@@ -421,7 +421,7 @@ namespace mongo {
         {
             scoped_ptr<rocksdb::DB> db( getDBPersist() );
 
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(), 
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(),
                                                       db->DefaultColumnFamily() );
 
             ASSERT_EQUALS( (long long) s1.size() + 1, rs.dataSize() );
@@ -527,7 +527,7 @@ namespace mongo {
             }
 
             OperationContextNoop txn;
-            scoped_ptr<RecordIterator> iter(rs.getIterator(&txn, DiskLoc(), false, 
+            scoped_ptr<RecordIterator> iter(rs.getIterator(&txn, DiskLoc(), false,
                                              CollectionScanParams::BACKWARD));
             ASSERT_EQUALS( false, iter->isEOF() );
             ASSERT_EQUALS( s2, iter->dataFor(loc3).data() );

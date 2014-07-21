@@ -69,7 +69,7 @@ namespace mongo {
 
         virtual bool isCapped() const;
 
-        virtual int64_t storageSize( OperationContext* txn, 
+        virtual int64_t storageSize( OperationContext* txn,
                                      BSONObjBuilder* extraInfo = NULL,
                                      int infoLevel = 0 ) const;
 

@@ -77,7 +77,7 @@ namespace mongo {
         iter->SeekToLast();
         if (iter->Valid()) {
             rocksdb::Slice lastSlice = iter->key();
-            DiskLoc lastLoc = reinterpret_cast<DiskLoc*>( const_cast<char*>( 
+            DiskLoc lastLoc = reinterpret_cast<DiskLoc*>( const_cast<char*>(
                                                            lastSlice.data() ) )[0];
             _nextIdNum = lastLoc.a() + ( (uint64_t) lastLoc.getOfs() << 32 ) + 1;
         }
@@ -120,8 +120,8 @@ namespace mongo {
         return _isCapped;
     }
 
-    int64_t RocksRecordStore::storageSize( OperationContext* txn, 
-                                           BSONObjBuilder* extraInfo, 
+    int64_t RocksRecordStore::storageSize( OperationContext* txn,
+                                           BSONObjBuilder* extraInfo,
                                            int infoLevel ) const {
         return dataSize(); // todo: this isn't very good
     }
@@ -517,7 +517,7 @@ namespace mongo {
     }
 
     RecordData RocksRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
-        if (_iterator->Valid() && 
+        if (_iterator->Valid() &&
                 *reinterpret_cast<const DiskLoc*>( _iterator->key().data() ) == loc) {
             rocksdb::Slice data_slice = _iterator->value();
 

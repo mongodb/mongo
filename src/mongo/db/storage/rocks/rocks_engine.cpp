@@ -62,7 +62,7 @@ namespace mongo {
             ROCK_STATUS_OK( s );
             return;
         }
-        
+
         // Open the database, getting handles for every column family
         std::vector<rocksdb::ColumnFamilyHandle*> handles;
         rocksdb::Status s = rocksdb::DB::Open( _dbOptions(), path, families, &handles, &_db );
@@ -265,7 +265,7 @@ namespace mongo {
                                     options.cappedSize ? options.cappedSize : 4096, // default size
                                     options.cappedMaxDocs ? options.cappedMaxDocs : -1 ));
         else
-            entry->recordStore.reset( new RocksRecordStore( ns, _db, 
+            entry->recordStore.reset( new RocksRecordStore( ns, _db,
                                                 entry->cfHandle.get(), cf_meta ) );
 
         entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
@@ -325,14 +325,14 @@ namespace mongo {
     }
 
     /**
-     * Create Entry's for all non-index column families in the database. This method is called by 
+     * Create Entry's for all non-index column families in the database. This method is called by
      * the constructor. It is necessary because information about indexes is needed before a
      * column family representing an index can be opened (specifically, the orderings used in the
      * comparators for these column families needs to be known). This information is accessed
      * through the RocksCollectionCatalogEntry class for each non-index column family in the
      * database. Hence, this method.
      */
-    RocksEngine::EntryVector RocksEngine::_createNonIndexCatalogEntries( 
+    RocksEngine::EntryVector RocksEngine::_createNonIndexCatalogEntries(
                                               const vector<string>& namespaces ) {
         EntryVector entries;
 
@@ -364,19 +364,19 @@ namespace mongo {
         return entries;
     }
 
-    RocksEngine::CfdVector RocksEngine::_generateMetaDataCfds( const EntryVector& entries, 
+    RocksEngine::CfdVector RocksEngine::_generateMetaDataCfds( const EntryVector& entries,
                                                                const vector<string>& nsVec ) const {
         set<string> namespaces( nsVec.begin(), nsVec.end() );
-        
+
         CfdVector cfds;
 
         // the default column family must always be included, as per rocksdb specifications
-        cfds.push_back( rocksdb::ColumnFamilyDescriptor( rocksdb::kDefaultColumnFamilyName, 
+        cfds.push_back( rocksdb::ColumnFamilyDescriptor( rocksdb::kDefaultColumnFamilyName,
                                                          _collectionOptions() ) );
 
         for ( unsigned i = 0; i < entries.size(); ++i ) {
             string columnFamilyName = entries[i]->collectionEntry->metaDataKey();
-            
+
             // some column families don't have corresponding metadata column families,
             // so before blindly opening a metadata column family, we check to see that it exists
             if ( namespaces.find( columnFamilyName ) == namespaces.end() ) {
@@ -431,12 +431,12 @@ namespace mongo {
 
         // open all the metadata column families so that we can retrieve information about
         // each index, which is needed in order to open the index column families
-        CfdVector metaDataCfds = _generateMetaDataCfds( nonIndexEntries, namespaces ); 
+        CfdVector metaDataCfds = _generateMetaDataCfds( nonIndexEntries, namespaces );
         vector<rocksdb::ColumnFamilyHandle*> metaDataHandles;
-        rocksdb::Status openROStatus = rocksdb::DB::OpenForReadOnly( _dbOptions(), 
-                                                                     path, 
-                                                                     metaDataCfds, 
-                                                                     &metaDataHandles, 
+        rocksdb::Status openROStatus = rocksdb::DB::OpenForReadOnly( _dbOptions(),
+                                                                     path,
+                                                                     metaDataCfds,
+                                                                     &metaDataHandles,
                                                                      &_db );
 
         ROCK_STATUS_OK( openROStatus );
@@ -448,7 +448,7 @@ namespace mongo {
         delete db;
 
         return indexOrderings;
-    } 
+    }
 
     RocksEngine::CfdVector RocksEngine::_createCfds( const string& path, rocksdb::DB* const db ) {
         std::vector<rocksdb::ColumnFamilyDescriptor> families;
@@ -456,7 +456,7 @@ namespace mongo {
         std::vector<std::string> namespaces;
         if ( boost::filesystem::exists( path ) ) {
             rocksdb::Status s = rocksdb::DB::ListColumnFamilies(_dbOptions(), path, &namespaces);
-            
+
             if ( s.IsIOError() ) {
                 // DNE, ok
             } else {
@@ -469,7 +469,7 @@ namespace mongo {
         }
 
         // Create a mapping from index names to the Ordering object for each index. These Ordering
-        // objects will be used to create RocksIndexEntryComparators to be used with each 
+        // objects will be used to create RocksIndexEntryComparators to be used with each
         // column family representing a namespace
         map<string, Ordering> indexOrderings = _createIndexOrderings( namespaces, path, _db );
 
@@ -479,7 +479,7 @@ namespace mongo {
 
             if ( isIndex ) {
                 rocksdb::ColumnFamilyOptions options = _indexOptions();
-                
+
                 string indexName = ns.substr( ns.find( '$' ) + 1 );
                 invariant( indexOrderings.find( indexName ) != indexOrderings.end() );
 
@@ -496,7 +496,7 @@ namespace mongo {
         return families;
     }
 
-    void RocksEngine::_createEntries( const CfdVector& families, 
+    void RocksEngine::_createEntries( const CfdVector& families,
                                       const vector<rocksdb::ColumnFamilyHandle*> handles ) {
         std::map<string, int> metadataMap;
         for ( unsigned i = 0; i < families.size(); i++ ) {
@@ -545,13 +545,13 @@ namespace mongo {
                 entry->cfHandle.reset( handles[i] );
                 entry->metaCfHandle.reset( handles[metadataMap[ns]] );
                 if ( options.capped ) {
-                    entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i], 
-                            handles[metadataMap[ns]], 
-                            options.capped, 
+                    entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i],
+                            handles[metadataMap[ns]],
+                            options.capped,
                             options.cappedSize ? options.cappedSize : 4096, // default size
                             options.cappedMaxDocs ? options.cappedMaxDocs : -1) );
                 } else {
-                    entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i], 
+                    entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i],
                             handles[metadataMap[ns]] ) );
                 }
                 // entry->collectionEntry is set in _createNonIndexCatalogEntries()

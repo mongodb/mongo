@@ -61,9 +61,9 @@ namespace mongo {
                 _checkStatus();
             }
 
-            virtual ~RocksCursor() { } 
+            virtual ~RocksCursor() { }
 
-            int getDirection() const { 
+            int getDirection() const {
                 return _forward ? 1 : -1;
             }
 
@@ -251,7 +251,7 @@ namespace mongo {
     }
 
     // RocksIndexEntry***********
-    
+
     RocksIndexEntry::RocksIndexEntry( const BSONObj& key, const DiskLoc loc, bool stripFieldNames )
         : IndexKeyEntry( key, loc ) {
 
@@ -347,7 +347,7 @@ namespace mongo {
         if ( cursor->isEOF() )
             return Status::OK();
 
-        return cursor->getDiskLoc() == loc ? Status::OK() : 
+        return cursor->getDiskLoc() == loc ? Status::OK() :
                 Status(ErrorCodes::DuplicateKey, dupKeyError(key));
     }
 
@@ -374,7 +374,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    SortedDataInterface::Cursor* RocksSortedDataImpl::newCursor(OperationContext* txn, 
+    SortedDataInterface::Cursor* RocksSortedDataImpl::newCursor(OperationContext* txn,
                                                                 int direction) const {
         invariant( ( direction == 1 || direction == -1 ) && "invalid value for direction" );
         rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );

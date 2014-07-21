@@ -40,7 +40,7 @@ namespace mongo {
     class RocksIndexEntryComparator : public rocksdb::Comparator {
     public:
         RocksIndexEntryComparator(Ordering order): _indexComparator(order) { }
-        virtual ~RocksIndexEntryComparator() { } 
+        virtual ~RocksIndexEntryComparator() { }
 
         virtual int Compare(const rocksdb::Slice& a, const rocksdb::Slice& b) const;
 
