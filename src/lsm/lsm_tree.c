@@ -83,7 +83,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		else
 			__wt_yield();
 	}
-	while (lsm_tree->refcnt > 1 && lsm_tree->queue_ref > 0)
+	while (lsm_tree->refcnt > 1 || lsm_tree->queue_ref > 0)
 		__wt_yield();
 	return (0);
 }
