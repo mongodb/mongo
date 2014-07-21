@@ -110,6 +110,11 @@ namespace repl {
         bool isVoter() const { return _isVoter; }
 
         /**
+         * Returns the number of votes that this member gets.
+         */
+        int getNumVotes() const { return isVoter() ? 1 : 0; }
+
+        /**
          * Returns true if this member is an arbiter (is not data-bearing).
          */
         bool isArbiter() const { return _arbiterOnly; }
@@ -138,6 +143,11 @@ namespace repl {
          * Gets an end iterator over the tags for this member.
          */
         TagIterator tagsEnd() const { return _tags.end(); }
+
+        /**
+         * Returns true if this represents the configuration of an electable member.
+         */
+        bool isElectable() const { return !isArbiter() && getPriority() > 0; }
 
         /**
          * Returns the member config as a BSONObj, using "tagConfig" to generate the tag subdoc.
