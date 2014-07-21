@@ -2652,15 +2652,20 @@ namespace mongo {
         /**
          * Designed to be used with boost::bind to be called on every user object in the result
          * set of a query over the tempUsersCollection provided to the command.  For each user
-         * in the temp collection, adds that user to the actual admin.system.users collection.
+         * in the temp collection that is defined on the given db, adds that user to the actual
+         * admin.system.users collection.
          * Also removes any users it encounters from the usersToDrop set.
          */
         static void addUser(AuthorizationManager* authzManager,
+                            const StringData& db,
                             bool update,
                             const BSONObj& writeConcern,
                             unordered_set<UserName>* usersToDrop,
                             const BSONObj& userObj) {
             UserName userName = extractUserNameFromBSON(userObj);
+            if (!db.empty() && userName.getDB() != db) {
+                return;
+            }
 
             if (update && usersToDrop->count(userName)) {
                 auditCreateOrUpdateUser(userObj, false);
@@ -2689,15 +2694,20 @@ namespace mongo {
         /**
          * Designed to be used with boost::bind to be called on every role object in the result
          * set of a query over the tempRolesCollection provided to the command.  For each role
-         * in the temp collection, adds that role to the actual admin.system.roles collection.
+         * in the temp collection that is defined on the given db, adds that role to the actual
+         * admin.system.roles collection.
          * Also removes any roles it encounters from the rolesToDrop set.
          */
         static void addRole(AuthorizationManager* authzManager,
+                            const StringData& db,
                             bool update,
                             const BSONObj& writeConcern,
                             unordered_set<RoleName>* rolesToDrop,
                             const BSONObj roleObj) {
             RoleName roleName = extractRoleNameFromBSON(roleObj);
+            if (!db.empty() && roleName.getDB() != db) {
+                return;
+            }
 
             if (update && rolesToDrop->count(roleName)) {
                 auditCreateOrUpdateRole(roleObj, false);
@@ -2727,6 +2737,7 @@ namespace mongo {
          */
         Status processUsers(AuthorizationManager* authzManager,
                             const StringData& usersCollName,
+                            const StringData& db,
                             bool drop,
                             const BSONObj& writeConcern) {
             // When the "drop" argument has been provided, we use this set to store the users
@@ -2742,12 +2753,14 @@ namespace mongo {
 
             if (drop) {
                 // Create map of the users currently in the DB
+                BSONObj query = db.empty() ?
+                        BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db);
                 BSONObj fields = BSON(AuthorizationManager::USER_NAME_FIELD_NAME << 1 <<
                                       AuthorizationManager::USER_DB_FIELD_NAME << 1);
 
                 Status status = authzManager->queryAuthzDocument(
                         AuthorizationManager::usersCollectionNamespace,
-                        BSONObj(),
+                        query,
                         fields,
                         boost::bind(&CmdMergeAuthzCollections::extractAndInsertUserName,
                                     &usersToDrop,
@@ -2759,10 +2772,11 @@ namespace mongo {
 
             Status status = authzManager->queryAuthzDocument(
                     NamespaceString(usersCollName),
-                    BSONObj(),
+                    db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db),
                     BSONObj(),
                     boost::bind(&CmdMergeAuthzCollections::addUser,
                                 authzManager,
+                                db,
                                 drop,
                                 writeConcern,
                                 &usersToDrop,
@@ -2801,6 +2815,7 @@ namespace mongo {
          */
         Status processRoles(AuthorizationManager* authzManager,
                             const StringData& rolesCollName,
+                            const StringData& db,
                             bool drop,
                             const BSONObj& writeConcern) {
             // When the "drop" argument has been provided, we use this set to store the roles
@@ -2815,12 +2830,14 @@ namespace mongo {
 
             if (drop) {
                 // Create map of the roles currently in the DB
+                BSONObj query = db.empty() ?
+                        BSONObj() : BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << db);
                 BSONObj fields = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << 1 <<
                                       AuthorizationManager::ROLE_SOURCE_FIELD_NAME << 1);
 
                 Status status = authzManager->queryAuthzDocument(
                         AuthorizationManager::rolesCollectionNamespace,
-                        BSONObj(),
+                        query,
                         fields,
                         boost::bind(&CmdMergeAuthzCollections::extractAndInsertRoleName,
                                     &rolesToDrop,
@@ -2832,10 +2849,12 @@ namespace mongo {
 
             Status status = authzManager->queryAuthzDocument(
                     NamespaceString(rolesCollName),
-                    BSONObj(),
+                    db.empty() ?
+                            BSONObj() : BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << db),
                     BSONObj(),
                     boost::bind(&CmdMergeAuthzCollections::addRole,
                                 authzManager,
+                                db,
                                 drop,
                                 writeConcern,
                                 &rolesToDrop,
@@ -2904,6 +2923,7 @@ namespace mongo {
             if (!args.usersCollName.empty()) {
                 Status status = processUsers(authzManager,
                                              args.usersCollName,
+                                             args.db,
                                              args.drop,
                                              args.writeConcern);
                 if (!status.isOK()) {
@@ -2914,6 +2934,7 @@ namespace mongo {
             if (!args.rolesCollName.empty()) {
                 Status status = processRoles(authzManager,
                                              args.rolesCollName,
+                                             args.db,
                                              args.drop,
                                              args.writeConcern);
                 if (!status.isOK()) {
