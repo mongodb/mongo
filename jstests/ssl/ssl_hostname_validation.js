@@ -14,7 +14,7 @@ TestData.useSSL = false;
 
 port = allocatePorts(1)[0];
 
-function testCombination(certPath, allowInvalidCert, shouldSucceed) {
+function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
     MongoRunner.runMongod({port: port,
                            sslMode: "requireSSL", 
                            sslPEMKeyFile: certPath,
@@ -28,7 +28,13 @@ function testCombination(certPath, allowInvalidCert, shouldSucceed) {
                                 "--sslAllowInvalidCertificates",
                                 "--eval", ";");
     }
-    else { 
+    else if (allowInvalidHost) {
+        mongo = runMongoProgram("mongo", "--port", port, "--ssl",
+                                "--sslCAFile", CA_CERT,
+                                "--sslPEMKeyFile", CLIENT_CERT,
+                                "--sslAllowInvalidHostnames",
+                                "--eval", ";");
+    } else {
         mongo = runMongoProgram("mongo", "--port", port, "--ssl", 
                                 "--sslCAFile", CA_CERT, 
                                 "--sslPEMKeyFile", CLIENT_CERT,
@@ -50,10 +56,12 @@ function testCombination(certPath, allowInvalidCert, shouldSucceed) {
 
 // 1. Test client connections with different server certificates
 // and allowInvalidCertificates
-testCombination(CN_CERT, false, true);
-testCombination(SAN_CERT, false, true);
-testCombination(SERVER_CERT, false, false);
-testCombination(SERVER_CERT, true, true);
+testCombination(CN_CERT, false, false, true);
+testCombination(SAN_CERT, false, false, true);
+testCombination(SERVER_CERT, false, false, false);
+testCombination(SERVER_CERT, false, true, true);
+testCombination(SERVER_CERT, true, false, true);
+testCombination(SERVER_CERT, true, true, true);
 
 // 2. Initiate ReplSetTest with invalid certs
 ssl_options = {sslMode : "requireSSL",
@@ -65,7 +73,18 @@ replTest.startSet();
 assert.throws( function() { replTest.initiate() } );
 replTest.stopSet();
 
-// 3. Initiate ReplSetTest with invalid certs but set allowInvalidCertificates
+// 3. Initiate ReplSetTest with invalid certs but set allowInvalidHostnames
+ssl_options = {sslMode : "requireSSL",
+               sslPEMKeyFile : SERVER_CERT,
+               sslCAFile: CA_CERT,
+               sslAllowInvalidHostnames: ""};
+
+var replTest = new ReplSetTest({nodes : {node0 : ssl_options, node1 : ssl_options}});
+replTest.startSet();
+replTest.initiate();
+replTest.stopSet();
+
+// 4. Initiate ReplSetTest with invalid certs but set allowInvalidCertificates
 ssl_options = {sslMode : "requireSSL",
                sslPEMKeyFile : SERVER_CERT,
                sslCAFile: CA_CERT,

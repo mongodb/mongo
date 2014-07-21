@@ -56,6 +56,9 @@ namespace mongo {
                 "sslWeakCertificateValidation", moe::Switch, "allow client to connect without "
                 "presenting a certificate");
 
+        options->addOptionChaining("net.ssl.allowInvalidHostnames", "sslAllowInvalidHostnames",
+                moe::Switch, "Allow server certificates to provide non-matching hostnames");
+
         options->addOptionChaining("net.ssl.allowInvalidCertificates", "sslAllowInvalidCertificates",
                     moe::Switch, "allow connections to servers with invalid certificates");
 
@@ -84,6 +87,10 @@ namespace mongo {
                 "Certificate Revocation List file for SSL")
                                   .requires("ssl")
                                   .requires("ssl.CAFile");
+
+        options->addOptionChaining("net.ssl.allowInvalidHostnames", "sslAllowInvalidHostnames",
+                    moe::Switch, "allow connections to servers with non-matching hostnames")
+                                  .requires("ssl");
 
         options->addOptionChaining("ssl.allowInvalidCertificates", "sslAllowInvalidCertificates",
                     moe::Switch, "allow connections to servers with invalid certificates")
@@ -166,6 +173,10 @@ namespace mongo {
         if (params.count("net.ssl.weakCertificateValidation")) {
             sslGlobalParams.sslWeakCertificateValidation = true;
         }
+        if (params.count("net.ssl.allowInvalidHostnames")) {
+            sslGlobalParams.sslAllowInvalidHostnames =
+                params["net.ssl.allowInvalidHostnames"].as<bool>();
+        }
         if (params.count("net.ssl.allowInvalidCertificates")) {
             sslGlobalParams.sslAllowInvalidCertificates = true;
         }
@@ -237,6 +248,10 @@ namespace mongo {
         }
         if (params.count("ssl.CRLFile")) {
             sslGlobalParams.sslCRLFile = params["ssl.CRLFile"].as<std::string>();
+        }
+        if (params.count("net.ssl.allowInvalidHostnames")) {
+            sslGlobalParams.sslAllowInvalidHostnames =
+                params["net.ssl.allowInvalidHostnames"].as<bool>();
         }
         if (params.count("ssl.allowInvalidCertificates")) {
             sslGlobalParams.sslAllowInvalidCertificates = true;
