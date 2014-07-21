@@ -172,6 +172,9 @@ namespace {
         else if (SPHERE == geoQuery.getGeometry().getNativeCRS()) {
             *os << "sp";
         }
+        else if (STRICT_SPHERE == geoQuery.getGeometry().getNativeCRS()) {
+            *os << "ss";
+        }
         else {
             error() << "unknown CRS type " << (int)geoQuery.getGeometry().getNativeCRS()
                     << " in geometry of type " << geoQuery.getGeometry().getDebugType();
@@ -192,10 +195,11 @@ namespace {
         // isNearSphere
         *os << (nearQuery.isNearSphere ? "ns" : "nr");
 
-        // CRS (flat or spherical)
+        // CRS (flat or spherical or strict-winding spherical)
         switch (nearQuery.centroid.crs) {
         case FLAT: *os << "fl"; break;
         case SPHERE: *os << "sp"; break;
+        case STRICT_SPHERE: *os << "ss"; break;
         case UNSET:
             error() << "unknown CRS type " << (int)nearQuery.centroid.crs
                     << " in point geometry for near query";

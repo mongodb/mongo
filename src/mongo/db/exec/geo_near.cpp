@@ -151,6 +151,10 @@ namespace mongo {
 
             StoredGeometry& stored = **it;
 
+            // NOTE: A stored document with STRICT_SPHERE CRS is treated as a malformed document
+            // and ignored. Since GeoNear requires an index, there's no stored STRICT_SPHERE shape.
+            // So we don't check it here.
+
             // NOTE: For now, we're sure that if we get this far in the query we'll have an
             // appropriate index which validates the type of geometry we're pulling back here.
             // TODO: It may make sense to change our semantics and, by default, only return

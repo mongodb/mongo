@@ -271,6 +271,15 @@ namespace mongo {
         if (!(parseLegacyQuery(obj) || parseNewQuery(obj)))
             return false;
 
+        // Big polygon with strict winding order is represented as an S2Loop in SPHERE CRS.
+        // So converting the query to SPHERE CRS makes things easier than projecting all the data
+        // into STRICT_SPHERE CRS.
+        if (STRICT_SPHERE == geoContainer.getNativeCRS()) {
+            if (!geoContainer.supportsProject(SPHERE))
+                return false;
+            geoContainer.projectInto(SPHERE);
+        }
+
         // $geoIntersect queries are hardcoded to *always* be in SPHERE CRS
         // TODO: This is probably bad semantics, should not do this
         if (GeoQuery::INTERSECT == predicate) {

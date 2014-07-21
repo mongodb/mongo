@@ -153,7 +153,9 @@ namespace mongo {
     }
 
     static bool parseGeoJSONPolygonCoordinates(const vector<BSONElement>& coordinates,
-                                               const BSONObj &sourceObject, S2Polygon *out) {
+                                               const BSONObj &sourceObject,
+                                               S2Polygon *out) {
+
         const vector<BSONElement>& exteriorRing = coordinates[0].Array();
         vector<S2Point> exteriorVertices;
         if (!parsePoints(exteriorRing, &exteriorVertices)) { return false; }
@@ -204,6 +206,38 @@ namespace mongo {
         }
 
         return polyBuilder.AssemblePolygon(out, NULL);
+    }
+
+    static bool parseBigSimplePolygonCoordinates(const vector<BSONElement>& coordinates,
+                                                 const BSONObj &sourceObject,
+                                                 BigSimplePolygon *out) {
+
+        // Only one loop is allowed in a BigSimplePolygon
+        if (coordinates.size() != 1)
+            return false;
+
+        const vector<BSONElement>& exteriorRing = coordinates[0].Array();
+
+        vector<S2Point> exteriorVertices;
+        if (!parsePoints(exteriorRing, &exteriorVertices))
+            return false;
+
+        eraseDuplicatePoints(&exteriorVertices);
+
+        // The last point is duplicated.  We drop it, since S2Loop expects no
+        // duplicate points
+        exteriorVertices.resize(exteriorVertices.size() - 1);
+
+        // S2 Polygon loops must have 3 vertices
+        if (exteriorVertices.size() < 3)
+            return false;
+
+        auto_ptr<S2Loop> loop(new S2Loop(exteriorVertices));
+        if (!loop->IsValid())
+            return false;
+
+        out->Init(loop.release());
+        return true;
     }
 
     static bool parseLegacyPoint(const BSONObj &obj, Point *out) {
@@ -326,7 +360,7 @@ namespace mongo {
             BSONElement x = it.next();
             BSONElement y = it.next();
             out->oldPoint.x = x.Number();
-            out->oldPoint.y = y.Number(); 
+            out->oldPoint.y = y.Number();
             out->crs = FLAT;
         } else if (isGeoJSONPoint(obj)) {
             const vector<BSONElement>& coords = obj.getFieldDotted(GEOJSON_COORDINATES).Array();
@@ -401,8 +435,22 @@ namespace mongo {
     bool GeoParser::parsePolygon(const BSONObj &obj, PolygonWithCRS *out) {
         if (isGeoJSONPolygon(obj)) {
             const vector<BSONElement>& coordinates = obj.getFieldDotted(GEOJSON_COORDINATES).Array();
-            if (!parseGeoJSONPolygonCoordinates(coordinates, obj, &out->polygon)) { return false; }
-            out->crs = SPHERE;
+
+            if (!parseGeoJSONCRS(obj, &out->crs))
+                return false;
+
+            if (out->crs == SPHERE) {
+                out->s2Polygon.reset(new S2Polygon());
+                if (!parseGeoJSONPolygonCoordinates(coordinates, obj, out->s2Polygon.get())) {
+                    return false;
+                }
+            }
+            else if (out->crs == STRICT_SPHERE) {
+                out->bigPolygon.reset(new BigSimplePolygon());
+                if (!parseBigSimplePolygonCoordinates(coordinates, obj, out->bigPolygon.get())) {
+                    return false;
+                }
+            }
         } else {
             BSONObjIterator typeIt(obj);
             BSONElement type = typeIt.next();
@@ -580,7 +628,26 @@ namespace mongo {
         // see http://portal.opengeospatial.org/files/?artifact_id=24045
         // and http://spatialreference.org/ref/epsg/4326/
         // and http://www.geojson.org/geojson-spec.html#named-crs
-        return ("urn:ogc:def:crs:OGC:1.3:CRS84" == name) || ("EPSG:4326" == name);
+        return ("urn:ogc:def:crs:OGC:1.3:CRS84" == name) || ("EPSG:4326" == name) ||
+               ("urn:mongodb:strictwindingcrs:EPSG:4326" == name);
+    }
+
+    bool GeoParser::parseGeoJSONCRS(const BSONObj& obj, CRS* crs) {
+
+        dassert(crsIsOK(obj));
+
+        *crs = SPHERE;
+
+        if (!obj["crs"].eoo()) {
+            const string name = obj["crs"].Obj()["properties"].Obj()["name"].String();
+
+            if (name == "urn:mongodb:strictwindingcrs:EPSG:4326")
+                *crs = STRICT_SPHERE;
+            else
+                *crs = SPHERE;
+        }
+
+        return true;
     }
 
     bool GeoParser::isCap(const BSONObj &obj) {

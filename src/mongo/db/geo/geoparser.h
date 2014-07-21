@@ -82,6 +82,7 @@ namespace mongo {
         // returning states: missing, invalid, unknown, ok, etc. -- whatever
         // needed.
         static bool crsIsOK(const BSONObj& obj);
+        static bool parseGeoJSONCRS(const BSONObj& obj, CRS* crs);
     };
 
 }  // namespace mongo

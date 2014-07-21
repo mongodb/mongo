@@ -91,6 +91,11 @@ namespace {
         GeometryContainer geoContainer;
         if (!geoContainer.parseFrom(obj)) { return false; }
 
+        // Don't index big polygon
+        if (geoContainer.getNativeCRS() == STRICT_SPHERE) {
+            return false;
+        }
+
         // Only certain geometries can be indexed in the old index format S2_INDEX_VERSION_1.  See
         // definition of S2IndexVersion for details.
         if (params.indexVersion == S2_INDEX_VERSION_1 && !geoContainer.isSimpleContainer()) {
