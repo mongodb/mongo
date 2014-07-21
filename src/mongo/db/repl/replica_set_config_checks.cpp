@@ -146,6 +146,14 @@ namespace {
                           newConfig.getReplSetName());
         }
 
+        if (oldConfig.getReplSetName() != newConfig.getReplSetName()) {
+            return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                          str::stream() <<
+                          "New and old configurations differ in replica set name; "
+                          "old was " << oldConfig.getReplSetName() << ", and new is " <<
+                          newConfig.getReplSetName());
+        }
+
         //
         // For every member config mNew in newConfig, if there exists member config mOld in
         // oldConfig such that mNew.getId() == mOld.getId(), it is required that
@@ -154,6 +162,9 @@ namespace {
         // Similarly, for every member config mNew in newConfig, if there exists member confg mOld
         // in oldConfig such that mNew.getHostAndPort() == mOld.getHostAndPort(), it is required
         // that mNew.getId() == mOld.getId().
+        //
+        // Finally, one may not use reconfig to change the value of the buildIndexes or
+        // arbiterOnly flags.
         //
         for (ReplicaSetConfig::MemberIterator mNew = newConfig.membersBegin();
              mNew != newConfig.membersEnd();
@@ -164,6 +175,9 @@ namespace {
 
                 const bool idsEqual = mOld->getId() == mNew->getId();
                 const bool hostsEqual = mOld->getHostAndPort() == mNew->getHostAndPort();
+                if (!idsEqual && !hostsEqual) {
+                    continue;
+                }
                 if (idsEqual && !hostsEqual) {
                     return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                                   str::stream() <<
@@ -187,6 +201,28 @@ namespace {
                                   mNew->getId() << " and in the old configuration it is " <<
                                   mOld->getId() <<
                                   " for replica set " << newConfig.getReplSetName());
+                }
+                // At this point, the _id and host fields are equal, so we're looking at the old and
+                // new configurations for the same member node.
+                const bool buildIndexesFlagsEqual =
+                    mOld->shouldBuildIndexes() == mNew->shouldBuildIndexes();
+                if (!buildIndexesFlagsEqual) {
+                    return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                                  str::stream() <<
+                                  "New and old configurations differ in the setting of the "
+                                  "buildIndexes field for member " <<
+                                  mOld->getHostAndPort().toString() <<
+                                  "; to make this change, remove then re-add the member.");
+                }
+                const bool arbiterFlagsEqual = mOld->isArbiter() == mNew->isArbiter();
+                if (!arbiterFlagsEqual) {
+                    return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                                  str::stream() <<
+                                  "New and old configurations differ in the setting of the "
+                                  "arbiterOnly field for member " <<
+                                  mOld->getHostAndPort().toString() <<
+                                  "; to make this change, remove then re-add the member.");
+
                 }
             }
         }

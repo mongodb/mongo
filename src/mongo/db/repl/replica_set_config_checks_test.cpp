@@ -137,6 +137,139 @@ namespace {
                                                 oldConfig).getStatus());
     }
 
+    TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetName) {
+        ReplicationCoordinatorExternalStateMock externalState;
+        externalState.addSelf(HostAndPort("h1"));
+
+        ReplicaSetConfig oldConfig;
+        ReplicaSetConfig newConfig;
+
+        // Two configurations, compatible except for set name.
+        ASSERT_OK(oldConfig.initialize(
+                          BSON("_id" << "rs0" <<
+                               "version" << 1 <<
+                               "members" << BSON_ARRAY(
+                                                 BSON("_id" << 1 << "host" << "h1") <<
+                                                 BSON("_id" << 2 << "host" << "h2") <<
+                                                 BSON("_id" << 3 << "host" << "h3")))));
+
+        ASSERT_OK(newConfig.initialize(
+                          BSON("_id" << "rs1" <<
+                               "version" << 3 <<
+                               "members" << BSON_ARRAY(
+                                                 BSON("_id" << 1 << "host" << "h1") <<
+                                                 BSON("_id" << 2 << "host" << "h2") <<
+                                                 BSON("_id" << 3 << "host" << "h3")))));
+
+        ASSERT_OK(oldConfig.validate());
+        ASSERT_OK(newConfig.validate());
+        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                      validateConfigForReconfig(&externalState,
+                                                oldConfig,
+                                                newConfig).getStatus());
+    }
+
+    TEST(ValidateConfigForReconfig, NewConfigMustNotFlipBuildIndexesFlag) {
+        ReplicationCoordinatorExternalStateMock externalState;
+        externalState.addSelf(HostAndPort("h1"));
+
+        ReplicaSetConfig oldConfig;
+        ReplicaSetConfig newConfig;
+        ReplicaSetConfig oldConfigRefresh;
+
+        // Three configurations, two compatible except that h2 flips the buildIndex flag.
+        // The third, compatible with the first.
+        ASSERT_OK(oldConfig.initialize(
+                          BSON("_id" << "rs0" <<
+                               "version" << 1 <<
+                               "members" << BSON_ARRAY(
+                                                 BSON("_id" << 1 << "host" << "h1") <<
+                                                 BSON("_id" << 2 << "host" << "h2" <<
+                                                      "buildIndexes" << false <<
+                                                      "priority" << 0) <<
+                                                 BSON("_id" << 3 << "host" << "h3")))));
+
+        ASSERT_OK(newConfig.initialize(
+                          BSON("_id" << "rs0" <<
+                               "version" << 3 <<
+                               "members" << BSON_ARRAY(
+                                                 BSON("_id" << 1 << "host" << "h1") <<
+                                                 BSON("_id" << 2 << "host" << "h2" <<
+                                                      "buildIndexes" << true <<
+                                                      "priority" << 0) <<
+                                                 BSON("_id" << 3 << "host" << "h3")))));
+
+        ASSERT_OK(oldConfigRefresh.initialize(
+                          BSON("_id" << "rs0" <<
+                               "version" << 2 <<
+                               "members" << BSON_ARRAY(
+                                                 BSON("_id" << 1 << "host" << "h1") <<
+                                                 BSON("_id" << 2 << "host" << "h2" <<
+                                                      "buildIndexes" << false <<
+                                                      "priority" << 0) <<
+                                                 BSON("_id" << 3 << "host" << "h3")))));
+
+        ASSERT_OK(oldConfig.validate());
+        ASSERT_OK(newConfig.validate());
+        ASSERT_OK(oldConfigRefresh.validate());
+        ASSERT_OK(validateConfigForReconfig(&externalState,
+                                            oldConfig,
+                                            oldConfigRefresh).getStatus());
+        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                      validateConfigForReconfig(&externalState,
+                                                oldConfig,
+                                                newConfig).getStatus());
+    }
+
+    TEST(ValidateConfigForReconfig, NewConfigMustNotFlipArbiterFlag) {
+        ReplicationCoordinatorExternalStateMock externalState;
+        externalState.addSelf(HostAndPort("h1"));
+
+        ReplicaSetConfig oldConfig;
+        ReplicaSetConfig newConfig;
+        ReplicaSetConfig oldConfigRefresh;
+
+        // Three configurations, two compatible except that h2 flips the arbiterOnly flag.
+        // The third, compatible with the first.
+        ASSERT_OK(oldConfig.initialize(
+                          BSON("_id" << "rs0" <<
+                               "version" << 1 <<
+                               "members" << BSON_ARRAY(
+                                                 BSON("_id" << 1 << "host" << "h1") <<
+                                                 BSON("_id" << 2 << "host" << "h2" <<
+                                                      "arbiterOnly" << false) <<
+                                                 BSON("_id" << 3 << "host" << "h3")))));
+
+        ASSERT_OK(newConfig.initialize(
+                          BSON("_id" << "rs0" <<
+                               "version" << 3 <<
+                               "members" << BSON_ARRAY(
+                                                 BSON("_id" << 1 << "host" << "h1") <<
+                                                 BSON("_id" << 2 << "host" << "h2" <<
+                                                      "arbiterOnly" << true) <<
+                                                 BSON("_id" << 3 << "host" << "h3")))));
+
+        ASSERT_OK(oldConfigRefresh.initialize(
+                          BSON("_id" << "rs0" <<
+                               "version" << 2 <<
+                               "members" << BSON_ARRAY(
+                                                 BSON("_id" << 1 << "host" << "h1") <<
+                                                 BSON("_id" << 2 << "host" << "h2" <<
+                                                      "arbiterOnly" << false) <<
+                                                 BSON("_id" << 3 << "host" << "h3")))));
+
+        ASSERT_OK(oldConfig.validate());
+        ASSERT_OK(newConfig.validate());
+        ASSERT_OK(oldConfigRefresh.validate());
+        ASSERT_OK(validateConfigForReconfig(&externalState,
+                                            oldConfig,
+                                            oldConfigRefresh).getStatus());
+        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                      validateConfigForReconfig(&externalState,
+                                                oldConfig,
+                                                newConfig).getStatus());
+    }
+
     TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
         // When reconfiguring a replica set, it is allowed to introduce (host, id) pairs
         // absent from the old config only when the hosts and ids were both individually
