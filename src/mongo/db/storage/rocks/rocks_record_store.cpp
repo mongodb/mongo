@@ -139,7 +139,7 @@ namespace mongo {
             invariant( false );
         }
 
-        boost::shared_array<char> data( const_cast<char*>( value->data() ) );
+        boost::shared_array<char> data( reinterpret_cast<char*>( value ) );
 
         return RecordData( value->data(), value->size(), data );
     }
