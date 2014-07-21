@@ -31,7 +31,7 @@
 
 #include <string>
 
-#include <rocksdb/options.h>
+//#include <rocksdb/options.h>
 
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/capped_callback.h"
