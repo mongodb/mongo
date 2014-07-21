@@ -186,8 +186,10 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 
 	INIT_LSN(cl->next_lsn);
 
-	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
+
+	/* Log cursors default to read only. */
+	WT_ERR(__wt_cursor_config_readonly(cursor, cfg, 1));
 
 	if (0) {
 err:		if (F_ISSET(cursor, WT_CURSTD_OPEN))

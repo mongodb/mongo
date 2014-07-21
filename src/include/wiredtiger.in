@@ -993,7 +993,7 @@ struct __wt_session {
 	 * boolean flag; default \c false.}
 	 * @config{readonly, only query operations are supported by this cursor.
 	 * An error is returned if a modification is attempted using the cursor.
-	 * The default is false for all cursor types except for metadata
+	 * The default is false for all cursor types except for log and metadata
 	 * cursors.., a boolean flag; default \c false.}
 	 * @config{statistics, Specify the statistics to be gathered.  Choosing
 	 * "all" gathers statistics regardless of cost and may include
