@@ -268,18 +268,24 @@ namespace repl {
     }
 
     Status HybridReplicationCoordinator::processReplSetUpdatePositionHandshake(
+            const OperationContext* txn,
             const BSONObj& handshake,
             BSONObjBuilder* resultObj) {
-        Status legacyStatus = _legacy.processReplSetUpdatePositionHandshake(handshake, resultObj);
+        Status legacyStatus = _legacy.processReplSetUpdatePositionHandshake(txn,
+                                                                            handshake,
+                                                                            resultObj);
         BSONObjBuilder implResult;
-        Status implStatus = _impl.processReplSetUpdatePositionHandshake(handshake, &implResult);
+        Status implStatus = _impl.processReplSetUpdatePositionHandshake(txn,
+                                                                        handshake,
+                                                                        &implResult);
         return legacyStatus;
     }
 
-    bool HybridReplicationCoordinator::processHandshake(const OID& remoteID,
+    bool HybridReplicationCoordinator::processHandshake(const OperationContext* txn,
+                                                        const OID& remoteID,
                                                         const BSONObj& handshake) {
-        bool legacyResponse = _legacy.processHandshake(remoteID, handshake);
-        _impl.processHandshake(remoteID, handshake);
+        bool legacyResponse = _legacy.processHandshake(txn, remoteID, handshake);
+        _impl.processHandshake(txn, remoteID, handshake);
         return legacyResponse;
     }
 

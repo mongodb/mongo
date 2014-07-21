@@ -332,8 +332,8 @@ namespace mongo {
         }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             OID rid =  cmdObj["handshake"].OID();
-            cc().setRemoteID(rid);
-            repl::getGlobalReplicationCoordinator()->processHandshake(rid, cmdObj);
+            txn->getClient()->setRemoteID(rid);
+            repl::getGlobalReplicationCoordinator()->processHandshake(txn, rid, cmdObj);
             return 1;
         }
 

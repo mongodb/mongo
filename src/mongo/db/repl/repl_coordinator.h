@@ -395,19 +395,22 @@ namespace repl {
          * if the handshaking node cannot be found in the config, or any of the normal replset
          * command ErrorCodes.
          */
-        virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
+        virtual Status processReplSetUpdatePositionHandshake(const OperationContext* txn,
+                                                             const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj) = 0;
 
         /**
          * Handles an incoming Handshake command (or a handshake from replSetUpdatePosition).
          * Associates the node's 'remoteID' with its 'handshake' object. This association is used
          * to update local.slaves and to forward the node's replication progress upstream when this
-         * node is being chainged through.
+         * node is being chained through.
          *
          * Returns true if it was able to associate the 'remoteID' and 'handshake' and false
          * otherwise.
          */
-        virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake) = 0;
+        virtual bool processHandshake(const OperationContext* txn,
+                                      const OID& remoteID,
+                                      const BSONObj& handshake) = 0;
 
         /**
          * Returns once the oplog's most recent entry changes or after one second, whichever

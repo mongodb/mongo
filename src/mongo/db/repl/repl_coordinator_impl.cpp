@@ -469,13 +469,15 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorImpl::processReplSetUpdatePositionHandshake(
+            const OperationContext* txn,
             const BSONObj& handshake,
             BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();
     }
 
-    bool ReplicationCoordinatorImpl::processHandshake(const OID& remoteID,
+    bool ReplicationCoordinatorImpl::processHandshake(const OperationContext*,
+                                                      const OID& remoteID,
                                                       const BSONObj& handshake) {
         // TODO
         return false;

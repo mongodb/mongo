@@ -139,10 +139,13 @@ namespace repl {
         virtual Status processReplSetUpdatePosition(const BSONArray& updates,
                                                     BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
+        virtual Status processReplSetUpdatePositionHandshake(const OperationContext* txn,
+                                                             const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj);
 
-        virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake);
+        virtual bool processHandshake(const OperationContext* txn,
+                                      const OID& remoteID,
+                                      const BSONObj& handshake);
 
         virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
 

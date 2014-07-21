@@ -353,6 +353,7 @@ namespace repl {
                 return appendCommandStatus(
                         result,
                         getGlobalReplicationCoordinator()->processReplSetUpdatePositionHandshake(
+                                txn,
                                 cmdObj["handshake"].embeddedObject(),
                                 &result));
             }

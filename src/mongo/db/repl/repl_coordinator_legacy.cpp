@@ -981,14 +981,14 @@ namespace {
     }
 
     Status LegacyReplicationCoordinator::processReplSetUpdatePositionHandshake(
-            const BSONObj& cmdObj, BSONObjBuilder* resultObj) {
+            const OperationContext* txn, const BSONObj& cmdObj, BSONObjBuilder* resultObj) {
         Status status = _checkReplEnabledForCommand(resultObj);
         if (!status.isOK()) {
             return status;
         }
 
         OID rid = cmdObj["handshake"].OID();
-        if (!processHandshake(rid, cmdObj)) {
+        if (!processHandshake(txn, rid, cmdObj)) {
             return Status(ErrorCodes::NodeNotFound,
                           "node could not be found in replica set config during handshake");
         }
@@ -1000,7 +1000,8 @@ namespace {
         return Status::OK();
     }
 
-    bool LegacyReplicationCoordinator::processHandshake(const OID& remoteID,
+    bool LegacyReplicationCoordinator::processHandshake(const OperationContext* txn,
+                                                        const OID& remoteID,
                                                         const BSONObj& handshake) {
         LOG(2) << "Received handshake " << handshake << " from node with RID " << remoteID;
 
@@ -1009,7 +1010,8 @@ namespace {
         if (handshake.hasField("config")) {
             configObj = handshake["config"].Obj().getOwned();
         } else {
-            configObj = BSON("host" << cc().clientAddress(true) << "upgradeNeeded" << true);
+            configObj = BSON("host" << txn->getClient()->clientAddress(true) <<
+                             "upgradeNeeded" << true);
         }
         _ridConfigMap[remoteID] = configObj;
 
