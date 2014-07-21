@@ -312,27 +312,6 @@ namespace mongo {
         return "";
     }
 
-    bool Client::gotHandshake( const BSONObj& o ) {
-        BSONObjIterator i(o);
-
-        {
-            BSONElement id = i.next();
-            verify( id.type() );
-            _remoteId = id.OID();
-        }
-
-        BSONObjBuilder b;
-        while (i.more()) {
-            b.append(i.next());
-        }
-        
-        if (!o.hasField("config")) {
-            b.append("config", BSON("host" << clientAddress(true) << "upgradeNeeded" << true));
-        }
-
-        return repl::getGlobalReplicationCoordinator()->processHandshake(_remoteId, b.obj());
-    }
-
     ClientBasic* ClientBasic::getCurrent() {
         return currentClient.get();
     }
@@ -352,8 +331,9 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            Client& c = cc();
-            c.gotHandshake( cmdObj );
+            OID rid =  cmdObj["handshake"].OID();
+            cc().setRemoteID(rid);
+            repl::getGlobalReplicationCoordinator()->processHandshake(rid, cmdObj);
             return 1;
         }
 

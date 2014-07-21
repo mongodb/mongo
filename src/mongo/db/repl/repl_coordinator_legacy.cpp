@@ -950,14 +950,14 @@ namespace {
     }
 
     Status LegacyReplicationCoordinator::processReplSetUpdatePositionHandshake(
-            const BSONObj& handshake,
-            BSONObjBuilder* resultObj) {
+            const BSONObj& cmdObj, BSONObjBuilder* resultObj) {
         Status status = _checkReplEnabledForCommand(resultObj);
         if (!status.isOK()) {
             return status;
         }
 
-        if (!cc().gotHandshake(handshake)) {
+        OID rid = cmdObj["handshake"].OID();
+        if (!processHandshake(rid, cmdObj)) {
             return Status(ErrorCodes::NodeNotFound,
                           "node could not be found in replica set config during handshake");
         }
@@ -975,8 +975,12 @@ namespace {
 
         {
             boost::lock_guard<boost::mutex> lock(_mutex);
-            BSONObj configObj = handshake["config"].Obj().getOwned();
-            invariant(!configObj.isEmpty());
+            BSONObj configObj;
+            if (handshake.hasField("config")) {
+                configObj = handshake["config"].Obj().getOwned();
+            } else {
+                configObj = BSON("host" << cc().clientAddress(true) << "upgradeNeeded" << true);
+            }
             _ridConfigMap[remoteID] = configObj;
         }
 
