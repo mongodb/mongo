@@ -26,47 +26,52 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 
-#include <set>
+#include <string>
 
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/util/concurrency/mutex.h"
-
+#include "mongo/db/client.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
+namespace repl {
 
-    class GlobalEnvironmentMongoD : public GlobalEnvironmentExperiment {
-    public:
-        GlobalEnvironmentMongoD();
+    ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl() {}
+    ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
-        ~GlobalEnvironmentMongoD();
+    OID ReplicationCoordinatorExternalStateImpl::ensureMe() {
+        std::string myname = getHostName();
+        OID myRID;
+        {
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, "local");
 
-        StorageEngine* getGlobalStorageEngine();
+            BSONObj me;
+            // local.me is an identifier for a server for getLastError w:2+
+            if (!Helpers::getSingleton(&txn, "local.me", me) ||
+                    !me.hasField("host") ||
+                    me["host"].String() != myname) {
 
-        void setKillAllOperations();
+                myRID = OID::gen();
 
-        void unsetKillAllOperations();
+                // clean out local.me
+                Helpers::emptyCollection(&txn, "local.me");
 
-        bool getKillAllOperations();
+                // repopulate
+                BSONObjBuilder b;
+                b.append("_id", myRID);
+                b.append("host", myname);
+                Helpers::putSingleton(&txn, "local.me", b.done());
+            } else {
+                myRID = me["_id"].OID();
+            }
+            ctx.commit();
+        }
+        return myRID;
+    }
 
-        bool killOperation(AtomicUInt opId);
-
-        void registerOperationContext(OperationContext* txn);
-
-        void unregisterOperationContext(OperationContext* txn);
-
-        void forEachOperationContext(ProcessOperationContext* procOpCtx);
-
-        OperationContext* newOpCtx();
-
-    private:
-        bool _globalKill;
-
-        typedef std::set<OperationContext*> OperationContextSet;
-
-        mongo::mutex _registeredOpContextsMutex;
-        OperationContextSet _registeredOpContexts;
-    };
-
-}  // namespace mongo
+} // namespace repl
+} // namespace mongo

@@ -331,7 +331,9 @@ namespace mongo {
         WriteUnitOfWork wunit(txn.recoveryUnit());
 
         vector< string > dbNames;
-        globalStorageEngine->listDatabases( &dbNames );
+
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases( &dbNames );
 
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
             string dbName = *i;
@@ -348,7 +350,7 @@ namespace mongo {
                 ctx.db()->clearTmpCollections(&txn);
 
             if ( storageGlobalParams.repair ) {
-                fassert(18506, globalStorageEngine->repairDatabase(&txn, dbName));
+                fassert(18506, storageEngine->repairDatabase(&txn, dbName));
             }
             else if (!ctx.db()->getDatabaseCatalogEntry()->currentFilesCompatible(&txn)) {
                 log() << "****";
@@ -467,7 +469,8 @@ namespace mongo {
                 }
 
                 Date_t start = jsTime();
-                int numFiles = globalStorageEngine->flushAllFiles( true );
+                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+                int numFiles = storageEngine->flushAllFiles( true );
                 time_flushing = (int) (jsTime() - start);
 
                 _flushed(time_flushing);

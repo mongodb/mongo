@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
@@ -60,10 +61,20 @@ namespace mongo {
             actions.addAction(ActionType::listDatabases);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
+
         CmdListDatabases() : Command("listDatabases" , true ) {}
-        bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& jsobj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool /*fromRepl*/) {
+
             vector< string > dbNames;
-            globalStorageEngine->listDatabases( &dbNames );
+            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            storageEngine->listDatabases( &dbNames );
 
             vector< BSONObj > dbInfos;
 

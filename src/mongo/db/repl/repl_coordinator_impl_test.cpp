@@ -33,6 +33,7 @@
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/network_interface_mock.h"
+#include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/topology_coordinator_mock.h"
@@ -49,14 +50,16 @@ namespace {
         ReplSettings settings;
         // Make sure we think we're a replSet
         settings.replSet = "mySet/node1:12345,node2:54321";
-        ReplicationCoordinatorImpl coordinator(settings);
+        ReplicationCoordinatorImpl coordinator(settings,
+                                               new ReplicationCoordinatorExternalStateMock);
         coordinator.startReplication(new TopologyCoordinatorMock, new NetworkInterfaceMock);
         coordinator.shutdown();
     }
 
     TEST(ReplicationCoordinator, AwaitReplicationNumberBaseCases) {
         ReplSettings settings;
-        ReplicationCoordinatorImpl coordinator(settings);
+        ReplicationCoordinatorImpl coordinator(settings,
+                                               new ReplicationCoordinatorExternalStateMock);
         OperationContextNoop txn;
         OpTime time(1, 1);
 
@@ -93,7 +96,8 @@ namespace {
         ReplSettings settings;
         // Make sure we think we're a replSet
         settings.replSet = "mySet/node1:12345,node2:54321";
-        ReplicationCoordinatorImpl coordinator(settings);
+        ReplicationCoordinatorImpl coordinator(settings,
+                                               new ReplicationCoordinatorExternalStateMock);
         OperationContextNoop txn;
 
         OID client1 = OID::gen();
@@ -200,7 +204,8 @@ namespace {
         ReplSettings settings;
         // Make sure we think we're a replSet
         settings.replSet = "mySet/node1:12345,node2:54321";
-        ReplicationCoordinatorImpl coordinator(settings);
+        ReplicationCoordinatorImpl coordinator(settings,
+                                               new ReplicationCoordinatorExternalStateMock);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
 
@@ -247,7 +252,8 @@ namespace {
         ReplSettings settings;
         // Make sure we think we're a replSet
         settings.replSet = "mySet/node1:12345,node2:54321";
-        ReplicationCoordinatorImpl coordinator(settings);
+        ReplicationCoordinatorImpl coordinator(settings,
+                                               new ReplicationCoordinatorExternalStateMock);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
 
@@ -275,7 +281,8 @@ namespace {
         ReplSettings settings;
         // Make sure we think we're a replSet
         settings.replSet = "mySet/node1:12345,node2:54321";
-        ReplicationCoordinatorImpl coordinator(settings);
+        ReplicationCoordinatorImpl coordinator(settings,
+                                               new ReplicationCoordinatorExternalStateMock);
         coordinator.startReplication(new TopologyCoordinatorMock, new NetworkInterfaceMock);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);

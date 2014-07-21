@@ -26,47 +26,13 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <set>
-
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/util/concurrency/mutex.h"
-
+#include "mongo/db/repl/repl_coordinator_external_state.h"
 
 namespace mongo {
+namespace repl {
 
-    class GlobalEnvironmentMongoD : public GlobalEnvironmentExperiment {
-    public:
-        GlobalEnvironmentMongoD();
+    ReplicationCoordinatorExternalState::ReplicationCoordinatorExternalState() {}
+    ReplicationCoordinatorExternalState::~ReplicationCoordinatorExternalState() {}
 
-        ~GlobalEnvironmentMongoD();
-
-        StorageEngine* getGlobalStorageEngine();
-
-        void setKillAllOperations();
-
-        void unsetKillAllOperations();
-
-        bool getKillAllOperations();
-
-        bool killOperation(AtomicUInt opId);
-
-        void registerOperationContext(OperationContext* txn);
-
-        void unregisterOperationContext(OperationContext* txn);
-
-        void forEachOperationContext(ProcessOperationContext* procOpCtx);
-
-        OperationContext* newOpCtx();
-
-    private:
-        bool _globalKill;
-
-        typedef std::set<OperationContext*> OperationContextSet;
-
-        mongo::mutex _registeredOpContextsMutex;
-        OperationContextSet _registeredOpContexts;
-    };
-
-}  // namespace mongo
+} // namespace repl
+} // namespace mongo

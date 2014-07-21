@@ -87,7 +87,7 @@ namespace repl {
         return None;
     }
 
-    void TopologyCoordinatorMock::updateConfig(const ReplicaSetConfig newConfig, const int selfId) {
+    void TopologyCoordinatorMock::updateConfig(const ReplicaSetConfig& newConfig, int selfIndex) {
     }
 
 } // namespace repl

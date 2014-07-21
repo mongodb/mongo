@@ -43,6 +43,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/global_optime.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
@@ -532,7 +533,8 @@ namespace repl {
         wunit.commit();
 
         /* sync here so we don't get any surprising lag later when we try to sync */
-        globalStorageEngine->flushAllFiles(true);
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->flushAllFiles(true);
         log() << "******" << endl;
     }
 

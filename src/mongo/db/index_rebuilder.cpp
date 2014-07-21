@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/client.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -63,7 +64,9 @@ namespace mongo {
         cc().getAuthorizationSession()->grantInternalAuthorization();
 
         std::vector<std::string> dbNames;
-        globalStorageEngine->listDatabases( &dbNames );
+
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases( &dbNames );
 
         try {
             std::list<std::string> collNames;

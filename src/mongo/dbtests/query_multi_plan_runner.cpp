@@ -28,19 +28,31 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/query_knobs.h"
+#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/single_solution_runner.h"
+#include "mongo/db/query/stage_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
+
+namespace mongo {
+
+    // How we access the external setParameter testing bool.
+    extern bool internalQueryForceIntersectionPlans;
+
+}  // namespace mongo
 
 namespace QueryMultiPlanRunner {
 
@@ -58,15 +70,21 @@ namespace QueryMultiPlanRunner {
     class MultiPlanRunnerBase {
     public:
         MultiPlanRunnerBase() : _client(&_txn) {
-
+            Client::WriteContext ctx(&_txn, ns());
+            _client.dropCollection(ns());
+            ctx.commit();
         }
 
         virtual ~MultiPlanRunnerBase() {
+            Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
+            ctx.commit();
         }
 
         void addIndex(const BSONObj& obj) {
+            Client::WriteContext ctx(&_txn, ns());
             _client.ensureIndex(ns(), obj);
+            ctx.commit();
         }
 
         IndexDescriptor* getIndex(OperationContext* txn, Database* db, const BSONObj& obj) {
@@ -75,11 +93,15 @@ namespace QueryMultiPlanRunner {
         }
 
         void insert(const BSONObj& obj) {
+            Client::WriteContext ctx(&_txn, ns());
             _client.insert(ns(), obj);
+            ctx.commit();
         }
 
         void remove(const BSONObj& obj) {
+            Client::WriteContext ctx(&_txn, ns());
             _client.remove(ns(), obj);
+            ctx.commit();
         }
 
         static const char* ns() { return "unittests.QueryStageMultiPlanRunner"; }
@@ -95,14 +117,15 @@ namespace QueryMultiPlanRunner {
     class MPRCollectionScanVsHighlySelectiveIXScan : public MultiPlanRunnerBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-
             const int N = 5000;
             for (int i = 0; i < N; ++i) {
                 insert(BSON("foo" << (i % 10)));
             }
 
             addIndex(BSON("foo" << 1));
+
+            Client::ReadContext ctx(&_txn, ns());
+            const Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
 
             // Plan 0: IXScan over foo == 7
             // Every call to work() returns something so this should clearly win (by current scoring
@@ -114,8 +137,6 @@ namespace QueryMultiPlanRunner {
             ixparams.bounds.endKey = BSON("" << 7);
             ixparams.bounds.endKeyInclusive = true;
             ixparams.direction = 1;
-
-            const Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
 
             auto_ptr<WorkingSet> sharedWs(new WorkingSet());
             IndexScan* ix = new IndexScan(&_txn, ixparams, sharedWs.get(), NULL);
@@ -164,9 +185,105 @@ namespace QueryMultiPlanRunner {
                 ASSERT_EQUALS(obj["foo"].numberInt(), 7);
                 ++results;
             }
-            ctx.commit();
 
             ASSERT_EQUALS(results, N / 10);
+        }
+    };
+
+    // Case in which we select a blocking plan as the winner, and a non-blocking plan
+    // is available as a backup.
+    class MPRBackupPlan : public MultiPlanRunnerBase {
+    public:
+        void run() {
+            // Data is just a single {_id: 1, a: 1, b: 1} document.
+            insert(BSON("_id" << 1 << "a" << 1 << "b" << 1));
+
+            // Indices on 'a' and 'b'.
+            addIndex(BSON("a" << 1));
+            addIndex(BSON("b" << 1));
+
+            Client::ReadContext ctx(&_txn, ns());
+            Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
+
+            // Query for both 'a' and 'b' and sort on 'b'.
+            CanonicalQuery* cq;
+            verify(CanonicalQuery::canonicalize(ns(),
+                                                BSON("a" << 1 << "b" << 1), // query
+                                                BSON("b" << 1), // sort
+                                                BSONObj(), // proj
+                                                &cq).isOK());
+            ASSERT(NULL != cq);
+
+            // Force index intersection.
+            bool forceIxisectOldValue = internalQueryForceIntersectionPlans;
+            internalQueryForceIntersectionPlans = true;
+
+            // Get planner params.
+            QueryPlannerParams plannerParams;
+            fillOutPlannerParams(collection, cq, &plannerParams);
+            // Turn this off otherwise it pops up in some plans.
+            plannerParams.options &= ~QueryPlannerParams::KEEP_MUTATIONS;
+
+            // Plan.
+            vector<QuerySolution*> solutions;
+            Status status = QueryPlanner::plan(*cq, plannerParams, &solutions);
+            ASSERT(status.isOK());
+
+            // We expect a plan using index {a: 1} and plan using index {b: 1} and
+            // an index intersection plan.
+            ASSERT_EQUALS(solutions.size(), 3U);
+
+            // Fill out the MultiPlanStage.
+            scoped_ptr<MultiPlanStage> mps(new MultiPlanStage(collection, cq));
+            scoped_ptr<WorkingSet> ws(new WorkingSet());
+            // Put each solution from the planner into the MPR.
+            for (size_t i = 0; i < solutions.size(); ++i) {
+                PlanStage* root;
+                ASSERT(StageBuilder::build(&_txn, collection, *solutions[i], ws.get(), &root));
+                // Takes ownership of 'solutions[i]' and 'root'.
+                mps->addPlan(solutions[i], root, ws.get());
+            }
+
+            // This sets a backup plan.
+            mps->pickBestPlan();
+            ASSERT(mps->bestPlanChosen());
+            ASSERT(mps->hasBackupPlan());
+
+            // We should have picked the index intersection plan due to forcing ixisect.
+            QuerySolution* soln = mps->bestSolution();
+            ASSERT(QueryPlannerTestLib::solutionMatches(
+                             "{sort: {pattern: {b: 1}, limit: 0, node: "
+                                 "{fetch: {filter: null, node: {andSorted: {nodes: ["
+                                         "{ixscan: {filter: null, pattern: {a:1}}},"
+                                         "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
+                             soln->root.get()));
+
+            // Get the resulting document.
+            PlanStage::StageState state = PlanStage::NEED_TIME;
+            WorkingSetID wsid;
+            while (state != PlanStage::ADVANCED) {
+                state = mps->work(&wsid);
+            }
+            WorkingSetMember* member = ws->get(wsid);
+
+            // Check the document returned by the query.
+            ASSERT(member->hasObj());
+            BSONObj expectedDoc = BSON("_id" << 1 << "a" << 1 << "b" << 1);
+            ASSERT(expectedDoc.woCompare(member->obj) == 0);
+
+            // The blocking plan became unblocked, so we should no longer have a backup plan,
+            // and the winning plan should still be the index intersection one.
+            ASSERT(!mps->hasBackupPlan());
+            soln = mps->bestSolution();
+            ASSERT(QueryPlannerTestLib::solutionMatches(
+                             "{sort: {pattern: {b: 1}, limit: 0, node: "
+                                 "{fetch: {filter: null, node: {andSorted: {nodes: ["
+                                         "{ixscan: {filter: null, pattern: {a:1}}},"
+                                         "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
+                             soln->root.get()));
+
+            // Restore index intersection force parameter.
+            internalQueryForceIntersectionPlans = forceIxisectOldValue;
         }
     };
 
@@ -176,6 +293,7 @@ namespace QueryMultiPlanRunner {
 
         void setupTests() {
             add<MPRCollectionScanVsHighlySelectiveIXScan>();
+            add<MPRBackupPlan>();
         }
     }  queryMultiPlanRunnerAll;
 

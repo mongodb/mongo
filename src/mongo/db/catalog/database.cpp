@@ -45,6 +45,7 @@
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/repair_database.h"
@@ -132,7 +133,8 @@ namespace mongo {
         }
 
         vector<string> others;
-        globalStorageEngine->listDatabases( &others );
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases(&others);
 
         set<string> allShortNames;
         dbHolder().getAllShortNames(allShortNames);
@@ -501,9 +503,12 @@ namespace mongo {
         Lock::GlobalWrite lk(txn->lockState());
 
         vector<string> n;
-        globalStorageEngine->listDatabases( &n );
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases(&n);
+
         if( n.size() == 0 ) return;
         log() << "dropAllDatabasesExceptLocal " << n.size() << endl;
+
         for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
             if( *i != "local" ) {
                 WriteUnitOfWork wunit(txn->recoveryUnit());

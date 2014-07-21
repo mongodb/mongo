@@ -1017,7 +1017,8 @@ namespace {
         log() << "shutdown: going to close sockets..." << endl;
         boost::thread close_socket_thread( stdx::bind(MessagingPort::closeAllSockets, 0) );
 
-        globalStorageEngine->cleanShutdown(txn);
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->cleanShutdown(txn);
     }
 
     void exitCleanly( ExitCode code ) {

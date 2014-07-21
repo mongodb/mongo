@@ -28,8 +28,6 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
-
 #include "mongo/db/commands/fsync.h"
 
 #include <string>
@@ -41,6 +39,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/client.h"
@@ -137,7 +136,8 @@ namespace mongo {
                     getDur().commitNow(txn);
                     //  No WriteUnitOfWork needed, as this does no writes of its own.
                 }
-                result.append( "numFiles" , globalStorageEngine->flushAllFiles( sync ) );
+                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+                result.append( "numFiles" , storageEngine->flushAllFiles( sync ) );
             }
             return 1;
         }
@@ -168,7 +168,8 @@ namespace mongo {
         global.downgrade();
         
         try {
-            globalStorageEngine->flushAllFiles(true);
+            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            storageEngine->flushAllFiles(true);
         }
         catch( std::exception& e ) { 
             error() << "error doing flushAll: " << e.what() << endl;

@@ -56,6 +56,7 @@ namespace repl {
         void associateMember(const OID& rid, Member* member);
 
         /// Ensures local.me is populated and populates it if not.
+        /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
         void ensureMe(OperationContext* txn);
 
         /// Notifies the SyncSourceFeedbackThread to wake up and send a handshake up the replication
@@ -69,6 +70,7 @@ namespace repl {
         std::string name() const { return "SyncSourceFeedbackThread"; }
 
         /// Returns the RID for this process.  ensureMe() must have been called before this can be.
+        /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
         OID getMyRID() const { return _me["_id"].OID(); }
 
         /// Loops forever, passing updates when they are present.
@@ -107,6 +109,7 @@ namespace repl {
         bool _connect(const std::string& hostName);
 
         // stores our OID to be passed along in commands
+        /// TODO(spencer): Remove this once the LegacyReplicationCoordinator is gone.
         BSONObj _me;
         // the member we are currently syncing from
         const Member* _syncTarget;

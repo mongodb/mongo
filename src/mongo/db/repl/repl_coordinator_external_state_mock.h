@@ -28,45 +28,20 @@
 
 #pragma once
 
-#include <set>
-
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/util/concurrency/mutex.h"
-
+#include "mongo/base/disallow_copying.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/repl/repl_coordinator_external_state.h"
 
 namespace mongo {
+namespace repl {
 
-    class GlobalEnvironmentMongoD : public GlobalEnvironmentExperiment {
+    class ReplicationCoordinatorExternalStateMock : public ReplicationCoordinatorExternalState {
+        MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateMock);
     public:
-        GlobalEnvironmentMongoD();
-
-        ~GlobalEnvironmentMongoD();
-
-        StorageEngine* getGlobalStorageEngine();
-
-        void setKillAllOperations();
-
-        void unsetKillAllOperations();
-
-        bool getKillAllOperations();
-
-        bool killOperation(AtomicUInt opId);
-
-        void registerOperationContext(OperationContext* txn);
-
-        void unregisterOperationContext(OperationContext* txn);
-
-        void forEachOperationContext(ProcessOperationContext* procOpCtx);
-
-        OperationContext* newOpCtx();
-
-    private:
-        bool _globalKill;
-
-        typedef std::set<OperationContext*> OperationContextSet;
-
-        mongo::mutex _registeredOpContextsMutex;
-        OperationContextSet _registeredOpContexts;
+        ReplicationCoordinatorExternalStateMock();
+        virtual ~ReplicationCoordinatorExternalStateMock();
+        virtual OID ensureMe();
     };
 
-}  // namespace mongo
+} // namespace repl
+} // namespace mongo

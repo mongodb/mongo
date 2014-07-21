@@ -489,6 +489,10 @@ namespace mongo {
         if (!status.isOK()) {
             return status;
         }
+        status = parser.initializeUserIndirectRolesFromUserDocument(privDoc, user);
+        if (!status.isOK()) {
+            return status;
+        }
         status = parser.initializeUserPrivilegesFromUserDocument(privDoc, user);
         return Status::OK();
     }

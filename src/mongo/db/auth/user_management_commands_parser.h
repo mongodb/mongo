@@ -218,7 +218,6 @@ namespace auth {
                                        const StringData& dbname,
                                        std::vector<UserName>* parsedUserNames);
 
-
     struct MergeAuthzCollectionsArgs {
         std::string usersCollName;
         std::string rolesCollName;

@@ -44,7 +44,7 @@
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/global_environment_noop.h"
+#include "mongo/db/global_environment_d.h"
 #include "mongo/db/json.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_coordinator_mock.h"
@@ -78,7 +78,8 @@ namespace mongo {
                 new AuthzManagerExternalStateMock()));
         repl::ReplSettings replSettings;
         repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
-        setGlobalEnvironment(new GlobalEnvironmentNoop());
+        // We don't use the noop environment here since we actually need the storage engine...
+        setGlobalEnvironment(new GlobalEnvironmentMongoD());
         return Status::OK();
     }
 

@@ -45,6 +45,7 @@ namespace {
 
     const std::string ROLES_FIELD_NAME = "roles";
     const std::string PRIVILEGES_FIELD_NAME = "inheritedPrivileges";
+    const std::string INHERITED_ROLES_FIELD_NAME = "inheritedRoles";
     const std::string OTHER_DB_ROLES_FIELD_NAME = "otherDBRoles";
     const std::string READONLY_FIELD_NAME = "readOnly";
     const std::string CREDENTIALS_FIELD_NAME = "credentials";
@@ -474,6 +475,36 @@ namespace {
             roles.push_back(role);
         }
         user->setRoles(makeRoleNameIteratorForContainer(roles));
+        return Status::OK();
+    }
+
+    Status V2UserDocumentParser::initializeUserIndirectRolesFromUserDocument(
+            const BSONObj& privDoc, User* user) const {
+
+        BSONElement indirectRolesElement = privDoc[INHERITED_ROLES_FIELD_NAME];
+
+        if (indirectRolesElement.type() != Array) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "User document needs 'inheritedRoles' field to be an array");
+        }
+
+        std::vector<RoleName> indirectRoles;
+        for (BSONObjIterator it(indirectRolesElement.Obj()); it.more(); it.next()) {
+            if ((*it).type() != Object) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "User document needs values in 'inheritedRoles'"
+                              " array to be a sub-documents");
+            }
+            BSONObj indirectRoleObject = (*it).Obj();
+
+            RoleName indirectRole;
+            Status status = parseRoleName(indirectRoleObject, &indirectRole);
+            if (!status.isOK()) {
+                return status;
+            }
+            indirectRoles.push_back(indirectRole);
+        }
+        user->setIndirectRoles(makeRoleNameIteratorForContainer(indirectRoles));
         return Status::OK();
     }
 

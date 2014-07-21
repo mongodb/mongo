@@ -28,6 +28,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -42,13 +43,14 @@
 namespace mongo {
 
     static TimerStats gleWtimeStats;
-    static ServerStatusMetricField<TimerStats> displayGleLatency( "getLastError.wtime", &gleWtimeStats );
+    static ServerStatusMetricField<TimerStats> displayGleLatency("getLastError.wtime",
+                                                                 &gleWtimeStats );
 
     static Counter64 gleWtimeouts;
-    static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay( "getLastError.wtimeouts", &gleWtimeouts );
+    static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay("getLastError.wtimeouts",
+                                                                  &gleWtimeouts );
 
     Status validateWriteConcern( const WriteConcernOptions& writeConcern ) {
-
         const bool isJournalEnabled = getDur().isDurable();
 
         if ( writeConcern.syncMode == WriteConcernOptions::JOURNAL && !isJournalEnabled ) {
@@ -147,7 +149,8 @@ namespace mongo {
             break;
         case WriteConcernOptions::FSYNC:
             if ( !getDur().isDurable() ) {
-                result->fsyncFiles = globalStorageEngine->flushAllFiles( true );
+                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+                result->fsyncFiles = storageEngine->flushAllFiles( true );
             }
             else {
                 // We only need to commit the journal if we're durable

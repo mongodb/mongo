@@ -28,45 +28,32 @@
 
 #pragma once
 
-#include <set>
-
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/util/concurrency/mutex.h"
-
+#include "mongo/base/disallow_copying.h"
+#include "mongo/bson/oid.h"
 
 namespace mongo {
+namespace repl {
 
-    class GlobalEnvironmentMongoD : public GlobalEnvironmentExperiment {
+    /**
+     * This class represents the interface the ReplicationCoordinator uses to interact with the
+     * rest of the system.  All functionality of the ReplicationCoordinatorImpl that would introduce
+     * dependencies on large sections of the server code and thus break the unit testability of
+     * ReplicationCoordinatorImpl should be moved here.
+     */
+    class ReplicationCoordinatorExternalState {
+        MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalState);
     public:
-        GlobalEnvironmentMongoD();
+        ReplicationCoordinatorExternalState();
+        virtual ~ReplicationCoordinatorExternalState();
 
-        ~GlobalEnvironmentMongoD();
-
-        StorageEngine* getGlobalStorageEngine();
-
-        void setKillAllOperations();
-
-        void unsetKillAllOperations();
-
-        bool getKillAllOperations();
-
-        bool killOperation(AtomicUInt opId);
-
-        void registerOperationContext(OperationContext* txn);
-
-        void unregisterOperationContext(OperationContext* txn);
-
-        void forEachOperationContext(ProcessOperationContext* procOpCtx);
-
-        OperationContext* newOpCtx();
-
-    private:
-        bool _globalKill;
-
-        typedef std::set<OperationContext*> OperationContextSet;
-
-        mongo::mutex _registeredOpContextsMutex;
-        OperationContextSet _registeredOpContexts;
+        /**
+         * Queries the singleton document in local.me.  If it exists and our hostname has not
+         * changed since we wrote, returns the RID stored in the object.  If the document does not
+         * exist or our hostname doesn't match what was recorded in local.me, generates a new OID
+         * to use as our RID, stores it in local.me, and returns it.
+         */
+        virtual OID ensureMe() = 0;
     };
 
-}  // namespace mongo
+} // namespace repl
+} // namespace mongo

@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_coordinator_hybrid.h"
+#include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 
 namespace mongo {
 
@@ -37,7 +38,7 @@ namespace mongo {
 namespace repl {
 
     HybridReplicationCoordinator::HybridReplicationCoordinator(const ReplSettings& settings) :
-            _legacy(settings), _impl(settings) {}
+            _legacy(settings), _impl(settings, new ReplicationCoordinatorExternalStateImpl()) {}
     HybridReplicationCoordinator::~HybridReplicationCoordinator() {}
 
     void HybridReplicationCoordinator::startReplication(

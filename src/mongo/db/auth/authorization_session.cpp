@@ -84,9 +84,6 @@ namespace {
             return status;
         }
 
-        // If there are any users in the impersonate list, clear them.
-        clearImpersonatedUserNames();
-
         // Calling add() on the UserSet may return a user that was replaced because it was from the
         // same database.
         User* replacedUser = _authenticatedUsers.add(user);
@@ -94,6 +91,10 @@ namespace {
             getAuthorizationManager().releaseUser(replacedUser);
         }
 
+        // If there are any users and roles in the impersonation data, clear it out.
+        clearImpersonatedUserData();
+
+        _buildAuthenticatedRolesVector();
         return Status::OK();
     }
 
@@ -102,15 +103,21 @@ namespace {
     }
 
     void AuthorizationSession::logoutDatabase(const std::string& dbname) {
-        clearImpersonatedUserNames();
         User* removedUser = _authenticatedUsers.removeByDBName(dbname);
         if (removedUser) {
             getAuthorizationManager().releaseUser(removedUser);
         }
+        clearImpersonatedUserData();
+        _buildAuthenticatedRolesVector();
     }
 
     UserNameIterator AuthorizationSession::getAuthenticatedUserNames() {
         return _authenticatedUsers.getNames();
+    }
+
+    RoleNameIterator AuthorizationSession::getAuthenticatedRoleNames() {
+        return makeRoleNameIterator(_authenticatedRoleNames.begin(),
+                                    _authenticatedRoleNames.end());
     }
 
     std::string AuthorizationSession::getAuthenticatedUserNamesToken() {
@@ -127,6 +134,7 @@ namespace {
 
     void AuthorizationSession::grantInternalAuthorization() {
         _authenticatedUsers.add(internalSecurity.user);
+        _buildAuthenticatedRolesVector();
     }
 
     PrivilegeVector AuthorizationSession::getDefaultPrivileges() {
@@ -470,6 +478,21 @@ namespace {
             }
             ++it;
         }
+        _buildAuthenticatedRolesVector();
+    }
+
+    void AuthorizationSession::_buildAuthenticatedRolesVector() {
+        _authenticatedRoleNames.clear();
+        for (UserSet::iterator it = _authenticatedUsers.begin();
+                it != _authenticatedUsers.end();
+                ++it) {
+            RoleNameIterator roles = (*it)->getIndirectRoles();
+            while (roles.more()) {
+                RoleName roleName = roles.next();
+                _authenticatedRoleNames.push_back(RoleName(roleName.getRole(),
+                                                           roleName.getDB()));
+            }
+        }
     }
 
     bool AuthorizationSession::_isAuthorizedForPrivilege(const Privilege& privilege) {
@@ -511,20 +534,30 @@ namespace {
         return false;
     }
 
-    void AuthorizationSession::setImpersonatedUserNames(const std::vector<UserName>& names) {
-        _impersonatedUserNames = names;
+    void AuthorizationSession::setImpersonatedUserData(std::vector<UserName> usernames,
+                                                       std::vector<RoleName> roles) {
+        _impersonatedUserNames = usernames;
+        _impersonatedRoleNames = roles;
         _impersonationFlag = true;
     }
 
-    // Clear the vector of impersonated UserNames.
-    void AuthorizationSession::clearImpersonatedUserNames() {
+    UserNameIterator AuthorizationSession::getImpersonatedUserNames() {
+        return makeUserNameIterator(_impersonatedUserNames.begin(),
+                                    _impersonatedUserNames.end());
+    }
+
+    RoleNameIterator AuthorizationSession::getImpersonatedRoleNames() {
+        return makeRoleNameIterator(_impersonatedRoleNames.begin(),
+                                    _impersonatedRoleNames.end());
+    }
+
+    // Clear the vectors of impersonated usernames and roles.
+    void AuthorizationSession::clearImpersonatedUserData() {
         _impersonatedUserNames.clear();
+        _impersonatedRoleNames.clear();
         _impersonationFlag = false;
     }
 
-    UserNameIterator AuthorizationSession::getImpersonatedUserNames() const {
-         return makeUserNameIteratorForContainer(_impersonatedUserNames);
-    }
 
     bool AuthorizationSession::isImpersonating() const {
         return _impersonationFlag;
