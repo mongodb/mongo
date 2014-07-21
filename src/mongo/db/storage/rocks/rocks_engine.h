@@ -159,6 +159,8 @@ namespace mongo {
         /**
          * Create Entry's for all non-index column families. See larger comment in .cpp for why
          * this is necessary
+         *
+         * @param families a vector containing the names of all the column families in the database
          */
         EntryVector _createNonIndexCatalogEntries( const std::vector<std::string>& families );
 
@@ -166,12 +168,20 @@ namespace mongo {
          * Generate column family descriptors for the metadata column family corresponding to each
          * Entry in entries. We need to open these first because the metadata column families
          * contain the information needed to open the column families representing indexes.
+         *
+         * @param entries a vector containing Entry structs for every non-index column family in
+         * the database. These Entry structs do not need to be fully initialized, but the
+         * collectionEntry field must be.
+         *
+         * @param nsVec a vector containing all the namespaces in this database 
          */
         CfdVector _generateMetaDataCfds( const EntryVector& entries,
                                          const std::vector<string>& nsVec ) const;
 
         /**
          * Helper function to the _createIndexOrderings method
+         *
+         * @param namespaces a vector containing all the namespaces in this database 
          */
         std::map<string, Ordering> _createIndexOrderingsHelper(
                 const std::vector<std::string>& namespaces );
@@ -181,7 +191,9 @@ namespace mongo {
          * needed to properly open column families representing indexes, because an Ordering for
          * each such index is needed in order to create the comparator for the column family.
          *
-         * @families a vector containing the name of every column family in the database
+         * @param namespaces a vector containing all the namespaces in this database 
+         * @param path a path to the database files for the rocksdb database
+         * @param an uninitialized pointer to a rocksdb database
          */
         std::map<string, Ordering> _createIndexOrderings( const std::vector<string>& namespaces,
                                                           const string& path,
@@ -190,11 +202,21 @@ namespace mongo {
         /**
          * Highest level helper function to generate a vector of all ColumnFamilyDescriptors
          * in the database, with proper rocksdb::Options set for each of them.
+         *
+         * @param path a path to the database files for the rocksdb database
+         * @param an uninitialized pointer to a rocksdb database
          */
         CfdVector _createCfds ( const string& path, rocksdb::DB* const db);        
 
         /**
-         * Create a complete Entry object in _map for every ColumnFamilyDescriptor
+         * Create a complete Entry object in _map for every ColumnFamilyDescriptor. Assumes that, if
+         * the collectionEntry field should be initialized, that is already has been prior to this 
+         * function call. 
+         *
+         * @param families A vector of column family descriptors for every column family in the
+         * database
+         * @param handles A vector of column family handles for every column family in the 
+         * database
          */
         void _createEntries( const CfdVector& families, 
                              const std::vector<rocksdb::ColumnFamilyHandle*> handles );
