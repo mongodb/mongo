@@ -376,7 +376,7 @@ namespace mongo {
 
     SortedDataInterface::Cursor* RocksSortedDataImpl::newCursor(OperationContext* txn, 
                                                                 int direction) const {
-        invariant( direction == 1 || direction == -1 && "invalid value for direction" );
+        invariant( ( direction == 1 || direction == -1 ) && "invalid value for direction" );
         rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
         return new RocksCursor( _db->NewIterator( options, _columnFamily ), direction == 1 );
     }
