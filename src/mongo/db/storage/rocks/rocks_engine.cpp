@@ -52,13 +52,11 @@ namespace mongo {
 #define ROCK_STATUS_OK(sss) \
     if ( !(sss).ok() ){ error() << "rocks error: " << (sss).ToString(); invariant( false ); }
 
-    RocksEngine::RocksEngine( const std::string& path )
-        : _path( path ), _db( NULL ) {
-
+    RocksEngine::RocksEngine( const std::string& path ): _path( path ), _db( NULL ) {
         // get ColumnFamilyDescriptors for all the column families
         CfdVector families = _createCfds( path, _db );
 
-        // If there are no column families, then just open the database
+        // If there are no column families, then just open the database and return
         if ( families.empty() ) {
             rocksdb::Status s = rocksdb::DB::Open( _dbOptions(), path, &_db );
             ROCK_STATUS_OK( s );
@@ -122,15 +120,17 @@ namespace mongo {
     }
 
     void RocksEngine::cleanShutdown(OperationContext* txn) {
+        typedef StringMap<rocksdb::ColumnFamilyHandle*>::const_iterator CfhIt;
+
         boost::mutex::scoped_lock lk( _mapLock );
         for ( Map::const_iterator i = _map.begin(); i != _map.end(); ++i ) {
             boost::shared_ptr<Entry> entry = i->second;
-            for ( StringMap< rocksdb::ColumnFamilyHandle* >::const_iterator j = 
-                    entry->indexNameToCF.begin();
-                    j != entry->indexNameToCF.end(); ++j ) {
+
+            for ( CfhIt j = entry->indexNameToCF.begin(); j != entry->indexNameToCF.end(); ++j ) {
                 rocksdb::ColumnFamilyHandle* index_handle = j->second;
                 delete index_handle;
             }
+
             entry->metaCfHandle.reset();
             entry->cfHandle.reset();
         }
@@ -234,35 +234,21 @@ namespace mongo {
         if ( _map.find( ns ) != _map.end() )
             return Status( ErrorCodes::NamespaceExists, "collection already exists" );
 
-        if (ns.toString().find('$') != string::npos ||
-            ns.toString().find('&') != string::npos ) {
+        if (ns.toString().find('$') != string::npos || ns.toString().find('&') != string::npos ) {
             return Status( ErrorCodes::NamespaceExists, "invalid character in namespace" );
         }
 
         rocksdb::ColumnFamilyOptions rocksOptions;
 
-        /* AFB: this implementation of capped collections could work if FB implements 
-                FIFO compaction with the number of records 
-        if ( options.capped ) {
-            // XXX capped collections do not yet honor cappedMaxDocs
-            rocksdb::CompactionOptionsFIFO rocksCompactionOptions;
-            rocksCompactionOptions.max_table_files_size = options.cappedSize;
-            rocksOptions.compaction_options_fifo = rocksCompactionOptions;
-        } */
-
         boost::shared_ptr<Entry> entry( new Entry() );
 
         rocksdb::ColumnFamilyHandle* cf;
-        rocksdb::Status status = _db->CreateColumnFamily( rocksOptions,
-                                                          ns.toString(),
-                                                          &cf );
+        rocksdb::Status status = _db->CreateColumnFamily( rocksOptions, ns.toString(), &cf );
 
         ROCK_STATUS_OK( status );
         rocksdb::ColumnFamilyHandle* cf_meta;
         string metadataName = ns.toString() + "&";
-        status = _db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(),
-                                                          metadataName,
-                                                          &cf_meta );
+        status = _db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), metadataName, &cf_meta );
         ROCK_STATUS_OK( status );
 
         BSONObj optionsObj = options.toBSON();
@@ -275,10 +261,9 @@ namespace mongo {
         entry->metaCfHandle.reset( cf_meta );
         if ( options.capped )
             entry->recordStore.reset( new RocksRecordStore( ns, _db, entry->cfHandle.get(), cf_meta,
-                                    true, options.cappedSize
-                                                     ? options.cappedSize : 4096, // default size
-                                                    options.cappedMaxDocs
-                                                     ? options.cappedMaxDocs : -1 ));
+                                    true,
+                                    options.cappedSize ? options.cappedSize : 4096, // default size
+                                    options.cappedMaxDocs ? options.cappedMaxDocs : -1 ));
         else
             entry->recordStore.reset( new RocksRecordStore( ns, _db, 
                                                 entry->cfHandle.get(), cf_meta ) );
@@ -292,13 +277,13 @@ namespace mongo {
 
     Status RocksEngine::dropCollection( OperationContext* opCtx,
                                         const StringData& ns ) {
-        // TODO delete metadata CF, indexes??
         boost::mutex::scoped_lock lk( _mapLock );
         if ( _map.find( ns ) == _map.end() )
             return Status( ErrorCodes::NamespaceNotFound, "can't find collection to drop" );
         Entry* entry = _map[ns].get();
 
         entry->recordStore.reset( NULL );
+        entry->collectionEntry->dropAllIndexes();
         entry->collectionEntry->dropMetaData();
         entry->collectionEntry.reset( NULL );
 
@@ -360,6 +345,7 @@ namespace mongo {
             }
 
             boost::shared_ptr<Entry> entry = _map[collection];
+            // this works because a shared_ptr's default constructor leaves it uninitialized
             if ( !entry ) {
                 _map[collection] = boost::shared_ptr<Entry>( new Entry() );
                 entry = _map[collection];
@@ -408,26 +394,21 @@ namespace mongo {
         for ( unsigned i = 0; i < namespaces.size(); i++ ) {
             string ns = namespaces[i];
             string collection = ns;
-            if ( ns.find( '&' ) != string::npos ) {
-                continue;
-            }
-            bool isIndex = ns.find( '$' ) != string::npos;
-
-            if ( !isIndex ) {
+            if ( ns.find( '&' ) != string::npos || ns.find( '$' ) != string::npos ) {
                 continue;
             }
 
             collection = ns.substr( 0, ns.find( '$' ) );
 
             boost::shared_ptr<Entry> entry = _map[collection];
+            // this works because a shared_ptr's default constructor leaves it uninitialized
             if ( !entry ) {
                 _map[collection] = boost::shared_ptr<Entry>( new Entry() );
                 entry = _map[collection];
             }
 
-            // All of these helper functions lead up to this: generating the Ordering object
-            // for each index, allowing the column families representing these indexes to
-            // eventually be opened
+            // Generate the Ordering object for each index, allowing the column families
+            // representing these indexes to eventually be opened
             string indexName = ns.substr( ns.find( '$' ) + 1 );
             BSONObj spec = entry->collectionEntry->getIndexSpec(indexName);
             Ordering order = Ordering::make( spec["key"].Obj().getOwned() );
@@ -513,7 +494,7 @@ namespace mongo {
     }
 
     void RocksEngine::_createEntries( const CfdVector& families, 
-            const vector<rocksdb::ColumnFamilyHandle*> handles ) {
+                                      const vector<rocksdb::ColumnFamilyHandle*> handles ) {
         std::map<string, int> metadataMap;
         for ( unsigned i = 0; i < families.size(); i++ ) {
             string ns = families[i].name;
@@ -561,15 +542,16 @@ namespace mongo {
 
                 entry->cfHandle.reset( handles[i] );
                 entry->metaCfHandle.reset( handles[metadataMap[ns]] );
-                if ( options.capped )
+                if ( options.capped ) {
                     entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i], 
-                            handles[metadataMap[ns]], options.capped, options.cappedSize
-                                                     ? options.cappedSize : 4096, // default size
-                                                    options.cappedMaxDocs
-                                                     ? options.cappedMaxDocs : -1) );
-                else
+                            handles[metadataMap[ns]], 
+                            options.capped, 
+                            options.cappedSize ? options.cappedSize : 4096, // default size
+                            options.cappedMaxDocs ? options.cappedMaxDocs : -1) );
+                } else {
                     entry->recordStore.reset( new RocksRecordStore( ns, _db, handles[i], 
                             handles[metadataMap[ns]] ) );
+                }
                 // entry->collectionEntry is set in _createNonIndexCatalogEntries()
                 entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
             }
