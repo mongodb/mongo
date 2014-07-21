@@ -1,18 +1,25 @@
 Import("env")
+Import("has_option")
 
-env.Library(
-    target= 'storage_wiredtiger',
-    source= [
-        'wiredtiger_btree_impl.cpp',
-        'wiredtiger_database_catalog_entry.cpp',
-        'wiredtiger_engine.cpp',
-        ],
-    LIBDEPS= [
-        '$BUILD_DIR/mongo/bson',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/foundation',
-        ]
-    )
+if has_option("wiredtiger"):
+    env.Library(
+	target= 'storage_wiredtiger',
+	source= [
+	    'wiredtiger_btree_impl.cpp',
+	    'wiredtiger_collection_catalog_entry.cpp',
+	    'wiredtiger_database_catalog_entry.cpp',
+	    'wiredtiger_engine.cpp',
+	    'wiredtiger_record_store.cpp',
+	    'wiredtiger_recovery_unit.cpp',
+	    'wiredtiger_init.cpp',
+	    ],
+	LIBDEPS= [
+	    '$BUILD_DIR/mongo/bson',
+	    '$BUILD_DIR/mongo/db/catalog/collection_options',
+	    '$BUILD_DIR/mongo/foundation',
+	    ],
+	SYSLIBDEPS=["wiredtiger"]
+	)
 
 #env.CppUnitTest(
 #    target='storage_wiredtiger_test',

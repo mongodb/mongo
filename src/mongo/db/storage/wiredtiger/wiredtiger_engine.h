@@ -44,6 +44,8 @@ namespace mongo {
 
     class WiredTigerEngine : public StorageEngine {
     public:
+	WiredTigerEngine(const std::string &) {}
+
         virtual ~WiredTigerEngine() {}
 
         virtual RecoveryUnit* newRecoveryUnit( OperationContext* opCtx );
