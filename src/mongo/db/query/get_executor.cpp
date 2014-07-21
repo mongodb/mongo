@@ -181,7 +181,7 @@ namespace mongo {
         if (!CanonicalQuery::isSimpleIdQuery(unparsedQuery) ||
             !collection->getIndexCatalog()->findIdIndex()) {
 
-            const WhereCallbackReal whereCallback(collection->ns().db());
+            const WhereCallbackReal whereCallback(txn, collection->ns().db());
             CanonicalQuery* cq;
             Status status = CanonicalQuery::canonicalize(
                         collection->ns(), unparsedQuery, &cq, whereCallback);
@@ -230,7 +230,7 @@ namespace mongo {
         // so we don't support covered projections. However, we might use the simple inclusion
         // fast path.
         if (NULL != canonicalQuery->getProj()) {
-            ProjectionStageParams params(WhereCallbackReal(collection->ns().db()));
+            ProjectionStageParams params(WhereCallbackReal(txn, collection->ns().db()));
             params.projObj = canonicalQuery->getProj()->getProjObj();
 
             // Stuff the right data into the params depending on what proj impl we use.
@@ -652,7 +652,7 @@ namespace mongo {
                             PlanExecutor** execOut) {
         invariant(collection);
 
-        const WhereCallbackReal whereCallback(collection->ns().db());
+        const WhereCallbackReal whereCallback(txn, collection->ns().db());
 
         CanonicalQuery* cq;
         uassertStatusOK(CanonicalQuery::canonicalize(collection->ns().ns(),
@@ -759,7 +759,7 @@ namespace mongo {
             }
         }
 
-        const WhereCallbackReal whereCallback(collection->ns().db());
+        const WhereCallbackReal whereCallback(txn, collection->ns().db());
 
         // If there are no suitable indices for the distinct hack bail out now into regular planning
         // with no projection.

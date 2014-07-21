@@ -101,8 +101,6 @@ namespace repl {
 
         BSONObj _me;
 
-        ReplSource();
-
         void resyncDrop( OperationContext* txn, const std::string& db );
         // call without the db mutex
         void syncToTailOfRemoteLog();
@@ -121,12 +119,15 @@ namespace repl {
                                     const char* db );
 
         // populates _me so that it can be passed to oplogreader for handshakes
-        void ensureMe();
+        void ensureMe(OperationContext* txn);
 
         void forceResync(OperationContext* txn, const char *requester);
 
     public:
         OplogReader oplogReader;
+
+        // Returns the RID for this process.  ensureMe() must have been called before this can be.
+        OID getMyRID() const { return _me["_id"].OID(); }
 
         void applyOperation(OperationContext* txn, Database* db, const BSONObj& op);
         std::string hostName;    // ip addr or hostname plus optionally, ":<port>"
@@ -141,12 +142,17 @@ namespace repl {
 
         typedef std::vector< shared_ptr< ReplSource > > SourceVector;
         static void loadAll(OperationContext* txn, SourceVector&);
-        explicit ReplSource(BSONObj);
+
+        explicit ReplSource(OperationContext* txn, BSONObj);
+        // This is not the constructor you are looking for. Always prefer the version that takes
+        // a BSONObj.  This is public only as a hack so that the ReplicationCoordinator can find
+        // out the process's RID in master/slave setups.
+        ReplSource(OperationContext* txn);
 
         /* -1 = error */
         int sync(int& nApplied);
 
-        void save(); // write ourself to local.sources
+        void save(OperationContext* txn); // write ourself to local.sources
 
         // make a jsobj from our member fields of the form
         //   { host: ..., source: ..., syncedTo: ... }

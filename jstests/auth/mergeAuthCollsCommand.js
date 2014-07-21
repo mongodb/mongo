@@ -47,6 +47,7 @@ function runTest(conn) {
     assert.commandWorked(admin.runCommand({_mergeAuthzCollections: 1,
                                            tempUsersCollection: 'admin.tempusers',
                                            tempRolesCollection: 'admin.temproles',
+                                           db: "",
                                            drop: true}));
 
     assert.eq(2, admin.system.users.count());
@@ -70,6 +71,7 @@ function runTest(conn) {
     assert.commandWorked(admin.runCommand({_mergeAuthzCollections: 1,
                                            tempUsersCollection: 'admin.tempusers',
                                            tempRolesCollection: 'admin.temproles',
+                                           db: "",
                                            drop: false}));
 
 
@@ -97,6 +99,7 @@ function runTest(conn) {
     assert.commandWorked(admin.runCommand({_mergeAuthzCollections: 1,
                                            tempUsersCollection: 'admin.tempusers',
                                            tempRolesCollection: 'admin.temproles',
+                                           db: "",
                                            drop: false}));
 
     assert.eq(2, admin.system.users.count());

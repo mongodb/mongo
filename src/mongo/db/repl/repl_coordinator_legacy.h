@@ -90,6 +90,10 @@ namespace repl {
 
         virtual OID getElectionId();
 
+        virtual OID getMyRID();
+
+        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
+
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
         virtual bool setMaintenanceMode(bool activate);
@@ -143,11 +147,16 @@ namespace repl {
 
         Status _checkReplEnabledForCommand(BSONObjBuilder* result);
 
-        // Mutex that protects the _ridConfigMap
-        boost::mutex _ridConfigMapMutex;
+        // Mutex that protects the _ridConfigMap and the _slaveOpTimeMap;
+        boost::mutex _mutex;
 
         // Map from RID to member config object
         std::map<OID, BSONObj> _ridConfigMap;
+
+        // Maps nodes in this replication group to the last oplog operation they have committed
+        // TODO(spencer): change to unordered_map
+        typedef std::map<OID, OpTime> SlaveOpTimeMap;
+        SlaveOpTimeMap _slaveOpTimeMap;
 
         // Rollback id. used to check if a rollback happened during some interval of time
         // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.

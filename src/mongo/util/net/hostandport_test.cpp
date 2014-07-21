@@ -70,9 +70,15 @@ namespace {
         ASSERT_THROWS(HostAndPort("a:"), AssertionException);
         ASSERT_THROWS(HostAndPort("a:0xa"), AssertionException);
         ASSERT_THROWS(HostAndPort(":123"), AssertionException);
+        ASSERT_THROWS(HostAndPort("[124d:"), AssertionException);
+        ASSERT_THROWS(HostAndPort("[124d:]asdf:34"), AssertionException);
+        ASSERT_THROWS(HostAndPort("frim[124d:]:34"), AssertionException);
+        ASSERT_THROWS(HostAndPort("[124d:]12:34"), AssertionException);
 
         ASSERT_EQUALS(HostAndPort("abc"), HostAndPort("abc", -1));
         ASSERT_EQUALS(HostAndPort("abc.def:3421"), HostAndPort("abc.def", 3421));
+        ASSERT_EQUALS(HostAndPort("[124d:]:34"), HostAndPort("124d:", 34));
+        ASSERT_EQUALS(HostAndPort("[124d:]"), HostAndPort("124d:", -1));
     }
 
     TEST(HostAndPort, StaticParseFunction) {
@@ -81,10 +87,20 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse("a:0").getStatus());
         ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse("a:0xa").getStatus());
         ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse(":123").getStatus());
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse("[124d:").getStatus());
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse("[124d:]asdf:34").getStatus());
 
         ASSERT_EQUALS(unittest::assertGet(HostAndPort::parse("abc")), HostAndPort("abc", -1));
         ASSERT_EQUALS(unittest::assertGet(HostAndPort::parse("abc.def:3421")),
                       HostAndPort("abc.def", 3421));
+    }
+
+    TEST(HostAndPort, RoundTripAbility) {
+        ASSERT_EQUALS(HostAndPort("abc"), HostAndPort(HostAndPort("abc").toString()));
+        ASSERT_EQUALS(HostAndPort("abc.def:3421"),
+                      HostAndPort(HostAndPort("abc.def:3421").toString()));
+        ASSERT_EQUALS(HostAndPort("[124d:]:34"), HostAndPort(HostAndPort("[124d:]:34").toString()));
+        ASSERT_EQUALS(HostAndPort("[124d:]"), HostAndPort(HostAndPort("[124d:]").toString()));
     }
 
 }  // namespace

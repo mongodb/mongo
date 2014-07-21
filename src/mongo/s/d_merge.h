@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     /**
      * Merges a chunks in the specified [minKey, maxKey) range of the specified namespace.
      * Updates the local and remote metadata by expanding the bounds of the first chunk in the
@@ -51,7 +53,8 @@ namespace mongo {
      *     + Takes a distributed lock over the namespace
      *     + Cannot be called with any other locks held
      */
-    bool mergeChunks( const NamespaceString& nss,
+    bool mergeChunks( OperationContext* txn,
+                      const NamespaceString& nss,
                       const BSONObj& minKey,
                       const BSONObj& maxKey,
                       const OID& epoch,

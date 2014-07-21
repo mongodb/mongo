@@ -156,7 +156,7 @@ namespace mongo {
             QLOG() << "Subplanner: index " << i << " is " << ie.toString() << endl;
         }
 
-        const WhereCallbackReal whereCallback(_collection->ns().db());
+        const WhereCallbackReal whereCallback(_txn, _collection->ns().db());
 
         for (size_t i = 0; i < theOr->numChildren(); ++i) {
             // Turn the i-th child into its own query.

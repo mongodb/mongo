@@ -142,7 +142,7 @@ namespace mongo {
             
             Collection* collection = cx.db()->getCollection( txn, ns );
 
-            const WhereCallbackReal whereCallback = WhereCallbackReal(StringData(ns));
+            const WhereCallbackReal whereCallback = WhereCallbackReal(txn, StringData(ns));
 
             BSONObj doc;
             bool found = false;
@@ -247,7 +247,7 @@ namespace mongo {
                     }
                     
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(requestNs);
+                    UpdateRequest request(txn, requestNs);
 
                     request.setQuery(queryModified);
                     request.setUpdates(update);
@@ -257,8 +257,7 @@ namespace mongo {
                     // the shard version below, but for now no
                     UpdateLifecycleImpl updateLifecycle(false, requestNs);
                     request.setLifecycle(&updateLifecycle);
-                    UpdateResult res = mongo::update(txn,
-                                                     cx.db(),
+                    UpdateResult res = mongo::update(cx.db(),
                                                      request,
                                                      &txn->getCurOp()->debug());
 
@@ -328,7 +327,7 @@ namespace mongo {
 
             Projection projection;
             if (fields) {
-                projection.init(fieldsHolder, WhereCallbackReal(StringData(dbname)));
+                projection.init(fieldsHolder, WhereCallbackReal(txn, StringData(dbname)));
                 if (!projection.includeID()) {
                     fields = NULL; // do projection in post-processing
                 }

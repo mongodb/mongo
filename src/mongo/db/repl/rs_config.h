@@ -38,6 +38,9 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+
+    class OperationContext;
+
 namespace repl {
     class Member;
     const std::string rsConfigNs = "local.system.replset";
@@ -157,7 +160,7 @@ namespace repl {
          * 3. If 'comment' isn't empty and we're a primary or not yet initiated, log an 'n' op
          *    to the oplog.  This is important because it establishes our lastOpWritten time.
          */
-        void saveConfigLocally(BSONObj comment); // to local db
+        void saveConfigLocally(OperationContext* txn, BSONObj comment); // to local db
 
         /**
          * Update members' groups when the config changes but members stay the same.

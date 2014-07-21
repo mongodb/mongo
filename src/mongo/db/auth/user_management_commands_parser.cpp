@@ -658,6 +658,7 @@ namespace auth {
         validFieldNames.insert("_mergeAuthzCollections");
         validFieldNames.insert("tempUsersCollection");
         validFieldNames.insert("tempRolesCollection");
+        validFieldNames.insert("db");
         validFieldNames.insert("drop");
         validFieldNames.insert("writeConcern");
 
@@ -684,6 +685,17 @@ namespace auth {
                                                    "",
                                                    &parsedArgs->rolesCollName);
         if (!status.isOK()) {
+            return status;
+        }
+
+        status = bsonExtractStringField(cmdObj, "db", &parsedArgs->db);
+        if (!status.isOK()) {
+            if (status == ErrorCodes::NoSuchKey) {
+                return Status(ErrorCodes::OutdatedClient,
+                              "Missing \"db\" field for _mergeAuthzCollections command. This is "
+                              "most likely due to running an outdated (pre-2.6.4) version of "
+                              "mongorestore.");
+            }
             return status;
         }
 

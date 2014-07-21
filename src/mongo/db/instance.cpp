@@ -104,7 +104,7 @@ namespace mongo {
 
     MONGO_FP_DECLARE(rsStopGetMore);
 
-    static void inProgCmd( Message &m, DbResponse &dbresponse ) {
+    static void inProgCmd(OperationContext* txn, Message &m, DbResponse &dbresponse) {
         DbMessage d(m);
         QueryMessage q(d);
         BSONObjBuilder b;
@@ -139,7 +139,7 @@ namespace mongo {
 
                 Client& me = cc();
                 scoped_lock bl(Client::clientsMutex);
-                Matcher m(filter, WhereCallbackReal(nss.db()));
+                Matcher m(filter, WhereCallbackReal(txn, nss.db()));
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
                     Client *c = *i;
                     verify( c );
@@ -346,7 +346,7 @@ namespace mongo {
                 opwrite(m);
                 if( strstr(ns, ".$cmd.sys.") ) {
                     if( strstr(ns, "$cmd.sys.inprog") ) {
-                        inProgCmd(m, dbresponse);
+                        inProgCmd(txn, m, dbresponse);
                         return;
                     }
                     if( strstr(ns, "$cmd.sys.killop") ) {
@@ -587,7 +587,7 @@ namespace mongo {
         op.debug().query = query;
         op.setQuery(query);
 
-        UpdateRequest request(ns);
+        UpdateRequest request(txn, ns);
 
         request.setUpsert(upsert);
         request.setMulti(multi);
@@ -609,7 +609,7 @@ namespace mongo {
 
         Client::Context ctx(txn,  ns );
 
-        UpdateResult res = executor.execute(txn, ctx.db());
+        UpdateResult res = executor.execute(ctx.db());
 
         // for getlasterror
         lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
@@ -635,7 +635,7 @@ namespace mongo {
         op.debug().query = pattern;
         op.setQuery(pattern);
 
-        DeleteRequest request(ns);
+        DeleteRequest request(txn, ns);
         request.setQuery(pattern);
         request.setMulti(!justOne);
         request.setUpdateOpLog(true);
@@ -650,7 +650,7 @@ namespace mongo {
 
         Client::Context ctx(txn, ns);
 
-        long long n = executor.execute(txn, ctx.db());
+        long long n = executor.execute(ctx.db());
         lastError.getSafe()->recordDelete( n );
         op.debug().ndeleted = n;
         wunit.commit();
@@ -997,11 +997,10 @@ namespace {
     }
 
 
-    mongo::mutex exitMutex("exit");
-    AtomicUInt numExitCalls = 0;
+    static AtomicUInt32 shutdownInProgress(0);
 
     bool inShutdown() {
-        return numExitCalls > 0;
+        return shutdownInProgress.load() != 0;
     }
 
     static void shutdownServer(OperationContext* txn) {
@@ -1022,6 +1021,8 @@ namespace {
     }
 
     void exitCleanly( ExitCode code ) {
+        shutdownInProgress.store(1);
+
         getGlobalEnvironment()->setKillAllOperations();
 
         repl::getGlobalReplicationCoordinator()->shutdown();
@@ -1051,22 +1052,10 @@ namespace {
         dbexit( code );
     }
 
-    /* not using log() herein in case we are already locked */
     NOINLINE_DECL void dbexit( ExitCode rc, const char *why ) {
         flushForGcov();
 
         audit::logShutdown(currentClient.get());
-        {
-            scoped_lock lk( exitMutex );
-            if ( numExitCalls++ > 0 ) {
-                if ( numExitCalls > 5 ) {
-                    // this means something horrible has happened
-                    ::_exit( rc );
-                }
-                log() << "dbexit: " << why << "; exiting immediately";
-                ::_exit( rc );
-            }
-        }
 
         log() << "dbexit: " << why;
 
@@ -1085,7 +1074,7 @@ namespace {
             return;
         }
 #endif
-        log() << "dbexit: really exiting now";
+
         ::_exit(rc);
     }
 

@@ -174,7 +174,7 @@ namespace mongo {
             BSONObj projectedObj;
             ProjectionExec projExec(projObj,
                                     _query->root(),
-                                    WhereCallbackReal(_collection->ns().db()));
+                                    WhereCallbackReal(_txn, _collection->ns().db()));
             projExec.transform(docObj, &projectedObj);
             return projectedObj;
         }

@@ -42,8 +42,9 @@ namespace mongo {
 
     class UpdateRequest {
     public:
-        inline UpdateRequest(const NamespaceString& nsString)
-            : _nsString(nsString)
+        inline UpdateRequest(OperationContext* txn, const NamespaceString& nsString)
+            : _txn(txn)
+            , _nsString(nsString)
             , _god(false)
             , _upsert(false)
             , _multi(false)
@@ -131,6 +132,10 @@ namespace mongo {
             return _lifecycle;
         }
 
+        inline OperationContext* getOpCtx() const {
+            return _txn;
+        }
+
         const std::string toString() const {
             return str::stream()
                         << " query: " << _query
@@ -143,6 +148,9 @@ namespace mongo {
                         << " fromReplications: " << _fromReplication;
         }
     private:
+
+        // Not owned. Must live as long as the request lives.
+        OperationContext* _txn;
 
         const NamespaceString& _nsString;
 

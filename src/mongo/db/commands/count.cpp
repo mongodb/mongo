@@ -209,7 +209,7 @@ namespace mongo {
         const BSONObj hintObj = hint.empty() ? BSONObj() : BSON("$hint" << hint);
 
         StringData dbnameData(dbname);
-        const WhereCallbackReal whereCallback(dbnameData);
+        const WhereCallbackReal whereCallback(txn, dbnameData);
 
         CanonicalQuery* cq;
         uassertStatusOK(CanonicalQuery::canonicalize(ns,

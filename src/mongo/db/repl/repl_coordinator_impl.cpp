@@ -329,6 +329,17 @@ namespace repl {
         return OID();
     }
 
+
+    OID ReplicationCoordinatorImpl::getMyRID() {
+        // TODO
+        return OID();
+    }
+
+    void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
+            BSONObjBuilder* cmdBuilder) {
+        // TODO
+    }
+
     void ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* result) {
         // TODO
     }

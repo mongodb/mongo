@@ -39,6 +39,8 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     typedef StatusWith<MatchExpression*> StatusWithMatchExpression;
 
     class MatchExpressionParser {
@@ -174,11 +176,19 @@ namespace mongo {
      */
     class WhereCallbackReal : public MatchExpressionParser::WhereCallback {
     public:
-        WhereCallbackReal(const StringData& dbName);
+
+        /**
+         * The OperationContext passed here is not owned, but just referenced. It gets assigned to
+         * any $where parsers, which this callback generates. Therefore, the op context must only
+         * be destroyed after these parsers and their clones (shallowClone) have been destroyed.
+         */
+        WhereCallbackReal(OperationContext* txn, const StringData& dbName);
 
         virtual StatusWithMatchExpression parseWhere(const BSONElement& where) const;
 
     private:
+        // 
+        OperationContext* _txn;
         const StringData _dbName;
     };
 

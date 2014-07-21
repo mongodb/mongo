@@ -691,7 +691,7 @@ namespace mongo {
                 // TODO: The above checks should be removed, we should only have one refresh
                 // mechanism.
                 ChunkVersion shardVersion;
-                Status status = shardingState.refreshMetadataNow( ns, &shardVersion );
+                Status status = shardingState.refreshMetadataNow(txn, ns, &shardVersion);
 
                 if (!status.isOK()) {
                     errmsg = str::stream() << "splitChunk cannot split chunk "
