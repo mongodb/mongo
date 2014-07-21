@@ -52,6 +52,11 @@ namespace repl {
     public:
         typedef std::vector<MemberConfig>::const_iterator MemberIterator;
 
+        static const std::string kIdFieldName;
+        static const std::string kVersionFieldName;
+        static const std::string kMembersFieldName;
+        static const std::string kSettingsFieldName;
+
         static const size_t kMaxMembers = 12;
         static const size_t kMaxVotingMembers = 7;
         static const Seconds kDefaultHeartbeatTimeoutPeriod;
@@ -62,6 +67,12 @@ namespace repl {
          * Initializes this ReplicaSetConfig from the contents of "cfg".
          */
         Status initialize(const BSONObj& cfg);
+
+        /**
+         * Returns true if this object has been successfully initialized or copied from
+         * an initialized object.
+         */
+        bool isInitialized() const { return _isInitialized; }
 
         /**
          * Performs basic consistency checks on the replica set configuration.
@@ -166,6 +177,7 @@ namespace repl {
          */
         void _calculateMajorityNumber();
 
+        bool _isInitialized;
         long long _version;
         std::string _replSetName;
         std::vector<MemberConfig> _members;

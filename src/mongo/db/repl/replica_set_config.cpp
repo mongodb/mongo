@@ -46,19 +46,18 @@ namespace repl {
 #endif
 
     const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
+    const std::string ReplicaSetConfig::kIdFieldName = "_id";
+    const std::string ReplicaSetConfig::kVersionFieldName = "version";
+    const std::string ReplicaSetConfig::kMembersFieldName = "members";
+    const std::string ReplicaSetConfig::kSettingsFieldName = "settings";
 
 namespace {
 
-    const std::string kIdFieldName = "_id";
-    const std::string kVersionFieldName = "version";
-    const std::string kMembersFieldName = "members";
-    const std::string kSettingsFieldName = "settings";
-
     const std::string kLegalConfigTopFieldNames[] = {
-        kIdFieldName,
-        kVersionFieldName,
-        kMembersFieldName,
-        kSettingsFieldName
+        ReplicaSetConfig::kIdFieldName,
+        ReplicaSetConfig::kVersionFieldName,
+        ReplicaSetConfig::kMembersFieldName,
+        ReplicaSetConfig::kSettingsFieldName
     };
 
     const std::string kHeartbeatTimeoutFieldName = "heartbeatTimeoutSecs";
@@ -68,9 +67,10 @@ namespace {
 
 }  // namespace
 
-    ReplicaSetConfig::ReplicaSetConfig() : _heartbeatTimeoutPeriod(0) {}
+    ReplicaSetConfig::ReplicaSetConfig() : _isInitialized(false), _heartbeatTimeoutPeriod(0) {}
 
     Status ReplicaSetConfig::initialize(const BSONObj& cfg) {
+        _isInitialized = false;
         _members.clear();
         Status status = bsonCheckOnlyHasFields(
                 "replica set configuration", cfg, kLegalConfigTopFieldNames);
@@ -130,6 +130,7 @@ namespace {
             return status;
 
         _calculateMajorityNumber();
+        _isInitialized = true;
         return Status::OK();
     }
 
