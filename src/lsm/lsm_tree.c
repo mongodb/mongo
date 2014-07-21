@@ -83,6 +83,8 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		else
 			__wt_yield();
 	}
+	while (lsm_tree->refcnt > 1)
+		__wt_yield();
 	return (0);
 }
 
@@ -97,6 +99,11 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 	WT_LSM_TREE *lsm_tree;
 
 	while ((lsm_tree = TAILQ_FIRST(&S2C(session)->lsmqh)) != NULL) {
+		/*
+		 * Setup the reference count so we wait for any entries on
+		 * the LSM managers queues to drain.
+		 */
+		(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
 		WT_TRET(__lsm_tree_close(session, lsm_tree));
 		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 	}
