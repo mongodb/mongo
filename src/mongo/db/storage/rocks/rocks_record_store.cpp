@@ -46,8 +46,7 @@ namespace mongo {
                                         bool isCapped,
                                         int64_t cappedMaxSize,
                                         int64_t cappedMaxDocs,
-                                        CappedDocumentDeleteCallback* cappedDeleteCallback
-                                        )
+                                        CappedDocumentDeleteCallback* cappedDeleteCallback )
         : RecordStore( ns ),
           _db( db ),
           _columnFamily( columnFamily ),
@@ -74,13 +73,13 @@ namespace mongo {
         // Get next id
         // XXX not using a Snapshot here
         boost::scoped_ptr<rocksdb::Iterator> iter( db->NewIterator( _readOptions(),
-                                                   columnFamily ) );
+                                                                    columnFamily ) );
         iter->SeekToLast();
         if (iter->Valid()) {
-            rocksdb::Slice last_slice = iter->key();
-            DiskLoc last_loc = reinterpret_cast<DiskLoc*>( const_cast<char*>( 
-                                                            last_slice.data() ) )[0];
-            _nextIdNum = last_loc.a() + ( (uint64_t) last_loc.getOfs() << 32 ) + 1;
+            rocksdb::Slice lastSlice = iter->key();
+            DiskLoc lastLoc = reinterpret_cast<DiskLoc*>( const_cast<char*>( 
+                                                           lastSlice.data() ) )[0];
+            _nextIdNum = lastLoc.a() + ( (uint64_t) lastLoc.getOfs() << 32 ) + 1;
         }
         else
             _nextIdNum = 1;
