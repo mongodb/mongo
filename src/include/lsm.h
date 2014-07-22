@@ -83,11 +83,11 @@ struct __wt_lsm_chunk {
  * type of work they will execute, and by work units to define which action
  * is required.
  */
-#define	WT_LSM_WORK_BLOOM	0x01
-#define	WT_LSM_WORK_DROP	0x02
-#define	WT_LSM_WORK_FLUSH	0x04
-#define	WT_LSM_WORK_MERGE	0x08
-#define	WT_LSM_WORK_SWITCH	0x10
+#define	WT_LSM_WORK_BLOOM	0x01	/* Create a bloom filter */
+#define	WT_LSM_WORK_DROP	0x02	/* Drop unused chunks */
+#define	WT_LSM_WORK_FLUSH	0x04	/* Flush a chunk to disk */
+#define	WT_LSM_WORK_MERGE	0x08	/* Look for a tree merge */
+#define	WT_LSM_WORK_SWITCH	0x10	/* Switch to a new in memory chunk */
 
 /*
  * WT_LSM_WORK_UNIT --
@@ -113,8 +113,7 @@ struct __wt_lsm_manager {
 	 *   work to be done.
 	 * One queue for application requested work. For example flushing
 	 *   and creating bloom filters.
-	 * One queue that is managed by the LSM manager thread. It's populated
-	 * with pending merges.
+	 * One queue that is for longer running operations such as merges.
 	 */
 	TAILQ_HEAD(__wt_lsm_work_switch_qh, __wt_lsm_work_unit)  switchqh;
 	TAILQ_HEAD(__wt_lsm_work_app_qh, __wt_lsm_work_unit)	  appqh;
@@ -128,6 +127,7 @@ struct __wt_lsm_manager {
 	WT_SESSION_IMPL	**lsm_worker_sessions;
 
 };
+
 /*
  * WT_LSM_TREE --
  *	An LSM tree.
@@ -224,7 +224,6 @@ struct __wt_lsm_worker_cookie {
  *	State for an LSM worker thread.
  */
 struct __wt_lsm_worker_args {
-	WT_LSM_TREE *lsm_tree;	/* TODO: remove - hangover from old code. */
 	WT_SESSION_IMPL *session;
 	u_int id;
 	uint32_t flags;

@@ -55,6 +55,10 @@ err:		__wt_free(session, manager->lsm_worker_tids);
 	return (ret);
 }
 
+/*
+ * __lsm_manager_free_work_unit --
+ *	Release an LSM tree work unit.
+ */
 static int
 __lsm_manager_free_work_unit(WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT *entry)
 {
@@ -141,17 +145,14 @@ __lsm_worker_manager(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
-	WT_LSM_TREE *next_tree;
 	WT_LSM_WORKER_ARGS *worker_args;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session, *worker_session;
-	int queued, pass_sleep;
 	u_int i;
 
 	session = (WT_SESSION_IMPL *)arg;
 	conn = S2C(session);
 	manager = &conn->lsm_manager;
-	pass_sleep = 10000;
 
 	WT_ASSERT(session, manager->lsm_workers == 1);
 
@@ -181,7 +182,12 @@ __lsm_worker_manager(void *arg)
 	WT_ERR(__wt_thread_create(session, &manager->lsm_worker_tids[1],
 	    __lsm_worker, worker_args));
 
-	/* Start a generic worker thread. */
+	/*
+	 * Start the remaining worker threads.
+	 * TODO: This should get more sophisticated in the future - only
+	 * launching as many worker threads as are required to keep up with
+	 * demand.
+	 */
 	for (; manager->lsm_workers < manager->lsm_workers_max;
 	    manager->lsm_workers++) {
 		WT_ERR(__wt_open_session(conn, 1, NULL,
@@ -197,8 +203,15 @@ __lsm_worker_manager(void *arg)
 		    WT_LSM_WORK_BLOOM |
 		    WT_LSM_WORK_DROP |
 		    WT_LSM_WORK_FLUSH |
-		    WT_LSM_WORK_MERGE |
 		    WT_LSM_WORK_SWITCH;
+		/*
+		 * Only allow half of the threads to run merges to avoid all
+		 * all workers getting stuck in long-running merge operations.
+		 * Make sure the first worker is allowed, so that there is at
+		 * least one thread capable of running merges.
+		 */
+		if (manager->lsm_workers % 2 == 1)
+			F_SET(worker_args, WT_LSM_WORK_MERGE);
 		WT_ERR(__wt_thread_create(session,
 		    &manager->lsm_worker_tids[manager->lsm_workers],
 		    __lsm_worker, worker_args));
@@ -209,57 +222,44 @@ __lsm_worker_manager(void *arg)
 			__wt_sleep(0, 10000);
 			continue;
 		}
-		queued = 0;
-		TAILQ_FOREACH(next_tree, &conn->lsmqh, q) {
-			if (next_tree->nchunks > 1 &&
-			    next_tree->merge_throttle > 0) {
-				++queued;
-				WT_ERR(__wt_lsm_manager_push_entry(
-				    session, WT_LSM_WORK_MERGE, next_tree));
-			}
-			/* TODO: We should be setting up aggressive merges
-			 * here. The old aggressive tracking code was:
-			 */
+		__wt_sleep(0, 10000);
+		/*
+		 * TODO: We should be looking for and setting up aggressive
+		 * merges and flushes here. The old aggressive tracking code
+		 * was:
+		 */
 #if 0
-			/* Poll 10 times per second. */
-			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
-			    session, lsm_tree->work_cond, 100000));
+		/* Poll 10 times per second. */
+		WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
+		    session, lsm_tree->work_cond, 100000));
 
-			(void)WT_ATOMIC_SUB(lsm_tree->merge_idle, 1);
+		(void)WT_ATOMIC_SUB(lsm_tree->merge_idle, 1);
 
-			/*
-			 * Randomize the tracking of stall time so that with
-			 * multiple LSM trees open, they don't all get
-			 * aggressive in lock-step.
-			 */
-			stallms += __wt_random() % 200;
+		/*
+		 * Randomize the tracking of stall time so that with
+		 * multiple LSM trees open, they don't all get
+		 * aggressive in lock-step.
+		 */
+		stallms += __wt_random() % 200;
 
-			/*
-			 * Get aggressive if more than enough chunks for a
-			 * merge should have been created while we waited.
-			 * Use 10 seconds as a default if we don't have an
-			 * estimate.
-			 */
-			chunk_wait = stallms / (lsm_tree->chunk_fill_ms == 0 ?
-			    10000 : lsm_tree->chunk_fill_ms);
-			old_aggressive = aggressive;
-			aggressive = chunk_wait / lsm_tree->merge_min;
+		/*
+		 * Get aggressive if more than enough chunks for a
+		 * merge should have been created while we waited.
+		 * Use 10 seconds as a default if we don't have an
+		 * estimate.
+		 */
+		chunk_wait = stallms / (lsm_tree->chunk_fill_ms == 0 ?
+		    10000 : lsm_tree->chunk_fill_ms);
+		old_aggressive = aggressive;
+		aggressive = chunk_wait / lsm_tree->merge_min;
 
-			if (aggressive > old_aggressive)
-				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-				     "LSM merge got aggressive (%u), "
-				     "%u / %" PRIu64,
-				     aggressive, stallms,
-				     lsm_tree->chunk_fill_ms));
+		if (aggressive > old_aggressive)
+			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+			     "LSM merge got aggressive (%u), "
+			     "%u / %" PRIu64,
+			     aggressive, stallms,
+			     lsm_tree->chunk_fill_ms));
 #endif
-		}
-		/* Don't busy loop finding work. */
-		if (!TAILQ_EMPTY(&manager->managerqh))
-			pass_sleep += 100;
-		else if (pass_sleep > 1000)
-			pass_sleep -= 1000;
-
-		__wt_sleep(0, pass_sleep);
 	}
 
 	/*
@@ -566,6 +566,8 @@ __lsm_worker(void *arg) {
 				__wt_lsm_free_chunks(session, entry->lsm_tree);
 			} else if (entry->flags == WT_LSM_WORK_BLOOM) {
 				__wt_lsm_bloom_work(session, entry->lsm_tree);
+				WT_ERR(__wt_lsm_manager_push_entry(session,
+				    WT_LSM_WORK_MERGE, entry->lsm_tree));
 			}
 			/*
 			 * If we completed some work from the application
