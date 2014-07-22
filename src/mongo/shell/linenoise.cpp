@@ -635,16 +635,20 @@ static void dynamicRefresh( PromptBase& pi, UChar32* buf32, int len, int pos ) {
 
     // calculate the position of the end of the prompt
     int xEndOfPrompt, yEndOfPrompt;
+    int width;
+
     calculateScreenPosition( 0, 0, pi.promptScreenColumns, pi.promptChars, xEndOfPrompt, yEndOfPrompt );
     pi.promptIndentation = xEndOfPrompt;
 
     // calculate the position of the end of the input line
     int xEndOfInput, yEndOfInput;
-    calculateScreenPosition( xEndOfPrompt, yEndOfPrompt, pi.promptScreenColumns, len, xEndOfInput, yEndOfInput );
+    width = mk_wcswidth((const int *)buf32, len);
+    calculateScreenPosition( xEndOfPrompt, yEndOfPrompt, pi.promptScreenColumns, width, xEndOfInput, yEndOfInput );
 
     // calculate the desired position of the cursor
     int xCursorPos, yCursorPos;
-    calculateScreenPosition( xEndOfPrompt, yEndOfPrompt, pi.promptScreenColumns, pos, xCursorPos, yCursorPos );
+    width = mk_wcswidth((const int *)buf32, pos);
+    calculateScreenPosition( xEndOfPrompt, yEndOfPrompt, pi.promptScreenColumns, width, xCursorPos, yCursorPos );
 
 #ifdef _WIN32
     // position at the start of the prompt, clear to end of previous input
@@ -737,13 +741,17 @@ void InputBuffer::refreshLine( PromptBase& pi ) {
         }
     }
 
+    int width = 0;
+    width = mk_wcswidth((const int *)buf32, len);
+
     // calculate the position of the end of the input line
     int xEndOfInput, yEndOfInput;
-    calculateScreenPosition( pi.promptIndentation, 0, pi.promptScreenColumns, len, xEndOfInput, yEndOfInput );
+    calculateScreenPosition( pi.promptIndentation, 0, pi.promptScreenColumns, width, xEndOfInput, yEndOfInput );
 
     // calculate the desired position of the cursor
     int xCursorPos, yCursorPos;
-    calculateScreenPosition( pi.promptIndentation, 0, pi.promptScreenColumns, pos, xCursorPos, yCursorPos );
+    width = mk_wcswidth((const int *)buf32, pos);
+    calculateScreenPosition( pi.promptIndentation, 0, pi.promptScreenColumns, width, xCursorPos, yCursorPos );
 
 #ifdef _WIN32
     // position at the end of the prompt, clear to end of previous input
