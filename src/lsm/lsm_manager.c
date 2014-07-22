@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+static int __lsm_manager_aggressive_update(WT_SESSION_IMPL *, WT_LSM_TREE *);
 static int __lsm_manager_pop_entry(
     WT_SESSION_IMPL *, uint32_t , WT_LSM_WORK_UNIT **);
 static void * __lsm_worker(void *);
@@ -135,6 +136,54 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 }
 
 /*
+ * __lsm_manager_aggressive_update --
+ *	Update the merge aggressiveness for a single LSM tree.
+ */
+static int
+__lsm_manager_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+{
+#if 1
+	WT_UNUSED(session);
+	WT_UNUSED(lsm_tree);
+#else
+	/*
+	 * TODO: This code needs to track when operations on an LSM tree are
+	 * making progress. I think we'll need to add a timestamp to the LSM
+	 * tree structure, and update it each time a relevant operation
+	 * completes. I *think* a relevant operation is a merge, but it may
+	 * also be a flush or a free of old chunks.
+	 */
+	u_int chunk_wait, old_aggressive, stallms;
+
+	/*
+	 * Randomize the tracking of stall time so that with
+	 * multiple LSM trees open, they don't all get
+	 * aggressive in lock-step.
+	 */
+	stallms += __wt_random() % 200;
+
+	/*
+	 * Get aggressive if more than enough chunks for a
+	 * merge should have been created while we waited.
+	 * Use 10 seconds as a default if we don't have an
+	 * estimate.
+	 */
+	chunk_wait = stallms / (lsm_tree->chunk_fill_ms == 0 ?
+	    10000 : lsm_tree->chunk_fill_ms);
+	old_aggressive = lsm_tree->merge_aggressiveness;
+	lsm_tree->merge_aggressiveness = chunk_wait / lsm_tree->merge_min;
+
+	if (lsm_tree->merge_aggressiveness > old_aggressive)
+		WT_RET(__wt_verbose(session, WT_VERB_LSM,
+		     "LSM merge got aggressive (%u), "
+		     "%u / %" PRIu64,
+		     lsm_tree->merge_aggressiveness, stallms,
+		     lsm_tree->chunk_fill_ms));
+#endif
+	return (0);
+}
+
+/*
  * __lsm_worker_manager --
  *	A thread that manages all open LSM trees, and the shared LSM worker
  *	threads.
@@ -145,6 +194,7 @@ __lsm_worker_manager(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
+	WT_LSM_TREE *lsm_tree;
 	WT_LSM_WORKER_ARGS *worker_args;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session, *worker_session;
@@ -223,43 +273,8 @@ __lsm_worker_manager(void *arg)
 			continue;
 		}
 		__wt_sleep(0, 10000);
-		/*
-		 * TODO: We should be looking for and setting up aggressive
-		 * merges and flushes here. The old aggressive tracking code
-		 * was:
-		 */
-#if 0
-		/* Poll 10 times per second. */
-		WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
-		    session, lsm_tree->work_cond, 100000));
-
-		(void)WT_ATOMIC_SUB(lsm_tree->merge_idle, 1);
-
-		/*
-		 * Randomize the tracking of stall time so that with
-		 * multiple LSM trees open, they don't all get
-		 * aggressive in lock-step.
-		 */
-		stallms += __wt_random() % 200;
-
-		/*
-		 * Get aggressive if more than enough chunks for a
-		 * merge should have been created while we waited.
-		 * Use 10 seconds as a default if we don't have an
-		 * estimate.
-		 */
-		chunk_wait = stallms / (lsm_tree->chunk_fill_ms == 0 ?
-		    10000 : lsm_tree->chunk_fill_ms);
-		old_aggressive = aggressive;
-		aggressive = chunk_wait / lsm_tree->merge_min;
-
-		if (aggressive > old_aggressive)
-			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-			     "LSM merge got aggressive (%u), "
-			     "%u / %" PRIu64,
-			     aggressive, stallms,
-			     lsm_tree->chunk_fill_ms));
-#endif
+		TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
+			__lsm_manager_aggressive_update(session, lsm_tree);
 	}
 
 	/*
@@ -584,7 +599,7 @@ __lsm_worker(void *arg) {
 		    entry != NULL) {
 			WT_ASSERT(session, entry->flags == WT_LSM_WORK_MERGE);
 			ret = __wt_lsm_merge(session,
-			    entry->lsm_tree, cookie->id, 0);
+			    entry->lsm_tree, cookie->id);
 			if (ret == WT_NOTFOUND) {
 				F_CLR(entry->lsm_tree, WT_LSM_TREE_COMPACTING);
 				ret = 0;

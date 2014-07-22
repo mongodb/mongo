@@ -188,6 +188,7 @@ struct __wt_lsm_tree {
 	size_t old_alloc;		/* Space allocated for old chunks */
 	u_int nold_chunks;		/* Number of old chunks */
 	int freeing_old_chunks;		/* Whether chunks are being freed */
+	uint32_t merge_aggressiveness;	/* Increase amount of work per merge */
 
 #define	WT_LSM_TREE_COMPACTING	0x01	/* Tree is being compacted */
 #define	WT_LSM_TREE_NEED_SWITCH	0x02	/* A new chunk should be created */

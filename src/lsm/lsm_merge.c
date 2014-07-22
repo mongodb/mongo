@@ -50,7 +50,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
  */
 int
 __wt_lsm_merge(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id, u_int aggressive)
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *dest, *src;
@@ -58,7 +58,7 @@ __wt_lsm_merge(
 	WT_DECL_RET;
 	WT_ITEM key, value;
 	WT_LSM_CHUNK *chunk, *previous, *youngest;
-	uint32_t generation, max_gap, max_gen, max_level, start_id;
+	uint32_t aggressive, generation, max_gap, max_gen, max_level, start_id;
 	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_max, merge_min, nchunks, start_chunk;
 	int create_bloom, locked, tret;
@@ -72,15 +72,16 @@ __wt_lsm_merge(
 	dest = src = NULL;
 	locked = 0;
 	start_id = 0;
+	aggressive = lsm_tree->merge_aggressiveness;
 
 	/*
-	 * If the tree is open read-only or we are compacting, be very
-	 * aggressive.  Otherwise, we can spend a long time waiting for merges
-	 * to start in read-only applications.
+	 * If the tree is open read-only be very aggressive. Otherwise, we can
+	 * spend a long time waiting for merges to start in read-only
+	 * applications.
 	 */
-	if (!lsm_tree->modified ||
-	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
-		aggressive = 10;
+	if (!lsm_tree->modified)
+		lsm_tree->merge_aggressiveness = 10;
+
 	merge_max = (aggressive > 5) ? 100 : lsm_tree->merge_min;
 	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
 	max_gap = (aggressive + 4) / 5;

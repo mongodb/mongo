@@ -954,9 +954,9 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	time_t begin, end;
-	int i, locked;
+	int i, compacting, locked;
 
-	locked = 0;
+	compacting = locked = 0;
 	/*
 	 * This function is applied to all matching sources: ignore anything
 	 * that is not an LSM tree.
@@ -981,11 +981,13 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 
 	/* Clear any merge throttle: compact throws out that calculation. */
 	lsm_tree->merge_throttle = 0;
+	lsm_tree->merge_aggressiveness = 0;
 
 	/* If another thread started compacting this tree, we're done. */
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
 		goto err;
 
+	compacting = 1;
 	F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
 
 	/*
@@ -1006,30 +1008,46 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	    session, WT_LSM_WORK_FLUSH, lsm_tree));
 
 	/* Wait for the work unit queues to drain. */
-	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE) &&
-	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) {
+	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
+		/*
+		 * The compacting flag is cleared when no merges can be done.
+		 * Ensure that we push through some aggressive merges before
+		 * stopping otherwise we might not do merges that would 
+		 * span chunks with different generations.
+		 */
+		if (!F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) {
+			if (lsm_tree->merge_aggressiveness < 10) {
+				F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+				lsm_tree->merge_aggressiveness = 10;
+			} else
+				break;
+		}
 		__wt_sleep(1, 0);
 		WT_ERR(__wt_seconds(session, &end));
 		if (session->compact->max_time > 0 &&
 		    session->compact->max_time < (uint64_t)(end - begin)) {
-			F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
 			WT_ERR(ETIMEDOUT);
 		}
 		/*
-		 * Wait for all activity to drain, at first this will let all
-		 * switches and bloom filter creates complete. We will know
-		 * that merges can't find any more candidates, because the
-		 * compacting flag will be cleared.
+		 * Push merge operations while they are still getting work
+		 * done. If we are pushing merges, make sure they are
+		 * aggressive, to avoid duplicating effort.
 		 */
-		if (lsm_tree->queue_ref != 0)
-			continue;
 #define	COMPACT_PARALLEL_MERGES	5
-		for (i = 0; i < COMPACT_PARALLEL_MERGES; i++)
+		for (i = lsm_tree->queue_ref;
+		    i < COMPACT_PARALLEL_MERGES; i++) {
+			lsm_tree->merge_aggressiveness = 10;
 			WT_ERR(__wt_lsm_manager_push_entry(
 			    session, WT_LSM_WORK_MERGE, lsm_tree));
+		}
 	}
 err:	if (locked)
 		WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
+	/* Ensure the compacting flag is cleared if we set it. */
+	if (compacting) {
+		F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
+		lsm_tree->merge_aggressiveness = 0;
+	}
 	__wt_lsm_tree_release(session, lsm_tree);
 	return (ret);
 
