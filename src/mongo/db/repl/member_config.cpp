@@ -270,7 +270,7 @@ namespace {
         tags.done();
 
         configBuilder.append("slaveDelay", _slaveDelay.total_seconds());
-        configBuilder.append("votes", _isVoter? 1 : 0);
+        configBuilder.append("votes", getNumVotes());
         return configBuilder.obj();
     }
 

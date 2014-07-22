@@ -431,7 +431,7 @@ namespace repl {
                 }
                 _lastVote.when = now;
                 _lastVote.who = whoid;
-                vote = _selfConfig().isVoter() ? 1 : 0;
+                vote = _selfConfig().getNumVotes();
                 invariant( _currentConfig.getMemberAt(hopefulIndex).getId() == whoid );
                 log() << "replSet info voting yea for " << 
                     _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString()
@@ -578,9 +578,8 @@ namespace repl {
         
         // make sure the electable set is up-to-date
         if (_aMajoritySeemsToBeUp()
-            && !_selfConfig().isArbiter()    // not an arbiter
-            && (_selfConfig().getPriority() > 0)  // not priority 0
-            && (_stepDownUntil <= now)              // stepDown timer has expired
+            && _selfConfig().isElectable()    // not an arbiter and not priority 0
+            && (_stepDownUntil <= now)        // stepDown timer has expired
             && (_memberState == MemberState::RS_SECONDARY)
             // we are within 10 seconds of primary
             && (latestOp == 0 || _lastApplied.getSecs() >= latestOp - 10)) {
@@ -779,9 +778,8 @@ namespace repl {
         // election candidate.
 
         // If we can't elect ourselves due to config, can't become a candidate.
-        if (!_selfConfig().isArbiter()       // not an arbiter
-            && (_selfConfig().getPriority() > 0)  // not priority 0
-            && (_stepDownUntil <= now)              // stepDown timer has expired
+        if (_selfConfig().isElectable()       // not an arbiter and not priority 0
+            && (_stepDownUntil <= now)        // stepDown timer has expired
             && (_memberState == MemberState::RS_SECONDARY)) {
             OCCASIONALLY log() << "replSet I don't see a primary and I can't elect myself";
             return None;
@@ -842,7 +840,7 @@ namespace repl {
              it != _hbdata.end(); 
              ++it) {
             if (it->up()) {
-                vUp += _currentConfig.getMemberAt(it->getConfigIndex()).isVoter() ? 1 : 0;
+                vUp += _currentConfig.getMemberAt(it->getConfigIndex()).getNumVotes();
             }
         }
 
@@ -855,7 +853,7 @@ namespace repl {
         for (ReplicaSetConfig::MemberIterator it = _currentConfig.membersBegin();
              it != _currentConfig.membersEnd();
              ++it) {
-            vTot += it->isVoter() ? 1 : 0;
+            vTot += it->getNumVotes();
         }
         if( vTot % 2 == 0 && vTot && complain++ == 0 )
             log() << "replSet warning: even number of voting members in replica set config - "
