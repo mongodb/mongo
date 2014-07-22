@@ -239,5 +239,10 @@ namespace repl {
         return Status::OK();
     }
 
+    BSONObj ReplicationCoordinatorMock::getGetLastErrorDefault() {
+        // TODO
+        return BSONObj();
+    }
+
 } // namespace repl
 } // namespace mongo

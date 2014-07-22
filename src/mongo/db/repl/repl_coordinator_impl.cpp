@@ -647,5 +647,10 @@ namespace repl {
         }
     }
 
+    BSONObj ReplicationCoordinatorImpl::getGetLastErrorDefault() {
+        boost::mutex::scoped_lock lock(_mutex);
+        return _rsConfig.getDefaultWriteConcern().toBSON();
+    }
+
 } // namespace repl
 } // namespace mongo

@@ -300,5 +300,11 @@ namespace repl {
         return legacyStatus;
     }
 
+    BSONObj HybridReplicationCoordinator::getGetLastErrorDefault() {
+        BSONObj legacyGLE = _legacy.getGetLastErrorDefault();
+        BSONObj implGLE = _impl.getGetLastErrorDefault();
+        return legacyGLE;
+    }
+
 } // namespace repl
 } // namespace mongo

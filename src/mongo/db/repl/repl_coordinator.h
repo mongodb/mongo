@@ -416,6 +416,11 @@ namespace repl {
          */
         virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op) = 0;
 
+        /**
+         * Returns a BSONObj containing a representation of the current default write concern.
+         */
+        virtual BSONObj getGetLastErrorDefault() = 0;
+
     protected:
 
         ReplicationCoordinator();

@@ -147,6 +147,8 @@ namespace repl {
 
         virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
 
+        virtual BSONObj getGetLastErrorDefault();
+
     private:
         LegacyReplicationCoordinator _legacy;
         ReplicationCoordinatorImpl _impl;

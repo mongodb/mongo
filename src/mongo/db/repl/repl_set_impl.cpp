@@ -32,7 +32,6 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/commands/get_last_error.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index_rebuilder.h"
@@ -518,9 +517,8 @@ namespace {
         //       we cannot error out at this point, except fatally.  Check errors earlier.
         lock lk(this);
 
-        if (getLastErrorDefault || !c.getLastErrorDefaults.isEmpty()) {
-            // see comment in dbcommands.cpp for getlasterrordefault
-            getLastErrorDefault = new BSONObj(c.getLastErrorDefaults);
+        if (!getLastErrorDefault.isEmpty() || !c.getLastErrorDefaults.isEmpty()) {
+            getLastErrorDefault = c.getLastErrorDefaults;
         }
 
         list<ReplSetConfig::MemberCfg*> newOnes;

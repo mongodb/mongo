@@ -143,6 +143,8 @@ namespace repl {
 
         virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
 
+        virtual BSONObj getGetLastErrorDefault();
+
     private:
         Status _stepDownHelper(OperationContext* txn,
                                bool force,

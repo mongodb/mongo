@@ -36,6 +36,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 
@@ -52,10 +53,6 @@ namespace mongo {
         }
 
     } // namespace
-
-    // This is set in rs.cpp when the replica set is initialized, and is stored in dbcommands.cpp
-    // for now.  See dbcommands.cpp
-    extern BSONObj* getLastErrorDefault;
 
     WriteCmd::WriteCmd( const StringData& name, BatchedCommandRequest::BatchType writeType ) :
         Command( name ), _writeType( writeType ) {
@@ -127,11 +124,8 @@ namespace mongo {
         NamespaceString nss(dbName, request.getNS());
         request.setNS(nss.ns());
 
-        BSONObj defaultWriteConcern;
-        // This is really bad - it's only safe because we leak the defaults by overriding them with
-        // new defaults and because we never reset to an empty default.
-        // TODO: fix this for sane behavior where we query repl set object
-        if ( getLastErrorDefault ) defaultWriteConcern = *getLastErrorDefault;
+        BSONObj defaultWriteConcern =
+                repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
 
         WriteBatchExecutor writeBatchExecutor(txn,
                                               defaultWriteConcern,

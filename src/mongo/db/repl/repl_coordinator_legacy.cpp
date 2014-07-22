@@ -1013,5 +1013,12 @@ namespace {
         return Status::OK();
     }
 
+    BSONObj LegacyReplicationCoordinator::getGetLastErrorDefault() {
+        if (getReplicationMode() == modeReplSet) {
+            return theReplSet->getLastErrorDefault;
+        }
+        return BSONObj();
+    }
+
 } // namespace repl
 } // namespace mongo

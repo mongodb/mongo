@@ -158,6 +158,8 @@ namespace repl {
 
         virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
 
+        virtual BSONObj getGetLastErrorDefault();
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions.

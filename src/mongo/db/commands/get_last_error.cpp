@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/get_last_error.h"
-
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/commands.h"
@@ -72,13 +70,6 @@ namespace mongo {
             return true;
         }
     } cmdResetError;
-
-    /* set by replica sets if specified in the configuration.
-       a pointer is used to avoid any possible locking issues with lockless reading.
-       (for now, it simply orphans any old copy as config changes should be extremely rare).
-       note: once non-null, never goes to null again.
-    */
-    BSONObj *getLastErrorDefault = 0;
 
     class CmdGetLastError : public Command {
     public:
@@ -185,8 +176,12 @@ namespace mongo {
                 (nFields == 2 && lastOpTimePresent) ||
                 (nFields == 3 && lastOpTimePresent && electionIdPresent);
 
-            if ( useDefaultGLEOptions && getLastErrorDefault ) {
-                writeConcernDoc = *getLastErrorDefault;
+            if (useDefaultGLEOptions) {
+                BSONObj getLastErrorDefault =
+                        repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
+                if (!getLastErrorDefault.isEmpty()) {
+                    writeConcernDoc = getLastErrorDefault;
+                }
             }
 
             //

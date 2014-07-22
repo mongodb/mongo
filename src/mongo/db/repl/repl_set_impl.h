@@ -346,6 +346,8 @@ namespace repl {
         // bool for indicating resync need on this node and the mutex that protects it
         bool initialSyncRequested;
         boost::mutex initialSyncMutex;
+
+        BSONObj getLastErrorDefault;
     private:
         IndexPrefetchConfig _indexPrefetchConfig;
 
