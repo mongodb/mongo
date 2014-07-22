@@ -170,7 +170,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	int ckpt_lock;
+	int is_bulk;
 
 	dhandle = session->dhandle;
 	btree = S2BT(session);
@@ -179,26 +179,13 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 		return (0);
 
 	/*
-	 * Checkpoint to flush out the file's changes.  This usually happens on
-	 * data handle close (which means we're holding the handle lock, so
-	 * this call serializes with any session checkpoint).  Bulk-cursors are
-	 * a special case: they do not hold the handle lock and they still must
-	 * serialize with checkpoints.   Acquire the lower-level checkpoint lock
-	 * and hold it until the handle is closed and the bulk-cursor flag has
-	 * been cleared.
-	 *    We hold the lock so long for two reasons: first, checkpoint uses
-	 * underlying btree handle structures (for example, the meta-tracking
-	 * checkpoint resolution uses the block-manager reference), and because
-	 * checkpoint writes "fake" checkpoint records for bulk-loaded files,
-	 * and a real checkpoint, which we're creating here, can't be followed
-	 * by more fake checkpoints.  In summary, don't let a checkpoint happen
-	 * unless all of the bulk cursor's information has been cleared.
+	 * Bulk-load has special checkpoint locking requirements (see the lock
+	 * function for details).  Lock/unlock around the checkpoint and clear
+	 * of the bulk-load flag.
 	 */
-	ckpt_lock = 0;
-	if (F_ISSET(btree, WT_BTREE_BULK)) {
-		ckpt_lock = 1;
-		__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
-	}
+	is_bulk = F_ISSET(btree, WT_BTREE_BULK) ? 1 : 0;
+	if (is_bulk)
+		__wt_checkpoint_bulk_lock(session, btree, 1);
 
 	/*
 	 * The close can fail if an update cannot be written, return the EBUSY
@@ -215,9 +202,8 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 	F_CLR(dhandle, WT_DHANDLE_OPEN);
 	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
-err:
-	if (ckpt_lock)
-		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
+err:	if (is_bulk)
+		__wt_checkpoint_bulk_lock(session, btree, 0);
 
 	return (ret);
 }
