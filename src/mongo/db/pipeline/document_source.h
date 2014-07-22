@@ -420,7 +420,7 @@ namespace mongo {
         long long _docsAddedToBatches; // for _limit enforcement
 
         const std::string _ns;
-        boost::shared_ptr<PlanExecutor> _exec; // PipelineRunner holds a weak_ptr to this.
+        boost::shared_ptr<PlanExecutor> _exec; // PipelineProxyStage holds a weak_ptr to this.
     };
 
 

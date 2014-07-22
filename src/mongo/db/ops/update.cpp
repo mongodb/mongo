@@ -517,7 +517,7 @@ namespace mongo {
         BSONObj oldObj;
 
         // Get first doc, and location
-        Runner::RunnerState state = Runner::RUNNER_ADVANCED;
+        PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
 
         uassert(ErrorCodes::NotMaster,
                 mongoutils::str::stream() << "Not primary while updating " << nsString.ns(),
@@ -530,15 +530,15 @@ namespace mongo {
             DiskLoc loc;
             state = exec->getNext(&oldObj, &loc);
 
-            if (state != Runner::RUNNER_ADVANCED) {
-                if (state == Runner::RUNNER_EOF) {
+            if (state != PlanExecutor::ADVANCED) {
+                if (state == PlanExecutor::IS_EOF) {
                     // We have reached the logical end of the loop, so do yielding recovery
                     break;
                 }
                 else {
                     uassertStatusOK(Status(ErrorCodes::InternalError,
                                            str::stream() << " Update query failed -- "
-                                                         << Runner::statestr(state)));
+                                                         << PlanExecutor::statestr(state)));
                 }
             }
 

@@ -107,14 +107,14 @@ namespace mongo {
         md5_init(&st);
 
         long long n = 0;
-        Runner::RunnerState state;
+        PlanExecutor::ExecState state;
         BSONObj c;
         verify(NULL != exec.get());
-        while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&c, NULL))) {
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&c, NULL))) {
             md5_append( &st , (const md5_byte_t*)c.objdata() , c.objsize() );
             n++;
         }
-        if (Runner::RUNNER_EOF != state) {
+        if (PlanExecutor::IS_EOF != state) {
             warning() << "error while hashing, db dropped? ns=" << fullCollectionName << endl;
         }
         md5digest d;

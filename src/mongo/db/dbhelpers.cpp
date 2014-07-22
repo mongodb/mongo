@@ -118,9 +118,9 @@ namespace mongo {
                 getExecutor(txn, collection, cq, &rawExec, options).isOK());
 
         auto_ptr<PlanExecutor> exec(rawExec);
-        Runner::RunnerState state;
+        PlanExecutor::ExecState state;
         DiskLoc loc;
-        if (Runner::RUNNER_ADVANCED == (state = exec->getNext(NULL, &loc))) {
+        if (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
             return loc;
         }
         return DiskLoc();
@@ -187,9 +187,9 @@ namespace mongo {
         auto_ptr<PlanExecutor> exec(
             InternalPlanner::collectionScan(txn, ns, context.db()->getCollection(txn, ns)));
 
-        Runner::RunnerState state = exec->getNext(&result, NULL);
+        PlanExecutor::ExecState state = exec->getNext(&result, NULL);
         context.getClient()->curop()->done();
-        return Runner::RUNNER_ADVANCED == state;
+        return PlanExecutor::ADVANCED == state;
     }
 
     bool Helpers::getLast(OperationContext* txn, const char *ns, BSONObj& result) {
@@ -198,8 +198,8 @@ namespace mongo {
         auto_ptr<PlanExecutor> exec(
             InternalPlanner::collectionScan(txn, ns, coll, InternalPlanner::BACKWARD));
 
-        Runner::RunnerState state = exec->getNext(&result, NULL);
-        return Runner::RUNNER_ADVANCED == state;
+        PlanExecutor::ExecState state = exec->getNext(&result, NULL);
+        return PlanExecutor::ADVANCED == state;
     }
 
     void Helpers::upsert( OperationContext* txn,
@@ -368,20 +368,20 @@ namespace mongo {
 
                 DiskLoc rloc;
                 BSONObj obj;
-                Runner::RunnerState state;
+                PlanExecutor::ExecState state;
                 // This may yield so we cannot touch nsd after this.
                 state = exec->getNext(&obj, &rloc);
                 exec.reset();
-                if (Runner::RUNNER_EOF == state) { break; }
+                if (PlanExecutor::IS_EOF == state) { break; }
 
-                if (Runner::RUNNER_DEAD == state) {
+                if (PlanExecutor::DEAD == state) {
                     warning() << "cursor died: aborting deletion for "
                               << min << " to " << max << " in " << ns
                               << endl;
                     break;
                 }
 
-                if (Runner::RUNNER_ERROR == state) {
+                if (PlanExecutor::EXEC_ERROR == state) {
                     warning() << "cursor error while trying to delete "
                               << min << " to " << max
                               << " in " << ns << ": "
@@ -389,7 +389,7 @@ namespace mongo {
                     break;
                 }
 
-                verify(Runner::RUNNER_ADVANCED == state);
+                verify(PlanExecutor::ADVANCED == state);
 
                 if ( onlyRemoveOrphanedDocs ) {
                     // Do a final check in the write lock to make absolutely sure that our
@@ -525,8 +525,8 @@ namespace mongo {
         // already being queued and will be migrated in the 'transferMods' stage
 
         DiskLoc loc;
-        Runner::RunnerState state;
-        while (Runner::RUNNER_ADVANCED == (state = exec->getNext(NULL, &loc))) {
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
             if ( !isLargeChunk ) {
                 locs->insert( loc );
             }

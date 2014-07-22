@@ -116,7 +116,7 @@ namespace ExecutorRegistry {
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
@@ -141,11 +141,11 @@ namespace ExecutorRegistry {
             // Make sure that the runner moved forward over the deleted data.  We don't see foo==10
             // or foo==11.
             for (int i = 12; i < N(); ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
-            ASSERT_EQUALS(Runner::RUNNER_EOF, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(PlanExecutor::IS_EOF, run->getNext(&obj, NULL));
         }
     };
 
@@ -158,7 +158,7 @@ namespace ExecutorRegistry {
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
@@ -173,7 +173,7 @@ namespace ExecutorRegistry {
             deregisterExecutor(run.get());
             run->restoreState(&_opCtx);
 
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
             ASSERT_EQUALS(10, obj["foo"].numberInt());
 
             // Save state and register.
@@ -188,7 +188,7 @@ namespace ExecutorRegistry {
             run->restoreState(&_opCtx);
 
             // PlanExecutor was killed.
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
         }
     };
 
@@ -203,7 +203,7 @@ namespace ExecutorRegistry {
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
@@ -219,7 +219,7 @@ namespace ExecutorRegistry {
             run->restoreState(&_opCtx);
 
             // PlanExecutor was killed.
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
         }
     };
 
@@ -234,7 +234,7 @@ namespace ExecutorRegistry {
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
@@ -250,7 +250,7 @@ namespace ExecutorRegistry {
             run->restoreState(&_opCtx);
 
             // PlanExecutor was killed.
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
         }
     };
 
@@ -263,7 +263,7 @@ namespace ExecutorRegistry {
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
@@ -282,7 +282,7 @@ namespace ExecutorRegistry {
             deregisterExecutor(run.get());
             run->restoreState(&_opCtx);
 
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
             ASSERT_EQUALS(10, obj["foo"].numberInt());
 
             // Save state and register.
@@ -302,7 +302,7 @@ namespace ExecutorRegistry {
             _ctx.reset();
 
             // PlanExecutor was killed.
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
         }
     };
 

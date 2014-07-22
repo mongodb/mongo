@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+// THIS FILE IS DEPRECATED -- the old explain implementation is being replaced
+
 #include "mongo/db/query/explain_plan.h"
 
 #include "mongo/db/query/stage_types.h"

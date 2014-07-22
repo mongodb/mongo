@@ -201,7 +201,7 @@ namespace mongo {
 
             BSONObj currObj;
             int results = 0;
-            while ((results < numWanted) && Runner::RUNNER_ADVANCED == exec->getNext(&currObj, NULL)) {
+            while ((results < numWanted) && PlanExecutor::ADVANCED == exec->getNext(&currObj, NULL)) {
 
                 // Come up with the correct distance.
                 double dist = currObj["$dis"].number() * distanceMultiplier;

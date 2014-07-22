@@ -130,7 +130,7 @@ namespace mongo {
             int numReturned = 0;
 
             BSONObj obj;
-            while (Runner::RUNNER_ADVANCED == exec->getNext(&obj, NULL)) {
+            while (PlanExecutor::ADVANCED == exec->getNext(&obj, NULL)) {
                 if ((resultSize + obj.objsize()) >= BSONObjMaxUserSize) {
                     break;
                 }

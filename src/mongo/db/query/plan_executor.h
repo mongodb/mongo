@@ -31,17 +31,18 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/db/query/runner.h"
+#include "mongo/db/invalidation_type.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 
     class BSONObj;
+    class Collection;
     class DiskLoc;
     class PlanStage;
+    class PlanExecutor;
     struct PlanStageStats;
     class WorkingSet;
-    class PlanExecutor;
 
     /**
      * RAII approach to ensuring that plan executors are deregistered.
@@ -66,11 +67,50 @@ namespace mongo {
      * The executor is usually part of a larger abstraction that is interacting with the cache
      * and/or the query optimizer.
      *
-     * Executes a plan.  Used by a runner.  Calls work() on a plan until a result is produced.
-     * Stops when the plan is EOF or if the plan errors.
+     * Executes a plan. Calls work() on a plan until a result is produced. Stops when the plan is
+     * EOF or if the plan errors.
      */
     class PlanExecutor {
     public:
+
+        enum ExecState {
+            // We successfully populated the out parameter.
+            ADVANCED,
+
+            // We're EOF.  We won't return any more results (edge case exception: capped+tailable).
+            IS_EOF,
+
+            // We were killed or had an error.
+            DEAD,
+
+            // getNext was asked for data it cannot provide, or the underlying PlanStage had an
+            // unrecoverable error.
+            // If the underlying PlanStage has any information on the error, it will be available in
+            // the objOut parameter. Call WorkingSetCommon::toStatusString() to retrieve the error
+            // details from the output BSON object.
+            EXEC_ERROR,
+        };
+
+        static std::string statestr(ExecState s) {
+            if (PlanExecutor::ADVANCED == s) {
+                return "ADVANCED";
+            }
+            else if (PlanExecutor::IS_EOF == s) {
+                return "IS_EOF";
+            }
+            else if (PlanExecutor::DEAD == s) {
+                return "DEAD";
+            }
+            else {
+                verify(PlanExecutor::EXEC_ERROR == s);
+                return "EXEC_ERROR";
+            }
+        }
+
+        //
+        // Constructors / destructor.
+        //
+
         /**
          * Used when there is no canonical query and no query solution.
          *
@@ -151,7 +191,7 @@ namespace mongo {
         //
 
         /** TODO document me */
-        Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut);
+        ExecState getNext(BSONObj* objOut, DiskLoc* dlOut);
 
         /** TOOD document me */
         bool isEOF();
@@ -174,7 +214,7 @@ namespace mongo {
 
         /**
          * During the yield, the database we're operating over or any collection we're relying on
-         * may be dropped.  When this happens all cursors and runners on that database and
+         * may be dropped.  When this happens all cursors and plan executors on that database and
          * collection are killed or deleted in some fashion. (This is how the _killed gets set.)
          */
         void kill();

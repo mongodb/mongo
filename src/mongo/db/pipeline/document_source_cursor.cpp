@@ -87,8 +87,8 @@ namespace mongo {
 
         int memUsageBytes = 0;
         BSONObj obj;
-        Runner::RunnerState state;
-        while ((state = _exec->getNext(&obj, NULL)) == Runner::RUNNER_ADVANCED) {
+        PlanExecutor::ExecState state;
+        while ((state = _exec->getNext(&obj, NULL)) == PlanExecutor::ADVANCED) {
             if (_dependencies) {
                 _currentBatch.push_back(_dependencies->extractFields(obj));
             }
@@ -117,13 +117,13 @@ namespace mongo {
         _exec.reset();
 
         uassert(16028, "collection or index disappeared when cursor yielded",
-                state != Runner::RUNNER_DEAD);
+                state != PlanExecutor::DEAD);
 
         uassert(17285, "cursor encountered an error: " + WorkingSetCommon::toStatusString(obj),
-                state != Runner::RUNNER_ERROR);
+                state != PlanExecutor::EXEC_ERROR);
 
         massert(17286, str::stream() << "Unexpected return from PlanExecutor::getNext: " << state,
-                state == Runner::RUNNER_EOF || state == Runner::RUNNER_ADVANCED);
+                state == PlanExecutor::IS_EOF || state == PlanExecutor::ADVANCED);
     }
 
     void DocumentSourceCursor::setSource(DocumentSource *pSource) {

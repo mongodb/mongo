@@ -258,8 +258,8 @@ namespace repl {
                                                 localSources,
                                                 ctx.db()->getCollection(txn, localSources)));
             BSONObj obj;
-            Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
+            PlanExecutor::ExecState state;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
                 n++;
                 ReplSource tmp(txn, obj);
                 if (tmp.hostName != replSettings.source) {
@@ -279,7 +279,7 @@ namespace repl {
                     dbexit( EXIT_REPLICATION_ERROR );
                 }
             }
-            uassert(17065, "Internal error reading from local.sources", Runner::RUNNER_EOF == state);
+            uassert(17065, "Internal error reading from local.sources", PlanExecutor::IS_EOF == state);
             uassert( 10002 ,  "local.sources collection corrupt?", n<2 );
             if ( n == 0 ) {
                 // source missing.  add.
@@ -303,8 +303,8 @@ namespace repl {
                                             localSources,
                                             ctx.db()->getCollection(txn, localSources)));
         BSONObj obj;
-        Runner::RunnerState state;
-        while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
             ReplSource tmp(txn, obj);
             if ( tmp.syncedTo.isNull() ) {
                 DBDirectClient c(txn);
@@ -317,7 +317,7 @@ namespace repl {
             }
             addSourceToList(txn, v, tmp, old);
         }
-        uassert(17066, "Internal error reading from local.sources", Runner::RUNNER_EOF == state);
+        uassert(17066, "Internal error reading from local.sources", PlanExecutor::IS_EOF == state);
     }
 
     bool ReplSource::throttledForceResyncDead( OperationContext* txn, const char *requester ) {

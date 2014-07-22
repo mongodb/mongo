@@ -689,8 +689,8 @@ namespace mongo {
             const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
 
             BSONObj obj;
-            Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
+            PlanExecutor::ExecState state;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
                 BSONElement ne = obj["n"];
                 verify(ne.isNumber());
                 int myn = ne.numberInt();
@@ -835,8 +835,8 @@ namespace mongo {
             long long numObjects = 0;
 
             DiskLoc loc;
-            Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = exec->getNext(NULL, &loc))) {
+            PlanExecutor::ExecState state;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
                 if ( estimate )
                     size += avgObjSize;
                 else
@@ -851,7 +851,7 @@ namespace mongo {
                 }
             }
 
-            if (Runner::RUNNER_EOF != state) {
+            if (PlanExecutor::IS_EOF != state) {
                 warning() << "Internal error while reading " << ns << endl;
             }
 

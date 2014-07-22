@@ -472,7 +472,7 @@ namespace mongo {
             bool isLargeChunk = false;
             unsigned long long recCount = 0;;
             DiskLoc dl;
-            while (Runner::RUNNER_ADVANCED == exec->getNext(NULL, &dl)) {
+            while (PlanExecutor::ADVANCED == exec->getNext(NULL, &dl)) {
                 if ( ! isLargeChunk ) {
                     scoped_spinlock lk( _trackerLocks );
                     _cloneLocs.insert( dl );

@@ -46,7 +46,7 @@ namespace mongo {
      *
      * Stages have zero or more input streams but only one output stream.  Data-accessing stages are
      * leaves and data-transforming stages have children.  Stages can be connected together to form
-     * a tree which is then executed (see plan_runner.h) to solve a query.
+     * a tree which is then executed (see plan_executor.h) to solve a query.
      *
      * A stage's input and output are each typed.  Only stages with compatible types can be
      * connected.

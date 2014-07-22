@@ -157,8 +157,8 @@ namespace mongo {
             DiskLoc end;
             // We remove 'n' elements so the start is one past that
             for( int i = 0; i < n + 1; ++i ) {
-                Runner::RunnerState state = exec->getNext(NULL, &end);
-                massert( 13418, "captrunc invalid n", Runner::RUNNER_ADVANCED == state);
+                PlanExecutor::ExecState state = exec->getNext(NULL, &end);
+                massert( 13418, "captrunc invalid n", PlanExecutor::ADVANCED == state);
             }
             collection->temp_cappedTruncateAfter( txn, end, inc );
             ctx.commit();

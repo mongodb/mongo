@@ -156,8 +156,8 @@ namespace mongo {
                 const ScopedExecutorRegistration safety(exec.get());
 
                 BSONObj obj;
-                Runner::RunnerState state;
-                while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
+                PlanExecutor::ExecState state;
+                while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
                     BSONObj key = getKey(obj , keyPattern , keyFunction , keysize / keynum,
                                          s.get() );
                     keysize += key.objsize();

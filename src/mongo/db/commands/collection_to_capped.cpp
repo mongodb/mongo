@@ -91,17 +91,17 @@ namespace mongo {
 
         while ( true ) {
             BSONObj obj;
-            Runner::RunnerState state = exec->getNext(&obj, NULL);
+            PlanExecutor::ExecState state = exec->getNext(&obj, NULL);
 
             switch( state ) {
-            case Runner::RUNNER_EOF:
+            case PlanExecutor::IS_EOF:
                 return Status::OK();
-            case Runner::RUNNER_DEAD:
+            case PlanExecutor::DEAD:
                 db->dropCollection( txn, toNs );
                 return Status( ErrorCodes::InternalError, "executor turned dead while iterating" );
-            case Runner::RUNNER_ERROR:
+            case PlanExecutor::EXEC_ERROR:
                 return Status( ErrorCodes::InternalError, "executor error while iterating" );
-            case Runner::RUNNER_ADVANCED:
+            case PlanExecutor::ADVANCED:
                 if ( excessSize > 0 ) {
                     excessSize -= ( 4 * obj.objsize() ); // 4x is for padding, power of 2, etc...
                     continue;

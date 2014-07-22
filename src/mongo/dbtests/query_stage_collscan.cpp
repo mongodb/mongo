@@ -98,7 +98,7 @@ namespace QueryStageCollectionScan {
 
             // Use the runner to count the number of objects scanned.
             int count = 0;
-            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL); ) { ++count; }
+            for (BSONObj obj; PlanExecutor::ADVANCED == runner.getNext(&obj, NULL); ) { ++count; }
             return count;
         }
 
@@ -202,7 +202,7 @@ namespace QueryStageCollectionScan {
             PlanExecutor runner(ws, ps, params.collection);
 
             int count = 0;
-            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL); ) {
+            for (BSONObj obj; PlanExecutor::ADVANCED == runner.getNext(&obj, NULL); ) {
                 // Make sure we get the objects in the order we want
                 ASSERT_EQUALS(count, obj["foo"].numberInt());
                 ++count;
@@ -231,7 +231,7 @@ namespace QueryStageCollectionScan {
             PlanExecutor runner(ws, ps, params.collection);
 
             int count = 0;
-            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL); ) {
+            for (BSONObj obj; PlanExecutor::ADVANCED == runner.getNext(&obj, NULL); ) {
                 ++count;
                 ASSERT_EQUALS(numObj() - count, obj["foo"].numberInt());
             }

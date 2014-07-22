@@ -242,8 +242,8 @@ namespace mongo {
             exec->restoreState(txn);
 
             BSONObj obj;
-            Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
+            PlanExecutor::ExecState state;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
                 // Add result to output buffer.
                 bb.appendBuf((void*)obj.objdata(), obj.objsize());
 
@@ -264,7 +264,7 @@ namespace mongo {
                 }
             }
 
-            if (Runner::RUNNER_EOF == state && 0 == numResults
+            if (PlanExecutor::IS_EOF == state && 0 == numResults
                 && (queryOptions & QueryOption_CursorTailable)
                 && (queryOptions & QueryOption_AwaitData) && (pass < 1000)) {
                 // If the cursor is tailable we don't kill it if it's eof.  We let it try to get
@@ -283,9 +283,9 @@ namespace mongo {
             // to getNext(...) might just return EOF).
             bool saveClientCursor = false;
 
-            if (Runner::RUNNER_DEAD == state || Runner::RUNNER_ERROR == state) {
+            if (PlanExecutor::DEAD == state || PlanExecutor::EXEC_ERROR == state) {
                 // Propagate this error to caller.
-                if (Runner::RUNNER_ERROR == state) {
+                if (PlanExecutor::EXEC_ERROR == state) {
                     scoped_ptr<PlanStageStats> stats(exec->getStats());
                     error() << "Plan executor error, stats: "
                             << statsToBSON(*stats);
@@ -306,12 +306,12 @@ namespace mongo {
                     resultFlags = ResultFlag_CursorNotFound;
                 }
             }
-            else if (Runner::RUNNER_EOF == state) {
+            else if (PlanExecutor::IS_EOF == state) {
                 // EOF is also end of the line unless it's tailable.
                 saveClientCursor = queryOptions & QueryOption_CursorTailable;
             }
             else {
-                verify(Runner::RUNNER_ADVANCED == state);
+                verify(PlanExecutor::ADVANCED == state);
                 saveClientCursor = true;
             }
 
@@ -321,7 +321,7 @@ namespace mongo {
                 cursorid = 0;
                 cc = NULL;
                 QLOG() << "getMore NOT saving client cursor, ended with state "
-                       << Runner::statestr(state)
+                       << PlanExecutor::statestr(state)
                        << endl;
             }
             else {
@@ -329,7 +329,7 @@ namespace mongo {
                 cc->incPos(numResults);
                 exec->saveState();
                 QLOG() << "getMore saving client cursor ended with state "
-                       << Runner::statestr(state)
+                       << PlanExecutor::statestr(state)
                        << endl;
 
                 // Possibly note slave's position in the oplog.
@@ -404,15 +404,15 @@ namespace mongo {
 
         // The stage returns a DiskLoc of where to start.
         DiskLoc startLoc;
-        Runner::RunnerState state = exec->getNext(NULL, &startLoc);
+        PlanExecutor::ExecState state = exec->getNext(NULL, &startLoc);
 
         // This is normal.  The start of the oplog is the beginning of the collection.
-        if (Runner::RUNNER_EOF == state) {
+        if (PlanExecutor::IS_EOF == state) {
             return getExecutor(txn, collection, autoCq.release(), execOut);
         }
 
         // This is not normal.  An error was encountered.
-        if (Runner::RUNNER_ADVANCED != state) {
+        if (PlanExecutor::ADVANCED != state) {
             return Status(ErrorCodes::InternalError,
                           "quick oplog start location had error...?");
         }
@@ -650,7 +650,7 @@ namespace mongo {
         auto_ptr<ScopedExecutorRegistration> safety(new ScopedExecutorRegistration(exec.get()));
 
         BSONObj obj;
-        Runner::RunnerState state;
+        PlanExecutor::ExecState state;
         // uint64_t numMisplacedDocs = 0;
 
         // Get summary info about which plan the executor is using.
@@ -658,7 +658,7 @@ namespace mongo {
         Explain::getSummaryStats(exec.get(), &stats);
         curop.debug().planSummary = stats.summaryStr.c_str();
 
-        while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
             // Add result to output buffer. This is unnecessary if explain info is requested
             if (!isExplain) {
                 bb.appendBuf((void*)obj.objdata(), obj.objsize());
@@ -710,7 +710,7 @@ namespace mongo {
         safety.reset();
 
         // Caller expects exceptions thrown in certain cases.
-        if (Runner::RUNNER_ERROR == state) {
+        if (PlanExecutor::EXEC_ERROR == state) {
             scoped_ptr<PlanStageStats> stats(exec->getStats());
             error() << "Plan executor error, stats: "
                     << statsToBSON(*stats);
@@ -718,7 +718,7 @@ namespace mongo {
         }
 
         // Why save a dead executor?
-        if (Runner::RUNNER_DEAD == state) {
+        if (PlanExecutor::DEAD == state) {
             saveClientCursor = false;
         }
         else if (pq.hasOption(QueryOption_CursorTailable)) {

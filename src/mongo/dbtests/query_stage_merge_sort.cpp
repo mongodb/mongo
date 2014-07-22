@@ -159,8 +159,8 @@ namespace QueryStageMergeSortTests {
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&first, NULL));
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&second, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&first, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&second, NULL));
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(i, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))
@@ -169,7 +169,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_NOT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&foo, NULL));
+            ASSERT_NOT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&foo, NULL));
         }
     };
 
@@ -222,8 +222,8 @@ namespace QueryStageMergeSortTests {
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&first, NULL));
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&second, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&first, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&second, NULL));
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(i, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))
@@ -232,7 +232,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo, NULL));
+            ASSERT_EQUALS(PlanExecutor::IS_EOF, runner.getNext(&foo, NULL));
         }
     };
 
@@ -286,8 +286,8 @@ namespace QueryStageMergeSortTests {
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
                 // We inserted N objects but we get 2 * N from the runner because of dups.
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&first, NULL));
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&second, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&first, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&second, NULL));
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(i, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))
@@ -296,7 +296,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo, NULL));
+            ASSERT_EQUALS(PlanExecutor::IS_EOF, runner.getNext(&foo, NULL));
         }
     };
 
@@ -351,8 +351,8 @@ namespace QueryStageMergeSortTests {
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&first, NULL));
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&second, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&first, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&second, NULL));
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(N - i - 1, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))
@@ -361,7 +361,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo, NULL));
+            ASSERT_EQUALS(PlanExecutor::IS_EOF, runner.getNext(&foo, NULL));
         }
     };
 
@@ -417,14 +417,14 @@ namespace QueryStageMergeSortTests {
             // Only getting results from the a:1 index scan.
             for (int i = 0; i < N; ++i) {
                 BSONObj obj;
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["c"].numberInt());
                 ASSERT_EQUALS(1, obj["a"].numberInt());
             }
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo, NULL));
+            ASSERT_EQUALS(PlanExecutor::IS_EOF, runner.getNext(&foo, NULL));
         }
     };
 
@@ -469,7 +469,7 @@ namespace QueryStageMergeSortTests {
 
             for (int i = 0; i < numIndices; ++i) {
                 BSONObj obj;
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
                 string index(1, 'a' + i);
                 ASSERT_EQUALS(1, obj[index].numberInt());
@@ -477,7 +477,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo, NULL));
+            ASSERT_EQUALS(PlanExecutor::IS_EOF, runner.getNext(&foo, NULL));
         }
     };
 

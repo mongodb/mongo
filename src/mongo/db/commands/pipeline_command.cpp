@@ -224,7 +224,7 @@ namespace {
         for (int objCount = 0; objCount < batchSize; objCount++) {
             // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
             // do it when batchSize is 0 since that indicates a desire for a fast return.
-            if (exec->getNext(&next, NULL) != Runner::RUNNER_ADVANCED) {
+            if (exec->getNext(&next, NULL) != PlanExecutor::ADVANCED) {
                 if (pin) pin->deleteUnderlying();
                 // make it an obvious error to use cursor or executor after this point
                 cursor = NULL;

@@ -46,7 +46,7 @@ namespace mongo {
     struct QuerySolutionNode;
 
     /**
-     * When the CachedPlanRunner runs a cached query, it can provide feedback to the cache.  This
+     * When the CachedPlanStage runs a cached query, it can provide feedback to the cache.  This
      * feedback is available to anyone who retrieves that query in the future.
      */
     struct PlanCacheEntryFeedback {
@@ -253,7 +253,7 @@ namespace mongo {
         // the other plans lost.
         boost::scoped_ptr<PlanRankingDecision> decision;
 
-        // Annotations from cached runs.  The CachedSolutionRunner provides these stats about its
+        // Annotations from cached runs.  The CachedPlanStage provides these stats about its
         // runs when they complete.
         std::vector<PlanCacheEntryFeedback*> feedback;
 
@@ -321,8 +321,8 @@ namespace mongo {
         Status get(const CanonicalQuery& query, CachedSolution** crOut) const;
 
         /**
-         * When the CachedPlanRunner runs a plan out of the cache, we want to record data about the
-         * plan's performance.  The CachedPlanRunner calls feedback(...) at the end of query
+         * When the CachedPlanStage runs a plan out of the cache, we want to record data about the
+         * plan's performance.  The CachedPlanStage calls feedback(...) at the end of query
          * execution in order to do this.
          *
          * Cache takes ownership of 'feedback'.

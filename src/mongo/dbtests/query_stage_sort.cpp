@@ -130,13 +130,13 @@ namespace QueryStageSortTests {
             // Look at pairs of objects to make sure that the sort order is pairwise (and therefore
             // totally) correct.
             BSONObj last;
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&last, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&last, NULL));
 
             // Count 'last'.
             int count = 1;
 
             BSONObj current;
-            while (Runner::RUNNER_ADVANCED == runner.getNext(&current, NULL)) {
+            while (PlanExecutor::ADVANCED == runner.getNext(&current, NULL)) {
                 int cmp = sgn(current.woSortOrder(last, params.pattern));
                 // The next object should be equal to the previous or oriented according to the sort
                 // pattern.
@@ -373,8 +373,8 @@ namespace QueryStageSortTests {
             // We don't get results back since we're sorting some parallel arrays.
             PlanExecutor runner(
                     ws, new FetchStage(ws, new SortStage(params, ws, ms), NULL, coll), coll);
-            Runner::RunnerState runnerState = runner.getNext(NULL, NULL);
-            ASSERT_EQUALS(Runner::RUNNER_ERROR, runnerState);
+            PlanExecutor::ExecState runnerState = runner.getNext(NULL, NULL);
+            ASSERT_EQUALS(PlanExecutor::EXEC_ERROR, runnerState);
             ctx.commit();
         }
     };

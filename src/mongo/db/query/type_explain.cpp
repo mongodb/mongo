@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+// THIS FILE IS DEPRECATED -- the old explain implementation is being replaced
+
 #include "mongo/db/query/type_explain.h"
 
 #include "mongo/db/field_parser.h"

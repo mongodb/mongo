@@ -124,8 +124,8 @@ namespace mongo {
         if (!_killed) { _root->invalidate(dl, type); }
     }
 
-    Runner::RunnerState PlanExecutor::getNext(BSONObj* objOut, DiskLoc* dlOut) {
-        if (_killed) { return Runner::RUNNER_DEAD; }
+    PlanExecutor::ExecState PlanExecutor::getNext(BSONObj* objOut, DiskLoc* dlOut) {
+        if (_killed) { return PlanExecutor::DEAD; }
 
         for (;;) {
             WorkingSetID id = WorkingSet::INVALID_ID;
@@ -136,7 +136,7 @@ namespace mongo {
                 if (WorkingSet::INVALID_ID == id) {
                     invariant(NULL == objOut);
                     invariant(NULL == dlOut);
-                    return Runner::RUNNER_ADVANCED;
+                    return PlanExecutor::ADVANCED;
                 }
 
                 WorkingSetMember* member = _workingSet->get(id);
@@ -173,7 +173,7 @@ namespace mongo {
 
                 if (hasRequestedData) {
                     _workingSet->free(id);
-                    return Runner::RUNNER_ADVANCED;
+                    return PlanExecutor::ADVANCED;
                 }
                 // This result didn't have the data the caller wanted, try again.
             }
@@ -181,17 +181,17 @@ namespace mongo {
                 // Fall through to yield check at end of large conditional.
             }
             else if (PlanStage::IS_EOF == code) {
-                return Runner::RUNNER_EOF;
+                return PlanExecutor::IS_EOF;
             }
             else if (PlanStage::DEAD == code) {
-                return Runner::RUNNER_DEAD;
+                return PlanExecutor::DEAD;
             }
             else {
                 verify(PlanStage::FAILURE == code);
                 if (NULL != objOut) {
                     WorkingSetCommon::getStatusMemberObject(*_workingSet, id, objOut);
                 }
-                return Runner::RUNNER_ERROR;
+                return PlanExecutor::EXEC_ERROR;
             }
         }
     }

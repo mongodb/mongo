@@ -161,8 +161,8 @@ namespace mongo {
                 // state and may continue doing that with document-level locking (approach is TBD).
                 const ScopedExecutorRegistration safety(exec.get());
 
-                Runner::RunnerState state;
-                if (Runner::RUNNER_ADVANCED == (state = exec->getNext(&doc, NULL))) {
+                PlanExecutor::ExecState state;
+                if (PlanExecutor::ADVANCED == (state = exec->getNext(&doc, NULL))) {
                     found = true;
                 }
             }

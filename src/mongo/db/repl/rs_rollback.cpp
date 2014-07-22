@@ -243,7 +243,7 @@ namespace repl {
         BSONObj ourObj;
         DiskLoc ourLoc;
 
-        if (Runner::RUNNER_ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
+        if (PlanExecutor::ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
             throw RSFatalException("our oplog empty or unreadable");
         }
 
@@ -304,7 +304,7 @@ namespace repl {
                 theirObj = oplogCursor->nextSafe();
                 theirTime = theirObj["ts"]._opTime();
 
-                if (Runner::RUNNER_ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
+                if (PlanExecutor::ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
                     log() << "replSet rollback error RS101 reached beginning of local oplog"
                           << rsLog;
                     log() << "replSet   them:      " << them->toString() << " scanned: "
@@ -331,7 +331,7 @@ namespace repl {
             else {
                 // theirTime < ourTime
                 refetch(fixUpInfo, ourObj);
-                if (Runner::RUNNER_ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
+                if (PlanExecutor::ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
                     log() << "replSet rollback error RS101 reached beginning of local oplog"
                           << rsLog;
                     log() << "replSet   them:      " << them->toString() << " scanned: "

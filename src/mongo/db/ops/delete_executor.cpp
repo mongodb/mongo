@@ -138,10 +138,10 @@ namespace mongo {
         ScopedExecutorRegistration safety(exec.get());
 
         DiskLoc rloc;
-        Runner::RunnerState state;
+        PlanExecutor::ExecState state;
         CurOp* curOp = _request->getOpCtx()->getCurOp();
         int oldYieldCount = curOp->numYields();
-        while (Runner::RUNNER_ADVANCED == (state = exec->getNext(NULL, &rloc))) {
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &rloc))) {
             if (oldYieldCount != curOp->numYields()) {
                 uassert(ErrorCodes::NotMaster,
                         str::stream() << "No longer primary while removing from " << ns.ns(),

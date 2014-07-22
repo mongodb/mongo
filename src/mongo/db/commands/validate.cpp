@@ -32,7 +32,6 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/runner.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/util/log.h"

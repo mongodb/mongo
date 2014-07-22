@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+// THIS FILE IS DEPRECATED -- the old explain implementation is being replaced
+
 #pragma once
 
 #include <string>

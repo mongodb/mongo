@@ -1002,8 +1002,8 @@ namespace mongo {
 
             // iterate over all sorted objects
             BSONObj o;
-            Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&o, NULL))) {
+            PlanExecutor::ExecState state;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(&o, NULL))) {
                 pm.hit();
 
                 if ( o.woSortOrder( prev , sortKey ) == 0 ) {
@@ -1353,7 +1353,7 @@ namespace mongo {
 
                         // go through each doc
                         BSONObj o;
-                        while (Runner::RUNNER_ADVANCED == exec->getNext(&o, NULL)) {
+                        while (PlanExecutor::ADVANCED == exec->getNext(&o, NULL)) {
                             // check to see if this is a new object we don't own yet
                             // because of a chunk migration
                             if ( collMetadata ) {

@@ -114,7 +114,7 @@ namespace mongo {
 
         BSONObj js;
         DiskLoc loc;
-        while (Runner::RUNNER_ADVANCED == exec->getNext(&js, &loc)) {
+        while (PlanExecutor::ADVANCED == exec->getNext(&js, &loc)) {
             try {
                 if ( !dupsAllowed && dropDups ) {
                     LastError::Disabled led( lastError.get() );

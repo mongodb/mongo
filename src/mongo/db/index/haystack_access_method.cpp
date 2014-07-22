@@ -102,9 +102,9 @@ namespace mongo {
 
                 scoped_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,  collection,
                                                                      _descriptor, key, key, true));
-                Runner::RunnerState state;
+                PlanExecutor::ExecState state;
                 DiskLoc loc;
-                while (Runner::RUNNER_ADVANCED == (state = exec->getNext(NULL, &loc))) {
+                while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
                     if (hopper.limitReached()) { break; }
                     pair<unordered_set<DiskLoc, DiskLoc::Hasher>::iterator, bool> p
                         = thisPass.insert(loc);

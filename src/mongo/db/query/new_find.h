@@ -34,7 +34,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/runner.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {

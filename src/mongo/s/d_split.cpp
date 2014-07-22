@@ -164,7 +164,7 @@ namespace mongo {
 
             DiskLoc loc;
             BSONObj currKey;
-            while (Runner::RUNNER_ADVANCED == exec->getNext(&currKey, &loc)) {
+            while (PlanExecutor::ADVANCED == exec->getNext(&currKey, &loc)) {
                 //check that current key contains non missing elements for all fields in keyPattern
                 BSONObjIterator i( currKey );
                 for( int k = 0; k < keyPatternLength ; k++ ) {
@@ -383,8 +383,8 @@ namespace mongo {
                     false, InternalPlanner::FORWARD));
 
                 BSONObj currKey;
-                Runner::RunnerState state = exec->getNext(&currKey, NULL);
-                if (Runner::RUNNER_ADVANCED != state) {
+                PlanExecutor::ExecState state = exec->getNext(&currKey, NULL);
+                if (PlanExecutor::ADVANCED != state) {
                     errmsg = "can't open a cursor for splitting (desired range is possibly empty)";
                     return false;
                 }
@@ -396,7 +396,7 @@ namespace mongo {
                 splitKeys.push_back(prettyKey(idx->keyPattern(), currKey.getOwned()).extractFields( keyPattern ) );
 
                 while ( 1 ) {
-                    while (Runner::RUNNER_ADVANCED == state) {
+                    while (PlanExecutor::ADVANCED == state) {
                         currCount++;
                         
                         if ( currCount > keyCount && !forceMedianSplit ) {
@@ -885,8 +885,8 @@ namespace mongo {
                                                                            newmin, newmax, false));
 
                     // check if exactly one document found
-                    if (Runner::RUNNER_ADVANCED == exec->getNext(NULL, NULL)) {
-                        if (Runner::RUNNER_EOF == exec->getNext(NULL, NULL)) {
+                    if (PlanExecutor::ADVANCED == exec->getNext(NULL, NULL)) {
+                        if (PlanExecutor::IS_EOF == exec->getNext(NULL, NULL)) {
                             result.append( "shouldMigrate",
                                            BSON("min" << chunk.min << "max" << chunk.max) );
                             break;

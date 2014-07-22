@@ -190,13 +190,13 @@ namespace QueryPlanExecutor {
             registerExec(exec.get());
 
             BSONObj objOut;
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, exec->getNext(&objOut, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
             ASSERT_EQUALS(1, objOut["_id"].numberInt());
 
             // After dropping the collection, the runner
             // should be dead.
             dropCollection();
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, exec->getNext(&objOut, NULL));
+            ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
 
             deregisterExec(exec.get());
             ctx.commit();
@@ -220,13 +220,13 @@ namespace QueryPlanExecutor {
             registerExec(exec.get());
 
             BSONObj objOut;
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, exec->getNext(&objOut, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
             ASSERT_EQUALS(7, objOut["a"].numberInt());
 
             // After dropping the collection, the runner
             // should be dead.
             dropCollection();
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, exec->getNext(&objOut, NULL));
+            ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
 
             deregisterExec(exec.get());
             ctx.commit();
@@ -266,7 +266,7 @@ namespace QueryPlanExecutor {
         void checkIds(int* expectedIds, PlanExecutor* exec) {
             BSONObj objOut;
             int idcount = 0;
-            while (Runner::RUNNER_ADVANCED == exec->getNext(&objOut, NULL)) {
+            while (PlanExecutor::ADVANCED == exec->getNext(&objOut, NULL)) {
                 ASSERT_EQUALS(expectedIds[idcount], objOut["_id"].numberInt());
                 ++idcount;
             }
@@ -288,7 +288,7 @@ namespace QueryPlanExecutor {
             scoped_ptr<PlanExecutor> exec(makeCollScanExec(ctx.ctx(),filterObj));
 
             BSONObj objOut;
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, exec->getNext(&objOut, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
             ASSERT_EQUALS(2, objOut["a"].numberInt());
 
             forceDocumentMove();
@@ -316,7 +316,7 @@ namespace QueryPlanExecutor {
             scoped_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.ctx(), indexSpec, 2, 5));
 
             BSONObj objOut;
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, exec->getNext(&objOut, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
             ASSERT_EQUALS(2, objOut["a"].numberInt());
 
             forceDocumentMove();
@@ -386,7 +386,7 @@ namespace QueryPlanExecutor {
 
                 // The invalidation should have killed the runner.
                 BSONObj objOut;
-                ASSERT_EQUALS(Runner::RUNNER_DEAD, exec->getNext(&objOut, NULL));
+                ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
 
                 // Deleting the underlying cursor should cause the
                 // number of cursors to return to 0.

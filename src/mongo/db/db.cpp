@@ -368,8 +368,8 @@ namespace mongo {
                 auto_ptr<PlanExecutor> exec(
                     InternalPlanner::collectionScan(&txn, systemIndexes,coll));
                 BSONObj index;
-                Runner::RunnerState state;
-                while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&index, NULL))) {
+                PlanExecutor::ExecState state;
+                while (PlanExecutor::ADVANCED == (state = exec->getNext(&index, NULL))) {
                     const BSONObj key = index.getObjectField("key");
                     const string plugin = IndexNames::findPluginName(key);
 
@@ -394,7 +394,7 @@ namespace mongo {
                     }
                 }
 
-                if (Runner::RUNNER_EOF != state) {
+                if (PlanExecutor::IS_EOF != state) {
                     warning() << "Internal error while reading collection " << systemIndexes;
                 }
 

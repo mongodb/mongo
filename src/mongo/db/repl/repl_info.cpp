@@ -89,8 +89,8 @@ namespace repl {
                                                     ctx.ctx().db()->getCollection(txn,
                                                                                   localSources)));
                 BSONObj obj;
-                Runner::RunnerState state;
-                while (Runner::RUNNER_ADVANCED == (state = exec->getNext(&obj, NULL))) {
+                PlanExecutor::ExecState state;
+                while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
                     src.push_back(obj);
                 }
             }
