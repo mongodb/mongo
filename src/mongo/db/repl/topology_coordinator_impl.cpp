@@ -44,9 +44,9 @@ namespace mongo {
 namespace repl {
 
     TopologyCoordinatorImpl::TopologyCoordinatorImpl() :
-        _startupStatus(PRESTART),
         _currentPrimaryIndex(-1),
         _syncSourceIndex(-1),
+        _forceSyncSourceIndex(-1),
         _busyWithElectSelf(false),
         _selfIndex(0),
         _blockSync(false),
@@ -66,6 +66,11 @@ namespace repl {
         _lastReceived = optime;
     }
 
+    void TopologyCoordinatorImpl::setForceSyncSourceIndex(int index) {
+        invariant(_forceSyncSourceIndex < _currentConfig.getNumMembers());
+        _forceSyncSourceIndex = index;
+    }
+
     HostAndPort TopologyCoordinatorImpl::getSyncSourceAddress() const {
         invariant(_syncSourceIndex >= 0);
         return _currentConfig.getMemberAt(_syncSourceIndex).getHostAndPort();
@@ -73,18 +78,15 @@ namespace repl {
 
     void TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now) {
         // if we have a target we've requested to sync from, use it
-/*
-  This should be a HostAndPort.
-*/
-        // XXX Eric
-/*
-        if (_forceSyncTarget) {
-            Member* target = _forceSyncTarget;
-            _forceSyncTarget = 0;
-            sethbmsg( str::stream() << "syncing to: " << target->fullName() << " by request", 0);
-            return target;
+        if (_forceSyncSourceIndex != -1) {
+            invariant(_forceSyncSourceIndex < _currentConfig.getNumMembers());
+            _syncSourceIndex = _forceSyncSourceIndex;
+            _forceSyncSourceIndex = -1;
+            sethbmsg( str::stream() << "syncing from: "
+                      << _currentConfig.getMemberAt(_syncSourceIndex).getHostAndPort().toString()
+                      << " by request", 0);
+            return;
         }
-*/
 
         // wait for 2N pings before choosing a sync target
         int needMorePings = _hbdata.size()*2 - HeartbeatInfo::numPings;
@@ -708,7 +710,8 @@ namespace repl {
 
                 if( it->getState().primary() && it->up() ) {
                     if (remotePrimaryIndex != -1) {
-                        /* two other nodes think they are primary (asynchronously polled) -- wait for things to settle down. */
+                        // two other nodes think they are primary (asynchronously polled) 
+                        // -- wait for things to settle down.
                         log() << "replSet info two primaries (transiently)" << rsLog;
                         return None;
                     }
@@ -1028,7 +1031,7 @@ namespace repl {
     void TopologyCoordinatorImpl::prepareFreezeResponse(Date_t now,
                                                         const BSONObj& cmdObj,
                                                         BSONObjBuilder& result) {
-        int secs = (int) cmdObj.firstElement().numberInt();
+        int secs = cmdObj.firstElement().numberInt();
 
         if (secs == 0) {
             _stepDownUntil = now;
@@ -1036,7 +1039,7 @@ namespace repl {
             result.append("info","unfreezing");
         }
         else {
-            if( secs == 1 )
+            if ( secs == 1 )
                 result.append("warning", "you really want to freeze for only 1 second?");
 
             if (_memberState != MemberState::RS_PRIMARY) {
@@ -1051,11 +1054,16 @@ namespace repl {
 
     // This function installs a new config object and recreates MemberHeartbeatData objects 
     // that reflect the new config.
-    void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig, int selfIndex) {
+    void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig, 
+                                               int selfIndex,
+                                               Date_t now) {
         invariant(selfIndex < newConfig.getNumMembers());
         _currentConfig = newConfig;        
 
         _hbdata.clear();
+        _currentPrimaryIndex = -1;
+        _syncSourceIndex = -1;
+        _forceSyncSourceIndex = -1;
         _selfIndex = selfIndex;
 
         int index = 0;
@@ -1066,7 +1074,10 @@ namespace repl {
             _hbdata.push_back(MemberHeartbeatData(index));
         }
 
+        chooseNewSyncSource(now);
+
         // call registered callbacks for config changes
+        // TODO(emilkie): Applier should register a callback to reconnect its oplog reader.
         for (std::vector<ConfigChangeCallbackFn>::const_iterator it = 
                  _configChangeCallbacks.begin();
              it != _configChangeCallbacks.end(); ++it) {

@@ -45,6 +45,7 @@ namespace repl {
         virtual void setLastApplied(const OpTime& optime);
         virtual void setCommitOkayThrough(const OpTime& optime);
         virtual void setLastReceived(const OpTime& optime);
+        virtual void setForceSyncSourceIndex(int index);
 
         virtual HostAndPort getSyncSourceAddress() const;
 
@@ -87,7 +88,7 @@ namespace repl {
 
         virtual void relinquishPrimary(OperationContext* txn);
 
-        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex);
+        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex, Date_t now);
 
     };
 

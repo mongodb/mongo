@@ -44,7 +44,6 @@ namespace mongo {
 namespace repl {
 
     class MemberHeartbeatData;
-    class NewMember;
     struct MemberState;
     class ReplicaSetConfig;
     class TagSubgroup;
@@ -77,6 +76,8 @@ namespace repl {
         virtual void setCommitOkayThrough(const OpTime& optime) = 0;
         // The optime of the last op received over the network from the sync source
         virtual void setLastReceived(const OpTime& optime) = 0;
+        // The index into the config used when we next choose a sync source
+        virtual void setForceSyncSourceIndex(int index) = 0;
 
         // Looks up _syncSource's address and returns it, for use by the Applier
         virtual HostAndPort getSyncSourceAddress() const = 0;
@@ -137,7 +138,7 @@ namespace repl {
         virtual void relinquishPrimary(OperationContext* txn) = 0;
 
         // called with new config; notifies all on change
-        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex) = 0;
+        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex, Date_t now) = 0;
 
     protected:
         TopologyCoordinator() {}

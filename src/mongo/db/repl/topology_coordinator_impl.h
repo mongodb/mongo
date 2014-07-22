@@ -54,6 +54,7 @@ namespace repl {
         virtual void setLastApplied(const OpTime& optime);
         virtual void setCommitOkayThrough(const OpTime& optime);
         virtual void setLastReceived(const OpTime& optime);
+        virtual void setForceSyncSourceIndex(int index);
 
         // Looks up syncSource's address and returns it, for use by the Applier
         virtual HostAndPort getSyncSourceAddress() const;
@@ -111,7 +112,7 @@ namespace repl {
         virtual void relinquishPrimary(OperationContext* txn);
 
         // update internal config with new config (already validated)
-        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex);
+        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex, Date_t now);
 
     private:
 
@@ -151,11 +152,6 @@ namespace repl {
         // Our current state (PRIMARY, SECONDARY, etc)
         MemberState _memberState;
         
-        enum StartupStatus {
-            PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3,
-            EMPTYUNREACHABLE=4, STARTED=5, SOON=6
-        }  _startupStatus;
-
         // This is a unique id that is generated and set each time we transition to PRIMARY, as the
         // result of an election.
         OID _electionId;
@@ -174,6 +170,8 @@ namespace repl {
         // These members are not chosen as sync sources for a period of time, due to connection
         // issues with them
         std::map<HostAndPort, Date_t> _syncSourceBlacklist;
+        // The next sync source to be chosen, requested via a replSetSyncFrom command
+        int _forceSyncSourceIndex;
 
         // insanity follows
 

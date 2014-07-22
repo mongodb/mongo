@@ -39,6 +39,8 @@ namespace repl {
 
     void TopologyCoordinatorMock::setLastReceived(const OpTime& optime) {}
 
+    void TopologyCoordinatorMock::setForceSyncSourceIndex(int index) {}
+
     HostAndPort TopologyCoordinatorMock::getSyncSourceAddress() const {
         return HostAndPort();
     }
@@ -89,7 +91,9 @@ namespace repl {
         return None;
     }
 
-    void TopologyCoordinatorMock::updateConfig(const ReplicaSetConfig& newConfig, int selfIndex) {
+    void TopologyCoordinatorMock::updateConfig(const ReplicaSetConfig& newConfig,
+                                               int selfIndex,
+                                               Date_t now) {
     }
 
 } // namespace repl
