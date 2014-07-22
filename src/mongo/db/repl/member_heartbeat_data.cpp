@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <climits>
+
 #include "mongo/db/repl/member_heartbeat_data.h"
 
 namespace mongo {

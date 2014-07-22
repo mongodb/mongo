@@ -983,7 +983,7 @@ namespace repl {
                 }
                 bb.appendTimeT("lastHeartbeat", it->getLastHeartbeat());
                 bb.appendTimeT("lastHeartbeatRecv", it->getLastHeartbeatRecv());
-                bb.append("pingMs", it->getPing().total_milliseconds());
+                bb.append("pingMs", static_cast<int>(it->getPing().total_milliseconds()));
                 std::string s = it->getLastHeartbeatMsg();
                 if( !s.empty() )
                     bb.append("lastHeartbeatMessage", s);
