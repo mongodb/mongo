@@ -950,16 +950,13 @@ __wt_lsm_tree_unlock(
 int
 __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 {
+	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	time_t begin, end;
-	uint32_t *modep, modes[] = {
-	    WT_LSM_TREE_FLUSH_ALL,
-	    WT_LSM_TREE_MERGING,
-	    WT_LSM_TREE_COMPACTING,
-	    0
-	};
+	int i, locked;
 
+	locked = 0;
 	/*
 	 * This function is applied to all matching sources: ignore anything
 	 * that is not an LSM tree.
@@ -973,22 +970,23 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	WT_RET(__wt_lsm_tree_get(session, name, 0, &lsm_tree));
 
 	if (!F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
-		WT_RET_MSG(session, EINVAL,
+		WT_ERR_MSG(session, EINVAL,
 		    "LSM compaction requires active merge threads");
 
-	WT_RET(__wt_seconds(session, &begin));
+	WT_ERR(__wt_seconds(session, &begin));
 
 	/* Lock the tree: single-thread compaction. */
-	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
+	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
+	locked = 1;
 
 	/* Clear any merge throttle: compact throws out that calculation. */
 	lsm_tree->merge_throttle = 0;
 
 	/* If another thread started compacting this tree, we're done. */
-	if (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL | WT_LSM_TREE_COMPACTING)) {
-		WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
-		return (0);
-	}
+	if (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
+		goto err;
+
+	F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
 
 	/*
 	 * Set the switch transaction on the current chunk, if it
@@ -1000,43 +998,41 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	    chunk->switch_txn == WT_TXN_NONE)
 		chunk->switch_txn = __wt_txn_current_id(session);
 
-	/*
-	 * First set the "flush all" flag so that the checkpoint worker tries
-	 * to write all in-memory chunks to disk.
-	 *
-	 * Then set the merging flag to detect when ordinary merges have
-	 * completed.
-	 *
-	 * Then set the compacting flag so that all merge threads look for
-	 * merges at all levels of the tree.
-	 */
-	modep = modes;
-	F_SET(lsm_tree, *modep);
-	WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
+	locked = 0;
+	WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
 
-	/* Wake up the merge threads. */
-	WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));
+	/* Make sure the in-memory chunk gets flushed but not switched. */
+	WT_ERR(__wt_lsm_manager_push_entry(
+	    session, WT_LSM_WORK_FLUSH, lsm_tree));
 
-	/* Wait for flushing to stop. */
-	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
-		if (!F_ISSET(lsm_tree, *modep)) {
-			/* Zero marks the end of the list. */
-			if (*++modep == 0)
-				break;
-			F_SET(lsm_tree, *modep);
-			WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));
-			continue;
-		}
+	/* Wait for the work unit queues to drain. */
+	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE) &&
+	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) {
 		__wt_sleep(1, 0);
-		WT_RET(__wt_seconds(session, &end));
+		WT_ERR(__wt_seconds(session, &end));
 		if (session->compact->max_time > 0 &&
 		    session->compact->max_time < (uint64_t)(end - begin)) {
-			F_CLR(lsm_tree, WT_LSM_TREE_FLUSH_ALL);
-			return (ETIMEDOUT);
+			F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
+			WT_ERR(ETIMEDOUT);
 		}
+		/*
+		 * Wait for all activity to drain, at first this will let all
+		 * switches and bloom filter creates complete. We will know
+		 * that merges can't find any more candidates, because the
+		 * compacting flag will be cleared.
+		 */
+		if (lsm_tree->queue_ref != 0)
+			continue;
+#define	COMPACT_PARALLEL_MERGES	5
+		for (i = 0; i < COMPACT_PARALLEL_MERGES; i++)
+			WT_ERR(__wt_lsm_manager_push_entry(
+			    session, WT_LSM_WORK_MERGE, lsm_tree));
 	}
+err:	if (locked)
+		WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
+	__wt_lsm_tree_release(session, lsm_tree);
+	return (ret);
 
-	return (0);
 }
 
 /*

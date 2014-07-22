@@ -486,8 +486,6 @@ __lsm_get_chunk_to_flush(
 	    i++) {}
 
 	if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK)) {
-		/* We should never be asked to flush the primary chunk */
-		WT_ASSERT(session, i < lsm_tree->nchunks);
 		(void)WT_ATOMIC_ADD(lsm_tree->chunk[i]->refcnt, 1);
 		*chunkp = lsm_tree->chunk[i];
 	}
@@ -587,8 +585,10 @@ __lsm_worker(void *arg) {
 			WT_ASSERT(session, entry->flags == WT_LSM_WORK_MERGE);
 			ret = __wt_lsm_merge(session,
 			    entry->lsm_tree, cookie->id, 0);
-			if (ret == WT_NOTFOUND)
+			if (ret == WT_NOTFOUND) {
+				F_CLR(entry->lsm_tree, WT_LSM_TREE_COMPACTING);
 				ret = 0;
+			}
 			/* Clear any state */
 			WT_CLEAR_BTREE_IN_SESSION(session);
 		}
