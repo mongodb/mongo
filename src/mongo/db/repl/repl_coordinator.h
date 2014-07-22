@@ -249,6 +249,8 @@ namespace repl {
         /**
          * Returns the RID for this node.  The RID is used to identify this node to our sync source
          * when sending updates about our replication progress.
+         *
+         * TODO(spencer): Remove txn argument once Legacy is gone
          */
         virtual OID getMyRID(OperationContext* txn) = 0;
 

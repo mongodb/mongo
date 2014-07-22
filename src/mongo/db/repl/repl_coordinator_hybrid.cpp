@@ -161,16 +161,18 @@ namespace repl {
     void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                                            BSONObjBuilder* result) {
         _legacy.prepareReplSetUpdatePositionCommand(txn, result);
-        BSONObjBuilder implResult;
-        _impl.prepareReplSetUpdatePositionCommand(txn, &implResult);
+        // TODO(spencer): Can't call into the impl until it can load a valid config
+        //BSONObjBuilder implResult;
+        //_impl.prepareReplSetUpdatePositionCommand(&implResult);
     }
 
     void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommandHandshakes(
             OperationContext* txn,
             std::vector<BSONObj>* handshakes) {
         _legacy.prepareReplSetUpdatePositionCommandHandshakes(txn, handshakes);
-        std::vector<BSONObj> implResult;
-        _impl.prepareReplSetUpdatePositionCommandHandshakes(txn, &implResult);
+        // TODO(spencer): Can't call into the impl until it can load a valid config
+        //std::vector<BSONObj> implResult;
+        //_impl.prepareReplSetUpdatePositionCommandHandshakes(&implResult);
     }
 
     void HybridReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {

@@ -356,13 +356,64 @@ namespace repl {
     void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
             OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {
-        // TODO
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        cmdBuilder->append("replSetUpdatePosition", 1);
+        // create an array containing objects each member connected to us and for ourself
+        BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
+        {
+            for (SlaveInfoMap::const_iterator itr = _slaveInfoMap.begin();
+                    itr != _slaveInfoMap.end(); ++itr) {
+                const OID& rid = itr->first;
+                const SlaveInfo& info = itr->second;
+                BSONObjBuilder entry(arrayBuilder.subobjStart());
+                entry.append("_id", rid);
+                entry.append("optime", info.opTime);
+                // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
+                // we need to keep sending it for 2.6 compatibility.
+                // TODO(spencer): Remove this after 2.8 is released.
+                const MemberConfig& memberConfig = _rsConfig.getMemberAt(info.memberID);
+                entry.append("config", memberConfig.toBSON(_rsConfig.getTagConfig()));
+            }
+        }
     }
 
     void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommandHandshakes(
             OperationContext* txn,
             std::vector<BSONObj>* handshakes) {
-        // TODO
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        // handshake obj for us
+        BSONObjBuilder cmd;
+        cmd.append("replSetUpdatePosition", 1);
+        {
+            BSONObjBuilder sub (cmd.subobjStart("handshake"));
+            sub.append("handshake", getMyRID(txn));
+            sub.append("member", _thisMembersConfigIndex);
+            // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
+            // we need to keep sending it for 2.6 compatibility.
+            // TODO(spencer): Remove this after 2.8 is released.
+            sub.append("config", _rsConfig.getMemberAt(_thisMembersConfigIndex).toBSON(
+                    _rsConfig.getTagConfig()));
+        }
+        handshakes->push_back(cmd.obj());
+
+        // handshake objs for all chained members
+        for (SlaveInfoMap::const_iterator itr = _slaveInfoMap.begin();
+             itr != _slaveInfoMap.end(); ++itr) {
+            BSONObjBuilder cmd;
+            cmd.append("replSetUpdatePosition", 1);
+            {
+                BSONObjBuilder subCmd (cmd.subobjStart("handshake"));
+                subCmd.append("handshake", itr->first);
+                int memberID = itr->second.memberID;
+                subCmd.append("member", memberID);
+                // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
+                // we need to keep sending it for 2.6 compatibility.
+                // TODO(spencer): Remove this after 2.8 is released.
+                subCmd.append("config",
+                              _rsConfig.getMemberAt(memberID).toBSON(_rsConfig.getTagConfig()));
+            }
+            handshakes->push_back(cmd.obj());
+        }
     }
 
     void ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* result) {
