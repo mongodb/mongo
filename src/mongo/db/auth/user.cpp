@@ -47,6 +47,10 @@ namespace mongo {
         return makeRoleNameIteratorForContainer(_roles);
     }
 
+    RoleNameIterator User::getIndirectRoles() const {
+         return makeRoleNameIteratorForContainer(_indirectRoles);
+    }
+
     bool User::hasRole(const RoleName& roleName) const {
         return _roles.count(roleName);
     }
@@ -89,6 +93,13 @@ namespace mongo {
         _roles.clear();
         while (roles.more()) {
             _roles.insert(roles.next());
+        }
+    }
+
+    void User::setIndirectRoles(RoleNameIterator indirectRoles) {
+        _indirectRoles.clear();
+        while (indirectRoles.more()) {
+            _indirectRoles.push_back(indirectRoles.next());
         }
     }
 

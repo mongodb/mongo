@@ -67,6 +67,11 @@ namespace mongo {
         RoleNameIterator getRoles() const;
 
         /**
+         * Returns an iterator over the names of the user's indirect roles
+         */
+        RoleNameIterator getIndirectRoles() const;
+
+        /**
          * Returns true if this user is a member of the given role.
          */
         bool hasRole(const RoleName& roleName) const;
@@ -128,6 +133,12 @@ namespace mongo {
          * Replaces any existing user role membership information with the roles from "roles".
          */
         void setRoles(RoleNameIterator roles);
+
+        /**
+         * Replaces any existing indirect user role membership information with the roles from
+         * "indirectRoles".
+         */
+        void setIndirectRoles(RoleNameIterator indirectRoles);
 
         /**
          * Replaces any existing user privilege information with "privileges".
@@ -205,6 +216,9 @@ namespace mongo {
         // List of databases already probed for privilege information for this user.  Only
         // meaningful for V2.4-schema users.
         std::vector<std::string> _probedDatabases;
+
+        // Roles that the user indirectly has privileges from, due to role inheritance.
+        std::vector<RoleName> _indirectRoles;
 
         // Credential information.
         CredentialData _credentials;
