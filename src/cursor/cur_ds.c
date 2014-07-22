@@ -430,7 +430,7 @@ err:	API_END_RET(session, ret);
 }
 
 /*
- * __wt_curds_create --
+ * __wt_curds_open --
  *	Initialize a data-source cursor.
  */
 int
