@@ -2808,7 +2808,7 @@ namespace mongo {
             if (drop) {
                 // Create map of the roles currently in the DB
                 BSONObj query = db.empty() ?
-                        BSONObj() : BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << db);
+                        BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db);
                 BSONObj fields = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << 1 <<
                                       AuthorizationManager::ROLE_DB_FIELD_NAME << 1);
 
@@ -2827,7 +2827,7 @@ namespace mongo {
             Status status = authzManager->queryAuthzDocument(
                     NamespaceString(rolesCollName),
                     db.empty() ?
-                            BSONObj() : BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << db),
+                            BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db),
                     BSONObj(),
                     stdx::bind(&CmdMergeAuthzCollections::addRole,
                                 authzManager,
