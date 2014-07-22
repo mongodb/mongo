@@ -40,6 +40,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/master_slave.h"
+#include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -455,6 +456,36 @@ namespace {
                     entry.append("config", config);
                 }
             }
+        }
+    }
+
+    void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommandHandshakes(
+            std::vector<BSONObj>* handshakes) {
+        invariant(getReplicationMode() == modeReplSet);
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        // handshake obj for us
+        BSONObjBuilder cmd;
+        cmd.append("replSetUpdatePosition", 1);
+        BSONObjBuilder sub (cmd.subobjStart("handshake"));
+        sub.append("handshake", getMyRID());
+        sub.append("member", theReplSet->selfId());
+        sub.append("config", theReplSet->myConfig().asBson());
+        sub.doneFast();
+        handshakes->push_back(cmd.obj());
+
+        // handshake objs for all chained members
+        for (OIDMemberMap::const_iterator itr = _ridMemberMap.begin();
+             itr != _ridMemberMap.end(); ++itr) {
+            BSONObjBuilder cmd;
+            cmd.append("replSetUpdatePosition", 1);
+            // outer handshake indicates this is a handshake command
+            // inner is needed as part of the structure to be passed to gotHandshake
+            BSONObjBuilder subCmd (cmd.subobjStart("handshake"));
+            subCmd.append("handshake", itr->first);
+            subCmd.append("member", itr->second->id());
+            subCmd.append("config", itr->second->config().asBson());
+            subCmd.doneFast();
+            handshakes->push_back(cmd.obj());
         }
     }
 
@@ -973,22 +1004,31 @@ namespace {
                                                         const BSONObj& handshake) {
         LOG(2) << "Received handshake " << handshake << " from node with RID " << remoteID;
 
-        {
-            boost::lock_guard<boost::mutex> lock(_mutex);
-            BSONObj configObj;
-            if (handshake.hasField("config")) {
-                configObj = handshake["config"].Obj().getOwned();
-            } else {
-                configObj = BSON("host" << cc().clientAddress(true) << "upgradeNeeded" << true);
-            }
-            _ridConfigMap[remoteID] = configObj;
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        BSONObj configObj;
+        if (handshake.hasField("config")) {
+            configObj = handshake["config"].Obj().getOwned();
+        } else {
+            configObj = BSON("host" << cc().clientAddress(true) << "upgradeNeeded" << true);
         }
+        _ridConfigMap[remoteID] = configObj;
 
         if (getReplicationMode() != modeReplSet || !handshake.hasField("member")) {
             return false;
         }
 
-        return theReplSet->registerSlave(remoteID, handshake["member"].Int());
+        int memberID = handshake["member"].Int();
+        Member* member = theReplSet->getMutableMember(memberID);
+        // it is possible that a node that was removed in a reconfig tried to handshake this node
+        // in that case, the Member will no longer be in theReplSet's _members List and member
+        // will be NULL
+        if (!member) {
+            return false;
+        }
+
+        _ridMemberMap[remoteID] = member;
+        theReplSet->syncSourceFeedback.forwardSlaveHandshake();
+        return true;
     }
 
     void LegacyReplicationCoordinator::waitUpToOneSecondForOptimeChange(const OpTime& ot) {

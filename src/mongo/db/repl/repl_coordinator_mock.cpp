@@ -140,6 +140,9 @@ namespace repl {
     void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
             BSONObjBuilder* cmdBuilder) {}
 
+    void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommandHandshakes(
+            std::vector<BSONObj>* handshakes) {}
+
     void ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
         //TODO
     }

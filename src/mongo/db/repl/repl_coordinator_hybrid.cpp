@@ -163,6 +163,13 @@ namespace repl {
         _impl.prepareReplSetUpdatePositionCommand(&implResult);
     }
 
+    void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommandHandshakes(
+            std::vector<BSONObj>* handshakes) {
+        _legacy.prepareReplSetUpdatePositionCommandHandshakes(handshakes);
+        std::vector<BSONObj> implResult;
+        _impl.prepareReplSetUpdatePositionCommandHandshakes(&implResult);
+    }
+
     void HybridReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
         _legacy.processReplSetGetStatus(result);
         BSONObjBuilder implResult;

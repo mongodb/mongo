@@ -356,6 +356,11 @@ namespace repl {
         // TODO
     }
 
+    void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommandHandshakes(
+            std::vector<BSONObj>* handshakes) {
+        // TODO
+    }
+
     void ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* result) {
         // TODO
     }

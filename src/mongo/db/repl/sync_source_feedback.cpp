@@ -52,15 +52,6 @@ namespace repl {
     // used in replAuthenticate
     static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
 
-    void SyncSourceFeedback::associateMember(const OID& rid, Member* member) {
-        invariant(member);
-        LOG(2) << "Associating RID " << rid << " with member: " << member->fullName();
-        boost::unique_lock<boost::mutex> lock(_mtx);
-        _handshakeNeeded = true;
-        _members[rid] = member;
-        _cond.notify_all();
-    }
-
     bool SyncSourceFeedback::replAuthenticate() {
         if (!getGlobalAuthorizationManager()->isAuthEnabled())
             return true;
@@ -99,33 +90,8 @@ namespace repl {
     bool SyncSourceFeedback::replHandshake() {
         // construct a vector of handshake obj for us as well as all chained members
         std::vector<BSONObj> handshakeObjs;
-        {
-            boost::unique_lock<boost::mutex> lock(_mtx);
-            // handshake obj for us
-            BSONObjBuilder cmd;
-            cmd.append("replSetUpdatePosition", 1);
-            BSONObjBuilder sub (cmd.subobjStart("handshake"));
-            sub.append("handshake", getGlobalReplicationCoordinator()->getMyRID());
-            sub.append("member", theReplSet->selfId());
-            sub.append("config", theReplSet->myConfig().asBson());
-            sub.doneFast();
-            handshakeObjs.push_back(cmd.obj());
-
-            // handshake objs for all chained members
-            for (OIDMemberMap::iterator itr = _members.begin();
-                 itr != _members.end(); ++itr) {
-                BSONObjBuilder cmd;
-                cmd.append("replSetUpdatePosition", 1);
-                // outer handshake indicates this is a handshake command
-                // inner is needed as part of the structure to be passed to gotHandshake
-                BSONObjBuilder subCmd (cmd.subobjStart("handshake"));
-                subCmd.append("handshake", itr->first);
-                subCmd.append("member", itr->second->id());
-                subCmd.append("config", itr->second->config().asBson());
-                subCmd.doneFast();
-                handshakeObjs.push_back(cmd.obj());
-            }
-        }
+        getGlobalReplicationCoordinator()->prepareReplSetUpdatePositionCommandHandshakes(
+                &handshakeObjs);
 
         LOG(1) << "handshaking upstream updater";
         for (std::vector<BSONObj>::iterator it = handshakeObjs.begin();

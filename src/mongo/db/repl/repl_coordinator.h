@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/date_time/posix_time/posix_time_types.hpp>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
@@ -256,6 +257,15 @@ namespace repl {
          * be sent to this node's sync source to update it about our progress in replication.
          */
         virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
+
+        /**
+         * For ourself and each secondary chaining off of us, adds a BSONObj to "handshakes"
+         * describing an invocation of the replSetUpdateCommand that can be sent to this node's
+         * sync source to handshake us and our chained secondaries, informing the sync source that
+         * we are replicating off of it.
+         */
+        virtual void prepareReplSetUpdatePositionCommandHandshakes(
+                std::vector<BSONObj>* handshakes) = 0;
 
         /**
          * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.

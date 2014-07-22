@@ -34,6 +34,8 @@
 namespace mongo {
 namespace repl {
 
+    class Member;
+
     /**
      * An implementation of ReplicationCoordinator that simply delegates to existing code.
      */
@@ -95,6 +97,9 @@ namespace repl {
         virtual OID getMyRID();
 
         virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
+
+        virtual void prepareReplSetUpdatePositionCommandHandshakes(
+                std::vector<BSONObj>* handshakes);
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
@@ -159,6 +164,10 @@ namespace repl {
 
         // Map from RID to member config object
         std::map<OID, BSONObj> _ridConfigMap;
+
+        // Map from RID to Member pointer for replica set nodes
+        typedef std::map<OID, Member*> OIDMemberMap;
+        OIDMemberMap _ridMemberMap;
 
         // Maps nodes in this replication group to the last oplog operation they have committed
         // TODO(spencer): change to unordered_map

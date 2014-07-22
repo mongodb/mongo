@@ -52,9 +52,6 @@ namespace repl {
 
         ~SyncSourceFeedback() {}
 
-        /// Adds an entry to _members for a secondary that has connected to us.
-        void associateMember(const OID& rid, Member* member);
-
         /// Ensures local.me is populated and populates it if not.
         /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
         void ensureMe(OperationContext* txn);
@@ -115,11 +112,8 @@ namespace repl {
         const Member* _syncTarget;
         // our connection to our sync target
         boost::scoped_ptr<DBClientConnection> _connection;
-        // protects cond and maps and the indicator bools
+        // protects cond and the indicator bools
         boost::mutex _mtx;
-        typedef std::map<mongo::OID, Member*> OIDMemberMap;
-        // contains a pointer to each member, which we can look up by oid
-        OIDMemberMap _members;
         // used to alert our thread of changes which need to be passed up the chain
         boost::condition _cond;
         // used to indicate a position change which has not yet been pushed along

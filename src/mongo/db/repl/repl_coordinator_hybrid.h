@@ -100,6 +100,9 @@ namespace repl {
 
         virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
 
+        virtual void prepareReplSetUpdatePositionCommandHandshakes(
+                std::vector<BSONObj>* handshakes);
+
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
         virtual bool setMaintenanceMode(OperationContext* txn, bool activate);

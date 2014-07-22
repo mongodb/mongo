@@ -914,21 +914,5 @@ namespace {
         return OpTime();
     }
 
-    bool ReplSetImpl::registerSlave(const OID& rid, const int memberId) {
-        Member* member = NULL;
-        {
-            lock lk(this);
-            member = getMutableMember(memberId);
-        }
-
-        // it is possible that a node that was removed in a reconfig tried to handshake this node
-        // in that case, the Member will no longer be in the _members List and member will be NULL
-        if (!member) {
-            return false;
-        }
-        syncSourceFeedback.associateMember(rid, member);
-        return true;
-    }
-
 } // namespace repl
 } // namespace mongo
