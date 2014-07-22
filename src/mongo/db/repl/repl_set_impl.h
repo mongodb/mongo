@@ -113,10 +113,10 @@ namespace repl {
         void startHealthTaskFor(Member *m);
 
         Consensus elect;
-        void relinquish();
-        void forgetPrimary();
+        void relinquish(OperationContext* txn);
+        void forgetPrimary(OperationContext* txn);
     protected:
-        bool _stepDown(int secs);
+        bool _stepDown(OperationContext* txn, int secs);
         bool _freeze(int secs);
     private:
         void _assumePrimary();
@@ -254,7 +254,7 @@ namespace repl {
          * call this and it will leave maintenance mode once all of the callers
          * have called it again, passing in false.
          */
-        bool setMaintenanceMode(const bool inc);
+        bool setMaintenanceMode(OperationContext* txn, const bool inc);
 
         // Records a new slave's id in the GhostSlave map, at handshake time.
         bool registerSlave(const OID& rid, const int memberId);

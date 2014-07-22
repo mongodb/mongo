@@ -280,7 +280,8 @@ namespace repl {
         return StatusAndDuration(Status::OK(), Milliseconds(0));
     }
 
-    Status ReplicationCoordinatorImpl::stepDown(bool force,
+    Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
+                                                bool force,
                                                 const Milliseconds& waitTime,
                                                 const Milliseconds& stepdownTime) {
         // TODO
@@ -288,6 +289,7 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorImpl::stepDownAndWaitForSecondary(
+            OperationContext* txn,
             const Milliseconds& initialWaitTime,
             const Milliseconds& stepdownTime,
             const Milliseconds& postStepdownWaitTime) {
@@ -358,7 +360,7 @@ namespace repl {
         // TODO
     }
 
-    bool ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
+    bool ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* txn, bool activate) {
         // TODO
         return false;
     }
@@ -369,7 +371,8 @@ namespace repl {
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorImpl::processReplSetMaintenance(bool activate,
+    Status ReplicationCoordinatorImpl::processReplSetMaintenance(OperationContext* txn,
+                                                                 bool activate,
                                                                  BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();

@@ -109,6 +109,7 @@ namespace mongo {
             }
 
             Status status = repl::getGlobalReplicationCoordinator()->stepDownAndWaitForSecondary(
+                    txn,
                     repl::ReplicationCoordinator::Milliseconds(timeoutSecs * 1000),
                     repl::ReplicationCoordinator::Milliseconds(120 * 1000),
                     repl::ReplicationCoordinator::Milliseconds(60 * 1000));
@@ -1172,14 +1173,18 @@ namespace mongo {
        assumption needs to be audited and documented. */
     class MaintenanceModeSetter {
     public:
-        MaintenanceModeSetter() :
-            maintenanceModeSet(repl::getGlobalReplicationCoordinator()->setMaintenanceMode(true))
+        MaintenanceModeSetter(OperationContext* txn) :
+            _txn(txn),
+            maintenanceModeSet(
+                    repl::getGlobalReplicationCoordinator()->setMaintenanceMode(txn, true))
             {}
         ~MaintenanceModeSetter() {
             if (maintenanceModeSet)
-                repl::getGlobalReplicationCoordinator()->setMaintenanceMode(false);
+                repl::getGlobalReplicationCoordinator()->setMaintenanceMode(_txn, false);
         } 
     private:
+        // Not owned.
+        OperationContext* _txn;
         bool maintenanceModeSet;
     };
 
@@ -1319,7 +1324,7 @@ namespace mongo {
         if (c->maintenanceMode() &&
                 repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                         repl::ReplicationCoordinator::modeReplSet) {
-            mmSetter.reset(new MaintenanceModeSetter());
+            mmSetter.reset(new MaintenanceModeSetter(txn));
         }
 
         if (c->shouldAffectCommandCounter()) {

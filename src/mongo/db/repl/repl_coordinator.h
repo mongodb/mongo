@@ -164,7 +164,8 @@ namespace repl {
          * catch up, and then should wait till a secondary is completely caught up rather than
          * within 10 seconds.
          */
-        virtual Status stepDown(bool force,
+        virtual Status stepDown(OperationContext* txn,
+                                bool force,
                                 const Milliseconds& waitTime,
                                 const Milliseconds& stepdownTime) = 0;
 
@@ -174,7 +175,8 @@ namespace repl {
          * TODO(spencer): This method should be removed and all callers should use shutDown, after
          * shutdown has been fixed to block new writes while waiting for secondaries to catch up.
          */
-        virtual Status stepDownAndWaitForSecondary(const Milliseconds& initialWaitTime,
+        virtual Status stepDownAndWaitForSecondary(OperationContext* txn,
+                                                   const Milliseconds& initialWaitTime,
                                                    const Milliseconds& stepdownTime,
                                                    const Milliseconds& postStepdownWaitTime) = 0;
 
@@ -264,7 +266,7 @@ namespace repl {
          * Toggles maintenanceMode to the value expressed by 'activate'
          * return true, if the change worked and false otherwise
          */
-        virtual bool setMaintenanceMode(bool activate) = 0;
+        virtual bool setMaintenanceMode(OperationContext* txn, bool activate) = 0;
 
         /**
          * Handles an incoming replSetSyncFrom command. Adds BSON to 'result'
@@ -280,7 +282,9 @@ namespace repl {
          * returns Status::OK() if maintenanceMode is successfully changed, otherwise returns a
          * Status containing an error message about the failure
          */
-        virtual Status processReplSetMaintenance(bool activate, BSONObjBuilder* resultObj) = 0;
+        virtual Status processReplSetMaintenance(OperationContext* txn,
+                                                 bool activate,
+                                                 BSONObjBuilder* resultObj) = 0;
 
         /**
          * Handles an incoming replSetFreeze command. Adds BSON to 'resultObj' 

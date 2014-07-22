@@ -148,12 +148,11 @@ namespace {
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
 
-    bool ReplSetImpl::setMaintenanceMode(const bool inc) {
+    bool ReplSetImpl::setMaintenanceMode(OperationContext* txn, const bool inc) {
         lock replLock(this);
 
         // Lock here to prevent state from changing between checking the state and changing it
-        LockState lockState;
-        Lock::GlobalWrite writeLock(&lockState);
+        Lock::GlobalWrite writeLock(txn->lockState());
 
         if (box.getState().primary()) {
             return false;
@@ -203,10 +202,9 @@ namespace {
         return max;
     }
 
-    void ReplSetImpl::relinquish() {
+    void ReplSetImpl::relinquish(OperationContext* txn) {
         {
-            LockState lockState;
-            Lock::GlobalWrite writeLock(&lockState);    // so we are synchronized with _logOp()
+            Lock::GlobalWrite writeLock(txn->lockState());  // so we are synchronized with _logOp()
 
             LOG(2) << "replSet attempting to relinquish" << endl;
             if (box.getState().primary()) {
@@ -234,21 +232,21 @@ namespace {
     }
 
     // look freshly for who is primary - includes relinquishing ourself.
-    void ReplSetImpl::forgetPrimary() {
+    void ReplSetImpl::forgetPrimary(OperationContext* txn) {
         if (box.getState().primary())
-            relinquish();
+            relinquish(txn);
         else {
             box.setOtherPrimary(0);
         }
     }
 
     // for the replSetStepDown command
-    bool ReplSetImpl::_stepDown(int secs) {
+    bool ReplSetImpl::_stepDown(OperationContext* txn, int secs) {
         lock lk(this);
         if (box.getState().primary()) {
             elect.steppedDown = time(0) + secs;
             log() << "replSet info stepping down as primary secs=" << secs << rsLog;
-            relinquish();
+            relinquish(txn);
             return true;
         }
         return false;
@@ -672,7 +670,7 @@ namespace {
             if (p)
                 oldPrimaryId = p->id();
         }
-        forgetPrimary();
+        forgetPrimary(txn);
 
         // not setting _self to 0 as other threads use _self w/o locking
         int me = 0;

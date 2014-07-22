@@ -32,6 +32,9 @@
 #include "mongo/db/repl/server.h"
 
 namespace mongo {
+
+    class OperationContext;
+
 namespace repl {
     class Member;
     class ReplSetImpl;
@@ -44,11 +47,11 @@ namespace repl {
          *  to our polling being only occasional.  in this case null is returned, but the caller
          *  should not assume primary itself in that situation.
          */
-        const Member* findOtherPrimary(bool& two);
+        const Member* findOtherPrimary(OperationContext* txn, bool& two);
 
-        void noteARemoteIsPrimary(const Member *);
-        void checkElectableSet();
-        void checkAuth();
+        void noteARemoteIsPrimary(OperationContext* txn, const Member *);
+        void checkElectableSet(OperationContext* txn);
+        void checkAuth(OperationContext* txn);
         virtual void starting();
     public:
         Manager(ReplSetImpl *rs);

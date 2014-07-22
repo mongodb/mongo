@@ -178,17 +178,19 @@ namespace repl {
         return awaitReplication(txn, cc().getLastOp(), writeConcern);
     }
 
-    Status LegacyReplicationCoordinator::stepDown(bool force,
+    Status LegacyReplicationCoordinator::stepDown(OperationContext* txn, 
+                                                  bool force,
                                                   const Milliseconds& waitTime,
                                                   const Milliseconds& stepdownTime) {
-        return _stepDownHelper(force, waitTime, stepdownTime, Milliseconds(0));
+        return _stepDownHelper(txn, force, waitTime, stepdownTime, Milliseconds(0));
     }
 
     Status LegacyReplicationCoordinator::stepDownAndWaitForSecondary(
+            OperationContext* txn,
             const Milliseconds& initialWaitTime,
             const Milliseconds& stepdownTime,
             const Milliseconds& postStepdownWaitTime) {
-        return _stepDownHelper(false, initialWaitTime, stepdownTime, postStepdownWaitTime);
+        return _stepDownHelper(txn, false, initialWaitTime, stepdownTime, postStepdownWaitTime);
     }
 
 namespace {
@@ -234,7 +236,8 @@ namespace {
     }
 } // namespace
 
-    Status LegacyReplicationCoordinator::_stepDownHelper(bool force,
+    Status LegacyReplicationCoordinator::_stepDownHelper(OperationContext* txn,
+                                                         bool force,
                                                          const Milliseconds& initialWaitTime,
                                                          const Milliseconds& stepdownTime,
                                                          const Milliseconds& postStepdownWaitTime) {
@@ -251,7 +254,7 @@ namespace {
         }
 
         // step down
-        bool worked = repl::theReplSet->stepDown(stepdownTime.total_seconds());
+        bool worked = repl::theReplSet->stepDown(txn, stepdownTime.total_seconds());
         if (!worked) {
             return Status(ErrorCodes::NotMaster, "not primary so can't step down");
         }
@@ -459,8 +462,8 @@ namespace {
         theReplSet->summarizeStatus(*result);
     }
 
-    bool LegacyReplicationCoordinator::setMaintenanceMode(bool activate) {
-        return theReplSet->setMaintenanceMode(activate);
+    bool LegacyReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
+        return theReplSet->setMaintenanceMode(txn, activate);
     }
 
     Status LegacyReplicationCoordinator::processHeartbeat(const BSONObj& cmdObj, 
@@ -897,13 +900,14 @@ namespace {
         return Status::OK();
     }
 
-    Status LegacyReplicationCoordinator::processReplSetMaintenance(bool activate,
+    Status LegacyReplicationCoordinator::processReplSetMaintenance(OperationContext* txn,
+                                                                   bool activate,
                                                                    BSONObjBuilder* resultObj) {
         Status status = _checkReplEnabledForCommand(resultObj);
         if (!status.isOK()) {
             return status;
         }
-        if (!setMaintenanceMode(activate)) {
+        if (!setMaintenanceMode(txn, activate)) {
             if (theReplSet->isPrimary()) {
                 return Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
             }

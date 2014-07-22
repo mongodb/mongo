@@ -70,11 +70,13 @@ namespace repl {
                 const OperationContext* txn,
                 const WriteConcernOptions& writeConcern);
 
-        virtual Status stepDown(bool force,
+        virtual Status stepDown(OperationContext* txn, 
+                                bool force,
                                 const Milliseconds& waitTime,
                                 const Milliseconds& stepdownTime);
 
-        virtual Status stepDownAndWaitForSecondary(const Milliseconds& initialWaitTime,
+        virtual Status stepDownAndWaitForSecondary(OperationContext* txn,
+                                                   const Milliseconds& initialWaitTime,
                                                    const Milliseconds& stepdownTime,
                                                    const Milliseconds& postStepdownWaitTime);
 
@@ -99,9 +101,11 @@ namespace repl {
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
-        virtual bool setMaintenanceMode(bool activate);
+        virtual bool setMaintenanceMode(OperationContext* txn, bool activate);
 
-        virtual Status processReplSetMaintenance(bool activate, BSONObjBuilder* resultObj);
+        virtual Status processReplSetMaintenance(OperationContext* txn,
+                                                 bool activate,
+                                                 BSONObjBuilder* resultObj);
 
         virtual Status processReplSetSyncFrom(const std::string& target,
                                               BSONObjBuilder* resultObj);

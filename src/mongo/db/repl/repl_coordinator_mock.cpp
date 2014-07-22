@@ -87,13 +87,15 @@ namespace repl {
         return StatusAndDuration(Status::OK(), Milliseconds(0));
     }
 
-    Status ReplicationCoordinatorMock::stepDown(bool force,
+    Status ReplicationCoordinatorMock::stepDown(OperationContext* txn,
+                                                bool force,
                                                 const Milliseconds& waitTime,
                                                 const Milliseconds& stepdownTime) {
         return Status::OK();
     }
 
     Status ReplicationCoordinatorMock::stepDownAndWaitForSecondary(
+            OperationContext* txn,
             const Milliseconds& initialWaitTime,
             const Milliseconds& stepdownTime,
             const Milliseconds& postStepdownWaitTime) {
@@ -142,7 +144,7 @@ namespace repl {
         //TODO
     }
 
-    bool ReplicationCoordinatorMock::setMaintenanceMode(bool activate) {
+    bool ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* txn, bool activate) {
         // TODO
         return false;
     }
@@ -153,7 +155,8 @@ namespace repl {
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorMock::processReplSetMaintenance(bool activate,
+    Status ReplicationCoordinatorMock::processReplSetMaintenance(OperationContext* txn,
+                                                                 bool activate,
                                                                  BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();

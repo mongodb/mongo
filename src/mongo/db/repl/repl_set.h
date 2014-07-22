@@ -41,7 +41,7 @@ namespace repl {
 
         // for the replSetStepDown command
         // Returns false if this node isn't currently primary
-        bool stepDown(int secs) { return _stepDown(secs); }
+        bool stepDown(OperationContext* txn, int secs) { return _stepDown(txn, secs); }
 
         // for the replSetFreeze command
         bool freeze(int secs) { return _freeze(secs); }
