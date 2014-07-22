@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
+#include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/instance.h"
@@ -106,6 +107,33 @@ namespace QueryStageAnd {
                 ++count;
             }
             return count;
+        }
+
+        /**
+         * Gets the next result from 'stage'.
+         *
+         * Fails if the stage fails or returns DEAD, if the returned working
+         * set member is not fetched, or if there are no more results.
+         */
+        BSONObj getNext(PlanStage* stage, WorkingSet* ws) {
+            while (!stage->isEOF()) {
+                WorkingSetID id = WorkingSet::INVALID_ID;
+                PlanStage::StageState status = stage->work(&id);
+
+                // We shouldn't fail or be dead.
+                ASSERT(PlanStage::FAILURE != status);
+                ASSERT(PlanStage::DEAD != status);
+
+                if (PlanStage::ADVANCED != status) { continue; }
+
+                WorkingSetMember* member = ws->get(id);
+                ASSERT(member->hasObj());
+                return member->obj;
+            }
+
+            // We failed to produce a result.
+            ASSERT(false);
+            return BSONObj();
         }
 
         static const char* ns() { return "unittests.QueryStageAnd"; }
@@ -740,6 +768,123 @@ namespace QueryStageAnd {
         }
     };
 
+    /**
+     * SERVER-14607: Check that hash-based intersection works when the first
+     * child returns fetched docs but the second child returns index keys.
+     */
+    class QueryStageAndHashFirstChildFetched : public QueryStageAndBase {
+    public:
+        void run() {
+            Client::WriteContext ctx(&_txn, ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(&_txn, ns());
+            if (!coll) {
+                coll = db->createCollection(&_txn, ns());
+            }
+
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i));
+            }
+
+            addIndex(BSON("foo" << 1));
+            addIndex(BSON("bar" << 1));
+
+            WorkingSet ws;
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+
+            // Foo <= 20
+            IndexScanParams params;
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 20);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = -1;
+            IndexScan* firstScan = new IndexScan(&_txn, params, &ws, NULL);
+
+            // First child of the AND_HASH stage is a Fetch. The NULL in the
+            // constructor means there is no filter.
+            FetchStage* fetch = new FetchStage(&ws, firstScan, NULL, coll);
+            ah->addChild(fetch);
+
+            // Bar >= 10
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
+            params.bounds.startKey = BSON("" << 10);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = 1;
+            ah->addChild(new IndexScan(&_txn, params, &ws, NULL));
+            ctx.commit();
+
+            // Check that the AndHash stage returns docs {foo: 10, bar: 10}
+            // through {foo: 20, bar: 20}.
+            for (int i = 10; i <= 20; i++) {
+                BSONObj obj = getNext(ah.get(), &ws);
+                ASSERT_EQUALS(i, obj["foo"].numberInt());
+                ASSERT_EQUALS(i, obj["bar"].numberInt());
+            }
+        }
+    };
+
+    /**
+     * SERVER-14607: Check that hash-based intersection works when the first
+     * child returns index keys but the second returns fetched docs.
+     */
+    class QueryStageAndHashSecondChildFetched : public QueryStageAndBase {
+    public:
+        void run() {
+            Client::WriteContext ctx(&_txn, ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(&_txn, ns());
+            if (!coll) {
+                coll = db->createCollection(&_txn, ns());
+            }
+
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i));
+            }
+
+            addIndex(BSON("foo" << 1));
+            addIndex(BSON("bar" << 1));
+
+            WorkingSet ws;
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+
+            // Foo <= 20
+            IndexScanParams params;
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 20);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = -1;
+            ah->addChild(new IndexScan(&_txn, params, &ws, NULL));
+
+            // Bar >= 10
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
+            params.bounds.startKey = BSON("" << 10);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = 1;
+            IndexScan* secondScan = new IndexScan(&_txn, params, &ws, NULL);
+
+            // Second child of the AND_HASH stage is a Fetch. The NULL in the
+            // constructor means there is no filter.
+            FetchStage* fetch = new FetchStage(&ws, secondScan, NULL, coll);
+            ah->addChild(fetch);
+            ctx.commit();
+
+            // Check that the AndHash stage returns docs {foo: 10, bar: 10}
+            // through {foo: 20, bar: 20}.
+            for (int i = 10; i <= 20; i++) {
+                BSONObj obj = getNext(ah.get(), &ws);
+                ASSERT_EQUALS(i, obj["foo"].numberInt());
+                ASSERT_EQUALS(i, obj["bar"].numberInt());
+            }
+        }
+    };
+
+
     //
     // Sorted AND tests
     //
@@ -1116,6 +1261,112 @@ namespace QueryStageAnd {
         }
     };
 
+    /**
+     * SERVER-14607: Check that sort-based intersection works when the first
+     * child returns fetched docs but the second child returns index keys.
+     */
+    class QueryStageAndSortedFirstChildFetched : public QueryStageAndBase {
+    public:
+        void run() {
+            Client::WriteContext ctx(&_txn, ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(&_txn, ns());
+            if (!coll) {
+                coll = db->createCollection(&_txn, ns());
+            }
+
+            // Insert a bunch of data
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << 1 << "bar" << 1));
+            }
+
+            addIndex(BSON("foo" << 1));
+            addIndex(BSON("bar" << 1));
+
+            WorkingSet ws;
+            scoped_ptr<AndSortedStage> as(new AndSortedStage(&ws, NULL, coll));
+
+            // Scan over foo == 1
+            IndexScanParams params;
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 1);
+            params.bounds.endKey = BSON("" << 1);
+            params.bounds.endKeyInclusive = true;
+            params.direction = 1;
+            IndexScan* firstScan = new IndexScan(&_txn, params, &ws, NULL);
+
+            // First child of the AND_SORTED stage is a Fetch. The NULL in the
+            // constructor means there is no filter.
+            FetchStage* fetch = new FetchStage(&ws, firstScan, NULL, coll);
+            as->addChild(fetch);
+
+            // bar == 1
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
+            as->addChild(new IndexScan(&_txn, params, &ws, NULL));
+            ctx.commit();
+
+            for (int i = 0; i < 50; i++) {
+                BSONObj obj = getNext(as.get(), &ws);
+                ASSERT_EQUALS(1, obj["foo"].numberInt());
+                ASSERT_EQUALS(1, obj["bar"].numberInt());
+            }
+        }
+    };
+
+    /**
+     * SERVER-14607: Check that sort-based intersection works when the first
+     * child returns index keys but the second returns fetched docs.
+     */
+    class QueryStageAndSortedSecondChildFetched : public QueryStageAndBase {
+    public:
+        void run() {
+            Client::WriteContext ctx(&_txn, ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(&_txn, ns());
+            if (!coll) {
+                coll = db->createCollection(&_txn, ns());
+            }
+
+            // Insert a bunch of data
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << 1 << "bar" << 1));
+            }
+
+            addIndex(BSON("foo" << 1));
+            addIndex(BSON("bar" << 1));
+
+            WorkingSet ws;
+            scoped_ptr<AndSortedStage> as(new AndSortedStage(&ws, NULL, coll));
+
+            // Scan over foo == 1
+            IndexScanParams params;
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 1);
+            params.bounds.endKey = BSON("" << 1);
+            params.bounds.endKeyInclusive = true;
+            params.direction = 1;
+            as->addChild(new IndexScan(&_txn, params, &ws, NULL));
+
+            // bar == 1
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
+            IndexScan* secondScan = new IndexScan(&_txn, params, &ws, NULL);
+
+            // Second child of the AND_SORTED stage is a Fetch. The NULL in the
+            // constructor means there is no filter.
+            FetchStage* fetch = new FetchStage(&ws, secondScan, NULL, coll);
+            as->addChild(fetch);
+            ctx.commit();
+
+            for (int i = 0; i < 50; i++) {
+                BSONObj obj = getNext(as.get(), &ws);
+                ASSERT_EQUALS(1, obj["foo"].numberInt());
+                ASSERT_EQUALS(1, obj["bar"].numberInt());
+            }
+        }
+    };
+
 
     class All : public Suite {
     public:
@@ -1132,12 +1383,16 @@ namespace QueryStageAnd {
             add<QueryStageAndHashProducesNothing>();
             add<QueryStageAndHashWithMatcher>();
             add<QueryStageAndHashInvalidateLookahead>();
+            add<QueryStageAndHashFirstChildFetched>();
+            add<QueryStageAndHashSecondChildFetched>();
             add<QueryStageAndSortedInvalidation>();
             add<QueryStageAndSortedThreeLeaf>();
             add<QueryStageAndSortedWithNothing>();
             add<QueryStageAndSortedProducesNothing>();
             add<QueryStageAndSortedWithMatcher>();
             add<QueryStageAndSortedByLastChild>();
+            add<QueryStageAndSortedFirstChildFetched>();
+            add<QueryStageAndSortedSecondChildFetched>();
         }
     }  queryStageAndAll;
 

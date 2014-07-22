@@ -38,8 +38,46 @@ namespace mongo {
             verify(src.hasLoc());
             verify(dest->loc == src.loc);
 
+            // Merge computed data.
+            typedef WorkingSetComputedDataType WSCD;
+            for (WSCD i = WSCD(0); i < WSM_COMPUTED_NUM_TYPES; i = WSCD(i + 1)) {
+                if (!dest->hasComputed(i) && src.hasComputed(i)) {
+                    dest->addComputed(src.getComputed(i)->clone());
+                }
+            }
+
+            if (dest->hasObj()) {
+                // The merged WSM that we're creating already has the full document, so there's
+                // nothing left to do.
+                return;
+            }
+
+            if (src.hasObj()) {
+                // 'src' has the full document but 'dest' doesn't so we need to copy it over.
+                //
+                // The source diskloc must be in the "diskloc and unowned object" state rather than
+                // the "owned object" state. This is because we've just intersected according to
+                // diskloc. Since we merge based on finding working set members with matching
+                // disklocs, we shouldn't have a WSM that is missing the diskloc.
+                invariant(WorkingSetMember::LOC_AND_UNOWNED_OBJ == src.state);
+
+                // Copy the object to 'dest'.
+                dest->obj = src.obj;
+
+                // We have an object so we don't need key data.
+                dest->keyData.clear();
+
+                // 'dest' should be LOC_AND_UNOWNED_OBJ
+                dest->state = src.state;
+
+                // Now 'dest' has the full object. No more work to do.
+                return;
+            }
+
+            // If we're here, then both WSMs getting merged contain index keys. We need
+            // to merge the key data.
+            //
             // This is N^2 but N is probably pretty small.  Easy enough to revisit.
-            // Merge key data.
             for (size_t i = 0; i < src.keyData.size(); ++i) {
                 bool found = false;
                 for (size_t j = 0; j < dest->keyData.size(); ++j) {
@@ -49,14 +87,6 @@ namespace mongo {
                     }
                 }
                 if (!found) { dest->keyData.push_back(src.keyData[i]); }
-            }
-
-            // Merge computed data.
-            typedef WorkingSetComputedDataType WSCD;
-            for (WSCD i = WSCD(0); i < WSM_COMPUTED_NUM_TYPES; i = WSCD(i + 1)) {
-                if (!dest->hasComputed(i) && src.hasComputed(i)) {
-                    dest->addComputed(src.getComputed(i)->clone());
-                }
             }
         }
     };
