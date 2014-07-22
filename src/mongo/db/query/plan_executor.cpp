@@ -236,7 +236,8 @@ namespace mongo {
 
     ScopedExecutorRegistration::ScopedExecutorRegistration(PlanExecutor* exec)
         : _exec(exec) {
-        // Collection can be null for EOFRunner, or other places where registration is not needed
+        // Collection can be null for an EOFStage plan, or other places where registration
+        // is not needed.
         if ( _exec->collection() )
             _exec->collection()->cursorCache()->registerExecutor( exec );
     }

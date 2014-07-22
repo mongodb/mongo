@@ -287,7 +287,7 @@ namespace mongo {
                 // Propagate this error to caller.
                 if (Runner::RUNNER_ERROR == state) {
                     scoped_ptr<PlanStageStats> stats(exec->getStats());
-                    error() << "Runner error, stats: "
+                    error() << "Plan executor error, stats: "
                             << statsToBSON(*stats);
                     uasserted(17406, "getMore executor error: " +
                               WorkingSetCommon::toStatusString(obj));
@@ -712,7 +712,7 @@ namespace mongo {
         // Caller expects exceptions thrown in certain cases.
         if (Runner::RUNNER_ERROR == state) {
             scoped_ptr<PlanStageStats> stats(exec->getStats());
-            error() << "Runner error, stats: "
+            error() << "Plan executor error, stats: "
                     << statsToBSON(*stats);
             uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
         }

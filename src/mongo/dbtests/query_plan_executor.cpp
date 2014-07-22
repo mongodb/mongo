@@ -204,8 +204,7 @@ namespace QueryPlanExecutor {
     };
 
     /**
-     * Test dropping the collection while the
-     * SingleSolutionRunner is doing an index scan.
+     * Test dropping the collection while the PlanExecutor is doing an index scan.
      */
     class DropIndexScan : public PlanExecutorBase {
     public:

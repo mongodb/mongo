@@ -75,7 +75,7 @@ namespace mongo {
      * for that field, so there is no point in examining all keys with the same value for that
      * field.
      *
-     * Only created through the getDistinctRunner path.  See db/query/get_runner.cpp
+     * Only created through the getExecutorDistinct path.  See db/query/get_executor.cpp
      */
     class DistinctScan : public PlanStage {
     public:

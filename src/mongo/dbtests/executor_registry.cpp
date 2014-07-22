@@ -41,7 +41,6 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/single_solution_runner.h"
 #include "mongo/dbtests/dbtests.h"
 
 

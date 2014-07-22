@@ -36,10 +36,10 @@
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
-#include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
@@ -170,18 +170,14 @@ namespace QueryMultiPlanRunner {
             ASSERT(mps->bestPlanChosen());
             ASSERT_EQUALS(0, mps->bestPlanIdx());
 
-            SingleSolutionRunner sr(
-                ctx.ctx().db()->getCollection(&_txn, ns()),
-                cq,
-                mps->bestSolution(),
-                mps,
-                sharedWs.release()
-            );
+            Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
+            // Takes ownership of arguments other than 'collection'.
+            PlanExecutor exec(sharedWs.release(), mps, cq, collection);
 
             // Get all our results out.
             int results = 0;
             BSONObj obj;
-            while (Runner::RUNNER_ADVANCED == sr.getNext(&obj, NULL)) {
+            while (Runner::RUNNER_ADVANCED == exec.getNext(&obj, NULL)) {
                 ASSERT_EQUALS(obj["foo"].numberInt(), 7);
                 ++results;
             }

@@ -34,7 +34,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/query/get_runner.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

@@ -31,18 +31,13 @@ env.Library(
 env.Library(
     target='query',
     source=[
-        "eof_runner.cpp",
         "explain.cpp",
         "explain_plan.cpp",
         "get_executor.cpp",
-        "get_runner.cpp",
-        "idhack_runner.cpp",
         "new_find.cpp",
         "plan_executor.cpp",
         "plan_ranker.cpp",
-        "single_solution_runner.cpp",
         "stage_builder.cpp",
-        "subplan_runner.cpp",
         "type_explain.cpp",
     ],
     LIBDEPS=[
@@ -53,9 +48,9 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target="get_runner_test",
+    target="get_executor_test",
     source=[
-        "get_runner_test.cpp"
+        "get_executor_test.cpp"
     ],
     LIBDEPS=[
         "query",
