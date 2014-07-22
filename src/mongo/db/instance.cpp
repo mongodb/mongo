@@ -1000,7 +1000,7 @@ namespace {
     static AtomicUInt32 shutdownInProgress(0);
 
     bool inShutdown() {
-        return shutdownInProgress.load() != 0;
+        return shutdownInProgress.loadRelaxed() != 0;
     }
 
     static void shutdownServer(OperationContext* txn) {
