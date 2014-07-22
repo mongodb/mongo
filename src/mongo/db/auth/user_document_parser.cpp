@@ -50,7 +50,7 @@ namespace {
     const std::string READONLY_FIELD_NAME = "readOnly";
     const std::string CREDENTIALS_FIELD_NAME = "credentials";
     const std::string ROLE_NAME_FIELD_NAME = "role";
-    const std::string ROLE_SOURCE_FIELD_NAME = "db";
+    const std::string ROLE_DB_FIELD_NAME = "db";
     const std::string MONGODB_CR_CREDENTIAL_FIELD_NAME = "MONGODB-CR";
     const std::string SCRAM_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-1";
     const std::string MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external";
@@ -397,7 +397,7 @@ namespace {
             BSONElement* roleSourceElement) {
 
         *roleNameElement = roleObject[ROLE_NAME_FIELD_NAME];
-        *roleSourceElement = roleObject[ROLE_SOURCE_FIELD_NAME];
+        *roleSourceElement = roleObject[ROLE_DB_FIELD_NAME];
 
         if (roleNameElement->type() != String || roleNameElement->valueStringData().empty()) {
             return Status(ErrorCodes::UnsupportedFormat,

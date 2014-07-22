@@ -78,7 +78,7 @@ namespace mongo {
         static const std::string USER_NAME_FIELD_NAME;
         static const std::string USER_DB_FIELD_NAME;
         static const std::string ROLE_NAME_FIELD_NAME;
-        static const std::string ROLE_SOURCE_FIELD_NAME; // TODO: rename to ROLE_DB_FIELD_NAME
+        static const std::string ROLE_DB_FIELD_NAME;
         static const std::string PASSWORD_FIELD_NAME;
         static const std::string V1_USER_NAME_FIELD_NAME;
         static const std::string V1_USER_SOURCE_FIELD_NAME;

@@ -47,7 +47,7 @@ namespace mongo {
 namespace {
     void addRoleNameToObjectElement(mutablebson::Element object, const RoleName& role) {
         fassert(17175, object.appendString(AuthorizationManager::ROLE_NAME_FIELD_NAME, role.getRole()));
-        fassert(17176, object.appendString(AuthorizationManager::ROLE_SOURCE_FIELD_NAME, role.getDB()));
+        fassert(17176, object.appendString(AuthorizationManager::ROLE_DB_FIELD_NAME, role.getDB()));
     }
 
     void addRoleNameObjectsToArrayElement(mutablebson::Element array, RoleNameIterator roles) {

@@ -132,7 +132,7 @@ namespace mongo {
                     BSON("rolesInfo" <<
                          BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
                                          roleName.getRole() <<
-                                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                         AuthorizationManager::ROLE_DB_FIELD_NAME <<
                                          roleName.getDB())) <<
                          "showPrivileges" << showPrivileges),
                     cmdResult);

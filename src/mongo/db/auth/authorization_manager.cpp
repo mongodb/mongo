@@ -81,7 +81,7 @@ namespace mongo {
     const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";
     const std::string AuthorizationManager::USER_DB_FIELD_NAME = "db";
     const std::string AuthorizationManager::ROLE_NAME_FIELD_NAME = "role";
-    const std::string AuthorizationManager::ROLE_SOURCE_FIELD_NAME = "db";
+    const std::string AuthorizationManager::ROLE_DB_FIELD_NAME = "db";
     const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
     const std::string AuthorizationManager::V1_USER_NAME_FIELD_NAME = "user";
     const std::string AuthorizationManager::V1_USER_SOURCE_FIELD_NAME = "userSource";
@@ -354,7 +354,7 @@ namespace mongo {
         }
         if (status.code() == ErrorCodes::DuplicateKey) {
             std::string name = roleObj[AuthorizationManager::ROLE_NAME_FIELD_NAME].String();
-            std::string source = roleObj[AuthorizationManager::ROLE_SOURCE_FIELD_NAME].String();
+            std::string source = roleObj[AuthorizationManager::ROLE_DB_FIELD_NAME].String();
             return Status(ErrorCodes::DuplicateKey,
                           mongoutils::str::stream() << "Role \"" << name << "@" << source <<
                                   "\" already exists");
@@ -371,7 +371,7 @@ namespace mongo {
         Status status = _externalState->updateOne(
                 rolesCollectionNamespace,
                 BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.getRole() <<
-                     AuthorizationManager::ROLE_SOURCE_FIELD_NAME << role.getDB()),
+                     AuthorizationManager::ROLE_DB_FIELD_NAME << role.getDB()),
                 updateObj,
                 false,
                 writeConcern);
@@ -438,7 +438,7 @@ namespace mongo {
         std::string id = mongoutils::str::stream() << roleName.getDB() << "." << roleName.getRole();
         result.appendString("_id", id);
         result.appendString(ROLE_NAME_FIELD_NAME, roleName.getRole());
-        result.appendString(ROLE_SOURCE_FIELD_NAME, roleName.getDB());
+        result.appendString(ROLE_DB_FIELD_NAME, roleName.getDB());
 
         // Build privileges array
         mutablebson::Element privilegesArrayElement =
@@ -460,7 +460,7 @@ namespace mongo {
             const RoleName& subRole = roles.get();
             mutablebson::Element roleObj = result.getDocument().makeElementObject("");
             roleObj.appendString(ROLE_NAME_FIELD_NAME, subRole.getRole());
-            roleObj.appendString(ROLE_SOURCE_FIELD_NAME, subRole.getDB());
+            roleObj.appendString(ROLE_DB_FIELD_NAME, subRole.getDB());
             rolesArrayElement.pushBack(roleObj);
         }
 

@@ -104,7 +104,7 @@ namespace {
     void addRoleNameToObjectElement(mutablebson::Element object, const RoleName& role) {
         fassert(17153, object.appendString(AuthorizationManager::ROLE_NAME_FIELD_NAME,
                                            role.getRole()));
-        fassert(17154, object.appendString(AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
+        fassert(17154, object.appendString(AuthorizationManager::ROLE_DB_FIELD_NAME,
                                            role.getDB()));
     }
 
@@ -226,7 +226,7 @@ namespace {
         fassert(17162, resultDoc.root().appendString(
                         AuthorizationManager::ROLE_NAME_FIELD_NAME, roleName.getRole()));
         fassert(17163, resultDoc.root().appendString(
-                        AuthorizationManager::ROLE_SOURCE_FIELD_NAME, roleName.getDB()));
+                        AuthorizationManager::ROLE_DB_FIELD_NAME, roleName.getDB()));
         fassert(17267,
                 resultDoc.root().appendBool("isBuiltin", _roleGraph.isBuiltinRole(roleName)));
         mutablebson::Element rolesElement = resultDoc.makeElementArray("roles");

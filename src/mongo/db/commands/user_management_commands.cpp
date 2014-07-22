@@ -81,7 +81,7 @@ namespace mongo {
             const RoleName& role = *it;
             rolesArrayBuilder.append(
                     BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.getRole() <<
-                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME << role.getDB()));
+                         AuthorizationManager::ROLE_DB_FIELD_NAME << role.getDB()));
         }
         return rolesArrayBuilder.arr();
     }
@@ -92,7 +92,7 @@ namespace mongo {
             const RoleName& role = *it;
             rolesArrayBuilder.append(
                     BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.getRole() <<
-                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME << role.getDB()));
+                         AuthorizationManager::ROLE_DB_FIELD_NAME << role.getDB()));
         }
         return rolesArrayBuilder.arr();
     }
@@ -1264,7 +1264,7 @@ namespace mongo {
                                           args.roleName.getRole());
             roleObjBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME,
                                   args.roleName.getRole());
-            roleObjBuilder.append(AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
+            roleObjBuilder.append(AuthorizationManager::ROLE_DB_FIELD_NAME,
                                   args.roleName.getDB());
 
             BSONArray privileges;
@@ -2038,12 +2038,12 @@ namespace mongo {
                     BSON("roles" << BSON("$elemMatch" <<
                                          BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
                                               roleName.getRole() <<
-                                              AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                              AuthorizationManager::ROLE_DB_FIELD_NAME <<
                                               roleName.getDB()))),
                     BSON("$pull" << BSON("roles" <<
                                          BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
                                               roleName.getRole() <<
-                                              AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                              AuthorizationManager::ROLE_DB_FIELD_NAME <<
                                               roleName.getDB()))),
                     false,
                     true,
@@ -2067,12 +2067,12 @@ namespace mongo {
                     BSON("roles" << BSON("$elemMatch" <<
                                          BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
                                               roleName.getRole() <<
-                                              AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                              AuthorizationManager::ROLE_DB_FIELD_NAME <<
                                               roleName.getDB()))),
                     BSON("$pull" << BSON("roles" <<
                                          BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
                                               roleName.getRole() <<
-                                              AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                              AuthorizationManager::ROLE_DB_FIELD_NAME <<
                                               roleName.getDB()))),
                     false,
                     true,
@@ -2096,7 +2096,7 @@ namespace mongo {
             // Finally, remove the actual role document
             status = authzManager->removeRoleDocuments(
                     BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << roleName.getRole() <<
-                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME << roleName.getDB()),
+                         AuthorizationManager::ROLE_DB_FIELD_NAME << roleName.getDB()),
                     writeConcern,
                     &nMatched);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -2187,9 +2187,9 @@ namespace mongo {
             int nMatched;
             status = authzManager->updateAuthzDocuments(
                     AuthorizationManager::usersCollectionNamespace,
-                    BSON("roles" << BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << dbname)),
+                    BSON("roles" << BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname)),
                     BSON("$pull" << BSON("roles" <<
-                                         BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                         BSON(AuthorizationManager::ROLE_DB_FIELD_NAME <<
                                               dbname))),
                     false,
                     true,
@@ -2209,12 +2209,12 @@ namespace mongo {
 
             // Remove these roles from all other roles
             std::string sourceFieldName =
-                    str::stream() << "roles." << AuthorizationManager::ROLE_SOURCE_FIELD_NAME;
+                    str::stream() << "roles." << AuthorizationManager::ROLE_DB_FIELD_NAME;
             status = authzManager->updateAuthzDocuments(
                     AuthorizationManager::rolesCollectionNamespace,
                     BSON(sourceFieldName << dbname),
                     BSON("$pull" << BSON("roles" <<
-                                         BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                         BSON(AuthorizationManager::ROLE_DB_FIELD_NAME <<
                                               dbname))),
                     false,
                     true,
@@ -2235,7 +2235,7 @@ namespace mongo {
             audit::logDropAllRolesFromDatabase(ClientBasic::getCurrent(), dbname);
             // Finally, remove the actual role documents
             status = authzManager->removeRoleDocuments(
-                    BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << dbname),
+                    BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname),
                     writeConcern,
                     &nMatched);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -2559,7 +2559,7 @@ namespace mongo {
                                                    &name);
             uassertStatusOK(status);
             status = bsonExtractStringField(roleObj,
-                                            AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
+                                            AuthorizationManager::ROLE_DB_FIELD_NAME,
                                             &db);
             uassertStatusOK(status);
             return RoleName(name, db);
@@ -2810,7 +2810,7 @@ namespace mongo {
                 BSONObj query = db.empty() ?
                         BSONObj() : BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << db);
                 BSONObj fields = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << 1 <<
-                                      AuthorizationManager::ROLE_SOURCE_FIELD_NAME << 1);
+                                      AuthorizationManager::ROLE_DB_FIELD_NAME << 1);
 
                 Status status = authzManager->queryAuthzDocument(
                         AuthorizationManager::rolesCollectionNamespace,
@@ -2849,7 +2849,7 @@ namespace mongo {
                     status = authzManager->removeRoleDocuments(
                             BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
                                  roleName.getRole().toString() <<
-                                 AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                 AuthorizationManager::ROLE_DB_FIELD_NAME <<
                                  roleName.getDB().toString()
                                  ),
                             writeConcern,
