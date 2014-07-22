@@ -207,8 +207,6 @@ namespace mongo {
 
         // Transition to the next state.
         _internalState = READING_TERMS;
-        _curScanner = &_scanners;
-        _curScoreMap = &_scores;
         return PlanStage::NEED_TIME;
     }
 
@@ -262,7 +260,7 @@ namespace mongo {
             // are so few documents that the potential I/O overhead of
             // an additional scan overwhelms the cost of parsing
             // all of the documents.
-            if ( !_startedNegativeScans && _negativeScanners.size() > 0
+            if ( !_startedNegativeScans && _params.query.getNegatedTerms().size() > 0
                  && _curScoreMap->size() >= NEGATION_SCAN_THRESHOLD) {
                 _startedNegativeScans = true;
                 _curScanner = &_negativeScanners;
