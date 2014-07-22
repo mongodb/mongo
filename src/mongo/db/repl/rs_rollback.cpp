@@ -662,7 +662,7 @@ namespace repl {
         // TODO: fatal error if this throws?
         oplogCollection->temp_cappedTruncateAfter(txn, fixUpInfo.commonPointOurDiskloc, false);
 
-        Status status = getGlobalAuthorizationManager()->initialize();
+        Status status = getGlobalAuthorizationManager()->initialize(txn);
         if (!status.isOK()) {
             warning() << "Failed to reinitialize auth data after rollback: " << status;
             warn = true;

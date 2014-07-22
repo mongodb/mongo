@@ -390,11 +390,12 @@ namespace mongo {
     }
 
     Status AuthorizationManager::queryAuthzDocument(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj& projection,
             const stdx::function<void(const BSONObj&)>& resultProcessor) {
-        return _externalState->query(collectionName, query, projection, resultProcessor);
+        return _externalState->query(txn, collectionName, query, projection, resultProcessor);
     }
 
     Status AuthorizationManager::updateAuthzDocuments(const NamespaceString& collectionName,
@@ -691,9 +692,9 @@ namespace mongo {
         _version = schemaVersionInvalid;
     }
 
-    Status AuthorizationManager::initialize() {
+    Status AuthorizationManager::initialize(OperationContext* txn) {
         invalidateUserCache();
-        Status status = _externalState->initialize();
+        Status status = _externalState->initialize(txn);
         if (!status.isOK())
             return status;
 

@@ -1155,7 +1155,8 @@ namespace mongo {
                         appendBSONObjToBSONArrayBuilder,
                         &usersArrayBuilder,
                         stdx::placeholders::_1);
-                authzManager->queryAuthzDocument(usersNamespace,
+                authzManager->queryAuthzDocument(txn,
+                                                 usersNamespace,
                                                  queryBuilder.done(),
                                                  projection.done(),
                                                  function);
@@ -2712,7 +2713,8 @@ namespace mongo {
          * Moves all user objects from usersCollName into admin.system.users.  If drop is true,
          * removes any users that were in admin.system.users but not in usersCollName.
          */
-        Status processUsers(AuthorizationManager* authzManager,
+        Status processUsers(OperationContext* txn,
+                            AuthorizationManager* authzManager,
                             const StringData& usersCollName,
                             const StringData& db,
                             bool drop,
@@ -2736,6 +2738,7 @@ namespace mongo {
                                       AuthorizationManager::USER_DB_FIELD_NAME << 1);
 
                 Status status = authzManager->queryAuthzDocument(
+                        txn,
                         AuthorizationManager::usersCollectionNamespace,
                         query,
                         fields,
@@ -2748,6 +2751,7 @@ namespace mongo {
             }
 
             Status status = authzManager->queryAuthzDocument(
+                    txn,
                     NamespaceString(usersCollName),
                     db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db),
                     BSONObj(),
@@ -2790,7 +2794,8 @@ namespace mongo {
          * Moves all user objects from usersCollName into admin.system.users.  If drop is true,
          * removes any users that were in admin.system.users but not in usersCollName.
          */
-        Status processRoles(AuthorizationManager* authzManager,
+        Status processRoles(OperationContext* txn,
+                            AuthorizationManager* authzManager,
                             const StringData& rolesCollName,
                             const StringData& db,
                             bool drop,
@@ -2813,6 +2818,7 @@ namespace mongo {
                                       AuthorizationManager::ROLE_DB_FIELD_NAME << 1);
 
                 Status status = authzManager->queryAuthzDocument(
+                        txn,
                         AuthorizationManager::rolesCollectionNamespace,
                         query,
                         fields,
@@ -2825,6 +2831,7 @@ namespace mongo {
             }
 
             Status status = authzManager->queryAuthzDocument(
+                    txn,
                     NamespaceString(rolesCollName),
                     db.empty() ?
                             BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db),
@@ -2898,7 +2905,8 @@ namespace mongo {
             }
 
             if (!args.usersCollName.empty()) {
-                Status status = processUsers(authzManager,
+                Status status = processUsers(txn,
+                                             authzManager,
                                              args.usersCollName,
                                              args.db,
                                              args.drop,
@@ -2909,7 +2917,8 @@ namespace mongo {
             }
 
             if (!args.rolesCollName.empty()) {
-                Status status = processRoles(authzManager,
+                Status status = processRoles(txn,
+                                             authzManager,
                                              args.rolesCollName,
                                              args.db,
                                              args.drop,

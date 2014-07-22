@@ -42,8 +42,8 @@ namespace mongo {
         _roleGraphState(roleGraphStateInitial) {}
     AuthzManagerExternalStateLocal::~AuthzManagerExternalStateLocal() {}
 
-    Status AuthzManagerExternalStateLocal::initialize() {
-        Status status = _initializeRoleGraph();
+    Status AuthzManagerExternalStateLocal::initialize(OperationContext* txn) {
+        Status status = _initializeRoleGraph(txn);
         if (!status.isOK()) {
             if (status == ErrorCodes::GraphContainsCycle) {
                 error() << "Cycle detected in admin.system.roles; role inheritance disabled. "
@@ -310,7 +310,7 @@ namespace {
 
 }  // namespace
 
-    Status AuthzManagerExternalStateLocal::_initializeRoleGraph() {
+    Status AuthzManagerExternalStateLocal::_initializeRoleGraph(OperationContext* txn) {
         boost::lock_guard<boost::mutex> lkInitialzeRoleGraph(_roleGraphMutex);
 
         _roleGraphState = roleGraphStateInitial;
@@ -318,6 +318,7 @@ namespace {
 
         RoleGraph newRoleGraph;
         Status status = query(
+                txn,
                 AuthorizationManager::rolesCollectionNamespace,
                 BSONObj(),
                 BSONObj(),

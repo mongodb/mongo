@@ -91,12 +91,13 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongod::query(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj& projection,
             const stdx::function<void(const BSONObj&)>& resultProcessor) {
         try {
-            DBDirectClient client;
+            DBDirectClient client(txn);
             client.query(resultProcessor, collectionName.ns(), query, &projection);
             return Status::OK();
         } catch (const DBException& e) {

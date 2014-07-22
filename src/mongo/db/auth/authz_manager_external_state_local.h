@@ -51,7 +51,7 @@ namespace mongo {
     public:
         virtual ~AuthzManagerExternalStateLocal();
 
-        virtual Status initialize();
+        virtual Status initialize(OperationContext* txn);
 
         virtual Status getStoredAuthorizationVersion(OperationContext* txn, int* outVersion);
         virtual Status getUserDescription(
@@ -84,7 +84,7 @@ namespace mongo {
         /**
          * Initializes the role graph from the contents of the admin.system.roles collection.
          */
-        Status _initializeRoleGraph();
+        Status _initializeRoleGraph(OperationContext* txn);
 
         /**
          * Fetches the user document for "userName" from local storage, and stores it into "result".

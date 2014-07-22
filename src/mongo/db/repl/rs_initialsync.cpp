@@ -459,7 +459,7 @@ namespace repl {
         
         // ---------
 
-        Status status = getGlobalAuthorizationManager()->initialize();
+        Status status = getGlobalAuthorizationManager()->initialize(&txn);
         if (!status.isOK()) {
             warning() << "Failed to reinitialize auth data after initial sync. " << status;
             return;

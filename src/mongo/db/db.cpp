@@ -625,7 +625,11 @@ namespace mongo {
             exitCleanly(EXIT_CLEAN);
         }
 
-        uassertStatusOK(getGlobalAuthorizationManager()->initialize());
+        {
+            OperationContextImpl txn;
+
+            uassertStatusOK(getGlobalAuthorizationManager()->initialize(&txn));
+        }
 
         /* this is for security on certain platforms (nonce generation) */
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));

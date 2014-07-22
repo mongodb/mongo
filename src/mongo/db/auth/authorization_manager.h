@@ -256,7 +256,8 @@ namespace mongo {
          * Should only be called on collections with authorization documents in them
          * (ie admin.system.users and admin.system.roles).
          */
-        Status queryAuthzDocument(const NamespaceString& collectionName,
+        Status queryAuthzDocument(OperationContext* txn,
+                                  const NamespaceString& collectionName,
                                   const BSONObj& query,
                                   const BSONObj& projection,
                                   const stdx::function<void(const BSONObj&)>& resultProcessor);
@@ -348,7 +349,7 @@ namespace mongo {
          * system is at, this may involve building up the user cache and/or the roles graph.
          * Call this function at startup and after resynchronizing a slave/secondary.
          */
-        Status initialize();
+        Status initialize(OperationContext* txn);
 
         /**
          * Invalidates all of the contents of the user cache.

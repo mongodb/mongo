@@ -51,7 +51,7 @@ namespace mongo {
 
     AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() {}
 
-    Status AuthzManagerExternalStateMongos::initialize() {
+    Status AuthzManagerExternalStateMongos::initialize(OperationContext* txn) {
         return Status::OK();
     }
 
@@ -212,6 +212,7 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::query(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& queryDoc,
             const BSONObj& projection,

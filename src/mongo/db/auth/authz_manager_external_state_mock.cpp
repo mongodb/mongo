@@ -156,6 +156,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMock::query(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj&,
