@@ -511,6 +511,11 @@ methods = {
 	    encoding of the data.  The "hex" and "print" dump format are
 	    compatible with the @ref util_dump and @ref util_load commands''',
 	    choices=['hex', 'json', 'print']),
+	Config('iterator', 'false', r'''
+            iterate over each individual operation within a log record
+            and return that rather than the entire log record itself.
+	    Valid only for log cursors''',
+	    type='boolean'),
 	Config('next_random', 'false', r'''
 	    configure the cursor to return a pseudo-random record from
 	    the object; valid only for row-store cursors.  Cursors

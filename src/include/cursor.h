@@ -252,8 +252,17 @@ struct __wt_cursor_json {
 struct __wt_cursor_log {
 	WT_CURSOR iface;
 
-	WT_LSN *next_lsn;		/* LSN of next record */
-	uint32_t flags;
+	WT_LSN		*cur_lsn;	/* LSN of current record */
+	WT_LSN		*next_lsn;	/* LSN of next record */
+	int (*scan_cb)(WT_SESSION_IMPL *session, WT_ITEM *logrec,
+	    WT_LSN *lsnp, void *cookie);
+	WT_ITEM		*iter_logrec;	/* Copy of record for iterating */
+	const uint8_t	*iterp, *iterp_end;	/* Pointer within record */
+	uint32_t	iter_count;	/* Intra-record count */
+	uint32_t	rectype;	/* Iterator record type */
+	uint64_t	txnid;		/* Iterator txnid */
+#define	WT_LOGC_ITERATOR	0x01
+	uint32_t	flags;
 };
 
 struct __wt_cursor_metadata {
