@@ -433,6 +433,8 @@ namespace mongo {
 
     // XXX make sure these work with rollbacks (I don't think they will)
     void RocksRecordStore::_changeNumRecords( OperationContext* txn, bool insert ) {
+        boost::mutex::scoped_lock lk( _numRecordsLock );
+
         if ( insert ) {
             _numRecords++;
         }
@@ -450,6 +452,8 @@ namespace mongo {
 
 
     void RocksRecordStore::_increaseDataSize( OperationContext* txn, int amount ) {
+        boost::mutex::scoped_lock lk( _dataSizeLock );
+
         _dataSize += amount;
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
         char* ds_ptr = reinterpret_cast<char*>( &_dataSize );

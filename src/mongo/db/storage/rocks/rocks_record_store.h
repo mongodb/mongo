@@ -168,7 +168,7 @@ namespace mongo {
          * Returns a new ReadOptions struct, containing the snapshot held in opCtx, if opCtx is not
          * null
          */
-        rocksdb::ReadOptions _readOptions( OperationContext* opCtx = nullptr ) const;
+        rocksdb::ReadOptions _readOptions( OperationContext* opCtx = NULL ) const;
 
         static RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx );
 
@@ -193,5 +193,7 @@ namespace mongo {
         long long _numRecords;
         rocksdb::ReadOptions _defaultReadOptions;
         mutable boost::mutex _idLock;
+        mutable boost::mutex _numRecordsLock;
+        mutable boost::mutex _dataSizeLock;
     };
 }
