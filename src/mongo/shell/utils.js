@@ -928,7 +928,6 @@ rs.help = function () {
     print();
     print("\treconfiguration helpers disconnect from the database so the shell will display");
     print("\tan error, even if the command succeeds.");
-    print("\tsee also http://<mongod_host>:28017/_replSet for additional diagnostic info");
 }
 rs.slaveOk = function (value) { return db.getMongo().setSlaveOk(value); }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
