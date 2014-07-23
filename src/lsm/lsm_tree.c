@@ -444,6 +444,9 @@ __lsm_tree_open(
 	lsm_tree->refcnt = 1;
 	lsm_tree->queue_ref = 0;
 
+	/* Set a flush timestamp as a baseline. */
+	WT_RET(__wt_epoch(session, &lsm_tree->last_flush_ts));
+
 	/* Now the tree is setup, make it visible to others. */
 	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
 	F_SET(lsm_tree, WT_LSM_TREE_ACTIVE | WT_LSM_TREE_OPEN);

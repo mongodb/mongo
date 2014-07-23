@@ -142,30 +142,13 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 static int
 __lsm_manager_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-#if 1
-	WT_UNUSED(session);
-	WT_UNUSED(lsm_tree);
-#else
-	/*
-	 * TODO: This code needs to track when operations on an LSM tree are
-	 * making progress. I think we'll need to add a timestamp to the LSM
-	 * tree structure, and update it each time a relevant operation
-	 * completes. I *think* a relevant operation is a merge, but it may
-	 * also be a flush or a free of old chunks.
-	 */
+	struct timespec now;
 	u_int chunk_wait, old_aggressive, stallms;
 
+	stallms = WT_TIMEDIFF(now, lsm_tree->last_flush_ts) / WT_MILLION;
 	/*
-	 * Randomize the tracking of stall time so that with
-	 * multiple LSM trees open, they don't all get
-	 * aggressive in lock-step.
-	 */
-	stallms += __wt_random() % 200;
-
-	/*
-	 * Get aggressive if more than enough chunks for a
-	 * merge should have been created while we waited.
-	 * Use 10 seconds as a default if we don't have an
+	 * Get aggressive if more than enough chunks for a merge should have
+	 * been created by now. Use 10 seconds as a default if we don't have an
 	 * estimate.
 	 */
 	chunk_wait = stallms / (lsm_tree->chunk_fill_ms == 0 ?
@@ -179,7 +162,6 @@ __lsm_manager_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		     "%u / %" PRIu64,
 		     lsm_tree->merge_aggressiveness, stallms,
 		     lsm_tree->chunk_fill_ms));
-#endif
 	return (0);
 }
 

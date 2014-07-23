@@ -220,6 +220,9 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	/* Now the file is written, get the chunk size. */
 	WT_RET(__wt_lsm_tree_set_chunk_size(session, chunk));
 
+	/* Update the flush timestamp to help track ongoing progress. */
+	WT_RET(__wt_epoch(session, &lsm_tree->last_flush_ts));
+
 	/* Lock the tree, mark the chunk as on disk and update the metadata. */
 	*flushed = 1;
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
