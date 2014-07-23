@@ -37,6 +37,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_database.h"
 
 namespace mongo {
 
@@ -66,6 +67,9 @@ namespace mongo {
                                        bool backupOriginalFiles = false ) { return Status::OK(); }
 
     private:
+	std::string _path;
+	WiredTigerDatabase *_db;
+
         mutable boost::mutex _dbLock;
         typedef std::set<std::string> DBMap;
         DBMap _dbs;

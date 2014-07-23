@@ -38,14 +38,13 @@
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 namespace mongo {
 
-    class HeapRecordStore;
-
     class WiredTigerDatabaseCatalogEntry : public DatabaseCatalogEntry {
     public:
-        WiredTigerDatabaseCatalogEntry( const StringData& name );
+        WiredTigerDatabaseCatalogEntry( const StringData& name, WiredTigerDatabase *_db );
 
         virtual ~WiredTigerDatabaseCatalogEntry();
 
@@ -104,8 +103,8 @@ namespace mongo {
             bool isMultikey;
             
             // Only one of these will be in use. See getIndex() implementation.
-            scoped_ptr<RecordStore> rs; // used by Btree on HeapRecordStore
-            shared_ptr<void> data; // used by WiredTigerBtreeImpl
+            scoped_ptr<RecordStore> rs;
+            shared_ptr<void> data;
         };
 
         class Entry : public CollectionCatalogEntry {
@@ -153,10 +152,13 @@ namespace mongo {
             CollectionOptions getCollectionOptions(OperationContext* txn) const { return options; }
 
             CollectionOptions options;
-            scoped_ptr<HeapRecordStore> rs;
+            scoped_ptr<WiredTigerRecordStore> rs;
+
             typedef std::map<std::string,IndexEntry*> Indexes;
             Indexes indexes;
         };
+
+	WiredTigerDatabase *_db;
 
         mutable boost::mutex _entryMapLock;
         typedef std::map<std::string, Entry *> EntryMap;

@@ -41,14 +41,13 @@
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_btree_impl.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/heap1/record_store_heap.h"
 
 namespace mongo {
 
-    WiredTigerDatabaseCatalogEntry::WiredTigerDatabaseCatalogEntry( const StringData& name )
-        : DatabaseCatalogEntry( name ) { }
+    WiredTigerDatabaseCatalogEntry::WiredTigerDatabaseCatalogEntry( const StringData& name, WiredTigerDatabase *db )
+        : DatabaseCatalogEntry( name ), _db(db) { }
 
     WiredTigerDatabaseCatalogEntry::~WiredTigerDatabaseCatalogEntry() {
         for ( EntryMap::const_iterator i = _entryMap.begin(); i != _entryMap.end(); ++i ) {
@@ -106,15 +105,15 @@ namespace mongo {
         entry = new Entry( ns, options );
 
         if ( options.capped ) {
-            entry->rs.reset(new HeapRecordStore(ns,
+            entry->rs.reset(new WiredTigerRecordStore(ns,
+				                _db,
                                                 true,
                                                 options.cappedSize
                                                      ? options.cappedSize : 4096, // default size
                                                 options.cappedMaxDocs
                                                      ? options.cappedMaxDocs : -1)); // no limit
-        }
-        else {
-            entry->rs.reset( new HeapRecordStore( ns ) );
+        } else {
+            entry->rs.reset( new WiredTigerRecordStore( ns, _db ) );
         }
 
         return Status::OK();
@@ -151,44 +150,28 @@ namespace mongo {
 
         const string& type = index->descriptor()->getAccessMethodName();
 
-#if 1 // Toggle to use Btree on HeapRecordStore
-
         // Need the Head to be non-Null to avoid asserts. TODO remove the asserts.
         index->headManager()->setHead(txn, DiskLoc(0xDEAD, 0xBEAF));
 
-        // When is a btree not a Btree? When it is a WiredTigerBtreeImpl!
-        std::auto_ptr<SortedDataInterface> btree(getWiredTigerBtreeImpl(index, &i->second->data));
-#else
-
-        if (!i->second->rs)
-            i->second->rs.reset(new HeapRecordStore( index->descriptor()->indexName() ));
-
-        std::auto_ptr<BtreeInterface> btree(
-            BtreeInterface::getInterface(index->headManager(),
-                                         i->second->rs,
-                                         index->ordering(),
-                                         index->descriptor()->indexNamespace(),
-                                         index->descriptor()->version(),
-                                         &BtreeBasedAccessMethod::invalidateCursors));
-#endif
+        std::auto_ptr<SortedDataInterface> wtidx(getWiredTigerIndex(index, &i->second->data));
 
         if ("" == type)
-            return new BtreeAccessMethod( index, btree.release() );
+            return new BtreeAccessMethod( index, wtidx.release() );
 
         if (IndexNames::HASHED == type)
-            return new HashAccessMethod( index, btree.release() );
+            return new HashAccessMethod( index, wtidx.release() );
 
         if (IndexNames::GEO_2DSPHERE == type)
-            return new S2AccessMethod( index, btree.release() );
+            return new S2AccessMethod( index, wtidx.release() );
 
         if (IndexNames::TEXT == type)
-            return new FTSAccessMethod( index, btree.release() );
+            return new FTSAccessMethod( index, wtidx.release() );
 
         if (IndexNames::GEO_HAYSTACK == type)
-            return new HaystackAccessMethod( index, btree.release() );
+            return new HaystackAccessMethod( index, wtidx.release() );
 
         if (IndexNames::GEO_2D == type)
-            return new TwoDAccessMethod( index, btree.release() );
+            return new TwoDAccessMethod( index, wtidx.release() );
 
         log() << "Can't find index for keyPattern " << index->descriptor()->keyPattern();
         fassertFailed(28518);

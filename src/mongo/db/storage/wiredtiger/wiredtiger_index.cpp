@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_btree_impl.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 
 #include <set>
 
@@ -220,9 +220,9 @@ namespace {
         unsigned long long _count;
     };
 
-    class WiredTigerBtreeImpl : public SortedDataInterface {
+    class WiredTigerIndex : public SortedDataInterface {
     public:
-        WiredTigerBtreeImpl(const IndexCatalogEntry& info, IndexSet* data) 
+        WiredTigerIndex(const IndexCatalogEntry& info, IndexSet* data) 
             : _info(info),
               _data(data)
         {}
@@ -372,13 +372,13 @@ namespace {
 
     // IndexCatalogEntry argument taken by non-const pointer for consistency with other Btree
     // factories. We don't actually modify it.
-    SortedDataInterface* getWiredTigerBtreeImpl(IndexCatalogEntry* info, boost::shared_ptr<void>* dataInOut) {
+    SortedDataInterface* getWiredTigerIndex(IndexCatalogEntry* info, boost::shared_ptr<void>* dataInOut) {
         invariant(info);
         invariant(dataInOut);
         if (!*dataInOut) {
             *dataInOut = boost::make_shared<IndexSet>(IndexEntryComparison(info->ordering()));
         }
-        return new WiredTigerBtreeImpl(*info, static_cast<IndexSet*>(dataInOut->get()));
+        return new WiredTigerIndex(*info, static_cast<IndexSet*>(dataInOut->get()));
     }
 
 }  // namespace mongo
