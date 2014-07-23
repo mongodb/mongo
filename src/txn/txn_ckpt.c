@@ -457,13 +457,13 @@ __checkpoint_worker(
 	btree = S2BT(session);
 	bm = btree->bm;
 	conn = S2C(session);
+	dhandle = session->dhandle;
+
 	ckpt = ckptbase = NULL;
 	INIT_LSN(&ckptlsn);
-	dhandle = session->dhandle;
-	name_alloc = NULL;
 	hot_backup_locked = 0;
-	name_alloc = NULL;
 	track_ckpt = 1;
+	name_alloc = NULL;
 
 	/*
 	 * If closing a file that's never been modified, discard its blocks.
