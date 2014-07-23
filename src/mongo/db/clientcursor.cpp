@@ -160,7 +160,7 @@ namespace mongo {
         _idleAgeMillis = millis;
     }
 
-    void ClientCursor::updateSlaveLocation(CurOp& curop) {
+    void ClientCursor::updateSlaveLocation(OperationContext* txn, CurOp& curop) {
         if (_slaveReadTill.isNull())
             return;
 
@@ -172,7 +172,7 @@ namespace mongo {
         if (!rid.isSet())
             return;
 
-        repl::getGlobalReplicationCoordinator()->setLastOptime(rid, _slaveReadTill);
+        repl::getGlobalReplicationCoordinator()->setLastOptime(txn, rid, _slaveReadTill);
     }
 
     //

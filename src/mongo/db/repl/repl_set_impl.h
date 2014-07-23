@@ -316,7 +316,7 @@ namespace repl {
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool tryToGoLiveAsASecondary(OperationContext* txn, OpTime&); // readlocks
-        void syncRollback(OplogReader& r);
+        void syncRollback(OperationContext* txn, OplogReader& r);
         void syncThread();
         const OpTime lastOtherOpTime() const;
         /**

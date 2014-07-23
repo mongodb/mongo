@@ -349,7 +349,7 @@ namespace repl {
             invariant(txn->lockState()->isW());
             Lock::TempRelease tempRelease(txn->lockState());
 
-            if (!oplogReader.connect(hostName, getGlobalReplicationCoordinator()->getMyRID())) {
+            if (!oplogReader.connect(hostName, getGlobalReplicationCoordinator()->getMyRID(txn))) {
                 msgassertedNoTrace( 14051 , "unable to connect to resync");
             }
             /* todo use getDatabaseNames() method here */
@@ -1006,7 +1006,7 @@ namespace repl {
        returns >= 0 if ok.  return -1 if you want to reconnect.
        return value of zero indicates no sleep necessary before next call
     */
-    int ReplSource::sync(int& nApplied) {
+    int ReplSource::sync(OperationContext* txn, int& nApplied) {
         _sleepAdviceTime = 0;
         ReplInfo r("sync");
         if (!serverGlobalParams.quiet) {
@@ -1027,13 +1027,12 @@ namespace repl {
             return -1;
         }
 
-        if ( !oplogReader.connect(hostName, getGlobalReplicationCoordinator()->getMyRID()) ) {
+        if ( !oplogReader.connect(hostName, getGlobalReplicationCoordinator()->getMyRID(txn)) ) {
             LOG(4) << "repl:  can't connect to sync source" << endl;
             return -1;
         }
 
-        OperationContextImpl txn; // XXX?
-        return _sync_pullOpLog(&txn, nApplied);
+        return _sync_pullOpLog(txn, nApplied);
     }
 
     /* --------------------------------------------------------------*/
@@ -1071,7 +1070,7 @@ namespace repl {
             ReplSource *s = i->get();
             int res = -1;
             try {
-                res = s->sync(nApplied);
+                res = s->sync(txn, nApplied);
                 bool moreToSync = s->haveMoreDbsToSync();
                 if( res < 0 ) {
                     sleepAdvice = 3;

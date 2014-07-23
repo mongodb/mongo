@@ -113,8 +113,10 @@ namespace repl {
     }
 
     void BackgroundSync::notify() {
+        OperationContextImpl txn;
+
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        replCoord->setLastOptime(replCoord->getMyRID(), theReplSet->lastOpTimeWritten);
+        replCoord->setLastOptime(&txn, replCoord->getMyRID(&txn), theReplSet->lastOpTimeWritten);
 
         {
             boost::unique_lock<boost::mutex> lock(s_instance->_mutex);
@@ -217,7 +219,7 @@ namespace repl {
 
         uassert(1000, "replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?", r.awaitCapable() );
 
-        if (isRollbackRequired(r)) {
+        if (isRollbackRequired(txn, r)) {
             stop();
             return;
         }
@@ -432,7 +434,7 @@ namespace repl {
         }
     }
 
-    bool BackgroundSync::isRollbackRequired(OplogReader& r) {
+    bool BackgroundSync::isRollbackRequired(OperationContext* txn, OplogReader& r) {
         string hn = r.conn()->getServerAddress();
 
         if (!r.more()) {
@@ -447,7 +449,7 @@ namespace repl {
                 if (theirTS < _lastOpTimeFetched) {
                     log() << "replSet we are ahead of the sync source, will try to roll back"
                           << rsLog;
-                    theReplSet->syncRollback(r);
+                    theReplSet->syncRollback(txn, r);
                     return true;
                 }
                 /* we're not ahead?  maybe our new query got fresher data.  best to come back and try again */
@@ -467,7 +469,7 @@ namespace repl {
         if( ts != _lastOpTimeFetched || h != _lastH ) {
             log() << "replSet our last op time fetched: " << _lastOpTimeFetched.toStringPretty() << rsLog;
             log() << "replset source's GTE: " << ts.toStringPretty() << rsLog;
-            theReplSet->syncRollback(r);
+            theReplSet->syncRollback(txn, r);
             return true;
         }
 

@@ -102,15 +102,17 @@ namespace repl {
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptime(const OID& rid, const OpTime& ts);
+        virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts);
 
         virtual OID getElectionId();
 
-        virtual OID getMyRID();
+        virtual OID getMyRID(OperationContext* txn);
 
-        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
+        virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
+                                                         BSONObjBuilder* cmdBuilder);
 
         virtual void prepareReplSetUpdatePositionCommandHandshakes(
+                OperationContext* txn,
                 std::vector<BSONObj>* handshakes);
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
@@ -147,7 +149,8 @@ namespace repl {
         virtual Status processReplSetElect(const ReplSetElectArgs& args,
                                            BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetUpdatePosition(const BSONArray& updates,
+        virtual Status processReplSetUpdatePosition(OperationContext* txn,
+                                                    const BSONArray& updates,
                                                     BSONObjBuilder* resultObj);
 
         virtual Status processReplSetUpdatePositionHandshake(const OperationContext* txn,

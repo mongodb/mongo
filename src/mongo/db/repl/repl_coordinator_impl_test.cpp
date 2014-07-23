@@ -114,20 +114,20 @@ namespace {
         ReplicationCoordinator::StatusAndDuration statusAndDur = coordinator.awaitReplication(
                 &txn, time1, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(coordinator.setLastOptime(client1, time1));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client1, time1));
         statusAndDur = coordinator.awaitReplication(&txn, time1, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(coordinator.setLastOptime(client2, time1));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client2, time1));
         statusAndDur = coordinator.awaitReplication(&txn, time1, writeConcern);
         ASSERT_OK(statusAndDur.status);
 
         // 2 nodes waiting for time2
         statusAndDur = coordinator.awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(coordinator.setLastOptime(client2, time2));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client2, time2));
         statusAndDur = coordinator.awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(coordinator.setLastOptime(client3, time2));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client3, time2));
         statusAndDur = coordinator.awaitReplication(&txn, time2, writeConcern);
         ASSERT_OK(statusAndDur.status);
 
@@ -135,7 +135,7 @@ namespace {
         writeConcern.wNumNodes = 3;
         statusAndDur = coordinator.awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(coordinator.setLastOptime(client1, time2));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client1, time2));
         statusAndDur = coordinator.awaitReplication(&txn, time2, writeConcern);
         ASSERT_OK(statusAndDur.status);
     }
@@ -223,8 +223,8 @@ namespace {
         awaiter.setOpTime(time1);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start();
-        ASSERT_OK(coordinator.setLastOptime(client1, time1));
-        ASSERT_OK(coordinator.setLastOptime(client2, time1));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client1, time1));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client2, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -232,8 +232,8 @@ namespace {
         // 2 nodes waiting for time2
         awaiter.setOpTime(time2);
         awaiter.start();
-        ASSERT_OK(coordinator.setLastOptime(client2, time2));
-        ASSERT_OK(coordinator.setLastOptime(client3, time2));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client2, time2));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client3, time2));
         statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -242,7 +242,7 @@ namespace {
         writeConcern.wNumNodes = 3;
         awaiter.setWriteConcern(writeConcern);
         awaiter.start();
-        ASSERT_OK(coordinator.setLastOptime(client1, time2));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client1, time2));
         statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -270,8 +270,8 @@ namespace {
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start();
-        ASSERT_OK(coordinator.setLastOptime(client1, time1));
-        ASSERT_OK(coordinator.setLastOptime(client2, time1));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client1, time1));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client2, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
         awaiter.reset();
@@ -300,8 +300,8 @@ namespace {
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start();
-        ASSERT_OK(coordinator.setLastOptime(client1, time1));
-        ASSERT_OK(coordinator.setLastOptime(client2, time1));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client1, time1));
+        ASSERT_OK(coordinator.setLastOptime(&txn, client2, time1));
         coordinator.shutdown();
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, statusAndDur.status);

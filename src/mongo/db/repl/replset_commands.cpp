@@ -364,6 +364,7 @@ namespace repl {
             return appendCommandStatus(
                     result,
                     getGlobalReplicationCoordinator()->processReplSetUpdatePosition(
+                            txn,
                             BSONArray(cmdObj["optimes"].Obj()),
                             &result));
         }

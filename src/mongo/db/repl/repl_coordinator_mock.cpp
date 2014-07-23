@@ -122,7 +122,8 @@ namespace repl {
         return false;
     }
 
-    Status ReplicationCoordinatorMock::setLastOptime(const OID& rid,
+    Status ReplicationCoordinatorMock::setLastOptime(OperationContext* txn,
+                                                     const OID& rid,
                                                      const OpTime& ts) {
         // TODO
         return Status::OK();
@@ -133,14 +134,16 @@ namespace repl {
         return OID();
     }
 
-    OID ReplicationCoordinatorMock::getMyRID() {
+    OID ReplicationCoordinatorMock::getMyRID(OperationContext* txn) {
         return OID();
     }
 
     void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
+            OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {}
 
     void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommandHandshakes(
+            OperationContext* txn,
             std::vector<BSONObj>* handshakes) {}
 
     void ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
@@ -204,7 +207,8 @@ namespace repl {
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorMock::processReplSetUpdatePosition(const BSONArray& updates,
+    Status ReplicationCoordinatorMock::processReplSetUpdatePosition(OperationContext* txn,
+                                                                    const BSONArray& updates,
                                                                     BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();

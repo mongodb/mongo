@@ -100,7 +100,7 @@ namespace repl {
         // Adds elements to the list, up to maxSize.
         void produce(OperationContext* txn);
         // Check if rollback is necessary
-        bool isRollbackRequired(OplogReader& r);
+        bool isRollbackRequired(OperationContext* txn, OplogReader& r);
         void getOplogReader(OperationContext* txn, OplogReader& r);
         // Evaluate if the current sync target is still good
         bool shouldChangeSyncTarget();

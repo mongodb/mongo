@@ -138,10 +138,11 @@ namespace repl {
         return legacyResponse;
     }
 
-    Status HybridReplicationCoordinator::setLastOptime(const OID& rid,
+    Status HybridReplicationCoordinator::setLastOptime(OperationContext* txn,
+                                                       const OID& rid,
                                                        const OpTime& ts) {
-        Status legacyStatus = _legacy.setLastOptime(rid, ts);
-        Status implStatus = _impl.setLastOptime(rid, ts);
+        Status legacyStatus = _legacy.setLastOptime(txn, rid, ts);
+        Status implStatus = _impl.setLastOptime(txn, rid, ts);
         return legacyStatus;
     }
     
@@ -151,23 +152,25 @@ namespace repl {
         return legacyOID;
     }
 
-    OID HybridReplicationCoordinator::getMyRID() {
-        OID legacyRID = _legacy.getMyRID();
-        _impl.getMyRID();
+    OID HybridReplicationCoordinator::getMyRID(OperationContext* txn) {
+        OID legacyRID = _legacy.getMyRID(txn);
+        _impl.getMyRID(txn);
         return legacyRID;
     }
 
-    void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommand(BSONObjBuilder* result) {
-        _legacy.prepareReplSetUpdatePositionCommand(result);
+    void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommand(OperationContext* txn,
+                                                                           BSONObjBuilder* result) {
+        _legacy.prepareReplSetUpdatePositionCommand(txn, result);
         BSONObjBuilder implResult;
-        _impl.prepareReplSetUpdatePositionCommand(&implResult);
+        _impl.prepareReplSetUpdatePositionCommand(txn, &implResult);
     }
 
     void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommandHandshakes(
+            OperationContext* txn,
             std::vector<BSONObj>* handshakes) {
-        _legacy.prepareReplSetUpdatePositionCommandHandshakes(handshakes);
+        _legacy.prepareReplSetUpdatePositionCommandHandshakes(txn, handshakes);
         std::vector<BSONObj> implResult;
-        _impl.prepareReplSetUpdatePositionCommandHandshakes(&implResult);
+        _impl.prepareReplSetUpdatePositionCommandHandshakes(txn, &implResult);
     }
 
     void HybridReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
@@ -259,11 +262,12 @@ namespace repl {
         return legacyStatus;
     }
 
-    Status HybridReplicationCoordinator::processReplSetUpdatePosition(const BSONArray& updates,
+    Status HybridReplicationCoordinator::processReplSetUpdatePosition(OperationContext* txn,
+                                                                      const BSONArray& updates,
                                                                       BSONObjBuilder* resultObj) {
-        Status legacyStatus = _legacy.processReplSetUpdatePosition(updates, resultObj);
+        Status legacyStatus = _legacy.processReplSetUpdatePosition(txn, updates, resultObj);
         BSONObjBuilder implResult;
-        Status implStatus = _impl.processReplSetUpdatePosition(updates, &implResult);
+        Status implStatus = _impl.processReplSetUpdatePosition(txn, updates, &implResult);
         return legacyStatus;
     }
 

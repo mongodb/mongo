@@ -238,7 +238,7 @@ namespace repl {
          * @returns ErrorCodes::NodeNotFound if the member cannot be found in sync progress tracking
          * @returns Status::OK() otherwise
          */
-        virtual Status setLastOptime(const OID& rid, const OpTime& ts) = 0;
+        virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts) = 0;
 
         /**
          * Retrieves and returns the current election id, which is a unique id which changes after
@@ -250,13 +250,14 @@ namespace repl {
          * Returns the RID for this node.  The RID is used to identify this node to our sync source
          * when sending updates about our replication progress.
          */
-        virtual OID getMyRID() = 0;
+        virtual OID getMyRID(OperationContext* txn) = 0;
 
         /**
          * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
          * be sent to this node's sync source to update it about our progress in replication.
          */
-        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
+        virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
+                                                         BSONObjBuilder* cmdBuilder) = 0;
 
         /**
          * For ourself and each secondary chaining off of us, adds a BSONObj to "handshakes"
@@ -265,6 +266,7 @@ namespace repl {
          * we are replicating off of it.
          */
         virtual void prepareReplSetUpdatePositionCommandHandshakes(
+                OperationContext* txn,
                 std::vector<BSONObj>* handshakes) = 0;
 
         /**
@@ -386,7 +388,8 @@ namespace repl {
          * if any updating node cannot be found in the config, or any of the normal replset
          * command ErrorCodes.
          */
-        virtual Status processReplSetUpdatePosition(const BSONArray& updates,
+        virtual Status processReplSetUpdatePosition(OperationContext* txn,
+                                                    const BSONArray& updates,
                                                     BSONObjBuilder* resultObj) = 0;
 
         /**

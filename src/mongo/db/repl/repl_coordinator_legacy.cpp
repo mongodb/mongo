@@ -36,7 +36,6 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/master_slave.h"
@@ -374,7 +373,8 @@ namespace {
         return true;
     }
 
-    Status LegacyReplicationCoordinator::setLastOptime(const OID& rid,
+    Status LegacyReplicationCoordinator::setLastOptime(OperationContext* txn,
+                                                       const OID& rid,
                                                        const OpTime& ts) {
         {
             boost::lock_guard<boost::mutex> lock(_mutex);
@@ -386,7 +386,7 @@ namespace {
             LOG(2) << "received notification that node with RID " << rid << " and config " << config
                     << " has reached optime: " << ts.toStringPretty();
 
-            if (rid != getMyRID()) {
+            if (rid != getMyRID(txn)) {
                 // TODO(spencer): Remove this invariant for backwards compatibility
                 invariant(!config.isEmpty());
                 // This is what updates the progress information used for satisfying write concern
@@ -418,26 +418,26 @@ namespace {
     }
 
 
-    OID LegacyReplicationCoordinator::getMyRID() {
+    OID LegacyReplicationCoordinator::getMyRID(OperationContext* txn) {
         Mode mode = getReplicationMode();
         if (mode == modeReplSet) {
             return theReplSet->syncSourceFeedback.getMyRID();
         } else if (mode == modeMasterSlave) {
-            OperationContextImpl txn;
-            ReplSource source(&txn);
+            ReplSource source(txn);
             return source.getMyRID();
         }
         invariant(false); // Don't have an RID if no replication is enabled
     }
 
     void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommand(
+            OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {
         invariant(getReplicationMode() == modeReplSet);
         boost::lock_guard<boost::mutex> lock(_mutex);
         cmdBuilder->append("replSetUpdatePosition", 1);
         // create an array containing objects each member connected to us and for ourself
         BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
-        OID myID = getMyRID();
+        OID myID = getMyRID(txn);
         {
             for (SlaveOpTimeMap::const_iterator itr = _slaveOpTimeMap.begin();
                     itr != _slaveOpTimeMap.end(); ++itr) {
@@ -460,6 +460,7 @@ namespace {
     }
 
     void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommandHandshakes(
+            OperationContext* txn,
             std::vector<BSONObj>* handshakes) {
         invariant(getReplicationMode() == modeReplSet);
         boost::lock_guard<boost::mutex> lock(_mutex);
@@ -467,7 +468,7 @@ namespace {
         BSONObjBuilder cmd;
         cmd.append("replSetUpdatePosition", 1);
         BSONObjBuilder sub (cmd.subobjStart("handshake"));
-        sub.append("handshake", getMyRID());
+        sub.append("handshake", getMyRID(txn));
         sub.append("member", theReplSet->selfId());
         sub.append("config", theReplSet->myConfig().asBson());
         sub.doneFast();
@@ -961,7 +962,8 @@ namespace {
         return theReplSet->forceSyncFrom(target, resultObj);
     }
 
-    Status LegacyReplicationCoordinator::processReplSetUpdatePosition(const BSONArray& updates,
+    Status LegacyReplicationCoordinator::processReplSetUpdatePosition(OperationContext* txn,
+                                                                      const BSONArray& updates,
                                                                       BSONObjBuilder* resultObj) {
         Status status = _checkReplEnabledForCommand(resultObj);
         if (!status.isOK()) {
@@ -972,7 +974,7 @@ namespace {
             BSONObj entry = elem.Obj();
             OID id = entry["_id"].OID();
             OpTime ot = entry["optime"]._opTime();
-            Status status = setLastOptime(id, ot);
+            Status status = setLastOptime(txn, id, ot);
             if (!status.isOK()) {
                 return status;
             }

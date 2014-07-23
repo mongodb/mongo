@@ -170,7 +170,8 @@ namespace repl {
         return _currentState;
     }
 
-    Status ReplicationCoordinatorImpl::setLastOptime(const OID& rid,
+    Status ReplicationCoordinatorImpl::setLastOptime(OperationContext* txn,
+                                                     const OID& rid,
                                                      const OpTime& ts) {
         // TODO(spencer): update slave tracking thread for local.slaves
         // TODO(spencer): pass info upstream if we're not primary
@@ -347,16 +348,18 @@ namespace repl {
     }
 
 
-    OID ReplicationCoordinatorImpl::getMyRID() {
+    OID ReplicationCoordinatorImpl::getMyRID(OperationContext* txn) {
         return _myRID;
     }
 
     void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
+            OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {
         // TODO
     }
 
     void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommandHandshakes(
+            OperationContext* txn,
             std::vector<BSONObj>* handshakes) {
         // TODO
     }
@@ -462,7 +465,8 @@ namespace repl {
 
     }
 
-    Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const BSONArray& updates,
+    Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(OperationContext* txn,
+                                                                    const BSONArray& updates,
                                                                     BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();

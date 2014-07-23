@@ -91,19 +91,19 @@ namespace repl {
         /* Sends initialization information to our sync target, also determines whether or not they
          * support the updater command.
          */
-        bool replHandshake();
+        bool replHandshake(OperationContext* txn);
 
         /* Inform the sync target of our current position in the oplog, as well as the positions
          * of all secondaries chained through us.
          */
-        bool updateUpstream();
+        bool updateUpstream(OperationContext* txn);
 
         bool hasConnection() {
             return _connection.get();
         }
 
         /// Connect to sync target.
-        bool _connect(const std::string& hostName);
+        bool _connect(OperationContext* txn, const std::string& hostName);
 
         // stores our OID to be passed along in commands
         /// TODO(spencer): Remove this once the LegacyReplicationCoordinator is gone.

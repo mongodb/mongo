@@ -153,7 +153,7 @@ namespace repl {
         ReplSource(OperationContext* txn);
 
         /* -1 = error */
-        int sync(int& nApplied);
+        int sync(OperationContext* txn, int& nApplied);
 
         void save(OperationContext* txn); // write ourself to local.sources
 
