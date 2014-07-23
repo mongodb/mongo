@@ -116,7 +116,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &dhandle));
 
-	WT_ERR(__wt_rwlock_alloc(session, "btree handle", &dhandle->rwlock));
+	WT_ERR(__wt_rwlock_alloc(session, "data handle", &dhandle->rwlock));
 	dhandle->session_ref = 1;
 
 	dhandle->name_hash = hash;
@@ -127,6 +127,9 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_calloc_def(session, 1, &btree));
 	dhandle->handle = btree;
 	btree->dhandle = dhandle;
+
+	WT_ERR(__wt_spin_init(
+	    session, &dhandle->close_lock, "data handle close"));
 
 	F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 	WT_ERR(__wt_writelock(session, dhandle->rwlock));
@@ -152,6 +155,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 
 err:	if (dhandle->rwlock != NULL)
 		WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
+	__wt_spin_destroy(session, &dhandle->close_lock);
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);
 	__wt_free(session, dhandle->handle);		/* btree free */
@@ -170,7 +174,6 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	int ckpt_lock;
 
 	dhandle = session->dhandle;
 	btree = S2BT(session);
@@ -179,26 +182,11 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 		return (0);
 
 	/*
-	 * Checkpoint to flush out the file's changes.  This usually happens on
-	 * data handle close (which means we're holding the handle lock, so
-	 * this call serializes with any session checkpoint).  Bulk-cursors are
-	 * a special case: they do not hold the handle lock and they still must
-	 * serialize with checkpoints.   Acquire the lower-level checkpoint lock
-	 * and hold it until the handle is closed and the bulk-cursor flag has
-	 * been cleared.
-	 *    We hold the lock so long for two reasons: first, checkpoint uses
-	 * underlying btree handle structures (for example, the meta-tracking
-	 * checkpoint resolution uses the block-manager reference), and because
-	 * checkpoint writes "fake" checkpoint records for bulk-loaded files,
-	 * and a real checkpoint, which we're creating here, can't be followed
-	 * by more fake checkpoints.  In summary, don't let a checkpoint happen
-	 * unless all of the bulk cursor's information has been cleared.
+	 * We're not holding the schema lock, and threads may be walking the
+	 * list of open handles, operating on them (for example, checkpoint).
+	 * Acquire the handle's close lock.
 	 */
-	ckpt_lock = 0;
-	if (F_ISSET(btree, WT_BTREE_BULK)) {
-		ckpt_lock = 1;
-		__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
-	}
+	__wt_spin_lock(session, &dhandle->close_lock);
 
 	/*
 	 * The close can fail if an update cannot be written, return the EBUSY
@@ -215,9 +203,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 	F_CLR(dhandle, WT_DHANDLE_OPEN);
 	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
-err:
-	if (ckpt_lock)
-		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
+err:	__wt_spin_unlock(session, &dhandle->close_lock);
 
 	return (ret);
 }
@@ -474,36 +460,20 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 		    (dhandle->checkpoint != NULL && checkpoint != NULL &&
 		    strcmp(dhandle->checkpoint, checkpoint) == 0))) {
 			/*
-			 * We have the schema lock, which prevents handles being
-			 * opened or closed, so there is no need for additional
-			 * handle locking here, or pulling every tree into this
-			 * session's handle cache.
-			 *
-			 * XXX
-			 * THIS IS NOT CORRECT.  This is safe for checkpoints
-			 * because LSM (which closes handles without holding
-			 * the schema lock), does hold the checkpoint lock as
-			 * it discards those handles.  This isn't safe for
-			 * hot-backup (or other callers of this function) as
-			 * they are only holding the schema lock.  The problem
-			 * is vanishingly unlikely to happen, but it needs to
-			 * be fixed.
-			 *
-			 * We're holding the schema lock, which means the only
-			 * files we are going to be asked for are bulk-load
-			 * files.  Other code that might cause an EBUSY return
-			 * to our caller (for example, WT_SESSION.verify or
-			 * drop), will itself be holding the schema lock, and
-			 * will serialize with our caller.  In summary, if the
-			 * handle requested wasn't for a bulk-load file, it's
-			 * all gone pear-shaped.
+			 * We're holding the schema lock which locks out handle
+			 * open (which might change the state of the underlying
+			 * object).  However, closing a handle doesn't require
+			 * the schema lock, lock out closing the handle and then
+			 * confirm the handle is still open.
 			 */
-			if (F_ISSET((WT_BTREE *)(dhandle->handle),
-			    WT_BTREE_SPECIAL_FLAGS) == WT_BTREE_BULK) {
+			__wt_spin_lock(session, &dhandle->close_lock);
+			ret = 0;
+			if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 				session->dhandle = dhandle;
-				WT_ERR(func(session, cfg));
-			} else
-				WT_ERR(EBUSY);
+				ret = func(session, cfg);
+			}
+			__wt_spin_unlock(session, &dhandle->close_lock);
+			WT_ERR(ret);
 		}
 
 err:	session->dhandle = saved_dhandle;
@@ -638,6 +608,7 @@ __wt_conn_dhandle_discard_single(
 		__wt_free(session, dhandle->checkpoint);
 		__conn_btree_config_clear(session);
 		__wt_free(session, dhandle->handle);
+		__wt_spin_destroy(session, &dhandle->close_lock);
 		__wt_overwrite_and_free(session, dhandle);
 
 		WT_CLEAR_BTREE_IN_SESSION(session);
