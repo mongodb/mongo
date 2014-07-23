@@ -54,7 +54,7 @@ namespace mongo {
         BSONObj key = shardKeyPattern.extractSingleKey(doc);
 
         if (key.objsize() > kMaxShardKeySize) {
-            *errMsg = str::stream() << "key is larger than " << kMaxShardKeySize
+            *errMsg = str::stream() << "shard key is larger than " << kMaxShardKeySize
                                     << " bytes: " << key.objsize();
             return false;
         }
