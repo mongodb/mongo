@@ -711,7 +711,7 @@ struct __wt_row {	/* On-page key, on-page cell, or off-page WT_IKEY */
  *	Return the 0-based array offset based on a WT_ROW reference.
  */
 #define	WT_ROW_SLOT(page, rip)						\
-	((uint32_t)(((WT_ROW *)rip) - (page)->pg_row_d))
+	((uint32_t)(((WT_ROW *)(rip)) - (page)->pg_row_d))
 
 /*
  * WT_COL --

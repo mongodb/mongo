@@ -225,7 +225,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	tracking = 1;
 
 	/* Tell logging that we are about to start a database checkpoint. */
-	if (S2C(session)->logging && full)
+	if (conn->logging && full)
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
@@ -242,7 +242,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Tell logging that we have started a database checkpoint. */
-	if (S2C(session)->logging && full) {
+	if (conn->logging && full) {
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_START, NULL));
 		started = 1;
@@ -306,7 +306,7 @@ err:	/*
 		WT_TRET(__wt_txn_rollback(session, NULL));
 
 	/* Tell logging that we have finished a database checkpoint. */
-	if (S2C(session)->logging && started)
+	if (conn->logging && started)
 		WT_TRET(__wt_txn_checkpoint_log(session, full,
 		    (ret == 0) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_FAIL,
 		    NULL));
@@ -472,7 +472,7 @@ __checkpoint_worker(
 	 * nature of the checkpoint.
 	 */
 	if (!btree->modified && !is_checkpoint)
-		return (__wt_bt_cache_op(session, NULL, WT_SYNC_DISCARD));
+		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
 
 	/*
 	 * Get the list of checkpoints for this file.  If there's no reference
@@ -482,7 +482,7 @@ __checkpoint_worker(
 	if ((ret = __wt_meta_ckptlist_get(
 	    session, dhandle->name, &ckptbase)) == WT_NOTFOUND) {
 		WT_ASSERT(session, session->dhandle->session_ref == 0);
-		return (__wt_bt_cache_op(session, NULL, WT_SYNC_DISCARD));
+		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
 	}
 	WT_ERR(ret);
 
@@ -729,10 +729,10 @@ __checkpoint_worker(
 	 * dirty pages), we do a checkpoint without any writes, no checkpoint
 	 * is created, and then things get bad.
 	 */
-	WT_ERR(__wt_bt_cache_force_write(session));
+	WT_ERR(__wt_cache_force_write(session));
 
 	/* Tell logging that a file checkpoint is starting. */
-	if (S2C(session)->logging)
+	if (conn->logging)
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 0, WT_TXN_LOG_CKPT_START, &ckptlsn));
 
@@ -751,9 +751,9 @@ __checkpoint_worker(
 
 	/* Flush the file from the cache, creating the checkpoint. */
 	if (is_checkpoint)
-		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_CHECKPOINT));
+		WT_ERR(__wt_cache_op(session, ckptbase, WT_SYNC_CHECKPOINT));
 	else
-		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_CLOSE));
+		WT_ERR(__wt_cache_op(session, ckptbase, WT_SYNC_CLOSE));
 
 	/*
 	 * All blocks being written have been written; set the object's write
@@ -782,7 +782,7 @@ fake:	/* Update the object's metadata. */
 	}
 
 	/* Tell logging that the checkpoint is complete. */
-	if (S2C(session)->logging)
+	if (conn->logging)
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 0, WT_TXN_LOG_CKPT_STOP, NULL));
 
@@ -820,7 +820,7 @@ __wt_checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* May not have been modified, in which case don't do the traversal. */
 	return (S2BT(session)->modified ?
-	    __wt_bt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES) : 0);
+	    __wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES) : 0);
 }
 
 /*
@@ -859,7 +859,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session)
 	 * otherwise there's no work to do.
 	 */
 	if (session->dhandle->checkpoint != NULL)
-		return (__wt_bt_cache_op(session, NULL, WT_SYNC_DISCARD));
+		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
 
 	/*
 	 * Otherwise, checkpoint the file and, if it was modified, optionally

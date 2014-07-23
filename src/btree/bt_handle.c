@@ -251,13 +251,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 			F_CLR(btree, WT_BTREE_NO_EVICTION);
 	}
 
-	/*
-	 * Disable eviction from bulk handles.  Among other things, this saves
-	 * a round trip to the eviction server when completing a bulk load.
-	 */
-	if (F_ISSET(btree, WT_BTREE_BULK))
-		F_SET(btree, WT_BTREE_NO_EVICTION);
-
 	/* Checksums */
 	WT_RET(__wt_config_gets(session, cfg, "checksum", &cval));
 	if (WT_STRING_MATCH("on", cval.str, cval.len))
@@ -396,10 +389,13 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 	/*
 	 * Newly created objects can be used for cursor inserts or for bulk
 	 * loads; set a flag that's cleared when a row is inserted into the
-	 * tree.
+	 * tree.   Objects being bulk-loaded cannot be evicted, we set it
+	 * globally, there's no point in searching empty trees for eviction.
 	 */
-	if (creation)
+	if (creation) {
 		btree->bulk_load_ok = 1;
+		__wt_btree_evictable(session, 0);
+	}
 
 	/*
 	 * A note about empty trees: the initial tree is a root page and a leaf
@@ -533,10 +529,15 @@ __wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 void
 __wt_btree_evictable(WT_SESSION_IMPL *session, int on)
 {
-	if (on)
-		F_CLR(S2BT(session), WT_BTREE_NO_EVICTION);
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	/* The metadata file is never evicted. */
+	if (on && !WT_IS_METADATA(btree->dhandle))
+		F_CLR(btree, WT_BTREE_NO_EVICTION);
 	else
-		F_SET(S2BT(session), WT_BTREE_NO_EVICTION);
+		F_SET(btree, WT_BTREE_NO_EVICTION);
 }
 
 /*

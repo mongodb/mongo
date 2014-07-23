@@ -151,7 +151,7 @@ __wt_logop_%(name)s_pack(
 	WT_RET(__wt_struct_size(session, &size, fmt,
 	    optype, 0%(arg_names)s));
 
-	size += __wt_vsize_uint(size) - 1;
+	__wt_struct_size_adjust(session, &size);
 	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,

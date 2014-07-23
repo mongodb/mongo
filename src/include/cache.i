@@ -64,12 +64,11 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 		return (0);
 
 	/*
-	 * Bulk-load threads or threads operating on trees that cannot be
-	 * evicted are ignored, mostly because they're not contributing to
-	 * the problem.
+	 * Threads operating on trees that cannot be evicted are ignored,
+	 * mostly because they're not contributing to the problem.
 	 */
 	if ((btree = S2BT_SAFE(session)) != NULL &&
-	    F_ISSET(btree, WT_BTREE_BULK | WT_BTREE_NO_EVICTION))
+	    F_ISSET(btree, WT_BTREE_NO_EVICTION))
 		return (0);
 
 	/*

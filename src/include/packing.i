@@ -282,7 +282,7 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 	case 'r':
 		return (__wt_vsize_uint(pv->u.u));
 	case 'R':
-		return (sizeof (uint64_t));
+		return (sizeof(uint64_t));
 	}
 
 	__wt_err(session, EINVAL, "unknown pack-value type: %c", (int)pv->type);
@@ -377,7 +377,7 @@ __pack_write(
 		WT_RET(__wt_vpack_uint(pp, maxlen, pv->u.u));
 		break;
 	case 'R':
-		WT_SIZE_CHECK(sizeof (uint64_t), maxlen);
+		WT_SIZE_CHECK(sizeof(uint64_t), maxlen);
 		*(uint64_t *)*pp = pv->u.u;
 		*pp += sizeof(uint64_t);
 		break;
@@ -454,7 +454,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 		WT_RET(__wt_vunpack_uint(pp, maxlen, &pv->u.u));
 		break;
 	case 'R':
-		WT_SIZE_CHECK(sizeof (uint64_t), maxlen);
+		WT_SIZE_CHECK(sizeof(uint64_t), maxlen);
 		pv->u.u = *(uint64_t *)*pp;
 		*pp += sizeof(uint64_t);
 		break;
@@ -616,4 +616,34 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 		return (ret);
 
 	return (0);
+}
+
+/*
+ * __wt_struct_size_adjust --
+ *	Adjust the size field for a packed structure.
+ *
+ *      Sometimes we want to include the size as a field in a packed structure.
+ *      This is done by calling __wt_struct_size with the expected format and
+ *      a size of zero.  Then we want to pack the structure using the final
+ *      size.  This function adjusts the size appropriately (taking into
+ *      account the size of the final size or the size field itself).
+ */
+static inline void
+__wt_struct_size_adjust(WT_SESSION_IMPL *session, size_t *sizep)
+{
+	size_t prev_size = 1;
+	size_t orig_size = *sizep;
+	size_t field_size0 = __wt_vsize_uint(orig_size);
+	size_t field_size1 =
+	    __wt_vsize_uint(orig_size + field_size0 - prev_size);
+	*sizep += field_size1 - prev_size;
+
+	/*
+	 * Make sure the field size we calculated matches the adjusted size.
+	 * This relies on the fact that we are only adjusting by a small number
+	 * of bytes, so we won't cross multiple boundaries in the packing
+	 * routine.  If that were not true, we would need to iterate here until
+	 * the field size stops growing.
+	 */
+	WT_ASSERT(session, field_size1 == __wt_vsize_uint(*sizep));
 }

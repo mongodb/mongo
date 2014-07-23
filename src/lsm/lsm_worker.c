@@ -201,7 +201,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	if (locked) {
 		saved_isolation = session->txn.isolation;
 		session->txn.isolation = TXN_ISO_EVICTION;
-		ret = __wt_bt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES);
+		ret = __wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES);
 		session->txn.isolation = saved_isolation;
 		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 	}
