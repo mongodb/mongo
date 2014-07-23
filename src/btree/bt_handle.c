@@ -158,7 +158,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	/* Destroy locks. */
 	WT_TRET(__wt_rwlock_destroy(session, &btree->ovfl_lock));
-	__wt_spin_destroy(session, &btree->bulk_ckpt_lock);
 
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
@@ -306,11 +305,9 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 			    (int)cval.len, cval.str);
 	}
 
-	/* Allocate locks. */
+	/* Overflow lock. */
 	WT_RET(__wt_rwlock_alloc(
 	    session, "btree overflow lock", &btree->ovfl_lock));
-	WT_RET(__wt_spin_init(
-	    session, &btree->bulk_ckpt_lock, "bulk/checkpoint lock"));
 
 	__wt_stat_init_dsrc_stats(&btree->dhandle->stats);
 

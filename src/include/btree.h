@@ -60,6 +60,8 @@
 struct __wt_btree {
 	WT_DATA_HANDLE *dhandle;
 
+	WT_CKPT	  *ckpt;		/* Checkpoint information */
+
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_VAR=2,	/* Variable-length column store */
 		BTREE_ROW=3		/* Row-store */
@@ -103,6 +105,7 @@ struct __wt_btree {
 
 	WT_REF root;			/* Root page reference */
 	int modified;			/* If the tree ever modified */
+	int bulk_load_ok;		/* Bulk-load is a possibility */
 
 	WT_BM	*bm;			/* Block manager reference */
 	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
@@ -115,11 +118,7 @@ struct __wt_btree {
 	u_int    evict_walk_skips;	/* Number of walks skipped */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
 
-	WT_CKPT	  *ckpt;		/* Checkpoint information */
 	int checkpointing;		/* Checkpoint in progress */
-
-	int bulk_load_ok;		/* Bulk-load is a possibility */
-	WT_SPINLOCK bulk_ckpt_lock;	/* Lock checkpoint and bulk close */
 
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
 #define	WT_BTREE_BULK		0x00100	/* Bulk-load handle */

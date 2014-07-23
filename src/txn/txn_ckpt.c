@@ -434,32 +434,6 @@ __drop_to(WT_CKPT *ckptbase, const char *name, size_t len)
 }
 
 /*
- * __wt_checkpoint_bulk_lock --
- *	Lock/unlock when checkpointing a bulk-load file.
- */
-void
-__wt_checkpoint_bulk_lock(
-    WT_SESSION_IMPL *session, WT_BTREE *btree, int getlock)
-{
-	/*
-	 * This function exists as a place for this comment: checkpoint does a
-	 * read-modify-write cycle of the file's metadata, which means there's
-	 * a potential race with other threads calling the checkpoint function.
-	 * There are two paths into the checkpoint worker function, database
-	 * checkpoints and handle close.  Both exclusively hold the handle's
-	 * lock, but bulk-load is a special case. Because bulk-load is likely
-	 * a long-lived operation, database checkpoint is allowed to proceed
-	 * without a bulk-load handle's lock.  To avoid a database checkpoint
-	 * racing with bulk-load handle close, we use a separate per-file lock
-	 * acquired/released around the checkpoint.
-	 */
-	if (getlock)
-		__wt_spin_lock(session, &btree->bulk_ckpt_lock);
-	else
-		__wt_spin_unlock(session, &btree->bulk_ckpt_lock);
-}
-
-/*
  * __checkpoint_worker --
  *	Checkpoint a tree.
  */
@@ -477,19 +451,19 @@ __checkpoint_worker(
 	WT_DECL_RET;
 	WT_LSN ckptlsn;
 	const char *name;
-	int bulk_ckpt_locked, deleted, force, hot_backup_locked, track_ckpt;
+	int deleted, force, hot_backup_locked, track_ckpt;
 	char *name_alloc;
 
 	btree = S2BT(session);
 	bm = btree->bm;
 	conn = S2C(session);
-	dhandle = session->dhandle;
-
 	ckpt = ckptbase = NULL;
 	INIT_LSN(&ckptlsn);
-	bulk_ckpt_locked = hot_backup_locked = 0;
-	track_ckpt = 1;
+	dhandle = session->dhandle;
 	name_alloc = NULL;
+	hot_backup_locked = 0;
+	name_alloc = NULL;
+	track_ckpt = 1;
 
 	/*
 	 * If closing a file that's never been modified, discard its blocks.
@@ -501,32 +475,14 @@ __checkpoint_worker(
 		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
 
 	/*
-	 * Bulk-load has special checkpoint locking requirements (see the lock
-	 * function for details).  Lock/unlock around the read-modify-write
-	 * cycle of the file's metadata.  We only lock here in the case of a
-	 * database checkpoint, the bulk-load handle close path has already
-	 * acquired the lock.
-	 */
-	if (is_checkpoint && F_ISSET(btree, WT_BTREE_BULK)) {
-		bulk_ckpt_locked = 1;
-		/*
-		 * The bulk-load flag could be cleared after we test and before
-		 * we acquire the lock.  We don't care, all this lock does is
-		 * single-thread this function, the race just means a bulk-load
-		 * handle had the lock and closed while we waited.
-		 */
-		__wt_checkpoint_bulk_lock(session, btree, 1);
-	}
-
-	/*
-	 * If the file has no metadata (the file is dead), then discard it from
+	 * Get the list of checkpoints for this file.  If there's no reference
+	 * to the file in the metadata (the file is dead), then discard it from
 	 * the cache without bothering to write any dirty pages.
 	 */
 	if ((ret = __wt_meta_ckptlist_get(
 	    session, dhandle->name, &ckptbase)) == WT_NOTFOUND) {
 		WT_ASSERT(session, session->dhandle->session_ref == 0);
-		ret = __wt_cache_op(session, NULL, WT_SYNC_DISCARD);
-		goto done;
+		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
 	}
 	WT_ERR(ret);
 
@@ -611,7 +567,7 @@ __checkpoint_worker(
 	}
 	if (!btree->modified && !force) {
 		if (!is_checkpoint)
-			goto done;
+			goto skip;
 
 		deleted = 0;
 		WT_CKPT_FOREACH(ckptbase, ckpt)
@@ -629,7 +585,7 @@ __checkpoint_worker(
 		    (strcmp(name, (ckpt - 1)->name) == 0 ||
 		    (WT_PREFIX_MATCH(name, WT_CHECKPOINT) &&
 		    WT_PREFIX_MATCH((ckpt - 1)->name, WT_CHECKPOINT))))
-			goto done;
+			goto skip;
 	}
 
 	/* Add a new checkpoint entry at the end of the list. */
@@ -830,13 +786,9 @@ fake:	/* Update the object's metadata. */
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 0, WT_TXN_LOG_CKPT_STOP, NULL));
 
-done:
 err:	if (hot_backup_locked)
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
-	if (bulk_ckpt_locked)
-		__wt_checkpoint_bulk_lock(session, btree, 0);
-
-	__wt_meta_ckptlist_free(session, ckptbase);
+skip:	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
 	return (ret);
 }
