@@ -178,7 +178,8 @@ namespace mongo {
     }
 
     /* Get the first object from a collection.  Generally only useful if the collection
-       only ever has a single object -- which is a "singleton collection.
+       only ever has a single object -- which is a "singleton collection". Note that the
+       BSONObj returned is *not* owned and will become invalid if the database is closed.
 
        Returns: true if object exists.
     */

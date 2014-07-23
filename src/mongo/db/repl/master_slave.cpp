@@ -187,6 +187,7 @@ namespace repl {
             Helpers::putSingleton(txn, "local.me", _me);
             ctx.commit();
         }
+        _me = _me.getOwned();
     }
 
     void ReplSource::save(OperationContext* txn) {
