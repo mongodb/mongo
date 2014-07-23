@@ -656,6 +656,7 @@ namespace mongo {
                 if (0 == solnRoot->numWanted) {
                     solnRoot->numWanted = 100;
                 }
+                solnRoot->numWanted += query.getParsed().getSkip();
                 solnRoot->indexKeyPattern = relevantIndices[tag->first[i]].keyPattern;
 
                 // Remove the 2d index.  2d can only be the first field, and we know there is

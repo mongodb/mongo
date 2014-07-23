@@ -75,3 +75,6 @@ assert.eq( 100 , t.find( q ).limit(100).count() , "D2" )
 assert.eq( 20 , t.find( q ).limit(20).itcount() , "D3" )
 assert.eq( 20 , t.find( q ).limit(20).size() , "D4" )
 
+// SERVER-14039 Wrong limit after skip with $nearSphere, 2d index
+assert.eq( 10 , t.find( q ).skip(10).limit(10).itcount() , "D5" )
+assert.eq( 10 , t.find( q ).skip(10).limit(10).size() , "D6" )
