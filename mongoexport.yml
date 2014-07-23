@@ -6,7 +6,7 @@ functions:
       script: |
         set -o verbose
         export GOPATH=`pwd`
-        ./gpm install godeps
+        ./gpm install
 
   "generate coverage html + text":
     command: shell.exec
