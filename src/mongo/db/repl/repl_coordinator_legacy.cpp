@@ -579,7 +579,7 @@ namespace {
         return Status::OK();
     }
 
-    Status LegacyReplicationCoordinator::_checkReplEnabledForCommand(BSONObjBuilder* result) {
+    Status LegacyReplicationCoordinator::checkReplEnabledForCommand(BSONObjBuilder* result) {
         if (!_settings.usingReplSets()) {
             if (serverGlobalParams.configsvr) {
                 result->append("info", "configsvr"); // for shell prompt
@@ -610,7 +610,9 @@ namespace {
             return Status::OK();
         }
 
-        Status status = _checkReplEnabledForCommand(resultObj);
+        // TODO(dannenberg) once reconfig processing has been figured out in the impl, this should
+        // be moved out of processReplSetReconfig and into the command body like all other cmds
+        Status status = checkReplEnabledForCommand(resultObj);
         if (!status.isOK()) {
             return status;
         }
@@ -811,10 +813,6 @@ namespace {
     }
 
     Status LegacyReplicationCoordinator::processReplSetGetRBID(BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
         resultObj->append("rbid", _rbid);
         return Status::OK();
     }
@@ -866,12 +864,7 @@ namespace {
 } // namespace
 
     Status LegacyReplicationCoordinator::processReplSetFresh(const ReplSetFreshArgs& args,
-                                                             BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
-
+                                                             BSONObjBuilder* resultObj){
         if( args.setName != theReplSet->name() ) {
             return Status(ErrorCodes::ReplicaSetNotFound,
                           str::stream() << "wrong repl set name. Expected: " <<
@@ -905,10 +898,6 @@ namespace {
 
     Status LegacyReplicationCoordinator::processReplSetElect(const ReplSetElectArgs& args,
                                                              BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
         theReplSet->electCmdReceived(args.set, args.whoid, args.cfgver, args.round, resultObj);
         return Status::OK();
     }
@@ -918,10 +907,6 @@ namespace {
     }
 
     Status LegacyReplicationCoordinator::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
         if (theReplSet->freeze(secs)) {
             if (secs == 0) {
                 resultObj->append("info","unfreezing");
@@ -936,10 +921,6 @@ namespace {
     Status LegacyReplicationCoordinator::processReplSetMaintenance(OperationContext* txn,
                                                                    bool activate,
                                                                    BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
         if (!setMaintenanceMode(txn, activate)) {
             if (theReplSet->isPrimary()) {
                 return Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
@@ -954,10 +935,6 @@ namespace {
 
     Status LegacyReplicationCoordinator::processReplSetSyncFrom(const std::string& target,
                                                                 BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
         resultObj->append("syncFromRequested", target);
 
         return theReplSet->forceSyncFrom(target, resultObj);
@@ -966,11 +943,6 @@ namespace {
     Status LegacyReplicationCoordinator::processReplSetUpdatePosition(OperationContext* txn,
                                                                       const BSONArray& updates,
                                                                       BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
-
         BSONForEach(elem, updates) {
             BSONObj entry = elem.Obj();
             OID id = entry["_id"].OID();
@@ -985,13 +957,9 @@ namespace {
 
     Status LegacyReplicationCoordinator::processReplSetUpdatePositionHandshake(
             const OperationContext* txn, const BSONObj& cmdObj, BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
 
         OID rid = cmdObj["handshake"].OID();
-        status = processHandshake(txn, rid, cmdObj);
+        Status status = processHandshake(txn, rid, cmdObj);
         if (!status.isOK()) {
             return status;
         }

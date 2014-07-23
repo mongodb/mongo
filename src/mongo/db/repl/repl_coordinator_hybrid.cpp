@@ -333,5 +333,11 @@ namespace repl {
         return legacyGLE;
     }
 
+    Status HybridReplicationCoordinator::checkReplEnabledForCommand(BSONObjBuilder* result) {
+        Status legacyStatus = _legacy.checkReplEnabledForCommand(result);
+        Status implStatus = _impl.checkReplEnabledForCommand(result);
+        return legacyStatus;
+    }
+
 } // namespace repl
 } // namespace mongo

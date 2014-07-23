@@ -161,6 +161,8 @@ namespace repl {
 
         virtual BSONObj getGetLastErrorDefault();
 
+        virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
+
     private:
         LegacyReplicationCoordinator _legacy;
         ReplicationCoordinatorImpl _impl;

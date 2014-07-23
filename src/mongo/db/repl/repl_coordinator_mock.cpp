@@ -256,5 +256,10 @@ namespace repl {
         return BSONObj();
     }
 
+    Status ReplicationCoordinatorMock::checkReplEnabledForCommand(BSONObjBuilder* result) {
+        // TODO
+        return Status::OK();
+    }
+
 } // namespace repl
 } // namespace mongo

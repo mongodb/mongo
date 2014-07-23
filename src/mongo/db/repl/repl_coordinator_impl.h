@@ -171,6 +171,8 @@ namespace repl {
 
         virtual BSONObj getGetLastErrorDefault();
 
+        virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions.

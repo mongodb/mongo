@@ -448,6 +448,16 @@ namespace repl {
          */
         virtual BSONObj getGetLastErrorDefault() = 0;
 
+        /**
+         * Checks that the --replSet flag was passed when starting up the node and that the node
+         * has a valid replica set config.
+         *
+         * Returns a Status indicating whether those conditions are met with errorcode 
+         * NoReplicationEnabled if --replSet was not present during start up or with errorcode
+         * NotYetInitialized in the absence of a valid config. Also adds error info to "result".
+         */
+        virtual Status checkReplEnabledForCommand(BSONObjBuilder* result) = 0;
+
     protected:
 
         ReplicationCoordinator();

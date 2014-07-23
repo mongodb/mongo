@@ -159,14 +159,14 @@ namespace repl {
 
         virtual BSONObj getGetLastErrorDefault();
 
+        virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
+
     private:
         Status _stepDownHelper(OperationContext* txn,
                                bool force,
                                const Milliseconds& initialWaitTime,
                                const Milliseconds& stepdownTime,
                                const Milliseconds& postStepdownWaitTime);
-
-        Status _checkReplEnabledForCommand(BSONObjBuilder* result);
 
         // Mutex that protects the _ridConfigMap and the _slaveOpTimeMap;
         boost::mutex _mutex;

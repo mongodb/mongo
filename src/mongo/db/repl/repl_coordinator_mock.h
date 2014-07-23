@@ -160,6 +160,8 @@ namespace repl {
 
         virtual BSONObj getGetLastErrorDefault();
 
+        virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
+
     private:
 
         ReplSettings _settings;

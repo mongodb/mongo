@@ -755,5 +755,10 @@ namespace repl {
         return _rsConfig.getDefaultWriteConcern().toBSON();
     }
 
+    Status ReplicationCoordinatorImpl::checkReplEnabledForCommand(BSONObjBuilder* result) {
+        //TODO
+        return Status::OK();
+    }
+
 } // namespace repl
 } // namespace mongo
