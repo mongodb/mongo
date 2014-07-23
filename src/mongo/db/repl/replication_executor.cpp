@@ -251,6 +251,8 @@ namespace {
         StatusWith<BSONObj> cmdResult = _networkInterface->runCommand(request);
 
         lk.lock();
+        if (_inShutdown)
+            return;
         if (generation != iter->generation)
             return;
         iter->callback = stdx::bind(remoteCommandFinished,
