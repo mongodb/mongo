@@ -1846,8 +1846,6 @@ int InputBuffer::incrementalHistorySearch( PromptBase& pi, int startChar ) {
     if ( activeHistoryLine ) {
         delete [] activeHistoryLine;
     }
-    pb.promptCharWidths = (char *) realloc(pb.promptCharWidths, len);
-    recomputeCharacterWidths(buf32, pb.promptCharWidths, len);
     dynamicRefresh( pb, buf32, len, pos );  // redraw the original prompt with current input
     pi.promptPreviousInputLen = len;
     pi.promptCursorRowOffset = pi.promptExtraLines + pb.promptCursorRowOffset;
