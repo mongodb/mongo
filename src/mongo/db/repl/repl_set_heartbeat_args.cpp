@@ -57,6 +57,20 @@ namespace {
 
 } // namespace
 
+    ReplSetHeartbeatArgs::ReplSetHeartbeatArgs() :
+        _hasCheckEmpty(false),
+        _hasProtocolVersion(false),
+        _hasConfigVersion(false),
+        _hasSenderId(false),
+        _hasSetName(false),
+        _hasSenderHost(false),
+        _checkEmpty(false),
+        _protocolVersion(-1),
+        _configVersion(-1),
+        _senderId(-1),
+        _setName(""),
+        _senderHost(HostAndPort()) {}
+
     Status ReplSetHeartbeatArgs::initialize(const BSONObj& argsObj) {
         Status status = bsonCheckOnlyHasFields("ReplSetHeartbeatArgs",
                                                argsObj,
@@ -70,22 +84,27 @@ namespace {
                                                     &_checkEmpty);
         if (!status.isOK())
             return status;
+        _hasCheckEmpty = true;
 
         status = bsonExtractIntegerField(argsObj, kProtocolVersionFieldName, &_protocolVersion);
         if (!status.isOK())
             return status;
+        _hasProtocolVersion = true;
 
         status = bsonExtractIntegerField(argsObj, kConfigVersionFieldName, &_configVersion);
         if (!status.isOK())
             return status;
+        _hasConfigVersion = true;
 
         status = bsonExtractIntegerFieldWithDefault(argsObj, kSenderIdFieldName, -1, &_senderId);
         if (!status.isOK())
             return status;
+        _hasSenderId = true;
 
         status = bsonExtractStringField(argsObj, kSetNameFieldName, &_setName);
         if (!status.isOK())
             return status;
+        _hasSetName = true;
 
         std::string hostAndPortString;
         status = bsonExtractStringField(argsObj, kSenderHostFieldName, &hostAndPortString);
@@ -101,5 +120,56 @@ namespace {
 
         return Status::OK();
     }
+
+    bool ReplSetHeartbeatArgs::isInitialized() const {
+        return _hasProtocolVersion && _hasConfigVersion && _hasSetName && _hasSenderHost;
+    }
+
+    BSONObj ReplSetHeartbeatArgs::toBSON() const {
+        invariant(isInitialized());
+        BSONObjBuilder builder;
+        builder.append("replSetHeartbeat", _setName);
+        builder.append("pv", _protocolVersion);
+        builder.append("v", _configVersion);
+        builder.append("from", _senderHost.toString());
+        if (_hasSenderId) {
+            builder.append("fromId", _senderId);
+        }
+        if (_hasCheckEmpty) {
+            builder.append("checkEmpty", _checkEmpty);
+        }
+        return builder.obj();
+    }
+
+    void ReplSetHeartbeatArgs::setCheckEmpty(bool newVal) {
+        _checkEmpty = newVal;
+        _hasCheckEmpty = true;
+    }
+
+    void ReplSetHeartbeatArgs::setProtocolVersion(long long newVal) {
+        _protocolVersion = newVal;
+        _hasProtocolVersion = true;
+    }
+
+    void ReplSetHeartbeatArgs::setConfigVersion(long long newVal) {
+        _configVersion = newVal;
+        _hasConfigVersion = true;
+    }
+
+    void ReplSetHeartbeatArgs::setSenderId(long long newVal) {
+        _senderId = newVal;
+        _hasSenderId = true;
+    }
+
+    void ReplSetHeartbeatArgs::setSetName(std::string newVal) {
+        _setName = newVal;
+        _hasSetName = true;
+    }
+
+    void ReplSetHeartbeatArgs::setSenderHost(HostAndPort newVal) {
+        _senderHost = newVal;
+        _hasSenderHost = true;
+    }
+
 }  // namespace repl
 }  // namespace mongo

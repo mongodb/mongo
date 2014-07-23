@@ -44,10 +44,17 @@ namespace repl {
      */
     class ReplSetHeartbeatArgs {
     public:
+        ReplSetHeartbeatArgs();
+
         /**
          * Initializes this ReplSetHeartbeatArgs from the contents of args.
          */
         Status initialize(const BSONObj& argsObj);
+
+        /**
+         * Returns true if all required fields have been initialized.
+         */
+        bool isInitialized() const;
 
         /**
          * Returns whether the sender would like to know whether the node is empty or not.
@@ -79,7 +86,42 @@ namespace repl {
          */
         HostAndPort getSenderHost() const { return _senderHost; }
 
+        /**
+         * The below methods check whether or not value in the method name has been set.
+         */
+        bool hasCheckEmpty() { return _hasCheckEmpty; }
+        bool hasProtocolVersion() { return _hasProtocolVersion; }
+        bool hasConfigVersion() { return _hasConfigVersion; }
+        bool hasSenderId() { return _hasSenderId; }
+        bool hasSetName() { return _hasSetName; }
+        bool hasSenderHost() { return _hasSenderHost; }
+
+        /**
+         * The below methods set the value in the method name to 'newVal'.
+         */
+        void setCheckEmpty(bool newVal);
+        void setProtocolVersion(long long newVal);
+        void setConfigVersion(long long newVal);
+        void setSenderId(long long newVal);
+        void setSetName(std::string newVal);
+        void setSenderHost(HostAndPort newVal);
+
+        /**
+         * Returns a BSONified version of the object.
+         * Should only be called if the mandatory fields have been set.
+         * Optional fields are only included if they have been set.
+         */
+        BSONObj toBSON() const;
+
     private:
+        bool _hasCheckEmpty;
+        bool _hasProtocolVersion;
+        bool _hasConfigVersion;
+        bool _hasSenderId;
+        bool _hasSetName;
+        bool _hasSenderHost;
+
+        // look at the body of the isInitialized() function to see which fields are mandatory
         bool _checkEmpty;
         long long _protocolVersion;
         long long _configVersion;
