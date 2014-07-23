@@ -87,14 +87,22 @@ namespace repl {
         if (!toStatus.isOK())
             return StatusWith<BSONObj>(toStatus.getStatus());
 
-        return mapFindWithDefault(
-                _responses,
-                request,
-                StatusWith<BSONObj>(
-                        ErrorCodes::NoSuchKey,
-                        str::stream() << "Could not find response for " <<
-                                "Request(" << request.target.toString() << ", " <<
-                                request.dbname << ", " << request.cmdObj << ')'));
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        while (1) {
+            ResponseInfo result = mapFindWithDefault(
+                    _responses,
+                    request,
+                    ResponseInfo(StatusWith<BSONObj>(
+                                         ErrorCodes::NoSuchKey,
+                                         str::stream() << "Could not find response for " <<
+                                         "Request(" << request.target.toString() << ", " <<
+                                         request.dbname << ", " << request.cmdObj << ')'),
+                                 false));
+            if (!result.isBlocked) {
+                return result.response;
+            }
+            _someResponseUnblocked.wait(lk);
+        }
     }
 
     void NetworkInterfaceMock::runCallbackWithGlobalExclusiveLock(
@@ -105,13 +113,42 @@ namespace repl {
 
     bool NetworkInterfaceMock::addResponse(
             const ReplicationExecutor::RemoteCommandRequest& request,
-            const StatusWith<BSONObj>& response) {
+            const StatusWith<BSONObj>& response,
+            bool isBlocked) {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        return _responses.insert(std::make_pair(request, ResponseInfo(response, isBlocked))).second;
+    }
 
-        return _responses.insert(std::make_pair(request, response)).second;
+    void NetworkInterfaceMock::unblockResponse(
+            const ReplicationExecutor::RemoteCommandRequest& request) {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        RequestResponseMap::iterator iter = _responses.find(request);
+        if (_responses.end() == iter) {
+            return;
+        }
+        if (iter->second.isBlocked) {
+            iter->second.isBlocked = false;
+            _someResponseUnblocked.notify_all();
+        }
+    }
+
+    void NetworkInterfaceMock::unblockAll() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        for (RequestResponseMap::iterator iter = _responses.begin();
+             iter != _responses.end();
+             ++iter) {
+            iter->second.isBlocked = false;
+        }
+        _someResponseUnblocked.notify_all();
     }
 
     void NetworkInterfaceMock::simulatedNetworkLatency(int millis) {
         _simulatedNetworkLatencyMillis = millis;
+    }
+
+    NetworkInterfaceMock::ResponseInfo::ResponseInfo(const StatusWith<BSONObj>& r, bool block) :
+        response(r),
+        isBlocked(block) {
     }
 
 }  // namespace repl

@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 #include <map>
 
 #include "mongo/db/repl/replication_executor.h"
@@ -46,11 +48,25 @@ namespace repl {
                 const stdx::function<void ()>& callback);
 
         /**
-         * Add a response (StatusWith<BSONObj>) for this mock to return for a given request.
+         * Adds a response (StatusWith<BSONObj>) for this mock to return for a given request.
          * For each request, the mock will return the corresponding response for all future calls.
+         *
+         * If "isBlocked" is set to true, the network will block in runCommand for the given
+         * request until unblockResponse is called with "request" as an argument.
          */
         bool addResponse(const ReplicationExecutor::RemoteCommandRequest& request,
-                         const StatusWith<BSONObj>& response);
+                         const StatusWith<BSONObj>& response,
+                         bool isBlocked = false);
+
+        /**
+         * Unblocks response to "request" that was blocked when it was added.
+         */
+        void unblockResponse(const ReplicationExecutor::RemoteCommandRequest& request);
+
+        /**
+         * Unblocks all responses that were blocked when added.
+         */
+        void unblockAll();
 
         /**
          * Network latency added for each remote command, defaults to 0.
@@ -58,8 +74,16 @@ namespace repl {
         void simulatedNetworkLatency(int millis);
 
     private:
+        struct ResponseInfo {
+            ResponseInfo(const StatusWith<BSONObj>& r, bool block);
+
+            StatusWith<BSONObj> response;
+            bool isBlocked;
+        };
         typedef std::map<ReplicationExecutor::RemoteCommandRequest,
-                         StatusWith<BSONObj> > RequestResponseMap;
+                         ResponseInfo > RequestResponseMap;
+        boost::mutex _mutex;
+        boost::condition_variable _someResponseUnblocked;
         RequestResponseMap _responses;
         int _simulatedNetworkLatencyMillis;
     };
