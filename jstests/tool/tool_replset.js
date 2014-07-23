@@ -87,6 +87,7 @@ replTest.stop(0);
 var dataDir = MongoRunner.dataDir + "/tool_replset-0/";
 data = MongoRunner.dataDir + "/tool_replset-dump-dbpath/";
 print("dump oplog with --dbpath");
+clearRawMongoProgramOutput();
 runMongoProgram("mongodump", "--dbpath", dataDir, "--out", data + "oplog", "-d", "local");
 assert.isnull(rawMongoProgramOutput().match(/assert/));
 // mongodump with --dbpath -d local & -c oplog.rs
