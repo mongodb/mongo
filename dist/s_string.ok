@@ -589,6 +589,10 @@ inuse
 io
 ip
 ispo
+iterinit
+iterkv
+iternext
+iterrec
 jrx
 json
 kb

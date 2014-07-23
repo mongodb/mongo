@@ -14,23 +14,32 @@
 static int
 __curlog_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 {
+	WT_CURSOR_LOG *acl, *bcl;
 	WT_DECL_RET;
-	WT_LSN alsn, blsn;
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL(a, session, compare, NULL);
 
+	acl = (WT_CURSOR_LOG *)a;
+	bcl = (WT_CURSOR_LOG *)b;
 	WT_ASSERT(session, cmpp != NULL);
-	WT_ERR(__wt_cursor_get_key(a, &alsn.file, &alsn.offset));
-	WT_ERR(__wt_cursor_get_key(b, &blsn.file, &blsn.offset));
-	*cmpp = LOG_CMP(&alsn, &blsn);
+	*cmpp = LOG_CMP(acl->cur_lsn, bcl->cur_lsn);
+	/*
+	 * If these are iterator cursors, compare the count
+	 * within the record if they are both on the same LSN.
+	 */
+	if (*cmpp == 0 && F_ISSET(acl, WT_LOGC_ITERATOR)) {
+		WT_ASSERT(session, F_ISSET(bcl, WT_LOGC_ITERATOR));
+		*cmpp = (acl->iter_count != bcl->iter_count ?
+		    (acl->iter_count < bcl->iter_count ? -1 : 1) : 0);
+	}
 err:	API_END_RET(session, ret);
 
 }
 
 /*
  * __curlog_iterrec --
- *	Callback function from log_scan to get a log record.
+ *	Callback function from log_scan to get a log record for an iterator.
  */
 static int
 __curlog_iterrec(
@@ -66,27 +75,64 @@ __curlog_iterrec(
 	 * reserve 0 to mean the entire record.
 	 */
 	cl->iter_count = 1;
+	WT_RET(__wt_logrec_read(session, &cl->iterp, cl->iterp_end,
+	    &cl->rectype));
+	/*
+	 * Unpack the txnid so that we can return each
+	 * individual operation for this txnid.
+	 */
+	if (cl->rectype == WT_LOGREC_COMMIT)
+		WT_RET(__wt_vunpack_uint(&cl->iterp,
+		    WT_PTRDIFF(cl->iterp_end, cl->iterp), &cl->txnid));
+	else
+		cl->txnid = 0;
+	return (0);
+}
+
+/*
+ * __curlog_iterkv --
+ *	Set the key and value to return for an iterator cursor.
+ */
+static int
+__curlog_iterkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
+{
+	WT_CURSOR_LOG *cl;
+	WT_ITEM value;
+	uint32_t opsize, optype;
+
+	cl = (WT_CURSOR_LOG *)cursor;
+	/*
+	 * If it is a commit, peek to get the size and optype.
+	 */
+	if (cl->rectype == WT_LOGREC_COMMIT)
+		WT_RET(__wt_logop_read(session, &cl->iterp, cl->iterp_end,
+		    &optype, &opsize));
+	else
+		opsize = cl->iter_logrec->size;
+	__wt_cursor_set_key(cursor, cl->cur_lsn->file, cl->cur_lsn->offset,
+	    cl->txnid, cl->iter_count++);
+	value.data = cl->iterp;
+	value.size = opsize;
+	cl->iterp += opsize;
+	__wt_cursor_set_raw_value(cursor, &value);
 	return (0);
 }
 
 /*
  * __curlog_iternext --
- *	WT_CURSOR.next method for the log cursor type.
+ *	WT_CURSOR.next method for the iterator log cursor type.
  */
 static int
 __curlog_iternext(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LOG *cl;
 	WT_DECL_RET;
-	WT_ITEM value;
 	WT_SESSION_IMPL *session;
-	uint32_t opsize, optype;
 
 	cl = (WT_CURSOR_LOG *)cursor;
 
 	CURSOR_API_CALL(cursor, session, next, NULL);
 
-	opsize = optype = 0;
 	/*
 	 * If we don't have a record, or went to the end of the record we
 	 * have, or we are in the zero-fill portion of the record, get a
@@ -96,38 +142,12 @@ __curlog_iternext(WT_CURSOR *cursor)
 	    !(*cl->iterp)) {
 		cl->txnid = 0;
 		WT_ERR(__wt_log_scan(session, cl->next_lsn, WT_LOGSCAN_ONE,
-		    __curlog_iterrec, cl));
-		WT_ERR(__wt_logrec_read(session, &cl->iterp, cl->iterp_end,
-		    &cl->rectype));
-		/*
-		 * If it is not a commit record, return the whole record.
-		 * Otherwise, unpack the txnid so that we can return each
-		 * individual operation for this txnid.
-		 */
-		if (cl->rectype != WT_LOGREC_COMMIT)
-			opsize = cl->iter_logrec->size;
-		else
-			WT_ERR(__wt_vunpack_uint(&cl->iterp,
-			    WT_PTRDIFF(cl->iterp_end, cl->iterp), &cl->txnid));
+		    cl->scan_cb, cl));
 	}
 	WT_ASSERT(session, cl->iter_logrec->data != NULL);
 	WT_STAT_FAST_CONN_INCR(session, cursor_next);
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
-	/*
-	 * Peek to get the size and optype.  If it isn't a commit
-	 * record, we set opsize to the record size above because we're
-	 * returning the entire record.  If it is a commit, we're walking
-	 * the parts of the record.
-	 */
-	if (cl->rectype == WT_LOGREC_COMMIT)
-		WT_ERR(__wt_logop_read(session, &cl->iterp, cl->iterp_end,
-		    &optype, &opsize));
-	__wt_cursor_set_key(cursor, cl->cur_lsn->file, cl->cur_lsn->offset,
-	    cl->txnid, cl->iter_count++);
-	value.data = cl->iterp;
-	value.size = opsize;
-	cl->iterp += opsize;
-	__wt_cursor_set_raw_value(cursor, &value);
+	WT_ERR(__curlog_iterkv(session, cursor));
 
 err:	API_END_RET(session, ret);
 
@@ -193,20 +213,29 @@ __curlog_search(WT_CURSOR *cursor)
 	WT_LSN key;
 	WT_SESSION_IMPL *session;
 	uint64_t txnid;
-	uint32_t opno;
+	uint32_t counter;
 
 	cl = (WT_CURSOR_LOG *)cursor;
 
 	CURSOR_API_CALL(cursor, session, search, NULL);
 
+	/*
+	 * !!! We are ignoring the txnid and counter on an iterator key
+	 * and only searching based on the LSN.
+	 */
 	if (F_ISSET(cl, WT_LOGC_ITERATOR))
 		WT_ERR(__wt_cursor_get_key((WT_CURSOR *)cl,
-		    &key.file, &key.offset, &txnid, &opno));
+		    &key.file, &key.offset, &txnid, &counter));
 	else
 		WT_ERR(__wt_cursor_get_key((WT_CURSOR *)cl,
 		    &key.file, &key.offset));
 	WT_ERR(__wt_log_scan(session, &key, WT_LOGSCAN_ONE,
 	    cl->scan_cb, cl));
+	/*
+	 * If it is an iterator set the key and value.
+	 */
+	if (F_ISSET(cl, WT_LOGC_ITERATOR))
+		WT_ERR(__curlog_iterkv(session, cursor));
 	WT_STAT_FAST_CONN_INCR(session, cursor_search);
 	WT_STAT_FAST_DATA_INCR(session, cursor_search);
 
@@ -267,6 +296,7 @@ __curlog_iterinit(WT_SESSION_IMPL *session, WT_CURSOR_LOG *cl)
 {
 	WT_CURSOR *cursor;
 
+	WT_UNUSED(session);
 	cursor = &cl->iface;
 	cursor->next = __curlog_iternext;
 	cursor->key_format = LSNITER_KEY_FORMAT;
