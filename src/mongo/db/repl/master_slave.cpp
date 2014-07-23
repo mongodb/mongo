@@ -176,6 +176,7 @@ namespace mongo {
                 Helpers::putSingleton("local.me", _me);
             }
         }
+        _me = _me.getOwned();
     }
 
     void ReplSource::save() {
