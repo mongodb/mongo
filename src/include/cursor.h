@@ -256,7 +256,7 @@ struct __wt_cursor_log {
 	WT_LSN		*next_lsn;	/* LSN of next record */
 	int (*scan_cb)(WT_SESSION_IMPL *session, WT_ITEM *logrec,
 	    WT_LSN *lsnp, void *cookie);
-	WT_ITEM		*iter_logrec;	/* Copy of record for iterating */
+	WT_ITEM		*logrec;	/* Copy of record for cursor */
 	const uint8_t	*iterp, *iterp_end;	/* Pointer within record */
 	uint32_t	iter_count;	/* Intra-record count */
 	uint32_t	rectype;	/* Iterator record type */

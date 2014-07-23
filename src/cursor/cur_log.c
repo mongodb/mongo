@@ -8,6 +8,32 @@
 #include "wt_internal.h"
 
 /*
+ * __curlog_logrec --
+ *	Callback function from log_scan to get a log record.
+ */
+static int
+__curlog_logrec(
+    WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
+{
+	WT_CURSOR_LOG *cl;
+
+	WT_UNUSED(session);
+	cl = cookie;
+	/*
+	 * Update the cursor's LSN to this record and set its key to this
+	 * LSN.  Set the log record as the value.
+	 */
+	*cl->cur_lsn = *lsnp;
+	*cl->next_lsn = *lsnp;
+	cl->next_lsn->offset += logrec->size;
+	if (cl->logrec == NULL)
+		__wt_scr_alloc(session, logrec->size, &cl->logrec);
+	WT_RET(__wt_buf_set(session,
+	    cl->logrec, logrec->data, logrec->size));
+	return (0);
+}
+
+/*
  * __curlog_compare --
  *	WT_CURSOR.compare method for the log cursor type.
  */
@@ -47,29 +73,18 @@ __curlog_iterrec(
 {
 	WT_CURSOR_LOG *cl;
 
-	WT_UNUSED(session);
+	/*
+	 * We need to do the common things a non-iterator cursor does first.
+	 */
+	WT_RET(__curlog_logrec(session, logrec, lsnp, cookie));
 	cl = cookie;
-	/*
-	 * Update the cursor's LSN to this record so that we know the next
-	 * full record to read.
-	 */
-	*cl->cur_lsn = *lsnp;
-	*cl->next_lsn = *lsnp;
-	cl->next_lsn->offset += logrec->size;
-	/*
-	 * We're starting with a new full record.  We need to copy it into
-	 * the cursor, and then set up our pointers within it.
-	 */
-	if (cl->iter_logrec == NULL)
-		__wt_scr_alloc(session, logrec->size, &cl->iter_logrec);
-	WT_RET(__wt_buf_set(session,
-	    cl->iter_logrec, logrec->data, logrec->size));
+
 	/*
 	 * Skip the log header.
 	 */
-	cl->iterp = (const uint8_t *)cl->iter_logrec->data +
+	cl->iterp = (const uint8_t *)cl->logrec->data +
 	    offsetof(WT_LOG_RECORD, record);
-	cl->iterp_end = (const uint8_t *)cl->iter_logrec->data + logrec->size;
+	cl->iterp_end = (const uint8_t *)cl->logrec->data + logrec->size;
 	/*
 	 * The record count within a record starts at 1 so that we can
 	 * reserve 0 to mean the entire record.
@@ -108,7 +123,7 @@ __curlog_iterkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 		WT_RET(__wt_logop_read(session, &cl->iterp, cl->iterp_end,
 		    &optype, &opsize));
 	else
-		opsize = cl->iter_logrec->size;
+		opsize = cl->logrec->size;
 	__wt_cursor_set_key(cursor, cl->cur_lsn->file, cl->cur_lsn->offset,
 	    cl->txnid, cl->iter_count++);
 	value.data = cl->iterp;
@@ -138,42 +153,19 @@ __curlog_iternext(WT_CURSOR *cursor)
 	 * have, or we are in the zero-fill portion of the record, get a
 	 * new one.
 	 */
-	if (cl->iter_logrec == NULL || cl->iterp >= cl->iterp_end ||
+	if (cl->logrec == NULL || cl->iterp >= cl->iterp_end ||
 	    !(*cl->iterp)) {
 		cl->txnid = 0;
 		WT_ERR(__wt_log_scan(session, cl->next_lsn, WT_LOGSCAN_ONE,
 		    cl->scan_cb, cl));
 	}
-	WT_ASSERT(session, cl->iter_logrec->data != NULL);
+	WT_ASSERT(session, cl->logrec->data != NULL);
 	WT_STAT_FAST_CONN_INCR(session, cursor_next);
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 	WT_ERR(__curlog_iterkv(session, cursor));
 
 err:	API_END_RET(session, ret);
 
-}
-
-/*
- * __curlog_logrec --
- *	Callback function from log_scan to get a log record.
- */
-static int
-__curlog_logrec(
-    WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
-{
-	WT_CURSOR_LOG *cl;
-
-	WT_UNUSED(session);
-	cl = cookie;
-	/*
-	 * Update the cursor's LSN to this record and set its key to this
-	 * LSN.  Set the log record as the value.
-	 */
-	*cl->cur_lsn = *lsnp;
-	*cl->next_lsn = *lsnp;
-	cl->next_lsn->offset += logrec->size;
-	__wt_cursor_set_raw_value((WT_CURSOR *)cl, logrec);
-	return (0);
 }
 
 /*
@@ -194,6 +186,7 @@ __curlog_next(WT_CURSOR *cursor)
 	WT_ERR(__wt_log_scan(session, cl->next_lsn, WT_LOGSCAN_ONE,
 	    __curlog_logrec, cl));
 	__wt_cursor_set_key(cursor, cl->cur_lsn->file, cl->cur_lsn->offset);
+	__wt_cursor_set_raw_value((WT_CURSOR *)cl, cl->logrec);
 	WT_STAT_FAST_CONN_INCR(session, cursor_next);
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 
@@ -236,6 +229,8 @@ __curlog_search(WT_CURSOR *cursor)
 	 */
 	if (F_ISSET(cl, WT_LOGC_ITERATOR))
 		WT_ERR(__curlog_iterkv(session, cursor));
+	else
+		__wt_cursor_set_raw_value((WT_CURSOR *)cl, cl->logrec);
 	WT_STAT_FAST_CONN_INCR(session, cursor_search);
 	WT_STAT_FAST_DATA_INCR(session, cursor_search);
 
@@ -252,11 +247,12 @@ __curlog_reset(WT_CURSOR *cursor)
 	WT_CURSOR_LOG *cl;
 
 	cl = (WT_CURSOR_LOG *)cursor;
-	if (F_ISSET(cl, WT_LOGC_ITERATOR) && cl->iter_logrec != NULL) {
+	if (F_ISSET(cl, WT_LOGC_ITERATOR)) {
 		cl->iterp = cl->iterp_end = NULL;
 		cl->iter_count = 0;
-		__wt_scr_free(&cl->iter_logrec);
 	}
+	if (cl->logrec != NULL)
+		__wt_scr_free(&cl->logrec);
 	INIT_LSN(cl->cur_lsn);
 	INIT_LSN(cl->next_lsn);
 	return (0);
@@ -275,11 +271,12 @@ __curlog_close(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, close, NULL);
 	cl = (WT_CURSOR_LOG *)cursor;
-	if (F_ISSET(cl, WT_LOGC_ITERATOR) && cl->iter_logrec != NULL) {
+	if (F_ISSET(cl, WT_LOGC_ITERATOR)) {
 		cl->iterp = cl->iterp_end = NULL;
 		cl->iter_count = 0;
-		__wt_scr_free(&cl->iter_logrec);
 	}
+	if (cl->logrec != NULL)
+		__wt_scr_free(&cl->logrec);
 	__wt_free(session, cl->cur_lsn);
 	__wt_free(session, cl->next_lsn);
 	WT_ERR(__wt_cursor_close(cursor));
@@ -363,7 +360,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 
 	INIT_LSN(cl->cur_lsn);
 	INIT_LSN(cl->next_lsn);
-	WT_CLEAR(cl->iter_logrec);
+	WT_CLEAR(cl->logrec);
 
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
