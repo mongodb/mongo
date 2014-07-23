@@ -38,7 +38,6 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/query/explain_plan.h"
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
@@ -288,7 +287,7 @@ namespace mongo {
                 if (PlanExecutor::EXEC_ERROR == state) {
                     scoped_ptr<PlanStageStats> stats(exec->getStats());
                     error() << "Plan executor error, stats: "
-                            << statsToBSON(*stats);
+                            << Explain::statsToBSON(*stats);
                     uasserted(17406, "getMore executor error: " +
                               WorkingSetCommon::toStatusString(obj));
                 }
@@ -713,7 +712,7 @@ namespace mongo {
         if (PlanExecutor::EXEC_ERROR == state) {
             scoped_ptr<PlanStageStats> stats(exec->getStats());
             error() << "Plan executor error, stats: "
-                    << statsToBSON(*stats);
+                    << Explain::statsToBSON(*stats);
             uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
         }
 

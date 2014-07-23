@@ -39,7 +39,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
-#include "mongo/db/query/explain_plan.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/qlog.h"
@@ -204,7 +204,7 @@ namespace mongo {
         QuerySolution* bestSolution = bestCandidate.solution;
 
         QLOG() << "Winning solution:\n" << bestSolution->toString() << endl;
-        LOG(2) << "Winning plan: " << getPlanSummary(*bestSolution);
+        LOG(2) << "Winning plan: " << Explain::getPlanSummary(bestCandidate.root);
 
         _backupPlanIdx = kNoSuchPlan;
         if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
@@ -232,10 +232,10 @@ namespace mongo {
                    << " " << _query->toStringShort()
                    << " winner score: " << ranking->scores[0]
                    << " winner summary: "
-                   << getPlanSummary(*_candidates[winnerIdx].solution)
+                   << Explain::getPlanSummary(_candidates[winnerIdx].root)
                    << " runner-up score: " << ranking->scores[1]
                    << " runner-up summary: "
-                   << getPlanSummary(*_candidates[runnerUpIdx].solution);
+                   << Explain::getPlanSummary(_candidates[runnerUpIdx].root);
 
             // There could be more than a 2-way tie, so log the stats for the remaining plans
             // involved in the tie.
@@ -251,7 +251,8 @@ namespace mongo {
                        << " ns: " << _collection->ns()
                        << " " << _query->toStringShort()
                        << " score: " << ranking->scores[i]
-                       << " summary: " << getPlanSummary(*_candidates[planIdx].solution);
+                       << " summary: "
+                       << Explain::getPlanSummary(_candidates[planIdx].root);
             }
         }
 

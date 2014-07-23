@@ -94,8 +94,8 @@ try {
     t.ensureIndex( {a:1} );
     t.find( {a:1} ).itcount();
     o = lastOp();
-    assert.eq( "FETCH", o.execStats.type, tojson( o.execStats ) );
-    assert.eq( "IXSCAN", o.execStats.children[0].type, tojson( o.execStats ) );
+    assert.eq( "FETCH", o.execStats.stage, tojson( o.execStats ) );
+    assert.eq( "IXSCAN", o.execStats.inputStage.stage, tojson( o.execStats ) );
 
     // For queries with a lot of stats data, the execution stats in the profile
     // is replaced by the plan summary.

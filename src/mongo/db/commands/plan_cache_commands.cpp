@@ -39,7 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/plan_cache_commands.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/query/explain_plan.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/util/log.h"
 
@@ -406,7 +406,7 @@ namespace mongo {
             BSONObjBuilder statsBob(reasonBob.subobjStart("stats"));
             PlanStageStats* stats = entry->decision->stats.vector()[i];
             if (stats) {
-                statsToBSON(*stats, &statsBob);
+                Explain::statsToBSON(*stats, &statsBob);
             }
             statsBob.doneFast();
             reasonBob.doneFast();

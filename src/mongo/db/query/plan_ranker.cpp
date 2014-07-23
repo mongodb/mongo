@@ -37,7 +37,7 @@
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/query/explain_plan.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/qlog.h"
@@ -96,8 +96,9 @@ namespace mongo {
         for (size_t i = 0; i < statTrees.size(); ++i) {
             QLOG() << "Scoring plan " << i << ":" << endl
                    << candidates[i].solution->toString() << "Stats:\n"
-                   << statsToBSON(*statTrees[i]).jsonString(Strict, true);
-            LOG(2) << "Scoring query plan: " << getPlanSummary(*candidates[i].solution)
+                   << Explain::statsToBSON(*statTrees[i]).jsonString(Strict, true);
+            LOG(2) << "Scoring query plan: "
+                   << Explain::getPlanSummary(candidates[i].root)
                    << " planHitEOF=" << statTrees[i]->common.isEOF;
 
             double score = scoreTree(statTrees[i]);

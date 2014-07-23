@@ -12,7 +12,7 @@ assert.writeOK(res);
 
 var explain = coll.find({$text:{$search: "\"a\" -b -\"c\""}}).explain(true);
 assert.eq(explain.cursor, "TextCursor");
-assert.eq(explain.stats.type, "TEXT");
+assert.eq(explain.stats.stage, "TEXT");
 assert.eq(explain.stats.parsedTextQuery.terms, ["a"]);
 assert.eq(explain.stats.parsedTextQuery.negatedTerms, ["b"]);
 assert.eq(explain.stats.parsedTextQuery.phrases, ["a"]);

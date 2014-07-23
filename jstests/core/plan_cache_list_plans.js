@@ -69,6 +69,6 @@ for (var i = 0; i < plans.length; i++) {
                    'plans not sorted by score in descending order. ' +
                    'plan ' + i + ' has a score that is greater than that of the previous plan');
     }
-    assert(plans[i].reason.stats.hasOwnProperty('type'), 'no stats inserted for plan ' + i);
+    assert(plans[i].reason.stats.hasOwnProperty('stage'), 'no stats inserted for plan ' + i);
 }
 

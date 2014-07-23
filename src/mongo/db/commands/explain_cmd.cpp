@@ -75,6 +75,9 @@ namespace mongo {
             else if (mongoutils::str::equals(verbStr, "allPlansExecution")) {
                 verbosity = Explain::EXEC_ALL_PLANS;
             }
+            else if (mongoutils::str::equals(verbStr, "full")) {
+                verbosity = Explain::FULL;
+            }
             else if (!mongoutils::str::equals(verbStr, "queryPlanner")) {
                errmsg = "verbosity string must be one of "
                         "{'queryPlanner', 'executionStats', 'allPlansExecution'}";

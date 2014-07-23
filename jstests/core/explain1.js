@@ -27,12 +27,12 @@ assert.eq( 49 , t.find(q).batchSize(20).explain().n , "J" );
 // display index bounds
 
 var explainGt = t.find({x: {$gt: 5}}).explain(true);
-var boundsVerboseGt = explainGt.stats.children[0].boundsVerbose;
+var boundsVerboseGt = explainGt.stats.inputStage.indexBounds;
 
 print('explain stats for $gt = ' + tojson(explainGt.stats));
 
 var explainGte = t.find({x: {$gte: 5}}).explain(true);
-var boundsVerboseGte = explainGte.stats.children[0].boundsVerbose;
+var boundsVerboseGte = explainGte.stats.inputStage.indexBounds;
 
 print('explain stats for $gte = ' + tojson(explainGte.stats));
 

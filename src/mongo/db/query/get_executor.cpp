@@ -43,7 +43,7 @@
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/explain_plan.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/internal_plans.h"
@@ -275,8 +275,9 @@ namespace mongo {
                     verify(StageBuilder::build(opCtx, collection, *qs, ws, rootOut));
                     if ((plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT)
                         && turnIxscanIntoCount(qs)) {
+
                         LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
-                               << ", planSummary: " << getPlanSummary(*qs);
+                               << ", planSummary: " << Explain::getPlanSummary(*rootOut);
 
                         if (NULL != backupQs) {
                             delete backupQs;
@@ -342,11 +343,12 @@ namespace mongo {
                             }
                         }
 
-                        LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
-                               << ", planSummary: " << getPlanSummary(*solutions[i]);
-
                         // We're not going to cache anything that's fast count.
                         verify(StageBuilder::build(opCtx, collection, *solutions[i], ws, rootOut));
+
+                        LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
+                               << ", planSummary: " << Explain::getPlanSummary(*rootOut);
+
                         *querySolutionOut = solutions[i];
                         return Status::OK();
                     }
@@ -354,12 +356,13 @@ namespace mongo {
             }
 
             if (1 == solutions.size()) {
-                LOG(2) << "Only one plan is available; it will be run but will not be cached. "
-                       << canonicalQuery->toStringShort()
-                       << ", planSummary: " << getPlanSummary(*solutions[0]);
-
                 // Only one possible plan.  Run it.  Build the stages from the solution.
                 verify(StageBuilder::build(opCtx, collection, *solutions[0], ws, rootOut));
+
+                LOG(2) << "Only one plan is available; it will be run but will not be cached. "
+                       << canonicalQuery->toStringShort()
+                       << ", planSummary: " << Explain::getPlanSummary(*rootOut);
+
                 *querySolutionOut = solutions[0];
                 return Status::OK();
             }
@@ -876,12 +879,13 @@ namespace mongo {
             QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(*cq, params, dn);
             invariant(soln);
 
-            LOG(2) << "Using fast distinct: " << cq->toStringShort()
-                   << ", planSummary: " << getPlanSummary(*soln);
-
             WorkingSet* ws = new WorkingSet();
             PlanStage* root;
             verify(StageBuilder::build(txn, collection, *soln, ws, &root));
+
+            LOG(2) << "Using fast distinct: " << cq->toStringShort()
+                   << ", planSummary: " << Explain::getPlanSummary(root);
+
             // Takes ownership of its arguments (except for 'collection').
             *out = new PlanExecutor(ws, root, soln, autoCq.release(), collection);
             return Status::OK();
@@ -904,13 +908,14 @@ namespace mongo {
                     }
                 }
 
-                LOG(2) << "Using fast distinct: " << cq->toStringShort()
-                       << ", planSummary: " << getPlanSummary(*solutions[i]);
-
                 // Build and return the SSR over solutions[i].
                 WorkingSet* ws = new WorkingSet();
                 PlanStage* root;
                 verify(StageBuilder::build(txn, collection, *solutions[i], ws, &root));
+
+                LOG(2) << "Using fast distinct: " << cq->toStringShort()
+                       << ", planSummary: " << Explain::getPlanSummary(root);
+
                 // Takes ownership of its arguments (except for 'collection').
                 *out = new PlanExecutor(ws, root, solutions[i], autoCq.release(), collection);
                 return Status::OK();
