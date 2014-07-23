@@ -130,6 +130,11 @@ namespace repl {
         int getMajorityNumber() const { return _majorityNumber; }
 
         /**
+         * Gets the number of votes required to win an election.
+         */
+        int getMajorityVoteCount() const { return _majorityVoteCount; }
+
+        /**
          * Returns true if automatic (not explicitly set) chaining is allowed.
          */
         bool isChainingAllowed() const { return _chainingAllowed; }
@@ -172,10 +177,10 @@ namespace repl {
         Status _parseSettingsSubdocument(const BSONObj& settings);
 
         /**
-         * Calculates majority number based on current config and stores in _majorityNumber.
-         * Called during initialize().
+         * Calculates and stores the majorities for replicating data (_majorityNumber) and for
+         * electing a primary (_majorityVoteCount).
          */
-        void _calculateMajorityNumber();
+        void _calculateMajorities();
 
         bool _isInitialized;
         long long _version;
@@ -185,6 +190,7 @@ namespace repl {
         Seconds _heartbeatTimeoutPeriod;
         bool _chainingAllowed;
         int _majorityNumber;
+        int _majorityVoteCount;
         ReplicaSetTagConfig _tagConfig;
         StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
     };

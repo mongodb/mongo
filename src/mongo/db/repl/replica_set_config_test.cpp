@@ -55,6 +55,22 @@ namespace {
         ASSERT_TRUE(config.isChainingAllowed());
     }
 
+    TEST(ReplicaSetConfig, MajorityCalculationThreeVotersNoArbiters) {
+        ReplicaSetConfig config;
+        ASSERT_OK(config.initialize(
+                          BSON("_id" << "rs0" <<
+                               "version" << 2 <<
+                               "members" << BSON_ARRAY(
+                                       BSON("_id" << 1 << "host" << "h1:1") <<
+                                       BSON("_id" << 2 << "host" << "h2:1") <<
+                                       BSON("_id" << 3 << "host" << "h3:1") <<
+                                       BSON("_id" << 4 << "host" << "h4:1" << "votes" << 0) <<
+                                       BSON("_id" << 5 << "host" << "h5:1" << "votes" << 0)))));
+        ASSERT_OK(config.validate());
+        ASSERT_EQUALS(3, config.getMajorityNumber());
+        ASSERT_EQUALS(2, config.getMajorityVoteCount());
+    }
+
     TEST(ReplicaSetConfig, ParseFailsWithBadOrMissingIdField) {
         ReplicaSetConfig config;
         // Replica set name must be a string.

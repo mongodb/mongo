@@ -129,7 +129,7 @@ namespace {
         if (!status.isOK())
             return status;
 
-        _calculateMajorityNumber();
+        _calculateMajorities();
         _isInitialized = true;
         return Status::OK();
     }
@@ -369,9 +369,9 @@ namespace {
         return StatusWith<ReplicaSetTagPattern>(iter->second);
     }
 
-    void ReplicaSetConfig::_calculateMajorityNumber() {
+    void ReplicaSetConfig::_calculateMajorities() {
         const int total = getNumMembers();
-        const int strictMajority = total/2+1;
+        const int strictMajority = total / 2 + 1;
         const int nonArbiters = total - std::count_if(
                 _members.begin(),
                 _members.end(),
@@ -383,6 +383,13 @@ namespace {
         // TODO(SERVER-14403): Should majority exclude hidden nodes? non-voting nodes? unelectable
         // nodes?
         _majorityNumber = (strictMajority > nonArbiters) ? nonArbiters : strictMajority;
+
+        const int voters = std::count_if(
+                _members.begin(),
+                _members.end(),
+                stdx::bind(&MemberConfig::isVoter, stdx::placeholders::_1));
+
+        _majorityVoteCount = voters / 2 + 1;
     }
 
     BSONObj ReplicaSetConfig::toBSON() const {
