@@ -732,7 +732,8 @@ env.Library('coreshard', ['s/distlock.cpp',
                           # No good reason to be here other than chunk.cpp needs this.
                           's/config_server_checker_service.cpp',
                           's/shard.cpp',
-                          's/shardkey.cpp'],
+                          's/shardkey.cpp',
+                          's/shard_key_pattern.cpp'],
             LIBDEPS=['s/base',
                      's/cluster_ops_impl']);
     
