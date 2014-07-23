@@ -134,6 +134,6 @@ namespace mongo {
         string asString() const;
 
     private:
-        int _size() const { return _key.objsize() + sizeof( DiskLoc ); }
+        int _size() const { return key.objsize() + sizeof( DiskLoc ); }
     };
 }

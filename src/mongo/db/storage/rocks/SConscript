@@ -1,5 +1,3 @@
-# -*- mode: python; -*-
-
 Import("env")
 Import("has_option")
 

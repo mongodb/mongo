@@ -195,7 +195,7 @@ namespace mongo {
 
                 // because considerFieldNames is false, it doesn't matter if we stripped the
                 // fieldnames or not when constructing rie
-                bool compareResult = rie.key().woCompare( _cachedKey, BSONObj(), false ) == 0;
+                bool compareResult = rie.key.woCompare( _cachedKey, BSONObj(), false ) == 0;
 
                 // if we can't find the result and we have a reverse iterator, we need to call
                 // advance() so that we're at the first value less than (to the left of) what we
@@ -252,30 +252,30 @@ namespace mongo {
 
     // RocksIndexEntry***********
 
-    RocksIndexEntry::RocksIndexEntry( const BSONObj& key, const DiskLoc loc, bool stripFieldNames )
-        : IndexKeyEntry( key, loc ) {
+    RocksIndexEntry::RocksIndexEntry( const BSONObj& _key, const DiskLoc _loc, bool stripFieldNames )
+        : IndexKeyEntry( _key, _loc ) {
 
         if ( stripFieldNames ) {
             BSONObjBuilder b;
-            BSONObjIterator i( _key );
+            BSONObjIterator i( key );
             while ( i.more() ) {
                 BSONElement e = i.next();
                 b.appendAs( e, "" );
             }
-            _key = b.obj();
+            key = b.obj();
         }
     }
 
     RocksIndexEntry::RocksIndexEntry( const rocksdb::Slice& slice )
         : IndexKeyEntry( BSONObj(), DiskLoc() ) {
-        _key = BSONObj( slice.data() ).getOwned();
-        _loc = reinterpret_cast<const DiskLoc*>( slice.data() + _key.objsize() )[0];
+        key = BSONObj( slice.data() ).getOwned();
+        loc = reinterpret_cast<const DiskLoc*>( slice.data() + key.objsize() )[0];
     }
 
     string RocksIndexEntry::asString() const {
-        string s( _key.objdata(), _key.objsize() );
+        string s( key.objdata(), key.objsize() );
 
-        s.append( reinterpret_cast<const char*>( &_loc ), sizeof( DiskLoc ) );
+        s.append( reinterpret_cast<const char*>( &loc ), sizeof( DiskLoc ) );
 
         return s;
     }

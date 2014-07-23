@@ -50,6 +50,7 @@ namespace rocksdb {
     struct ColumnFamilyDescriptor;
     struct ColumnFamilyOptions;
     class DB;
+    class Status;
     struct Options;
     struct ReadOptions;
 }
@@ -88,7 +89,9 @@ namespace mongo {
                                        bool preserveClonedFilesOnFailure = false,
                                        bool backupOriginalFiles = false );
 
-        // This executes a shutdown in rocks, so this rocksdb must not be used after this call
+        /**
+         *  This executes a shutdown in rocks, so this rocksdb must not be used after this call
+         */
         virtual void cleanShutdown(OperationContext* txn);
 
         // rocks specific api
@@ -102,8 +105,7 @@ namespace mongo {
                                  const StringData& ns,
                                  const CollectionOptions& options );
 
-        Status dropCollection( OperationContext* opCtx,
-                               const StringData& ns );
+        Status dropCollection( OperationContext* opCtx, const StringData& ns );
 
         /**
          * Will create if doesn't exist. The collection has to exist first, though.
@@ -114,11 +116,11 @@ namespace mongo {
         rocksdb::ColumnFamilyHandle* getIndexColumnFamily(
                               const StringData& ns,
                               const StringData& indexName,
-                              const boost::optional<Ordering> order = boost::optional<Ordering>() );
+                              const boost::optional<Ordering> order = boost::none );
         /**
          * Completely removes a column family. Input pointer is invalid after calling
          */
-        void removeColumnFamily( rocksdb::ColumnFamilyHandle*& cfh, const StringData& indexName,
+        void removeColumnFamily( rocksdb::ColumnFamilyHandle** cfh, const StringData& indexName,
                                             const StringData& ns );
 
         /**
@@ -146,6 +148,11 @@ namespace mongo {
         rocksdb::Options _dbOptions() const;
         rocksdb::ColumnFamilyOptions _collectionOptions() const;
         rocksdb::ColumnFamilyOptions _indexOptions() const;
+
+        /**
+         * Does nothing if s.ok() is true, and blows up otherwise
+         */
+        void _rock_status_ok( rocksdb::Status s );
 
         std::string _path;
         rocksdb::DB* _db;
@@ -196,8 +203,7 @@ namespace mongo {
          * @param an uninitialized pointer to a rocksdb database
          */
         std::map<string, Ordering> _createIndexOrderings( const std::vector<string>& namespaces,
-                                                          const string& path,
-                                                          rocksdb::DB* const db );
+                                                          const string& path );
 
         /**
          * Highest level helper function to generate a vector of all ColumnFamilyDescriptors
@@ -206,7 +212,7 @@ namespace mongo {
          * @param path a path to the database files for the rocksdb database
          * @param an uninitialized pointer to a rocksdb database
          */
-        CfdVector _createCfds ( const string& path, rocksdb::DB* const db);
+        CfdVector _createCfds ( const string& path );
 
         /**
          * Create a complete Entry object in _map for every ColumnFamilyDescriptor. Assumes that, if

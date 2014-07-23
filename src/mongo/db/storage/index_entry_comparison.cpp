@@ -30,19 +30,30 @@
 #include "mongo/db/storage/index_entry_comparison.h"
 
 namespace mongo {
+
+    // Due to the limitations of various APIs, we need to use the same type (IndexKeyEntry)
+    // for both the stored data and the "query". We cheat and encode extra information in the
+    // first byte of the field names in the query. This works because all stored objects should
+    // have all field names empty, so their first bytes are '\0'.
+    enum BehaviorIfFieldIsEqual {
+        normal = '\0',
+        less = 'l',
+        greater = 'g',
+    };
+
     bool IndexEntryComparison::operator() (const IndexKeyEntry& lhs, const IndexKeyEntry& rhs)
        const {
         // implementing in memcmp style to ease reuse of this code.
-        return comparison(lhs, rhs) < 0;
+        return compare(lhs, rhs) < 0;
     }
 
     // This should behave the same as customBSONCmp from btree_logic.cpp.
     //
     // Reading the comment in the .h file is HIGHLY recommended if you need to understand what this
     // function is doing
-    int IndexEntryComparison::comparison(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const {
-        BSONObjIterator lhsIt(lhs.key());
-        BSONObjIterator rhsIt(rhs.key());
+    int IndexEntryComparison::compare(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const {
+        BSONObjIterator lhsIt(lhs.key);
+        BSONObjIterator rhsIt(rhs.key);
 
         // Iterate through both BSONObjects, comparing individual elements one by one
         for (unsigned mask = 1; lhsIt.more(); mask <<= 1) {
@@ -86,10 +97,10 @@ namespace mongo {
             return 1;
 
         // This means just look at the key, not the loc.
-        if (lhs.loc().isNull() || rhs.loc().isNull())
+        if (lhs.loc.isNull() || rhs.loc.isNull())
             return 0;
 
-        return lhs.loc().compare(rhs.loc()); // is supposed to ignore ordering
+        return lhs.loc.compare(rhs.loc); // is supposed to ignore ordering
     }
 
     // Reading the comment in the .h file is HIGHLY recommended if you need to understand what this
@@ -105,9 +116,7 @@ namespace mongo {
         // The basic idea is that we use the field name to store a byte which indicates whether
         // each field in the query object is inclusive and exclusive, and if it is exclusive, in
         // which direction.
-        const char exclusiveByte = (cursorDirection == 1
-                                    ? IndexEntryComparison::greater
-                                    : IndexEntryComparison::less);
+        const char exclusiveByte = (cursorDirection == 1 ? greater : less);
 
         const StringData exclusiveFieldName(&exclusiveByte, 1);
 

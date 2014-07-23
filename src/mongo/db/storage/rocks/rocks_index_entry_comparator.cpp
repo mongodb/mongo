@@ -39,7 +39,7 @@ namespace mongo {
     int RocksIndexEntryComparator::Compare(const rocksdb::Slice& a, const rocksdb::Slice& b) const {
         RocksIndexEntry lhs(a);
         RocksIndexEntry rhs(b);
-        return _indexComparator.comparison(lhs, rhs);
+        return _indexComparator.compare(lhs, rhs);
     }
 
 } // namespace mongo
