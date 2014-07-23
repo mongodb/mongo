@@ -100,7 +100,7 @@ var runTests = function(t, conn, shardTest) {
     if ("collOptions" in t) {
         collOptions = t.collOptions;
     }
-    var dbName = "natural";
+    var dbName = "test";
 
     // Optional test attributes
     // Test throws error
@@ -373,7 +373,7 @@ tests = [
 
 
 // Main program
-var dbName = "natural";
+var dbName = "test";
 
 // Standalone tests
 var conn = MongoRunner.runMongod();
