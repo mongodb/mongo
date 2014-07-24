@@ -903,11 +903,11 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
     var status = undefined
 
     var self = this;
-    var checkStatusWaitForIndicator = function(conn) {
-        assert.soon(function(conn) {
+    var checkStatusWaitForIndicator = function() {
+        assert.soon(function() {
 
             try {
-                status = conn.getDB('admin').runCommand({replSetGetStatus: 1});
+                status = self.status();
             }
             catch ( ex ) {
                 print( "ReplSetTest waitForIndicator could not get status: " + tojson( ex ) );
@@ -952,17 +952,14 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
         }, "waiting for state indicator " + ind + " for " + timeout + "ms", timeout);
     };
 
-    var conn = this.callIsMaster();
-    if (!conn) conn = this.liveNodes.slaves[0];
-
     if (self.keyFile) {
         // Authenticate connections to the replica set members using the keyfile,
         // if applicable, before attempting to perform operations.
-        authutil.asCluster(conn, self.keyFile, function() { checkStatusWaitForIndicator(conn); });
+        authutil.asCluster(self.getMaster(), self.keyFile, checkStatusWaitForIndicator);
     }
     else {
         // No keyfile, so no authenication necessary.
-        checkStatusWaitForIndicator(conn);
+        checkStatusWaitForIndicator();
     }
 
     print( "ReplSetTest waitForIndicator final status:" )
