@@ -106,7 +106,7 @@ namespace mongo {
         /**
          * Creates an error code message out of a key
          */
-        string dupKeyError(const BSONObj& key) const;
+        std::string dupKeyError(const BSONObj& key) const;
     };
 
 } // namespace mongo
