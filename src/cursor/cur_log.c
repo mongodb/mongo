@@ -20,8 +20,7 @@ __curlog_logrec(
 	WT_UNUSED(session);
 	cl = cookie;
 	/*
-	 * Update the cursor's LSN to this record and set its key to this
-	 * LSN.  Set the log record as the value.
+	 * Set up the LSNs and take a copy of the log record for the cursor.
 	 */
 	*cl->cur_lsn = *lsnp;
 	*cl->next_lsn = *lsnp;
@@ -118,6 +117,7 @@ __curlog_iterkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	cl = (WT_CURSOR_LOG *)cursor;
 	/*
 	 * If it is a commit, peek to get the size and optype.
+	 * Currently we don't do anything with the optype.
 	 */
 	if (cl->rectype == WT_LOGREC_COMMIT)
 		WT_RET(__wt_logop_read(session, &cl->iterp, cl->iterp_end,
@@ -341,7 +341,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc_def(session, 1, &cl));
 	cursor = &cl->iface;
 	*cursor = iface;
-	WT_RET(__wt_calloc_def(session, 1, &cl->cur_lsn));
+	WT_ERR(__wt_calloc_def(session, 1, &cl->cur_lsn));
 	WT_ERR(__wt_calloc_def(session, 1, &cl->next_lsn));
 	cursor->session = &session->iface;
 

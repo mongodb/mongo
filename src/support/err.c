@@ -522,6 +522,7 @@ __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri)
 	    WT_PREFIX_MATCH(uri, "config:") ||
 	    WT_PREFIX_MATCH(uri, "file:") ||
 	    WT_PREFIX_MATCH(uri, "index:") ||
+	    WT_PREFIX_MATCH(uri, "log:") ||
 	    WT_PREFIX_MATCH(uri, "lsm:") ||
 	    WT_PREFIX_MATCH(uri, "statistics:") ||
 	    WT_PREFIX_MATCH(uri, "table:"))
