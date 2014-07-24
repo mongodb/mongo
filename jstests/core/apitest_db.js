@@ -29,13 +29,13 @@ dd( "c" );
  */
  
 db.getCollection( "test" ).drop();
-db.getCollection( "system.namespaces" ).find().forEach( function(x) { assert(x.name != "test.test"); });
+db.getCollectionNames().forEach( function(x) { assert(x != "test"); });
 
 dd( "d" );
  
 db.createCollection("test");
 var found = false;
-db.getCollection( "system.namespaces" ).find().forEach( function(x) {  if (x.name == "test.test") found = true; });
+db.getCollectionNames().forEach( function(x) { if (x == "test") found = true; });
 assert(found, "found test.test in system.namespaces");
 
 dd( "e" );
