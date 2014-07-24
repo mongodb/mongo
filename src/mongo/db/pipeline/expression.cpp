@@ -808,7 +808,7 @@ namespace {
 
         verify(str::equals(expr.fieldName(), "$dateToString"));
 
-        uassert(18530, "$dateToString only supports an object as its argument",
+        uassert(18629, "$dateToString only supports an object as its argument",
                 expr.type() == Object);
 
         BSONElement formatElem;
@@ -825,9 +825,9 @@ namespace {
             }
         }
 
-        uassert(18531, "Missing 'format' parameter to $dateToString",
+        uassert(18627, "Missing 'format' parameter to $dateToString",
                 !formatElem.eoo());
-        uassert(18532, "Missing 'date' parameter to $dateToString",
+        uassert(18628, "Missing 'date' parameter to $dateToString",
                 !dateElem.eoo());
 
         uassert(18533, "The 'format' parameter to $dateToString must be a string literal",
