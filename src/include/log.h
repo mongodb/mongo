@@ -22,8 +22,8 @@
  * Both of the macros below need to change if the content of __wt_lsn
  * ever changes.
  */
-#define	LSN_KEY_FORMAT		"Iq"
-#define	LSNITER_KEY_FORMAT	"IqqI"
+#define	LSN_KEY_FORMAT		WT_UNCHECKED_STRING(Iq)
+#define	LSNITER_KEY_FORMAT	WT_UNCHECKED_STRING(IqqI)
 
 #define	MAX_LSN(l)	do {						\
 	(l)->file = UINT32_MAX;						\
