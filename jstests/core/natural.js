@@ -82,7 +82,7 @@ function checkQuery(name, cur, field, dir, shardTest, errorExpected) {
 //   test - test object
 //   db - connection to DB
 //   isMongo - connected to mongos, true/false
-var runTests = function(test, db, shardTest) {
+var runTests = function(test, db, isMongo) {
 
     var name = test.name;
     if (isMongo) {
@@ -368,9 +368,9 @@ tests = [
 
 // Main program
 // Determine if test is standalone or sharded (connected to Mongos)
-var sharded = ("isdbgrid" == db.runCommand("ismaster").msg);
+var isMongo = ("isdbgrid" == db.runCommand("ismaster").msg);
 
 // Execute tests
 for (var i=0; i<tests.length; i++) {
-    runTests(tests[i], db, sharded);
+    runTests(tests[i], db, isMongo);
 }
