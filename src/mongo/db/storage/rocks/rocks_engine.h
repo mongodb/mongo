@@ -163,19 +163,10 @@ namespace mongo {
 
         // private methods that should only be called from the RocksEngine constructor
 
-        /**
-         * Create Entry's for all non-index column families. See larger comment in .cpp for why
-         * this is necessary
-         *
-         * @param families a vector containing the names of all the column families in the database
-         */
+        // See larger comment in .cpp for why this is necessary
         EntryVector _createNonIndexCatalogEntries( const std::vector<std::string>& families );
 
         /**
-         * Generate column family descriptors for the metadata column family corresponding to each
-         * Entry in entries. We need to open these first because the metadata column families
-         * contain the information needed to open the column families representing indexes.
-         *
          * @param entries a vector containing Entry structs for every non-index column family in
          * the database. These Entry structs do not need to be fully initialized, but the
          * collectionEntry field must be.
@@ -185,33 +176,19 @@ namespace mongo {
         CfdVector _generateMetaDataCfds( const EntryVector& entries,
                                          const std::vector<string>& nsVec ) const;
 
-        /**
-         * Returns a list of all the namespaces in the rocksdb database
-         *
-         * @param path a filepath to the rocksdb database
-         */
-        std::vector<std::string> _listNamespaces( std::string path );
+        std::vector<std::string> _listNamespaces( std::string filepath );
 
         /**
-         * Highest level helper function to generate a map from index names to Orderings. This is
-         * needed to properly open column families representing indexes, because an Ordering for
-         * each such index is needed in order to create the comparator for the column family.
-         *
          * @param namespaces a vector containing all the namespaces in this database.
          * @param metaDataCfds a vector of the column family descriptors for every column family
          * in the database representing metadata.
-         * @param path a path to the database files for the rocksdb database.
          */
         std::map<string, Ordering> _createIndexOrderings( const std::vector<string>& namespaces,
                                                           const CfdVector& metaDataCfds,
-                                                          const string& path );
+                                                          const string& filepath );
 
         /**
-         * Generate a vector of all ColumnFamilyDescriptors
-         * in the database, with proper rocksdb::Options set for each of them.
-         *
          * @param namespaces a vector containing all the namespaces in this database
-         * @param indexOrderings a map from index names to Orderings
          */
         CfdVector _createCfds ( const std::vector<std::string>& namespaces, 
                                 const std::map<std::string, Ordering>& indexOrderings );

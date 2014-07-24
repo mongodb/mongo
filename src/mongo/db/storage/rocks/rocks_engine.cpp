@@ -347,10 +347,12 @@ namespace mongo {
         }
     }
 
-    vector<std::string> RocksEngine::_listNamespaces( string path ) {
+    vector<std::string> RocksEngine::_listNamespaces( string filepath ) {
         std::vector<std::string> namespaces;
-        if ( boost::filesystem::exists( path ) ) {
-            rocksdb::Status s = rocksdb::DB::ListColumnFamilies(_dbOptions(), path, &namespaces);
+        if ( boost::filesystem::exists( filepath ) ) {
+            rocksdb::Status s = rocksdb::DB::ListColumnFamilies(_dbOptions(),
+                                                                filepath,
+                                                                &namespaces);
 
             if ( s.IsIOError() ) {
                 // DNE, ok
@@ -430,7 +432,7 @@ namespace mongo {
 
     map<string, Ordering> RocksEngine::_createIndexOrderings( const vector<string>& namespaces,
                                                               const CfdVector& metaDataCfds,
-                                                              const string& path ) {
+                                                              const string& filepath ) {
 
 
         // open all the metadata column families so that we can retrieve information about
@@ -438,7 +440,7 @@ namespace mongo {
         rocksdb::DB* db = nullptr;
         vector<rocksdb::ColumnFamilyHandle*> metaDataHandles;
         rocksdb::Status openROStatus = rocksdb::DB::OpenForReadOnly( _dbOptions(),
-                                                                     path,
+                                                                     filepath,
                                                                      metaDataCfds,
                                                                      &metaDataHandles,
                                                                      &_db );
