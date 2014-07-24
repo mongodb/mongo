@@ -38,11 +38,12 @@
 #include <rocksdb/options.h>
 
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/rocks/rocks_collection_catalog_entry.h"
 #include "mongo/db/storage/rocks/rocks_database_catalog_entry.h"
-#include "mongo/db/storage/rocks/rocks_index_entry_comparator.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
+#include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 #include "mongo/util/log.h"
 
 #define ROCKS_TRACE log()
@@ -185,7 +186,7 @@ namespace mongo {
 
         rocksdb::ColumnFamilyOptions options = rocksdb::ColumnFamilyOptions();
 
-        options.comparator = new RocksIndexEntryComparator( order.get() );
+        options.comparator = RocksSortedDataImpl::newRocksComparator( order.get() );
 
         rocksdb::Status status = _db->CreateColumnFamily( options, fullName, &cf );
         _rock_status_ok( status );
@@ -489,8 +490,8 @@ namespace mongo {
                 string indexName = ns.substr( sepPos + 1 );
                 invariant( indexOrderings.find( indexName ) != indexOrderings.end() );
 
-                options.comparator =
-                    new RocksIndexEntryComparator( indexOrderings.find( indexName )->second );
+                const Ordering order = indexOrderings.find( indexName )->second;
+                options.comparator = RocksSortedDataImpl::newRocksComparator( order );
 
                 families.push_back( rocksdb::ColumnFamilyDescriptor( ns, options ) );
 

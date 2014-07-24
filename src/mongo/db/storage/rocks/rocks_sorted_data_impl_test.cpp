@@ -34,13 +34,13 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/filesystem/operations.hpp>
 
+#include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
 #include <rocksdb/slice.h>
 #include <rocksdb/options.h>
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
-#include "mongo/db/storage/rocks/rocks_index_entry_comparator.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 #include "mongo/unittest/unittest.h"
@@ -57,8 +57,8 @@ namespace mongo {
     };
 
     // to be used in testing
-    static std::unique_ptr<RocksIndexEntryComparator> _rocksComparator(
-            new RocksIndexEntryComparator( Ordering::make( BSON( "a" << 1 ) ) ) );
+    static std::unique_ptr<rocksdb::Comparator> _rocksComparator(
+            RocksSortedDataImpl::newRocksComparator( Ordering::make( BSON( "a" << 1 ) ) ) );
 
     rocksdb::DB* getDB() {
         string path = "/tmp/mongo-rocks-test";

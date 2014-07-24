@@ -87,28 +87,10 @@ namespace mongo {
         virtual Status initAsEmpty(OperationContext* txn);
 
         //rocks specific
-        
-        /**
-         * Constructs a string containing the bytes of key followed by the bytes of loc.
-         * Currently, (7/18/14) the stripFieldNames boolean exists
-         * solely to construct slices that have been created by the
-         * IndexEntryComparison::makeQueryObject method, since this is the only case where it is
-         * desirable to keep the field names.
-         */
-        static std::string makeString( const BSONObj& key,
-                                       const DiskLoc loc,
-                                       bool stripFieldNames = true );
 
-        /**
-         * Constructs an IndexKeyEntry from a slice containing the bytes of a BSONObject followed
-         * by the bytes of a DiskLoc
-         */
-        static IndexKeyEntry makeIndexKeyEntry( const rocksdb::Slice& slice );
-
-        /**
-         * Strips the field names from a BSON object
-         */
-        static BSONObj stripFieldNames( const BSONObj& obj );
+        // ownership passes to caller. Bare because we need to pass the bare pointer to the
+        // rocksdb::Options class
+        static rocksdb::Comparator* newRocksComparator( const Ordering& order );
 
     private:
         typedef DiskLoc RecordId;
