@@ -59,7 +59,7 @@ namespace mongo {
     // If the number of documents is very small, an extra
     // scan could incur huge additional I/O costs when it would
     // be simpler to just scan all the documents manually.
-    const int NEGATION_SCAN_THRESHOLD = 10;
+    const int NEGATION_SCAN_THRESHOLD = 1000;
 
     struct TextStageParams {
         TextStageParams(const FTSSpec& s) : spec(s) {}
