@@ -478,14 +478,12 @@ __lsm_get_chunk_to_flush(
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
 		return (__wt_lsm_tree_unlock(session, lsm_tree));
 
-	for (i = 0;
-	    i < lsm_tree->nchunks &&
-	    F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK);
-	    i++) {}
-
-	if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK)) {
-		(void)WT_ATOMIC_ADD(lsm_tree->chunk[i]->refcnt, 1);
-		*chunkp = lsm_tree->chunk[i];
+	for (i = 0; i < lsm_tree->nchunks - 1; i++) {
+		if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK)) {
+			(void)WT_ATOMIC_ADD(lsm_tree->chunk[i]->refcnt, 1);
+			*chunkp = lsm_tree->chunk[i];
+			break;
+		}
 	}
 
 	WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
