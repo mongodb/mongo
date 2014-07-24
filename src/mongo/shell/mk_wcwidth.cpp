@@ -206,7 +206,7 @@ int mk_wcwidth(int ucs)
 }
 
 
-int mk_wcswidth(const int *pwcs, size_t n)
+int mk_wcswidth(unsigned int *pwcs, size_t n)
 {
   int w, width = 0;
 
