@@ -159,6 +159,8 @@ namespace repl {
 
         virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
 
+        virtual bool isReplEnabled() const;
+
     private:
         Status _stepDownHelper(OperationContext* txn,
                                bool force,

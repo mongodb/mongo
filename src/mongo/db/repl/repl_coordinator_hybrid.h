@@ -161,6 +161,8 @@ namespace repl {
 
         virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
 
+        virtual bool isReplEnabled() const;
+
     private:
         LegacyReplicationCoordinator _legacy;
         ReplicationCoordinatorImpl _impl;

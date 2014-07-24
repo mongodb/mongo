@@ -118,7 +118,7 @@ namespace repl {
          * Returns true if this node is configured to be a member of a replica set or master/slave
          * setup.
          */
-        virtual bool isReplEnabled() const { return getReplicationMode() != modeNone; }
+        virtual bool isReplEnabled() const = 0;
 
         /**
          * Returns the current replica set state of this node (PRIMARY, SECONDARY, STARTUP, etc).

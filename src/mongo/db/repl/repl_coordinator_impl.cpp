@@ -157,8 +157,7 @@ namespace repl {
     }
 
     ReplicationCoordinator::Mode ReplicationCoordinatorImpl::_getReplicationMode_inlock() const {
-        // TODO(spencer): This should be checking if you have a config
-        if (_settings.usingReplSets()) {
+        if (_rsConfig.isInitialized()) {
             return modeReplSet;
         }
         else if (_settings.slave || _settings.master) {
@@ -170,6 +169,7 @@ namespace repl {
     void ReplicationCoordinatorImpl::setCurrentMemberState(const MemberState& newState) {
         invariant(_settings.usingReplSets());
         boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(_settings.usingReplSets());
         _currentState = newState;
     }
 
@@ -249,7 +249,10 @@ namespace repl {
             return StatusAndDuration(Status::OK(), Milliseconds(0));
         }
 
-        const Mode replMode = getReplicationMode();
+        Timer timer;
+        boost::unique_lock<boost::mutex> lk(_mutex);
+
+        const Mode replMode = _getReplicationMode_inlock();
         if (replMode == modeNone || serverGlobalParams.configsvr) {
             // no replication check needed (validated above)
             return StatusAndDuration(Status::OK(), Milliseconds(0));
@@ -260,9 +263,7 @@ namespace repl {
             return StatusAndDuration(Status::OK(), Milliseconds(0));
         }
 
-        Timer timer;
         boost::condition_variable condVar;
-        boost::unique_lock<boost::mutex> lk(_mutex);
         // Must hold _mutex before constructing waitInfo as it will modify _replicationWaiterList
         WaiterInfo waitInfo(&_replicationWaiterList, &opId, &writeConcern, &condVar);
 
@@ -547,7 +548,7 @@ namespace repl {
 
     void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(const ReplicaSetConfig& newConfig,
                                                                 int myIndex) {
-        invariant(getReplicationMode() == modeReplSet);
+        invariant(_settings.usingReplSets());
         boost::lock_guard<boost::mutex> lk(_mutex);
         _rsConfig = newConfig;
         _thisMembersConfigIndex = myIndex;
@@ -812,6 +813,10 @@ namespace repl {
     Status ReplicationCoordinatorImpl::checkReplEnabledForCommand(BSONObjBuilder* result) {
         //TODO
         return Status::OK();
+    }
+
+    bool ReplicationCoordinatorImpl::isReplEnabled() const {
+        return _settings.usingReplSets() || _settings.master || _settings.slave;
     }
 
 } // namespace repl

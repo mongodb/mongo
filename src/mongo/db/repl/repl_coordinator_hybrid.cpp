@@ -61,6 +61,9 @@ namespace repl {
 
     ReplicationCoordinator::Mode HybridReplicationCoordinator::getReplicationMode() const {
         Mode legacyMode = _legacy.getReplicationMode();
+        // TODO(dannenberg) uncomment below once impl has implemented mode related functionality
+        // Mode implMode = _impl.getReplicationMode();
+        // invariant(legacyMode == implMode);
         return legacyMode;
     }
 
@@ -112,7 +115,9 @@ namespace repl {
 
     bool HybridReplicationCoordinator::isMasterForReportingPurposes() {
         bool legacyResponse = _legacy.isMasterForReportingPurposes();
-        _impl.isMasterForReportingPurposes();
+        // TODO(dannenberg) uncomment below once the impl state changes are fully implemented
+        // bool implResponse = _impl.isMasterForReportingPurposes();
+        // invariant(legacyResponse == implResponse);
         return legacyResponse;
     }
 
@@ -334,6 +339,14 @@ namespace repl {
         Status legacyStatus = _legacy.checkReplEnabledForCommand(result);
         Status implStatus = _impl.checkReplEnabledForCommand(result);
         return legacyStatus;
+    }
+
+    bool HybridReplicationCoordinator::isReplEnabled() const {
+        bool legacyResponse = _legacy.isReplEnabled();
+        // TODO(dannenberg) uncomment once config loading is working properly in impl
+        // bool implResponse = _impl.isReplEnabled();
+        // invariant(legacyResponse == implResponse);
+        return legacyResponse;
     }
 
 } // namespace repl

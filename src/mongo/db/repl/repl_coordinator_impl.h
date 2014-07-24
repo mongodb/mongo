@@ -173,6 +173,8 @@ namespace repl {
 
         virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
 
+        virtual bool isReplEnabled() const;
+
         // ================== Members of replication code internal API ===================
 
         // Called by the TopologyCoordinator whenever this node's replica set state transitions.
@@ -227,9 +229,13 @@ namespace repl {
          */
         void _startHeartbeats();
 
-        Mode _getReplicationMode_inlock() const;
-
         MemberState _getCurrentMemberState_inlock() const;
+
+        /**
+         * Returns the current replication mode. This method requires the caller to be holding
+         * "_mutex" to be called safely.
+         */
+        Mode _getReplicationMode_inlock() const;
 
         // Handles to actively queued heartbeats
         typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;

@@ -1045,5 +1045,9 @@ namespace {
         return BSONObj();
     }
 
+    bool LegacyReplicationCoordinator::isReplEnabled() const {
+        return _settings.usingReplSets() || _settings.slave || _settings.master;
+    }
+
 } // namespace repl
 } // namespace mongo

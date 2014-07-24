@@ -64,6 +64,12 @@ namespace {
         settings.replSet = "mySet/node1:12345,node2:54321";
         ReplicationCoordinatorImpl coordinator(settings,
                                                new ReplicationCoordinatorExternalStateMock);
+        ReplicaSetConfig config;
+        config.initialize((BSON("_id" << "mySet" <<
+                                "version" << 2 <<
+                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                             "_id" << 0 )))));
+        coordinator.setCurrentReplicaSetConfig(config, 0);
         coordinator.startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
         coordinator.shutdown();
     }
@@ -110,6 +116,12 @@ namespace {
         settings.replSet = "mySet/node1:12345,node2:54321";
         ReplicationCoordinatorImpl coordinator(settings,
                                                new ReplicationCoordinatorExternalStateMock);
+        ReplicaSetConfig config;
+        config.initialize((BSON("_id" << "mySet" <<
+                                "version" << 2 <<
+                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                             "_id" << 0 )))));
+        coordinator.setCurrentReplicaSetConfig(config, 0);
         OperationContextNoop txn;
 
         OID client1 = OID::gen();
@@ -218,6 +230,12 @@ namespace {
         settings.replSet = "mySet/node1:12345,node2:54321";
         ReplicationCoordinatorImpl coordinator(settings,
                                                new ReplicationCoordinatorExternalStateMock);
+        ReplicaSetConfig config;
+        config.initialize((BSON("_id" << "mySet" <<
+                                "version" << 2 <<
+                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                             "_id" << 0 )))));
+        coordinator.setCurrentReplicaSetConfig(config, 0);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
 
@@ -266,6 +284,12 @@ namespace {
         settings.replSet = "mySet/node1:12345,node2:54321";
         ReplicationCoordinatorImpl coordinator(settings,
                                                new ReplicationCoordinatorExternalStateMock);
+        ReplicaSetConfig config;
+        config.initialize((BSON("_id" << "mySet" <<
+                                "version" << 2 <<
+                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                             "_id" << 0 )))));
+        coordinator.setCurrentReplicaSetConfig(config, 0);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
 
@@ -295,6 +319,12 @@ namespace {
         settings.replSet = "mySet/node1:12345,node2:54321";
         ReplicationCoordinatorImpl coordinator(settings,
                                                new ReplicationCoordinatorExternalStateMock);
+        ReplicaSetConfig config;
+        config.initialize((BSON("_id" << "mySet" <<
+                                "version" << 2 <<
+                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                             "_id" << 0 )))));
+        coordinator.setCurrentReplicaSetConfig(config, 0);
         coordinator.startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
@@ -318,6 +348,50 @@ namespace {
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, statusAndDur.status);
         awaiter.reset();
+    }
+
+    TEST(ReplicationCoordinator, GetReplicationMode) {
+        // should default to modeNone
+        ReplSettings settings;
+        ReplicationCoordinatorImpl coordinator(settings,
+                                               new ReplicationCoordinatorExternalStateMock);
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, coordinator.getReplicationMode());
+
+        // modeMasterSlave if master set
+        ReplSettings settings2;
+        settings2.master = true;
+        ReplicationCoordinatorImpl coordinator2(settings2,
+                                                new ReplicationCoordinatorExternalStateMock);
+        ASSERT_EQUALS(ReplicationCoordinator::modeMasterSlave, coordinator2.getReplicationMode());
+
+        // modeMasterSlave if the slave flag was set
+        ReplSettings settings3;
+        settings3.slave = SimpleSlave;
+        ReplicationCoordinatorImpl coordinator3(settings3,
+                                                new ReplicationCoordinatorExternalStateMock);
+        ASSERT_EQUALS(ReplicationCoordinator::modeMasterSlave, coordinator3.getReplicationMode());
+
+        // modeReplSet only once config isInitialized
+        ReplSettings settings4;
+        settings4.replSet = "mySet/node1:12345";
+        ReplicationCoordinatorImpl coordinator4(settings4,
+                                                new ReplicationCoordinatorExternalStateMock);
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, coordinator4.getReplicationMode());
+        ReplicaSetConfig config;
+        config.initialize((BSON("_id" << "mySet" <<
+                                "version" << 2 <<
+                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                             "_id" << 0 )))));
+        coordinator4.setCurrentReplicaSetConfig(config, 0);
+        ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, coordinator4.getReplicationMode());
+
+        // modeReplSet only once config isInitialized even if the slave flag was set
+        settings4.slave = SimpleSlave;
+        ReplicationCoordinatorImpl coordinator5(settings4,
+                                                new ReplicationCoordinatorExternalStateMock);
+        ASSERT_EQUALS(ReplicationCoordinator::modeMasterSlave, coordinator5.getReplicationMode());
+        coordinator5.setCurrentReplicaSetConfig(config, 0);
+        ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, coordinator5.getReplicationMode());
     }
 
     TEST(ReplicationCoordinator, AwaitReplicationNamedModes) {
