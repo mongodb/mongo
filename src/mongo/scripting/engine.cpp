@@ -57,6 +57,7 @@ namespace mongo {
     }
 
     Scope::~Scope() {
+
     }
 
     void Scope::append(BSONObjBuilder& builder, const char* fieldName, const char* scopeName) {
@@ -177,7 +178,7 @@ namespace mongo {
             uassert(10430,  "invalid object id: not hex", std::isxdigit(str.at(i)));
     }
 
-    void Scope::loadStored(bool ignoreNotConnected) {
+    void Scope::loadStored(OperationContext* txn, bool ignoreNotConnected) {
         if (_localDBName.size() == 0) {
             if (ignoreNotConnected)
                 return;
@@ -190,7 +191,7 @@ namespace mongo {
         _loadedVersion = _lastVersion;
         string coll = _localDBName + ".system.js";
 
-        DBClientBase* directDBClient = createDirectClient();
+        scoped_ptr<DBClientBase> directDBClient(createDirectClient(txn));
         auto_ptr<DBClientCursor> c = directDBClient->query(coll, Query(), 0, 0, NULL,
             QueryOption_SlaveOk, 0);
         massert(16669, "unable to get db client cursor from query", c.get());
@@ -347,7 +348,7 @@ namespace {
         PooledScope(const std::string& pool, const boost::shared_ptr<Scope>& real)
             : _pool(pool)
             , _real(real) {
-            _real->loadStored(true);
+
         }
 
         virtual ~PooledScope() {
@@ -357,9 +358,13 @@ namespace {
         // wrappers for the derived (_real) scope
         void reset() { _real->reset(); }
         void init(const BSONObj* data) { _real->init(data); }
-        void localConnect(const char* dbName) { _real->localConnect(dbName); }
+        void localConnectForDbEval(OperationContext* txn, const char* dbName) {
+            invariant(!"localConnectForDbEval should only be called from dbEval");
+        }
         void setLocalDB(const string& dbName) { _real->setLocalDB(dbName); }
-        void loadStored(bool ignoreNotConnected = false) { _real->loadStored(ignoreNotConnected); }
+        void loadStored(OperationContext* txn, bool ignoreNotConnected = false) { 
+            _real->loadStored(txn, ignoreNotConnected);
+        }
         void externalSetup() { _real->externalSetup(); }
         void gc() { _real->gc(); }
         bool isKillPending() const { return _real->isKillPending(); }
@@ -417,7 +422,9 @@ namespace {
     };
 
     /** Get a scope from the pool of scopes matching the supplied pool name */
-    auto_ptr<Scope> ScriptEngine::getPooledScope(const string& db, const string& scopeType) {
+    auto_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* txn,
+                                                 const string& db,
+                                                 const string& scopeType) {
         const string fullPoolName = db + scopeType;
         boost::shared_ptr<Scope> s = scopeCache.tryAcquire(fullPoolName);
         if (!s) {
@@ -427,7 +434,7 @@ namespace {
         auto_ptr<Scope> p;
         p.reset(new PooledScope(fullPoolName, s));
         p->setLocalDB(db);
-        p->loadStored(true);
+        p->loadStored(txn, true);
         return p;
     }
 

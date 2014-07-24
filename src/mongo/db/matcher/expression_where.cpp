@@ -28,7 +28,8 @@
  *    it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/namespace_string.h"
@@ -111,7 +112,8 @@ namespace mongo {
         const string userToken = ClientBasic::getCurrent()->getAuthorizationSession()
                                                           ->getAuthenticatedUserNamesToken();
 
-        _scope = globalScriptEngine->getPooledScope(_dbName, "where" + userToken);
+        _scope = globalScriptEngine->getPooledScope(_txn, _dbName, "where" + userToken);
+
         _func = _scope->createFunction( _code.c_str() );
 
         if ( !_func )
@@ -127,6 +129,7 @@ namespace mongo {
         if ( ! _userScope.isEmpty() ) {
             _scope->init( &_userScope );
         }
+
         _scope->setObject( "obj", const_cast< BSONObj & >( obj ) );
         _scope->setBoolean( "fullObject" , true ); // this is a hack b/c fullObject used to be relevant
 

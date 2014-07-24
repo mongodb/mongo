@@ -988,8 +988,8 @@ namespace {
         return (unsigned long long )res;
     }
 
-    DBClientBase* createDirectClient() {
-        return new DBDirectClient();
+    DBClientBase* createDirectClient(OperationContext* txn) {
+        return new DBDirectClient(txn);
     }
 
 

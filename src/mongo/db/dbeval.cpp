@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <time.h>
 
@@ -46,7 +46,12 @@ namespace mongo {
 
     const int edebug=0;
 
-    bool dbEval(const string& dbName, BSONObj& cmd, BSONObjBuilder& result, string& errmsg) {
+    static bool dbEval(OperationContext* txn,
+                       const string& dbName,
+                       const BSONObj& cmd,
+                       BSONObjBuilder& result,
+                       string& errmsg) {
+
         BSONElement e = cmd.firstElement();
         uassert( 10046 ,  "eval needs Code" , e.type() == Code || e.type() == CodeWScope || e.type() == String );
 
@@ -69,18 +74,18 @@ namespace mongo {
             return false;
         }
 
-        const string userToken = ClientBasic::getCurrent()->getAuthorizationSession()
-                                                          ->getAuthenticatedUserNamesToken();
-        auto_ptr<Scope> s = globalScriptEngine->getPooledScope( dbName, "dbeval" + userToken );
+        scoped_ptr<Scope> s(globalScriptEngine->newScope());
+
         ScriptingFunction f = s->createFunction(code);
         if ( f == 0 ) {
             errmsg = (string)"compile failed: " + s->getError();
             return false;
         }
 
+        s->localConnectForDbEval(txn, dbName.c_str());
+
         if ( e.type() == CodeWScope )
             s->init( e.codeWScopeScopeDataUnsafe() );
-        s->localConnect( dbName.c_str() );
 
         BSONObj args;
         {
@@ -139,14 +144,14 @@ namespace mongo {
         CmdEval() : Command("eval", false, "$eval") { }
         bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( cmdObj["nolock"].trueValue() ) {
-                return dbEval(dbname, cmdObj, result, errmsg);
+                return dbEval(txn, dbname, cmdObj, result, errmsg);
             }
 
             Lock::GlobalWrite lk(txn->lockState());
             // No WriteUnitOfWork necessary, as dbEval will create its own, see "nolock" case above
             Client::Context ctx(txn,  dbname );
 
-            return dbEval(dbname, cmdObj, result, errmsg);
+            return dbEval(txn, dbname, cmdObj, result, errmsg);
         }
     } cmdeval;
 

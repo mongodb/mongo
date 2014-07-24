@@ -1,4 +1,4 @@
-// javajstests.cpp
+// jstests.cpp
 //
 
 /**
@@ -43,10 +43,6 @@
 #include "mongo/util/timer.h"
 
 using std::string;
-
-namespace mongo {
-    bool dbEval(const string& dbName , BSONObj& cmd, BSONObjBuilder& result, string& errmsg);
-} // namespace mongo
 
 namespace JSTests {
 
@@ -649,7 +645,6 @@ namespace JSTests {
     public:
         void run() {
             auto_ptr<Scope> s( globalScriptEngine->newScope() );
-            s->localConnect( "blah" );
             BSONObjBuilder b;
             long long val = (long long)( 0xbabadeadbeefbaddULL );
             b.append( "a", val );
@@ -710,7 +705,6 @@ namespace JSTests {
     public:
         void run() {
             auto_ptr<Scope> s( globalScriptEngine->newScope() );
-            s->localConnect( "blah" );
 
             BSONObj in;
             {
@@ -738,7 +732,7 @@ namespace JSTests {
     public:
         void run() {
             auto_ptr<Scope> s( globalScriptEngine->newScope() );
-            s->localConnect( "blah" );
+
             BSONObjBuilder b;
             // limit is 2^53
             long long val = (long long)( 9007199254740991ULL );
@@ -784,7 +778,6 @@ namespace JSTests {
     public:
         void run() {
             auto_ptr<Scope> s( globalScriptEngine->newScope() );
-            s->localConnect( "blah" );
 
             // Timestamp 't' component cannot exceed max for int32_t.
             // Use appendTimestamp(field, Date) to bypass OpTime construction.
@@ -814,8 +807,6 @@ namespace JSTests {
         void run() {
             Scope * s = globalScriptEngine->newScope();
 
-            s->localConnect( "blah" );
-
             for ( int i=5; i<100 ; i += 10 ) {
                 s->setObject( "a" , build(i) , false );
                 s->invokeSafe( "tojson( a )" , 0, 0 );
@@ -835,7 +826,7 @@ namespace JSTests {
     public:
         void run() {
             scoped_ptr<Scope> scope(globalScriptEngine->newScope());
-            scope->localConnect("ExecTimeoutDB");
+
             // assert timeout occurred
             ASSERT(!scope->exec("var a = 1; while (true) { ; }",
                                 "ExecTimeout", false, true, false, 1));
@@ -849,7 +840,7 @@ namespace JSTests {
     public:
         void run() {
             scoped_ptr<Scope> scope(globalScriptEngine->newScope());
-            scope->localConnect("ExecNoTimeoutDB");
+
             // assert no timeout occurred
             ASSERT(scope->exec("var a = function() { return 1; }",
                                "ExecNoTimeout", false, true, false, 5 * 60 * 1000));
@@ -863,7 +854,6 @@ namespace JSTests {
     public:
         void run() {
             scoped_ptr<Scope> scope(globalScriptEngine->newScope());
-            scope->localConnect("InvokeTimeoutDB");
 
             // scope timeout after 500ms
             bool caught = false;
@@ -886,7 +876,6 @@ namespace JSTests {
     public:
         void run() {
             scoped_ptr<Scope> scope(globalScriptEngine->newScope());
-            scope->localConnect("InvokeTimeoutDB");
 
             // invoke completes before timeout
             scope->invokeSafe("function() { "
@@ -895,15 +884,6 @@ namespace JSTests {
                               0, 0, 5 * 60 * 1000);
         }
     };
-
-
-    void dummy_function_to_force_dbeval_cpp_linking() {
-        BSONObj cmd;
-        BSONObjBuilder result;
-        string errmsg;
-        dbEval( "test", cmd, result, errmsg);
-        verify(0);
-    }
 
 
     class Utf8Check {
@@ -1868,7 +1848,7 @@ namespace JSTests {
 
         void run() {
             Scope * s = globalScriptEngine->newScope();
-            s->localConnect( "asd" );
+
             const char * foo = "asdas\0asdasd";
             const char * base64 = "YXNkYXMAYXNkYXNk";
 

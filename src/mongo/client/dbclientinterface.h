@@ -32,8 +32,6 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/client/export_macros.h"
@@ -1393,8 +1391,6 @@ namespace mongo {
     /** pings server to check if it's up
      */
     MONGO_CLIENT_API bool serverAlive( const std::string &uri );
-
-    MONGO_CLIENT_API DBClientBase * createDirectClient();
 
     MONGO_CLIENT_API BSONElement getErrField( const BSONObj& result );
     MONGO_CLIENT_API bool hasErrField( const BSONObj& result );

@@ -454,6 +454,10 @@ namespace mongo {
         return _pendingKill || _engine->interrupted();
     }
 
+    OperationContext* V8Scope::getOpContext() const {
+        return _opCtx;
+    }
+
     /**
      * Display a list of all known ops (for verbose output)
      */
@@ -476,7 +480,8 @@ namespace mongo {
           _cpuProfiler(),
           _interruptLock("ScopeInterruptLock"),
           _inNativeExecution(true),
-          _pendingKill(false) {
+          _pendingKill(false),
+          _opCtx(NULL) {
 
         // create new isolate and enter it via a scope
         _isolate.set(v8::Isolate::New());
@@ -1191,10 +1196,14 @@ namespace mongo {
         v8::V8::LowMemoryNotification();
     }
 
-    void V8Scope::localConnect(const char * dbName) {
+    void V8Scope::localConnectForDbEval(OperationContext* txn, const char * dbName) {
         typedef v8::Persistent<v8::FunctionTemplate> FTPtr;
         {
-            V8_SIMPLE_HEADER
+            V8_SIMPLE_HEADER;
+
+            invariant(_opCtx == NULL);
+            _opCtx = txn;
+
             if (_connectState == EXTERNAL)
                 uasserted(12510, "externalSetup already called, can't call localConnect");
             if (_connectState ==  LOCAL) {
@@ -1221,7 +1230,7 @@ namespace mongo {
             _connectState = LOCAL;
             _localDBName = dbName;
         }
-        loadStored();
+        loadStored(txn);
     }
 
     void V8Scope::externalSetup() {

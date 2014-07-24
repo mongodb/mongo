@@ -63,6 +63,9 @@ namespace {
 }
 
 namespace mongo {
+
+    class OperationContext;
+
     // Symbols defined to build the binary correctly.
 
     bool inShutdown() {
@@ -70,7 +73,7 @@ namespace mongo {
         return shuttingDown;
     }
 
-    DBClientBase *createDirectClient() { return NULL; }
+    DBClientBase* createDirectClient(OperationContext* txn) { return NULL; }
 
     void dbexit(ExitCode rc, const char *why){
         {
