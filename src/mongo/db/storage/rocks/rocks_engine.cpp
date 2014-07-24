@@ -254,12 +254,10 @@ namespace mongo {
             return Status( ErrorCodes::NamespaceExists, "invalid character in namespace" );
         }
 
-        rocksdb::ColumnFamilyOptions rocksOptions;
-
         boost::shared_ptr<Entry> entry( new Entry() );
 
         rocksdb::ColumnFamilyHandle* cf;
-        rocksdb::Status status = _db->CreateColumnFamily( rocksOptions, ns.toString(), &cf );
+        rocksdb::Status status = _db->CreateColumnFamily( _collectionOptions(), ns.toString(), &cf );
 
         _rock_status_ok( status );
         rocksdb::ColumnFamilyHandle* cf_meta;
@@ -279,7 +277,7 @@ namespace mongo {
             entry->recordStore.reset( new RocksRecordStore( ns, _db, entry->cfHandle.get(), cf_meta,
                                     true,
                                     options.cappedSize ? options.cappedSize : 4096, // default size
-                                    options.cappedMaxDocs ? options.cappedMaxDocs : -1 ));
+                                    options.cappedMaxDocs ? options.cappedMaxDocs : -1 ) );
         else
             entry->recordStore.reset( new RocksRecordStore( ns, _db,
                                                 entry->cfHandle.get(), cf_meta ) );
@@ -333,7 +331,9 @@ namespace mongo {
     }
 
     rocksdb::ColumnFamilyOptions RocksEngine::_collectionOptions() const {
-        return rocksdb::ColumnFamilyOptions();
+        rocksdb::ColumnFamilyOptions options;
+        options.comparator = RocksRecordStore::newRocksCollectionComparator( );
+        return options;
     }
 
     rocksdb::ColumnFamilyOptions RocksEngine::_indexOptions() const {

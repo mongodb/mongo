@@ -144,6 +144,8 @@ namespace mongo {
         }
         bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
+
+        static rocksdb::Comparator* newRocksCollectionComparator();
     private:
 
         class Iterator : public RecordIterator {

@@ -33,9 +33,10 @@
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 
+#include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
-#include <rocksdb/slice.h>
 #include <rocksdb/options.h>
+#include <rocksdb/slice.h>
 
 namespace mongo {
 
@@ -403,6 +404,41 @@ namespace mongo {
             return Status( ErrorCodes::BadValue, "Invalid Option" );
 
         return Status::OK();
+    }
+
+    namespace {
+        class RocksIndexEntryComparator : public rocksdb::Comparator {
+            public:
+                RocksIndexEntryComparator() { }
+                virtual ~RocksIndexEntryComparator() { }
+
+                virtual int Compare( const rocksdb::Slice& a, const rocksdb::Slice& b ) const {
+                    DiskLoc lhs = reinterpret_cast<const DiskLoc*>( a.data() )[0];
+                    DiskLoc rhs = reinterpret_cast<const DiskLoc*>( b.data() )[0];
+                    return lhs.compare( rhs );
+                }
+
+                virtual const char* Name() const {
+                    return "mongodb.RocksCollectionComparator";
+                }
+
+                /**
+                 * From the RocksDB comments: "an implementation of this method that does nothing is
+                 * correct"
+                 */
+                virtual void FindShortestSeparator( std::string* start,
+                        const rocksdb::Slice& limit) const { }
+
+                /**
+                 * From the RocksDB comments: "an implementation of this method that does nothing is
+                 * correct.
+                 */
+                virtual void FindShortSuccessor(std::string* key) const { }
+        };
+    }
+
+    rocksdb::Comparator* RocksRecordStore::newRocksCollectionComparator() {
+        return new RocksIndexEntryComparator();
     }
 
     void RocksRecordStore::temp_cappedTruncateAfter( OperationContext* txn,
