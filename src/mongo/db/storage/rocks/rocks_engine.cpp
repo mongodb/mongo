@@ -388,11 +388,7 @@ namespace mongo {
             }
 
             boost::shared_ptr<Entry> entry = _map[collection];
-            // this works because a shared_ptr's default constructor leaves it uninitialized
-            if ( !entry ) {
-                _map[collection] = boost::shared_ptr<Entry>( new Entry() );
-                entry = _map[collection];
-            }
+            if ( !entry ) { entry = boost::make_shared<Entry>(); }
 
             // We'll use this RocksCollectionCatalogEntry to open the column families representing
             // indexes
@@ -406,7 +402,7 @@ namespace mongo {
 
     RocksEngine::CfdVector RocksEngine::_generateMetaDataCfds( const EntryVector& entries,
                                                                const vector<string>& nsVec ) const {
-        set<string> namespaces( nsVec.begin(), nsVec.end() );
+        unordered_set<string> namespaces( nsVec.begin(), nsVec.end() );
 
         CfdVector cfds;
 
@@ -423,8 +419,8 @@ namespace mongo {
                 continue;
             }
 
-            rocksdb::ColumnFamilyDescriptor cfd( columnFamilyName, _collectionOptions() );
-            cfds.push_back( cfd );
+            cfds.push_back(rocksdb::ColumnFamilyDescriptor( columnFamilyName, 
+                                                            _collectionOptions() ) );
         }
 
         return cfds;
