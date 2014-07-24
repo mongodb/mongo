@@ -488,15 +488,20 @@ namespace mongo {
           _iterator( _rs->_db->NewIterator( rs->_readOptions(),
                                             rs->_columnFamily ) ) {
         _iterator->Seek( rs->_makeKey( start ) );
-        if ( _forward() && _iterator->Valid() && 
+
+        if ( !_forward() && !_iterator->Valid() )
+            _iterator->SeekToLast();
+        else if ( !_forward() && _iterator->Valid() && 
              reinterpret_cast<const DiskLoc*>( _iterator->key().data() )[0] != start )
             _iterator->Prev();
+
 
         _checkStatus();
     }
 
     void RocksRecordStore::Iterator::_checkStatus() {
-        log() << "Rocks Iterator Status: " << _iterator->status().ToString();
+        if ( !_iterator->status().ok() )
+            log() << "Rocks Iterator Error: " << _iterator->status().ToString();
         invariant( _iterator->status().ok() );
     }
 

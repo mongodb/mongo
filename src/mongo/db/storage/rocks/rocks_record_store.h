@@ -33,8 +33,8 @@
 
 #include <rocksdb/options.h>
 
-#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/capped_callback.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace rocksdb {
@@ -139,7 +139,9 @@ namespace mongo {
                                               DiskLoc end,
                                               bool inclusive);
 
-        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) { _cappedDeleteCallback = cb; }
+        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) { 
+          _cappedDeleteCallback = cb; 
+        }
         bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
     private:
