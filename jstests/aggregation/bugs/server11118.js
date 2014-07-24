@@ -81,16 +81,16 @@ testFormat(now,
 testFormat(ISODate('1999-01-02 03:04:05.006Z'), "%U-%w-%j", "00-7-002");
 
 // Missing date
-testFormatError({format: "%Y"}, 18532);
+testFormatError({format: "%Y"}, 18628);
 
 // Missing format
-testFormatError({date: "$date"}, 18531);
+testFormatError({date: "$date"}, 18627);
 
 // Extra field
 testFormatError({format: "%Y", date: "$date", extra: "whyamIhere"}, 18534);
 
 // Not an object
-testFormatError(["%Y", "$date"], 18530);
+testFormatError(["%Y", "$date"], 18629);
 
 // Use invalid modifier at middle of string
 testFormatError({format:"%Y-%q", date: "$date"}, 18536);
