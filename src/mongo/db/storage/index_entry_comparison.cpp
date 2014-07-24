@@ -120,6 +120,8 @@ namespace mongo {
 
         const StringData exclusiveFieldName(&exclusiveByte, 1);
 
+        bool seenExclusive = prefixExclusive;
+
         BSONObjBuilder bb;
 
         // handle the prefix
@@ -142,7 +144,12 @@ namespace mongo {
         // rather than at 0.
         invariant(keySuffix.size() == suffixInclusive.size());
         for (size_t i = prefixLen; i < keySuffix.size(); i++) {
-            if (suffixInclusive[i]) {
+            if (!keySuffix[i]) {
+                invariant(seenExclusive);
+                bb.append(StringData(), false);
+            }
+            else if (suffixInclusive[i]) {
+                seenExclusive = true;
                 bb.appendAs(*keySuffix[i], StringData());
             }
             else {

@@ -568,7 +568,7 @@ namespace mongo {
                             handles[metadataMap[ns]] ) );
                 }
                 // entry->collectionEntry is set in _createNonIndexCatalogEntries()
-                entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
+                invariant( entry->collectionEntry.get() != NULL );
             }
         }
     }
