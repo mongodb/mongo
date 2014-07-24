@@ -52,6 +52,7 @@ walk_log(WT_SESSION *session)
 	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
 	/*! [log cursor] */
 	i = 0;
+	memset(&lsnsave, 0, sizeof(lsnsave));
 	while ((ret = cursor->next(cursor)) == 0) {
 		/*! [log cursor get_key] */
 		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset);
@@ -95,6 +96,7 @@ iterate_log(WT_SESSION *session)
 	    "log:", NULL, "iterator=true", &cursor);
 	/*! [log iterator open] */
 	i = 0;
+	memset(&lsnsave, 0, sizeof(lsnsave));
 	while ((ret = cursor->next(cursor)) == 0) {
 		/*! [log iterator get_key] */
 		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset,
