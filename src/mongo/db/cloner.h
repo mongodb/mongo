@@ -73,13 +73,22 @@ namespace mongo {
                   const std::string& toDBName,
                   const NamespaceString& from_ns,
                   const NamespaceString& to_ns,
-                  bool isindex,
                   bool logForRepl,
                   bool masterSameProcess,
                   bool slaveOk,
                   bool mayYield,
                   bool mayBeInterrupted,
                   Query q);
+
+        void copyIndexes(OperationContext* txn,
+                         const string& toDBName,
+                         const NamespaceString& from_ns,
+                         const NamespaceString& to_ns,
+                         bool logForRepl,
+                         bool masterSameProcess,
+                         bool slaveOk,
+                         bool mayYield,
+                         bool mayBeInterrupted);
 
         struct Fun;
         std::auto_ptr<DBClientBase> _conn;

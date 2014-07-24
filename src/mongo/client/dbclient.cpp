@@ -1307,6 +1307,42 @@ namespace mongo {
         return query( NamespaceString( ns ).getSystemIndexesCollection() , BSON( "ns" << ns ) );
     }
 
+    list<BSONObj> DBClientWithCommands::getIndexSpecs( const string &ns, int options ) {
+        list<BSONObj> specs;
+
+        {
+            BSONObj cmd = BSON( "listIndexes" << nsToCollectionSubstring( ns ) );
+            BSONObj res;
+            if ( runCommand( nsToDatabase( ns ), cmd, res, options ) ) {
+                BSONObjIterator i( res["indexes"].Obj() );
+                while ( i.more() ) {
+                    specs.push_back( i.next().Obj().getOwned() );
+                }
+                return specs;
+            }
+            int code = res["code"].numberInt();
+            string errmsg = res["errmsg"].valuestrsafe();
+            if ( code == 59 || errmsg.find( "no such cmd" ) != string::npos ) {
+                // old version of server, ok, fall through to old code
+            }
+            else if ( code == 26 ) {
+                // NamespaceNotFound
+                return specs;
+            }
+            else {
+                uasserted( 18531, str::stream() << "listIndexes failed: " << res );
+            }
+        }
+
+        auto_ptr<DBClientCursor> cursor = getIndexes( ns );
+        while ( cursor->more() ) {
+            BSONObj spec = cursor->nextSafe();
+            specs.push_back( spec.getOwned() );
+        }
+        return specs;
+    }
+
+
     void DBClientWithCommands::dropIndex( const string& ns , BSONObj keys ) {
         dropIndex( ns , genIndexName( keys ) );
     }

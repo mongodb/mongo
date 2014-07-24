@@ -977,6 +977,8 @@ namespace mongo {
 
         virtual std::auto_ptr<DBClientCursor> getIndexes( const std::string &ns );
 
+        virtual std::list<BSONObj> getIndexSpecs( const std::string &ns, int options = 0 );
+
         virtual void dropIndex( const std::string& ns , BSONObj keys );
         virtual void dropIndex( const std::string& ns , const std::string& indexName );
 

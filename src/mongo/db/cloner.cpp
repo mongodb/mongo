@@ -84,8 +84,9 @@ namespace mongo {
                 string newname = newDbName + p;
                 b.append("ns", newname);
             }
-            else
+            else {
                 b.append(e);
+            }
         }
 
         BSONObj res= b.obj();
@@ -103,9 +104,11 @@ namespace mongo {
         {}
 
         void operator()( DBClientCursorBatchIterator &i ) {
+            invariant(from_collection.coll() != "system.indexes");
+
             // XXX: can probably take dblock instead
             Lock::GlobalWrite lk(txn->lockState());
-            
+
             // Make sure database still exists after we resume from the temp release
             bool unused;
             Database* db = dbHolder().getOrCreate(txn, _dbName, unused);
@@ -113,20 +116,18 @@ namespace mongo {
             bool createdCollection = false;
             Collection* collection = NULL;
 
-            if ( isindex == false ) {
-                collection = db->getCollection( txn, to_collection );
-                if ( !collection ) {
-                    massert( 17321,
-                             str::stream()
-                             << "collection dropped during clone ["
-                             << to_collection.ns() << "]",
-                             !createdCollection );
-                    WriteUnitOfWork wunit(txn->recoveryUnit());
-                    createdCollection = true;
-                    collection = db->createCollection( txn, to_collection.ns() );
-                    verify( collection );
-                    wunit.commit();
-                }
+            collection = db->getCollection( txn, to_collection );
+            if ( !collection ) {
+                massert( 17321,
+                         str::stream()
+                         << "collection dropped during clone ["
+                         << to_collection.ns() << "]",
+                         !createdCollection );
+                WriteUnitOfWork wunit(txn->recoveryUnit());
+                createdCollection = true;
+                collection = db->createCollection( txn, to_collection.ns() );
+                verify( collection );
+                wunit.commit();
             }
 
             while( i.moreInCurrentBatch() ) {
@@ -154,14 +155,6 @@ namespace mongo {
                 WriteUnitOfWork wunit(txn->recoveryUnit());
 
                 BSONObj js = tmp;
-                if ( isindex ) {
-                    verify(from_collection.coll() == "system.indexes");
-                    js = fixindex(db->name(), tmp);
-                    indexesToBuild->push_back( js.getOwned() );
-                    continue;
-                }
-
-                verify(from_collection.coll() != "system.indexes");
 
                 StatusWith<DiskLoc> loc = collection->insertDocument( txn, js, true );
                 if ( !loc.isOK() ) {
@@ -187,7 +180,6 @@ namespace mongo {
         const string _dbName;
 
         int64_t numSeen;
-        bool isindex;
         NamespaceString from_collection;
         NamespaceString to_collection;
         time_t saveLast;
@@ -204,7 +196,6 @@ namespace mongo {
                       const string& toDBName,
                       const NamespaceString& from_collection,
                       const NamespaceString& to_collection,
-                      bool isindex,
                       bool logForRepl,
                       bool masterSameProcess,
                       bool slaveOk,
@@ -217,7 +208,6 @@ namespace mongo {
 
         Fun f(txn, toDBName);
         f.numSeen = 0;
-        f.isindex = isindex;
         f.from_collection = from_collection;
         f.to_collection = to_collection;
         f.saveLast = time( 0 );
@@ -245,6 +235,64 @@ namespace mongo {
 
                 BSONObj spec = *i;
                 string ns = spec["ns"].String(); // this was fixed when pulled off network
+                Collection* collection = db->getCollection( txn, ns );
+                if ( !collection ) {
+                    collection = db->createCollection( txn, ns );
+                    verify( collection );
+                }
+
+                Status status = collection->getIndexCatalog()->createIndex(txn, spec, mayBeInterrupted);
+                if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
+                    // no-op
+                }
+                else if ( !status.isOK() ) {
+                    error() << "error creating index when cloning spec: " << spec
+                            << " error: " << status.toString();
+                    uassertStatusOK( status );
+                }
+
+                if (logForRepl)
+                    repl::logOp(txn, "i", to_collection.ns().c_str(), spec);
+
+                txn->recoveryUnit()->commitIfNeeded();
+
+            }
+        }
+    }
+
+    void Cloner::copyIndexes(OperationContext* txn,
+                             const string& toDBName,
+                             const NamespaceString& from_collection,
+                             const NamespaceString& to_collection,
+                             bool logForRepl,
+                             bool masterSameProcess,
+                             bool slaveOk,
+                             bool mayYield,
+                             bool mayBeInterrupted) {
+
+        LOG(2) << "\t\t copyIndexes " << from_collection << " to " << to_collection
+               << " on " << _conn->getServerAddress();
+
+        list<BSONObj> indexesToBuild;
+
+        {
+            Lock::TempRelease tempRelease(txn->lockState());
+            indexesToBuild = _conn->getIndexSpecs( from_collection,
+                                                   slaveOk ? QueryOption_SlaveOk : 0 );
+        }
+
+        // We are under lock here again, so reload the database in case it may have disappeared
+        // during the temp release
+        bool unused;
+        Database* db = dbHolder().getOrCreate(txn, toDBName, unused);
+
+        if ( indexesToBuild.size() ) {
+            for (list<BSONObj>::const_iterator i = indexesToBuild.begin();
+                 i != indexesToBuild.end();
+                 ++i) {
+
+                BSONObj spec = fixindex( to_collection.db().toString(), *i );
+                string ns = spec["ns"].String();
                 Collection* collection = db->getCollection( txn, ns );
                 if ( !collection ) {
                     collection = db->createCollection( txn, ns );
@@ -301,7 +349,7 @@ namespace mongo {
                                 string& errmsg,
                                 bool mayYield,
                                 bool mayBeInterrupted,
-                                bool copyIndexes,
+                                bool shouldCopyIndexes,
                                 bool logForRepl) {
 
         const NamespaceString nss(ns);
@@ -327,20 +375,19 @@ namespace mongo {
         // main data
         copy(txn, dbName,
              NamespaceString(ns), NamespaceString(ns),
-             false, logForRepl, false, true, mayYield, mayBeInterrupted,
+             logForRepl, false, true, mayYield, mayBeInterrupted,
              Query(query).snapshot());
 
         /* TODO : copyIndexes bool does not seem to be implemented! */
-        if(!copyIndexes) {
-            log() << "ERROR copy collection copyIndexes not implemented? " << ns << endl;
+        if(!shouldCopyIndexes) {
+            log() << "ERROR copy collection shouldCopyIndexes not implemented? " << ns << endl;
         }
 
         // indexes
-        temp = dbName + ".system.indexes";
-        copy(txn, dbName,
-             NamespaceString(temp), NamespaceString(temp),
-             true, logForRepl, false, true, mayYield,
-             mayBeInterrupted, BSON( "ns" << ns ));
+        copyIndexes(txn, dbName,
+                    NamespaceString(ns), NamespaceString(ns),
+                    logForRepl, false, true, mayYield,
+                    mayBeInterrupted);
 
         wunit.commit();
         txn->recoveryUnit()->commitIfNeeded();
@@ -418,7 +465,7 @@ namespace mongo {
 
         list<BSONObj> toClone;
         if ( clonedColls ) clonedColls->clear();
-        if ( opts.syncData ) {
+        {
             /* todo: we can put these releases inside dbclient or a dbclient specialization.
                or just wait until we get rid of global lock anyway.
                */
@@ -476,92 +523,91 @@ namespace mongo {
             }
         }
 
-        for ( list<BSONObj>::iterator i=toClone.begin(); i != toClone.end(); i++ ) {
-            BSONObj collection = *i;
-            LOG(2) << "  really will clone: " << collection << endl;
-            const char* collectionName = collection["name"].valuestr();
-            BSONObj options = collection.getObjectField("options");
+        if ( opts.syncData ) {
+            for ( list<BSONObj>::iterator i=toClone.begin(); i != toClone.end(); i++ ) {
+                BSONObj collection = *i;
+                LOG(2) << "  really will clone: " << collection << endl;
+                const char* collectionName = collection["name"].valuestr();
+                BSONObj options = collection.getObjectField("options");
 
-            NamespaceString from_name( opts.fromDB, collectionName );
-            NamespaceString to_name( toDBName, collectionName );
+                NamespaceString from_name( opts.fromDB, collectionName );
+                NamespaceString to_name( toDBName, collectionName );
 
-            // Copy releases the lock, so we need to re-load the database. This should probably
-            // throw if the database has changed in between, but for now preserve the existing
-            // behaviour.
-            bool unused;
-            Database* db = dbHolder().getOrCreate(txn, toDBName, unused);
+                // Copy releases the lock, so we need to re-load the database. This should probably
+                // throw if the database has changed in between, but for now preserve the existing
+                // behaviour.
+                bool unused;
+                Database* db = dbHolder().getOrCreate(txn, toDBName, unused);
 
-            /* we defer building id index for performance - building it in batch is much faster */
-            Status createStatus = userCreateNS( txn, db, to_name.ns(), options,
-                                                opts.logForRepl, false );
-            if ( !createStatus.isOK() ) {
-                errmsg = str::stream() << "failed to create collection \""
-                                       << to_name.ns() << "\": "
-                                       << createStatus.reason();
-                return false;
-            }
-
-            LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
-            Query q;
-            if( opts.snapshot )
-                q.snapshot();
-
-            copy(txn,
-                 toDBName,
-                 from_name,
-                 to_name,
-                 false,
-                 opts.logForRepl,
-                 masterSameProcess,
-                 opts.slaveOk,
-                 opts.mayYield,
-                 opts.mayBeInterrupted,
-                 q);
-
-            {
-                /* we need dropDups to be true as we didn't do a true snapshot and this is before applying oplog operations
-                   that occur during the initial sync.  inDBRepair makes dropDups be true.
-                   */
-                bool old = inDBRepair;
-                try {
-                    inDBRepair = true;
-                    Collection* c = db->getCollection( txn, to_name );
-                    if ( c )
-                        c->getIndexCatalog()->ensureHaveIdIndex(txn);
-                    inDBRepair = old;
+                /* we defer building id index for performance - building it in batch is much faster */
+                Status createStatus = userCreateNS( txn, db, to_name.ns(), options,
+                                                    opts.logForRepl, false );
+                if ( !createStatus.isOK() ) {
+                    errmsg = str::stream() << "failed to create collection \""
+                                           << to_name.ns() << "\": "
+                                           << createStatus.reason();
+                    return false;
                 }
-                catch(...) {
-                    inDBRepair = old;
-                    throw;
+
+                LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
+                Query q;
+                if( opts.snapshot )
+                    q.snapshot();
+
+                copy(txn,
+                     toDBName,
+                     from_name,
+                     to_name,
+                     opts.logForRepl,
+                     masterSameProcess,
+                     opts.slaveOk,
+                     opts.mayYield,
+                     opts.mayBeInterrupted,
+                     q);
+
+                {
+                    /* we need dropDups to be true as we didn't do a true snapshot and this is before applying oplog operations
+                       that occur during the initial sync.  inDBRepair makes dropDups be true.
+                    */
+                    bool old = inDBRepair;
+                    try {
+                        inDBRepair = true;
+                        Collection* c = db->getCollection( txn, to_name );
+                        if ( c )
+                            c->getIndexCatalog()->ensureHaveIdIndex(txn);
+                        inDBRepair = old;
+                    }
+                    catch(...) {
+                        inDBRepair = old;
+                        throw;
+                    }
                 }
             }
         }
 
         // now build the indexes
-        
         if ( opts.syncIndexes ) {
-            string system_indexes_from = opts.fromDB + ".system.indexes";
-            string system_indexes_to = toDBName + ".system.indexes";
-            
-            /* [dm]: is the ID index sometimes not called "_id_"?  There is other code in the system that looks for a "_id" prefix
-               rather than this exact value.  we should standardize.  OR, remove names - which is in the bugdb.  Anyway, this
-               is dubious here at the moment.
-            */
-            
-            // build a $nin query filter for the collections we *don't* want
-            BSONArrayBuilder barr;
-            barr.append( opts.collsToIgnore );
-            BSONArray arr = barr.arr();
-            
-            // Also don't copy the _id_ index
-            BSONObj query = BSON( "name" << NE << "_id_" << "ns" << NIN << arr );
-            
-            // won't need a snapshot of the query of system.indexes as there can never be very many.
-            copy(txn, toDBName,
-                 NamespaceString(system_indexes_from), NamespaceString(system_indexes_to),
-                 true, opts.logForRepl, masterSameProcess, opts.slaveOk,
-                 opts.mayYield, opts.mayBeInterrupted, query );
+            for ( list<BSONObj>::iterator i=toClone.begin(); i != toClone.end(); i++ ) {
+                BSONObj collection = *i;
+                log() << "copying indexes for: " << collection;
+
+                const char* collectionName = collection["name"].valuestr();
+
+                NamespaceString from_name( opts.fromDB, collectionName );
+                NamespaceString to_name( toDBName, collectionName );
+
+                copyIndexes(txn,
+                            toDBName,
+                            from_name,
+                            to_name,
+                            opts.logForRepl,
+                            masterSameProcess,
+                            opts.slaveOk,
+                            opts.mayYield,
+                            opts.mayBeInterrupted );
+            }
         }
+
         return true;
     }
 
