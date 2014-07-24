@@ -184,6 +184,14 @@ static void calculateScreenPosition( int x, int y, int screenColumns, int charCo
     }
 }
 
+static int calculateColumnPosition( unsigned int* buf32, size_t n) {
+    int width = mk_wcswidth( reinterpret_cast<const int*>( buf32 ), n );
+    if ( width == -1 )
+        return n;
+    else
+        return width;
+}
+
 static bool isControlChar( UChar32 testChar ) {
     return ( testChar < ' ' ) ||                        // C0 controls
            ( testChar >= 0x7F && testChar <= 0x9F );    // DEL and C1 controls
@@ -635,20 +643,26 @@ static void dynamicRefresh( PromptBase& pi, UChar32* buf32, int len, int pos ) {
 
     // calculate the position of the end of the prompt
     int xEndOfPrompt, yEndOfPrompt;
-    int width;
-
     calculateScreenPosition( 0, 0, pi.promptScreenColumns, pi.promptChars, xEndOfPrompt, yEndOfPrompt );
     pi.promptIndentation = xEndOfPrompt;
 
     // calculate the position of the end of the input line
     int xEndOfInput, yEndOfInput;
-    width = mk_wcswidth((const int *)buf32, len);
-    calculateScreenPosition( xEndOfPrompt, yEndOfPrompt, pi.promptScreenColumns, width, xEndOfInput, yEndOfInput );
+    calculateScreenPosition( xEndOfPrompt,
+                             yEndOfPrompt,
+                             pi.promptScreenColumns,
+                             calculateColumnPosition( buf32, len ),
+                             xEndOfInput,
+                             yEndOfInput );
 
     // calculate the desired position of the cursor
     int xCursorPos, yCursorPos;
-    width = mk_wcswidth((const int *)buf32, pos);
-    calculateScreenPosition( xEndOfPrompt, yEndOfPrompt, pi.promptScreenColumns, width, xCursorPos, yCursorPos );
+    calculateScreenPosition( xEndOfPrompt,
+                             yEndOfPrompt,
+                             pi.promptScreenColumns,
+                             calculateColumnPosition( buf32, len ),
+                             xCursorPos,
+                             yCursorPos );
 
 #ifdef _WIN32
     // position at the start of the prompt, clear to end of previous input
@@ -741,17 +755,23 @@ void InputBuffer::refreshLine( PromptBase& pi ) {
         }
     }
 
-    int width = 0;
-    width = mk_wcswidth((const int *)buf32, len);
-
     // calculate the position of the end of the input line
     int xEndOfInput, yEndOfInput;
-    calculateScreenPosition( pi.promptIndentation, 0, pi.promptScreenColumns, width, xEndOfInput, yEndOfInput );
+    calculateScreenPosition( pi.promptIndentation,
+                             0,
+                             pi.promptScreenColumns,
+                             calculateColumnPosition( buf32, len ),
+                             xEndOfInput,
+                             yEndOfInput );
 
     // calculate the desired position of the cursor
     int xCursorPos, yCursorPos;
-    width = mk_wcswidth((const int *)buf32, pos);
-    calculateScreenPosition( pi.promptIndentation, 0, pi.promptScreenColumns, width, xCursorPos, yCursorPos );
+    calculateScreenPosition( pi.promptIndentation,
+                             0,
+                             pi.promptScreenColumns,
+                             calculateColumnPosition( buf32, pos ),
+                             xCursorPos,
+                             yCursorPos );
 
 #ifdef _WIN32
     // position at the end of the prompt, clear to end of previous input
