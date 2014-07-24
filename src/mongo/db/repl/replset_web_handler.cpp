@@ -30,6 +30,7 @@
 
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/health.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/mongoutils/html.h"

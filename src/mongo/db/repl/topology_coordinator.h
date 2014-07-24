@@ -115,6 +115,7 @@ namespace repl {
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
                                               Date_t now,
                                               const BSONObj& cmdObj, 
+                                              const std::string& ourSetName,
                                               BSONObjBuilder* resultObj,
                                               Status* result) = 0;
 

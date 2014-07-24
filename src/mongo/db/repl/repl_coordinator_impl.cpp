@@ -400,6 +400,7 @@ namespace repl {
                        stdx::placeholders::_1,
                        Date_t(curTimeMillis64()),
                        cmdObj,
+                       _settings.ourSetName(),
                        resultObj,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
