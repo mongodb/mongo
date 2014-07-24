@@ -94,13 +94,6 @@ namespace repl {
         virtual void shutdown() = 0;
 
         /**
-         * Returns true if it is safe to shut down the server now.  Currently the only time this
-         * can be false is if this node is primary and there are no secondaries within 10 seconds
-         * of our optime.
-         */
-        virtual bool isShutdownOkay() const = 0;
-
-        /**
          * Returns a reference to the parsed command line arguments that are related to replication.
          * TODO(spencer): Change this to a const ref once we are no longer using it for mutable
          * global state.

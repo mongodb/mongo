@@ -54,8 +54,6 @@ namespace repl {
 
         virtual void shutdown();
 
-        virtual bool isShutdownOkay() const;
-
         virtual ReplSettings& getSettings();
 
         virtual Mode getReplicationMode() const;

@@ -141,11 +141,6 @@ namespace repl {
         _topCoordDriverThread->join(); // must happen outside _mutex
     }
 
-    bool ReplicationCoordinatorImpl::isShutdownOkay() const {
-        // TODO
-        return false;
-    }
-
     ReplSettings& ReplicationCoordinatorImpl::getSettings() {
         return _settings;
     }

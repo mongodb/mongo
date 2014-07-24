@@ -53,11 +53,6 @@ namespace repl {
         _impl.shutdown();
     }
 
-    bool HybridReplicationCoordinator::isShutdownOkay() const {
-        bool legacyResponse = _legacy.isShutdownOkay();
-        return legacyResponse;
-    }
-
     ReplSettings& HybridReplicationCoordinator::getSettings() {
         ReplSettings& legacySettings = _legacy.getSettings();
         return legacySettings;

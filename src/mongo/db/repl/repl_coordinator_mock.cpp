@@ -50,11 +50,6 @@ namespace repl {
         // TODO
     }
 
-    bool ReplicationCoordinatorMock::isShutdownOkay() const {
-        // TODO
-        return false;
-    }
-
     ReplSettings& ReplicationCoordinatorMock::getSettings() {
         return _settings;
     }

@@ -92,11 +92,6 @@ namespace repl {
         }
     }
 
-    bool LegacyReplicationCoordinator::isShutdownOkay() const {
-        // TODO
-        return false;
-    }
-
     ReplSettings& LegacyReplicationCoordinator::getSettings() {
         return _settings;
     }
