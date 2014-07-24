@@ -763,11 +763,11 @@ namespace QueryStageAnd {
     class QueryStageAndHashFirstChildFetched : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -778,7 +778,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL));
 
             // Foo <= 20
             IndexScanParams params;
@@ -788,11 +788,11 @@ namespace QueryStageAnd {
             params.bounds.endKey = BSONObj();
             params.bounds.endKeyInclusive = true;
             params.direction = -1;
-            IndexScan* firstScan = new IndexScan(&_txn, params, &ws, NULL);
+            IndexScan* firstScan = new IndexScan(params, &ws, NULL);
 
             // First child of the AND_HASH stage is a Fetch. The NULL in the
             // constructor means there is no filter.
-            FetchStage* fetch = new FetchStage(&ws, firstScan, NULL, coll);
+            FetchStage* fetch = new FetchStage(&ws, firstScan, NULL);
             ah->addChild(fetch);
 
             // Bar >= 10
@@ -801,8 +801,7 @@ namespace QueryStageAnd {
             params.bounds.endKey = BSONObj();
             params.bounds.endKeyInclusive = true;
             params.direction = 1;
-            ah->addChild(new IndexScan(&_txn, params, &ws, NULL));
-            ctx.commit();
+            ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Check that the AndHash stage returns docs {foo: 10, bar: 10}
             // through {foo: 20, bar: 20}.
@@ -821,11 +820,11 @@ namespace QueryStageAnd {
     class QueryStageAndHashSecondChildFetched : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -836,7 +835,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL));
 
             // Foo <= 20
             IndexScanParams params;
@@ -846,7 +845,7 @@ namespace QueryStageAnd {
             params.bounds.endKey = BSONObj();
             params.bounds.endKeyInclusive = true;
             params.direction = -1;
-            ah->addChild(new IndexScan(&_txn, params, &ws, NULL));
+            ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar >= 10
             params.descriptor = getIndex(BSON("bar" << 1), coll);
@@ -854,13 +853,12 @@ namespace QueryStageAnd {
             params.bounds.endKey = BSONObj();
             params.bounds.endKeyInclusive = true;
             params.direction = 1;
-            IndexScan* secondScan = new IndexScan(&_txn, params, &ws, NULL);
+            IndexScan* secondScan = new IndexScan(params, &ws, NULL);
 
             // Second child of the AND_HASH stage is a Fetch. The NULL in the
             // constructor means there is no filter.
-            FetchStage* fetch = new FetchStage(&ws, secondScan, NULL, coll);
+            FetchStage* fetch = new FetchStage(&ws, secondScan, NULL);
             ah->addChild(fetch);
-            ctx.commit();
 
             // Check that the AndHash stage returns docs {foo: 10, bar: 10}
             // through {foo: 20, bar: 20}.
@@ -1250,11 +1248,11 @@ namespace QueryStageAnd {
     class QueryStageAndSortedFirstChildFetched : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(ns());
             }
 
             // Insert a bunch of data
@@ -1266,7 +1264,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> as(new AndSortedStage(&ws, NULL, coll));
+            scoped_ptr<AndSortedStage> as(new AndSortedStage(&ws, NULL));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -1276,17 +1274,16 @@ namespace QueryStageAnd {
             params.bounds.endKey = BSON("" << 1);
             params.bounds.endKeyInclusive = true;
             params.direction = 1;
-            IndexScan* firstScan = new IndexScan(&_txn, params, &ws, NULL);
+            IndexScan* firstScan = new IndexScan(params, &ws, NULL);
 
             // First child of the AND_SORTED stage is a Fetch. The NULL in the
             // constructor means there is no filter.
-            FetchStage* fetch = new FetchStage(&ws, firstScan, NULL, coll);
+            FetchStage* fetch = new FetchStage(&ws, firstScan, NULL);
             as->addChild(fetch);
 
             // bar == 1
             params.descriptor = getIndex(BSON("bar" << 1), coll);
-            as->addChild(new IndexScan(&_txn, params, &ws, NULL));
-            ctx.commit();
+            as->addChild(new IndexScan(params, &ws, NULL));
 
             for (int i = 0; i < 50; i++) {
                 BSONObj obj = getNext(as.get(), &ws);
@@ -1303,11 +1300,11 @@ namespace QueryStageAnd {
     class QueryStageAndSortedSecondChildFetched : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(ns());
             }
 
             // Insert a bunch of data
@@ -1319,7 +1316,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> as(new AndSortedStage(&ws, NULL, coll));
+            scoped_ptr<AndSortedStage> as(new AndSortedStage(&ws, NULL));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -1329,17 +1326,16 @@ namespace QueryStageAnd {
             params.bounds.endKey = BSON("" << 1);
             params.bounds.endKeyInclusive = true;
             params.direction = 1;
-            as->addChild(new IndexScan(&_txn, params, &ws, NULL));
+            as->addChild(new IndexScan(params, &ws, NULL));
 
             // bar == 1
             params.descriptor = getIndex(BSON("bar" << 1), coll);
-            IndexScan* secondScan = new IndexScan(&_txn, params, &ws, NULL);
+            IndexScan* secondScan = new IndexScan(params, &ws, NULL);
 
             // Second child of the AND_SORTED stage is a Fetch. The NULL in the
             // constructor means there is no filter.
-            FetchStage* fetch = new FetchStage(&ws, secondScan, NULL, coll);
+            FetchStage* fetch = new FetchStage(&ws, secondScan, NULL);
             as->addChild(fetch);
-            ctx.commit();
 
             for (int i = 0; i < 50; i++) {
                 BSONObj obj = getNext(as.get(), &ws);
