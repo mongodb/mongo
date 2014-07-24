@@ -550,18 +550,19 @@ namespace mongo {
                           const Ordering& o,
                           int direction) const;
 
-        // TODO needs 'this' for _ordering for sanity check
-        bool _pushBack(BucketType* bucket,
-                       const DiskLoc recordLoc,
-                       const KeyDataType& key,
-                       const DiskLoc prevChild);
-
-        void pushBack(BucketType* bucket,
+        /**
+         * Tries to push key into bucket. Return false if it can't because key doesn't fit.
+         *
+         * bucket must be declared as writable by the caller.
+         * The new key/recordLoc pair must be higher than any others in bucket.
+         *
+         * TODO needs 'this' for _ordering for sanity check
+         */
+        bool pushBack(BucketType* bucket,
                       const DiskLoc recordLoc,
                       const KeyDataType& key,
-                      const DiskLoc prevChild) {
-            invariant(_pushBack(bucket, recordLoc, key, prevChild));
-        }
+                      const DiskLoc prevChild);
+
 
         BucketType* childForPos(BucketType* bucket, int pos) const;
 

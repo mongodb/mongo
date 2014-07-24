@@ -119,11 +119,11 @@ namespace mongo {
             }
         }
 
-        if (!_logic->_pushBack(_rightLeaf, loc, *key, DiskLoc())) {
+        if (!_logic->pushBack(_rightLeaf, loc, *key, DiskLoc())) {
             // bucket was full, so split and try with the new node.
             _rightLeafLoc = newBucket(_rightLeaf, _rightLeafLoc);
             _rightLeaf = _getModifiableBucket(_rightLeafLoc);
-            _logic->pushBack(_rightLeaf, loc, *key, DiskLoc());
+            invariant(_logic->pushBack(_rightLeaf, loc, *key, DiskLoc()));
         }
 
         _keyLast = key;
@@ -169,11 +169,11 @@ namespace mongo {
         KeyDataType key;
         DiskLoc val;
         _logic->popBack(leftSib, &val, &key);
-        if (!_logic->_pushBack(parent, val, key, leftSibLoc)) {
+        if (!_logic->pushBack(parent, val, key, leftSibLoc)) {
             // parent is full, so split it.
             parentLoc = newBucket(parent, parentLoc);
             parent = _getModifiableBucket(parentLoc);
-            _logic->pushBack(parent, val, key, leftSibLoc);
+            invariant(_logic->pushBack(parent, val, key, leftSibLoc));
             leftSib->parent = parentLoc;
         }
 
@@ -376,10 +376,10 @@ namespace mongo {
      * Add a key.  Must be > all existing.  Be careful to set next ptr right.
      */
     template <class BtreeLayout>
-    bool BtreeLogic<BtreeLayout>::_pushBack(BucketType* bucket,
-                                             const DiskLoc recordLoc,
-                                             const KeyDataType& key,
-                                             const DiskLoc prevChild) {
+    bool BtreeLogic<BtreeLayout>::pushBack(BucketType* bucket,
+                                           const DiskLoc recordLoc,
+                                           const KeyDataType& key,
+                                           const DiskLoc prevChild) {
 
         int bytesNeeded = key.dataSize() + sizeof(KeyHeaderType);
         if (bytesNeeded > bucket->emptySize) {
@@ -1571,11 +1571,11 @@ namespace mongo {
         int oldLNum = l->n;
         // left child's right child becomes old parent key's left child
         FullKey knLeft = getFullKey(bucket, leftIndex);
-        pushBack(l, knLeft.recordLoc, knLeft.data, l->nextChild);
+        invariant(pushBack(l, knLeft.recordLoc, knLeft.data, l->nextChild));
 
         for (int i = 0; i < r->n; ++i) {
             FullKey kn = getFullKey(r, i);
-            pushBack(l, kn.recordLoc, kn.data, kn.prevChildBucket);
+            invariant(pushBack(l, kn.recordLoc, kn.data, kn.prevChildBucket));
         }
 
         l->nextChild = r->nextChild;
@@ -1699,12 +1699,12 @@ namespace mongo {
         {
             // left child's right child becomes old parent key's left child
             FullKey kn = getFullKey(bucket, leftIndex);
-            pushBack(l, kn.recordLoc, kn.data, l->nextChild);
+            invariant(pushBack(l, kn.recordLoc, kn.data, l->nextChild));
         }
 
         for (int i = 0; i < split - lN - 1; ++i) {
             FullKey kn = getFullKey(r, i);
-            pushBack(l, kn.recordLoc, kn.data, kn.prevChildBucket);
+            invariant(pushBack(l, kn.recordLoc, kn.data, kn.prevChildBucket));
         }
 
         {
@@ -1940,7 +1940,7 @@ namespace mongo {
 
         for (int i = split + 1; i < bucket->n; i++) {
             FullKey kn = getFullKey(bucket, i);
-            pushBack(r, kn.recordLoc, kn.data, kn.prevChildBucket);
+            invariant(pushBack(r, kn.recordLoc, kn.data, kn.prevChildBucket));
         }
         r->nextChild = bucket->nextChild;
         assertValid(_indexName, r, _ordering);
@@ -1959,7 +1959,7 @@ namespace mongo {
             // promote splitkey to a parent this->node make a new parent if we were the root
             DiskLoc L = _addBucket(txn);
             BucketType* p = btreemod(txn, getBucket(L));
-            pushBack(p, splitkey.recordLoc, splitkey.data, bucketLoc);
+            invariant(pushBack(p, splitkey.recordLoc, splitkey.data, bucketLoc));
             p->nextChild = rLoc;
             assertValid(_indexName, p, _ordering);
             bucket->parent = L;
