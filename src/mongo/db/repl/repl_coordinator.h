@@ -56,6 +56,16 @@ namespace repl {
     class TopologyCoordinator;
 
     /**
+     * Global variable that contains a std::string telling why master/slave halted
+     *
+     * "dead" means something really bad happened like replication falling completely out of sync.
+     * when non-null, we are dead and the string is informational
+     *
+     * TODO(dannenberg) remove when master slave goes
+     */
+    extern const char *replAllDead;
+    
+    /**
      * The ReplicationCoordinator is responsible for coordinating the interaction of replication
      * with the rest of the system.  The public methods on ReplicationCoordinator are the public
      * API that the replication subsystem presents to the rest of the codebase.
@@ -213,7 +223,9 @@ namespace repl {
          * Returns Status::OK() if it is valid for this node to serve reads on the given collection
          * and an errorcode indicating why the node cannot if it cannot.
          */
-        virtual Status canServeReadsFor(const NamespaceString& ns, bool slaveOk) = 0;
+        virtual Status canServeReadsFor(OperationContext* txn,
+                                        const NamespaceString& ns,
+                                        bool slaveOk) = 0;
 
         /**
          * Returns true if this node should ignore unique index constraints on new documents.

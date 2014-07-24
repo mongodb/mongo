@@ -94,6 +94,11 @@ namespace repl {
          * represented by "txn".
          */
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn) = 0;
+
+        /**
+         * Returns true if the client associated with 'txn' is using godmode.
+         */
+        virtual bool isGod(OperationContext* txn) = 0;
     };
 
 } // namespace repl

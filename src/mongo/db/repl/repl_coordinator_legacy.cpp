@@ -306,6 +306,7 @@ namespace {
         if (!_settings.slave)
             return true;
 
+        // TODO(dannenberg) replAllDead is bad and should be removed when master slave is removed
         if (replAllDead) {
             return dbName == "local";
         }
@@ -318,8 +319,10 @@ namespace {
         return dbName == "local";
     }
 
-    Status LegacyReplicationCoordinator::canServeReadsFor(const NamespaceString& ns, bool slaveOk) {
-        if (cc().isGod()) {
+    Status LegacyReplicationCoordinator::canServeReadsFor(OperationContext* txn,
+                                                          const NamespaceString& ns,
+                                                          bool slaveOk) {
+        if (txn->getClient()->isGod()) {
             return Status::OK();
         }
         if (canAcceptWritesForDatabase(ns.db())) {

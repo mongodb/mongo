@@ -74,11 +74,6 @@ namespace repl {
     volatile int syncing = 0;
     volatile int relinquishSyncingSome = 0;
 
-    /* "dead" means something really bad happened like replication falling completely out of sync.
-       when non-null, we are dead and the string is informational
-    */
-    const char *replAllDead = 0;
-
     static time_t lastForcedResync = 0;
 
     /* output by the web console */

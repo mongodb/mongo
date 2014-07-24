@@ -123,13 +123,19 @@ namespace repl {
 
     bool HybridReplicationCoordinator::canAcceptWritesForDatabase(const StringData& dbName) {
         bool legacyResponse = _legacy.canAcceptWritesForDatabase(dbName);
-        _impl.canAcceptWritesForDatabase(dbName);
+        // TODO(dannenberg) uncomment below once the impl state changes are fully implemented
+        // bool implResponse = _impl.canAcceptWritesForDatabase(dbName);
+        // invariant(legacyResponse == implResponse);
         return legacyResponse;
     }
 
-    Status HybridReplicationCoordinator::canServeReadsFor(const NamespaceString& ns, bool slaveOk) {
-        Status legacyStatus = _legacy.canServeReadsFor(ns, slaveOk);
-        Status implStatus = _impl.canServeReadsFor(ns, slaveOk);
+    Status HybridReplicationCoordinator::canServeReadsFor(OperationContext* txn,
+                                                          const NamespaceString& ns,
+                                                          bool slaveOk) {
+        Status legacyStatus = _legacy.canServeReadsFor(txn, ns, slaveOk);
+        // TODO(dannenberg) uncomment below once the impl state changes are full implemeneted
+        // Status implStatus = _impl.canServeReadsFor(txn, ns, slaveOk);
+        // invariant(legacyStatus == implStatus);
         return legacyStatus;
     }
 

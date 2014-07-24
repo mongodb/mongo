@@ -106,5 +106,9 @@ namespace repl {
         return HostAndPort(txn->getClient()->clientAddress(true));
     }
 
+    bool ReplicationCoordinatorExternalStateImpl::isGod(OperationContext* txn) {
+        return txn->getClient()->isGod();
+    }
+
 } // namespace repl
 } // namespace mongo

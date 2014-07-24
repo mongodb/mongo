@@ -31,6 +31,8 @@
 #include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 
 #include "mongo/bson/oid.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
 
@@ -60,6 +62,10 @@ namespace repl {
     HostAndPort ReplicationCoordinatorExternalStateMock::getClientHostAndPort(
             const OperationContext* txn) {
         return HostAndPort();
+    }
+
+    bool ReplicationCoordinatorExternalStateMock::isGod(OperationContext* txn) {
+        return false;
     }
 
 } // namespace repl

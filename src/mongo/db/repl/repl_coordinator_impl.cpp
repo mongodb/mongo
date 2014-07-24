@@ -34,12 +34,14 @@
 #include <boost/thread.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
@@ -323,14 +325,59 @@ namespace repl {
         return false;
     }
 
-    bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(const StringData& collection) {
-        // TODO
-        return false;
+    bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(const StringData& dbName) {
+        // we must check _settings since getReplicationMode() isn't aware of modeReplSet
+        // until a valid replica set config has been loaded
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        if (_settings.usingReplSets()) {
+            if (_getReplicationMode_inlock() == modeReplSet && _currentState.primary()) {
+                return true;
+            }
+            return dbName == "local";
+        }
+
+        if (!_settings.slave)
+            return true;
+
+        // TODO(dannenberg) replAllDead is bad and should be removed when master slave is removed
+        if (replAllDead) {
+            return dbName == "local";
+        }
+
+        if (_settings.master) {
+            // if running with --master --slave, allow.
+            return true;
+        }
+
+        return dbName == "local";
     }
 
-    Status ReplicationCoordinatorImpl::canServeReadsFor(const NamespaceString& ns, bool slaveOk) {
-        // TODO
-        return Status::OK();
+    Status ReplicationCoordinatorImpl::canServeReadsFor(OperationContext* txn,
+                                                        const NamespaceString& ns,
+                                                        bool slaveOk) {
+        if (_externalState->isGod(txn)) {
+            return Status::OK();
+        }
+        if (canAcceptWritesForDatabase(ns.db())) {
+            return Status::OK();
+        }
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        Mode replMode = _getReplicationMode_inlock();
+        if (replMode == modeMasterSlave && _settings.slave == SimpleSlave) {
+            return Status::OK();
+        }
+        if (slaveOk) {
+            if (replMode == modeMasterSlave || replMode == modeNone) {
+                return Status::OK();
+            }
+            if (_currentState.secondary()) {
+                return Status::OK();
+            }
+            return Status(ErrorCodes::NotMasterOrSecondaryCode,
+                         "not master or secondary; cannot currently read from this replSet member");
+        }
+        return Status(ErrorCodes::NotMasterNoSlaveOkCode,
+                      "not master and slaveOk=false");
     }
 
     bool ReplicationCoordinatorImpl::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {

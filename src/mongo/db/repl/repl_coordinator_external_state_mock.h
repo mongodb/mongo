@@ -49,6 +49,7 @@ namespace repl {
         virtual OID ensureMe();
         virtual bool isSelf(const HostAndPort& host);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
+        virtual bool isGod(OperationContext* txn);
 
         /**
          * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"

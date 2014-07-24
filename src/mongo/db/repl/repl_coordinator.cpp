@@ -36,5 +36,8 @@ namespace repl {
     ReplicationCoordinator::ReplicationCoordinator() {}
     ReplicationCoordinator::~ReplicationCoordinator() {}
 
+    //  TODO(dannenberg) remove when master slave is removed
+    const char *replAllDead = 0;
+
 } // namespace repl
 } // namespace mongo

@@ -56,9 +56,6 @@ namespace repl {
     extern volatile int relinquishSyncingSome;
     extern volatile int syncing;
 
-    // Global variable that contains a std::string telling why master/slave halted
-    extern const char *replAllDead;
-
     extern const char *replInfo;
 
     /* A replication exception */

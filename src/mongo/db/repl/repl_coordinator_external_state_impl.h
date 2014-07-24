@@ -46,6 +46,7 @@ namespace repl {
         virtual void forwardSlaveProgress();
         virtual OID ensureMe();
         virtual bool isSelf(const HostAndPort& host);
+        virtual bool isGod(OperationContext* txn);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
 
     private:
