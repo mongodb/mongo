@@ -29,9 +29,11 @@
 #ifdef _WIN32
 #include <crtdbg.h>
 #include <stdlib.h>
+#include <stdio.h>
 #endif
 
 #include "mongo/base/init.h"
+#include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
 
 #ifdef _WIN32
@@ -45,6 +47,10 @@ namespace mongo {
 
         // hook the C runtime's error display
         _CrtSetReportHook(crtDebugCallback);
+
+        if (_setmaxstdio(2048) == -1) {
+            warning() << "Failed to increase max open files limit from default of 512 to 2048";
+        }
 
         return Status::OK();
     }
