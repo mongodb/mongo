@@ -35,6 +35,7 @@
 
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/capped_callback.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace rocksdb {
     class ColumnFamilyHandle;
@@ -145,7 +146,9 @@ namespace mongo {
 
         class Iterator : public RecordIterator {
         public:
-            Iterator( const RocksRecordStore* rs, const CollectionScanParams::Direction& dir );
+            Iterator( const RocksRecordStore* rs, 
+                      const CollectionScanParams::Direction& dir,
+                      const DiskLoc& start );
 
             virtual bool isEOF();
             virtual DiskLoc curr();
@@ -188,7 +191,7 @@ namespace mongo {
         const int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
 
-        uint64_t _nextIdNum;
+        AtomicUInt64 _nextIdNum;
         long long _dataSize;
         long long _numRecords;
         rocksdb::ReadOptions _defaultReadOptions;

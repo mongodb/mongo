@@ -79,10 +79,12 @@ namespace mongo {
             rocksdb::Slice lastSlice = iter->key();
             DiskLoc lastLoc = reinterpret_cast<DiskLoc*>( const_cast<char*>(
                                                            lastSlice.data() ) )[0];
-            _nextIdNum = lastLoc.a() + ( (uint64_t) lastLoc.getOfs() << 32 ) + 1;
+            _nextIdNum.store( lastLoc.getOfs() + ( uint64_t( lastLoc.a() ) << 32 ) + 1) ;
         }
-        else
-            _nextIdNum = 1;
+        else {
+            // Need to start at 1 so we are always higher than minDiskLoc
+            _nextIdNum.store( 1 );
+        }
 
         // load metadata
         std::string value;
@@ -102,8 +104,10 @@ namespace mongo {
                        &value ).ok()) {
             _dataSize = 0;
         }
-        else
-            _dataSize = *((long long *) value.data());
+        else {
+            memcpy( &_dataSize, value.data(), sizeof( long long ));
+            invariant( _dataSize >= 0 );
+        }
     }
 
     RocksRecordStore::~RocksRecordStore() { }
@@ -123,39 +127,42 @@ namespace mongo {
     int64_t RocksRecordStore::storageSize( OperationContext* txn,
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel ) const {
+        uint64_t storageSize;
+        rocksdb::Range wholeRange( _makeKey( minDiskLoc ), _makeKey( maxDiskLoc ) );
+        _db->GetApproximateSizes( _columnFamily, &wholeRange, 0, &storageSize);
         return dataSize(); // todo: this isn't very good
     }
 
     RecordData RocksRecordStore::dataFor( const DiskLoc& loc) const {
         // ownership passes to the shared_array created below
-        std::string* value = new std::string();
+        std::string value;
 
         // XXX not using a Snapshot here
-        rocksdb::Status status = _db->Get( _readOptions(), _columnFamily, _makeKey( loc ), value );
+        rocksdb::Status status = _db->Get( _readOptions(), _columnFamily, _makeKey( loc ), &value );
 
         if ( !status.ok() ) {
             log() << "rocks Get failed, blowing up: " << status.ToString();
-            delete value;
             invariant( false );
         }
 
-        boost::shared_array<char> data( reinterpret_cast<char*>( value ) );
+        boost::shared_array<char> data( new char[value.size()] );
+        memcpy( data.get(), value.data(), value.size() );
 
-        return RecordData( value->data(), value->size(), data );
+        return RecordData( data.get(), value.size(), data );
     }
 
     void RocksRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& dl ) {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
-        std::string old_value;
-        _db->Get( _readOptions( txn ), _columnFamily, _makeKey( dl ), &old_value );
-        int old_length = old_value.size();
+        std::string oldValue;
+        _db->Get( _readOptions( txn ), _columnFamily, _makeKey( dl ), &oldValue );
+        int oldLength = oldValue.size();
 
         ru->writeBatch()->Delete( _columnFamily,
                                   _makeKey( dl ) );
 
         _changeNumRecords(txn, false);
-        _increaseDataSize(txn, -old_length);
+        _increaseDataSize(txn, -oldLength);
     }
 
     bool RocksRecordStore::cappedAndNeedDelete() const {
@@ -165,7 +172,7 @@ namespace mongo {
         if (_dataSize > _cappedMaxSize)
             return true;
 
-        if ((_cappedMaxDocs != -1) && (numRecords() > _cappedMaxDocs))
+        if ((_cappedMaxDocs != -1) && (_numRecords > _cappedMaxDocs))
             return true;
 
         return false;
@@ -174,12 +181,12 @@ namespace mongo {
     void RocksRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
         // This persistent iterator is necessary since you can't read your own writes
         boost::scoped_ptr<rocksdb::Iterator> iter( _db->NewIterator( rocksdb::ReadOptions(),
-                                                   _columnFamily ) );
+                                                                     _columnFamily ) );
         iter->SeekToFirst();
         while ( cappedAndNeedDelete() ) {
             invariant(_numRecords > 0);
+            invariant (iter->Valid());
 
-            invariant ( iter->Valid() );
             rocksdb::Slice slice = iter->key();
             DiskLoc oldest = reinterpret_cast<const DiskLoc*>( slice.data() )[0];
 
@@ -218,27 +225,10 @@ namespace mongo {
                                                         const DocWriter* doc,
                                                         bool enforceQuota ) {
         const int len = doc->documentSize();
-
-        if ( _isCapped && len > _cappedMaxSize ) {
-            return StatusWith<DiskLoc>( ErrorCodes::BadValue,
-                                       "object to insert exceeds cappedMaxSize" );
-        }
-
         boost::shared_array<char> buf( new char[len] );
         doc->writeDocument( buf.get() );
 
-        RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
-
-        DiskLoc loc = _nextId();
-
-        ru->writeBatch()->Put( _columnFamily, _makeKey( loc ), rocksdb::Slice( buf.get(), len ) );
-
-        _changeNumRecords( txn, true );
-        _increaseDataSize( txn, len );
-
-        cappedDeleteAsNeeded( txn );
-
-        return StatusWith<DiskLoc>( loc );
+        return insertRecord( txn, buf.get(), len, enforceQuota );
     }
 
     StatusWith<DiskLoc> RocksRecordStore::updateRecord( OperationContext* txn,
@@ -256,8 +246,7 @@ namespace mongo {
                                            &old_value );
 
         if ( !status.ok() ) {
-            log() << "rocks Get failed, blowing up: " << status.ToString();
-            invariant( false );
+            return StatusWith<DiskLoc>( ErrorCodes::InternalError, status.ToString() );
         }
 
         int old_length = old_value.size();
@@ -293,12 +282,10 @@ namespace mongo {
         }
 
         // apply changes to our copy
-        char* root = const_cast<char*>( value.c_str() );
         for( size_t i = 0; i < damages.size(); i++ ) {
             mutablebson::DamageEvent event = damages[i];
             const char* sourcePtr = damangeSource + event.sourceOffset;
-            char* targetPtr = root + event.targetOffset;
-            std::memcpy(targetPtr, sourcePtr, event.size);
+            value.replace( event.targetOffset, event.size, sourcePtr );
         }
 
         // write back
@@ -312,10 +299,9 @@ namespace mongo {
                                                    bool tailable,
                                                    const CollectionScanParams::Direction& dir
                                                    ) const {
-        invariant( start == DiskLoc() );
         invariant( !tailable );
 
-        return new Iterator( this, dir );
+        return new Iterator( this, dir, start );
     }
 
 
@@ -324,14 +310,14 @@ namespace mongo {
     }
 
     std::vector<RecordIterator*> RocksRecordStore::getManyIterators( OperationContext* txn ) const {
-        // XXX do we want this to actually return a set of iterators?
-
+        // AFB: any way to get the split point keys for the bottom layer of the lsm tree?
         std::vector<RecordIterator*> iterators;
         iterators.push_back( getIterator( txn ) );
         return iterators;
     }
 
     Status RocksRecordStore::truncate( OperationContext* txn ) {
+        //AFB add Clear(ColumnFamilyHandle*)
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         while( !iter->isEOF() ) {
             DiskLoc loc = iter->getNext();
@@ -350,9 +336,11 @@ namespace mongo {
                                       RecordStoreCompactAdaptor* adaptor,
                                       const CompactOptions* options,
                                       CompactStats* stats ) {
-        rocksdb::Status status = _db->CompactRange( _columnFamily, nullptr, nullptr );
-        invariant ( status.ok() );
-        return Status::OK();
+        rocksdb::Status status = _db->CompactRange( _columnFamily, NULL, NULL );
+        if ( status.ok() )
+            return Status::OK();
+        else 
+            return Status( ErrorCodes::InternalError, status.ToString() );
     }
 
     Status RocksRecordStore::validate( OperationContext* txn,
@@ -361,16 +349,19 @@ namespace mongo {
                                        ValidateResults* results,
                                        BSONObjBuilder* output ) const {
         RecordIterator* iter = getIterator( txn );
-        while( !iter->isEOF() ) {
-            RecordData data = dataFor( iter->curr() );
-            if ( scanData ) {
-                BSONObj b( data.data() );
-                if ( !b.valid() ) {
-                    DiskLoc l = iter->curr();
-                    results->errors.push_back( l.toString() + " is corrupted" );
+        // TODO validate that _numRecords and _dataSize are correct in scanData mode
+        if ( scanData ) {
+            while( !iter->isEOF() ) {
+                RecordData data = dataFor( iter->curr() );
+                size_t dataSize;
+                const Status status = adaptor->validate( data, &dataSize );
+                if (!status.isOK()) {
+                    results->valid = false;
+                    results->errors.push_back("invalid object detected (see logs)");
+                    log() << "Invalid object detected in " << _ns << ": " << status.reason();
                 }
+                iter->getNext();
             }
-            iter->getNext();
         }
         return Status::OK();
     }
@@ -393,7 +384,7 @@ namespace mongo {
     Status RocksRecordStore::setCustomOption( OperationContext* txn,
                                               const BSONElement& option,
                                               BSONObjBuilder* info ) {
-        // XXX can't do write options here as writes are dont in a write batch which is held in
+        // NOTE can't do write options here as writes are done in a write batch which is held in
         // a recovery unit
         string optionName = option.fieldName();
         if ( !option.isBoolean() ) {
@@ -414,12 +405,34 @@ namespace mongo {
         return Status::OK();
     }
 
+    void RocksRecordStore::temp_cappedTruncateAfter( OperationContext* txn,
+                                                     DiskLoc end,
+                                                     bool inclusive ) {
+        boost::scoped_ptr<RecordIterator> iter( 
+                getIterator( txn, maxDiskLoc, false, CollectionScanParams::BACKWARD ) );
+
+        while( !iter->isEOF() ) {
+            DiskLoc loc = iter->getNext();
+            if ( loc < end || ( !inclusive && loc == end))
+                return;
+
+            deleteRecord( txn, loc );
+        }
+    }
+
+    rocksdb::ReadOptions RocksRecordStore::_readOptions( OperationContext* opCtx ) const {
+        rocksdb::ReadOptions options( _defaultReadOptions );
+        if ( opCtx ) {
+            options.snapshot = _getRecoveryUnit( opCtx )->snapshot();
+        }
+        return options;
+    }
+
     DiskLoc RocksRecordStore::_nextId() {
-        boost::mutex::scoped_lock lk( _idLock );
-        int ofs = _nextIdNum >> 32;
-        int a = (_nextIdNum << 32 ) >> 32;
+        const uint64_t myId = _nextIdNum.fetchAndAdd(1);
+        int a = myId >> 32;
+        int ofs = myId & 0x00000000FFFFFFFF;
         DiskLoc loc( a, ofs );
-        _nextIdNum++;
         return loc;
     }
 
@@ -467,20 +480,23 @@ namespace mongo {
     // --------
 
     RocksRecordStore::Iterator::Iterator( const RocksRecordStore* rs,
-                                          const CollectionScanParams::Direction& dir )
+                                          const CollectionScanParams::Direction& dir,
+                                          const DiskLoc& start )
         : _rs( rs ),
           _dir( dir ),
           // XXX not using a snapshot here
           _iterator( _rs->_db->NewIterator( rs->_readOptions(),
                                             rs->_columnFamily ) ) {
-        if ( _forward() )
-            _iterator->SeekToFirst();
-        else
-            _iterator->SeekToLast();
+        _iterator->Seek( rs->_makeKey( start ) );
+        if ( _forward() && _iterator->Valid() && 
+             reinterpret_cast<const DiskLoc*>( _iterator->key().data() )[0] != start )
+            _iterator->Prev();
+
         _checkStatus();
     }
 
     void RocksRecordStore::Iterator::_checkStatus() {
+        log() << "Rocks Iterator Status: " << _iterator->status().ToString();
         invariant( _iterator->status().ok() );
     }
 
@@ -521,41 +537,10 @@ namespace mongo {
     }
 
     RecordData RocksRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
-        if (_iterator->Valid() &&
-                *reinterpret_cast<const DiskLoc*>( _iterator->key().data() ) == loc) {
-            rocksdb::Slice data_slice = _iterator->value();
-
-            boost::shared_array<char> data( new char[data_slice.size()] );
-            memcpy( data.get(), data_slice.data(), data_slice.size() );
-
-            return RecordData( data.get(), data_slice.size(), data );
-        }
-
         return _rs->dataFor( loc );
     }
 
     bool RocksRecordStore::Iterator::_forward() const {
         return _dir == CollectionScanParams::FORWARD;
-    }
-
-    void RocksRecordStore::temp_cappedTruncateAfter( OperationContext* txn,
-                                                     DiskLoc end,
-                                                     bool inclusive ) {
-        boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
-        if ( iter->isEOF() )
-            return;
-        while( !iter->isEOF() ) {
-            DiskLoc loc = iter->getNext();
-            if ( end < loc || ( inclusive && end == loc ) )
-                deleteRecord( txn, loc );
-        }
-    }
-
-    rocksdb::ReadOptions RocksRecordStore::_readOptions( OperationContext* opCtx ) const {
-        rocksdb::ReadOptions options( _defaultReadOptions );
-        if ( opCtx ) {
-            options.snapshot = _getRecoveryUnit( opCtx )->snapshot();
-        }
-        return options;
     }
 }
