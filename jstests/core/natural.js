@@ -79,63 +79,63 @@ function checkQuery(name, cur, field, dir, shardTest, errorExpected) {
 }
 
 // Run test cases
-//   t - test object
-//   conn - connection to DB
-//   shardTest - if sharding test, true/false
-var runTests = function(t, conn, shardTest) {
+//   test - test object
+//   db - connection to DB
+//   isMongo - connected to mongos, true/false
+var runTests = function(test, db, shardTest) {
 
-    var name = t.name;
-    if (shardTest) {
+    var name = test.name;
+    if (isMongo) {
         name += " sharding";
         // Not a shard test if no shardKey specified
-        if (!("shardKey" in t)) {
+        if (!("shardKey" in test)) {
             return;
         }
     }
+
     // print test name and test info
     jsTest.log(name);
-    printjson(t);
+    printjson(test);
 
     var collOptions = {};
-    if ("collOptions" in t) {
-        collOptions = t.collOptions;
+    if ("collOptions" in test) {
+        collOptions = test.collOptions;
     }
     var dbName = "test";
 
     // Optional test attributes
     // Test throws error
     var err = false;
-    if ("errorExpected" in t) {
-        err = t.errorExpected;
+    if ("errorExpected" in test) {
+        err = test.errorExpected;
     }
 
-    assert.commandWorked(conn.getSiblingDB(dbName).createCollection(name, collOptions));
-    var coll = conn.getSiblingDB(dbName)[name];
+    assert.commandWorked(db.getSiblingDB(dbName).createCollection(name, collOptions));
+    var coll = db.getSiblingDB(dbName)[name];
 
     // Set indexes on collection
-    var sharded = false;
-    t.indexes.forEach(function(idx) {
+    test.indexes.forEach(function(idx) {
         // Test has second arg to ensureIndex
         var idxOpt = null;
         if ("indexOpt" in idx) {
             idxOpt = idx.indexOpt;
         }
         coll.ensureIndex(idx.index, idxOpt);
-        if (shardTest && !sharded) {
-            sharded = true;
-            conn.getDB("admin").runCommand
-                ({shardCollection : coll+"", key: t.shardKey});
-            // pre-split collection on shardKey
-            var splitCmd = {split: coll+"", middle: {}};
-            for (var k in t.shardKey) {
-                splitCmd.middle[k] = docNum/2;
-            }
-            conn.getSiblingDB("admin").runCommand(splitCmd);
-        }
     });
 
+    // shard collection if connected to mongos
+    if (isMongo) {
+        db.getDB("admin").runCommand({shardCollection : coll+"", key: test.shardKey});
+        // pre-split collection on shardKey
+        var splitCmd = {split: coll+"", middle: {}};
+        for (var k in test.shardKey) {
+            splitCmd.middle[k] = docNum/2;
+        }
+        db.getSiblingDB("admin").runCommand(splitCmd);
+    }
+
     // Insert docs
-    t.inserts(coll);
+    test.inserts(coll);
 
     printjson(coll.getDB().stats());
 
@@ -143,11 +143,11 @@ var runTests = function(t, conn, shardTest) {
     var dl = {diskLoc: {$meta: "diskloc"}};
 
     var projs = [];
-    if ("projections" in t) {
-        projs = t.projections;
+    if ("projections" in test) {
+        projs = test.projections;
     }
-    var order = t.orderField;
-    t.queries.forEach(function(q) {
+    var order = test.orderField;
+    test.queries.forEach(function(q) {
         // Tests with hint should override sort $natural
         if ("hints" in t) {
             t.hints.forEach(function(hint) {
