@@ -71,8 +71,8 @@ namespace mongo {
     private:
         void copy(OperationContext* txn,
                   const std::string& toDBName,
-                  const char *from_ns,
-                  const char *to_ns,
+                  const NamespaceString& from_ns,
+                  const NamespaceString& to_ns,
                   bool isindex,
                   bool logForRepl,
                   bool masterSameProcess,

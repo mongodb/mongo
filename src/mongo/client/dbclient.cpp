@@ -864,17 +864,60 @@ namespace mongo {
     }
 
     list<string> DBClientWithCommands::getCollectionNames( const string& db ) {
+        list<BSONObj> infos = getCollectionInfos( db );
         list<string> names;
+        for ( list<BSONObj>::iterator it = infos.begin(); it != infos.end(); ++it ) {
+            names.push_back( db + "." + (*it)["name"].valuestr() );
+        }
+        return names;
+    }
+
+    list<BSONObj> DBClientWithCommands::getCollectionInfos( const string& db ) {
+        list<BSONObj> infos;
+
+        // first we're going to try the command
+        // it was only added in 2.8, so if we're talking to an older server
+        // we'll fail back to querying system.namespaces
+
+        {
+            BSONObj res;
+            if ( runCommand( db, BSON( "listCollections" << 1), res ) ) {
+                BSONObj collections = res["collections"].Obj();
+                BSONObjIterator it( collections );
+                while ( it.more() ) {
+                    BSONElement e = it.next();
+                    infos.push_back( e.Obj().getOwned() );
+                }
+                return infos;
+            }
+
+            // command failed
+
+            int code = res["code"].numberInt();
+            string errmsg = res["errmsg"].valuestrsafe();
+            if ( code == 59 || errmsg.find( "no such cmd" ) != string::npos ) {
+                // old version of server, ok, fall through to old code
+            }
+            else {
+                uasserted( 18530, str::stream() << "listCollections failed: " << res );
+            }
+
+        }
 
         string ns = db + ".system.namespaces";
         auto_ptr<DBClientCursor> c = query( ns.c_str() , BSONObj() );
         while ( c->more() ) {
-            string name = c->nextSafe()["name"].valuestr();
-            if ( name.find( "$" ) != string::npos )
+            BSONObj obj = c->nextSafe();
+            string ns = obj["name"].valuestr();
+            if ( ns.find( "$" ) != string::npos )
                 continue;
-            names.push_back( name );
+            BSONObjBuilder b;
+            b.append( "name", ns.substr( db.size() + 1 ) );
+            b.appendElementsUnique( obj );
+            infos.push_back( b.obj() );
         }
-        return names;
+
+        return infos;
     }
 
     bool DBClientWithCommands::exists( const string& ns ) {

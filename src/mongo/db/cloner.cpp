@@ -119,11 +119,11 @@ namespace mongo {
                     massert( 17321,
                              str::stream()
                              << "collection dropped during clone ["
-                             << to_collection << "]",
+                             << to_collection.ns() << "]",
                              !createdCollection );
                     WriteUnitOfWork wunit(txn->recoveryUnit());
                     createdCollection = true;
-                    collection = db->createCollection( txn, to_collection );
+                    collection = db->createCollection( txn, to_collection.ns() );
                     verify( collection );
                     wunit.commit();
                 }
@@ -155,13 +155,13 @@ namespace mongo {
 
                 BSONObj js = tmp;
                 if ( isindex ) {
-                    verify(nsToCollectionSubstring(from_collection) == "system.indexes");
+                    verify(from_collection.coll() == "system.indexes");
                     js = fixindex(db->name(), tmp);
                     indexesToBuild->push_back( js.getOwned() );
                     continue;
                 }
 
-                verify(nsToCollectionSubstring(from_collection) != "system.indexes");
+                verify(from_collection.coll() != "system.indexes");
 
                 StatusWith<DiskLoc> loc = collection->insertDocument( txn, js, true );
                 if ( !loc.isOK() ) {
@@ -170,7 +170,7 @@ namespace mongo {
                 }
                 uassertStatusOK( loc.getStatus() );
                 if (logForRepl)
-                    repl::logOp(txn, "i", to_collection, js);
+                    repl::logOp(txn, "i", to_collection.ns().c_str(), js);
 
                 wunit.commit();
                 txn->recoveryUnit()->commitIfNeeded();
@@ -188,8 +188,8 @@ namespace mongo {
 
         int64_t numSeen;
         bool isindex;
-        const char *from_collection;
-        const char *to_collection;
+        NamespaceString from_collection;
+        NamespaceString to_collection;
         time_t saveLast;
         list<BSONObj> *indexesToBuild;  // deferred query results (e.g. index insert/build)
         bool logForRepl;
@@ -202,8 +202,8 @@ namespace mongo {
     */
     void Cloner::copy(OperationContext* txn,
                       const string& toDBName,
-                      const char *from_collection,
-                      const char *to_collection,
+                      const NamespaceString& from_collection,
+                      const NamespaceString& to_collection,
                       bool isindex,
                       bool logForRepl,
                       bool masterSameProcess,
@@ -262,7 +262,7 @@ namespace mongo {
                 }
 
                 if (logForRepl)
-                    repl::logOp(txn, "i", to_collection, spec);
+                    repl::logOp(txn, "i", to_collection.ns().c_str(), spec);
 
                 txn->recoveryUnit()->commitIfNeeded();
 
@@ -326,7 +326,8 @@ namespace mongo {
 
         // main data
         copy(txn, dbName,
-             ns.c_str(), ns.c_str(), false, logForRepl, false, true, mayYield, mayBeInterrupted,
+             NamespaceString(ns), NamespaceString(ns),
+             false, logForRepl, false, true, mayYield, mayBeInterrupted,
              Query(query).snapshot());
 
         /* TODO : copyIndexes bool does not seem to be implemented! */
@@ -336,7 +337,9 @@ namespace mongo {
 
         // indexes
         temp = dbName + ".system.indexes";
-        copy(txn, dbName, temp.c_str(), temp.c_str(), true, logForRepl, false, true, mayYield,
+        copy(txn, dbName,
+             NamespaceString(temp), NamespaceString(temp),
+             true, logForRepl, false, true, mayYield,
              mayBeInterrupted, BSON( "ns" << ns ));
 
         wunit.commit();
@@ -413,8 +416,6 @@ namespace mongo {
             }
         }
 
-        string systemNamespacesNS = opts.fromDB + ".system.namespaces";
-
         list<BSONObj> toClone;
         if ( clonedColls ) clonedColls->clear();
         if ( opts.syncData ) {
@@ -423,24 +424,9 @@ namespace mongo {
                */
             Lock::TempRelease tempRelease(txn->lockState());
 
-            // just using exhaust for collection copying right now
-
-            // todo: if snapshot (bool param to this func) is true, we need to snapshot this query?
-            //       only would be relevant if a thousands of collections -- maybe even then it is hard
-            //       to exceed a single cursor batch.
-            //       for repl it is probably ok as we apply oplog section after the clone (i.e. repl
-            //       doesnt not use snapshot=true).
-            auto_ptr<DBClientCursor> cursor = _conn->query(systemNamespacesNS, BSONObj(), 0, 0, 0,
-                                                      opts.slaveOk ? QueryOption_SlaveOk : 0);
-
-            if (!validateQueryResults(cursor, errCode, errmsg)) {
-                errmsg = str::stream() << "index query on ns " << systemNamespacesNS
-                                       << " failed: " << errmsg;
-                return false;
-            }
-
-            while ( cursor->more() ) {
-                BSONObj collection = cursor->next();
+            list<BSONObj> raw = _conn->getCollectionInfos( opts.fromDB );
+            for ( list<BSONObj>::iterator it = raw.begin(); it != raw.end(); ++it ) {
+                BSONObj collection = *it;
 
                 LOG(2) << "\t cloner got " << collection << endl;
 
@@ -456,35 +442,36 @@ namespace mongo {
 
                 BSONElement e = collection.getField("name");
                 if ( e.eoo() ) {
-                    string s = "bad system.namespaces object " + collection.toString();
+                    string s = "bad collection object " + collection.toString();
                     massert( 10290 , s.c_str(), false);
                 }
                 verify( !e.eoo() );
                 verify( e.type() == String );
-                const char *from_name = e.valuestr();
 
-                if( strstr(from_name, ".system.") ) {
+                NamespaceString ns( opts.fromDB, e.valuestr() );
+
+                if( ns.isSystem() ) {
                     /* system.users and s.js is cloned -- but nothing else from system.
                      * system.indexes is handled specially at the end*/
-                    if( legalClientSystemNS( from_name , true ) == 0 ) {
+                    if( legalClientSystemNS( ns.ns() , true ) == 0 ) {
                         LOG(2) << "\t\t not cloning because system collection" << endl;
                         continue;
                     }
                 }
-                if( ! NamespaceString::normal( from_name ) ) {
-                    LOG(2) << "\t\t not cloning because has $ " << endl;
+                if( !ns.isNormal() ) {
+                    LOG(2) << "\t\t not cloning because has $ ";
                     continue;
                 }
 
-                if( opts.collsToIgnore.find( string( from_name ) ) != opts.collsToIgnore.end() ){
-                    LOG(2) << "\t\t ignoring collection " << from_name << endl;
+                if( opts.collsToIgnore.find( ns.ns() ) != opts.collsToIgnore.end() ){
+                    LOG(2) << "\t\t ignoring collection " << ns;
                     continue;
                 }
                 else {
-                    LOG(2) << "\t\t not ignoring collection " << from_name << endl;
+                    LOG(2) << "\t\t not ignoring collection " << ns;
                 }
 
-                if ( clonedColls ) clonedColls->insert( from_name );
+                if ( clonedColls ) clonedColls->insert( ns.ns() );
                 toClone.push_back( collection.getOwned() );
             }
         }
@@ -492,13 +479,11 @@ namespace mongo {
         for ( list<BSONObj>::iterator i=toClone.begin(); i != toClone.end(); i++ ) {
             BSONObj collection = *i;
             LOG(2) << "  really will clone: " << collection << endl;
-            const char * from_name = collection["name"].valuestr();
+            const char* collectionName = collection["name"].valuestr();
             BSONObj options = collection.getObjectField("options");
 
-            /* change name "<fromdb>.collection" -> <todb>.collection */
-            const char *p = strchr(from_name, '.');
-            verify(p);
-            const string to_name = toDBName + p;
+            NamespaceString from_name( opts.fromDB, collectionName );
+            NamespaceString to_name( toDBName, collectionName );
 
             // Copy releases the lock, so we need to re-load the database. This should probably
             // throw if the database has changed in between, but for now preserve the existing
@@ -507,10 +492,11 @@ namespace mongo {
             Database* db = dbHolder().getOrCreate(txn, toDBName, unused);
 
             /* we defer building id index for performance - building it in batch is much faster */
-            Status createStatus = userCreateNS( txn, db, to_name, options,
+            Status createStatus = userCreateNS( txn, db, to_name.ns(), options,
                                                 opts.logForRepl, false );
             if ( !createStatus.isOK() ) {
-                errmsg = str::stream() << "failed to create collection \"" << to_name << "\": "
+                errmsg = str::stream() << "failed to create collection \""
+                                       << to_name.ns() << "\": "
                                        << createStatus.reason();
                 return false;
             }
@@ -523,7 +509,7 @@ namespace mongo {
             copy(txn,
                  toDBName,
                  from_name,
-                 to_name.c_str(),
+                 to_name,
                  false,
                  opts.logForRepl,
                  masterSameProcess,
@@ -571,8 +557,10 @@ namespace mongo {
             BSONObj query = BSON( "name" << NE << "_id_" << "ns" << NIN << arr );
             
             // won't need a snapshot of the query of system.indexes as there can never be very many.
-            copy(txn, toDBName, system_indexes_from.c_str(), system_indexes_to.c_str(), true,
-                 opts.logForRepl, masterSameProcess, opts.slaveOk, opts.mayYield, opts.mayBeInterrupted, query );
+            copy(txn, toDBName,
+                 NamespaceString(system_indexes_from), NamespaceString(system_indexes_to),
+                 true, opts.logForRepl, masterSameProcess, opts.slaveOk,
+                 opts.mayYield, opts.mayBeInterrupted, query );
         }
         return true;
     }

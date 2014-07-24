@@ -934,9 +934,17 @@ namespace mongo {
         std::list<std::string> getDatabaseNames();
 
         /**
-           get a list of all the current collections in db
+         * get a list of all the current collections in db
+         * returns fully qualified names
          */
         std::list<std::string> getCollectionNames( const std::string& db );
+
+        /**
+         * { name : "<short collection name>",
+         *   options : { }
+         *  }
+         */
+        std::list<BSONObj> getCollectionInfos( const std::string& db );
 
         bool exists( const std::string& ns );
 
