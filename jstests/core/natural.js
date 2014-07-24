@@ -367,11 +367,10 @@ tests = [
 
 
 // Main program
-var dbName = "test";
-
-var isMongos = ("isdbgrid" == db.runCommand("ismaster").msg);
+// Determine if test is standalone or sharded (connected to Mongos)
+var sharded = ("isdbgrid" == db.runCommand("ismaster").msg);
 
 // Execute tests
 for (var i=0; i<tests.length; i++) {
-    runTests(tests[i], db, isMongos);
+    runTests(tests[i], db, sharded);
 }
