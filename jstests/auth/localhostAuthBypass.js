@@ -10,9 +10,12 @@ var password = "bar";
 var port = allocatePorts(1)[0];
 var host = "localhost:" + port;
 
+load("jstests/libs/host_ipaddr.js");
+
 var createUser = function(mongo) {
     print("============ adding a user.");
-    mongo.getDB("admin").createUser({user:username,pwd:  password, roles: jsTest.adminUserRoles});
+    mongo.getDB("admin").createUser(
+        { user:username, pwd: password, roles: jsTest.adminUserRoles });
 };
 
 var assertCannotRunCommands = function(mongo) {
@@ -33,6 +36,45 @@ var assertCannotRunCommands = function(mongo) {
             function() { emit(1, 1); }, 
             function(id, count) { return Array.sum(count); },
             { out: "other" });
+    });
+
+    // Additional commands not permitted
+    // Create non-admin user
+    assert.throws(function() { mongo.getDB("test").createUser(
+        { user: username, pwd: password, roles: ['readWrite'] }); });
+    // DB operations
+    var authorizeErrorCode = 13;
+    assert.commandFailedWithCode(mongo.getDB("test").copyDatabase("admin",  "admin2"),
+        authorizeErrorCode, "copyDatabase");
+    // Create collection
+    assert.commandFailedWithCode(mongo.getDB("test").createCollection(
+        "log", { capped: true, size: 5242880, max: 5000 } ),
+        authorizeErrorCode, "createCollection");
+    // Set/Get system parameters
+    var params = [{ param: "journalCommitInterval", val: 200 },
+                  { param: "logLevel", val: 2 },
+                  { param: "logUserIds", val: 1 },
+                  { param: "notablescan", val: 1 },
+                  { param: "quiet", val: 1 },
+                  { param: "replApplyBatchSize", val: 10 },
+                  { param: "replIndexPrefetch", val: "none" },
+                  { param: "syncdelay", val: 30 },
+                  { param: "traceExceptions", val: true },
+                  { param: "sslMode", val: "preferSSL" },
+                  { param: "clusterAuthMode", val: "sendX509" },
+                  { param: "userCacheInvalidationIntervalSecs", val: 300 }
+                 ];
+    params.forEach(function(p) {
+        var cmd = { setParameter: 1 };
+        cmd[p.param] = p.val;
+        assert.commandFailedWithCode(mongo.getDB("admin").runCommand(cmd),
+            authorizeErrorCode, "setParameter: "+p.param);
+    });
+    params.forEach(function(p) {
+        var cmd = { getParameter: 1 };
+        cmd[p.param] = 1;
+        assert.commandFailedWithCode(mongo.getDB("admin").runCommand(cmd),
+            authorizeErrorCode, "getParameter: "+p.param);
     });
 };
 
@@ -94,5 +136,23 @@ var runTest = function(useHostName) {
     shutdown(mongo);
 };
 
+var runNonlocalTest = function(hostPort) {
+    print("==========================");
+    print("starting mongod: non-local host access "+hostPort);
+    print("==========================");
+    MongoRunner.runMongod({auth: "", port: port, dbpath: dbpath});
+
+    var mongo = new Mongo(hostPort);
+
+    assertCannotRunCommands(mongo);
+    assert.throws(function() { mongo.getDB("admin").createUser
+        ({ user:username, pwd: password, roles: jsTest.adminUserRoles }); });
+    assert.throws(function() { mongo.getDB("$external").createUser
+        ({ user:username, pwd: password, roles: jsTest.adminUserRoles }); });
+    shutdown(mongo);
+};
+
 runTest(false);
 runTest(true);
+
+runNonlocalTest(get_ipaddr()+":"+port);
