@@ -494,12 +494,44 @@ namespace mongo {
         Value pValue;
     };
 
+    class ExpressionDateToString : public Expression {
+    public:
+        // virtuals from Expression
+        virtual intrusive_ptr<Expression> optimize();
+        virtual Value serialize(bool explain) const;
+        virtual Value evaluateInternal(Variables* vars) const;
+        virtual void addDependencies(DepsTracker* deps, std::vector<std::string>* path=NULL) const;
+
+        static intrusive_ptr<Expression> parse(
+            BSONElement expr,
+            const VariablesParseState& vps);
+
+    private:
+        ExpressionDateToString(const std::string& format, // the format string
+                               intrusive_ptr<Expression> date); // the date to format
+
+        // Will uassert on invalid data
+        static void validateFormat(const std::string& format);
+
+        // Need raw date as tm doesn't have millisecond resolution.
+        // Format must be valid.
+        static std::string formatDate(const std::string& format,
+                                      const tm& tm,
+                                      const long long date);
+
+        static void insertPadded(StringBuilder& sb, int number, int spaces);
+
+        const std::string _format;
+        intrusive_ptr<Expression> _date;
+    };
 
     class ExpressionDayOfMonth : public ExpressionFixedArity<ExpressionDayOfMonth, 1> {
     public:
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
+
+        static inline int extract(const tm& tm) { return tm.tm_mday; }
     };
 
 
@@ -508,6 +540,9 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
+
+        // MySQL uses 1-7, tm uses 0-6
+        static inline int extract(const tm& tm) { return tm.tm_wday + 1; }
     };
 
 
@@ -516,6 +551,9 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
+
+        // MySQL uses 1-366, tm uses 0-365
+        static inline int extract(const tm& tm) { return tm.tm_yday + 1; }
     };
 
 
@@ -588,6 +626,8 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
+
+        static inline int extract(const tm& tm) { return tm.tm_hour; }
     };
 
 
@@ -673,6 +713,8 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char* getOpName() const;
+
+        static int extract(const long long date);
     };
 
 
@@ -681,6 +723,8 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
+
+        static int extract(const tm& tm) { return tm.tm_min; }
     };
 
 
@@ -706,6 +750,9 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
+
+        // MySQL uses 1-12, tm uses 0-11
+        static inline int extract(const tm& tm) { return tm.tm_mon + 1; }
     };
 
 
@@ -842,6 +889,8 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
+
+        static inline int extract(const tm& tm) { return tm.tm_sec; }
     };
 
 
@@ -945,6 +994,8 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
+
+        static int extract(const tm& tm);
     };
 
 
@@ -953,6 +1004,9 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
+
+        // tm_year is years since 1990
+        static int extract(const tm& tm) { return tm.tm_year + 1900; }
     };
 }
 
