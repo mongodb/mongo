@@ -89,11 +89,11 @@ namespace mongo {
 
         // ------ internal api
 
-        // called once when collection is created
+        // called once when collection is created.
         void createMetaData();
 
         // when collection is dropped, call this
-        // all indexes have to be dropped first
+        // all indexes have to be dropped first.
         void dropMetaData();
 
         const string metaDataKey() { return _metaDataKey; }
@@ -117,7 +117,7 @@ namespace mongo {
 
             /**
              * Removes information about an index from the MetaData. Returns true if an index
-             * called name existed and was deleted, and false otherwise
+             * called name existed and was deleted, and false otherwise.
              */
             bool eraseIndex( const StringData& name );
 
@@ -127,34 +127,25 @@ namespace mongo {
 
     private:
         /**
-         * This class works by storing metadata in a column family with a specific name.
-         * For example, at one point the name of the metadata column family was the namespace,
-         * prefixed with "metadata-". The _getMetaData method reads the MetaData struct from the
-         * specific column family
+         * Currently, always returns an optional containing an initialized MetaData.
          */
-        // XXX is this a bad signature? Would it be better to return an Optional<MetaData> ?
-        bool _getMetaData( MetaData* out ) const;
+        boost::optional<MetaData> _getMetaData() const;
 
         /**
-         * Same as _getMetaData(), but with the relevant lock already acquired
+         * Same as _getMetaData(), but must be called with _metaDataMutex acquired.
          */
-        bool _getMetaData_inlock( MetaData* out ) const;
+        boost::optional<MetaData> _getMetaData_inlock() const;
 
-        /**
-         * Writes a MetaData to the metadata column family
-         */
         void _putMetaData_inlock( const MetaData& in );
 
         RocksEngine* _engine; // not owned
 
-        // the name of the column family which holds the metadata
-        string _metaDataKey;
+        // the name of the column family which holds the metadata.
+        const string _metaDataKey;
 
-        // lock which must be acquired before
-        mutable boost::mutex _metaDataLock;
-
-        static const int _maxAllowedIndexes = 64; // for compatability for now, could be higher
-
+        // lock which must be acquired before calling _getMetaData_inlock(). Protects the metadata
+        // stored in the metadata column family.
+        mutable boost::mutex _metaDataMutex;
     };
 
 }

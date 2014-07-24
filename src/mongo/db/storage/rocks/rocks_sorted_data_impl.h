@@ -86,6 +86,12 @@ namespace mongo {
 
         virtual Status initAsEmpty(OperationContext* txn);
 
+        //rocks specific
+
+        // ownership passes to caller. Bare because we need to pass the bare pointer to the
+        // rocksdb::Options class
+        static rocksdb::Comparator* newRocksComparator( const Ordering& order );
+
     private:
         typedef DiskLoc RecordId;
 
@@ -103,37 +109,4 @@ namespace mongo {
         string dupKeyError(const BSONObj& key) const;
     };
 
-    /**
-     * Extends the functionality of IndexKeyEntry to better interact with the rocksdb api.
-     * Namely, it is necessary to support conversion to and from a rocksdb::Slice. This class also
-     * handles the necessary conversion to and from a BSONObj-DiskLoc pair and the string
-     * representation of such a pair. This is important because these BSONObj-DiskLoc pairs are
-     * used as keys in the column families which represent indexes (see comment for the
-     * RocksSortedDataImpl class for more information)
-     */
-    class RocksIndexEntry: public IndexKeyEntry {
-    public:
-        /**
-         * Constructs a RocksIndexEntry. Currently, (7/18/14) the stripFieldNames boolean exists
-         * solely to construct RocksIndexEntry's that have been created by the
-         * IndexEntryComparison::makeQueryObject method, since this is the only case where it is
-         * desirable to keep the field names.
-         */
-        RocksIndexEntry( const BSONObj& key, const DiskLoc loc, bool stripFieldNames = true );
-
-        /**
-         * Constructs a RocksIndexEntry from a Slice.
-         */
-        RocksIndexEntry( const rocksdb::Slice& slice );
-
-        ~RocksIndexEntry() { }
-
-        /**
-         * Returns a string representation of this
-         */
-        string asString() const;
-
-    private:
-        int _size() const { return _key.objsize() + sizeof( DiskLoc ); }
-    };
-}
+} // namespace mongo

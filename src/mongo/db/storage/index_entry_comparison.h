@@ -30,10 +30,10 @@
 
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/ordering.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/diskloc.h"
+#include "mongo/bson/ordering.h"
 
 namespace mongo {
 
@@ -43,21 +43,14 @@ namespace mongo {
      * and a disk location, but this could be subclassed to perform more complex tasks.
      */
     struct IndexKeyEntry {
-    public:
-        IndexKeyEntry(const BSONObj& key, DiskLoc loc) : _key(key), _loc(loc) {}
-        virtual ~IndexKeyEntry() { }
+        IndexKeyEntry(const BSONObj& key, DiskLoc loc) :key(key), loc(loc) {}
 
-        virtual const BSONObj& key() const { return _key; }
-        virtual DiskLoc loc() const { return _loc; }
-
-    protected:
-        BSONObj _key;
-        DiskLoc _loc;
-
-    }; // struct IndexKeyEntry
+        BSONObj key;
+        DiskLoc loc;
+    };
 
     /**
-     * As the name suggests, this class is used to compare two different IndexKeyEntry instances.
+     * Compares two different IndexKeyEntry instances.
      * The existense of compound indexes necessitates some complicated logic. This is meant to
      * support the implementation of the SortedDataInterface::customLocate() and
      * SortedDataInterface::advanceTo() methods, which require fine-grained control over whether the
@@ -72,48 +65,31 @@ namespace mongo {
         /**
          * Returns -1 if lhs < rhs, 1 if lhs > rhs, and 0 otherwise.
          *
-         * This function requires much more explanation than that, however:
-         *
          * This function compares two IndexKeyEntry objects which have been stripped of their field
-         * names. Either lhs or rhs represents the lower bound of a query, meaning that either lhs
-         * or rhs must be the result of a call to makeQueryObject(). The comparison function simply
-         * compares the BSONObjects in each IndexKeyEntry, and uses the DiskLoc's as a tiebreaker.
+         * names. Either lhs or rhs can represent the lower bound of a query, meaning that either
+         * lhs or rhs can be the result of a call to makeQueryObject(). At most one can be a query
+         * object. The comparison function compares the BSONObjects in each IndexKeyEntry, and uses
+         * the DiskLoc's as a tiebreaker.
          *
-         * Ex: lhs's key is {"": 5, "": "foo"}, and it represents the lower bound of a range query.
-         * If rhs's key is {"": 4, "": "foo"}, then the function will return 1, because the left
-         * hand side's first element is greater than the rhs's.
+         * Ex: {"": 5, "": "foo"} > {"": 4, "": "foo"}
+         *     {"": 5, "": "foo"} < {"": 5, "": "zzz"}
          *
-         * Another ex: lhs's key is {"": 5, "": "foo"}, and rhs's key is {"": 5, "": "zzz"}. The
-         * function will return -1, because rhs's second element is greater than lhs's.
-         *
-         * So far, this is all very reasonable. However, suppose that lhs and rhs both have the key
-         * {"": 5, "": "foo"}. A general-purpose comparison function might return 0 in this
-         * instance to indicate that the two objects are equal (assuming that lhs and rhs have the
-         * same DiskLoc as well). However, either lhs or rhs represents the lower bound of a query,
-         * so if comparison() always returned zero in this case, then the lower bound of the query
-         * would always be defined as an exclusive lower bound across all the elements in the
-         * BSONObject. This is not desirable behavior. Rather, it may be necessary to specify the
-         * first element as an inclusive range, the second one as an exclusive range, etc. Clearly,
-         * some way of specifying whether each element in the query object is inclusive or exclusive
-         * is needed.
-         *
-         * Recall that the BSONObjects in both lhs and rhs have been stripped of their field names.
-         * Consequently, the query object could store information about each element's inclusive/
-         * exclusive properties in the field names for these elements. This is exactly what is done
-         * by the makeQueryObject method: the BSONObject it returns uses its field names to
-         * describe what a given field's behavior should be if it is being compared to a field with
-         * an equal value. An 'l' indicates that the query should be considered less than the other
-         * object, a 'g' indicates that the query should be considered greater than the other
-         * object,and a null byte indicates that the query should be considered equal to the other
+         * It may be necessary to specify the first element of a query object as an inclusive range,
+         * the second one as an exclusive range, etc. Always returning 0 when the two BSONObjects
+         * have identical values would only allow inclusive ranges across all elements of the query
          * object.
          *
-         * Here are a few examples to illustrate this point:
+         * To get around this, a query object uses its field names to describe what a given
+         * field's behavior should be if it is being compared to a field with an equal value. An 'l'
+         * indicates that the query should be considered less than the other object, a 'g' indicates
+         * that the query should be considered greater than the other object,and a null byte
+         * indicates that the query should be considered equal to the other object.
          *
-         * {"": 5, "": "foo"} == {"": 5, "": "foo"}
-         * {"g": 5, "": "foo"} > {"": 5, "": "foo"}
-         * {"l": 5, "": "foo"} < {"": 5, "": "foo"}
+         * Ex: {"": 5, "": "foo"} == {"": 5, "": "foo"}
+         *     {"g": 5, "": "foo"} > {"": 5, "": "foo"}
+         *     {"": 5, "l": "foo"} < {"": 5, "": "foo"}
          */
-        int comparison(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const;
+        int compare(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const;
 
         /**
          * See the comment above comparison() for some important details.
@@ -147,16 +123,6 @@ namespace mongo {
                                        const int cursorDirection);
 
     private:
-        // Due to the limitations of various APIs, we need to use the same type (IndexKeyEntry)
-        // for both the stored data and the "query". We cheat and encode extra information in the
-        // first byte of the field names in the query. This works because all stored objects should
-        // have all field names empty, so their first bytes are '\0'.
-        enum BehaviorIfFieldIsEqual {
-            normal = '\0',
-            less = 'l',
-            greater = 'g',
-        };
-
         // Ordering is used in comparison() to compare BSONElements
         const Ordering _order;
 

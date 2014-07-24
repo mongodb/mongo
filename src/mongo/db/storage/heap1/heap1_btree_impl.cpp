@@ -74,7 +74,7 @@ namespace {
             return false;
 
         // Not a dup if the entry is for the same loc.
-        return it->loc() != loc;
+        return it->loc != loc;
     }
 
     class Heap1BtreeBuilderImpl : public SortedDataBuilderInterface {
@@ -204,7 +204,7 @@ namespace {
             virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
                 const BSONObj key = stripFieldNames(keyRaw);
                 _it = _data.lower_bound(IndexKeyEntry(key, loc)); // lower_bound is >= key
-                return _it != _data.end() && (_it->key() == key); // intentionally not comparing loc
+                return _it != _data.end() && (_it->key == key); // intentionally not comparing loc
             }
 
             virtual void customLocate(const BSONObj& keyBegin,
@@ -233,11 +233,11 @@ namespace {
             }
 
             virtual BSONObj getKey() const {
-                return _it->key();
+                return _it->key;
             }
 
             virtual DiskLoc getDiskLoc() const {
-                return _it->loc();
+                return _it->loc;
             }
 
             virtual void advance() {
@@ -251,8 +251,8 @@ namespace {
                     return;
                 }
 
-                _savedKey = _it->key();
-                _savedLoc = _it->loc();
+                _savedKey = _it->key;
+                _savedLoc = _it->loc;
             }
 
             virtual void restorePosition() {
@@ -303,7 +303,7 @@ namespace {
             virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
                 const BSONObj key = stripFieldNames(keyRaw);
                 _it = lower_bound(IndexKeyEntry(key, loc)); // lower_bound is <= query
-                return _it != _data.rend() && (_it->key() == key); // intentionally not comparing loc
+                return _it != _data.rend() && (_it->key == key); // intentionally not comparing loc
             }
 
             virtual void customLocate(const BSONObj& keyBegin,
@@ -332,11 +332,11 @@ namespace {
             }
 
             virtual BSONObj getKey() const {
-                return _it->key();
+                return _it->key;
             }
 
             virtual DiskLoc getDiskLoc() const {
-                return _it->loc();
+                return _it->loc;
             }
 
             virtual void advance() {
@@ -350,8 +350,8 @@ namespace {
                     return;
                 }
 
-                _savedKey = _it->key();
-                _savedLoc = _it->loc();
+                _savedKey = _it->key;
+                _savedLoc = _it->loc;
             }
 
             virtual void restorePosition() {

@@ -32,6 +32,7 @@
 
 #include <string>
 
+#include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
 #include <rocksdb/iterator.h>
 
@@ -46,6 +47,49 @@ namespace mongo {
         rocksdb::Slice emptyByteSlice( "" );
         rocksdb::SliceParts emptyByteSliceParts( &emptyByteSlice, 1 );
 
+        // functions for converting between BSONObj-DiskLoc pairs and strings/rocksdb::Slices
+        
+        /**
+         * Strips the field names from a BSON object
+         */
+        BSONObj stripFieldNames( const BSONObj& obj ) {
+            BSONObjBuilder b;
+            BSONObjIterator i( obj );
+            while ( i.more() ) {
+                BSONElement e = i.next();
+                b.appendAs( e, "" );
+            }
+            return b.obj();
+        }
+
+        /**
+         * Constructs a string containing the bytes of key followed by the bytes of loc.
+         *
+         * @param removeFieldNames true if the field names in key should be replaces with empty
+         * strings, and false otherwise. Useful because field names are not necessary in an index
+         * key, because the ordering of the fields is already known.
+         */
+        string makeString( const BSONObj& key, const DiskLoc loc, bool removeFieldNames = true ) {
+            const BSONObj& finalKey = removeFieldNames ? stripFieldNames( key ) : key;
+            string s( finalKey.objdata(), finalKey.objsize() );
+            s.append( reinterpret_cast<const char*>( &loc ), sizeof( DiskLoc ) );
+
+            return s;
+        }
+
+        /**
+         * Constructs an IndexKeyEntry from a slice containing the bytes of a BSONObject followed
+         * by the bytes of a DiskLoc
+         */
+        IndexKeyEntry makeIndexKeyEntry( const rocksdb::Slice& slice ) {
+            BSONObj key = BSONObj(slice.data() ).getOwned();
+            DiskLoc loc = reinterpret_cast<const DiskLoc*>( slice.data() + key.objsize() )[0];
+            return IndexKeyEntry( key, loc );
+        }
+
+        /**
+         * Rocks cursor
+         */
         class RocksCursor : public SortedDataInterface::Cursor {
         public:
             RocksCursor( rocksdb::Iterator* iterator, bool forward )
@@ -86,7 +130,7 @@ namespace mongo {
             }
 
             bool locate(const BSONObj& key, const DiskLoc& loc) {
-                return _locate( RocksIndexEntry( key, loc ) );
+                return _locate( stripFieldNames( key ), loc );
             }
 
 
@@ -104,7 +148,7 @@ namespace mongo {
                                          keyEndInclusive,
                                          getDirection() );
 
-                _locate( RocksIndexEntry( key, DiskLoc(), false ) );
+                _locate( key, DiskLoc() );
             }
 
             /**
@@ -180,22 +224,21 @@ namespace mongo {
         private:
 
             /**
-             * locate function which takes in a RocksIndexEntry. This logic is abstracted out into a
-             * helper so that its possible to choose whether or not to pass a RocksIndexEntry with
-             * the key fields stripped.
+             * locate function which takes in a IndexKeyEntry. This logic is abstracted out into a
+             * helper so that its possible to choose whether or not to strip the fieldnames before
+             * performing the actual locate logic.
              */
-            bool _locate( const RocksIndexEntry rie ) {
+            bool _locate( const BSONObj& key, const DiskLoc loc ) {
                 _cached = false;
-                string keyData = rie.asString();
+                //assumes fieldNames already stripped if necessary 
+                string keyData = makeString( key, loc, false );
                 _iterator->Seek( keyData );
                 _checkStatus();
                 if ( !_iterator->Valid() )
                     return false;
                 _load();
 
-                // because considerFieldNames is false, it doesn't matter if we stripped the
-                // fieldnames or not when constructing rie
-                bool compareResult = rie.key().woCompare( _cachedKey, BSONObj(), false ) == 0;
+                bool compareResult = key.woCompare( _cachedKey, BSONObj(), false ) == 0;
 
                 // if we can't find the result and we have a reverse iterator, we need to call
                 // advance() so that we're at the first value less than (to the left of) what we
@@ -248,37 +291,42 @@ namespace mongo {
             mutable DiskLoc _savePositionLoc;
         };
 
-    }
+        /**
+         * Custom comparator for rocksdb used to compare Index Entries by BSONObj and DiskLoc
+         */
+        class RocksIndexEntryComparator : public rocksdb::Comparator {
+            public:
+                RocksIndexEntryComparator(const Ordering& order): _indexComparator(order) { }
+                virtual ~RocksIndexEntryComparator() { }
 
-    // RocksIndexEntry***********
+                virtual int Compare( const rocksdb::Slice& a, const rocksdb::Slice& b ) const {
+                    IndexKeyEntry lhs = makeIndexKeyEntry( a );
+                    IndexKeyEntry rhs = makeIndexKeyEntry( b );
+                    return _indexComparator.compare(lhs, rhs);
+                }
 
-    RocksIndexEntry::RocksIndexEntry( const BSONObj& key, const DiskLoc loc, bool stripFieldNames )
-        : IndexKeyEntry( key, loc ) {
+                virtual const char* Name() const {
+                    return "mongodb.RocksIndexEntryComparator";
+                }
 
-        if ( stripFieldNames ) {
-            BSONObjBuilder b;
-            BSONObjIterator i( _key );
-            while ( i.more() ) {
-                BSONElement e = i.next();
-                b.appendAs( e, "" );
-            }
-            _key = b.obj();
-        }
-    }
+                /**
+                 * From the RocksDB comments: "an implementation of this method that does nothing is
+                 * correct"
+                 */
+                virtual void FindShortestSeparator( std::string* start,
+                        const rocksdb::Slice& limit) const { }
 
-    RocksIndexEntry::RocksIndexEntry( const rocksdb::Slice& slice )
-        : IndexKeyEntry( BSONObj(), DiskLoc() ) {
-        _key = BSONObj( slice.data() ).getOwned();
-        _loc = reinterpret_cast<const DiskLoc*>( slice.data() + _key.objsize() )[0];
-    }
+                /**
+                 * From the RocksDB comments: "an implementation of this method that does nothing is
+                 * correct.
+                 */
+                virtual void FindShortSuccessor(std::string* key) const { }
 
-    string RocksIndexEntry::asString() const {
-        string s( _key.objdata(), _key.objsize() );
+            private:
+                IndexEntryComparison _indexComparator;
+        };
 
-        s.append( reinterpret_cast<const char*>( &_loc ), sizeof( DiskLoc ) );
-
-        return s;
-    }
+    } // namespace
 
     // RocksSortedDataImpl***********
 
@@ -307,8 +355,7 @@ namespace mongo {
             }
         }
 
-        RocksIndexEntry rIndexEntry( key, loc );
-        ru->writeBatch()->Put( _columnFamily, rIndexEntry.asString(), emptyByteSlice );
+        ru->writeBatch()->Put( _columnFamily, makeString( key, loc ), emptyByteSlice );
 
         return Status::OK();
     }
@@ -318,7 +365,7 @@ namespace mongo {
                                       const DiskLoc& loc) {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
-        string keyData = RocksIndexEntry( key, loc ).asString();
+        string keyData = makeString( key, loc );
 
         string dummy;
         rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
@@ -384,6 +431,11 @@ namespace mongo {
     Status RocksSortedDataImpl::initAsEmpty(OperationContext* txn) {
         // no-op
         return Status::OK();
+    }
+
+    // ownership passes to caller
+    rocksdb::Comparator* RocksSortedDataImpl::newRocksComparator( const Ordering& order ) {
+        return new RocksIndexEntryComparator( order );
     }
 
     RocksRecoveryUnit* RocksSortedDataImpl::_getRecoveryUnit( OperationContext* opCtx ) const {

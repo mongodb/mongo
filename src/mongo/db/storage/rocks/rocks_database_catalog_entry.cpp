@@ -85,7 +85,7 @@ namespace mongo {
         RocksEngine::Entry* entry = _engine->getEntry( ns );
         if ( !entry )
             return NULL;
-        return reinterpret_cast<RecordStore*>( entry->recordStore.get() );
+        return entry->recordStore.get();
     }
 
     Status RocksDatabaseCatalogEntry::createCollection( OperationContext* txn,
