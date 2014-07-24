@@ -254,7 +254,7 @@ namespace mongo {
                         ObjectCtx oCtx(
                             (pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0)
                              | (pCtx->inclusionOk() ? ObjectCtx::INCLUSION_OK : 0));
-                            
+
                         pExpressionObject->addField(fieldName,
                                                     parseObject(fieldElement.Obj(), &oCtx, vps));
                         break;
@@ -799,12 +799,198 @@ namespace {
         return "$const";
     }
 
+    /* ---------------------- ExpressionDateToString ----------------------- */
+
+    REGISTER_EXPRESSION("$dateToString", ExpressionDateToString::parse);
+    intrusive_ptr<Expression> ExpressionDateToString::parse(
+            BSONElement expr,
+            const VariablesParseState& vps) {
+
+        verify(str::equals(expr.fieldName(), "$dateToString"));
+
+        uassert(18530, "$dateToString only supports an object as its argument",
+                expr.type() == Object);
+
+        BSONElement formatElem;
+        BSONElement dateElem;
+        const BSONObj args = expr.embeddedObject();
+        BSONForEach(arg, args) {
+            if (str::equals(arg.fieldName(), "format")) {
+                formatElem = arg;
+            } else if (str::equals(arg.fieldName(), "date")) {
+                dateElem = arg;
+            } else {
+                uasserted(18534, str::stream() << "Unrecognized argument to $dateToString: "
+                                               << arg.fieldName());
+            }
+        }
+
+        uassert(18531, "Missing 'format' parameter to $dateToString",
+                !formatElem.eoo());
+        uassert(18532, "Missing 'date' parameter to $dateToString",
+                !dateElem.eoo());
+
+        uassert(18533, "The 'format' parameter to $dateToString must be a string literal",
+                formatElem.type() == String);
+
+        const string format = formatElem.str();
+
+        validateFormat(format);
+
+        return new ExpressionDateToString(format, parseOperand(dateElem, vps));
+    }
+
+    ExpressionDateToString::ExpressionDateToString(const string& format,
+                                                   intrusive_ptr<Expression> date)
+        : _format(format)
+        , _date(date)
+    {}
+
+    intrusive_ptr<Expression> ExpressionDateToString::optimize() {
+        _date = _date->optimize();
+        return this;
+    }
+
+    Value ExpressionDateToString::serialize(bool explain) const {
+        return Value(DOC("$dateToString" << DOC("format" << _format
+                                             << "date" << _date->serialize(explain)
+                                                )));
+    }
+
+    Value ExpressionDateToString::evaluateInternal(Variables* vars) const {
+        const Value date = _date->evaluateInternal(vars);
+
+        if (date.nullish()) {
+            return Value(BSONNULL);
+        }
+
+        return Value(formatDate(_format, date.coerceToTm(), date.coerceToDate()));
+    }
+
+    // verifies that any '%' is followed by a valid format character, and that
+    // the format string ends with an even number of '%' symbols
+    void ExpressionDateToString::validateFormat(const std::string& format) {
+        for (string::const_iterator it = format.begin(); it != format.end(); ++it) {
+            if (*it != '%') {
+                continue;
+            }
+
+            ++it; // next character must be format modifier
+            uassert(18535, "Unmatched '%' at end of $dateToString format string",
+                    it != format.end());
+
+
+            switch (*it) {
+            // all of these fall through intentionally
+            case '%': case 'Y': case 'm':
+            case 'd': case 'H': case 'M':
+            case 'S': case 'L': case 'j':
+            case 'w': case 'U':
+                break;
+            default:
+                uasserted(18536, str::stream() << "Invalid format character '%"
+                                               << *it
+                                               << "' in $dateToString format string");
+            }
+        }
+    }
+
+    string ExpressionDateToString::formatDate(const string& format,
+                                              const tm& tm,
+                                              const long long date) {
+        StringBuilder formatted;
+        for (string::const_iterator it = format.begin(); it != format.end(); ++it) {
+            if (*it != '%') {
+                formatted << *it;
+                continue;
+            }
+
+            ++it; // next character is format modifier
+            invariant(it != format.end()); // checked in validateFormat
+
+            switch (*it) {
+            case '%': // Escaped literal %
+                formatted << '%';
+                break;
+            case 'Y': // Year
+                {
+                    const int year = ExpressionYear::extract(tm);
+                    uassert(18537, str::stream() << "$dateToString is only defined on year 0-9999,"
+                                                 << " tried to use year "
+                                                 << year,
+                            (year >= 0) && (year <= 9999));
+                    insertPadded(formatted, year, 4);
+                    break;
+                }
+            case 'm': // Month
+                insertPadded(formatted, ExpressionMonth::extract(tm), 2);
+                break;
+            case 'd': // Day of month
+                insertPadded(formatted, ExpressionDayOfMonth::extract(tm), 2);
+                break;
+            case 'H': // Hour
+                insertPadded(formatted, ExpressionHour::extract(tm), 2);
+                break;
+            case 'M': // Minute
+                insertPadded(formatted, ExpressionMinute::extract(tm), 2);
+                break;
+            case 'S': // Second
+                insertPadded(formatted, ExpressionSecond::extract(tm), 2);
+                break;
+            case 'L': // Millisecond
+                insertPadded(formatted, ExpressionMillisecond::extract(date), 3);
+                break;
+            case 'j': // Day of year
+                insertPadded(formatted, ExpressionDayOfYear::extract(tm), 3);
+                break;
+            case 'w': // Day of week
+                insertPadded(formatted, ExpressionDayOfWeek::extract(tm), 1);
+                break;
+            case 'U': // Week
+                insertPadded(formatted, ExpressionWeek::extract(tm), 2);
+                break;
+            default:
+                // Should never happen as format is pre-validated
+                invariant(false);
+            }
+        }
+        return formatted.str();
+    }
+
+    // Only works with 1 <= spaces <= 4 and 0 <= number <= 9999.
+    // If spaces is less than the digit count of number we simply insert the number
+    // without padding.
+    void ExpressionDateToString::insertPadded(StringBuilder& sb, int number, int width) {
+        invariant(width >= 1);
+        invariant(width <= 4);
+        invariant(number >= 0);
+        invariant(number <= 9999);
+
+        int digits = 1;
+
+        if (number >= 1000) {
+            digits = 4;
+        } else if (number >= 100) {
+            digits = 3;
+        } else if (number >= 10) {
+            digits = 2;
+        }
+
+        if (width > digits) {
+            sb.write("0000", width - digits);
+        }
+        sb << number;
+    }
+
+    void ExpressionDateToString::addDependencies(DepsTracker* deps, vector<string> *path) const {
+        _date->addDependencies(deps);
+    }
+
     /* ---------------------- ExpressionDayOfMonth ------------------------- */
 
     Value ExpressionDayOfMonth::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
-        tm date = pDate.coerceToTm();
-        return Value(date.tm_mday);
+        return Value(extract(pDate.coerceToTm()));
     }
 
     REGISTER_EXPRESSION("$dayOfMonth", ExpressionDayOfMonth::parse);
@@ -816,8 +1002,7 @@ namespace {
 
     Value ExpressionDayOfWeek::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
-        tm date = pDate.coerceToTm();
-        return Value(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
+        return Value(extract(pDate.coerceToTm()));
     }
 
     REGISTER_EXPRESSION("$dayOfWeek", ExpressionDayOfWeek::parse);
@@ -829,8 +1014,7 @@ namespace {
 
     Value ExpressionDayOfYear::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
-        tm date = pDate.coerceToTm();
-        return Value(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
+        return Value(extract(pDate.coerceToTm()));
     }
 
     REGISTER_EXPRESSION("$dayOfYear", ExpressionDayOfYear::parse);
@@ -917,7 +1101,7 @@ namespace {
         else {
             verify(!_excludeId);
         }
-        
+
 
         for (FieldMap::const_iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
             if (it->second) {
@@ -978,7 +1162,7 @@ namespace {
             BSONType valueType = field.second.getType();
             if ((valueType != Object && valueType != Array) || !exprObj ) {
                 // This expression replace the whole field
-                
+
                 Value pValue(expr->evaluateInternal(vars));
 
                 // don't add field if nothing was found in the subobject
@@ -1075,7 +1259,7 @@ namespace {
     Document ExpressionObject::evaluateDocument(Variables* vars) const {
         /* create and populate the result */
         MutableDocument out (getSizeHint());
-        
+
         addToDocument(out,
                       Document(), // No inclusion field matching.
                       vars);
@@ -1534,9 +1718,13 @@ namespace {
 
     Value ExpressionMillisecond::evaluateInternal(Variables* vars) const {
         Value date(vpOperand[0]->evaluateInternal(vars));
-        const int ms = date.coerceToDate() % 1000LL;
+        return Value(extract(date.coerceToDate()));
+    }
+
+    int ExpressionMillisecond::extract(const long long date) {
+        const int ms = date % 1000LL;
         // adding 1000 since dates before 1970 would have negative ms
-        return Value(ms >= 0 ? ms : 1000 + ms);
+        return ms >= 0 ? ms : 1000 + ms;
     }
 
     REGISTER_EXPRESSION("$millisecond", ExpressionMillisecond::parse);
@@ -1548,8 +1736,7 @@ namespace {
 
     Value ExpressionMinute::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
-        tm date = pDate.coerceToTm();
-        return Value(date.tm_min);
+        return Value(extract(pDate.coerceToTm()));
     }
 
     REGISTER_EXPRESSION("$minute", ExpressionMinute::parse);
@@ -1614,8 +1801,7 @@ namespace {
 
     Value ExpressionMonth::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
-        tm date = pDate.coerceToTm();
-        return Value(date.tm_mon + 1); // MySQL uses 1-12 tm uses 0-11
+        return Value(extract(pDate.coerceToTm()));
     }
 
     REGISTER_EXPRESSION("$month", ExpressionMonth::parse);
@@ -1674,8 +1860,7 @@ namespace {
 
     Value ExpressionHour::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
-        tm date = pDate.coerceToTm();
-        return Value(date.tm_hour);
+        return Value(extract(pDate.coerceToTm()));
     }
 
     REGISTER_EXPRESSION("$hour", ExpressionHour::parse);
@@ -1719,7 +1904,7 @@ namespace {
         }
 
         // If all the operands are constant, we can replace this expression with a constant. Using
-        // an empty Variables since it will never be accessed.  
+        // an empty Variables since it will never be accessed.
         if (constCount == n) {
             Variables emptyVars;
             Value pResult(evaluateInternal(&emptyVars));
@@ -1887,16 +2072,13 @@ namespace {
 
     Value ExpressionSecond::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
-        tm date = pDate.coerceToTm();
-        return Value(date.tm_sec);
+        return Value(extract(pDate.coerceToTm()));
     }
 
     REGISTER_EXPRESSION("$second", ExpressionSecond::parse);
     const char *ExpressionSecond::getOpName() const {
         return "$second";
     }
-
-
 
     namespace {
         ValueSet arrayToSet(const Value& val) {
@@ -2188,14 +2370,14 @@ namespace {
         uassert(16034, str::stream() << getOpName() <<
                 ":  starting index must be a numeric type (is BSON type " <<
                 typeName(pLower.getType()) << ")",
-                (pLower.getType() == NumberInt 
-                 || pLower.getType() == NumberLong 
+                (pLower.getType() == NumberInt
+                 || pLower.getType() == NumberLong
                  || pLower.getType() == NumberDouble));
         uassert(16035, str::stream() << getOpName() <<
                 ":  length must be a numeric type (is BSON type " <<
                 typeName(pLength.getType() )<< ")",
-                (pLength.getType() == NumberInt 
-                 || pLength.getType() == NumberLong 
+                (pLength.getType() == NumberInt
+                 || pLength.getType() == NumberLong
                  || pLength.getType() == NumberDouble));
         string::size_type lower = static_cast< string::size_type >( pLower.coerceToLong() );
         string::size_type length = static_cast< string::size_type >( pLength.coerceToLong() );
@@ -2217,14 +2399,14 @@ namespace {
     Value ExpressionSubtract::evaluateInternal(Variables* vars) const {
         Value lhs = vpOperand[0]->evaluateInternal(vars);
         Value rhs = vpOperand[1]->evaluateInternal(vars);
-            
+
         BSONType diffType = Value::getWidestNumeric(rhs.getType(), lhs.getType());
 
         if (diffType == NumberDouble) {
             double right = rhs.coerceToDouble();
             double left = lhs.coerceToDouble();
             return Value(left - right);
-        } 
+        }
         else if (diffType == NumberLong) {
             long long right = rhs.coerceToLong();
             long long left = lhs.coerceToLong();
@@ -2298,9 +2480,12 @@ namespace {
 
     Value ExpressionWeek::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
-        tm date = pDate.coerceToTm();
-        int dayOfWeek = date.tm_wday;
-        int dayOfYear = date.tm_yday;
+        return Value(extract(pDate.coerceToTm()));
+    }
+
+    int ExpressionWeek::extract(const tm& tm) {
+        int dayOfWeek = tm.tm_wday;
+        int dayOfYear = tm.tm_yday;
         int prevSundayDayOfYear = dayOfYear - dayOfWeek; // may be negative
         int nextSundayDayOfYear = prevSundayDayOfYear + 7; // must be positive
 
@@ -2311,11 +2496,11 @@ namespace {
         // Verify that the week calculation is consistent with strftime "%U".
         DEV{
             char buf[3];
-            verify(strftime(buf,3,"%U",&date));
+            verify(strftime(buf,3,"%U",&tm));
             verify(int(str::toUnsigned(buf))==nextSundayWeek);
         }
 
-        return Value(nextSundayWeek);
+        return nextSundayWeek;
     }
 
     REGISTER_EXPRESSION("$week", ExpressionWeek::parse);
@@ -2327,13 +2512,11 @@ namespace {
 
     Value ExpressionYear::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
-        tm date = pDate.coerceToTm();
-        return Value(date.tm_year + 1900); // tm_year is years since 1900
+        return Value(extract(pDate.coerceToTm()));
     }
 
     REGISTER_EXPRESSION("$year", ExpressionYear::parse);
     const char *ExpressionYear::getOpName() const {
         return "$year";
     }
-
 }
