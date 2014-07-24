@@ -137,7 +137,7 @@ namespace mongo {
          *
          * @throws UserException
          */
-        Status split( bool atMedian, size_t* resultingSplits ) const;
+        Status split(bool atMedian, size_t* resultingSplits, BSONObj* res) const;
 
         /**
          * Splits this chunk at the given key (or keys)
@@ -147,7 +147,7 @@ namespace mongo {
          *
          * @throws UserException
          */
-        Status multiSplit( const std::vector<BSONObj>& splitPoints ) const;
+        Status multiSplit(const std::vector<BSONObj>& splitPoints, BSONObj* res) const;
 
         /**
          * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two

@@ -267,7 +267,7 @@ namespace mongo {
         }
     }
 
-    Status Chunk::split( bool atMedian, size_t* resultingSplits ) const {
+    Status Chunk::split(bool atMedian, size_t* resultingSplits, BSONObj* res) const {
         size_t dummy;
         if (resultingSplits == NULL) {
             resultingSplits = &dummy;
@@ -307,12 +307,12 @@ namespace mongo {
             return Status(ErrorCodes::CannotSplit, msg);
         }
 
-        Status status = multiSplit( splitPoints );
+        Status status = multiSplit(splitPoints, res);
         *resultingSplits = splitPoints.size();
         return status;
     }
 
-    Status Chunk::multiSplit( const vector<BSONObj>& m ) const {
+    Status Chunk::multiSplit(const vector<BSONObj>& m, BSONObj* res) const {
         const size_t maxSplitPoints = 8192;
 
         uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
@@ -333,10 +333,14 @@ namespace mongo {
         cmd.append( "configdb" , configServer.modelServer() );
         BSONObj cmdObj = cmd.obj();
 
-        BSONObj res;
-        if ( ! conn->runCommand( "admin" , cmdObj , res )) {
+        BSONObj dummy;
+        if (res == NULL) {
+            res = &dummy;
+        }
+
+        if (!conn->runCommand("admin", cmdObj, *res)) {
             string msg(str::stream() << "splitChunk failed - cmd: "
-                                     << cmdObj << " result: " << res);
+                                     << cmdObj << " result: " << *res);
             warning() << msg << endl;
             conn.done();
 
@@ -449,8 +453,9 @@ namespace mongo {
 
             BSONObj res;
             size_t splitCount = 0;
-            Status status = split( false /* does not force a split if not enough data */,
-                                   &splitCount );
+            Status status = split(false /* does not force a split if not enough data */,
+                                  &splitCount,
+                                  &res);
             if ( !status.isOK() ) {
                 // split would have issued a message if we got here
                 _dataWritten = 0; // this means there wasn't enough data to split, so don't want to try again until considerable more data

@@ -798,7 +798,7 @@ namespace mongo {
                         if ( i == allSplits.size() ||
                                 ! currentChunk->containsPoint( allSplits[i] ) ) {
                             if ( ! subSplits.empty() ){
-                                Status status = currentChunk->multiSplit( subSplits );
+                                Status status = currentChunk->multiSplit(subSplits, NULL);
                                 if ( !status.isOK() ){
                                     warning().stream()
                                         << "Couldn't split chunk " << currentChunk
@@ -1003,8 +1003,9 @@ namespace mongo {
 
                 BSONObj res;
                 if ( middle.isEmpty() ) {
-                    Status status = chunk->split( true /* force a split even if not enough data */,
-                                                  NULL );
+                    Status status = chunk->split(true /* force a split even if not enough data */,
+                                                 NULL,
+                                                 NULL);
                     if ( !status.isOK() ) {
                         errmsg = "split failed";
                         result.append( "cause", status.toString() );
@@ -1025,7 +1026,7 @@ namespace mongo {
 
                     vector<BSONObj> splitPoints;
                     splitPoints.push_back( middle );
-                    Status status = chunk->multiSplit( splitPoints );
+                    Status status = chunk->multiSplit(splitPoints, NULL);
 
                     if ( !status.isOK() ) {
                         errmsg = "split failed";

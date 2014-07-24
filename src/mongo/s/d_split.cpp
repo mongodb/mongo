@@ -865,39 +865,36 @@ namespace mongo {
                 }
             }
 
-            if (newChunks.size() == 2){
-                // If one of the chunks has only one object in it we should move it
-                for (int i=1; i >= 0 ; i--){ // high chunk more likely to have only one obj
+            dassert(newChunks.size() > 1);
 
-                    Client::ReadContext ctx(txn, ns);
-                    Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
-                    verify( collection );
+            {
+                Client::ReadContext ctx(txn, ns);
+                Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
+                verify(collection);
 
-                    // Allow multiKey based on the invariant that shard keys must be
-                    // single-valued. Therefore, any multi-key index prefixed by shard
-                    // key cannot be multikey over the shard key fields.
-                    IndexDescriptor *idx =
-                        collection->getIndexCatalog()->findIndexByPrefix( keyPattern ,
-                                                                          false );
-                    if ( idx == NULL ) {
-                        break;
-                    }
+                // Allow multiKey based on the invariant that shard keys must be
+                // single-valued. Therefore, any multi-key index prefixed by shard
+                // key cannot be multikey over the shard key fields.
+                IndexDescriptor *idx =
+                        collection->getIndexCatalog()->findIndexByPrefix(keyPattern, false);
 
-                    ChunkInfo chunk = newChunks[i];
-                    KeyPattern kp( idx->keyPattern() );
-                    BSONObj newmin = Helpers::toKeyFormat( kp.extendRangeBound( chunk.min, false) );
-                    BSONObj newmax = Helpers::toKeyFormat( kp.extendRangeBound( chunk.max, false) );
+                if (idx == NULL) {
+                    return true;
+                }
 
-                    auto_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn, collection, idx,
-                                                                           newmin, newmax, false));
+                ChunkInfo chunk = newChunks.back();
+                KeyPattern kp(idx->keyPattern());
+                BSONObj newmin = Helpers::toKeyFormat(kp.extendRangeBound(chunk.min, false));
+                BSONObj newmax = Helpers::toKeyFormat(kp.extendRangeBound(chunk.max, false));
 
-                    // check if exactly one document found
-                    if (PlanExecutor::ADVANCED == exec->getNext(NULL, NULL)) {
-                        if (PlanExecutor::IS_EOF == exec->getNext(NULL, NULL)) {
-                            result.append( "shouldMigrate",
-                                           BSON("min" << chunk.min << "max" << chunk.max) );
-                            break;
-                        }
+                auto_ptr<PlanExecutor> exec(
+                        InternalPlanner::indexScan(txn, collection, idx, newmin, newmax, false));
+
+                // check if exactly one document found
+                if (PlanExecutor::ADVANCED == exec->getNext(NULL, NULL)) {
+                    if (PlanExecutor::IS_EOF == exec->getNext(NULL, NULL)) {
+                        result.append("shouldMigrate",
+                                      BSON("min" << chunk.min << "max" << chunk.max));
                     }
                 }
             }
