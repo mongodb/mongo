@@ -690,20 +690,7 @@ namespace mongo {
 
         // verify state is sane post cleaning
 
-        long long numSystemIndexesEntries = 0;
-        {
-            Collection* systemIndexes =
-                _collection->_database->getCollection( txn, _collection->_database->_indexesName );
-            if ( systemIndexes ) {
-                EqualityMatchExpression expr;
-                BSONObj nsBSON = BSON( "ns" << _collection->ns() );
-                invariant( expr.init( "ns", nsBSON.firstElement() ).isOK() );
-                numSystemIndexesEntries = systemIndexes->countTableScan( txn, &expr );
-            }
-            else {
-                // this is ok, 0 is the right number
-            }
-        }
+        long long numSystemIndexesEntries = _collection->getCatalogEntry()->getTotalIndexCount();
 
         if ( haveIdIndex ) {
             fassert( 17324, numIndexesTotal() == 1 );
