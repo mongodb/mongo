@@ -86,7 +86,7 @@ namespace mongo {
             }
 
             bool locate(const BSONObj& key, const DiskLoc& loc) {
-                return _locate( RocksIndexEntry( key, loc ) );
+                return _locate( RocksSortedDataImpl::stripFieldNames( key ), loc );
             }
 
 
@@ -104,7 +104,7 @@ namespace mongo {
                                          keyEndInclusive,
                                          getDirection() );
 
-                _locate( RocksIndexEntry( key, DiskLoc(), false ) );
+                _locate( key, DiskLoc() );
             }
 
             /**
@@ -180,22 +180,21 @@ namespace mongo {
         private:
 
             /**
-             * locate function which takes in a RocksIndexEntry. This logic is abstracted out into a
-             * helper so that its possible to choose whether or not to pass a RocksIndexEntry with
-             * the key fields stripped.
+             * locate function which takes in a IndexKeyEntry. This logic is abstracted out into a
+             * helper so that its possible to choose whether or not to strip the fieldnames before
+             * performing the actual locate logic.
              */
-            bool _locate( const RocksIndexEntry rie ) {
+            bool _locate( const BSONObj& key, const DiskLoc loc ) {
                 _cached = false;
-                string keyData = rie.asString();
+                //assumes fieldNames already stripped if necessary 
+                string keyData = RocksSortedDataImpl::makeString( key, loc, false );
                 _iterator->Seek( keyData );
                 _checkStatus();
                 if ( !_iterator->Valid() )
                     return false;
                 _load();
 
-                // because considerFieldNames is false, it doesn't matter if we stripped the
-                // fieldnames or not when constructing rie
-                bool compareResult = rie.key.woCompare( _cachedKey, BSONObj(), false ) == 0;
+                bool compareResult = key.woCompare( _cachedKey, BSONObj(), false ) == 0;
 
                 // if we can't find the result and we have a reverse iterator, we need to call
                 // advance() so that we're at the first value less than (to the left of) what we
@@ -250,36 +249,6 @@ namespace mongo {
 
     }
 
-    // RocksIndexEntry***********
-
-    RocksIndexEntry::RocksIndexEntry( const BSONObj& _key, const DiskLoc _loc, bool stripFieldNames )
-        : IndexKeyEntry( _key, _loc ) {
-
-        if ( stripFieldNames ) {
-            BSONObjBuilder b;
-            BSONObjIterator i( key );
-            while ( i.more() ) {
-                BSONElement e = i.next();
-                b.appendAs( e, "" );
-            }
-            key = b.obj();
-        }
-    }
-
-    RocksIndexEntry::RocksIndexEntry( const rocksdb::Slice& slice )
-        : IndexKeyEntry( BSONObj(), DiskLoc() ) {
-        key = BSONObj( slice.data() ).getOwned();
-        loc = reinterpret_cast<const DiskLoc*>( slice.data() + key.objsize() )[0];
-    }
-
-    string RocksIndexEntry::asString() const {
-        string s( key.objdata(), key.objsize() );
-
-        s.append( reinterpret_cast<const char*>( &loc ), sizeof( DiskLoc ) );
-
-        return s;
-    }
-
     // RocksSortedDataImpl***********
 
     RocksSortedDataImpl::RocksSortedDataImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf )
@@ -307,8 +276,7 @@ namespace mongo {
             }
         }
 
-        RocksIndexEntry rIndexEntry( key, loc );
-        ru->writeBatch()->Put( _columnFamily, rIndexEntry.asString(), emptyByteSlice );
+        ru->writeBatch()->Put( _columnFamily, makeString( key, loc ), emptyByteSlice );
 
         return Status::OK();
     }
@@ -318,7 +286,7 @@ namespace mongo {
                                       const DiskLoc& loc) {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
-        string keyData = RocksIndexEntry( key, loc ).asString();
+        string keyData = makeString( key, loc );
 
         string dummy;
         rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
@@ -390,4 +358,30 @@ namespace mongo {
         return dynamic_cast<RocksRecoveryUnit*>( opCtx->recoveryUnit() );
     }
 
+    BSONObj RocksSortedDataImpl::stripFieldNames( const BSONObj& obj ) {
+        BSONObjBuilder b;
+        BSONObjIterator i( obj );
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            b.appendAs( e, "" );
+        }
+        return b.obj();
+    }
+    
+    string RocksSortedDataImpl::makeString( const BSONObj& key,
+                                            const DiskLoc loc,
+                                            bool stripFieldNames ) {
+        const BSONObj& finalKey = stripFieldNames 
+                                  ? RocksSortedDataImpl::stripFieldNames( key ) : key;
+        string s( finalKey.objdata(), finalKey.objsize() );
+        s.append( reinterpret_cast<const char*>( &loc ), sizeof( DiskLoc ) );
+
+        return s;
+    }
+
+    IndexKeyEntry RocksSortedDataImpl::makeIndexKeyEntry( const rocksdb::Slice& slice ) {
+        BSONObj key = BSONObj(slice.data() ).getOwned();
+        DiskLoc loc = reinterpret_cast<const DiskLoc*>( slice.data() + key.objsize() )[0];
+        return IndexKeyEntry( key, loc );
+    }
 }
