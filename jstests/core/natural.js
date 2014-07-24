@@ -5,9 +5,9 @@
 //   cur - cursor
 //   field - field name to check
 //   dir - direction for test (-1 for decreasing or 1 for increasing)
-//   shardTest - true/false
+//   isMongos - true/false
 //   errorExpected - expected error true/false
-function checkQuery(name, cur, field, dir, shardTest, errorExpected) {
+function checkQuery(name, cur, field, dir, isMongos, errorExpected) {
     var minVal = -1;
     var maxVal = Number.MAX_VALUE;
     var lastVal = minVal;
@@ -70,8 +70,8 @@ function checkQuery(name, cur, field, dir, shardTest, errorExpected) {
     catch(err) {
         // Rethrow if no error is expected
         if (!errorExpected) {
-            // shardTest should swallow assert, as docs do not have a preserved order
-            if (!shardTest) {
+            // isMongos should swallow assert, as docs do not have a preserved order
+            if (!isMongos) {
                 throw(err);
             }
         }
@@ -82,10 +82,10 @@ function checkQuery(name, cur, field, dir, shardTest, errorExpected) {
 //   test - test object
 //   db - connection to DB
 //   isMongo - connected to mongos, true/false
-var runTests = function(test, db, isMongo) {
+var runTests = function(test, db, isMongos) {
 
     var name = test.name;
-    if (isMongo) {
+    if (isMongos) {
         name += " sharding";
         // Not a shard test if no shardKey specified
         if (!("shardKey" in test)) {
@@ -110,8 +110,9 @@ var runTests = function(test, db, isMongo) {
         err = test.errorExpected;
     }
 
-    assert.commandWorked(db.createCollection(name, collOptions), name);
+    db.createCollection(name, collOptions);
     var coll = db[name];
+    coll.remove({});
 
     // Set indexes on collection
     test.indexes.forEach(function(idx) {
@@ -149,10 +150,10 @@ var runTests = function(test, db, isMongo) {
     var order = test.orderField;
     test.queries.forEach(function(q) {
         // Tests with hint should override sort $natural
-        if ("hints" in t) {
-            t.hints.forEach(function(hint) {
+        if ("hints" in test) {
+            test.hints.forEach(function(hint) {
                 checkQuery(name+" hint override",
-                    coll.find(q).sort({$natural: -1}).hint(hint), order, 1, shardTest, err);
+                    coll.find(q).sort({$natural: -1}).hint(hint), order, 1, isMongos, err);
             });
         }
         // Check all queries with sort & hint $natural in both directions: -1 & 1
@@ -161,37 +162,37 @@ var runTests = function(test, db, isMongo) {
             [-1, 1].forEach(function(dir) {
                 checkQuery(name+" sort "+dir,
                     coll.find(q, dl).sort({$natural: dir}),
-                    order, dir, shardTest, err);
+                    order, dir, isMongos, err);
                 checkQuery(name+" hint "+dir,
                     coll.find(q, dl).hint({$natural: dir}),
-                    order, dir, shardTest, err);
+                    order, dir, isMongos, err);
                 checkQuery(name+" sort/hint "+dir,
                     coll.find(q, dl).sort({$natural: dir}).hint({$natural: dir}),
-                    order, dir, shardTest, err);
+                    order, dir, isMongos, err);
                 checkQuery(name+" sort/hint opposite",
                     coll.find(q, dl).sort({$natural: dir}).hint({$natural: dir*-1}),
-                    order, dir, shardTest, err);
+                    order, dir, isMongos, err);
                 // Test various projections
                 projs.forEach(function(proj) {
                     checkQuery(name+" proj sort "+dir,
                         coll.find(q, proj).sort({$natural: dir}),
-                        order, dir, shardTest, err);
+                        order, dir, isMongos, err);
                     checkQuery(name+" proj hint "+dir,
                         coll.find(q, proj).hint({$natural: dir}),
-                        order, dir, shardTest, err);
+                        order, dir, isMongos, err);
                     checkQuery(name+" proj sort/hint "+dir,
                         coll.find(q, proj).sort({$natural: dir}).hint({$natural: dir}),
-                        order, dir, shardTest, err);
+                        order, dir, isMongos, err);
                     checkQuery(name+" proj sort/hint opposite",
                         coll.find(q, proj).sort({$natural: dir}).hint({$natural: dir*-1}),
-                        order, dir, shardTest, err);
+                        order, dir, isMongos, err);
                 });
             });
         }
     });
 
     // Drop collection
-    assert(function() {return coll.drop();}, "Coll drop"+coll);
+    assert.doesNotThrow(function() {return coll.drop();}, [], "Coll drop"+coll);
 };
 
 // Test cases, each test is a doc
