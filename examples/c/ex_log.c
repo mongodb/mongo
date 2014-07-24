@@ -76,7 +76,6 @@ walk_log(WT_SESSION *session)
 	    lsnsave.file, lsnsave.offset, (u_long)log_rec.size);
 	ret = cursor->get_key(cursor, &lsn.file, &lsn.offset);
 	assert(lsnsave.file == lsn.file && lsnsave.offset == lsn.offset);
-err:
 	cursor->close(cursor);
 	return (ret);
 }
@@ -137,7 +136,6 @@ iterate_log(WT_SESSION *session)
 		if (ret != 0)
 			break;
 	}
-err:
 	cursor->close(cursor);
 	return (ret);
 }
