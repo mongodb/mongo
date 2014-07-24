@@ -78,6 +78,7 @@ walk_log(WT_SESSION *session)
 	assert(lsnsave.file == lsn.file && lsnsave.offset == lsn.offset);
 err:
 	cursor->close(cursor);
+	return (ret);
 }
 
 static int
@@ -138,6 +139,7 @@ iterate_log(WT_SESSION *session)
 	}
 err:
 	cursor->close(cursor);
+	return (ret);
 }
 
 int main(void)
@@ -185,8 +187,8 @@ int main(void)
 	ret = session->commit_transaction(session, NULL);
 	cursor->close(cursor);
 
-	walk_log(session);
-	iterate_log(session);
+	ret = walk_log(session);
+	ret = iterate_log(session);
 
 	ret = wt_conn->close(wt_conn, NULL);
 	return (ret);
