@@ -110,8 +110,8 @@ var runTests = function(test, db, shardTest) {
         err = test.errorExpected;
     }
 
-    assert.commandWorked(db.getSiblingDB(dbName).createCollection(name, collOptions));
-    var coll = db.getSiblingDB(dbName)[name];
+    assert.commandWorked(db.createCollection(name, collOptions), name);
+    var coll = db[name];
 
     // Set indexes on collection
     test.indexes.forEach(function(idx) {
@@ -125,13 +125,13 @@ var runTests = function(test, db, shardTest) {
 
     // shard collection if connected to mongos
     if (isMongo) {
-        db.getDB("admin").runCommand({shardCollection : coll+"", key: test.shardKey});
+        db.getMongo().getDB("admin").runCommand({shardCollection : coll+"", key: test.shardKey});
         // pre-split collection on shardKey
         var splitCmd = {split: coll+"", middle: {}};
         for (var k in test.shardKey) {
             splitCmd.middle[k] = docNum/2;
         }
-        db.getSiblingDB("admin").runCommand(splitCmd);
+        db.getMongo().getDB("admin").runCommand(splitCmd);
     }
 
     // Insert docs
