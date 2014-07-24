@@ -51,8 +51,26 @@
 namespace mongo {
 
     RocksEngine::RocksEngine( const std::string& path ): _path( path ), _db( NULL ) {
-        // get ColumnFamilyDescriptors for all the column families
-        CfdVector families = _createCfds( path );
+        std::vector<rocksdb::ColumnFamilyDescriptor> families;
+
+        vector<string> namespaces = _listNamespaces( path );
+
+        if ( !namespaces.empty() ) {
+            // go through and create RocksCollectionCatalogEntries for all non-indexes
+            EntryVector nonIndexEntries = _createNonIndexCatalogEntries( namespaces );
+
+            CfdVector metaDataCfds = _generateMetaDataCfds( nonIndexEntries, namespaces );
+            
+            // Create a mapping from index names to the Ordering object for each index. These Ordering
+            // objects will be used to create RocksIndexEntryComparators to be used with each
+            // column family representing a namespace
+            map<string, Ordering> indexOrderings = _createIndexOrderings( namespaces,
+                                                                          metaDataCfds,
+                                                                          path );
+
+            // get ColumnFamilyDescriptors for all the column families
+            families = _createCfds( namespaces, indexOrderings );
+        }
 
         // If there are no column families, then just open the database and return
         if ( families.empty() ) {
@@ -329,6 +347,21 @@ namespace mongo {
         }
     }
 
+    vector<std::string> RocksEngine::_listNamespaces( string path ) {
+        std::vector<std::string> namespaces;
+        if ( boost::filesystem::exists( path ) ) {
+            rocksdb::Status s = rocksdb::DB::ListColumnFamilies(_dbOptions(), path, &namespaces);
+
+            if ( s.IsIOError() ) {
+                // DNE, ok
+            } else {
+                _rock_status_ok( s );
+            }
+        }
+
+        return namespaces;
+    }
+
     /**
      * Create Entry's for all non-index column families in the database. This method is called by
      * the constructor. It is necessary because information about indexes is needed before a
@@ -395,10 +428,26 @@ namespace mongo {
         return cfds;
     }
 
-    map<string, Ordering> RocksEngine::_createIndexOrderingsHelper(
-            const vector<string>& namespaces ) {
+    map<string, Ordering> RocksEngine::_createIndexOrderings( const vector<string>& namespaces,
+                                                              const CfdVector& metaDataCfds,
+                                                              const string& path ) {
+
+
+        // open all the metadata column families so that we can retrieve information about
+        // each index, which is needed in order to open the index column families
+        rocksdb::DB* db = nullptr;
+        vector<rocksdb::ColumnFamilyHandle*> metaDataHandles;
+        rocksdb::Status openROStatus = rocksdb::DB::OpenForReadOnly( _dbOptions(),
+                                                                     path,
+                                                                     metaDataCfds,
+                                                                     &metaDataHandles,
+                                                                     &_db );
+
+        _rock_status_ok( openROStatus );
+
         map<string, Ordering> indexOrderings;
 
+        // populate indexOrderings
         for ( unsigned i = 0; i < namespaces.size(); i++ ) {
             string ns = namespaces[i];
             string collection = ns;
@@ -425,59 +474,15 @@ namespace mongo {
             indexOrderings.insert( pair<string, Ordering> (indexName, order) );
         }
 
-        return indexOrderings;
-    }
-
-    map<string, Ordering> RocksEngine::_createIndexOrderings( const vector<string>& namespaces,
-                                                              const string& path ) {
-
-        // first, go through and create RocksCollectionCatalogEntries for all non-indexes
-        EntryVector nonIndexEntries = _createNonIndexCatalogEntries( namespaces );
-
-        // open all the metadata column families so that we can retrieve information about
-        // each index, which is needed in order to open the index column families
-        rocksdb::DB* db = nullptr;
-        CfdVector metaDataCfds = _generateMetaDataCfds( nonIndexEntries, namespaces );
-        vector<rocksdb::ColumnFamilyHandle*> metaDataHandles;
-        rocksdb::Status openROStatus = rocksdb::DB::OpenForReadOnly( _dbOptions(),
-                                                                     path,
-                                                                     metaDataCfds,
-                                                                     &metaDataHandles,
-                                                                     &_db );
-
-        _rock_status_ok( openROStatus );
-
-        // find all the indexes for this database
-        map<string, Ordering> indexOrderings = _createIndexOrderingsHelper( namespaces );
-
         // close the database
         delete db;
 
         return indexOrderings;
     }
 
-    RocksEngine::CfdVector RocksEngine::_createCfds( const string& path ) {
+    RocksEngine::CfdVector RocksEngine::_createCfds( const std::vector<std::string>& namespaces, 
+                                                     const map<string, Ordering>& indexOrderings ) {
         std::vector<rocksdb::ColumnFamilyDescriptor> families;
-
-        std::vector<std::string> namespaces;
-        if ( boost::filesystem::exists( path ) ) {
-            rocksdb::Status s = rocksdb::DB::ListColumnFamilies(_dbOptions(), path, &namespaces);
-
-            if ( s.IsIOError() ) {
-                // DNE, ok
-            } else {
-                _rock_status_ok( s );
-            }
-        }
-
-        if ( namespaces.empty() ) {
-            return families;
-        }
-
-        // Create a mapping from index names to the Ordering object for each index. These Ordering
-        // objects will be used to create RocksIndexEntryComparators to be used with each
-        // column family representing a namespace
-        map<string, Ordering> indexOrderings = _createIndexOrderings( namespaces, path );
 
         for ( size_t i = 0; i < namespaces.size(); i++ ) {
             std::string ns = namespaces[i];

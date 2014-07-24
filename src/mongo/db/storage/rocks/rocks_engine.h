@@ -186,33 +186,35 @@ namespace mongo {
                                          const std::vector<string>& nsVec ) const;
 
         /**
-         * Helper function to the _createIndexOrderings method
+         * Returns a list of all the namespaces in the rocksdb database
          *
-         * @param namespaces a vector containing all the namespaces in this database
+         * @param path a filepath to the rocksdb database
          */
-        std::map<string, Ordering> _createIndexOrderingsHelper(
-                const std::vector<std::string>& namespaces );
+        std::vector<std::string> _listNamespaces( std::string path );
 
         /**
          * Highest level helper function to generate a map from index names to Orderings. This is
          * needed to properly open column families representing indexes, because an Ordering for
          * each such index is needed in order to create the comparator for the column family.
          *
-         * @param namespaces a vector containing all the namespaces in this database
-         * @param path a path to the database files for the rocksdb database
-         * @param an uninitialized pointer to a rocksdb database
+         * @param namespaces a vector containing all the namespaces in this database.
+         * @param metaDataCfds a vector of the column family descriptors for every column family
+         * in the database representing metadata.
+         * @param path a path to the database files for the rocksdb database.
          */
         std::map<string, Ordering> _createIndexOrderings( const std::vector<string>& namespaces,
+                                                          const CfdVector& metaDataCfds,
                                                           const string& path );
 
         /**
-         * Highest level helper function to generate a vector of all ColumnFamilyDescriptors
+         * Generate a vector of all ColumnFamilyDescriptors
          * in the database, with proper rocksdb::Options set for each of them.
          *
-         * @param path a path to the database files for the rocksdb database
-         * @param an uninitialized pointer to a rocksdb database
+         * @param namespaces a vector containing all the namespaces in this database
+         * @param indexOrderings a map from index names to Orderings
          */
-        CfdVector _createCfds ( const string& path );
+        CfdVector _createCfds ( const std::vector<std::string>& namespaces, 
+                                const std::map<std::string, Ordering>& indexOrderings );
 
         /**
          * Create a complete Entry object in _map for every ColumnFamilyDescriptor. Assumes that, if
