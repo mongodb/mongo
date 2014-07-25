@@ -305,10 +305,10 @@ __wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	case WT_SYNC_CHECKPOINT:
 	case WT_SYNC_CLOSE:
 		/*
-		 * XXX
-		 * Set the checkpoint reference for reconciliation -- this is
-		 * ugly, but there's no data structure path from here to the
-		 * reconciliation of the tree's root page.
+		 * Set the checkpoint reference for reconciliation; it's ugly,
+		 * but drilling a function parameter path from our callers to
+		 * the reconciliation of the tree's root page is going to be
+		 * worse.
 		 */
 		WT_ASSERT(session, btree->ckpt == NULL);
 		btree->ckpt = ckptbase;
