@@ -527,7 +527,7 @@ namespace mongo {
                 continue;
             }
 
-            string collection = ns;
+            StringData collection( ns );
 
             size_t sepPos = ns.find( '$' );
 
