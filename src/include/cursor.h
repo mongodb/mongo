@@ -184,7 +184,7 @@ struct __wt_cursor_btree {
 struct __wt_cursor_bulk {
 	WT_CURSOR_BTREE cbt;
 
-	WT_REF	*ref;				/* The leaf page */
+	WT_REF	*ref;			/* The leaf page */
 	WT_PAGE *leaf;
 
 	/*
@@ -192,7 +192,7 @@ struct __wt_cursor_bulk {
 	 * part of RLE compression, row-store compares keys during bulk load
 	 * to avoid corruption.
 	 */
-	WT_ITEM cmp;				/* Comparison buffer */
+	WT_ITEM cmp;			/* Comparison buffer */
 
 	/*
 	 * Variable-length column-store RLE counter (also overloaded to mean
@@ -204,13 +204,13 @@ struct __wt_cursor_bulk {
 	 * Fixed-length column-store current entry in memory chunk count, and
 	 * the maximum number of records per chunk.
 	 */
-	uint32_t entry;				/* Entry count */
-	uint32_t nrecs;				/* Max records per chunk */
+	uint32_t entry;			/* Entry count */
+	uint32_t nrecs;			/* Max records per chunk */
 
 	/* Special bitmap bulk load for fixed-length column stores. */
 	int	bitmap;
 
-	void	*reconcile;			/* Reconciliation information */
+	void	*reconcile;		/* Reconciliation information */
 };
 
 struct __wt_cursor_config {
@@ -220,9 +220,9 @@ struct __wt_cursor_config {
 struct __wt_cursor_data_source {
 	WT_CURSOR iface;
 
-	WT_COLLATOR *collator;			/* Configured collator */
+	WT_COLLATOR *collator;		/* Configured collator */
 
-	WT_CURSOR *source;			/* Application-owned cursor */
+	WT_CURSOR *source;		/* Application-owned cursor */
 };
 
 struct __wt_cursor_dump {
