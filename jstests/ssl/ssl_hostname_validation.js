@@ -58,14 +58,18 @@ function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSuc
 // and allowInvalidCertificates
 testCombination(CN_CERT, false, false, true);
 testCombination(SAN_CERT, false, false, true);
-testCombination(SERVER_CERT, false, false, false);
+
+// SERVER_CERT has SAN=localhost
+testCombination(SERVER_CERT, false, false, true);
 testCombination(SERVER_CERT, false, true, true);
 testCombination(SERVER_CERT, true, false, true);
 testCombination(SERVER_CERT, true, true, true);
 
+
 // 2. Initiate ReplSetTest with invalid certs
 ssl_options = {sslMode : "requireSSL",
-               sslPEMKeyFile : SERVER_CERT,
+               // SERVER_CERT has SAN=localhost. CLIENT_CERT is exact same except no SANS
+               sslPEMKeyFile : CLIENT_CERT,
                sslCAFile: CA_CERT};
 
 replTest = new ReplSetTest({nodes : {node0 : ssl_options, node1 : ssl_options}});
@@ -86,6 +90,7 @@ replTest.stopSet();
 
 // 4. Initiate ReplSetTest with invalid certs but set allowInvalidCertificates
 ssl_options = {sslMode : "requireSSL",
+               // SERVER_CERT has SAN=localhost. CLIENT_CERT is exact same except no SANS
                sslPEMKeyFile : SERVER_CERT,
                sslCAFile: CA_CERT,
                sslAllowInvalidCertificates: ""};

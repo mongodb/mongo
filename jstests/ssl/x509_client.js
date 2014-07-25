@@ -18,8 +18,8 @@ MongoRunner.stopMongod(conn);
 var SERVER_CERT = "jstests/libs/server.pem"
 var CA_CERT = "jstests/libs/ca.pem" 
 
-var CLIENT_USER = "CN=client,OU=kerneluser,O=10Gen,L=New York City,ST=New York,C=US"
-var INVALID_CLIENT_USER = "CN=invalidclient,OU=kerneluser,O=10Gen,L=New York City,ST=New York,C=US"
+var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client"
+var INVALID_CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=invalid"
 
 port = allocatePorts(1)[0];
 
