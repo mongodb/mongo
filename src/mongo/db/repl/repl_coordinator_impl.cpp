@@ -321,7 +321,27 @@ namespace repl {
     }
 
     bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
-        // TODO
+        if (_settings.usingReplSets()) {
+            if (getReplicationMode() == modeReplSet && getCurrentMemberState().primary()) {
+                return true;
+            }
+            return false;
+        }
+
+        if (!_settings.slave)
+            return true;
+
+
+        // TODO(dannenberg) replAllDead is bad and should be removed when master slave is removed
+        if (replAllDead) {
+            return false;
+        }
+
+        if (_settings.master) {
+            // if running with --master --slave, allow.
+            return true;
+        }
+
         return false;
     }
 
