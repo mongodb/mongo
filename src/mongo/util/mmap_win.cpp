@@ -332,9 +332,6 @@ namespace mongo {
         return newPrivateView;
     }
 
-    // prevent WRITETODATAFILES() from running at the same time as FlushViewOfFile()
-    SimpleMutex globalFlushMutex("globalFlushMutex");
-
     class WindowsFlushable : public MemoryMappedFile::Flushable {
     public:
         WindowsFlushable( MemoryMappedFile* theFile,
@@ -365,7 +362,6 @@ namespace mongo {
                 _flushMutex.lock();
             }
 
-            SimpleMutex::scoped_lock _globalFlushMutex(globalFlushMutex);
             boost::lock_guard<boost::mutex> lk(_flushMutex, boost::adopt_lock_t());
 
             int loopCount = 0;
