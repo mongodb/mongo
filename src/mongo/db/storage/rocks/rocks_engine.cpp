@@ -74,14 +74,14 @@ namespace mongo {
 
         // If there are no column families, then just open the database and return
         if ( families.empty() ) {
-            rocksdb::Status s = rocksdb::DB::Open( _dbOptions(), path, &_db );
+            rocksdb::Status s = rocksdb::DB::Open( dbOptions(), path, &_db );
             _rock_status_ok( s );
             return;
         }
 
         // Open the database, getting handles for every column family
         std::vector<rocksdb::ColumnFamilyHandle*> handles;
-        rocksdb::Status s = rocksdb::DB::Open( _dbOptions(), path, families, &handles, &_db );
+        rocksdb::Status s = rocksdb::DB::Open( dbOptions(), path, families, &handles, &_db );
         _rock_status_ok( s );
 
         invariant( handles.size() == families.size() );
@@ -317,7 +317,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    rocksdb::Options RocksEngine::_dbOptions() const {
+    rocksdb::Options RocksEngine::dbOptions() {
         rocksdb::Options options;
 
         // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
@@ -350,9 +350,9 @@ namespace mongo {
     vector<std::string> RocksEngine::_listFamilyNames( string filepath ) {
         std::vector<std::string> familyNames;
         if ( boost::filesystem::exists( filepath ) ) {
-            rocksdb::Status s = rocksdb::DB::ListColumnFamilies(_dbOptions(),
-                                                                filepath,
-                                                                &familyNames );
+            rocksdb::Status s = rocksdb::DB::ListColumnFamilies( dbOptions(),
+                                                                 filepath,
+                                                                 &familyNames );
 
             if ( s.IsIOError() ) {
                 // DNE, ok
@@ -437,7 +437,7 @@ namespace mongo {
         // each index, which is needed in order to open the index column families
         rocksdb::DB* db = nullptr;
         vector<rocksdb::ColumnFamilyHandle*> metaDataHandles;
-        rocksdb::Status openROStatus = rocksdb::DB::OpenForReadOnly( _dbOptions(),
+        rocksdb::Status openROStatus = rocksdb::DB::OpenForReadOnly( dbOptions(),
                                                                      filepath,
                                                                      metaDataCfds,
                                                                      &metaDataHandles,

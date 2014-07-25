@@ -143,9 +143,9 @@ namespace mongo {
         typedef std::vector<boost::shared_ptr<Entry> > EntryVector;
         typedef std::vector<rocksdb::ColumnFamilyDescriptor> CfdVector;
 
-    private:
+        static rocksdb::Options dbOptions();
 
-        rocksdb::Options _dbOptions() const;
+    private:
         rocksdb::ColumnFamilyOptions _collectionOptions() const;
         rocksdb::ColumnFamilyOptions _indexOptions() const;
 
