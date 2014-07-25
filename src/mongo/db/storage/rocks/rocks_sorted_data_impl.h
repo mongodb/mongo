@@ -55,17 +55,16 @@ namespace mongo {
      * Rocks implementation of the SortedDataInterface. Each index is stored as a single column
      * family. Each mapping from a BSONObj to a DiskLoc is stored as the key of a key-value pair
      * in the column family. Consequently, each value in the database is simply an empty string.
-     * This is done to take advantage of the fact that RocksDB can take a custom comparator to use
-     * when ordering keys. We use a custom comparator which orders keys based first upon the
-     * BSONObj in the key, and uses the DiskLoc as a tiebreaker.
+     * This is done because RocksDB only supports unique keys, and because RocksDB can take a custom
+     * comparator to use when ordering keys. We use a custom comparator which orders keys based
+     * first upon the BSONObj in the key, and uses the DiskLoc as a tiebreaker.
      */
     class RocksSortedDataImpl : public SortedDataInterface {
         MONGO_DISALLOW_COPYING( RocksSortedDataImpl );
     public:
         RocksSortedDataImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf );
 
-        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
-                                                      bool dupsAllowed);
+        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
         virtual Status insert(OperationContext* txn,
                               const BSONObj& key,

@@ -95,7 +95,7 @@ namespace mongo {
             RocksCursor( rocksdb::Iterator* iterator, bool forward )
                 : _iterator( iterator ),
                   _forward( forward ),
-                  _cached( false ) {
+                  _isCached( false ) {
 
                 // TODO: maybe don't seek until we know we need to?
                 if ( _forward )
@@ -185,7 +185,7 @@ namespace mongo {
                 } else {
                     _iterator->Prev();
                 }
-                _cached = false;
+                _isCached = false;
             }
 
             void savePosition() {
@@ -200,7 +200,7 @@ namespace mongo {
             }
 
             void restorePosition() {
-                _cached = false;
+                _isCached = false;
 
                 if ( _savedAtEnd ) {
                     if ( _forward ) {
@@ -230,7 +230,7 @@ namespace mongo {
              * performing the actual locate logic.
              */
             bool _locate( const BSONObj& key, const DiskLoc loc ) {
-                _cached = false;
+                _isCached = false;
                 //assumes fieldNames already stripped if necessary 
                 string keyData = makeString( key, loc, false );
                 _iterator->Seek( keyData );
@@ -251,7 +251,7 @@ namespace mongo {
                     } else {
                         advance();
                     }
-                    invariant( !_cached );
+                    invariant( !_isCached );
                 }
 
                 return isExactMatch;
@@ -259,6 +259,7 @@ namespace mongo {
 
             void _checkStatus() {
                 // TODO: Fix me
+                log() << _iterator->status().ToString();
                 invariant( _iterator->status().ok() );
             }
 
@@ -268,28 +269,29 @@ namespace mongo {
             void _load() const {
                 invariant( !isEOF() );
 
-                if ( _cached ) {
+                if ( _isCached ) {
                     return;
                 }
 
-                _cached = true;
+                _isCached = true;
                 rocksdb::Slice slice = _iterator->key();
                 _cachedKey = BSONObj( slice.data() ).getOwned();
-                _cachedLoc = reinterpret_cast<const DiskLoc*>( slice.data() + _cachedKey.objsize() )[0];
+                _cachedLoc = *reinterpret_cast<const DiskLoc*>(
+                        slice.data() + _cachedKey.objsize() );
             }
 
             scoped_ptr<rocksdb::Iterator> _iterator;
             OperationContext* _txn; // not owned
             const bool _forward;
 
-            mutable bool _cached;
+            mutable bool _isCached;
             mutable BSONObj _cachedKey;
             mutable DiskLoc _cachedLoc;
 
             // not for caching, but rather for savePosition() and restorePosition()
-            mutable bool _savedAtEnd;
-            mutable BSONObj _savePositionObj;
-            mutable DiskLoc _savePositionLoc;
+            bool _savedAtEnd;
+            BSONObj _savePositionObj;
+            DiskLoc _savePositionLoc;
         };
 
         /**
@@ -333,7 +335,7 @@ namespace mongo {
 
     SortedDataBuilderInterface* RocksSortedDataImpl::getBulkBuilder(OperationContext* txn,
                                                                     bool dupsAllowed) {
-        invariant( false );
+        invariant( !"getBulkBuilder not yet implemented" );
     }
 
     Status RocksSortedDataImpl::insert(OperationContext* txn,
@@ -344,6 +346,7 @@ namespace mongo {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         if ( !dupsAllowed ) {
+            // TODO need key locking to support unique indexes.
             Status status = dupKeyCheck( txn, key, loc );
             if ( !status.isOK() ) {
                 return status;
@@ -401,14 +404,11 @@ namespace mongo {
 
     bool RocksSortedDataImpl::isEmpty() {
         // XXX doesn't use snapshot
-        rocksdb::Iterator* it = _db->NewIterator( rocksdb::ReadOptions(), _columnFamily );
+        boost::scoped_ptr<rocksdb::Iterator> it( _db->NewIterator( rocksdb::ReadOptions(),
+                                                                   _columnFamily ) );
 
         it->SeekToFirst();
-        bool toRet = it->Valid();
-
-        delete it;
-
-        return toRet;
+        return it->Valid();
     }
 
     Status RocksSortedDataImpl::touch(OperationContext* txn) const {

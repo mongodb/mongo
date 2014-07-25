@@ -33,7 +33,6 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/heap1/heap1_engine.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
-#include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
