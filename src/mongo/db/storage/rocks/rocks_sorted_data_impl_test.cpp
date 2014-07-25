@@ -92,6 +92,7 @@ namespace mongo {
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
                     ASSERT( !sortedData.unindex( &opCtx, key, loc ) );
+                    uow.commit();
                 }
             }
 
@@ -101,6 +102,7 @@ namespace mongo {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
                     Status res = sortedData.insert( &opCtx, key, loc, true );
                     ASSERT_OK( res );
+                    uow.commit();
                 }
             }
 
@@ -109,6 +111,7 @@ namespace mongo {
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
                     ASSERT( sortedData.unindex( &opCtx, key, loc ) );
+                    uow.commit();
                 }
             }
 
@@ -117,6 +120,7 @@ namespace mongo {
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
                     sortedData.unindex( &opCtx, key, loc );
+                    uow.commit();
                 }
             }
 
@@ -146,6 +150,7 @@ namespace mongo {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
                     Status res = sortedData.insert( &opCtx, key, loc, true );
                     ASSERT_OK( res );
+                    uow.commit();
                 }
             }
 
@@ -174,6 +179,7 @@ namespace mongo {
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
                 }
             }
 
@@ -184,6 +190,13 @@ namespace mongo {
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+
+                cursor->advance();
+                ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
+                
+                cursor->advance();
+                ASSERT( cursor->isEOF() );
             }
         }
     }
@@ -215,6 +228,7 @@ namespace mongo {
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
                 }
             }
 
@@ -242,6 +256,7 @@ namespace mongo {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    uow.commit();
                 }
             }
 
@@ -257,6 +272,7 @@ namespace mongo {
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
                 }
 
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
@@ -286,6 +302,7 @@ namespace mongo {
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
                 }
             }
 
@@ -299,13 +316,6 @@ namespace mongo {
 
                 // save the position
                 cursor->savePosition();
-
-                // advance to the end
-                while ( !cursor->isEOF() ) {
-                    cursor->advance();
-                }
-
-                ASSERT( cursor->isEOF() );
 
                 // restore position
                 cursor->restorePosition();
@@ -322,11 +332,6 @@ namespace mongo {
                 // save the position
                 cursor->savePosition();
 
-                // advance to the end
-                while ( !cursor->isEOF() ) {
-                    cursor->advance();
-                }
-
                 // restore position
                 cursor->restorePosition();
                 ASSERT( !cursor->isEOF()  );
@@ -336,7 +341,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionAdvanced ) {
+    TEST( RocksRecordStoreTest, SaveAndRestorePositionEOF ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -351,6 +356,7 @@ namespace mongo {
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
                 }
             }
 
@@ -372,15 +378,167 @@ namespace mongo {
                 // save the position
                 cursor->savePosition();
 
-                // go back
-                ASSERT( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
+                // restore position, make sure we're at the end
+                cursor->restorePosition();
+                ASSERT( cursor->isEOF()  );
+            }
+        }
+    }
+
+    TEST( RocksRecordStoreTest, SaveAndRestorePositionInsert ) {
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+
+        {
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
+                }
+            }
+
+            {
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
+                ASSERT( cursor->locate( BSON( "" << 3 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
+
+                // save the position
+                cursor->savePosition();
+
+                {
+                    MyOperationContext opCtx( db.get() );
+                    {
+                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        ASSERT_OK(
+                                sortedData.insert( &opCtx, BSON( "" << 4 ), DiskLoc(1,4), true ) );
+                        uow.commit();
+                    }
+                }
+
+                // restore position, make sure we don't see the newly inserted value
+                cursor->restorePosition();
+                ASSERT( !cursor->isEOF() );
+                ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
+
+                cursor->advance();
+                ASSERT( cursor->isEOF() );
+            }
+        }
+    }
+
+    TEST( RocksRecordStoreTest, SaveAndRestorePositionDelete2 ) {
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+
+        {
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
+                }
+            }
+
+            {
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
+                ASSERT( cursor->locate( BSON( "" << 2 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
 
-                // restore position, make sure we're at the end
+                // save the position
+                cursor->savePosition();
+
+                {
+                    MyOperationContext opCtx( db.get() );
+                    {
+                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        ASSERT( sortedData.unindex( &opCtx, BSON( "" << 1 ), DiskLoc(1,1) ) );
+                        uow.commit();
+                    }
+                }
+
+                // restore position
                 cursor->restorePosition();
-                ASSERT( cursor->isEOF()  );
+                ASSERT( !cursor->isEOF() );
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+            }
+        }
+    }
+
+    TEST( RocksRecordStoreTest, SaveAndRestorePositionDelete3 ) {
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+
+        {
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
+                }
+            }
+
+            {
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
+                ASSERT( cursor->locate( BSON( "" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+
+                // save the position
+                cursor->savePosition();
+
+                {
+                    MyOperationContext opCtx( db.get() );
+                    {
+                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        ASSERT( sortedData.unindex( &opCtx, BSON( "" << 3 ), DiskLoc(1,3) ) );
+                        uow.commit();
+                    }
+                }
+
+                // restore position
+                cursor->restorePosition();
+                ASSERT( !cursor->isEOF() );
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+
+                // make sure that we can still see the unindexed data, since we're working on 
+                // a snapshot
+                cursor->advance();
+                ASSERT( !cursor->isEOF() );
+                ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
+
+                cursor->advance();
+                ASSERT( cursor->isEOF() );
             }
         }
     }
@@ -407,6 +565,7 @@ namespace mongo {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
                     Status res = sortedData.insert( &opCtx, key, loc, true );
                     ASSERT_OK( res );
+                    uow.commit();
                 }
             }
 
@@ -436,6 +595,7 @@ namespace mongo {
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "a" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "a" << 3 ), DiskLoc(1,1), true ) );
+                    uow.commit();
                 }
             }
 
@@ -465,6 +625,7 @@ namespace mongo {
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
                 }
             }
 
@@ -478,13 +639,6 @@ namespace mongo {
 
                 // save the position
                 cursor->savePosition();
-
-                // advance to the end
-                while ( !cursor->isEOF() ) {
-                    cursor->advance();
-                }
-
-                ASSERT( cursor->isEOF() );
 
                 // restore position
                 cursor->restorePosition();
@@ -501,11 +655,6 @@ namespace mongo {
                 // save the position
                 cursor->savePosition();
 
-                // advance to the end
-                while ( !cursor->isEOF() ) {
-                    cursor->advance();
-                }
-
                 // restore position
                 cursor->restorePosition();
                 ASSERT( !cursor->isEOF()  );
@@ -515,7 +664,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionReverseAdvanced ) {
+    TEST( RocksRecordStoreTest, SaveAndRestorePositionEOFReverse ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -530,6 +679,7 @@ namespace mongo {
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 4 ), DiskLoc(1,4), true ) );
+                    uow.commit();
                 }
             }
 
@@ -551,14 +701,223 @@ namespace mongo {
                 // save the position
                 cursor->savePosition();
 
-                // go back
-                ASSERT( cursor->locate( BSON( "a" << 3 ), DiskLoc(0,0) ) );
+                // restore position, make sure we're at the end
+                cursor->restorePosition();
+                ASSERT( cursor->isEOF() );
+            }
+        }
+    }
+
+    TEST( RocksRecordStoreTest, SaveAndRestorePositionInsertReverse ) {
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+
+        {
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
+                }
+            }
+
+            {
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx,
+                                                                                      -1 ) );
+                ASSERT( cursor->locate( BSON( "" << 3 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
 
-                // restore position, make sure we're at the end
+                // save the position
+                cursor->savePosition();
+
+                {
+                    MyOperationContext opCtx( db.get() );
+                    {
+                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        ASSERT_OK(
+                                sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                        uow.commit();
+                    }
+                }
+
+                // restore position, make sure we don't see the newly inserted value
                 cursor->restorePosition();
+                ASSERT( !cursor->isEOF() );
+                ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
+
+                cursor->advance();
+                ASSERT( !cursor->isEOF() );
+                ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
+
+                cursor->advance();
+                ASSERT( cursor->isEOF() );
+            }
+        }
+    }
+
+    TEST( RocksRecordStoreTest, SaveAndRestorePositionDelete1Reverse ) {
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+
+        {
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
+                }
+            }
+
+            {
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx,
+                                                                                      -1 ) );
+                ASSERT( cursor->locate( BSON( "" << 3 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
+
+                // save the position
+                cursor->savePosition();
+
+                {
+                    MyOperationContext opCtx( db.get() );
+                    {
+                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        ASSERT( sortedData.unindex( &opCtx, BSON( "" << 3 ), DiskLoc(1,3) ) );
+                        uow.commit();
+                    }
+                }
+
+                // restore position, make sure we still see the deleted key and value, because
+                // we're using a snapshot
+                cursor->restorePosition();
+                ASSERT( !cursor->isEOF() );
+                ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
+            }
+        }
+    }
+
+    TEST( RocksRecordStoreTest, SaveAndRestorePositionDelete2Reverse ) {
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+
+        {
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
+                }
+            }
+
+            {
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx,
+                                                                                      -1 ) );
+                ASSERT( cursor->locate( BSON( "" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+
+                // save the position
+                cursor->savePosition();
+
+                {
+                    MyOperationContext opCtx( db.get() );
+                    {
+                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        ASSERT( sortedData.unindex( &opCtx, BSON( "" << 1 ), DiskLoc(1,1) ) );
+                        uow.commit();
+                    }
+                }
+
+                // restore position
+                cursor->restorePosition();
+                ASSERT( !cursor->isEOF() );
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+            }
+        }
+    }
+
+    TEST( RocksRecordStoreTest, SaveAndRestorePositionDelete3Reverse ) {
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+
+        {
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
+                    ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                    uow.commit();
+                }
+            }
+
+            {
+                MyOperationContext opCtx( db.get() );
+                scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx,
+                                                                                      -1 ) );
+                ASSERT( cursor->locate( BSON( "" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->isEOF()  );
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+
+                // save the position
+                cursor->savePosition();
+
+                {
+                    MyOperationContext opCtx( db.get() );
+                    {
+                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        ASSERT( sortedData.unindex( &opCtx, BSON( "" << 1 ), DiskLoc(1,1) ) );
+                        uow.commit();
+                    }
+                }
+
+                // restore position
+                cursor->restorePosition();
+                ASSERT( !cursor->isEOF() );
+                ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+
+                // make sure that we can still see the unindexed data, since we're working on 
+                // a snapshot
+                cursor->advance();
+                ASSERT( !cursor->isEOF() );
+                ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
+                ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
+
+                cursor->advance();
                 ASSERT( cursor->isEOF() );
             }
         }
