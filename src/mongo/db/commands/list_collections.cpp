@@ -67,14 +67,17 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool /*fromRepl*/) {
 
-            Client::ReadContext ctx( txn, dbname );
-            const Database* d = ctx.ctx().db();
-            const DatabaseCatalogEntry* dbEntry = d->getDatabaseCatalogEntry();
+            Lock::DBRead lk( txn->lockState(), dbname );
+
+            const Database* d = dbHolder().get( txn, dbname );
+            const DatabaseCatalogEntry* dbEntry = NULL;
 
             list<string> names;
-            dbEntry->getCollectionNamespaces( &names );
-
-            names.sort();
+            if ( d ) {
+                dbEntry = d->getDatabaseCatalogEntry();
+                dbEntry->getCollectionNamespaces( &names );
+                names.sort();
+            }
 
             BSONArrayBuilder arr;
 
