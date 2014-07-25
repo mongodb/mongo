@@ -68,15 +68,22 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 static int
 __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
+	int i;
+
 	/* Stop any active merges. */
 	F_CLR(lsm_tree, WT_LSM_TREE_ACTIVE);
 
-	/* Remove any work units from the manager queues. */
-	WT_RET(__wt_lsm_manager_clear_tree(session, lsm_tree));
-
 	/* Wait for all LSM operations that were in flight to finish. */
-	while (lsm_tree->refcnt > 1 || lsm_tree->queue_ref > 0)
+	for (i = 0; lsm_tree->refcnt > 1 || lsm_tree->queue_ref > 0; ++i) {
+		/*
+		 * Remove any work units from the manager queues. Do this step
+		 * repeatedly in case a work unit was in the process of being
+		 * created when we cleared the active flag.
+		 */
+		if (i % 1000 == 0)
+			WT_RET(__wt_lsm_manager_clear_tree(session, lsm_tree));
 		__wt_yield();
+	}
 	return (0);
 }
 

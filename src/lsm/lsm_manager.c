@@ -83,7 +83,7 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
-	WT_LSM_WORK_UNIT *entry;
+	WT_LSM_WORK_UNIT *current, *next;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 	uint64_t removed;
@@ -110,20 +110,26 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	manager->lsm_worker_sessions[0] = NULL;
 
 	/* Release memory from any operations left on the queue. */
-	while ((entry = TAILQ_FIRST(&manager->switchqh)) != NULL) {
-		TAILQ_REMOVE(&manager->switchqh, entry, q);
+	for (current = TAILQ_FIRST(&manager->switchqh);
+	    current != NULL; current = next) {
+		next = TAILQ_NEXT(current, q);
+		TAILQ_REMOVE(&manager->switchqh, current, q);
 		++removed;
-		__lsm_manager_free_work_unit(session, entry);
+		__lsm_manager_free_work_unit(session, current);
 	}
-	while ((entry = TAILQ_FIRST(&manager->appqh)) != NULL) {
-		TAILQ_REMOVE(&manager->appqh, entry, q);
+	for (current = TAILQ_FIRST(&manager->appqh);
+	    current != NULL; current = next) {
+		next = TAILQ_NEXT(current, q);
+		TAILQ_REMOVE(&manager->appqh, current, q);
 		++removed;
-		__lsm_manager_free_work_unit(session, entry);
+		__lsm_manager_free_work_unit(session, current);
 	}
-	while ((entry = TAILQ_FIRST(&manager->managerqh)) != NULL) {
-		TAILQ_REMOVE(&manager->managerqh, entry, q);
+	for (current = TAILQ_FIRST(&manager->managerqh);
+	    current != NULL; current = next) {
+		next = TAILQ_NEXT(current, q);
+		TAILQ_REMOVE(&manager->managerqh, current, q);
 		++removed;
-		__lsm_manager_free_work_unit(session, entry);
+		__lsm_manager_free_work_unit(session, current);
 	}
 
 	WT_STAT_FAST_CONN_INCRV(session, lsm_work_units_discarded, removed);
@@ -305,6 +311,8 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 		}
 		__wt_sleep(0, 10000);
 		TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q) {
+			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
+				continue;
 			WT_RET(__lsm_manager_aggressive_update(
 			    session, lsm_tree));
 			WT_RET(__wt_epoch(session, &now));
@@ -329,8 +337,21 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			 */
 			if ((!lsm_tree->modified && lsm_tree->nchunks > 1) ||
 			    lsm_tree->merge_aggressiveness > 3 ||
+			    (lsm_tree->queue_ref == 0 && lsm_tree->nchunks > 1) ||
 			    pushms > fillms) {
-				fprintf(stderr, "Pushing work unit.\n");
+#if 0
+		//This code triggers a problem with test/fops - if a switch is
+		//on the queue when a switch is pushed we can end up deadlocked
+		//waiting for the schema lock. It's possible without this change,
+		//but not likely in fops, since it doesn't trigger many switch
+		//operations.
+				fprintf(stderr, "Pushing work unit.");
+				fprintf(stderr, "nchunks: %d, ", lsm_tree->nchunks);
+				fprintf(stderr, "aggressive: %d\n\t ", lsm_tree->merge_aggressiveness);
+				fprintf(stderr, "modified: %d, ", lsm_tree->modified);
+				fprintf(stderr, "queue size: %d, ", lsm_tree->queue_ref);
+				fprintf(stderr, "pushms: %d, ", (int)pushms);
+				fprintf(stderr, "fillms: %d\n ", (int)fillms);
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_SWITCH, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
@@ -339,6 +360,12 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 				    session, WT_LSM_WORK_BLOOM, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_MERGE, lsm_tree));
+			}
+			if (lsm_tree->queue_ref == 0 &&
+			    lsm_tree->nold_chunks != 0) {
+				WT_RET(__wt_lsm_manager_push_entry(
+				    session, WT_LSM_WORK_DROP, lsm_tree));
+#endif
 			}
 		}
 	}
@@ -516,12 +543,13 @@ __wt_lsm_manager_push_entry(
 
 	manager = &S2C(session)->lsm_manager;
 
+	WT_RET(__wt_epoch(session, &lsm_tree->work_push_ts));
+
 	WT_RET(__wt_calloc_def(session, 1, &entry));
 	entry->flags = type;
 	entry->lsm_tree = lsm_tree;
 	(void)WT_ATOMIC_ADD(lsm_tree->queue_ref, 1);
 	WT_STAT_FAST_CONN_INCR(session, lsm_work_units_created);
-	WT_RET(__wt_epoch(session, &lsm_tree->work_push_ts));
 
 	switch (type) {
 	case WT_LSM_WORK_SWITCH:
@@ -672,11 +700,11 @@ __lsm_worker(void *arg) {
 			}
 			/* Clear any state */
 			WT_CLEAR_BTREE_IN_SESSION(session);
+			__lsm_manager_free_work_unit(session, entry);
+			entry = NULL;
 		}
 		/* Flag an error if the pop failed. */
 		WT_ERR(ret);
-		__lsm_manager_free_work_unit(session, entry);
-		entry = NULL;
 	}
 
 	if (ret != 0) {
