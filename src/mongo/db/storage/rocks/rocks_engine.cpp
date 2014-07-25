@@ -262,7 +262,7 @@ namespace mongo {
         _rock_status_ok( status );
         rocksdb::ColumnFamilyHandle* cf_meta;
         string metadataName = ns.toString() + "&";
-        status = _db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), metadataName, &cf_meta );
+        status = _db->CreateColumnFamily( _collectionOptions(), metadataName, &cf_meta );
         _rock_status_ok( status );
 
         BSONObj optionsObj = options.toBSON();

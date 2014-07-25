@@ -241,6 +241,7 @@ namespace mongo {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         std::string old_value;
+        // XXX Be sure to also first query the write batch once Facebook implements that
         rocksdb::Status status = _db->Get( _readOptions( txn ),
                                            _columnFamily,
                                            _makeKey( loc ),
@@ -286,7 +287,9 @@ namespace mongo {
         for( size_t i = 0; i < damages.size(); i++ ) {
             mutablebson::DamageEvent event = damages[i];
             const char* sourcePtr = damangeSource + event.sourceOffset;
-            value.replace( event.targetOffset, event.size, sourcePtr );
+
+            invariant( event.targetOffset + event.size < value.length() );
+            value.replace( event.targetOffset, event.size, sourcePtr, event.size );
         }
 
         // write back
