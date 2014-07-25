@@ -105,8 +105,6 @@ namespace mongo {
                 _checkStatus();
             }
 
-            virtual ~RocksCursor() { }
-
             int getDirection() const {
                 return _forward ? 1 : -1;
             }
@@ -121,8 +119,12 @@ namespace mongo {
              */
             bool pointsToSamePlaceAs(const Cursor& other) const {
                 const RocksCursor* realOther = dynamic_cast<const RocksCursor*>( &other );
-                return _iterator->Valid() && realOther->_iterator->Valid() &&
-                    _iterator->key() == realOther->_iterator->key();
+
+                bool valid = _iterator->Valid();
+                bool otherValid = realOther->_iterator->Valid();
+
+                return ( !valid && !otherValid ) ||
+                       ( valid && otherValid && _iterator->key() == realOther->_iterator->key() );
             }
 
             void aboutToDeleteBucket(const DiskLoc& bucket) {
@@ -139,8 +141,7 @@ namespace mongo {
                            bool afterKey,
                            const vector<const BSONElement*>& keyEnd,
                            const vector<bool>& keyEndInclusive) {
-                // XXX does this work with reverse iterators?
-                BSONObj key = IndexEntryComparison::makeQueryObject (
+                BSONObj key = IndexEntryComparison::makeQueryObject(
                                          keyBegin,
                                          keyBeginLen,
                                          afterKey,
@@ -238,13 +239,13 @@ namespace mongo {
                     return false;
                 _load();
 
-                bool compareResult = key.woCompare( _cachedKey, BSONObj(), false ) == 0;
+                bool isExactMatch = key.woCompare( _cachedKey, BSONObj(), false ) == 0;
 
                 // if we can't find the result and we have a reverse iterator, we need to call
                 // advance() so that we're at the first value less than (to the left of) what we
                 // were searching for, rather than the first value greater than (to the right of)
                 // the value we were searching for
-                if ( !compareResult && !_forward && !isEOF() ) {
+                if ( !isExactMatch && !_forward ) {
                     if ( isEOF() ) {
                         _iterator->SeekToLast();
                     } else {
@@ -253,7 +254,7 @@ namespace mongo {
                     invariant( !_cached );
                 }
 
-                return compareResult;
+                return isExactMatch;
             }
 
             void _checkStatus() {
