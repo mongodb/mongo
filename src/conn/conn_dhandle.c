@@ -155,10 +155,10 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 
 err:	if (dhandle->rwlock != NULL)
 		WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
-	__wt_spin_destroy(session, &dhandle->close_lock);
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);
 	__wt_free(session, dhandle->handle);		/* btree free */
+	__wt_spin_destroy(session, &dhandle->close_lock);
 	__wt_overwrite_and_free(session, dhandle);
 
 	return (ret);
