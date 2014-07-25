@@ -297,7 +297,6 @@ namespace mongo {
         class RocksIndexEntryComparator : public rocksdb::Comparator {
             public:
                 RocksIndexEntryComparator(const Ordering& order): _indexComparator(order) { }
-                virtual ~RocksIndexEntryComparator() { }
 
                 virtual int Compare( const rocksdb::Slice& a, const rocksdb::Slice& b ) const {
                     IndexKeyEntry lhs = makeIndexKeyEntry( a );
@@ -306,20 +305,15 @@ namespace mongo {
                 }
 
                 virtual const char* Name() const {
+                    // changing this means that any existing mongod instances using rocks storage
+                    // engine will not be able to start up again, because the comparator's name
+                    // will not match
                     return "mongodb.RocksIndexEntryComparator";
                 }
 
-                /**
-                 * From the RocksDB comments: "an implementation of this method that does nothing is
-                 * correct"
-                 */
                 virtual void FindShortestSeparator( std::string* start,
                         const rocksdb::Slice& limit) const { }
 
-                /**
-                 * From the RocksDB comments: "an implementation of this method that does nothing is
-                 * correct.
-                 */
                 virtual void FindShortSuccessor(std::string* key) const { }
 
             private:

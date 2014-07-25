@@ -174,9 +174,12 @@ namespace mongo {
          * @param nsVec a vector containing all the namespaces in this database
          */
         CfdVector _generateMetaDataCfds( const EntryVector& entries,
-                                         const std::vector<std::string>& nsVec ) const;
+                                         const std::vector<std::string>& familyNameVec ) const;
 
-        std::vector<std::string> _listNamespaces( std::string filepath );
+        /**
+         * Return a vector containing the name of every column family in the database
+         */
+        std::vector<std::string> _listFamilyNames( std::string filepath );
 
         /**
          * @param namespaces a vector containing all the namespaces in this database.
