@@ -52,9 +52,10 @@ __wt_bulk_insert_fix(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 
+	WT_STAT_FAST_DATA_INCR(session, cursor_insert_bulk);
+
 	WT_RET(__wt_rec_col_fix_bulk_insert(cbulk));
 
-	WT_STAT_FAST_DATA_INCR(session, cursor_insert_bulk);
 	return (0);
 }
 
@@ -71,6 +72,8 @@ __wt_bulk_insert_var(WT_CURSOR_BULK *cbulk)
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	cursor = &cbulk->cbt.iface;
 
+	WT_STAT_FAST_DATA_INCR(session, cursor_insert_bulk);
+
 	/*
 	 * If this isn't the first value inserted, compare it against the last
 	 * value and increment the RLE count.
@@ -78,19 +81,19 @@ __wt_bulk_insert_var(WT_CURSOR_BULK *cbulk)
 	 * Instead of a "first time" variable, I'm using the RLE count, because
 	 * it is set to 0 exactly once, the first time through the code.
 	 */
-	if (cbulk->rle != 0) {
-		if (cbulk->cmp.size == cursor->value.size &&
-		    memcmp(cbulk->cmp.data,
-		    cursor->value.data, cursor->value.size) == 0)
-			++cbulk->rle;
-		else
-			WT_RET(__wt_rec_col_var_bulk_insert(cbulk));
+	if (cbulk->rle != 0 &&
+	    cbulk->cmp.size == cursor->value.size && memcmp(
+	    cbulk->cmp.data, cursor->value.data, cursor->value.size) == 0) {
+		++cbulk->rle;
+		return (0);
 	}
+
+	if (cbulk->rle != 0)
+		WT_RET(__wt_rec_col_var_bulk_insert(cbulk));
 	WT_RET(__wt_buf_set(session,
 	    &cbulk->cmp, cursor->value.data, cursor->value.size));
 	cbulk->rle = 1;
 
-	WT_STAT_FAST_DATA_INCR(session, cursor_insert_bulk);
 	return (0);
 }
 
@@ -110,6 +113,8 @@ __wt_bulk_insert_row(WT_CURSOR_BULK *cbulk)
 	btree = S2BT(session);
 	cursor = &cbulk->cbt.iface;
 
+	WT_STAT_FAST_DATA_INCR(session, cursor_insert_bulk);
+
 	/*
 	 * If this isn't the first key inserted, compare it against the last key
 	 * to ensure the application doesn't accidentally corrupt the table.
@@ -127,10 +132,7 @@ __wt_bulk_insert_row(WT_CURSOR_BULK *cbulk)
 	    &cbulk->cmp, cursor->key.data, cursor->key.size));
 	cbulk->rle = 1;
 
-	WT_RET(__wt_rec_row_bulk_insert(cbulk));
-
-	WT_STAT_FAST_DATA_INCR(session, cursor_insert_bulk);
-	return (0);
+	return (__wt_rec_row_bulk_insert(cbulk));
 }
 
 /*
@@ -146,13 +148,12 @@ __wt_bulk_insert_row_skip_check(WT_CURSOR_BULK *cbulk)
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	cursor = &cbulk->cbt.iface;
 
+	WT_STAT_FAST_DATA_INCR(session, cursor_insert_bulk);
+
 	WT_RET(__wt_buf_set(session,
 	    &cbulk->cmp, cursor->key.data, cursor->key.size));
 
-	WT_RET(__wt_rec_row_bulk_insert(cbulk));
-
-	WT_STAT_FAST_DATA_INCR(session, cursor_insert_bulk);
-	return (0);
+	return (__wt_rec_row_bulk_insert(cbulk));
 }
 
 /*
