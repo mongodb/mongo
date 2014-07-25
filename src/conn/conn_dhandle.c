@@ -153,8 +153,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	session->dhandle = dhandle;
 	return (0);
 
-err:	if (dhandle->rwlock != NULL)
-		WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
+err:	WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);
 	__wt_free(session, dhandle->handle);		/* btree free */
