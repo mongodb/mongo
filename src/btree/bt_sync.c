@@ -32,7 +32,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	internal_bytes = leaf_bytes = 0;
 	internal_pages = leaf_pages = 0;
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
-		WT_ERR(__wt_epoch(session, &start));
+		WT_RET(__wt_epoch(session, &start));
 
 	switch (syncop) {
 	case WT_SYNC_WRITE_LEAVES:
