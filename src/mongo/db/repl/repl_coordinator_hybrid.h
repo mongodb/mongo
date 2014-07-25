@@ -107,6 +107,8 @@ namespace repl {
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
+        virtual void processReplSetGetConfig(BSONObjBuilder* result);
+
         virtual bool setMaintenanceMode(OperationContext* txn, bool activate);
 
         virtual Status processReplSetMaintenance(OperationContext* txn,

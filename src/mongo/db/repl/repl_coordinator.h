@@ -275,6 +275,11 @@ namespace repl {
         virtual void processReplSetGetStatus(BSONObjBuilder* result) = 0;
 
         /**
+         * Handles an incoming replSetGetConfig command. Adds BSON to 'result'.
+         */
+        virtual void processReplSetGetConfig(BSONObjBuilder* result) = 0;
+
+        /**
          * Toggles maintenanceMode to the value expressed by 'activate'
          * return true, if the change worked and false otherwise
          */

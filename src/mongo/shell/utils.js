@@ -997,8 +997,16 @@ rs.syncFrom = function (host) { return db._adminCommand({replSetSyncFrom : host}
 rs.stepDown = function (secs) { return db._adminCommand({ replSetStepDown:(secs === undefined) ? 60:secs}); }
 rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); }
 rs.addArb = function (hn) { return this.add(hn, true); }
-rs.conf = function () { return db.getSisterDB("local").system.replset.findOne(); }
-rs.config = function () { return rs.conf(); }
+
+rs.conf = function () { 
+    var resp = db._adminCommand({replSetGetConfig:1});
+    if (resp.ok && !(resp.errmsg) && resp.config)
+        return resp.config;
+    else if(res.errmsg && res.errmsg.startsWith( "no such cmd" ))
+        return db.getSisterDB("local").system.replset.findOne(); 
+    throw new Error("Could not retrieve replica set config: " + tojson(resp));
+}
+rs.config = rs.conf;
 
 rs.remove = function (hn) {
     var local = db.getSisterDB("local");
