@@ -40,8 +40,9 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
-#include "mongo/bson/ordering.h"
+
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/string_map.h"
 
@@ -90,14 +91,15 @@ namespace mongo {
                                        bool backupOriginalFiles = false );
 
         /**
-         *  This executes a shutdown in rocks, so this rocksdb must not be used after this call
+         * This executes a shutdown in rocks, so this rocksdb must not be used after this call
+         * MongoDB will not call into the storage subsystem after calling this function
          */
         virtual void cleanShutdown(OperationContext* txn);
 
         // rocks specific api
 
-        rocksdb::DB* getDB() { return _db; }
-        const rocksdb::DB* getDB() const { return _db; }
+        rocksdb::DB* getDB() { return _db.get(); }
+        const rocksdb::DB* getDB() const { return _db.get(); }
 
         void getCollectionNamespaces( const StringData& dbName, std::list<std::string>* out ) const;
 
@@ -120,8 +122,9 @@ namespace mongo {
         /**
          * Completely removes a column family. Input pointer is invalid after calling
          */
-        void removeColumnFamily( rocksdb::ColumnFamilyHandle** cfh, const StringData& indexName,
-                                            const StringData& ns );
+        void removeColumnFamily( rocksdb::ColumnFamilyHandle** cfh,
+                                 const StringData& indexName,
+                                 const StringData& ns );
 
         /**
          * Returns a ReadOptions object that uses the snapshot contained in opCtx
@@ -134,7 +137,7 @@ namespace mongo {
             boost::scoped_ptr<RocksCollectionCatalogEntry> collectionEntry;
             boost::scoped_ptr<RocksRecordStore> recordStore;
             // These ColumnFamilyHandles must be deleted by removeIndex
-            StringMap<rocksdb::ColumnFamilyHandle*> indexNameToCF;
+            StringMap<boost::shared_ptr<rocksdb::ColumnFamilyHandle>> indexNameToCF;
         };
 
         Entry* getEntry( const StringData& ns );
@@ -155,7 +158,7 @@ namespace mongo {
         void _rock_status_ok( rocksdb::Status s );
 
         std::string _path;
-        rocksdb::DB* _db;
+        boost::scoped_ptr<rocksdb::DB> _db;
 
         typedef StringMap< boost::shared_ptr<Entry> > Map;
         mutable boost::mutex _mapLock;
