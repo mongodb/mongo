@@ -182,7 +182,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
-	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
@@ -313,7 +312,6 @@ err:	/*
 
 	__wt_spin_unlock(session, &conn->checkpoint_lock);
 
-	__wt_scr_free(&tmp);
 	session->isolation = txn->isolation = saved_isolation;
 
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
