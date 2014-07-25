@@ -33,8 +33,41 @@ import wiredtiger, wttest
 from helper import key_populate, value_populate
 from wtscenario import multiply_scenarios, number_scenarios
 
-# Test out-of-order in a row-store fails by default, but works if key order
-# validation is turned off.
+# Smoke test bulk-load.
+class test_bulk_load(wttest.WiredTigerTestCase):
+    name = 'test_bulk'
+
+    types = [
+        ('file', dict(type='file:')),
+        ('table', dict(type='table:'))
+    ]
+    keyfmt = [
+        ('integer', dict(keyfmt='i')),
+        ('recno', dict(keyfmt='r')),
+        ('string', dict(keyfmt='S')),
+    ]
+    valfmt = [
+        ('fixed', dict(valfmt='8t')),
+        ('integer', dict(valfmt='i')),
+        ('string', dict(valfmt='S')),
+    ]
+    scenarios = number_scenarios(multiply_scenarios('.', types, keyfmt, valfmt))
+
+    # Test a simple bulk-load
+    def test_bulk_load(self):
+        uri = self.type + self.name
+        self.session.create(uri,
+            'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
+        cursor = self.session.open_cursor(uri, None, "bulk")
+        for i in range(1, 100):
+            cursor.set_key(key_populate(cursor, i))
+            cursor.set_value(value_populate(cursor, i))
+            cursor.insert()
+        cursor.close()
+
+
+# Test that out-of-order insert in a row-store fails by default, but
+# works if key order validation is turned off.
 class test_bulk_load_row_order(wttest.WiredTigerTestCase):
     name = 'test_bulk'
 
@@ -105,39 +138,6 @@ class test_bulk_load_not_empty(wttest.WiredTigerTestCase):
         # Don't close the insert cursor, we want EBUSY.
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(uri, None, "bulk"))
-
-
-# Smoke test bulk-load.
-class test_bulk_load(wttest.WiredTigerTestCase):
-    name = 'test_bulk'
-
-    types = [
-        ('file', dict(type='file:')),
-        ('table', dict(type='table:'))
-    ]
-    keyfmt = [
-        ('integer', dict(keyfmt='i')),
-        ('recno', dict(keyfmt='r')),
-        ('string', dict(keyfmt='S')),
-    ]
-    valfmt = [
-        ('fixed', dict(valfmt='8t')),
-        ('integer', dict(valfmt='i')),
-        ('string', dict(valfmt='S')),
-    ]
-    scenarios = number_scenarios(multiply_scenarios('.', types, keyfmt, valfmt))
-
-    # Test a simple bulk-load
-    def test_bulk_load(self):
-        uri = self.type + self.name
-        self.session.create(uri,
-            'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
-        cursor = self.session.open_cursor(uri, None, "bulk")
-        for i in range(1, 100):
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
-        cursor.close()
 
 
 if __name__ == '__main__':
