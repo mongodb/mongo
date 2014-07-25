@@ -177,7 +177,6 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
             a.push( "jstests/libs/ca.pem" )
         }
         a.push( "--sslWeakCertificateValidation" )
-        a.push( "--sslAllowInvalidCertificates" )
     }
     if( jsTestOptions().useX509 && !a.contains("--clusterAuthMode")) {
         a.push( "--clusterAuthMode" )
@@ -320,7 +319,6 @@ function startParallelShell( jsCode, port, noConnect ){
         args.push( "jstests/libs/client.pem" )
         args.push( "--sslCAFile" )
         args.push( "jstests/libs/ca.pem" )
-        args.push( "--sslAllowInvalidCertificates" )
     }
 
     x = startMongoProgramNoConnect.apply(null, args);
