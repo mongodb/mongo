@@ -75,6 +75,11 @@ namespace mongo {
         }
 
         _writeBatch.reset( new rocksdb::WriteBatch() );
+
+        if ( _snapshot ) {
+            _db->ReleaseSnapshot( _snapshot );
+            _snapshot = _db->GetSnapshot();
+        }
     }
 
     void RocksRecoveryUnit::endUnitOfWork() {
