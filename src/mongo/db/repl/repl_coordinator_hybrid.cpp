@@ -318,7 +318,9 @@ namespace repl {
 
     bool HybridReplicationCoordinator::buildsIndexes() {
         bool legacyResponse = _legacy.buildsIndexes();
-        _impl.buildsIndexes();
+        // TODO(dannenberg) uncomment once config loading is working properly in impl
+        // bool implResponse = _impl.buildsIndexes();
+        // invariant(legacyResponse == implResponse);
         return legacyResponse;
     }
 

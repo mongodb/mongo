@@ -705,8 +705,9 @@ namespace repl {
     }
 
     bool ReplicationCoordinatorImpl::buildsIndexes() {
-        // TODO
-        return false;
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        const MemberConfig& self = _rsConfig.getMemberAt(_thisMembersConfigIndex);
+        return self.shouldBuildIndexes();
     }
 
     std::vector<BSONObj> ReplicationCoordinatorImpl::getHostsWrittenTo(const OpTime& op) {
