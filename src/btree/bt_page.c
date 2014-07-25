@@ -16,6 +16,44 @@ static int  __inmem_row_leaf_entries(
 	WT_SESSION_IMPL *, const WT_PAGE_HEADER *, uint32_t *);
 
 /*
+ * eviction_force_check --
+ *	Check if a page matches the criteria for forced eviction.
+ */
+static int
+eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	/* Pages are usually small enough, check that first. */
+	if (page->memory_footprint < btree->maxmempage)
+		return (0);
+
+	/* Leaf pages only. */
+	if (page->type != WT_PAGE_COL_FIX &&
+	    page->type != WT_PAGE_COL_VAR &&
+	    page->type != WT_PAGE_ROW_LEAF)
+		return (0);
+
+	/* Eviction may be turned off, although that's rare. */
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		return (0);
+
+	/*
+	 * It's hard to imagine a page with a huge memory footprint that has
+	 * never been modified, but check to be sure.
+	 */
+	if (page->modify == NULL)
+		return (0);
+
+	/* Trigger eviction on the next page release. */
+	page->read_gen = WT_READGEN_OLDEST;
+
+	return (1);
+}
+
+/*
  * __wt_page_in_func --
  *	Acquire a hazard pointer to a page; if the page is not in-memory,
  *	read it from the disk and build an in-memory version.
@@ -80,7 +118,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			/* Forcibly evict pages that are too big. */
 			if (!LF_ISSET(WT_READ_NO_GEN) &&
 			    force_attempts < 10 &&
-			    __wt_eviction_force_check(session, page)) {
+			    eviction_force_check(session, page)) {
 				++force_attempts;
 				WT_RET(__wt_page_release(session, ref));
 				break;
