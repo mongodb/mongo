@@ -74,6 +74,8 @@ namespace {
                                                PlanCache** planCacheOut) {
         invariant(db);
 
+        *querySettingsOut = NULL;
+        *planCacheOut = NULL;
         Collection* collection = db->getCollection(txn, ns);
         if (NULL == collection) {
             return Status(ErrorCodes::BadValue, "no such collection");

@@ -48,10 +48,8 @@ namespace repl {
 
     class TopologyCoordinatorImpl : public TopologyCoordinator {
     public:
-
         explicit TopologyCoordinatorImpl(int maxSyncSourceLagSecs);
-        virtual ~TopologyCoordinatorImpl() {};
-        
+
         virtual void setLastApplied(const OpTime& optime);
         virtual void setCommitOkayThrough(const OpTime& optime);
         virtual void setLastReceived(const OpTime& optime);

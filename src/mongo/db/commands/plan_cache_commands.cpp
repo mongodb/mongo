@@ -68,6 +68,7 @@ namespace {
     Status getPlanCache(OperationContext* txn, Database* db, const string& ns, PlanCache** planCacheOut) {
         invariant(db);
 
+        *planCacheOut = NULL;
         Collection* collection = db->getCollection(txn, ns);
         if (NULL == collection) {
             return Status(ErrorCodes::BadValue, "no such collection");
