@@ -365,6 +365,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_BTREE *cbt;
+	WT_CURSOR_BULK *cbulk;
 	WT_DECL_RET;
 	size_t csize;
 
@@ -388,7 +389,16 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cbt->btree = btree;
 	if (bulk) {
 		F_SET(cursor, WT_CURSTD_BULK);
-		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt, bitmap));
+
+		cbulk = (WT_CURSOR_BULK *)cbt;
+
+		/* Optionally skip the validation of each bulk-loaded key. */
+		WT_RET(__wt_config_gets_def(
+		    session, cfg, "skip_sort_check", 0, &cval));
+		if (cval.val != 0)
+			F_SET(cbulk, WT_BC_SKIP_SORT_CHECK);
+
+		WT_ERR(__wt_curbulk_init(session, cbulk, bitmap));
 	}
 
 	/*

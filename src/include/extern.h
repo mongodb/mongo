@@ -255,7 +255,10 @@ extern int __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key);
 extern int __wt_bloom_close(WT_BLOOM *bloom);
 extern int __wt_bloom_drop(WT_BLOOM *bloom, const char *config);
 extern int __wt_bulk_init(WT_CURSOR_BULK *cbulk);
-extern int __wt_bulk_insert(WT_CURSOR_BULK *cbulk);
+extern int __wt_bulk_insert_fix(WT_CURSOR_BULK *cbulk);
+extern int __wt_bulk_insert_var(WT_CURSOR_BULK *cbulk);
+extern int __wt_bulk_insert_row(WT_CURSOR_BULK *cbulk);
+extern int __wt_bulk_insert_row_skip_check(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_end(WT_CURSOR_BULK *cbulk);
 extern int __wt_compact(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_compact_page_skip(WT_SESSION_IMPL *session,
@@ -655,7 +658,9 @@ extern int __wt_curbackup_open(WT_SESSION_IMPL *session,
 extern int __wt_backup_list_uri_append( WT_SESSION_IMPL *session,
     const char *name,
     int *skip);
-extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk, int bitmap);
+extern int __wt_curbulk_init(WT_SESSION_IMPL *session,
+    WT_CURSOR_BULK *cbulk,
+    int bitmap);
 extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],

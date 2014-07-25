@@ -33,6 +33,46 @@ import wiredtiger, wttest
 from helper import key_populate, value_populate
 from wtscenario import multiply_scenarios, number_scenarios
 
+# Test out-of-order in a row-store fails by default, but works if key order
+# validation is turned off.
+class test_bulk_load_row_order(wttest.WiredTigerTestCase):
+    name = 'test_bulk'
+
+    scenarios = [
+        ('file', dict(type='file:')),
+        ('table', dict(type='table:'))
+    ]
+
+    def test_bulk_load_row_order_check(self):
+        uri = self.type + self.name
+        self.session.create(uri, 'key_format=S,value_format=S')
+        cursor = self.session.open_cursor(uri, None, "bulk")
+        cursor.set_key(key_populate(cursor, 10))
+        cursor.set_value(value_populate(cursor, 10))
+        cursor.insert()
+        cursor.set_key(key_populate(cursor, 1))
+        cursor.set_value(value_populate(cursor, 1))
+        msg = '/compares smaller than previously inserted key/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: cursor.insert(), msg)
+
+    def test_bulk_load_row_order_nocheck(self):
+        uri = self.type + self.name
+        self.session.create(uri, 'key_format=S,value_format=S')
+        cursor = self.session.open_cursor(uri, None, "bulk,skip_sort_check")
+        cursor.set_key(key_populate(cursor, 10))
+        cursor.set_value(value_populate(cursor, 10))
+        cursor.insert()
+        cursor.set_key(key_populate(cursor, 1))
+        cursor.set_value(value_populate(cursor, 1))
+        cursor.insert()
+
+        # Close explicitly, there's going to be a fallure.
+        msg = '/are incorrectly sorted/'
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: self.conn.close(), msg)
+
+
 # Test that inserting into the file blocks a subsequent bulk-load.
 class test_bulk_load_not_empty(wttest.WiredTigerTestCase):
     name = 'test_bulk'
