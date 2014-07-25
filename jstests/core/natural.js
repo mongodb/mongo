@@ -97,11 +97,13 @@ var runTests = function(test, db, isMongos) {
     jsTest.log(name);
     printjson(test);
 
+    // Set collection name, with prefix
+    var collName = "Natural "+name;
+
     var collOptions = {};
     if ("collOptions" in test) {
         collOptions = test.collOptions;
     }
-    var dbName = "test";
 
     // Optional test attributes
     // Test throws error
@@ -110,8 +112,8 @@ var runTests = function(test, db, isMongos) {
         err = test.errorExpected;
     }
 
-    db.createCollection(name, collOptions);
-    var coll = db[name];
+    db.createCollection(collName, collOptions);
+    var coll = db[collName];
     coll.remove({});
 
     // Set indexes on collection
