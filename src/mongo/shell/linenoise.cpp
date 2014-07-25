@@ -184,10 +184,10 @@ static void calculateScreenPosition( int x, int y, int screenColumns, int charCo
     }
 }
 
-static int calculateColumnPosition( unsigned int* buf32, size_t n) {
-    int width = mk_wcswidth( reinterpret_cast<const int*>( buf32 ), n );
+static int calculateColumnPosition( UChar32* buf32, int len) {
+    int width = mk_wcswidth( reinterpret_cast<const int*>( buf32 ), len );
     if ( width == -1 )
-        return n;
+        return len;
     else
         return width;
 }
@@ -660,7 +660,7 @@ static void dynamicRefresh( PromptBase& pi, UChar32* buf32, int len, int pos ) {
     calculateScreenPosition( xEndOfPrompt,
                              yEndOfPrompt,
                              pi.promptScreenColumns,
-                             calculateColumnPosition( buf32, len ),
+                             calculateColumnPosition( buf32, pos ),
                              xCursorPos,
                              yCursorPos );
 
