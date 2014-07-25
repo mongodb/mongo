@@ -33,6 +33,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
+#include <limits>
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
@@ -103,6 +104,7 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/version_reporting.h"
 
 #if !defined(_WIN32)
@@ -263,8 +265,8 @@ namespace mongo {
         c.insert( name, o);
     }
 
+    // Starts the listener port and never returns unless an error occurs
     static void listen(int port) {
-        //testTheDb();
         MessageServer::Options options;
         options.port = port;
         options.ipList = serverGlobalParams.bind_ip;
@@ -286,6 +288,14 @@ namespace mongo {
         boost::thread thr(testExhaust);
 #endif
         server->run();
+
+        // If system is in shutdown, any network errors are from the sockets closing, so just block
+        // and wait for _exit to be called.
+        if (inShutdown()) {
+            sleepsecs(std::numeric_limits<int>::max());
+        }
+
+        exitCleanly(EXIT_NET_ERROR);
     }
 
     void checkForIdIndexes( OperationContext* txn, Database* db ) {
@@ -669,9 +679,6 @@ namespace mongo {
         indexRebuilder.go(); 
 
         listen(listenPort);
-
-        // listen() will return when exit code closes its socket.
-        exitCleanly(EXIT_NET_ERROR);
     }
 
     static void initAndListen(int listenPort) {
