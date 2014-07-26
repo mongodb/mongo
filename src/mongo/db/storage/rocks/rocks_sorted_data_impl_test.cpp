@@ -40,9 +40,11 @@
 #include <rocksdb/options.h>
 
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -60,16 +62,12 @@ namespace mongo {
     static std::unique_ptr<rocksdb::Comparator> _rocksComparator(
             RocksSortedDataImpl::newRocksComparator( Ordering::make( BSON( "a" << 1 ) ) ) );
 
-    rocksdb::DB* getDB() {
-        string path = "/tmp/mongo-rocks-test";
+    string _rocksSortedDataTestDir = "mongo-rocks-test";
+
+    rocksdb::DB* getDB( string path ) {
         boost::filesystem::remove_all( path );
 
-        rocksdb::Options options;
-        // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
-        options.IncreaseParallelism();
-        options.OptimizeLevelStyleCompaction();
-        // create the DB if it's not already present
-        options.create_if_missing = true;
+        rocksdb::Options options = RocksEngine::dbOptions();
 
         // open DB
         rocksdb::DB* db;
@@ -80,7 +78,8 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, BrainDead ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
             RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
@@ -125,7 +124,8 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, Locate1 ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
             RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
@@ -160,7 +160,8 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, Locate2 ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
             RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
@@ -199,7 +200,8 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, LocateInexact ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
             boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = makeColumnFamily( db.get() );
@@ -228,7 +230,8 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, Snapshots ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
             RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
@@ -269,7 +272,8 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, SaveAndRestorePositionSimple ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
             RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
@@ -333,7 +337,8 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, SaveAndRestorePositionAdvanced ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
             RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
@@ -381,7 +386,8 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, Locate1Reverse ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
             RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
@@ -415,7 +421,8 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, LocateInexactReverse ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
             boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = makeColumnFamily( db.get() );
@@ -444,7 +451,8 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, SaveAndRestorePositionReverseSimple ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
             RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
@@ -508,7 +516,8 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, SaveAndRestorePositionReverseAdvanced ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksSortedDataTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
             RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );

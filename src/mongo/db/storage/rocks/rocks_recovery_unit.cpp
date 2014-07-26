@@ -60,6 +60,7 @@ namespace mongo {
 
     void RocksRecoveryUnit::beginUnitOfWork() {
         if ( !_writeBatch ) {
+            // XXX change to _writeBatch->Clear() everywhere
             _writeBatch.reset( new rocksdb::WriteBatch() );
         }
         _depth++;
