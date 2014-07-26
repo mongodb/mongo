@@ -36,11 +36,10 @@ __sweep(WT_SESSION_IMPL *session)
 			continue;
 
 		/*
-		 * We have a candidate for closing; if it's open, acquire an
-		 * exclusive lock on the handle and close it (the lock blocks
-		 * threads from opening the handle).  We might be blocking an
-		 * open for a fairly long time (over disk I/O), but the handle
-		 * has been quiescent for awhile.
+		 * We have a candidate for closing; if it's open, flush dirty
+		 * leaf pages, then acquire an exclusive lock on the handle
+		 * and close it. We might be blocking opens for a long time
+		 * (over disk I/O), but the handle was quiescent for awhile.
 		 *
 		 * The close can fail if an update cannot be written (updates in
 		 * a no-longer-referenced file might not yet be globally visible
@@ -49,6 +48,15 @@ __sweep(WT_SESSION_IMPL *session)
 		 * the transaction state has progressed.
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
+			WT_WITH_DHANDLE(session, dhandle,
+			    (ret = __wt_cache_op(
+			    session, NULL, WT_SYNC_WRITE_LEAVES)));
+			if (ret == EBUSY) {
+				ret = 0;
+				continue;
+			}
+			WT_RET(ret);
+
 			/*
 			 * We don't set WT_DHANDLE_EXCLUSIVE deliberately, we
 			 * want opens to block on us rather than returning an
@@ -62,7 +70,7 @@ __sweep(WT_SESSION_IMPL *session)
 			WT_RET(ret);
 
 			WT_WITH_DHANDLE(session, dhandle,
-			    ret = __wt_conn_btree_sync_and_close(session));
+			    (ret = __wt_conn_btree_sync_and_close(session)));
 			if (ret == EBUSY)
 				ret = 0;
 

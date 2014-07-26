@@ -261,8 +261,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_SESSION_IMPL *session;
 	WT_TXN_ISOLATION saved_isolation;
 	u_int i, j;
-	int locked;
-	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	lsm_tree = arg;
 	session = lsm_tree->ckpt_session;
@@ -319,8 +317,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 			/*
 			 * Flush the file before checkpointing: this is the
-			 * expensive part in terms of I/O: do it without
-			 * holding the schema lock.
+			 * expensive part in terms of I/O.
 			 *
 			 * Use the special eviction isolation level to avoid
 			 * interfering with an application checkpoint: we have
@@ -329,36 +326,17 @@ __wt_lsm_checkpoint_worker(void *arg)
 			 *
 			 * !!! We can wait here for checkpoints and fsyncs to
 			 * complete, which can be a long time.
-			 *
-			 * Don't keep waiting for the lock if application
-			 * threads are waiting for a switch.  Don't skip
-			 * flushing the leaves either: that just means we'll
-			 * hold the schema lock for (much) longer, which blocks
-			 * the world.
 			 */
-			WT_ERR(__wt_session_get_btree(
-			    session, chunk->uri, NULL, NULL, 0));
-			for (locked = 0;
-			    !locked && ret == 0 &&
-			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);) {
-				if ((ret = __wt_spin_trylock(session,
-				    &S2C(session)->checkpoint_lock, &id)) == 0)
-					locked = 1;
-				else if (ret == EBUSY) {
-					ret = 0;
-					__wt_yield();
-				}
-			}
-			if (locked) {
+			if ((ret = __wt_session_get_btree(
+			    session, chunk->uri, NULL, NULL, 0)) == 0) {
 				saved_isolation = session->txn.isolation;
 				session->txn.isolation = TXN_ISO_EVICTION;
-				ret = __wt_cache_op(
-				    session, NULL, WT_SYNC_WRITE_LEAVES);
+				if ((ret = __wt_cache_op(session,
+				    NULL, WT_SYNC_WRITE_LEAVES)) == EBUSY)
+					ret = 0;
 				session->txn.isolation = saved_isolation;
-				__wt_spin_unlock(
-				    session, &S2C(session)->checkpoint_lock);
+				WT_TRET(__wt_session_release_btree(session));
 			}
-			WT_TRET(__wt_session_release_btree(session));
 			WT_ERR(ret);
 
 			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))

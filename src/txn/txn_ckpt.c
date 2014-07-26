@@ -79,7 +79,7 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 	WT_ERR(__wt_config_gets(session, cfg, "name", &cval));
 	named = cval.len != 0;
 
-	/* Step through the list of targets and checkpoint each one. */
+	/* Step through the targets and optionally operate on each one. */
 	WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
 	WT_ERR(__wt_config_subinit(session, &targetconf, &cval));
 	while ((ret = __wt_config_next(&targetconf, &k, &v)) == 0) {
@@ -98,6 +98,8 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 		if (named)
 			WT_ERR(__checkpoint_name_check(session, k.str));
 
+		if (op == NULL)
+			continue;
 		WT_ERR(__wt_buf_fmt(session, tmp, "%.*s", (int)k.len, k.str));
 		if ((ret = __wt_schema_worker(
 		    session, tmp->data, op, NULL, cfg, 0)) != 0)
@@ -105,11 +107,11 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-	if (!target_list) {
+	if (!target_list && named)
 		/* Some objects don't support named checkpoints. */
-		if (named)
-			WT_ERR(__checkpoint_name_check(session, NULL));
+		WT_ERR(__checkpoint_name_check(session, NULL));
 
+	if (!target_list && op != NULL) {
 		/*
 		 * If the checkpoint is named or we're dropping checkpoints, we
 		 * checkpoint both open and closed files; else, only checkpoint
@@ -131,9 +133,10 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 		    __wt_conn_btree_apply(session, 0, op, cfg));
 	}
 
-err:	__wt_scr_free(&tmp);
-	if (ret == 0 && fullp != NULL)
+	if (fullp != NULL)
 		*fullp = !target_list;
+
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -174,6 +177,77 @@ __checkpoint_data_source(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
+ * __wt_checkpoint_list --
+ *	Get a list of URIs we want to flush.
+ */
+int
+__wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_UNUSED(cfg);
+
+	/* Should not be called with anything other than a file object. */
+	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
+	WT_ASSERT(session,
+	    memcmp(session->dhandle->name, "file:", strlen("file:")) == 0);
+
+	return (__wt_buf_catfmt(
+	    session, session->checkpoint, "%s,", session->dhandle->name));
+}
+
+/*
+ * __checkpoint_write_leaves --
+ *	Write the dirty leaf pages for all open handles.
+ */
+static int
+__checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_DECL_RET;
+	char *p, *t;
+
+	/* Should not be called with any handle reference. */
+	WT_ASSERT(session, session->dhandle == NULL);
+
+	WT_RET(__wt_scr_alloc(session, 512, &session->checkpoint));
+
+	/*
+	 * Get a list of URIs we want to flush; this pulls closed objects into
+	 * the session cache, but we're going to do that anyway.  There's a
+	 * race where an object might be closed between the time we decide to
+	 * flush it and do the flush, but that's pretty unlikely and only means
+	 * we waste a little work.
+	 */
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __checkpoint_apply(session, cfg, __wt_checkpoint_list, NULL));
+	WT_ERR(ret);
+
+	/*
+	 * Walk the list, flushing the leaf pages from each file.  If the file
+	 * is busy that's fine, we'll deal with it once we get the schema lock.
+	 */
+	for (p = t = (char *)session->checkpoint->data; *p != '\0'; p = t + 1)
+		if ((t = strchr(p, ',')) != NULL) {
+			*t = '\0';
+
+			ret = __wt_session_get_btree(session, p, NULL, NULL, 0);
+			if (ret == EBUSY || ret == ENOENT) {
+				ret = 0;
+				continue;
+			}
+			WT_ERR(ret);
+
+			if ((ret = __wt_cache_op(
+			    session, NULL, WT_SYNC_WRITE_LEAVES)) == EBUSY)
+				ret = 0;
+
+			WT_TRET(__wt_session_release_btree(session));
+			WT_ERR(ret);
+		}
+
+err:	__wt_scr_free(&session->checkpoint);
+	return (ret);
+}
+
+/*
  * __wt_txn_checkpoint --
  *	Checkpoint a database or a list of objects in the database.
  */
@@ -185,16 +259,22 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
-	const char *txn_cfg[3];
-	void *saved_meta_next;
 	int full, started, tracking;
+	const char *txn_cfg[] =
+	    { WT_CONFIG_BASE(session, session_begin_transaction),
+	      "isolation=snapshot", NULL };
+	void *saved_meta_next;
 
 	conn = S2C(session);
 	saved_isolation = session->isolation;
 	txn = &session->txn;
 	full = started = tracking = 0;
 
-	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 1);
+	/*
+	 * Do a pass over the configuration arguments and figure out what kind
+	 * kind of checkpoint this is.
+	 */
+	WT_RET(__checkpoint_apply(session, cfg, NULL, &full));
 
 	/*
 	 * Update the global oldest ID so we do all possible cleanup.
@@ -204,21 +284,16 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	__wt_txn_update_oldest(session);
 
-	/*
-	 * Only one checkpoint can be active at a time, and checkpoints must run
-	 * in the same order as they update the metadata, also, there are other
-	 * operations (for example, Btree compaction) that must serialize with
-	 * checkpoints.
-	 */
-	__wt_spin_lock(session, &conn->checkpoint_lock);
-
 	/* Flush data-sources before we start the checkpoint. */
 	WT_ERR(__checkpoint_data_source(session, cfg));
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
 	session->isolation = txn->isolation = TXN_ISO_READ_COMMITTED;
-	WT_ERR(__checkpoint_apply(
-	    session, cfg, __wt_checkpoint_write_leaves, &full));
+	WT_ERR(__checkpoint_write_leaves(session, cfg));
+
+	/* Acquire the schema lock. */
+	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
+	__wt_spin_lock(session, &conn->schema_lock);
 
 	WT_ERR(__wt_meta_track_on(session));
 	tracking = 1;
@@ -235,9 +310,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * side effects on cursors, which applications can hold open across
 	 * calls to checkpoint.
 	 */
-	txn_cfg[0] = WT_CONFIG_BASE(session, session_begin_transaction);
-	txn_cfg[1] = "isolation=snapshot";
-	txn_cfg[2] = NULL;
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Tell logging that we have started a database checkpoint. */
@@ -310,11 +382,12 @@ err:	/*
 		    (ret == 0) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_FAIL,
 		    NULL));
 
-	__wt_spin_unlock(session, &conn->checkpoint_lock);
+	if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED)) {
+		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);
+		__wt_spin_unlock(session, &conn->schema_lock);
+	}
 
 	session->isolation = txn->isolation = saved_isolation;
-
-	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
 
 	return (ret);
 }
@@ -796,23 +869,6 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 
 	return (__checkpoint_worker(session, cfg, 1));
-}
-
-/*
- * __wt_checkpoint_write_leaves --
- *	Write dirty leaf pages before a checkpoint.
- */
-int
-__wt_checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
-{
-	WT_UNUSED(cfg);
-
-	/* Should not be called with a checkpoint handle. */
-	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
-
-	/* May not have been modified, in which case don't do the traversal. */
-	return (S2BT(session)->modified ?
-	    __wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES) : 0);
 }
 
 /*

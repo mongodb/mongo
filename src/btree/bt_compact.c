@@ -64,6 +64,64 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 }
 
 /*
+ * __compact_locking --
+ *	Handling compaction locking.
+ */
+static int
+__compact_locking(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
+
+	conn = S2C(session);
+	btree = S2BT(session);
+
+	/*
+	 * Reviewing in-memory pages requires looking at page reconciliation
+	 * results, because we care about where the page is stored now, not
+	 * where the page was stored when we first read it into the cache.
+	 *	We need to ensure we don't collide with page reconciliation as
+	 * it writes the page modify information.
+	 *	There are two ways we call reconciliation, in checkpoints and
+	 * threads writing leaf pages (usually in preparation for a checkpoint,
+	 * but also when the file is closed).  Lock out checkpoints then acquire
+	 * the tree handle's flush lock, then set a flag so reconciliation knows
+	 * compaction is running.  This means checkpoints block compaction, but
+	 * compaction won't block checkpoints for more than a few instructions.
+	 *	Reconciliation looks for the flag: if set, reconciliation locks
+	 * the page it's writing.  That's bad, because a page lock blocks work
+	 * on the page, but compaction is an uncommon, heavy-weight operation,
+	 * we're doing a ton of I/O, spinlocks aren't our primary concern.
+	 */
+	for (;; __wt_yield()) {
+		__wt_spin_lock(session, &conn->checkpoint_lock);
+		if ((ret =
+		    __wt_spin_trylock(session, &btree->flush_lock, &id)) == 0) {
+			conn->compact_in_memory_pass = 1;
+			__wt_spin_unlock(session, &btree->flush_lock);
+		}
+		__wt_spin_unlock(session, &conn->checkpoint_lock);
+		if (ret == 0)
+			break;
+		if (ret == EBUSY)
+			ret = 0;
+		WT_RET(ret);
+	}
+
+	/*
+	 * After we set the flag, wait for eviction of this file to drain, and
+	 * then let eviction continue; we don't need to block eviction, we just
+	 * need to make sure we don't race with an on-going reconciliation.
+	 */
+	WT_RET(__wt_evict_file_exclusive_on(session));
+	__wt_evict_file_exclusive_off(session);
+
+	return (0);
+}
+
+/*
  * __wt_compact --
  *	Compact a file.
  */
@@ -91,38 +149,15 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(bm->compact_skip(bm, session, &skip));
 	if (skip)
 		return (0);
-	session->compaction = 1;
 
-	/*
-	 * Walk the tree reviewing pages to see if they need to be re-written.
-	 * Reviewing in-memory pages requires looking at page reconciliation
-	 * results, because we care about where the page is stored now, not
-	 * where the page was stored when we first read it into the cache.
-	 *	We need to ensure we don't collide with page reconciliation as
-	 * it writes the page modify information, which means ensuring we don't
-	 * collide with page eviction or checkpoints, they are the operations
-	 * that reconcile pages.
-	 *	Lock out checkpoints and set a flag so reconciliation knows
-	 * compaction is running.  This means checkpoints block compaction, but
-	 * compaction won't block checkpoints for more than a few instructions.
-	 *	Reconciliation looks for the flag: if set, reconciliation locks
-	 * the page it's writing.  That's bad, because a page lock blocks work
-	 * on the page, but compaction is an uncommon, heavy-weight operation,
-	 * we're doing a ton of I/O, spinlocks aren't our primary concern.
-	 *	After we set the flag, wait for eviction of this file to drain,
-	 * and then let eviction continue; we don't need to block eviction, we
-	 * just need to make sure we don't race with reconciliation.
-	 */
-	__wt_spin_lock(session, &conn->checkpoint_lock);
-	conn->compact_in_memory_pass = 1;
-	__wt_spin_unlock(session, &conn->checkpoint_lock);
-	WT_RET(__wt_evict_file_exclusive_on(session));
-	__wt_evict_file_exclusive_off(session);
+	/* Handle locking. */
+	WT_RET(__compact_locking(session));
 
 	/* Start compaction. */
-	WT_RET(bm->compact_start(bm, session));
+	WT_ERR(bm->compact_start(bm, session));
 
-	/* Walk the tree. */
+	/* Walk the tree reviewing pages to see if they should be re-written. */
+	session->compaction = 1;
 	for (ref = NULL;;) {
 		/*
 		 * Pages read for compaction aren't "useful"; don't update the
