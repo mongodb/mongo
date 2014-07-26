@@ -259,8 +259,10 @@ namespace mongo {
 
             void _checkStatus() {
                 // TODO: Fix me
-                log() << _iterator->status().ToString();
-                invariant( _iterator->status().ok() );
+                if ( !_iterator->status().ok() ) {
+                    log() << _iterator->status().ToString();
+                    invariant( false );
+                }
             }
 
             /**
