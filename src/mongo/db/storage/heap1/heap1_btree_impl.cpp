@@ -374,7 +374,8 @@ namespace {
                     return;
                 }
 
-                _savedKey = _it->key;
+                _savedAtEnd = false;
+                _savedKey = _it->key.getOwned();
                 _savedLoc = _it->loc;
             }
 
@@ -473,7 +474,8 @@ namespace {
                     return;
                 }
 
-                _savedKey = _it->key;
+                _savedAtEnd = false;
+                _savedKey = _it->key.getOwned();
                 _savedLoc = _it->loc;
             }
 
