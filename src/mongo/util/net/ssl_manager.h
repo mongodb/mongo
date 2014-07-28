@@ -33,6 +33,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/time_support.h"
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
@@ -105,6 +106,12 @@ namespace mongo {
          * @return the subject name.
          */
         virtual std::string getClientSubjectName() = 0;
+
+        /**
+         * Gets the expiration date of our own server certificate.
+         * @return the expiration date.
+         */
+        virtual Date_t getServerCertificateExpirationDate() = 0;
 
         /**
         * Fetches the error text for an error code, in a thread-safe manner.
