@@ -174,30 +174,6 @@ namespace repl {
         }
     } cmdReplSetGetStatus;
 
-    class CmdReplSetGetConfig : public ReplSetCommand {
-    public:
-        virtual void help( stringstream &help ) const {
-            help << "Returns the current replica set configuration";
-            help << "{ replSetGetConfig : 1 }";
-            help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
-        }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::replSetGetConfig);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
-        CmdReplSetGetConfig() : ReplSetCommand("replSetGetConfig", true) { }
-        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj,
-                         int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if (!check(errmsg, result))
-                return false;
-            getGlobalReplicationCoordinator()->processReplSetGetConfig(&result);
-            return true;
-        }
-    } cmdReplSetGetConfig;
-
     class CmdReplSetReconfig : public ReplSetCommand {
         RWLock mutex; /* we don't need rw but we wanted try capability. :-( */
     public:

@@ -494,10 +494,6 @@ namespace {
         theReplSet->summarizeStatus(*result);
     }
 
-    void LegacyReplicationCoordinator::processReplSetGetConfig(BSONObjBuilder* result) {
-        result->append("config", theReplSet->config().asBson());
-    }
-
     bool LegacyReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
         return theReplSet->setMaintenanceMode(txn, activate);
     }
