@@ -60,7 +60,7 @@ namespace mongo {
             EntryVector nonIndexEntries = _createNonIndexCatalogEntries( familyNames );
 
             CfdVector metaDataCfds = _generateMetaDataCfds( nonIndexEntries, familyNames );
-            
+
             // Create a mapping from index names to the Ordering object for each index.
             // These Ordering objects will be used to create RocksIndexEntryComparators to be used
             // with each column family representing a namespace
@@ -100,7 +100,7 @@ namespace mongo {
     }
 
     RecoveryUnit* RocksEngine::newRecoveryUnit( OperationContext* opCtx ) {
-        /* TODO change to false when unit of work hooked up*/ 
+        /* TODO change to false when unit of work hooked up*/
         return new RocksRecoveryUnit( _db.get(), true );
     }
 
@@ -264,13 +264,13 @@ namespace mongo {
         entry->cfHandle.reset( cf );
         entry->metaCfHandle.reset( cf_meta );
         if ( options.capped )
-            entry->recordStore.reset( 
-                                    new RocksRecordStore( 
+            entry->recordStore.reset(
+                                    new RocksRecordStore(
                                         ns, _db.get(), entry->cfHandle.get(), cf_meta, true,
                                         options.cappedSize ? options.cappedSize : 4096,
                                         options.cappedMaxDocs ? options.cappedMaxDocs : -1 ) );
         else
-            entry->recordStore.reset( new RocksRecordStore( 
+            entry->recordStore.reset( new RocksRecordStore(
                                         ns, _db.get(), entry->cfHandle.get(), cf_meta ) );
 
         entry->collectionEntry.reset( new RocksCollectionCatalogEntry( this, ns ) );
@@ -412,7 +412,7 @@ namespace mongo {
                 continue;
             }
 
-            cfds.push_back(rocksdb::ColumnFamilyDescriptor( columnFamilyName, 
+            cfds.push_back(rocksdb::ColumnFamilyDescriptor( columnFamilyName,
                                                             rocksdb::ColumnFamilyOptions() ) );
         }
 
@@ -469,7 +469,7 @@ namespace mongo {
         return indexOrderings;
     }
 
-    RocksEngine::CfdVector RocksEngine::_createCfds( const std::vector<std::string>& namespaces, 
+    RocksEngine::CfdVector RocksEngine::_createCfds( const std::vector<std::string>& namespaces,
                                                      const map<string, Ordering>& indexOrderings ) {
         CfdVector families;
 
@@ -497,7 +497,7 @@ namespace mongo {
                                                                 rocksdb::ColumnFamilyOptions() ) );
             }
             else if ( ns.compare("default") == 0 ) {
-                families.push_back( rocksdb::ColumnFamilyDescriptor( ns, 
+                families.push_back( rocksdb::ColumnFamilyDescriptor( ns,
                                                                 rocksdb::ColumnFamilyOptions() ) );
             }
             else {
@@ -566,7 +566,7 @@ namespace mongo {
                 entry->metaCfHandle.reset( handles[metadataMap[ns]] );
                 if ( options.capped ) {
                     entry->recordStore.reset(new RocksRecordStore(
-                                ns, 
+                                ns,
                                 _db.get(),
                                 handles[i],
                                 handles[metadataMap[ns]],

@@ -69,7 +69,7 @@ namespace mongo {
 
         if ( !_writeBatch ) {
             // nothing to be committed
-            return; 
+            return;
         }
 
         rocksdb::Status status = _db->Write( rocksdb::WriteOptions(), _writeBatch.get() );

@@ -194,7 +194,7 @@ namespace mongo {
                 cursor->advance();
                 ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
-                
+
                 cursor->advance();
                 ASSERT( cursor->isEOF() );
             }
@@ -530,7 +530,7 @@ namespace mongo {
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
 
-                // make sure that we can still see the unindexed data, since we're working on 
+                // make sure that we can still see the unindexed data, since we're working on
                 // a snapshot
                 cursor->advance();
                 ASSERT( !cursor->isEOF() );
@@ -910,7 +910,7 @@ namespace mongo {
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
 
-                // make sure that we can still see the unindexed data, since we're working on 
+                // make sure that we can still see the unindexed data, since we're working on
                 // a snapshot
                 cursor->advance();
                 ASSERT( !cursor->isEOF() );

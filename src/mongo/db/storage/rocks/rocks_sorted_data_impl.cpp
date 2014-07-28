@@ -48,7 +48,7 @@ namespace mongo {
         rocksdb::SliceParts emptyByteSliceParts( &emptyByteSlice, 1 );
 
         // functions for converting between BSONObj-DiskLoc pairs and strings/rocksdb::Slices
-        
+
         /**
          * Strips the field names from a BSON object
          */
@@ -231,7 +231,7 @@ namespace mongo {
              */
             bool _locate( const BSONObj& key, const DiskLoc loc ) {
                 _isCached = false;
-                //assumes fieldNames already stripped if necessary 
+                //assumes fieldNames already stripped if necessary
                 string keyData = makeString( key, loc, false );
                 _iterator->Seek( keyData );
                 _checkStatus();

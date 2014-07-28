@@ -242,7 +242,7 @@ namespace mongo {
 
     // The metadata in a column family with a specific name. This method reads from that column
     // family
-    boost::optional<RocksCollectionCatalogEntry::MetaData> 
+    boost::optional<RocksCollectionCatalogEntry::MetaData>
         RocksCollectionCatalogEntry::_getMetaData_inlock() const {
 
         string result;

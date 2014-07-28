@@ -152,8 +152,8 @@ namespace mongo {
         int size;
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(), 
-                                 db->DefaultColumnFamily(), 
+            RocksRecordStore rs( "foo.bar", db.get(),
+                                 db->DefaultColumnFamily(),
                                  db->DefaultColumnFamily() );
             string s = "eliot was here";
             size = s.length() + 1;
@@ -366,7 +366,7 @@ namespace mongo {
         unittest::TempDir td( _rocksRecordStoreTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
-        RocksRecordStore rs( "foo.bar", db.get(), 
+        RocksRecordStore rs( "foo.bar", db.get(),
                              db->DefaultColumnFamily(),
                              db->DefaultColumnFamily() );
         string s = "eliot was here";
@@ -409,7 +409,7 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
-                    StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, origStr.c_str(), 
+                    StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, origStr.c_str(),
                                                                origStr.size() + 1, -1 );
                     ASSERT_OK( res.getStatus() );
                     loc = res.getValue();

@@ -139,8 +139,8 @@ namespace mongo {
                                               DiskLoc end,
                                               bool inclusive);
 
-        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) { 
-          _cappedDeleteCallback = cb; 
+        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
+          _cappedDeleteCallback = cb;
         }
         bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
@@ -150,7 +150,7 @@ namespace mongo {
 
         class Iterator : public RecordIterator {
         public:
-            Iterator( const RocksRecordStore* rs, 
+            Iterator( const RocksRecordStore* rs,
                       const CollectionScanParams::Direction& dir,
                       const DiskLoc& start );
 

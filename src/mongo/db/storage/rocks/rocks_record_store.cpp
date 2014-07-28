@@ -321,7 +321,7 @@ namespace mongo {
     }
 
     Status RocksRecordStore::truncate( OperationContext* txn ) {
-        // XXX once we have readable WriteBatch, also delete outstanding writes to 
+        // XXX once we have readable WriteBatch, also delete outstanding writes to
         // this collection in the WriteBatch
         //AFB add Clear(ColumnFamilyHandle*)
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
@@ -340,7 +340,7 @@ namespace mongo {
         rocksdb::Status status = _db->CompactRange( _columnFamily, NULL, NULL );
         if ( status.ok() )
             return Status::OK();
-        else 
+        else
             return Status( ErrorCodes::InternalError, status.ToString() );
     }
 
@@ -444,7 +444,7 @@ namespace mongo {
     void RocksRecordStore::temp_cappedTruncateAfter( OperationContext* txn,
                                                      DiskLoc end,
                                                      bool inclusive ) {
-        boost::scoped_ptr<RecordIterator> iter( 
+        boost::scoped_ptr<RecordIterator> iter(
                 getIterator( txn, maxDiskLoc, false, CollectionScanParams::BACKWARD ) );
 
         while( !iter->isEOF() ) {
@@ -527,7 +527,7 @@ namespace mongo {
 
         if ( !_forward() && !_iterator->Valid() )
             _iterator->SeekToLast();
-        else if ( !_forward() && _iterator->Valid() && 
+        else if ( !_forward() && _iterator->Valid() &&
              reinterpret_cast<const DiskLoc*>( _iterator->key().data() )[0] != start )
             _iterator->Prev();
 
