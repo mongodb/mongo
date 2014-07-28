@@ -391,6 +391,7 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 	WT_ITEM *buf, *item;
 	WT_SESSION_IMPL *session;
 	const char *fmt, *str;
+	va_list ap_copy;
 	size_t sz;
 
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
@@ -413,8 +414,10 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 		WT_ERR(__wt_buf_initsize(session, buf, sz));
 		*(uint8_t *)buf->mem = (uint8_t)va_arg(ap, int);
 	} else {
-		WT_ERR(
-		    __wt_struct_sizev(session, &sz, cursor->value_format, ap));
+		va_copy(ap_copy, ap);
+		WT_ERR(__wt_struct_sizev(session,
+		    &sz, cursor->value_format, ap_copy));
+		va_end(ap_copy);
 		buf = &cursor->value;
 		WT_ERR(__wt_buf_initsize(session, buf, sz));
 		WT_ERR(__wt_struct_packv(session, buf->mem, sz,
