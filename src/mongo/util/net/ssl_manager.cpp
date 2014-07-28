@@ -209,6 +209,10 @@ namespace mongo {
                 return _clientSubjectName;
             }
 
+            virtual Date_t getServerCertificateExpirationDate() {
+                return _serverCertificateExpirationDate;
+            }
+
             virtual std::string getSSLErrorMessage(int code);
 
             virtual int SSL_read(SSLConnection* conn, void* buf, int num);
@@ -235,6 +239,7 @@ namespace mongo {
             bool _allowInvalidHostnames;
             std::string _serverSubjectName;
             std::string _clientSubjectName;
+            Date_t _serverCertificateExpirationDate;
 
             /**
              * creates an SSL object to be used for this file descriptor.
@@ -263,6 +268,11 @@ namespace mongo {
              * Parse and store x509 subject name from the PEM keyfile.
              * For server instances check that PEM certificate is not expired
              * and extract server certificate notAfter date.
+             * @param keyFile referencing the PEM file to be read.
+             * @param subjectName as a pointer to the subject name variable being set.
+             * @param serverNotAfter a Date_t object pointer that is valued if the
+             * date is to be checked (as for a server certificate) and null otherwise.
+             * @return bool showing if the function was successful.
              */
             bool _parseAndValidateCertificate(const std::string& keyFile,
                                               std::string* subjectName,
@@ -449,12 +459,15 @@ namespace mongo {
                 uasserted(16562, "ssl initialization problem"); 
             }
 
-            Date_t notAfter = Date_t();
-            if (!_parseAndValidateCertificate(params.pemfile, &_serverSubjectName, &notAfter)) {
+            if (!_parseAndValidateCertificate(params.pemfile,
+                                              &_serverSubjectName,
+                                              &_serverCertificateExpirationDate)) {
                 uasserted(16942, "ssl initialization problem"); 
             }
 
-            static CertificateExpirationMonitor task = CertificateExpirationMonitor(notAfter);
+            static CertificateExpirationMonitor task =
+                CertificateExpirationMonitor(_serverCertificateExpirationDate);
+
             // use the cluster certificate for outgoing connections if specified
             if (!params.clusterfile.empty()) {
                 if (!_parseAndValidateCertificate(params.clusterfile, &_clientSubjectName, NULL)) {
@@ -656,7 +669,7 @@ namespace mongo {
 
     bool SSLManager::_parseAndValidateCertificate(const std::string& keyFile, 
                                                   std::string* subjectName,
-                                                  Date_t* serverNotAfter) {
+                                                  Date_t* serverCertificateExpirationDate) {
         BIO *inBIO = BIO_new(BIO_s_file_internal());
         if (inBIO == NULL) {
             error() << "failed to allocate BIO object: "
@@ -680,7 +693,7 @@ namespace mongo {
         ON_BLOCK_EXIT(X509_free, x509);
 
         *subjectName = getCertificateSubjectName(x509);
-        if (serverNotAfter != NULL) {
+        if (serverCertificateExpirationDate != NULL) {
 
             unsigned long long notBeforeMillis = _convertASN1ToMillis(X509_get_notBefore(x509));
             if (notBeforeMillis == 0) {
@@ -700,7 +713,7 @@ namespace mongo {
                        "The provided SSL certificate is expired or not yet valid.");
             }
 
-            *serverNotAfter = Date_t(notAfterMillis);
+            *serverCertificateExpirationDate = Date_t(notAfterMillis);
         }
 
         return true;
