@@ -321,17 +321,14 @@ namespace mongo {
     }
 
     Status RocksRecordStore::truncate( OperationContext* txn ) {
+        // XXX once we have readable WriteBatch, also delete outstanding writes to 
+        // this collection in the WriteBatch
         //AFB add Clear(ColumnFamilyHandle*)
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         while( !iter->isEOF() ) {
             DiskLoc loc = iter->getNext();
             deleteRecord( txn, loc );
         }
-        // also clear current write batch
-        RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
-        rocksdb::WriteBatch* wb = ru->writeBatch();
-        if ( wb != NULL )
-            wb->Clear();
 
         return Status::OK();
     }
@@ -534,7 +531,6 @@ namespace mongo {
              reinterpret_cast<const DiskLoc*>( _iterator->key().data() )[0] != start )
             _iterator->Prev();
 
-
         _checkStatus();
     }
 
@@ -560,7 +556,7 @@ namespace mongo {
         if ( !_iterator->Valid() ) {
             return DiskLoc();
         }
-        
+
         DiskLoc toReturn = curr();
 
         if ( _forward() )

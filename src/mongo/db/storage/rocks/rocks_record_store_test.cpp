@@ -29,11 +29,14 @@
 *    it in the license file.
 */
 
+#include <memory>
+
 #include <boost/filesystem/operations.hpp>
 
+#include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
-#include <rocksdb/slice.h>
 #include <rocksdb/options.h>
+#include <rocksdb/slice.h>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_noop.h"
@@ -52,6 +55,16 @@ namespace mongo {
         MyOperationContext( rocksdb::DB* db )
             : OperationContextNoop( new RocksRecoveryUnit( db, false ) ) { }
     };
+
+    // to be used in testing
+    static std::unique_ptr<rocksdb::Comparator> _rocksComparator(
+            RocksRecordStore::newRocksCollectionComparator() );
+
+    rocksdb::ColumnFamilyOptions getColumnFamilyOptions() {
+        rocksdb::ColumnFamilyOptions options;
+        options.comparator = _rocksComparator.get();
+        return options;
+    }
 
     string _rocksRecordStoreTestDir = "mongo-rocks-test";
 
@@ -460,7 +473,7 @@ namespace mongo {
 
             rocksdb::Status status;
 
-            status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1", &cf1 );
+            status = db->CreateColumnFamily( getColumnFamilyOptions(), "foo.bar1", &cf1 );
             ASSERT( status.ok() );
             status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
             ASSERT( status.ok() );
@@ -520,7 +533,7 @@ namespace mongo {
 
             rocksdb::Status status;
 
-            status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1", &cf1 );
+            status = db->CreateColumnFamily( getColumnFamilyOptions(), "foo.bar1", &cf1 );
             ASSERT( status.ok() );
             status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
             ASSERT( status.ok() );
@@ -550,7 +563,7 @@ namespace mongo {
             }
 
             OperationContextNoop txn;
-            scoped_ptr<RecordIterator> iter( rs.getIterator( &txn, DiskLoc(), false,
+            scoped_ptr<RecordIterator> iter( rs.getIterator( &txn, maxDiskLoc, false,
                                              CollectionScanParams::BACKWARD ) );
             ASSERT_EQUALS( false, iter->isEOF() );
             ASSERT_EQUALS( loc3, iter->getNext() );
@@ -579,7 +592,7 @@ namespace mongo {
 
             rocksdb::Status status;
 
-            status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1", &cf1 );
+            status = db->CreateColumnFamily( getColumnFamilyOptions(), "foo.bar1", &cf1 );
             ASSERT( status.ok() );
             status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
             ASSERT( status.ok() );

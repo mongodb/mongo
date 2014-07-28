@@ -36,8 +36,8 @@
 
 #include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
-#include <rocksdb/slice.h>
 #include <rocksdb/options.h>
+#include <rocksdb/slice.h>
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/rocks/rocks_engine.h"
