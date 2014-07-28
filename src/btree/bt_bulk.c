@@ -142,11 +142,9 @@ __wt_bulk_insert_row(WT_CURSOR_BULK *cbulk)
 int
 __wt_bulk_insert_row_skip_check(WT_CURSOR_BULK *cbulk)
 {
-	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
-	cursor = &cbulk->cbt.iface;
 
 	WT_STAT_FAST_DATA_INCR(session, cursor_insert_bulk);
 
