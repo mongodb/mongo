@@ -153,7 +153,8 @@ namespace repl {
         // TODO(spencer): This should be checking if you have a config
         if (_settings.usingReplSets()) {
             return modeReplSet;
-        } else if (_settings.slave || _settings.master) {
+        }
+        else if (_settings.slave || _settings.master) {
             return modeMasterSlave;
         }
         return modeNone;
@@ -203,7 +204,8 @@ namespace repl {
         if (!writeConcern.wMode.empty()) {
             fassert(18524, writeConcern.wMode == "majority"); // TODO(spencer): handle tags
             numNodes = _rsConfig.getMajorityNumber();
-        } else {
+        }
+        else {
             numNodes = writeConcern.wNumNodes;
         }
 
@@ -267,7 +269,8 @@ namespace repl {
             try {
                 if (writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
                     condVar.wait(lk);
-                } else {
+                }
+                else {
                     condVar.timed_wait(lk, Milliseconds(writeConcern.wTimeout - elapsed));
                 }
             } catch (const boost::thread_interrupted&) {}
@@ -566,7 +569,8 @@ namespace repl {
             }
             slaveInfo.memberID = memberID;
             slaveInfo.hostAndPort = member->getHostAndPort();
-        } else {
+        }
+        else {
             slaveInfo.memberID = -1;
             slaveInfo.hostAndPort = _externalState->getClientHostAndPort(txn);
         }
@@ -622,7 +626,8 @@ namespace repl {
                 if (hap == ignoreHAP) {
                     dontHeartbeatMember = true;
                 }
-            } else {
+            }
+            else {
                 log() << "replset: Bad member for rsHeartbeatRequestNoopByMember failpoint "
                        <<  member.getData() << ". 'member' failed to parse into HostAndPort -- "
                        << status;
