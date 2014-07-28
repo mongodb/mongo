@@ -660,7 +660,8 @@ extern int __wt_backup_list_uri_append( WT_SESSION_IMPL *session,
     int *skip);
 extern int __wt_curbulk_init(WT_SESSION_IMPL *session,
     WT_CURSOR_BULK *cbulk,
-    int bitmap);
+    int bitmap,
+    int skip_sort_check);
 extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],

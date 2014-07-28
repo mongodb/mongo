@@ -211,9 +211,6 @@ struct __wt_cursor_bulk {
 	int	bitmap;
 
 	void	*reconcile;		/* Reconciliation information */
-
-#define	WT_BC_SKIP_SORT_CHECK	0x01	/* Skip the sort check */
-	uint32_t flags;
 };
 
 struct __wt_cursor_config {

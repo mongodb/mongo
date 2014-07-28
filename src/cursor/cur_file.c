@@ -393,12 +393,10 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		cbulk = (WT_CURSOR_BULK *)cbt;
 
 		/* Optionally skip the validation of each bulk-loaded key. */
-		WT_RET(__wt_config_gets_def(
+		WT_ERR(__wt_config_gets_def(
 		    session, cfg, "skip_sort_check", 0, &cval));
-		if (cval.val != 0)
-			F_SET(cbulk, WT_BC_SKIP_SORT_CHECK);
-
-		WT_ERR(__wt_curbulk_init(session, cbulk, bitmap));
+		WT_ERR(__wt_curbulk_init(
+		    session, cbulk, bitmap, cval.val == 0 ? 0 : 1));
 	}
 
 	/*

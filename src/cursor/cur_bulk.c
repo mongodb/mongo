@@ -68,7 +68,8 @@ err:	API_END_RET(session, ret);
  *	Initialize a bulk cursor.
  */
 int
-__wt_curbulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, int bitmap)
+__wt_curbulk_init(WT_SESSION_IMPL *session,
+    WT_CURSOR_BULK *cbulk, int bitmap, int skip_sort_check)
 {
 	WT_CURSOR *c;
 	WT_CURSOR_BTREE *cbt;
@@ -91,10 +92,8 @@ __wt_curbulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, int bitmap)
 		c->insert = __curbulk_insert_var;
 		break;
 	case BTREE_ROW:
-		if (F_ISSET(cbulk, WT_BC_SKIP_SORT_CHECK))
-			c->insert = __curbulk_insert_row_skip_check;
-		else
-			c->insert = __curbulk_insert_row;
+		c->insert = skip_sort_check ?
+		    __curbulk_insert_row_skip_check : __curbulk_insert_row;
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
