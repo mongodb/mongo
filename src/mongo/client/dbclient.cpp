@@ -895,7 +895,8 @@ namespace mongo {
 
             int code = res["code"].numberInt();
             string errmsg = res["errmsg"].valuestrsafe();
-            if ( code == 59 || errmsg.find( "no such cmd" ) != string::npos ) {
+            if ( code == ErrorCodes::CommandNotFound ||
+                 errmsg.find( "no such cmd" ) != string::npos ) {
                 // old version of server, ok, fall through to old code
             }
             else {
@@ -1322,11 +1323,11 @@ namespace mongo {
             }
             int code = res["code"].numberInt();
             string errmsg = res["errmsg"].valuestrsafe();
-            if ( code == 59 || errmsg.find( "no such cmd" ) != string::npos ) {
+            if ( code == ErrorCodes::CommandNotFound ||
+                 errmsg.find( "no such cmd" ) != string::npos ) {
                 // old version of server, ok, fall through to old code
             }
-            else if ( code == 26 ) {
-                // NamespaceNotFound
+            else if ( code == ErrorCodes::NamespaceNotFound ) {
                 return specs;
             }
             else {

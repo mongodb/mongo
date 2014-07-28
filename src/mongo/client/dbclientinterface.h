@@ -934,15 +934,15 @@ namespace mongo {
         std::list<std::string> getDatabaseNames();
 
         /**
-         * get a list of all the current collections in db
-         * returns fully qualified names
+         * Get a list of all the current collections in db.
+         * Returns fully qualified names.
          */
         std::list<std::string> getCollectionNames( const std::string& db );
 
         /**
          * { name : "<short collection name>",
          *   options : { }
-         *  }
+         * }
          */
         std::list<BSONObj> getCollectionInfos( const std::string& db );
 
@@ -975,6 +975,9 @@ namespace mongo {
          */
         virtual void resetIndexCache();
 
+        /**
+         * @deprecated use getIndexSpecs
+         */
         virtual std::auto_ptr<DBClientCursor> getIndexes( const std::string &ns );
 
         virtual std::list<BSONObj> getIndexSpecs( const std::string &ns, int options = 0 );
