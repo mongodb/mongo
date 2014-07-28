@@ -184,6 +184,11 @@ static void calculateScreenPosition( int x, int y, int screenColumns, int charCo
     }
 }
 
+/**
+ * Calculate a column width using mk_wcswidth()
+ * @param buf32  text to calculate
+ * @param len    length of text to calculate
+ */
 static int calculateColumnPosition( UChar32* buf32, int len) {
     int width = mk_wcswidth( reinterpret_cast<const int*>( buf32 ), len );
     if ( width == -1 )
