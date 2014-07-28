@@ -44,9 +44,7 @@ namespace mongo {
                                        _defaultCommit( defaultCommit ),
                                        _writeBatch(  ),
                                        _depth( 0 ),
-                                       _snapshot( NULL ) {
-        _writeBatch.reset( new rocksdb::WriteBatch() );
-    }
+                                       _snapshot( NULL ) { }
 
     RocksRecoveryUnit::~RocksRecoveryUnit() {
         if ( _defaultCommit ) {
@@ -59,8 +57,9 @@ namespace mongo {
     }
 
     void RocksRecoveryUnit::beginUnitOfWork() {
+        // TODO so long as _writeBatch is lazily initialized, it doesn't need to be
+        // initialized here. Not sure that the increased code complexity is worth it, though.
         if ( !_writeBatch ) {
-            // XXX change to _writeBatch->Clear() everywhere
             _writeBatch.reset( new rocksdb::WriteBatch() );
         }
         _depth++;
@@ -117,8 +116,14 @@ namespace mongo {
         log() << "RocksRecoveryUnit::syncDataAndTruncateJournal() does nothing";
     }
 
+    // lazily initialized because Recovery Units are sometimes initialized just for reading,
+    // which does not require write batches
     rocksdb::WriteBatch* RocksRecoveryUnit::writeBatch() {
-        invariant( _writeBatch );
+        if ( !_writeBatch ) {
+            // XXX change to _writeBatch->Clear() everywhere
+            _writeBatch.reset( new rocksdb::WriteBatch() );
+        }
+
         return _writeBatch.get();
     }
 
