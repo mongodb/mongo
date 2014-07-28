@@ -299,7 +299,9 @@ namespace mongo {
                     verify( collection );
                 }
 
-                Status status = collection->getIndexCatalog()->createIndex(txn, spec, mayBeInterrupted);
+                Status status = collection->getIndexCatalog()->createIndex(txn,
+                                                                           spec,
+                                                                           mayBeInterrupted);
                 if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
                     // no-op
                 }
@@ -374,7 +376,7 @@ namespace mongo {
 
         // main data
         copy(txn, dbName,
-             NamespaceString(ns), NamespaceString(ns),
+             nss, nss,
              logForRepl, false, true, mayYield, mayBeInterrupted,
              Query(query).snapshot());
 
