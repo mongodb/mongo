@@ -44,9 +44,7 @@ namespace mongo {
                                        _defaultCommit( defaultCommit ),
                                        _writeBatch(  ),
                                        _depth( 0 ),
-                                       _snapshot( NULL ) {
-        beginUnitOfWork();
-    }
+                                       _snapshot( NULL ) { }
 
 
     RocksRecoveryUnit::~RocksRecoveryUnit() {
