@@ -525,7 +525,15 @@ namespace repl {
     Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(OperationContext* txn,
                                                                     const BSONArray& updates,
                                                                     BSONObjBuilder* resultObj) {
-        // TODO
+        BSONForEach(elem, updates) {
+            BSONObj entry = elem.Obj();
+            OID id = entry["_id"].OID();
+            OpTime ot = entry["optime"]._opTime();
+            Status status = setLastOptime(txn, id, ot);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
         return Status::OK();
     }
 
