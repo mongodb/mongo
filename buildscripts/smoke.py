@@ -233,7 +233,6 @@ class mongod(NullMongod):
         if self.kwargs.get('use_x509'):
             argv += ['--clusterAuthMode','x509'];
             self.auth = True
-        argv += ["--storageEngine=rocksExperiment"];
         print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))
 
@@ -540,6 +539,8 @@ def runTest(test, result):
         # this updates the default data directory for mongod processes started through shell (src/mongo/shell/servers.js)
         evalString += 'MongoRunner.dataDir = "' + os.path.abspath(smoke_db_prefix + '/data/db') + '";'
         evalString += 'MongoRunner.dataPath = MongoRunner.dataDir + "/";'
+        if temp_path:
+            evalString += 'TestData.tmpPath = "' + temp_path + '";'
         if os.sys.platform == "win32":
             # double quotes in the evalString on windows; this
             # prevents the backslashes from being removed when
@@ -550,6 +551,7 @@ def runTest(test, result):
             evalString += 'jsTest.authenticate(db.getMongo());'
 
         argv = argv + [ '--eval', evalString]
+
 
     if argv[0].endswith( 'dbtest' ) or argv[0].endswith( 'dbtest.exe' ):
         if no_preallocj :
@@ -842,10 +844,11 @@ suiteGlobalConfig = {"js": ("core/*.js", True),
                      "ssl": ("ssl/*.js", True),
                      "sslSpecial": ("sslSpecial/*.js", True),
                      "jsCore": ("core/*.js", True),
+                     "mmap_v1": ("mmap_v1/*.js", True),
                      "gle": ("gle/*.js", True),
+                     "rocksDB": ("rocksDB/*.js", True),
                      "slow1": ("slow1/*.js", True),
                      "slow2": ("slow2/*.js", True),
-                     "rocksDB": ("rocksDB/*.js", True),
                      }
 
 def get_module_suites():
@@ -911,6 +914,7 @@ def expand_suites(suites,expandUseDB=True):
                                   'perf', 
                                   'jsCore', 
                                   'jsPerf', 
+                                  'mmap_v1',
                                   'noPassthroughWithMongod', 
                                   'noPassthrough', 
                                   'clone', 
@@ -1204,7 +1208,7 @@ def main():
     parser.add_option('--set-parameters-mongos', dest='set_parameters_mongos', default="",
                       help='Adds --setParameter to mongos for each passed in item in the csv list - ex. "param1=1,param2=foo" ')
     parser.add_option('--temp-path', dest='temp_path', default=None,
-                      help='If present, passed as --tempPath to unittests and dbtests')
+                      help='If present, passed as --tempPath to unittests and dbtests or TestData.tmpPath to mongo')
     # Buildlogger invocation from command line
     parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=None,
                       action="store", help='Set the "builder name" for buildlogger')
