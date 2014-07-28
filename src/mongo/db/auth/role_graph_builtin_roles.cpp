@@ -181,6 +181,7 @@ namespace {
             << ActionType::listDatabases
             << ActionType::listShards // clusterManager gets this also
             << ActionType::netstat
+            << ActionType::replSetGetConfig // clusterManager gets this also
             << ActionType::replSetGetStatus // clusterManager gets this also
             << ActionType::serverStatus
             << ActionType::top
@@ -223,6 +224,7 @@ namespace {
             << ActionType::appendOplogNote // backup gets this also
             << ActionType::applicationMessage // hostManager gets this also
             << ActionType::replSetConfigure
+            << ActionType::replSetGetConfig // clusterMonitor gets this also
             << ActionType::replSetGetStatus // clusterMonitor gets this also
             << ActionType::replSetStateChange
             << ActionType::resync // hostManager gets this also

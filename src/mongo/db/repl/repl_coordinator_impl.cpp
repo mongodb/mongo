@@ -368,6 +368,10 @@ namespace repl {
         // TODO
     }
 
+    void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result) {
+        result->append("config", _rsConfig.toBSON());
+    }
+
     bool ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* txn, bool activate) {
         // TODO
         return false;

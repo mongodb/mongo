@@ -146,8 +146,12 @@ namespace repl {
             OperationContext* txn,
             std::vector<BSONObj>* handshakes) {}
 
+    void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result) {
+        // TODO
+    }
+
     void ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
-        //TODO
+        // TODO
     }
 
     bool ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* txn, bool activate) {

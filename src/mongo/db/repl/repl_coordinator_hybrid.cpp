@@ -179,6 +179,12 @@ namespace repl {
         _impl.processReplSetGetStatus(&implResult);
     }
 
+    void HybridReplicationCoordinator::processReplSetGetConfig(BSONObjBuilder* result) {
+        _legacy.processReplSetGetConfig(result);
+        BSONObjBuilder implResult;
+        _impl.processReplSetGetConfig(&implResult);
+    }
+
     bool HybridReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
         bool legacyResponse = _legacy.setMaintenanceMode(txn, activate);
         _impl.setMaintenanceMode(txn, activate);
