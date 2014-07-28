@@ -53,7 +53,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -66,6 +66,18 @@ namespace mongo {
                  << " on namespace with a $ in it: " << ns,
                  NamespaceString::normal( ns ) );
     }
+
+    class Database::CollectionCacheChange : public RecoveryUnit::Change {
+    public:
+        CollectionCacheChange(Database* db, const StringData& ns)
+        : _db(db), _ns(ns.toString()) { }
+
+        void rollback() { _db->_clearCollectionCache(_ns); }
+        void commit() { }
+    private:
+        Database* const _db;
+        std::string _ns;
+    };
 
     Database::~Database() {
         for (CollectionMap::const_iterator i = _collections.begin(); i != _collections.end(); ++i)
@@ -299,6 +311,8 @@ namespace mongo {
             return Status::OK();
         }
 
+        txn->recoveryUnit()->registerChange( new CollectionCacheChange(this, fullns) );
+
         {
             NamespaceString s( fullns );
             verify( s.db() == _name );
@@ -470,13 +484,14 @@ namespace mongo {
 
         audit::logCreateCollection( currentClient.get(), ns );
 
-        Status status = _dbEntry->createCollection( txn, ns,
-                                                    options, allocateDefaultSpace );
-        massertStatusOK( status );
+        txn->recoveryUnit()->registerChange( new CollectionCacheChange(this, ns) );
 
+        Status status = _dbEntry->createCollection(txn, ns,
+                                                options, allocateDefaultSpace);
+        massertStatusOK(status);
 
-        Collection* collection = getCollection( txn, ns );
-        invariant( collection );
+        Collection* collection = getCollection(txn, ns);
+        invariant(collection);
 
         if ( createIdIndex ) {
             if ( collection->requiresIdIndex() ) {

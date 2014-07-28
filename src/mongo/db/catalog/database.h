@@ -142,6 +142,8 @@ namespace mongo {
 
         void _clearCollectionCache_inlock( const StringData& fullns );
 
+        class CollectionCacheChange; // to allow rollback actions for invalidating above cache
+
         const std::string _name; // "alleyinsider"
 
         boost::scoped_ptr<DatabaseCatalogEntry> _dbEntry;

@@ -91,6 +91,35 @@ namespace mongo {
          */
         virtual bool isCommitNeeded() const = 0;
 
+        /**
+         * A Change is an action that is registerChange()'d while a WriteUnitOfWork exists. The
+         * change is either rollback()'d or commit()'d when the WriteUnitOfWork goes out of scope.
+         *
+         * Neither rollback() nor commit() may fail or throw exceptions.
+         *
+         * Change implementors are responsible for handling their own locking, and must be aware
+         * that rollback() and commit() may be called after resources with a shorter lifetime than
+         * the WriteUnitOfWork have been freed. Each registered change will be committed or rolled
+         * back once.
+         */
+        class Change {
+        public:
+            virtual ~Change() { }
+
+            virtual void rollback() = 0;
+            virtual void commit() = 0;
+        };
+
+        /**
+         * The RecoveryUnit takes ownership of the change. The commitUnitOfWork() method calls the
+         * commit() method of each registered change in order of registration. The endUnitOfWork()
+         * method calls the rollback() method of each registered Change in reverse order of
+         * registration. Either will unregister and delete the changes.
+         *
+         * The registerChange() method may only be called when a WriteUnitOfWork is active, and
+         * may not be called during commit or rollback.
+         */
+        virtual void registerChange(Change* change) = 0;
 
         //
         // The remaining methods probably belong on DurRecoveryUnit rather than on the interface.

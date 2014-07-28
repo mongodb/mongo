@@ -30,6 +30,8 @@
 
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 
+#include <utility>
+
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/2d_access_method.h"
@@ -41,17 +43,66 @@
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/pdfile_version.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_interface.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_collection_entry.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
+#include "mongo/db/storage/mmap_v1/data_file.h"
+#include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
 
 namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(newCollectionsUsePowerOf2Sizes, bool, true);
+
+    /**
+     * Registers the insertion of a new entry in the _collections cache with the RecoveryUnit,
+     * allowing for rollback.
+     */
+    class MMAPV1DatabaseCatalogEntry::EntryInsertion : public RecoveryUnit::Change {
+    public:
+        EntryInsertion(const StringData& ns, MMAPV1DatabaseCatalogEntry* entry)
+            : _ns(ns.toString()), _entry(entry) { }
+
+        void rollback() {
+            _entry->_removeFromCache(NULL, _ns);
+        }
+
+        void commit() { }
+    private:
+        std::string _ns;
+        MMAPV1DatabaseCatalogEntry* const _entry;
+    };
+
+    /**
+     * Registers the removal of an entry from the _collections cache with the RecoveryUnit,
+     * delaying actual deletion of the information until the change is commited. This allows
+     * for easy rollback.
+     */
+    class MMAPV1DatabaseCatalogEntry::EntryRemoval : public RecoveryUnit::Change {
+    public:
+        //  Rollback removing the collection from the cache. Takes ownership of the cachedEntry,
+        //  and will delete it if removal is final.
+        EntryRemoval(const StringData& ns,
+                     MMAPV1DatabaseCatalogEntry* catalogEntry,
+                     Entry *cachedEntry)
+            : _ns(ns.toString()), _catalogEntry(catalogEntry), _cachedEntry(cachedEntry) { }
+
+        void rollback() {
+            boost::mutex::scoped_lock lk(_catalogEntry->_collectionsLock);
+            _catalogEntry->_collections[_ns] = _cachedEntry;
+        }
+
+        void commit() {
+            delete _cachedEntry;
+        }
+
+    private:
+        std::string _ns;
+        MMAPV1DatabaseCatalogEntry* const _catalogEntry;
+        Entry* const _cachedEntry;
+    };
 
     MMAPV1DatabaseCatalogEntry::MMAPV1DatabaseCatalogEntry( OperationContext* txn,
                                                             const StringData& name,
@@ -101,7 +152,7 @@ namespace mongo {
                     Entry*& entry = _collections[ns];
                     if ( !entry ) {
                         entry = new Entry();
-                        _fillInEntry_inlock( txn, ns, entry );
+                        _insertInCache_inlock(txn, ns, entry);
                     }
                 }
             }
@@ -118,8 +169,6 @@ namespace mongo {
             _extentManager.reset();
             throw;
         }
-
-
     }
 
     MMAPV1DatabaseCatalogEntry::~MMAPV1DatabaseCatalogEntry() {
@@ -131,18 +180,26 @@ namespace mongo {
         _collections.clear();
     }
 
-    void MMAPV1DatabaseCatalogEntry::_removeFromCache( const StringData& ns ) {
-        boost::mutex::scoped_lock lk( _collectionsLock );
-        CollectionMap::iterator i = _collections.find( ns.toString() );
+    void MMAPV1DatabaseCatalogEntry::_removeFromCache(RecoveryUnit* ru,
+                                                      const StringData& ns) {
+        boost::mutex::scoped_lock lk(_collectionsLock);
+        CollectionMap::iterator i = _collections.find(ns.toString());
         if ( i == _collections.end() )
             return;
-        delete i->second;
-        _collections.erase( i );
+
+        //  If there is an operation context, register a rollback to restore the cache entry
+        if (ru) {
+            ru->registerChange(new EntryRemoval(ns, this, i->second));
+        }
+        else {
+            delete i->second;
+        }
+        _collections.erase(i);
     }
 
-    Status MMAPV1DatabaseCatalogEntry::dropCollection( OperationContext* txn, const StringData& ns ) {
-        invariant( txn->lockState()->isWriteLocked( ns ) );
-        _removeFromCache( ns );
+    Status MMAPV1DatabaseCatalogEntry::dropCollection(OperationContext* txn, const StringData& ns) {
+        invariant(txn->lockState()->isWriteLocked(ns));
+        _removeFromCache(txn->recoveryUnit(), ns);
 
         NamespaceDetails* details = _namespaceIndex.details( ns );
 
@@ -253,7 +310,7 @@ namespace mongo {
         if ( _namespaceIndex.details( toNS ) )
             return Status( ErrorCodes::BadValue, "to namespace already exists" );
 
-        _removeFromCache( fromNS );
+        _removeFromCache(txn->recoveryUnit(), fromNS);
 
         // at this point, we haven't done anything destructive yet
 
@@ -327,7 +384,7 @@ namespace mongo {
         Entry*& entry = _collections[toNS.toString()];
         invariant( entry == NULL );
         entry = new Entry();
-        _fillInEntry_inlock( txn, toNS, entry );
+        _insertInCache_inlock(txn, toNS, entry);
 
         return Status::OK();
     }
@@ -558,7 +615,7 @@ namespace mongo {
             Entry*& entry = _collections[ns.toString()];
             invariant( !entry );
             entry = new Entry();
-            _fillInEntry_inlock( txn, ns, entry );
+            _insertInCache_inlock(txn, ns, entry);
         }
 
         if ( allocateDefaultSpace ) {
@@ -606,11 +663,12 @@ namespace mongo {
         return i->second->catalogEntry.get();
     }
 
-    void MMAPV1DatabaseCatalogEntry::_fillInEntry_inlock( OperationContext* txn,
-                                                          const StringData& ns,
-                                                          Entry* entry ) {
-        NamespaceDetails* details = _namespaceIndex.details( ns );
-        invariant( details );
+    void MMAPV1DatabaseCatalogEntry::_insertInCache_inlock(OperationContext* txn,
+                                                         const StringData& ns,
+                                                         Entry* entry) {
+        txn->recoveryUnit()->registerChange(new EntryInsertion(ns, this));
+        NamespaceDetails* details = _namespaceIndex.details(ns);
+        invariant(details);
 
         entry->catalogEntry.reset( new NamespaceDetailsCollectionCatalogEntry( ns,
                                                                                details,
@@ -678,7 +736,7 @@ namespace mongo {
             Entry*& entry = _collections[ns];
             if ( !entry ) {
                 entry = new Entry();
-                _fillInEntry_inlock( txn, ns, entry );
+                _insertInCache_inlock(txn, ns, entry);
             }
             rs = entry->recordStore.get();
         }
@@ -812,5 +870,4 @@ namespace mongo {
 
         return CollectionOptions();
     }
-
-}
+} // namespace mongo
