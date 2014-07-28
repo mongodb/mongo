@@ -40,6 +40,11 @@ namespace repl {
     ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock() {}
     ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
 
+    void ReplicationCoordinatorExternalStateMock::runSyncSourceFeedback() {}
+    void ReplicationCoordinatorExternalStateMock::shutdown() {}
+    void ReplicationCoordinatorExternalStateMock::forwardSlaveHandshake() {}
+    void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}
+
     OID ReplicationCoordinatorExternalStateMock::ensureMe() {
         return OID::gen();
     }

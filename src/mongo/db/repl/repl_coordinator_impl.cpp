@@ -115,6 +115,9 @@ namespace repl {
         _replExecutor.reset(new ReplicationExecutor(network));
         _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                                  _replExecutor.get())));
+        _syncSourceFeedbackThread.reset(new boost::thread(
+                stdx::bind(&ReplicationCoordinatorExternalState::runSyncSourceFeedback,
+                           _externalState.get())));
     }
 
     void ReplicationCoordinatorImpl::shutdown() {
@@ -140,6 +143,8 @@ namespace repl {
 
         _replExecutor->shutdown();
         _topCoordDriverThread->join(); // must happen outside _mutex
+        _externalState->shutdown();
+        _syncSourceFeedbackThread->join();
     }
 
     ReplSettings& ReplicationCoordinatorImpl::getSettings() {
@@ -147,6 +152,11 @@ namespace repl {
     }
 
     ReplicationCoordinator::Mode ReplicationCoordinatorImpl::getReplicationMode() const {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        return _getReplicationMode_inlock();
+    }
+
+    ReplicationCoordinator::Mode ReplicationCoordinatorImpl::_getReplicationMode_inlock() const {
         // TODO(spencer): This should be checking if you have a config
         if (_settings.usingReplSets()) {
             return modeReplSet;
@@ -158,22 +168,24 @@ namespace repl {
     }
 
     void ReplicationCoordinatorImpl::setCurrentMemberState(const MemberState& newState) {
-        invariant(getReplicationMode() == modeReplSet);
+        invariant(_settings.usingReplSets());
         boost::lock_guard<boost::mutex> lk(_mutex);
         _currentState = newState;
     }
 
     MemberState ReplicationCoordinatorImpl::getCurrentMemberState() const {
-        invariant(getReplicationMode() == modeReplSet);
         boost::lock_guard<boost::mutex> lk(_mutex);
+        return _getCurrentMemberState_inlock();
+    }
+
+    MemberState ReplicationCoordinatorImpl::_getCurrentMemberState_inlock() const {
+        invariant(_settings.usingReplSets());
         return _currentState;
     }
 
     Status ReplicationCoordinatorImpl::setLastOptime(OperationContext* txn,
                                                      const OID& rid,
                                                      const OpTime& ts) {
-        // TODO(spencer): update slave tracking thread for local.slaves
-        // TODO(spencer): pass info upstream if we're not primary
         boost::lock_guard<boost::mutex> lk(_mutex);
 
         OpTime& slaveOpTime = _slaveInfoMap[rid].opTime;
@@ -190,6 +202,12 @@ namespace repl {
                     info->condVar->notify_all();
                 }
             }
+        }
+
+        if (_getReplicationMode_inlock() == modeReplSet &&
+                !_getCurrentMemberState_inlock().primary()) {
+            // pass along if we are not primary
+            _externalState->forwardSlaveProgress();
         }
         return Status::OK();
     }
@@ -547,8 +565,6 @@ namespace repl {
             return status;
         }
 
-        // TODO(spencer): if we aren't primary, pass the handshake along
-        // _syncSourceFeedback.forwardSlaveHandshake();
         return Status::OK();
     }
 
@@ -559,7 +575,7 @@ namespace repl {
 
         boost::lock_guard<boost::mutex> lock(_mutex);
         SlaveInfo& slaveInfo = _slaveInfoMap[remoteID];
-        if (getReplicationMode() == modeReplSet) {
+        if (_getReplicationMode_inlock() == modeReplSet) {
             if (!handshake.hasField("member")) {
                 return Status(ErrorCodes::ProtocolError,
                               str::stream() << "Handshake object did not contain \"member\" field. "
@@ -574,11 +590,18 @@ namespace repl {
             }
             slaveInfo.memberID = memberID;
             slaveInfo.hostAndPort = member->getHostAndPort();
+
+            if (!_getCurrentMemberState_inlock().primary()) {
+                // pass along if we are not primary
+                _externalState->forwardSlaveHandshake();
+            }
         }
         else {
+            // master/slave
             slaveInfo.memberID = -1;
             slaveInfo.hostAndPort = _externalState->getClientHostAndPort(txn);
         }
+
         return Status::OK();
     }
 

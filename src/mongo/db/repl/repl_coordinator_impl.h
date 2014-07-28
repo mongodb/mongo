@@ -47,6 +47,8 @@
 namespace mongo {
 namespace repl {
 
+    class SyncSourceFeedback;
+
     class ReplicationCoordinatorImpl : public ReplicationCoordinator {
         MONGO_DISALLOW_COPYING(ReplicationCoordinatorImpl);
 
@@ -225,6 +227,10 @@ namespace repl {
          */
         void _startHeartbeats();
 
+        Mode _getReplicationMode_inlock() const;
+
+        MemberState _getCurrentMemberState_inlock() const;
+
         // Handles to actively queued heartbeats
         typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
         HeartbeatHandles _heartbeatHandles;
@@ -254,6 +260,9 @@ namespace repl {
 
         // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
         boost::scoped_ptr<ReplicationCoordinatorExternalState> _externalState;
+
+        // Thread that _syncSourceFeedback runs in to send replSetUpdatePosition commands upstream.
+        boost::scoped_ptr<boost::thread> _syncSourceFeedbackThread;
 
         // Thread that drives actions in the topology coordinator
         boost::scoped_ptr<boost::thread> _topCoordDriverThread;

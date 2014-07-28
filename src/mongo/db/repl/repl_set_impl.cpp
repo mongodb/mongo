@@ -40,6 +40,7 @@
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/storage/storage_engine.h"

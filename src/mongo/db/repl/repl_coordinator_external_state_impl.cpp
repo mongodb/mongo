@@ -49,6 +49,22 @@ namespace repl {
     ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl() {}
     ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
+    void ReplicationCoordinatorExternalStateImpl::runSyncSourceFeedback() {
+        _syncSourceFeedback.run();
+    }
+
+    void ReplicationCoordinatorExternalStateImpl::shutdown() {
+        _syncSourceFeedback.shutdown();
+    }
+
+    void ReplicationCoordinatorExternalStateImpl::forwardSlaveHandshake() {
+        _syncSourceFeedback.forwardSlaveHandshake();
+    }
+
+    void ReplicationCoordinatorExternalStateImpl::forwardSlaveProgress() {
+        _syncSourceFeedback.forwardSlaveProgress();
+    }
+
     OID ReplicationCoordinatorExternalStateImpl::ensureMe() {
         std::string myname = getHostName();
         OID myRID;

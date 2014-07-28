@@ -42,6 +42,10 @@ namespace repl {
     public:
         ReplicationCoordinatorExternalStateMock();
         virtual ~ReplicationCoordinatorExternalStateMock();
+        virtual void runSyncSourceFeedback();
+        virtual void shutdown();
+        virtual void forwardSlaveHandshake();
+        virtual void forwardSlaveProgress();
         virtual OID ensureMe();
         virtual bool isSelf(const HostAndPort& host);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);

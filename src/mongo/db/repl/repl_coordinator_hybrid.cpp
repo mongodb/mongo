@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_coordinator_hybrid.h"
+
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 
 namespace mongo {
@@ -268,8 +269,9 @@ namespace repl {
                                                                       const BSONArray& updates,
                                                                       BSONObjBuilder* resultObj) {
         Status legacyStatus = _legacy.processReplSetUpdatePosition(txn, updates, resultObj);
-        BSONObjBuilder implResult;
-        Status implStatus = _impl.processReplSetUpdatePosition(txn, updates, &implResult);
+        // TODO(spencer): Can't uncomment this until we uncomment processHandshake below
+        //BSONObjBuilder implResult;
+        //Status implStatus = _impl.processReplSetUpdatePosition(txn, updates, &implResult);
         return legacyStatus;
     }
 

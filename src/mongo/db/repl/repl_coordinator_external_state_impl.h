@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/repl_coordinator_external_state.h"
+#include "mongo/db/repl/sync_source_feedback.h"
 
 namespace mongo {
 namespace repl {
@@ -39,9 +40,20 @@ namespace repl {
     public:
         ReplicationCoordinatorExternalStateImpl();
         virtual ~ReplicationCoordinatorExternalStateImpl();
+        virtual void runSyncSourceFeedback();
+        virtual void shutdown();
+        virtual void forwardSlaveHandshake();
+        virtual void forwardSlaveProgress();
         virtual OID ensureMe();
         virtual bool isSelf(const HostAndPort& host);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
+
+    private:
+
+        // The SyncSourceFeedback class is responsible for sending replSetUpdatePosition commands
+        // for forwarding replication progress information upstream when there is chained
+        // replication.
+        SyncSourceFeedback _syncSourceFeedback;
     };
 
 } // namespace repl

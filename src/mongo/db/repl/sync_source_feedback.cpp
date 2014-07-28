@@ -40,7 +40,6 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/rs.h"  // theReplSet
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 
@@ -52,6 +51,12 @@ namespace repl {
 
     // used in replAuthenticate
     static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
+
+    SyncSourceFeedback::SyncSourceFeedback() : _syncTarget(NULL),
+                                               _positionChanged(false),
+                                               _handshakeNeeded(false),
+                                               _shutdownSignaled(false) {}
+    SyncSourceFeedback::~SyncSourceFeedback() {}
 
     bool SyncSourceFeedback::replAuthenticate() {
         if (!getGlobalAuthorizationManager()->isAuthEnabled())
@@ -187,6 +192,12 @@ namespace repl {
         return true;
     }
 
+    void SyncSourceFeedback::shutdown() {
+        boost::unique_lock<boost::mutex> lock(_mtx);
+        _shutdownSignaled = true;
+        _cond.notify_all();
+    }
+
     void SyncSourceFeedback::run() {
         Client::initThread("SyncSourceFeedbackThread");
         OperationContextImpl txn;
@@ -194,9 +205,16 @@ namespace repl {
         bool sleepNeeded = false;
         bool positionChanged = false;
         bool handshakeNeeded = false;
-        while (!inShutdown()) {
-            if (!theReplSet) {
-                sleepsecs(5);
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        while (!inShutdown()) { // TODO(spencer): Remove once legacy repl coordinator is gone.
+            {
+                boost::unique_lock<boost::mutex> lock(_mtx);
+                if (_shutdownSignaled) {
+                    break;
+                }
+            }
+            if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet) {
+                sleepsecs(1);
                 continue;
             }
             if (sleepNeeded) {
@@ -214,7 +232,7 @@ namespace repl {
                 _handshakeNeeded = false;
             }
 
-            MemberState state = theReplSet->state();
+            MemberState state = replCoord->getCurrentMemberState();
             if (state.primary() || state.fatal() || state.startup()) {
                 continue;
             }

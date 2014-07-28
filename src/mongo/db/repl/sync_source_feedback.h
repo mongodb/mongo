@@ -29,10 +29,12 @@
 
 #pragma once
 
-#include "mongo/db/repl/oplogreader.h"
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
+
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/util/background.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -43,14 +45,10 @@ namespace repl {
 
     class Member;
 
-    class SyncSourceFeedback : public BackgroundJob {
+    class SyncSourceFeedback {
     public:
-        SyncSourceFeedback() : BackgroundJob(false /*don't selfdelete*/),
-                              _syncTarget(NULL),
-                              _positionChanged(false),
-                              _handshakeNeeded(false) {}
-
-        ~SyncSourceFeedback() {}
+        SyncSourceFeedback();
+        ~SyncSourceFeedback();
 
         /// Ensures local.me is populated and populates it if not.
         /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
@@ -64,14 +62,17 @@ namespace repl {
         /// replication progress.
         void forwardSlaveProgress();
 
-        std::string name() const { return "SyncSourceFeedbackThread"; }
-
         /// Returns the RID for this process.  ensureMe() must have been called before this can be.
         /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
         OID getMyRID() const { return _me["_id"].OID(); }
 
-        /// Loops forever, passing updates when they are present.
+        /// Loops continuously until shutdown() is called, passing updates when they are present.
+        /// TODO(spencer): Currently also can terminate when the global inShutdown() function
+        /// returns true.  Remove that once the legacy repl coordinator is gone.
         void run();
+
+        /// Signals the run() method to terminate.
+        void shutdown();
 
     private:
         void _resetConnection() {
@@ -112,7 +113,7 @@ namespace repl {
         const Member* _syncTarget;
         // our connection to our sync target
         boost::scoped_ptr<DBClientConnection> _connection;
-        // protects cond and the indicator bools
+        // protects cond, _shutdownSignaled, and the indicator bools.
         boost::mutex _mtx;
         // used to alert our thread of changes which need to be passed up the chain
         boost::condition _cond;
@@ -120,6 +121,8 @@ namespace repl {
         bool _positionChanged;
         // used to indicate a connection change which has not yet been shook on
         bool _handshakeNeeded;
+        // Once this is set to true the _run method will terminate
+        bool _shutdownSignaled;
     };
 } // namespace repl
 } // namespace mongo

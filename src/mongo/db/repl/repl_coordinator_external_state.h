@@ -51,6 +51,32 @@ namespace repl {
         virtual ~ReplicationCoordinatorExternalState();
 
         /**
+         * Simple wrapper around SyncSourceFeedback::run().  Loops continuously until shutdown() is
+         * called.
+         */
+        virtual void runSyncSourceFeedback() = 0;
+
+        /**
+         * Performs any necessary external state specific shutdown tasks, such as signaling
+         * the SyncSourceFeedback thread to terminate.
+         */
+        virtual void shutdown() = 0;
+
+        /**
+         * Simple wrapper around SyncSourceFeedback::forwardSlaveHandshake.  Signals to the
+         * SyncSourceFeedback thread that it needs to wake up and send a replication handshake
+         * upstream.
+         */
+        virtual void forwardSlaveHandshake() = 0;
+
+        /**
+         * Simple wrapper around SyncSourceFeedback::forwardSlaveProgress.  Signals to the
+         * SyncSourceFeedback thread that it needs to wake up and send a replSetUpdatePosition
+         * command upstream.
+         */
+        virtual void forwardSlaveProgress() = 0;
+
+        /**
          * Queries the singleton document in local.me.  If it exists and our hostname has not
          * changed since we wrote, returns the RID stored in the object.  If the document does not
          * exist or our hostname doesn't match what was recorded in local.me, generates a new OID
