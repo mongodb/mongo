@@ -469,7 +469,7 @@ err:	if (ret == 0)
 		 * so that the next open is fast and keep the metadata
 		 * up to date with the checkpoint LSN and archiving.
 		 */
-		session->iface.checkpoint(session, "force=1");
+		session->iface.checkpoint(&session->iface, "force=1");
 	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);
 	WT_TRET(session->iface.close(&session->iface, NULL));
