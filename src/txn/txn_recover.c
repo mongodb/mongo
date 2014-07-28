@@ -406,7 +406,7 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	WT_DECL_RET;
 	WT_RECOVERY r;
 	WT_SESSION_IMPL *session;
-	const char *cfg[3], *config;
+	const char *config;
 	int was_backup;
 
 	conn = S2C(default_session);
@@ -463,18 +463,13 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 
 	conn->next_file_id = r.max_fileid;
 
-err:	if (ret == 0) {
+err:	if (ret == 0)
 		/*
 		 * If recovery ran successfully forcibly log a checkpoint
 		 * so that the next open is fast and keep the metadata
 		 * up to date with the checkpoint LSN and archiving.
 		 */
-		cfg[0] = WT_CONFIG_BASE(session, session_checkpoint);
-		cfg[1] = "force=1";
-		cfg[2] = NULL;
-		WT_WITH_BTREE(session, session->metafile,
-		    ret = __wt_checkpoint(session, cfg));
-	}
+		session->iface.checkpoint(session, "force=1");
 	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);
 	WT_TRET(session->iface.close(&session->iface, NULL));
