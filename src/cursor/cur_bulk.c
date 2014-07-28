@@ -68,7 +68,7 @@ __curbulk_insert_var(WT_CURSOR *cursor)
 	 * value and increment the RLE count.
 	 *
 	 * Instead of a "first time" variable, I'm using the RLE count, because
-	 * it is set to 0 exactly once, when the first row is inserted.
+	 * it is only zero before the first row is inserted.
 	 */
 	duplicate = 0;
 	if (cbulk->rle != 0) {
@@ -164,7 +164,7 @@ __curbulk_insert_row(WT_CURSOR *cursor)
 	 * to ensure the application doesn't accidentally corrupt the table.
 	 *
 	 * Instead of a "first time" variable, I'm using the RLE count, because
-	 * it is set to 0 exactly once, when the first row is inserted.
+	 * it is only zero before the first row is inserted.
 	 */
 	if (cbulk->rle != 0) {
 		WT_ERR(WT_LEX_CMP(session,
