@@ -37,7 +37,7 @@ namespace mongo {
         ~OwnedPointerMap();
 
         /** Access the map. */
-        const MapType& map() { return _map; }
+        const MapType& map() const { return _map; }
         MapType& mutableMap() { return _map; }
 
         void clear();
