@@ -31,7 +31,7 @@
 
 #pragma once
 
-#include "mongo/db/geo/geoquery.h"
+#include "mongo/db/geo/geo_query.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 

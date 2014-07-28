@@ -32,6 +32,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/exec/projection.h"
+#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/s/d_logic.h"
 
@@ -48,7 +49,14 @@ namespace mongo {
           _key(query->getQueryObj()["_id"].wrap()),
           _killed(false),
           _done(false),
-          _commonStats(kStageType) { }
+          _commonStats(kStageType) {
+        if (NULL != query->getProj()) {
+            _addKeyMetadata = query->getProj()->wantIndexKey();
+        }
+        else {
+            _addKeyMetadata = false;
+        }
+    }
 
     IDHackStage::IDHackStage(OperationContext* txn, Collection* collection,
                              const BSONObj& key, WorkingSet* ws)
@@ -58,6 +66,7 @@ namespace mongo {
           _key(key),
           _killed(false),
           _done(false),
+          _addKeyMetadata(false),
           _commonStats(kStageType) { }
 
     IDHackStage::~IDHackStage() { }
@@ -108,6 +117,13 @@ namespace mongo {
         member->obj = _collection->docFor(loc);
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
 
+        if (_addKeyMetadata) {
+            BSONObjBuilder bob;
+            BSONObj ownedKeyObj = member->obj["_id"].wrap().getOwned();
+            bob.appendKeys(_key, ownedKeyObj);
+            member->addComputed(new IndexKeyComputedData(bob.obj()));
+        }
+
         _done = true;
         ++_commonStats.advanced;
         *out = id;
@@ -118,7 +134,7 @@ namespace mongo {
         ++_commonStats.yields;
     }
 
-    void IDHackStage::recoverFromYield() {
+    void IDHackStage::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
     }
 

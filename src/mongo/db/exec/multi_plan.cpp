@@ -72,11 +72,6 @@ namespace mongo {
             // 
             // delete _candidates[_bestPlanIdx].solution; // (owned by containing runner)
 
-            if (hasBackupPlan()) {
-                delete _candidates[_backupPlanIdx].solution;
-                delete _candidates[_backupPlanIdx].root;
-            }
-
             // Clean up the losing candidates.
             clearCandidates();
         }
@@ -152,9 +147,7 @@ namespace mongo {
         }
 
         if (hasBackupPlan() && PlanStage::ADVANCED == state) {
-            QLOG() << "Best plan had a blocking sort, became unblocked, deleting backup plan\n";
-            delete _candidates[_backupPlanIdx].solution;
-            delete _candidates[_backupPlanIdx].root;
+            QLOG() << "Best plan had a blocking stage, became unblocked\n";
             _backupPlanIdx = kNoSuchPlan;
         }
 
@@ -321,7 +314,6 @@ namespace mongo {
         // Traverse candidate plans in order or score
         for (size_t ix = 0; ix < _candidates.size(); ix++) {
             if (ix == (size_t)_bestPlanIdx) { continue; }
-            if (ix == (size_t)_backupPlanIdx) { continue; }
 
             delete _candidates[ix].root;
             delete _candidates[ix].solution;
@@ -426,7 +418,7 @@ namespace mongo {
         }
     }
 
-    void MultiPlanStage::recoverFromYield() {
+    void MultiPlanStage::recoverFromYield(OperationContext* opCtx) {
         if (_failure) return;
 
         // this logic is from multi_plan_runner
@@ -434,13 +426,13 @@ namespace mongo {
         // the _bestPlan if we've switched to the backup?
 
         if (bestPlanChosen()) {
-            _candidates[_bestPlanIdx].root->recoverFromYield();
+            _candidates[_bestPlanIdx].root->recoverFromYield(opCtx);
             if (hasBackupPlan()) {
-                _candidates[_backupPlanIdx].root->recoverFromYield();
+                _candidates[_backupPlanIdx].root->recoverFromYield(opCtx);
             }
         }
         else {
-            allPlansRestoreState();
+            allPlansRestoreState(opCtx);
         }
     }
 
@@ -514,9 +506,9 @@ namespace mongo {
         }
     }
 
-    void MultiPlanStage::allPlansRestoreState() {
+    void MultiPlanStage::allPlansRestoreState(OperationContext* opCtx) {
         for (size_t i = 0; i < _candidates.size(); ++i) {
-            _candidates[i].root->recoverFromYield();
+            _candidates[i].root->recoverFromYield(opCtx);
         }
     }
 

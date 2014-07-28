@@ -967,8 +967,42 @@ DBCollection.prototype.getShardVersion = function(){
     return this._db._adminCommand( { getShardVersion : this._fullName } );
 }
 
+DBCollection.prototype._getIndexesSystemIndexes = function(){
+    var si = this.getDB().getCollection( "system.indexes" );
+    return si.find( { ns : this.getFullName() } ).toArray();
+}
+
+DBCollection.prototype._getIndexesCommand = function(){
+    var res = this.runCommand( "listIndexes" );
+
+    if ( !res.ok ) {
+
+        if ( res.code == 59 ) {
+            // command doesn't exist, old mongod
+            return null;
+        }
+
+        if ( res.code == 26 ) {
+            // NamespaceNotFound, for compatability, return []
+            return [];
+        }
+
+        if ( res.errmsg && res.errmsg.startsWith( "no such cmd" ) ) {
+            return null;
+        }
+
+        throw Error( "listIndexes failed: " + tojson( res ) );
+    }
+
+    return res.indexes;
+}
+
 DBCollection.prototype.getIndexes = function(){
-    return this.getDB().getCollection( "system.indexes" ).find( { ns : this.getFullName() } ).toArray();
+    var res = this._getIndexesCommand();
+    if ( res ) {
+        return res;
+    }
+    return this._getIndexesSystemIndexes();
 }
 
 DBCollection.prototype.getIndices = DBCollection.prototype.getIndexes;

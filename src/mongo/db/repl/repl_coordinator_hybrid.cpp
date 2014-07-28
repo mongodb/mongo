@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_coordinator_hybrid.h"
+#include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 
 namespace mongo {
 
@@ -37,7 +38,7 @@ namespace mongo {
 namespace repl {
 
     HybridReplicationCoordinator::HybridReplicationCoordinator(const ReplSettings& settings) :
-            _legacy(settings), _impl(settings) {}
+            _legacy(settings), _impl(settings, new ReplicationCoordinatorExternalStateImpl()) {}
     HybridReplicationCoordinator::~HybridReplicationCoordinator() {}
 
     void HybridReplicationCoordinator::startReplication(
@@ -88,22 +89,26 @@ namespace repl {
         return legacyStatus;
     }
 
-    Status HybridReplicationCoordinator::stepDown(bool force,
+    Status HybridReplicationCoordinator::stepDown(OperationContext* txn,
+                                                  bool force,
                                                   const Milliseconds& waitTime,
                                                   const Milliseconds& stepdownTime) {
-        Status legacyStatus = _legacy.stepDown(force, waitTime, stepdownTime);
-        Status implStatus = _impl.stepDown(force, waitTime, stepdownTime);
+        Status legacyStatus = _legacy.stepDown(txn, force, waitTime, stepdownTime);
+        Status implStatus = _impl.stepDown(txn, force, waitTime, stepdownTime);
         return legacyStatus;
     }
 
     Status HybridReplicationCoordinator::stepDownAndWaitForSecondary(
+            OperationContext* txn,
             const Milliseconds& initialWaitTime,
             const Milliseconds& stepdownTime,
             const Milliseconds& postStepdownWaitTime) {
-        Status legacyStatus = _legacy.stepDownAndWaitForSecondary(initialWaitTime,
+        Status legacyStatus = _legacy.stepDownAndWaitForSecondary(txn,
+                                                                  initialWaitTime,
                                                                   stepdownTime,
                                                                   postStepdownWaitTime);
-        Status implStatus = _impl.stepDownAndWaitForSecondary(initialWaitTime,
+        Status implStatus = _impl.stepDownAndWaitForSecondary(txn,
+                                                              initialWaitTime,
                                                               stepdownTime,
                                                               postStepdownWaitTime);
         return legacyStatus;
@@ -133,10 +138,11 @@ namespace repl {
         return legacyResponse;
     }
 
-    Status HybridReplicationCoordinator::setLastOptime(const OID& rid,
+    Status HybridReplicationCoordinator::setLastOptime(OperationContext* txn,
+                                                       const OID& rid,
                                                        const OpTime& ts) {
-        Status legacyStatus = _legacy.setLastOptime(rid, ts);
-        Status implStatus = _impl.setLastOptime(rid, ts);
+        Status legacyStatus = _legacy.setLastOptime(txn, rid, ts);
+        Status implStatus = _impl.setLastOptime(txn, rid, ts);
         return legacyStatus;
     }
     
@@ -146,16 +152,25 @@ namespace repl {
         return legacyOID;
     }
 
-    OID HybridReplicationCoordinator::getMyRID() {
-        OID legacyRID = _legacy.getMyRID();
-        _impl.getMyRID();
+    OID HybridReplicationCoordinator::getMyRID(OperationContext* txn) {
+        OID legacyRID = _legacy.getMyRID(txn);
+        _impl.getMyRID(txn);
         return legacyRID;
     }
 
-    void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommand(BSONObjBuilder* result) {
-        _legacy.prepareReplSetUpdatePositionCommand(result);
+    void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommand(OperationContext* txn,
+                                                                           BSONObjBuilder* result) {
+        _legacy.prepareReplSetUpdatePositionCommand(txn, result);
         BSONObjBuilder implResult;
-        _impl.prepareReplSetUpdatePositionCommand(&implResult);
+        _impl.prepareReplSetUpdatePositionCommand(txn, &implResult);
+    }
+
+    void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommandHandshakes(
+            OperationContext* txn,
+            std::vector<BSONObj>* handshakes) {
+        _legacy.prepareReplSetUpdatePositionCommandHandshakes(txn, handshakes);
+        std::vector<BSONObj> implResult;
+        _impl.prepareReplSetUpdatePositionCommandHandshakes(txn, &implResult);
     }
 
     void HybridReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
@@ -164,9 +179,9 @@ namespace repl {
         _impl.processReplSetGetStatus(&implResult);
     }
 
-    bool HybridReplicationCoordinator::setMaintenanceMode(bool activate) {
-        bool legacyResponse = _legacy.setMaintenanceMode(activate);
-        _impl.setMaintenanceMode(activate);
+    bool HybridReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
+        bool legacyResponse = _legacy.setMaintenanceMode(txn, activate);
+        _impl.setMaintenanceMode(txn, activate);
         return legacyResponse;
     }
 
@@ -230,11 +245,12 @@ namespace repl {
         return legacyStatus;
     }
 
-    Status HybridReplicationCoordinator::processReplSetMaintenance(bool activate,
+    Status HybridReplicationCoordinator::processReplSetMaintenance(OperationContext* txn,
+                                                                   bool activate,
                                                                    BSONObjBuilder* resultObj) {
-        Status legacyStatus = _legacy.processReplSetMaintenance(activate, resultObj);
+        Status legacyStatus = _legacy.processReplSetMaintenance(txn, activate, resultObj);
         BSONObjBuilder implResult;
-        Status implStatus = _impl.processReplSetMaintenance(activate, &implResult);
+        Status implStatus = _impl.processReplSetMaintenance(txn, activate, &implResult);
         return legacyStatus;
     }
 
@@ -246,27 +262,34 @@ namespace repl {
         return legacyStatus;
     }
 
-    Status HybridReplicationCoordinator::processReplSetUpdatePosition(const BSONArray& updates,
+    Status HybridReplicationCoordinator::processReplSetUpdatePosition(OperationContext* txn,
+                                                                      const BSONArray& updates,
                                                                       BSONObjBuilder* resultObj) {
-        Status legacyStatus = _legacy.processReplSetUpdatePosition(updates, resultObj);
+        Status legacyStatus = _legacy.processReplSetUpdatePosition(txn, updates, resultObj);
         BSONObjBuilder implResult;
-        Status implStatus = _impl.processReplSetUpdatePosition(updates, &implResult);
+        Status implStatus = _impl.processReplSetUpdatePosition(txn, updates, &implResult);
         return legacyStatus;
     }
 
     Status HybridReplicationCoordinator::processReplSetUpdatePositionHandshake(
+            const OperationContext* txn,
             const BSONObj& handshake,
             BSONObjBuilder* resultObj) {
-        Status legacyStatus = _legacy.processReplSetUpdatePositionHandshake(handshake, resultObj);
+        Status legacyStatus = _legacy.processReplSetUpdatePositionHandshake(txn,
+                                                                            handshake,
+                                                                            resultObj);
         BSONObjBuilder implResult;
-        Status implStatus = _impl.processReplSetUpdatePositionHandshake(handshake, &implResult);
+        Status implStatus = _impl.processReplSetUpdatePositionHandshake(txn,
+                                                                        handshake,
+                                                                        &implResult);
         return legacyStatus;
     }
 
-    bool HybridReplicationCoordinator::processHandshake(const OID& remoteID,
+    bool HybridReplicationCoordinator::processHandshake(const OperationContext* txn,
+                                                        const OID& remoteID,
                                                         const BSONObj& handshake) {
-        bool legacyResponse = _legacy.processHandshake(remoteID, handshake);
-        _impl.processHandshake(remoteID, handshake);
+        bool legacyResponse = _legacy.processHandshake(txn, remoteID, handshake);
+        _impl.processHandshake(txn, remoteID, handshake);
         return legacyResponse;
     }
 
@@ -292,6 +315,12 @@ namespace repl {
         Status legacyStatus = _legacy.checkIfWriteConcernCanBeSatisfied(writeConcern);
         Status implStatus = _impl.checkIfWriteConcernCanBeSatisfied(writeConcern);
         return legacyStatus;
+    }
+
+    BSONObj HybridReplicationCoordinator::getGetLastErrorDefault() {
+        BSONObj legacyGLE = _legacy.getGetLastErrorDefault();
+        BSONObj implGLE = _impl.getGetLastErrorDefault();
+        return legacyGLE;
     }
 
 } // namespace repl

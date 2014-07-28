@@ -37,7 +37,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/query/runner.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/startup_test.h"
 
@@ -276,16 +276,16 @@ namespace mongo {
     void CollectionCursorCache::invalidateAll( bool collectionGoingAway ) {
         SimpleMutex::scoped_lock lk( _mutex );
 
-        for ( RunnerSet::iterator it = _nonCachedRunners.begin();
-              it != _nonCachedRunners.end();
+        for ( ExecSet::iterator it = _nonCachedExecutors.begin();
+              it != _nonCachedExecutors.end();
               ++it ) {
 
-            // we kill the runner, but it deletes itself
-            Runner* runner = *it;
-            runner->kill();
-            invariant( runner->collection() == NULL );
+            // we kill the executor, but it deletes itself
+            PlanExecutor* exec = *it;
+            exec->kill();
+            invariant( exec->collection() == NULL );
         }
-        _nonCachedRunners.clear();
+        _nonCachedExecutors.clear();
 
         if ( collectionGoingAway ) {
             // we're going to wipe out the world
@@ -294,7 +294,7 @@ namespace mongo {
 
                 cc->kill();
 
-                invariant( cc->getRunner() == NULL || cc->getRunner()->collection() == NULL );
+                invariant( cc->getExecutor() == NULL || cc->getExecutor()->collection() == NULL );
 
                 // If there is a pinValue >= 100, somebody is actively using the CC and we do
                 // not delete it.  Instead we notify the holder that we killed it.  The holder
@@ -310,7 +310,7 @@ namespace mongo {
         else {
             CursorMap newMap;
 
-            // collection will still be around, just all Runners are invalid
+            // collection will still be around, just all PlanExecutors are invalid
             for ( CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i ) {
                 ClientCursor* cc = i->second;
 
@@ -320,10 +320,10 @@ namespace mongo {
                     continue;
                 }
 
-                // Note that a valid ClientCursor state is "no cursor no runner."  This is because
+                // Note that a valid ClientCursor state is "no cursor no executor."  This is because
                 // the set of active cursor IDs in ClientCursor is used as representation of query
                 // state.  See sharding_block.h.  TODO(greg,hk): Move this out.
-                if (NULL == cc->getRunner() ) {
+                if (NULL == cc->getExecutor() ) {
                     newMap.insert( *i );
                     continue;
                 }
@@ -334,9 +334,9 @@ namespace mongo {
                 }
                 else {
                     // this is pinned, so still alive, so we leave around
-                    // we kill the Runner to signal
-                    if ( cc->getRunner() )
-                        cc->getRunner()->kill();
+                    // we kill the PlanExecutor to signal
+                    if ( cc->getExecutor() )
+                        cc->getExecutor()->kill();
                     newMap.insert( *i );
                 }
 
@@ -350,18 +350,18 @@ namespace mongo {
                                                     InvalidationType type ) {
         SimpleMutex::scoped_lock lk( _mutex );
 
-        for ( RunnerSet::iterator it = _nonCachedRunners.begin();
-              it != _nonCachedRunners.end();
+        for ( ExecSet::iterator it = _nonCachedExecutors.begin();
+              it != _nonCachedExecutors.end();
               ++it ) {
 
-            Runner* runner = *it;
-            runner->invalidate(dl, type);
+            PlanExecutor* exec = *it;
+            exec->invalidate(dl, type);
         }
 
         for ( CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i ) {
-            Runner* runner = i->second->getRunner();
-            if ( runner ) {
-                runner->invalidate(dl, type);
+            PlanExecutor* exec = i->second->getExecutor();
+            if ( exec ) {
+                exec->invalidate(dl, type);
             }
         }
     }
@@ -387,18 +387,18 @@ namespace mongo {
         return toDelete.size();
     }
 
-    void CollectionCursorCache::registerRunner( Runner* runner ) {
+    void CollectionCursorCache::registerExecutor( PlanExecutor* exec ) {
         if (!useExperimentalDocLocking) {
             SimpleMutex::scoped_lock lk(_mutex);
-            const std::pair<RunnerSet::iterator, bool> result = _nonCachedRunners.insert(runner);
+            const std::pair<ExecSet::iterator, bool> result = _nonCachedExecutors.insert(exec);
             invariant(result.second); // make sure this was inserted
         }
     }
 
-    void CollectionCursorCache::deregisterRunner( Runner* runner ) {
+    void CollectionCursorCache::deregisterExecutor( PlanExecutor* exec ) {
         if (!useExperimentalDocLocking) {
             SimpleMutex::scoped_lock lk(_mutex);
-            _nonCachedRunners.erase(runner);
+            _nonCachedExecutors.erase(exec);
         }
     }
 

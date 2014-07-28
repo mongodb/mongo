@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,60 +28,20 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
-#include <string>
-
-#include "mongo/base/status.h"
-#include "mongo/db/query/runner.h"
-
 namespace mongo {
 
-    class BSONObj;
-    class CanonicalQuery;
-    class DiskLoc;
-    class TypeExplain;
-    struct PlanInfo;
+    //
+    // Geo Query knobs
+    //
 
     /**
-     * EOFRunner is EOF immediately and doesn't do anything except return EOF and possibly die
-     * during a yield.
+     * The maximum number of cells to use for 2D geo query covering for predicate queries
      */
-    class EOFRunner : public Runner {
-    public:
+    extern int internalGeoPredicateQuery2DMaxCoveringCells;
 
-        /* Takes ownership */
-        EOFRunner(CanonicalQuery* cq, const std::string& ns);
-
-        virtual ~EOFRunner();
-
-        virtual Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut);
-
-        virtual bool isEOF();
-
-        virtual void saveState();
-
-        virtual bool restoreState(OperationContext* opCtx);
-
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
-
-        virtual const std::string& ns();
-
-        virtual void kill();
-
-        // this can return NULL since we never yield or anything over it
-        virtual const Collection* collection() { return NULL; }
-
-        /**
-         * Always returns OK, allocating and filling in '*explain' with a fake ("zeroed")
-         * collection scan plan. Fills in '*planInfo' with information indicating an
-         * EOF runner. Caller owns '*explain', though.
-         */
-        virtual Status getInfo(TypeExplain** explain,
-                               PlanInfo** planInfo) const;
-
-    private:
-        boost::scoped_ptr<CanonicalQuery> _cq;
-        std::string _ns;
-    };
+    /**
+     * The maximum number of cells to use for 2D geo query covering for predicate queries
+     */
+    extern int internalGeoNearQuery2DMaxCoveringCells;
 
 }  // namespace mongo

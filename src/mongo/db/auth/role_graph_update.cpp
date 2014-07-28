@@ -60,7 +60,7 @@ namespace {
         if (!status.isOK())
             return status;
         status = bsonExtractTypedField(
-                doc, AuthorizationManager::ROLE_SOURCE_FIELD_NAME, String, &sourceElement);
+                doc, AuthorizationManager::ROLE_DB_FIELD_NAME, String, &sourceElement);
         if (!status.isOK())
             return status;
         *name = RoleName(nameElement.valueStringData(), sourceElement.valueStringData());

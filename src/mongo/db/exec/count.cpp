@@ -152,7 +152,7 @@ namespace mongo {
         _endCursor->savePosition();
     }
 
-    void Count::recoverFromYield() {
+    void Count::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
         if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
 

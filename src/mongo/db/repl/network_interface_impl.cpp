@@ -32,7 +32,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/lockstate.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -97,8 +97,10 @@ namespace repl {
     void NetworkInterfaceImpl::runCallbackWithGlobalExclusiveLock(
             const stdx::function<void ()>& callback) {
 
-        LockState lockState;
-        Lock::GlobalWrite lk(&lockState);
+        OperationContextImpl txn;
+        Lock::GlobalWrite lk(txn.lockState());
+
+        // TODO: OperationContext will have to be given to callback
         callback();
     }
 

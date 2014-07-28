@@ -26,12 +26,11 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
-
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/heartbeat_info.h"
@@ -61,7 +60,8 @@ namespace {
      */
     bool replHasDatabases(OperationContext* txn) {
         vector<string> names;
-        globalStorageEngine->listDatabases( &names );
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases(&names);
 
         if( names.size() >= 2 ) return true;
         if( names.size() == 1 ) {

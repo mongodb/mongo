@@ -217,14 +217,9 @@ if (numDocs != num) {
 }
 
 
-//SERVER-4031
-/*
-s.s.setSlaveOk();
-
 // We're only sure we aren't duplicating documents iff there's no balancing going on here
 // This call also waits for any ongoing balancing to stop
-s.stopBalancer()
-*/
+s.stopBalancer(60000);
 
 var cursor = s.getDB("test").foo.find({x:{$lt : 500}});
 
@@ -238,7 +233,8 @@ assert.eq(count, 500);
 
 logout(adminUser);
 
-d2.waitForState( d2.getSecondaries(), d2.SECONDARY, 5 * 60 * 1000 )
+d1.waitForState( d1.getSecondaries(), d1.SECONDARY, 5 * 60 * 1000 );
+d2.waitForState( d2.getSecondaries(), d2.SECONDARY, 5 * 60 * 1000 );
 
 // add admin on shard itself, hack to prevent localhost auth bypass
 d1.getMaster().getDB(adminUser.db).createUser({user: adminUser.username,

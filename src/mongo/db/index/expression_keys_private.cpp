@@ -32,8 +32,8 @@
 
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/geo/geoconstants.h"
+#include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/geoparser.h"
-#include "mongo/db/geo/geoquery.h"
 #include "mongo/db/geo/s2common.h"
 #include "mongo/db/geo/s2.h"
 #include "mongo/db/index_names.h"
@@ -97,10 +97,14 @@ namespace {
             return false;
         }
 
-        if (!geoContainer.hasS2Region()) { return false; }
+        // Project the geometry into spherical space
+        if (!geoContainer.supportsProject(SPHERE))
+            return false;
+        geoContainer.projectInto(SPHERE);
+
+        invariant(geoContainer.hasS2Region());
 
         S2KeysFromRegion(&coverer, geoContainer.getS2Region(), out);
-
         return true;
     }
 

@@ -39,6 +39,8 @@ namespace repl {
 
     void TopologyCoordinatorMock::setLastReceived(const OpTime& optime) {}
 
+    void TopologyCoordinatorMock::setForceSyncSourceIndex(int index) {}
+
     HostAndPort TopologyCoordinatorMock::getSyncSourceAddress() const {
         return HostAndPort();
     }
@@ -82,12 +84,16 @@ namespace repl {
                                                         BSONObjBuilder& result) {
     }
 
-    HeartbeatResultAction TopologyCoordinatorMock::updateHeartbeatInfo(Date_t now,
-                                                                   const HeartbeatInfo& newInfo) {
+    HeartbeatResultAction 
+    TopologyCoordinatorMock::updateHeartbeatData(Date_t now,
+                                                 const MemberHeartbeatData& newInfo,
+                                                 int id) {
         return None;
     }
 
-    void TopologyCoordinatorMock::updateConfig(const ReplicaSetConfig newConfig, const int selfId) {
+    void TopologyCoordinatorMock::updateConfig(const ReplicaSetConfig& newConfig,
+                                               int selfIndex,
+                                               Date_t now) {
     }
 
 } // namespace repl

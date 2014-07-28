@@ -87,7 +87,7 @@ namespace QueryStageTests {
                                 ctx.ctx().db()->getCollection(&_txn, ns()));
 
             int count = 0;
-            for (DiskLoc dl; Runner::RUNNER_ADVANCED == runner.getNext(NULL, &dl); ) {
+            for (DiskLoc dl; PlanExecutor::ADVANCED == runner.getNext(NULL, &dl); ) {
                 ++count;
             }
 

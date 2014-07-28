@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"  // theReplSet
@@ -51,15 +52,6 @@ namespace repl {
 
     // used in replAuthenticate
     static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
-
-    void SyncSourceFeedback::associateMember(const OID& rid, Member* member) {
-        invariant(member);
-        LOG(2) << "Associating RID " << rid << " with member: " << member->fullName();
-        boost::unique_lock<boost::mutex> lock(_mtx);
-        _handshakeNeeded = true;
-        _members[rid] = member;
-        _cond.notify_all();
-    }
 
     bool SyncSourceFeedback::replAuthenticate() {
         if (!getGlobalAuthorizationManager()->isAuthEnabled())
@@ -96,37 +88,12 @@ namespace repl {
         }
     }
 
-    bool SyncSourceFeedback::replHandshake() {
+    bool SyncSourceFeedback::replHandshake(OperationContext* txn) {
         // construct a vector of handshake obj for us as well as all chained members
         std::vector<BSONObj> handshakeObjs;
-        {
-            boost::unique_lock<boost::mutex> lock(_mtx);
-            // handshake obj for us
-            BSONObjBuilder cmd;
-            cmd.append("replSetUpdatePosition", 1);
-            BSONObjBuilder sub (cmd.subobjStart("handshake"));
-            sub.appendAs(_me["_id"], "handshake");
-            sub.append("member", theReplSet->selfId());
-            sub.append("config", theReplSet->myConfig().asBson());
-            sub.doneFast();
-            handshakeObjs.push_back(cmd.obj());
-
-            // handshake objs for all chained members
-            for (OIDMemberMap::iterator itr = _members.begin();
-                 itr != _members.end(); ++itr) {
-                BSONObjBuilder cmd;
-                cmd.append("replSetUpdatePosition", 1);
-                // outer handshake indicates this is a handshake command
-                // inner is needed as part of the structure to be passed to gotHandshake
-                BSONObjBuilder subCmd (cmd.subobjStart("handshake"));
-                subCmd.append("handshake", itr->first);
-                subCmd.append("member", itr->second->id());
-                subCmd.append("config", itr->second->config().asBson());
-                subCmd.doneFast();
-                handshakeObjs.push_back(cmd.obj());
-            }
-        }
-
+        getGlobalReplicationCoordinator()->prepareReplSetUpdatePositionCommandHandshakes(
+                txn,
+                &handshakeObjs);
         LOG(1) << "handshaking upstream updater";
         for (std::vector<BSONObj>::iterator it = handshakeObjs.begin();
                 it != handshakeObjs.end();
@@ -155,7 +122,7 @@ namespace repl {
         return true;
     }
 
-    bool SyncSourceFeedback::_connect(const std::string& hostName) {
+    bool SyncSourceFeedback::_connect(OperationContext* txn, const std::string& hostName) {
         if (hasConnection()) {
             return true;
         }
@@ -169,7 +136,7 @@ namespace repl {
             return false;
         }
 
-        replHandshake();
+        replHandshake(txn);
         return hasConnection();
     }
 
@@ -185,7 +152,7 @@ namespace repl {
         _cond.notify_all();
     }
 
-    bool SyncSourceFeedback::updateUpstream() {
+    bool SyncSourceFeedback::updateUpstream(OperationContext* txn) {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         if (replCoord->getCurrentMemberState().primary()) {
             // primary has no one to update to
@@ -198,7 +165,7 @@ namespace repl {
                 // Don't send updates if there are nodes that haven't yet been handshaked
                 return false;
             }
-            replCoord->prepareReplSetUpdatePositionCommand(&cmd);
+            replCoord->prepareReplSetUpdatePositionCommand(txn, &cmd);
         }
         BSONObj res;
 
@@ -222,6 +189,8 @@ namespace repl {
 
     void SyncSourceFeedback::run() {
         Client::initThread("SyncSourceFeedbackThread");
+        OperationContextImpl txn;
+
         bool sleepNeeded = false;
         bool positionChanged = false;
         bool handshakeNeeded = false;
@@ -260,20 +229,20 @@ namespace repl {
                     sleepNeeded = true;
                     continue;
                 }
-                if (!_connect(target->fullName())) {
+                if (!_connect(&txn, target->fullName())) {
                     sleepNeeded = true;
                     continue;
                 }
             }
             if (handshakeNeeded) {
-                if (!replHandshake()) {
+                if (!replHandshake(&txn)) {
                     boost::unique_lock<boost::mutex> lock(_mtx);
                     _handshakeNeeded = true;
                     continue;
                 }
             }
             if (positionChanged) {
-                if (!updateUpstream()) {
+                if (!updateUpstream(&txn)) {
                     boost::unique_lock<boost::mutex> lock(_mtx);
                     _positionChanged = true;
                 }

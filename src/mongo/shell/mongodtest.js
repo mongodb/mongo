@@ -42,7 +42,6 @@ startMongodTest = function (port, dirname, restart, extraOptions) {
         if (!options["sslCAFile"])
             options["sslCAFile"] = "jstests/libs/ca.pem";
         options["sslWeakCertificateValidation"] = "";
-        options["sslAllowInvalidCertificates"] = "";
     }
     if (jsTestOptions().useX509 && !options["clusterAuthMode"])
         options["clusterAuthMode"] = "x509";

@@ -89,9 +89,9 @@ namespace mongo {
         _child->prepareToYield();
     }
 
-    void ShardFilterStage::recoverFromYield() {
+    void ShardFilterStage::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        _child->recoverFromYield();
+        _child->recoverFromYield(opCtx);
     }
 
     void ShardFilterStage::invalidate(const DiskLoc& dl, InvalidationType type) {

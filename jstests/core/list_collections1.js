@@ -20,10 +20,4 @@ assert.eq( foo.name, mydb.foo.getName() );
 
 assert( mydb.bar.temp, tojson( bar ) );
 
-assert.eq( mydb._getCollectionNamesSystemNamespaces(),
-           mydb._getCollectionNamesCommand() );
-
-assert.eq( mydb.getCollectionNames(),
-           mydb._getCollectionNamesCommand() );
-
 mydb.dropDatabase();

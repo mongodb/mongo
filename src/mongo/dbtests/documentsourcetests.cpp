@@ -38,7 +38,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
@@ -172,27 +172,28 @@ namespace DocumentSourceTests {
                 // clean up first if this was called before
                 _source.reset();
                 _registration.reset();
-                _runner.reset();
+                _exec.reset();
 
                 Client::WriteContext ctx(&_opCtx, ns);
                 CanonicalQuery* cq;
                 uassertStatusOK(CanonicalQuery::canonicalize(ns, /*query=*/BSONObj(), &cq));
-                Runner* runnerBare;
-                uassertStatusOK(getRunner(&_opCtx, ctx.ctx().db()->getCollection(&_opCtx, ns), cq, &runnerBare));
+                PlanExecutor* execBare;
+                uassertStatusOK(getExecutor(&_opCtx, ctx.ctx().db()->getCollection(&_opCtx, ns),
+                                            cq, &execBare));
 
-                _runner.reset(runnerBare);
-                _runner->saveState();
-                _registration.reset(new ScopedRunnerRegistration(_runner.get()));
+                _exec.reset(execBare);
+                _exec->saveState();
+                _registration.reset(new ScopedExecutorRegistration(_exec.get()));
 
-                _source = DocumentSourceCursor::create(ns, _runner, _ctx);
+                _source = DocumentSourceCursor::create(ns, _exec, _ctx);
             }
             intrusive_ptr<ExpressionContext> ctx() { return _ctx; }
             DocumentSourceCursor* source() { return _source.get(); }
 
         private:
             // It is important that these are ordered to ensure correct destruction order.
-            boost::shared_ptr<Runner> _runner;
-            boost::scoped_ptr<ScopedRunnerRegistration> _registration;
+            boost::shared_ptr<PlanExecutor> _exec;
+            boost::scoped_ptr<ScopedExecutorRegistration> _registration;
             intrusive_ptr<ExpressionContext> _ctx;
             intrusive_ptr<DocumentSourceCursor> _source;
         };

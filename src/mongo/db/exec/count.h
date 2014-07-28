@@ -63,7 +63,7 @@ namespace mongo {
      * any WorkingSetMember(s) for any of the data, instead returning ADVANCED to indicate to the
      * caller that another result should be counted.
      *
-     * Only created through the getRunnerCount path, as count is the only operation that doesn't
+     * Only created through the getExecutorCount path, as count is the only operation that doesn't
      * care about its data.
      */
     class Count : public PlanStage {
@@ -74,7 +74,7 @@ namespace mongo {
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
         virtual void prepareToYield();
-        virtual void recoverFromYield();
+        virtual void recoverFromYield(OperationContext* opCtx);
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;

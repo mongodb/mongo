@@ -31,10 +31,10 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
-#include "mongo/db/query/eof_runner.h"
-#include "mongo/db/query/internal_runner.h"
+#include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
 
@@ -64,13 +64,16 @@ namespace mongo {
         /**
          * Return a collection scan.  Caller owns pointer.
          */
-        static Runner* collectionScan(OperationContext* txn,
-                                      const StringData& ns,
-                                      Collection* collection,
-                                      const Direction direction = FORWARD,
-                                      const DiskLoc startLoc = DiskLoc()) {
+        static PlanExecutor* collectionScan(OperationContext* txn,
+                                            const StringData& ns,
+                                            Collection* collection,
+                                            const Direction direction = FORWARD,
+                                            const DiskLoc startLoc = DiskLoc()) {
+            WorkingSet* ws = new WorkingSet();
+
             if (NULL == collection) {
-                return new EOFRunner(NULL, ns.toString());
+                EOFStage* eof = new EOFStage();
+                return new PlanExecutor(ws, eof, ns.toString());
             }
 
             dassert( ns == collection->ns().ns() );
@@ -86,20 +89,22 @@ namespace mongo {
                 params.direction = CollectionScanParams::BACKWARD;
             }
 
-            WorkingSet* ws = new WorkingSet();
             CollectionScan* cs = new CollectionScan(txn, params, ws, NULL);
-            return new InternalRunner(collection, cs, ws);
+            PlanExecutor* exec = new PlanExecutor(ws, cs, collection);
+            // 'exec' will be registered until it is destroyed.
+            exec->registerExecInternalPlan();
+            return exec;
         }
 
         /**
          * Return an index scan.  Caller owns returned pointer.
          */
-        static Runner* indexScan(OperationContext* txn,
-                                 const Collection* collection,
-                                 const IndexDescriptor* descriptor,
-                                 const BSONObj& startKey, const BSONObj& endKey,
-                                 bool endKeyInclusive, Direction direction = FORWARD,
-                                 int options = 0) {
+        static PlanExecutor* indexScan(OperationContext* txn,
+                                       const Collection* collection,
+                                       const IndexDescriptor* descriptor,
+                                       const BSONObj& startKey, const BSONObj& endKey,
+                                       bool endKeyInclusive, Direction direction = FORWARD,
+                                       int options = 0) {
             invariant(collection);
             invariant(descriptor);
 
@@ -114,13 +119,16 @@ namespace mongo {
             WorkingSet* ws = new WorkingSet();
             IndexScan* ix = new IndexScan(txn, params, ws, NULL);
 
+            PlanStage* root = ix;
+
             if (IXSCAN_FETCH & options) {
-                return new InternalRunner(
-                    collection, new FetchStage(ws, ix, NULL, collection), ws);
+                root = new FetchStage(ws, root, NULL, collection);
             }
-            else {
-                return new InternalRunner(collection, ix, ws);
-            }
+
+            PlanExecutor* exec = new PlanExecutor(ws, root, collection);
+            // 'exec' will be registered until it is destroyed.
+            exec->registerExecInternalPlan();
+            return exec;
         }
     };
 

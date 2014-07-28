@@ -51,7 +51,7 @@ namespace mongo {
 
     AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() {}
 
-    Status AuthzManagerExternalStateMongos::initialize() {
+    Status AuthzManagerExternalStateMongos::initialize(OperationContext* txn) {
         return Status::OK();
     }
 
@@ -132,7 +132,7 @@ namespace mongo {
                     BSON("rolesInfo" <<
                          BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
                                          roleName.getRole() <<
-                                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                         AuthorizationManager::ROLE_DB_FIELD_NAME <<
                                          roleName.getDB())) <<
                          "showPrivileges" << showPrivileges),
                     cmdResult);
@@ -212,6 +212,7 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::query(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& queryDoc,
             const BSONObj& projection,

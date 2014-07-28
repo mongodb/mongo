@@ -88,9 +88,9 @@ namespace mongo {
         _child->prepareToYield();
     }
 
-    void LimitStage::recoverFromYield() {
+    void LimitStage::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        _child->recoverFromYield();
+        _child->recoverFromYield(opCtx);
     }
 
     void LimitStage::invalidate(const DiskLoc& dl, InvalidationType type) {

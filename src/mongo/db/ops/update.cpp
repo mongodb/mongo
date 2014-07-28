@@ -466,6 +466,9 @@ namespace mongo {
         // Create the plan executor and setup all deps.
         auto_ptr<PlanExecutor> exec(rawExec);
 
+        // Register executor with the collection cursor cache.
+        const ScopedExecutorRegistration safety(exec.get());
+
         // Get the canonical query which the underlying executor is using. This may be NULL in
         // the case of idhack updates.
         cq = exec->getCanonicalQuery();
@@ -514,7 +517,7 @@ namespace mongo {
         BSONObj oldObj;
 
         // Get first doc, and location
-        Runner::RunnerState state = Runner::RUNNER_ADVANCED;
+        PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
 
         uassert(ErrorCodes::NotMaster,
                 mongoutils::str::stream() << "Not primary while updating " << nsString.ns(),
@@ -527,15 +530,15 @@ namespace mongo {
             DiskLoc loc;
             state = exec->getNext(&oldObj, &loc);
 
-            if (state != Runner::RUNNER_ADVANCED) {
-                if (state == Runner::RUNNER_EOF) {
+            if (state != PlanExecutor::ADVANCED) {
+                if (state == PlanExecutor::IS_EOF) {
                     // We have reached the logical end of the loop, so do yielding recovery
                     break;
                 }
                 else {
                     uassertStatusOK(Status(ErrorCodes::InternalError,
                                            str::stream() << " Update query failed -- "
-                                                         << Runner::statestr(state)));
+                                                         << PlanExecutor::statestr(state)));
                 }
             }
 
@@ -667,7 +670,7 @@ namespace mongo {
             // Restore state after modification
             uassert(17278,
                     "Update could not restore plan executor state after updating a document.",
-                    exec->restoreState());
+                    exec->restoreState(request.getOpCtx()));
 
             // Call logOp if requested.
             if (request.shouldCallLogOp() && !logObj.isEmpty()) {

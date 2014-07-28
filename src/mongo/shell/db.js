@@ -893,98 +893,6 @@ function getUserObjString(userObj) {
     return toreturn;
 }
 
-/**
- * Used for creating users in systems with v1 style user information (ie MongoDB v2.4 and prior)
- */
-DB.prototype._addUserWithInsert = function(userObj, replicatedTo, timeout) {
-    var c = this.getCollection( "system.users" );
-    userObj = Object.extend({}, userObj); // Prevent modifications to userObj from getting to caller
-    if (userObj.pwd != null) {
-        userObj.pwd = _hashPassword(userObj.user, userObj.pwd);
-    }
-
-    try {
-        c.save(userObj);
-    } catch (e) {
-        // SyncClusterConnections call GLE automatically after every write and will throw an
-        // exception if the insert failed.
-        if ( tojson(e).indexOf( "login" ) >= 0 ){
-            // TODO: this check is a hack
-            print( "Creating user seems to have succeeded but threw an exception because we no " +
-                   "longer have auth." );
-        } else {
-            throw Error( "Could not insert into system.users: " + tojson(e) );
-        }
-    }
-    print("Successfully added user: " + getUserObjString(userObj));
-
-    //
-    // When saving users to replica sets, the shell user will want to know if the user hasn't
-    // been fully replicated everywhere, since this will impact security.  By default, replicate to
-    // majority of nodes with wtimeout 15 secs, though user can override
-    //
-    
-    replicatedTo = replicatedTo != undefined && replicatedTo != null ? replicatedTo : "majority"
-    
-    // in mongod version 2.1.0-, this worked
-    var le = {};
-    try {        
-        le = this.getLastErrorObj( replicatedTo, timeout || 30 * 1000 );
-        // printjson( le )
-    }
-    catch (e) {
-        errjson = tojson(e);
-        if ( errjson.indexOf( "login" ) >= 0 || errjson.indexOf( "unauthorized" ) >= 0 ) {
-            // TODO: this check is a hack
-            print( "addUser succeeded, but cannot wait for replication since we no longer have auth" );
-            return "";
-        }
-        print( "could not find getLastError object : " + tojson( e ) )
-    }
-
-    if (!le.err) {
-        return;
-    }
-
-    // We can't detect replica set shards via mongos, so we'll sometimes get this error
-    // In this case though, we've already checked the local error before returning norepl, so
-    // the user has been written and we're happy
-    if (le.err == "norepl" || le.err == "noreplset") {
-        // nothing we can do
-        return;
-    }
-
-    if (le.err == "timeout") {
-        throw Error( "timed out while waiting for user authentication to replicate - " +
-              "database will not be fully secured until replication finishes" )
-    }
-
-    if (le.err.startsWith("E11000 duplicate key error")) {
-        throw Error("User already exists with that username/userSource combination");
-    }
-
-    throw Error( "couldn't add user: " + le.err );
-}
-
-/**
- * Helper method to convert "replicatedTo" and "timeout" fields into a writeConcern object
- */
-DB.prototype._getWriteConcern = function(replicatedTo, timeout) {
-    return { w: replicatedTo != null ? replicatedTo : _defaultWriteConcern.w,
-             wtimeout: timeout || _defaultWriteConcern.wtimeout };
-}
-
-DB.prototype._addUser = function(userObj, replicatedTo, timeout) {
-    if (typeof replicatedTo == "object") {
-        throw Error("Cannot provide write concern object to addUser shell helper, " +
-                    "use createUser instead");
-    }
-    var commandExisted = this._createUser(userObj, this._getWriteConcern(replicatedTo, timeout));
-    if (!commandExisted) {
-        this._addUserWithInsert(userObj, replicatedTo, timeout);
-    }
-}
-
 DB.prototype._modifyCommandToDigestPasswordIfNecessary = function(cmdObj, username) {
     if (!cmdObj["pwd"]) {
         return;
@@ -1006,9 +914,7 @@ DB.prototype._modifyCommandToDigestPasswordIfNecessary = function(cmdObj, userna
     delete cmdObj["passwordDigestor"];
 }
 
-// Returns true if it worked, false if the createUser command wasn't found, and throws on all other
-// failures
-DB.prototype._createUser = function(userObj, writeConcern) {
+DB.prototype.createUser = function(userObj, writeConcern) {
     var name = userObj["user"];
     var cmdObj = {createUser:name};
     cmdObj = Object.extend(cmdObj, userObj);
@@ -1022,11 +928,12 @@ DB.prototype._createUser = function(userObj, writeConcern) {
 
     if (res.ok) {
         print("Successfully added user: " + getUserObjString(userObj));
-        return true;
+        return;
     }
 
     if (res.errmsg == "no such cmd: createUser") {
-        return false;
+        throw Error("'createUser' command not found.  This is most likely because you are " +
+                    "talking to an old (pre v2.6) MongoDB server");
     }
 
     if (res.errmsg == "timeout") {
@@ -1045,60 +952,6 @@ function _hashPassword(username, password) {
     return hex_md5(username + ":mongo:" + password);
 }
 
-// We need to continue to support the addUser(username, password, readOnly) form of addUser for at
-// least one release, even though its behavior of creating a super-user by default is bad.
-// TODO(spencer): remove this form from v2.8
-DB.prototype._addUserDeprecatedV22Version = function(username, pass, readOnly, replicatedTo, timeout) {
-    if ( pass == null || pass.length == 0 )
-        throw Error("password can't be empty");
-
-    var userObjForCommand = { user: username, pwd: pass };
-    if (this.getName() == "admin") {
-        if (readOnly) {
-            userObjForCommand["roles"] = ['readAnyDatabase'];
-        } else {
-            userObjForCommand["roles"] = ['root'];
-        }
-    } else {
-        if (readOnly) {
-            userObjForCommand["roles"] = ['read'];
-        } else {
-            userObjForCommand["roles"] = ['dbOwner'];
-        }
-    }
-
-    var commandExisted = this._createUser(userObjForCommand,
-                                          this._getWriteConcern(replicatedTo, timeout));
-    if (!commandExisted) {
-        var userObjForInsert = { user: username, pwd: pass, readOnly: readOnly || false };
-        this._addUserWithInsert(userObjForInsert, replicatedTo, timeout);
-    }
-}
-
-/**
- * TODO(spencer): Remove this from 2.8, in favor of "createUser"
- */
-DB.prototype.addUser = function() {
-    print("WARNING: The 'addUser' shell helper is DEPRECATED. Please use 'createUser' instead");
-
-    if (arguments.length == 0) {
-        throw Error("No arguments provided to addUser");
-    }
-
-    if (typeof arguments[0] == "object") {
-        this._addUser.apply(this, arguments);
-    } else {
-        this._addUserDeprecatedV22Version.apply(this, arguments);
-    }
-}
-
-DB.prototype.createUser = function(userObj, writeConcern) {
-    var commandExisted = this._createUser(userObj, writeConcern);
-    if (!commandExisted) {
-        throw Error("'createUser' command not found.  This is most likely because you are " +
-                    "talking to an old (pre v2.6) MongoDB server");
-    }
-}
 /**
  * Used for updating users in systems with V1 style user information
  * (ie MongoDB v2.4 and prior)

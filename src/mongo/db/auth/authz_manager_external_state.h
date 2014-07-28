@@ -60,7 +60,7 @@ namespace mongo {
          * calling other methods.  Object may not be used after this method returns something other
          * than Status::OK().
          */
-        virtual Status initialize() = 0;
+        virtual Status initialize(OperationContext* txn) = 0;
 
         /**
          * Retrieves the schema version of the persistent data describing users and roles.
@@ -166,7 +166,8 @@ namespace mongo {
          * Finds all documents matching "query" in "collectionName".  For each document returned,
          * calls the function resultProcessor on it.
          */
-        virtual Status query(const NamespaceString& collectionName,
+        virtual Status query(OperationContext* txn,
+                             const NamespaceString& collectionName,
                              const BSONObj& query,
                              const BSONObj& projection,
                              const stdx::function<void(const BSONObj&)>& resultProcessor) = 0;

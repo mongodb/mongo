@@ -113,9 +113,11 @@ namespace mongo {
         }
 
         try {
+            ScopedExecutorRegistration safety(exec.get());
+
             long long count = 0;
-            Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = exec->getNext(NULL, NULL))) {
+            PlanExecutor::ExecState state;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, NULL))) {
                 if (skip > 0) {
                     --skip;
                 }

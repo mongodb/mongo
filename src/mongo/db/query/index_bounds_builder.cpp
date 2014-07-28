@@ -31,10 +31,12 @@
 #include <limits>
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/s2common.h"
-#include "mongo/db/index/expression_index.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/query/expression_index.h"
+#include "mongo/db/query/expression_index_knobs.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/db/geo/s2.h"
 #include "third_party/s2/s2cell.h"
@@ -584,7 +586,12 @@ namespace mongo {
             else if (mongoutils::str::equals("2d", elt.valuestrsafe())) {
                 verify(gme->getGeoQuery().getGeometry().hasR2Region());
                 const R2Region& region = gme->getGeoQuery().getGeometry().getR2Region();
-                ExpressionMapping::cover2d(region, index.infoObj, oilOut);
+
+                ExpressionMapping::cover2d(region,
+                                           index.infoObj,
+                                           internalGeoPredicateQuery2DMaxCoveringCells,
+                                           oilOut);
+
                 *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             }
             else {

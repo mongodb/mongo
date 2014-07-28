@@ -151,7 +151,7 @@ namespace mongo {
         }
     }
 
-    void CollectionScan::recoverFromYield() {
+    void CollectionScan::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
         if (NULL != _iter) {
             if (!_iter->recoverFromYield()) {

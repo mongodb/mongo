@@ -56,14 +56,14 @@ function runInitialSyncTest() {
 
 // Standard case, clusterAuthMode: x509
 var x509_options1 = Object.merge(common_options, 
-                             {sslClusterFile: "jstests/libs/cluster-cert.pem",
+                             {sslClusterFile: "jstests/libs/cluster_cert.pem",
                               clusterAuthMode: "x509"});
 var x509_options2 = x509_options1;
 runInitialSyncTest();
 
 // Mixed clusterAuthMode: sendX509 and sendKeyFile and try adding --auth 
 x509_options1 = Object.merge(common_options, 
-                             {sslClusterFile: "jstests/libs/cluster-cert.pem",
+                             {sslClusterFile: "jstests/libs/cluster_cert.pem",
                               clusterAuthMode: "sendX509",
                               auth: ""});
 x509_options2 = Object.merge(common_options, {clusterAuthMode: "sendKeyFile"});
@@ -76,9 +76,9 @@ runInitialSyncTest();
 
 // verify that replset initiate fails if using a self-signed cert
 x509_options1 = Object.merge(common_options, {clusterAuthMode: "x509"});
-x509_options2 = Object.merge(common_options, 
-                             {sslClusterFile: "jstests/libs/smoke.pem",
-                              clusterAuthMode: "x509"});
+x509_options2 = Object.merge(common_options,
+                            {sslClusterFile: "jstests/libs/smoke.pem",
+                             clusterAuthMode: "x509"});
 var replTest = new ReplSetTest({nodes : {node0 : x509_options1, node1 : x509_options2}});
 var conns = replTest.startSet();
 assert.throws( function() { replTest.initiate() } );

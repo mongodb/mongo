@@ -46,13 +46,14 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/db/global_environment_d.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -61,15 +62,15 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/d_writeback.h"
@@ -108,6 +109,7 @@ namespace mongo {
             }
 
             Status status = repl::getGlobalReplicationCoordinator()->stepDownAndWaitForSecondary(
+                    txn,
                     repl::ReplicationCoordinator::Milliseconds(timeoutSecs * 1000),
                     repl::ReplicationCoordinator::Milliseconds(120 * 1000),
                     repl::ReplicationCoordinator::Milliseconds(60 * 1000));
@@ -273,10 +275,9 @@ namespace mongo {
             bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
             e = cmdObj.getField( "backupOriginalFiles" );
             bool backupOriginalFiles = e.isBoolean() && e.boolean();
-            Status status = globalStorageEngine->repairDatabase( txn,
-                                                                 dbname,
-                                                                 preserveClonedFilesOnFailure,
-                                                                 backupOriginalFiles );
+
+            Status status = getGlobalEnvironment()->getGlobalStorageEngine()->repairDatabase(
+                txn, dbname, preserveClonedFilesOnFailure, backupOriginalFiles );
 
             IndexBuilder::restoreIndexes(indexesInProg);
 
@@ -673,23 +674,23 @@ namespace mongo {
                 return 0;
             }
 
-            Runner* rawRunner;
-            if (!getRunner(txn, coll, cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
-                uasserted(17241, "Can't get runner for query " + query.toString());
+            PlanExecutor* rawExec;
+            if (!getExecutor(txn, coll, cq, &rawExec, QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
+                uasserted(17241, "Can't get executor for query " + query.toString());
                 return 0;
             }
 
-            auto_ptr<Runner> runner(rawRunner);
+            auto_ptr<PlanExecutor> exec(rawExec);
 
-            // The runner must be registered to be informed of DiskLoc deletions and NS dropping
+            // The executor must be registered to be informed of DiskLoc deletions and NS dropping
             // when we yield the lock below.
-            const ScopedRunnerRegistration safety(runner.get());
+            const ScopedExecutorRegistration safety(exec.get());
 
             const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
 
             BSONObj obj;
-            Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+            PlanExecutor::ExecState state;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
                 BSONElement ne = obj["n"];
                 verify(ne.isNumber());
                 int myn = ne.numberInt();
@@ -788,7 +789,7 @@ namespace mongo {
 
             result.appendBool( "estimate" , estimate );
 
-            auto_ptr<Runner> runner;
+            auto_ptr<PlanExecutor> exec;
             if ( min.isEmpty() && max.isEmpty() ) {
                 if ( estimate ) {
                     result.appendNumber( "size" , static_cast<long long>(collection->dataSize()) );
@@ -797,7 +798,7 @@ namespace mongo {
                     result.append( "millis" , timer.millis() );
                     return 1;
                 }
-                runner.reset(InternalPlanner::collectionScan(txn, ns,collection));
+                exec.reset(InternalPlanner::collectionScan(txn, ns,collection));
             }
             else if ( min.isEmpty() || max.isEmpty() ) {
                 errmsg = "only one of min or max specified";
@@ -822,7 +823,7 @@ namespace mongo {
                 min = Helpers::toKeyFormat( kp.extendRangeBound( min, false ) );
                 max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
 
-                runner.reset(InternalPlanner::indexScan(txn, collection, idx, min, max, false));
+                exec.reset(InternalPlanner::indexScan(txn, collection, idx, min, max, false));
             }
 
             long long avgObjSize = collection->dataSize() / collection->numRecords();
@@ -834,8 +835,8 @@ namespace mongo {
             long long numObjects = 0;
 
             DiskLoc loc;
-            Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &loc))) {
+            PlanExecutor::ExecState state;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
                 if ( estimate )
                     size += avgObjSize;
                 else
@@ -850,7 +851,7 @@ namespace mongo {
                 }
             }
 
-            if (Runner::RUNNER_EOF != state) {
+            if (PlanExecutor::IS_EOF != state) {
                 warning() << "Internal error while reading " << ns << endl;
             }
 
@@ -1172,14 +1173,18 @@ namespace mongo {
        assumption needs to be audited and documented. */
     class MaintenanceModeSetter {
     public:
-        MaintenanceModeSetter() :
-            maintenanceModeSet(repl::getGlobalReplicationCoordinator()->setMaintenanceMode(true))
+        MaintenanceModeSetter(OperationContext* txn) :
+            _txn(txn),
+            maintenanceModeSet(
+                    repl::getGlobalReplicationCoordinator()->setMaintenanceMode(txn, true))
             {}
         ~MaintenanceModeSetter() {
             if (maintenanceModeSet)
-                repl::getGlobalReplicationCoordinator()->setMaintenanceMode(false);
+                repl::getGlobalReplicationCoordinator()->setMaintenanceMode(_txn, false);
         } 
     private:
+        // Not owned.
+        OperationContext* _txn;
         bool maintenanceModeSet;
     };
 
@@ -1192,19 +1197,20 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(ImpersonationSessionGuard);
     public:
         ImpersonationSessionGuard(AuthorizationSession* authSession,
-                                  bool fieldIsPresent, 
-                                  const std::vector<UserName> &parsedUserNames) :
+                                  bool fieldIsPresent,
+                                  const std::vector<UserName> &parsedUserNames,
+                                  const std::vector<RoleName> &parsedRoleNames):
             _authSession(authSession), _impersonation(false) {
             if (fieldIsPresent) {
-                massert(17317, "impersonation unexpectedly active", 
+                massert(17317, "impersonation unexpectedly active",
                         !authSession->isImpersonating());
-                authSession->setImpersonatedUserNames(parsedUserNames);
+                authSession->setImpersonatedUserData(parsedUserNames, parsedRoleNames);
                 _impersonation = true;
             }
         }
         ~ImpersonationSessionGuard() {
             if (_impersonation) {
-                _authSession->clearImpersonatedUserNames();
+                _authSession->clearImpersonatedUserData();
             }
         }
     private:
@@ -1252,19 +1258,34 @@ namespace mongo {
             return;
         }
 
-        // Handle command option impersonatedUsers.
+        // Handle command option impersonatedUsers and impersonatedRoles.
         // This must come before _checkAuthorization(), as there is some command parsing logic
-        // in that code path that must not see the impersonated user array element.
+        // in that code path that must not see the impersonated user and roles array elements.
         std::vector<UserName> parsedUserNames;
+        std::vector<RoleName> parsedRoleNames;
         AuthorizationSession* authSession = client.getAuthorizationSession();
-        bool fieldIsPresent = false;
-        audit::parseAndRemoveImpersonatedUserField(cmdObj,
-                                                   authSession,
-                                                   &parsedUserNames,
-                                                   &fieldIsPresent);
-        ImpersonationSessionGuard impersonationSession(authSession, 
-                                                       fieldIsPresent, 
-                                                       parsedUserNames);
+        bool rolesFieldIsPresent = false;
+        bool usersFieldIsPresent = false;
+        audit::parseAndRemoveImpersonatedRolesField(cmdObj,
+                                                    authSession,
+                                                    &parsedRoleNames,
+                                                    &rolesFieldIsPresent);
+        audit::parseAndRemoveImpersonatedUsersField(cmdObj,
+                                                    authSession,
+                                                    &parsedUserNames,
+                                                    &usersFieldIsPresent);
+        if (rolesFieldIsPresent != usersFieldIsPresent) {
+            // If there is a version mismatch between the mongos and the mongod,
+            // the mongos may fail to pass the role information, causing an error.
+            Status s(ErrorCodes::IncompatibleAuditMetadata,
+                    "Audit metadata does not include both user and role information.");
+            appendCommandStatus(result, s);
+            return;
+        }
+        ImpersonationSessionGuard impersonationSession(authSession,
+                                                       usersFieldIsPresent,
+                                                       parsedUserNames,
+                                                       parsedRoleNames);
 
         Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
         if (!status.isOK()) {
@@ -1303,7 +1324,7 @@ namespace mongo {
         if (c->maintenanceMode() &&
                 repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                         repl::ReplicationCoordinator::modeReplSet) {
-            mmSetter.reset(new MaintenanceModeSetter());
+            mmSetter.reset(new MaintenanceModeSetter(txn));
         }
 
         if (c->shouldAffectCommandCounter()) {

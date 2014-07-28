@@ -27,8 +27,8 @@
  */
 
 /**
- * This file tests Runner forced yielding, ClientCursor::registerRunner, and
- * ClientCursor::deregisterRunner.
+ * This file tests PlanExecutor forced yielding, ClientCursor::registerExecutor, and
+ * ClientCursor::deregisterExecutor.
  */
 
 #include "mongo/client/dbclientcursor.h"
@@ -41,15 +41,14 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/single_solution_runner.h"
 #include "mongo/dbtests/dbtests.h"
 
 
-namespace RunnerRegistry {
+namespace ExecutorRegistry {
 
-    class RunnerRegistryBase {
+    class ExecutorRegistryBase {
     public:
-        RunnerRegistryBase()
+        ExecutorRegistryBase()
             : _client(&_opCtx)
         {
             _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
@@ -60,16 +59,16 @@ namespace RunnerRegistry {
             }
         }
 
-        ~RunnerRegistryBase() {
+        ~ExecutorRegistryBase() {
             if (_ctx.get()) {
                 _ctx->commit();
             }
         }
 
         /**
-         * Return a runner that is going over the collection in ns().
+         * Return a plan executor that is going over the collection in ns().
          */
-        Runner* getCollscan() {
+        PlanExecutor* getCollscan() {
             auto_ptr<WorkingSet> ws(new WorkingSet());
             CollectionScanParams params;
             params.collection = collection();
@@ -77,22 +76,20 @@ namespace RunnerRegistry {
             params.tailable = false;
             auto_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, ws.get(), NULL));
 
-            // Create a runner to hold it
+            // Create a plan executor to hold it
             CanonicalQuery* cq;
             ASSERT(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
             // Owns all args
-            auto_ptr<Runner> run(new SingleSolutionRunner(_ctx->ctx().db()->getCollection( &_opCtx,
-                                                                                           ns() ),
-                                                          cq, NULL, scan.release(), ws.release()));
-            return run.release();
+            return new PlanExecutor(ws.release(), scan.release(), cq,
+                                    _ctx->ctx().db()->getCollection( &_opCtx, ns() ));
         }
 
-        void registerRunner( Runner* runner ) {
-            _ctx->ctx().db()->getOrCreateCollection( &_opCtx, ns() )->cursorCache()->registerRunner( runner );
+        void registerExecutor( PlanExecutor* exec ) {
+            _ctx->ctx().db()->getOrCreateCollection( &_opCtx, ns() )->cursorCache()->registerExecutor( exec );
         }
 
-        void deregisterRunner( Runner* runner ) {
-            _ctx->ctx().db()->getOrCreateCollection( &_opCtx, ns() )->cursorCache()->deregisterRunner( runner );
+        void deregisterExecutor( PlanExecutor* exec ) {
+            _ctx->ctx().db()->getOrCreateCollection( &_opCtx, ns() )->cursorCache()->deregisterExecutor( exec );
         }
 
         int N() { return 50; }
@@ -101,7 +98,7 @@ namespace RunnerRegistry {
             return _ctx->ctx().db()->getCollection( &_opCtx, ns() );
         }
 
-        static const char* ns() { return "unittests.RunnerRegistryDiskLocInvalidation"; }
+        static const char* ns() { return "unittests.ExecutorRegistryDiskLocInvalidation"; }
 
         // Order of these is important for initialization
         OperationContextImpl _opCtx;
@@ -111,21 +108,21 @@ namespace RunnerRegistry {
 
 
     // Test that a registered runner receives invalidation notifications.
-    class RunnerRegistryDiskLocInvalid : public RunnerRegistryBase {
+    class ExecutorRegistryDiskLocInvalid : public ExecutorRegistryBase {
     public:
         void run() {
-            auto_ptr<Runner> run(getCollscan());
+            auto_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
             // Register it.
             run->saveState();
-            registerRunner(run.get());
+            registerExecutor(run.get());
             // At this point it's safe to yield.  forceYield would do that.  Let's now simulate some
             // stuff going on in the yield.
 
@@ -136,7 +133,7 @@ namespace RunnerRegistry {
             // At this point, we're done yielding.  We recover our lock.
 
             // Unregister the runner.
-            deregisterRunner(run.get());
+            deregisterExecutor(run.get());
 
             // And clean up anything that happened before.
             run->restoreState(&_opCtx);
@@ -144,135 +141,135 @@ namespace RunnerRegistry {
             // Make sure that the runner moved forward over the deleted data.  We don't see foo==10
             // or foo==11.
             for (int i = 12; i < N(); ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
-            ASSERT_EQUALS(Runner::RUNNER_EOF, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(PlanExecutor::IS_EOF, run->getNext(&obj, NULL));
         }
     };
 
     // Test that registered runners are killed when their collection is dropped.
-    class RunnerRegistryDropCollection : public RunnerRegistryBase {
+    class ExecutorRegistryDropCollection : public ExecutorRegistryBase {
     public:
         void run() {
-            auto_ptr<Runner> run(getCollscan());
+            auto_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
             // Save state and register.
             run->saveState();
-            registerRunner(run.get());
+            registerExecutor(run.get());
 
             // Drop a collection that's not ours.
             _client.dropCollection("unittests.someboguscollection");
 
             // Unregister and restore state.
-            deregisterRunner(run.get());
+            deregisterExecutor(run.get());
             run->restoreState(&_opCtx);
 
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
             ASSERT_EQUALS(10, obj["foo"].numberInt());
 
             // Save state and register.
             run->saveState();
-            registerRunner(run.get());
+            registerExecutor(run.get());
 
             // Drop our collection.
             _client.dropCollection(ns());
 
             // Unregister and restore state.
-            deregisterRunner(run.get());
+            deregisterExecutor(run.get());
             run->restoreState(&_opCtx);
 
-            // Runner was killed.
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
+            // PlanExecutor was killed.
+            ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
         }
     };
 
     // Test that registered runners are killed when all indices are dropped on the collection.
-    class RunnerRegistryDropAllIndices : public RunnerRegistryBase {
+    class ExecutorRegistryDropAllIndices : public ExecutorRegistryBase {
     public:
         void run() {
-            auto_ptr<Runner> run(getCollscan());
+            auto_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
             _client.ensureIndex(ns(), BSON("foo" << 1));
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
             // Save state and register.
             run->saveState();
-            registerRunner(run.get());
+            registerExecutor(run.get());
 
             // Drop all indices.
             _client.dropIndexes(ns());
 
             // Unregister and restore state.
-            deregisterRunner(run.get());
+            deregisterExecutor(run.get());
             run->restoreState(&_opCtx);
 
-            // Runner was killed.
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
+            // PlanExecutor was killed.
+            ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
         }
     };
 
     // Test that registered runners are killed when an index is dropped on the collection.
-    class RunnerRegistryDropOneIndex : public RunnerRegistryBase {
+    class ExecutorRegistryDropOneIndex : public ExecutorRegistryBase {
     public:
         void run() {
-            auto_ptr<Runner> run(getCollscan());
+            auto_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
             _client.ensureIndex(ns(), BSON("foo" << 1));
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
             // Save state and register.
             run->saveState();
-            registerRunner(run.get());
+            registerExecutor(run.get());
 
             // Drop a specific index.
             _client.dropIndex(ns(), BSON("foo" << 1));
 
             // Unregister and restore state.
-            deregisterRunner(run.get());
+            deregisterExecutor(run.get());
             run->restoreState(&_opCtx);
 
-            // Runner was killed.
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
+            // PlanExecutor was killed.
+            ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
         }
     };
 
     // Test that registered runners are killed when their database is dropped.
-    class RunnerRegistryDropDatabase : public RunnerRegistryBase {
+    class ExecutorRegistryDropDatabase : public ExecutorRegistryBase {
     public:
         void run() {
-            auto_ptr<Runner> run(getCollscan());
+            auto_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
             // Save state and register.
             run->saveState();
-            registerRunner(run.get());
+            registerExecutor(run.get());
 
             // Drop a DB that's not ours.  We can't have a lock at all to do this as dropping a DB
             // requires a "global write lock."
@@ -282,15 +279,15 @@ namespace RunnerRegistry {
             _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
 
             // Unregister and restore state.
-            deregisterRunner(run.get());
+            deregisterExecutor(run.get());
             run->restoreState(&_opCtx);
 
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
             ASSERT_EQUALS(10, obj["foo"].numberInt());
 
             // Save state and register.
             run->saveState();
-            registerRunner(run.get());
+            registerExecutor(run.get());
 
             // Drop our DB.  Once again, must give up the lock.
             _ctx->commit();
@@ -299,13 +296,13 @@ namespace RunnerRegistry {
             _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
 
             // Unregister and restore state.
-            deregisterRunner(run.get());
+            deregisterExecutor(run.get());
             run->restoreState(&_opCtx);
             _ctx->commit();
             _ctx.reset();
 
-            // Runner was killed.
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
+            // PlanExecutor was killed.
+            ASSERT_EQUALS(PlanExecutor::DEAD, run->getNext(&obj, NULL));
         }
     };
 
@@ -313,15 +310,15 @@ namespace RunnerRegistry {
 
     class All : public Suite {
     public:
-        All() : Suite( "runner_registry" ) { }
+        All() : Suite( "executor_registry" ) { }
 
         void setupTests() {
-            add<RunnerRegistryDiskLocInvalid>();
-            add<RunnerRegistryDropCollection>();
-            add<RunnerRegistryDropAllIndices>();
-            add<RunnerRegistryDropOneIndex>();
-            add<RunnerRegistryDropDatabase>();
+            add<ExecutorRegistryDiskLocInvalid>();
+            add<ExecutorRegistryDropCollection>();
+            add<ExecutorRegistryDropAllIndices>();
+            add<ExecutorRegistryDropOneIndex>();
+            add<ExecutorRegistryDropDatabase>();
         }
-    }  runnerRegistryAll;
+    }  executorRegistryAll;
 
-}  // namespace RunnerRegistry
+}  // namespace ExecutorRegistry

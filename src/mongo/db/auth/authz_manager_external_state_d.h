@@ -57,7 +57,8 @@ namespace mongo {
                                const NamespaceString& collectionName,
                                const BSONObj& query,
                                BSONObj* result);
-        virtual Status query(const NamespaceString& collectionName,
+        virtual Status query(OperationContext* txn,
+                             const NamespaceString& collectionName,
                              const BSONObj& query,
                              const BSONObj& projection,
                              const stdx::function<void(const BSONObj&)>& resultProcessor);

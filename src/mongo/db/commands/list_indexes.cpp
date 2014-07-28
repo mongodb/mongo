@@ -52,10 +52,9 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
-            string ns = parseNs( dbname, cmdObj );
             ActionSet actions;
             actions.addAction(ActionType::listIndexes);
-            out->push_back(Privilege(ResourcePattern::forCollectionName( ns ), actions));
+            out->push_back(Privilege(parseResourcePattern( dbname, cmdObj ), actions));
         }
 
         CmdListIndexes() : Command( "listIndexes", true ) {}
@@ -73,15 +72,15 @@ namespace mongo {
             Lock::DBRead lock( txn->lockState(), dbname );
             const Database* d = dbHolder().get( txn, dbname );
             if ( !d ) {
-                errmsg = "no database";
-                return false;
+                return appendCommandStatus( result, Status( ErrorCodes::NamespaceNotFound,
+                                                            "no database" ) );
             }
 
             const DatabaseCatalogEntry* dbEntry = d->getDatabaseCatalogEntry();
             const CollectionCatalogEntry* cce = dbEntry->getCollectionCatalogEntry( txn, ns );
             if ( !cce ) {
-                errmsg = "no collection";
-                return false;
+                return appendCommandStatus( result, Status( ErrorCodes::NamespaceNotFound,
+                                                            "no collection" ) );
             }
 
             vector<string> indexNames;

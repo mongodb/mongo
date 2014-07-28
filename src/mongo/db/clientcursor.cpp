@@ -69,16 +69,16 @@ namespace mongo {
         return cursorStatsOpen.get();
     }
 
-    ClientCursor::ClientCursor(const Collection* collection, Runner* runner,
+    ClientCursor::ClientCursor(const Collection* collection, PlanExecutor* exec,
                                int qopts, const BSONObj query)
         : _collection( collection ),
           _countedYet( false ) {
-        _runner.reset(runner);
-        _ns = runner->ns();
+        _exec.reset(exec);
+        _ns = exec->ns();
         _query = query;
         _queryOptions = qopts;
-        if ( runner->collection() ) {
-            invariant( collection == runner->collection() );
+        if ( exec->collection() ) {
+            invariant( collection == exec->collection() );
         }
         init();
     }
@@ -141,8 +141,8 @@ namespace mongo {
     }
 
     void ClientCursor::kill() {
-        if ( _runner.get() )
-            _runner->kill();
+        if ( _exec.get() )
+            _exec->kill();
 
         _collection = NULL;
     }
@@ -160,7 +160,7 @@ namespace mongo {
         _idleAgeMillis = millis;
     }
 
-    void ClientCursor::updateSlaveLocation(CurOp& curop) {
+    void ClientCursor::updateSlaveLocation(OperationContext* txn, CurOp& curop) {
         if (_slaveReadTill.isNull())
             return;
 
@@ -172,7 +172,7 @@ namespace mongo {
         if (!rid.isSet())
             return;
 
-        repl::getGlobalReplicationCoordinator()->setLastOptime(rid, _slaveReadTill);
+        repl::getGlobalReplicationCoordinator()->setLastOptime(txn, rid, _slaveReadTill);
     }
 
     //

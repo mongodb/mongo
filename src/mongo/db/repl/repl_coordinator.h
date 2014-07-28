@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/date_time/posix_time/posix_time_types.hpp>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
@@ -164,7 +165,8 @@ namespace repl {
          * catch up, and then should wait till a secondary is completely caught up rather than
          * within 10 seconds.
          */
-        virtual Status stepDown(bool force,
+        virtual Status stepDown(OperationContext* txn,
+                                bool force,
                                 const Milliseconds& waitTime,
                                 const Milliseconds& stepdownTime) = 0;
 
@@ -174,7 +176,8 @@ namespace repl {
          * TODO(spencer): This method should be removed and all callers should use shutDown, after
          * shutdown has been fixed to block new writes while waiting for secondaries to catch up.
          */
-        virtual Status stepDownAndWaitForSecondary(const Milliseconds& initialWaitTime,
+        virtual Status stepDownAndWaitForSecondary(OperationContext* txn,
+                                                   const Milliseconds& initialWaitTime,
                                                    const Milliseconds& stepdownTime,
                                                    const Milliseconds& postStepdownWaitTime) = 0;
 
@@ -235,7 +238,7 @@ namespace repl {
          * @returns ErrorCodes::NodeNotFound if the member cannot be found in sync progress tracking
          * @returns Status::OK() otherwise
          */
-        virtual Status setLastOptime(const OID& rid, const OpTime& ts) = 0;
+        virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts) = 0;
 
         /**
          * Retrieves and returns the current election id, which is a unique id which changes after
@@ -247,13 +250,24 @@ namespace repl {
          * Returns the RID for this node.  The RID is used to identify this node to our sync source
          * when sending updates about our replication progress.
          */
-        virtual OID getMyRID() = 0;
+        virtual OID getMyRID(OperationContext* txn) = 0;
 
         /**
          * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
          * be sent to this node's sync source to update it about our progress in replication.
          */
-        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
+        virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
+                                                         BSONObjBuilder* cmdBuilder) = 0;
+
+        /**
+         * For ourself and each secondary chaining off of us, adds a BSONObj to "handshakes"
+         * describing an invocation of the replSetUpdateCommand that can be sent to this node's
+         * sync source to handshake us and our chained secondaries, informing the sync source that
+         * we are replicating off of it.
+         */
+        virtual void prepareReplSetUpdatePositionCommandHandshakes(
+                OperationContext* txn,
+                std::vector<BSONObj>* handshakes) = 0;
 
         /**
          * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.
@@ -264,7 +278,7 @@ namespace repl {
          * Toggles maintenanceMode to the value expressed by 'activate'
          * return true, if the change worked and false otherwise
          */
-        virtual bool setMaintenanceMode(bool activate) = 0;
+        virtual bool setMaintenanceMode(OperationContext* txn, bool activate) = 0;
 
         /**
          * Handles an incoming replSetSyncFrom command. Adds BSON to 'result'
@@ -280,7 +294,9 @@ namespace repl {
          * returns Status::OK() if maintenanceMode is successfully changed, otherwise returns a
          * Status containing an error message about the failure
          */
-        virtual Status processReplSetMaintenance(bool activate, BSONObjBuilder* resultObj) = 0;
+        virtual Status processReplSetMaintenance(OperationContext* txn,
+                                                 bool activate,
+                                                 BSONObjBuilder* resultObj) = 0;
 
         /**
          * Handles an incoming replSetFreeze command. Adds BSON to 'resultObj' 
@@ -372,7 +388,8 @@ namespace repl {
          * if any updating node cannot be found in the config, or any of the normal replset
          * command ErrorCodes.
          */
-        virtual Status processReplSetUpdatePosition(const BSONArray& updates,
+        virtual Status processReplSetUpdatePosition(OperationContext* txn,
+                                                    const BSONArray& updates,
                                                     BSONObjBuilder* resultObj) = 0;
 
         /**
@@ -381,19 +398,22 @@ namespace repl {
          * if the handshaking node cannot be found in the config, or any of the normal replset
          * command ErrorCodes.
          */
-        virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
+        virtual Status processReplSetUpdatePositionHandshake(const OperationContext* txn,
+                                                             const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj) = 0;
 
         /**
          * Handles an incoming Handshake command (or a handshake from replSetUpdatePosition).
          * Associates the node's 'remoteID' with its 'handshake' object. This association is used
          * to update local.slaves and to forward the node's replication progress upstream when this
-         * node is being chainged through.
+         * node is being chained through.
          *
          * Returns true if it was able to associate the 'remoteID' and 'handshake' and false
          * otherwise.
          */
-        virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake) = 0;
+        virtual bool processHandshake(const OperationContext* txn,
+                                      const OID& remoteID,
+                                      const BSONObj& handshake) = 0;
 
         /**
          * Returns once the oplog's most recent entry changes or after one second, whichever
@@ -411,6 +431,11 @@ namespace repl {
          * at OpTime 'op'.
          */
         virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op) = 0;
+
+        /**
+         * Returns a BSONObj containing a representation of the current default write concern.
+         */
+        virtual BSONObj getGetLastErrorDefault() = 0;
 
     protected:
 

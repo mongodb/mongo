@@ -50,7 +50,7 @@ namespace repl {
         _id(0xffffffff) { 
     }
 
-    HeartbeatInfo::HeartbeatInfo(unsigned id) :
+    HeartbeatInfo::HeartbeatInfo(int id) :
         hbstate(MemberState::RS_UNKNOWN),
         health(-1.0),
         upSince(0),

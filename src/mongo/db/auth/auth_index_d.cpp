@@ -57,7 +57,7 @@ namespace {
         v3SystemUsersKeyPattern = BSON(AuthorizationManager::USER_NAME_FIELD_NAME << 1 <<
                                        AuthorizationManager::USER_DB_FIELD_NAME << 1);
         v3SystemRolesKeyPattern = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << 1 <<
-                                       AuthorizationManager::ROLE_SOURCE_FIELD_NAME << 1);
+                                       AuthorizationManager::ROLE_DB_FIELD_NAME << 1);
         v3SystemUsersIndexName = std::string(
                 str::stream() <<
                         AuthorizationManager::USER_NAME_FIELD_NAME << "_1_" <<
@@ -65,7 +65,7 @@ namespace {
         v3SystemRolesIndexName = std::string(
                 str::stream() <<
                         AuthorizationManager::ROLE_NAME_FIELD_NAME << "_1_" <<
-                        AuthorizationManager::ROLE_SOURCE_FIELD_NAME << "_1");
+                        AuthorizationManager::ROLE_DB_FIELD_NAME << "_1");
 
         return Status::OK();
     }

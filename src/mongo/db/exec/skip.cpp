@@ -92,9 +92,9 @@ namespace mongo {
         _child->prepareToYield();
     }
 
-    void SkipStage::recoverFromYield() {
+    void SkipStage::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        _child->recoverFromYield();
+        _child->recoverFromYield(opCtx);
     }
 
     void SkipStage::invalidate(const DiskLoc& dl, InvalidationType type) {

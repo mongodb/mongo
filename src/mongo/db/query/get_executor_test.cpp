@@ -27,11 +27,10 @@
  */
 
 /**
- * This file contains tests for mongo/db/query/get_runner.h
+ * This file contains tests for mongo/db/query/get_executor.h
  */
 
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/get_runner.h"
 
 #include "mongo/db/json.h"
 #include "mongo/db/query/query_settings.h"
@@ -63,7 +62,7 @@ namespace {
     }
 
     //
-    // get_runner tests
+    // get_executor tests
     //
 
     //
@@ -116,7 +115,7 @@ namespace {
      }
 
     // Use of index filters to select compound index over single key index.
-    TEST(GetRunnerTest, GetAllowedIndices) {
+    TEST(GetExecutorTest, GetAllowedIndices) {
         const char* hintKeyPatterns[] = {"{a: 1, b: 1}", NULL};
         const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: 1, b: 1}", "{a: 1, c: 1}", NULL};
         const char* expectedFilteredKeyPatterns[] = {"{a: 1, b: 1}", NULL};
@@ -126,7 +125,7 @@ namespace {
     // Setting index filter referring to non-existent indexes
     // will effectively disregard the index catalog and
     // result in the planner generating a collection scan.
-    TEST(GetRunnerTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
+    TEST(GetExecutorTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
         const char* hintKeyPatterns[] = {"{nosuchfield: 1}", NULL};
         const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: 1, b: 1}", "{a: 1, c: 1}", NULL};
         const char* expectedFilteredKeyPatterns[] = {NULL};
@@ -135,7 +134,7 @@ namespace {
 
     // This test case shows how to force query execution to use
     // an index that orders items in descending order.
-    TEST(GetRunnerTest, GetAllowedIndicesDescendingOrder) {
+    TEST(GetExecutorTest, GetAllowedIndicesDescendingOrder) {
         const char* hintKeyPatterns[] = {"{a: -1}", NULL};
         const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: -1}", NULL};
         const char* expectedFilteredKeyPatterns[] = {"{a: -1}", NULL};

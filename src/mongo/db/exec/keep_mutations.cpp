@@ -108,9 +108,9 @@ namespace mongo {
         _child->prepareToYield();
     }
 
-    void KeepMutationsStage::recoverFromYield() {
+    void KeepMutationsStage::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        _child->recoverFromYield();
+        _child->recoverFromYield(opCtx);
     }
 
     void KeepMutationsStage::invalidate(const DiskLoc& dl, InvalidationType type) {

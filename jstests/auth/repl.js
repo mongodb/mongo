@@ -22,7 +22,7 @@ var AuthReplTest = function(spec) {
     secondaryConn = spec.secondaryConn;
 
     adminPri = primaryConn.getDB("admin");
-    adminPri.addUser({user: "super", pwd: "super", roles: ["__system"]});
+    adminPri.createUser({user: "super", pwd: "super", roles: ["__system"]});
     assert(adminPri.auth("super", "super"), "could not authenticate as superuser");
 
     if (secondaryConn != null) {

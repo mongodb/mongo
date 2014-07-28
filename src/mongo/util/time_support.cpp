@@ -755,37 +755,6 @@ namespace {
         }
         boost::thread::sleep(xt);
     }
-#elif defined(__sunos__)
-    void sleepsecs(int s) {
-        boost::xtime xt;
-        boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
-        xt.sec += s;
-        boost::thread::sleep(xt);
-    }
-    void sleepmillis(long long s) {
-        boost::xtime xt;
-        boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
-        xt.sec += (int)( s / 1000 );
-        xt.nsec += (int)(( s % 1000 ) * 1000000);
-        if ( xt.nsec >= 1000000000 ) {
-            xt.nsec -= 1000000000;
-            xt.sec++;
-        }
-        boost::thread::sleep(xt);
-    }
-    void sleepmicros(long long s) {
-        if ( s <= 0 )
-            return;
-        boost::xtime xt;
-        boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
-        xt.sec += (int)( s / 1000000 );
-        xt.nsec += (int)(( s % 1000000 ) * 1000);
-        if ( xt.nsec >= 1000000000 ) {
-            xt.nsec -= 1000000000;
-            xt.sec++;
-        }
-        boost::thread::sleep(xt);
-    }
 #else
     void sleepsecs(int s) {
         struct timespec t;

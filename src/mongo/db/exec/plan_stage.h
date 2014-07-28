@@ -36,6 +36,7 @@ namespace mongo {
 
     class Collection;
     class DiskLoc;
+    class OperationContext;
 
     /**
      * A PlanStage ("stage") is the basic building block of a "Query Execution Plan."  A stage is
@@ -45,7 +46,7 @@ namespace mongo {
      *
      * Stages have zero or more input streams but only one output stream.  Data-accessing stages are
      * leaves and data-transforming stages have children.  Stages can be connected together to form
-     * a tree which is then executed (see plan_runner.h) to solve a query.
+     * a tree which is then executed (see plan_executor.h) to solve a query.
      *
      * A stage's input and output are each typed.  Only stages with compatible types can be
      * connected.
@@ -176,6 +177,8 @@ namespace mongo {
         /**
          * Notifies the stage that all locks are about to be released.  The stage must save any
          * state required to resume where it was before prepareToYield was called.
+         *
+         * XXX: rename to saveState()
          */
         virtual void prepareToYield() = 0;
 
@@ -184,8 +187,13 @@ namespace mongo {
          * any saved state and be ready to handle calls to work().
          *
          * Can only be called after prepareToYield.
+         *
+         * XXX: rename to restoreState()
+         *
+         * XXX: We may not need to pass down 'opCtx' if getMore'd queries use the same
+         * OperationContext they were created with.
          */
-        virtual void recoverFromYield() = 0;
+        virtual void recoverFromYield(OperationContext* opCtx) = 0;
 
         /**
          * Notifies a stage that a DiskLoc is going to be deleted (or in-place updated) so that the

@@ -32,6 +32,8 @@ namespace mongo {
 
     class GlobalEnvironmentNoop : public GlobalEnvironmentExperiment {
     public:
+        StorageEngine* getGlobalStorageEngine();
+
         bool killOperation(AtomicUInt opId);
 
         void setKillAllOperations();

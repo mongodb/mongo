@@ -37,6 +37,8 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_coordinator.h"
+#include "mongo/db/repl/repl_coordinator_external_state.h"
+#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/platform/unordered_map.h"
@@ -50,7 +52,9 @@ namespace repl {
 
     public:
 
-        ReplicationCoordinatorImpl(const ReplSettings& settings);
+        // Takes ownership of the passed in ReplicationCoordinatorExternalState.
+        ReplicationCoordinatorImpl(const ReplSettings& settings,
+                                   ReplicationCoordinatorExternalState* externalState);
         virtual ~ReplicationCoordinatorImpl();
 
         // ================== Members of public ReplicationCoordinator API ===================
@@ -77,11 +81,13 @@ namespace repl {
                 const OperationContext* txn,
                 const WriteConcernOptions& writeConcern);
 
-        virtual Status stepDown(bool force,
+        virtual Status stepDown(OperationContext* txn,
+                                bool force,
                                 const Milliseconds& waitTime,
                                 const Milliseconds& stepdownTime);
 
-        virtual Status stepDownAndWaitForSecondary(const Milliseconds& initialWaitTime,
+        virtual Status stepDownAndWaitForSecondary(OperationContext* txn,
+                                                   const Milliseconds& initialWaitTime,
                                                    const Milliseconds& stepdownTime,
                                                    const Milliseconds& postStepdownWaitTime);
 
@@ -96,19 +102,26 @@ namespace repl {
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptime(const OID& rid, const OpTime& ts);
+        virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts);
 
         virtual OID getElectionId();
 
-        virtual OID getMyRID();
+        virtual OID getMyRID(OperationContext* txn);
 
-        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
+        virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
+                                                         BSONObjBuilder* cmdBuilder);
+
+        virtual void prepareReplSetUpdatePositionCommandHandshakes(
+                OperationContext* txn,
+                std::vector<BSONObj>* handshakes);
 
         virtual void processReplSetGetStatus(BSONObjBuilder* result);
 
-        virtual bool setMaintenanceMode(bool activate);
+        virtual bool setMaintenanceMode(OperationContext* txn, bool activate);
 
-        virtual Status processReplSetMaintenance(bool activate, BSONObjBuilder* resultObj);
+        virtual Status processReplSetMaintenance(OperationContext* txn,
+                                                 bool activate,
+                                                 BSONObjBuilder* resultObj);
 
         virtual Status processReplSetSyncFrom(const std::string& target,
                                               BSONObjBuilder* resultObj);
@@ -136,13 +149,17 @@ namespace repl {
         virtual Status processReplSetElect(const ReplSetElectArgs& args,
                                            BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetUpdatePosition(const BSONArray& updates,
+        virtual Status processReplSetUpdatePosition(OperationContext* txn,
+                                                    const BSONArray& updates,
                                                     BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetUpdatePositionHandshake(const BSONObj& handshake,
+        virtual Status processReplSetUpdatePositionHandshake(const OperationContext* txn,
+                                                             const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj);
 
-        virtual bool processHandshake(const OID& remoteID, const BSONObj& handshake);
+        virtual bool processHandshake(const OperationContext* txn,
+                                      const OID& remoteID,
+                                      const BSONObj& handshake);
 
         virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
 
@@ -150,30 +167,39 @@ namespace repl {
 
         virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
 
+        virtual BSONObj getGetLastErrorDefault();
+
         // ================== Members of replication code internal API ===================
 
-        // Called by the TopologyCoordinator whenever this node's replica set state transitions
+        // Called by the TopologyCoordinator whenever this node's replica set state transitions.
         void setCurrentMemberState(const MemberState& newState);
 
         // Called by the TopologyCoordinator whenever the replica set configuration is updated
-        void setCurrentReplicaSetConfig(const TopologyCoordinator::ReplicaSetConfig& newConfig);
+        void setCurrentReplicaSetConfig(const ReplicaSetConfig& newConfig, int myIndex);
 
         /**
          * Does a heartbeat for a member of the replica set.
          * Should be started during (re)configuration or in the heartbeat callback only.
          */
-        void doMemberHeartbeat(ReplicationExecutor* executor,
-                               const Status& inStatus,
+        void doMemberHeartbeat(ReplicationExecutor::CallbackData cbData,
                                const HostAndPort& hap);
+
+        /**
+         * Cancels all heartbeats.
+         *
+         * This is only called during the callback when there is a new config.
+         * At this time no new heartbeats can be scheduled due to the serialization
+         * of calls via the executor.
+         */
         void cancelHeartbeats();
 
     private:
 
-        // Struct that holds information about clients waiting for replication
+        // Struct that holds information about clients waiting for replication.
         struct WaiterInfo;
 
         /*
-         * Returns true if the given writeConcern is satisfied up to "optime"
+         * Returns true if the given writeConcern is satisfied up to "optime".
          */
         bool _opReplicatedEnough_inlock(const OpTime& opTime,
                                         const WriteConcernOptions& writeConcern);
@@ -184,59 +210,65 @@ namespace repl {
          * and on success.
          */
         void _handleHeartbeatResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData,
-                                      StatusWith<BSONObj>* outStatus,
                                       const HostAndPort& hap,
                                       Date_t firstCallDate,
                                       int retriesLeft);
 
-        void _trackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle) {
-            // this mutex should not be needed because it is always used during a callback.
-            // boost::mutex::scoped_lock lock(_mutex);
-            _heartbeatHandles.push_back(handle);
-        }
+        void _trackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle);
 
-        void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle) {
-            // this mutex should not be needed because it is always used during a callback.
-            // boost::mutex::scoped_lock lock(_mutex);
-            // TODO
-        }
+        void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle);
+
+        /**
+         * Start a heartbeat for each member in the current config
+         */
+        void _startHeartbeats();
 
         // Handles to actively queued heartbeats
         typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
         HeartbeatHandles _heartbeatHandles;
 
-        // Protects all member data of this ReplicationCoordinator
+        // Protects all member data of this ReplicationCoordinator.
         mutable boost::mutex _mutex;
 
         // list of information about clients waiting on replication.  Does *not* own the
         // WaiterInfos.
         std::vector<WaiterInfo*> _replicationWaiterList;
 
-        // Set to true when we are in the process of shutting down replication
+        // Set to true when we are in the process of shutting down replication.
         bool _inShutdown;
 
-        // Parsed command line arguments related to replication
+        // Parsed command line arguments related to replication.
         ReplSettings _settings;
 
-        // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator
+        // Our RID, used to identify us to our sync source when sending replication progress
+        // updates upstream.  Set once at startup and then never modified again.
+        OID _myRID;
+
+        // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
         boost::scoped_ptr<TopologyCoordinator> _topCoord;
 
-        // Pointer to the ReplicationExecutor owned by this ReplicationCoordinator
+        // Pointer to the ReplicationExecutor owned by this ReplicationCoordinator.
         boost::scoped_ptr<ReplicationExecutor> _replExecutor;
+
+        // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
+        boost::scoped_ptr<ReplicationCoordinatorExternalState> _externalState;
 
         // Thread that drives actions in the topology coordinator
         boost::scoped_ptr<boost::thread> _topCoordDriverThread;
 
-        // Maps nodes in this replication group to the last oplog operation they have committed
+        // Maps nodes in this replication group to the last oplog operation they have committed.
         typedef unordered_map<OID, OpTime, OID::Hasher> SlaveOpTimeMap;
         SlaveOpTimeMap _slaveOpTimeMap;
 
-        // Current ReplicaSet state
+        // Current ReplicaSet state.
         MemberState _currentState;
 
         // The current ReplicaSet configuration object, including the information about tag groups
         // that is used to satisfy write concern requests with named gle modes.
-        TopologyCoordinatorImpl::ReplicaSetConfig _rsConfig;
+        ReplicaSetConfig _rsConfig;
+
+        // This member's index position in the current config.
+        int _thisMembersConfigIndex;
     };
 
 } // namespace repl

@@ -45,6 +45,7 @@ namespace repl {
         virtual void setLastApplied(const OpTime& optime);
         virtual void setCommitOkayThrough(const OpTime& optime);
         virtual void setLastReceived(const OpTime& optime);
+        virtual void setForceSyncSourceIndex(int index);
 
         virtual HostAndPort getSyncSourceAddress() const;
 
@@ -72,7 +73,9 @@ namespace repl {
                                               BSONObjBuilder* resultObj,
                                               Status* result);
 
-        virtual HeartbeatResultAction updateHeartbeatInfo(Date_t now, const HeartbeatInfo& newInfo);
+        virtual HeartbeatResultAction updateHeartbeatData(Date_t now,
+                                                          const MemberHeartbeatData& newInfo,
+                                                          int id);
 
         virtual void prepareStatusResponse(Date_t now,
                                            const BSONObj& cmdObj,
@@ -85,7 +88,7 @@ namespace repl {
 
         virtual void relinquishPrimary(OperationContext* txn);
 
-        virtual void updateConfig(const ReplicaSetConfig newConfig, const int selfId);
+        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex, Date_t now);
 
     };
 

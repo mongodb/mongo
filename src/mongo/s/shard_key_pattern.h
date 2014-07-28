@@ -39,5 +39,9 @@ namespace mongo {
      * metadata or index information aside from the key patterns themselves.
      */
 
-    bool isUniqueIndexCompatible( const BSONObj shardKeyPattern, const BSONObj uIndexKeyPattern );
+    const int kMaxShardKeySize = 512;
+
+    bool isUniqueIndexCompatible(const BSONObj& shardKeyPattern, const BSONObj& uIndexKeyPattern);
+
+    bool isShardDocSizeValid(const BSONObj& shardKey, const BSONObj& doc, std::string* errMsg);
 }

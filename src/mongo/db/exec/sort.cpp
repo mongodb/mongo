@@ -420,9 +420,9 @@ namespace mongo {
         _child->prepareToYield();
     }
 
-    void SortStage::recoverFromYield() {
+    void SortStage::recoverFromYield(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        _child->recoverFromYield();
+        _child->recoverFromYield(opCtx);
     }
 
     void SortStage::invalidate(const DiskLoc& dl, InvalidationType type) {

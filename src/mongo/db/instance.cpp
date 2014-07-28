@@ -1000,7 +1000,7 @@ namespace {
     static AtomicUInt32 shutdownInProgress(0);
 
     bool inShutdown() {
-        return shutdownInProgress.load() != 0;
+        return shutdownInProgress.loadRelaxed() != 0;
     }
 
     static void shutdownServer(OperationContext* txn) {
@@ -1017,7 +1017,8 @@ namespace {
         log() << "shutdown: going to close sockets..." << endl;
         boost::thread close_socket_thread( stdx::bind(MessagingPort::closeAllSockets, 0) );
 
-        globalStorageEngine->cleanShutdown(txn);
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->cleanShutdown(txn);
     }
 
     void exitCleanly( ExitCode code ) {

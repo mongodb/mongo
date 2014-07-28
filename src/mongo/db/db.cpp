@@ -33,6 +33,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
+#include <limits>
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
@@ -103,6 +104,7 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/version_reporting.h"
 
 #if !defined(_WIN32)
@@ -263,8 +265,8 @@ namespace mongo {
         c.insert( name, o);
     }
 
+    // Starts the listener port and never returns unless an error occurs
     static void listen(int port) {
-        //testTheDb();
         MessageServer::Options options;
         options.port = port;
         options.ipList = serverGlobalParams.bind_ip;
@@ -286,6 +288,14 @@ namespace mongo {
         boost::thread thr(testExhaust);
 #endif
         server->run();
+
+        // If system is in shutdown, any network errors are from the sockets closing, so just block
+        // and wait for _exit to be called.
+        if (inShutdown()) {
+            sleepsecs(std::numeric_limits<int>::max());
+        }
+
+        exitCleanly(EXIT_NET_ERROR);
     }
 
     void checkForIdIndexes( OperationContext* txn, Database* db ) {
@@ -331,7 +341,9 @@ namespace mongo {
         WriteUnitOfWork wunit(txn.recoveryUnit());
 
         vector< string > dbNames;
-        globalStorageEngine->listDatabases( &dbNames );
+
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases( &dbNames );
 
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
             string dbName = *i;
@@ -348,7 +360,7 @@ namespace mongo {
                 ctx.db()->clearTmpCollections(&txn);
 
             if ( storageGlobalParams.repair ) {
-                fassert(18506, globalStorageEngine->repairDatabase(&txn, dbName));
+                fassert(18506, storageEngine->repairDatabase(&txn, dbName));
             }
             else if (!ctx.db()->getDatabaseCatalogEntry()->currentFilesCompatible(&txn)) {
                 log() << "****";
@@ -363,10 +375,11 @@ namespace mongo {
 
                 const string systemIndexes = ctx.db()->name() + ".system.indexes";
                 Collection* coll = ctx.db()->getCollection( &txn, systemIndexes );
-                auto_ptr<Runner> runner(InternalPlanner::collectionScan(&txn, systemIndexes,coll));
+                auto_ptr<PlanExecutor> exec(
+                    InternalPlanner::collectionScan(&txn, systemIndexes,coll));
                 BSONObj index;
-                Runner::RunnerState state;
-                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&index, NULL))) {
+                PlanExecutor::ExecState state;
+                while (PlanExecutor::ADVANCED == (state = exec->getNext(&index, NULL))) {
                     const BSONObj key = index.getObjectField("key");
                     const string plugin = IndexNames::findPluginName(key);
 
@@ -391,7 +404,7 @@ namespace mongo {
                     }
                 }
 
-                if (Runner::RUNNER_EOF != state) {
+                if (PlanExecutor::IS_EOF != state) {
                     warning() << "Internal error while reading collection " << systemIndexes;
                 }
 
@@ -467,7 +480,8 @@ namespace mongo {
                 }
 
                 Date_t start = jsTime();
-                int numFiles = globalStorageEngine->flushAllFiles( true );
+                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+                int numFiles = storageEngine->flushAllFiles( true );
                 time_flushing = (int) (jsTime() - start);
 
                 _flushed(time_flushing);
@@ -621,7 +635,11 @@ namespace mongo {
             exitCleanly(EXIT_CLEAN);
         }
 
-        uassertStatusOK(getGlobalAuthorizationManager()->initialize());
+        {
+            OperationContextImpl txn;
+
+            uassertStatusOK(getGlobalAuthorizationManager()->initialize(&txn));
+        }
 
         /* this is for security on certain platforms (nonce generation) */
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
@@ -661,9 +679,6 @@ namespace mongo {
         indexRebuilder.go(); 
 
         listen(listenPort);
-
-        // listen() will return when exit code closes its socket.
-        exitCleanly(EXIT_NET_ERROR);
     }
 
     static void initAndListen(int listenPort) {

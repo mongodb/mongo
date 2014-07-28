@@ -164,9 +164,9 @@ namespace mongo {
         }
     }
 
-    void OplogStart::recoverFromYield() {
+    void OplogStart::recoverFromYield(OperationContext* opCtx) {
         if (_cs) {
-            _cs->recoverFromYield();
+            _cs->recoverFromYield(opCtx);
         }
 
         for (size_t i = 0; i < _subIterators.size(); i++) {

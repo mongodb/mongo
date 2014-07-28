@@ -483,6 +483,9 @@ namespace mongo {
         return newPrivateView;
     }
 
+    // prevent WRITETODATAFILES() from running at the same time as FlushViewOfFile()
+    SimpleMutex globalFlushMutex("globalFlushMutex");
+
     class WindowsFlushable : public MemoryMappedFile::Flushable {
     public:
         WindowsFlushable( MemoryMappedFile* theFile,
@@ -513,59 +516,44 @@ namespace mongo {
                 _flushMutex.lock();
             }
 
+            SimpleMutex::scoped_lock _globalFlushMutex(globalFlushMutex);
             boost::lock_guard<boost::mutex> lk(_flushMutex, boost::adopt_lock_t());
 
+            int loopCount = 0;
+            bool success = false;
+            bool timeout = false;
+            int dosError = ERROR_SUCCESS;
             const int maximumTimeInSeconds = 60 * 15;
-            const unsigned long long chunkSize = 2 * 1024 * 1024;
-
-            for ( unsigned long long i = 0; i < _theFile->length(); i += chunkSize )
-            {
-                bool success = false;
-                int loopCount = 0;
-                bool timeout = false;
-                int dosError = ERROR_SUCCESS;
-
-                unsigned long long flushSize = min(chunkSize, _theFile->length() - i);
-                LPCVOID flushAddress = reinterpret_cast<LPCVOID>(
-                    reinterpret_cast<unsigned long long>(_view) + i);
-                Timer t;
-                while ( !success && !timeout ) {
-                    ++loopCount;
-
-                    // We flush the file in 2MB chunks to avoid a bug in Windows Azure Drives
-                    // that are attached with caching set to none or read-only, see SERVER-13681
-                    success = FlushViewOfFile(flushAddress, flushSize);
-                    if ( !success ) {
-                        dosError = GetLastError();
-                        if ( dosError != ERROR_LOCK_VIOLATION ) {
-                            break;
-                        }
-                        timeout = t.seconds() > maximumTimeInSeconds;
+            Timer t;
+            while ( !success && !timeout ) {
+                ++loopCount;
+                success = FALSE != FlushViewOfFile( _view, 0 );
+                if ( !success ) {
+                    dosError = GetLastError();
+                    if ( dosError != ERROR_LOCK_VIOLATION ) {
+                        break;
                     }
+                    timeout = t.seconds() > maximumTimeInSeconds;
                 }
-
-                if ( success && loopCount > 1 ) {
-                    log() << "FlushViewOfFile for " << _filename
-                        << " for address " << flushAddress
-                        << " of size " << flushSize
+            }
+            if ( success && loopCount > 1 ) {
+                log() << "FlushViewOfFile for " << _filename
                         << " succeeded after " << loopCount
                         << " attempts taking " << t.millis()
                         << "ms" << endl;
-                }
-                else if ( !success ) {
-                    log() << "FlushViewOfFile for " << _filename
+            }
+            else if ( !success ) {
+                log() << "FlushViewOfFile for " << _filename
                         << " failed with error " << dosError
-                        << " for address " << flushAddress
-                        << " of size " << flushSize
                         << " after " << loopCount
                         << " attempts taking " << t.millis()
                         << "ms" << endl;
-                    // Abort here to avoid data corruption
-                    fassert(16387, false);
-                }
+                // Abort here to avoid data corruption
+                fassert(16387, false);
             }
 
-            if (!FlushFileBuffers(_fd)) {
+            success = FALSE != FlushFileBuffers(_fd);
+            if (!success) {
                 int err = GetLastError();
                 log() << "FlushFileBuffers failed: " << errnoWithDescription( err )
                       << " file: " << _filename << endl;

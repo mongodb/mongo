@@ -16,18 +16,24 @@ for ( i=0; i<1000; i++ ){
 }
 
 x = d( "a" );
+// Collection scan looks at all 1000 documents and gets 1000
+// distinct values. Looks at 0 index keys.
 assert.eq( 1000 , x.stats.n , "AA1" )
-assert.eq( 1000 , x.stats.nscanned , "AA2" )
+assert.eq( 0 , x.stats.nscanned , "AA2" )
 assert.eq( 1000 , x.stats.nscannedObjects , "AA3" )
 
 x = d( "a" , { a : { $gt : 5 } } );
+// Collection scan looks at all 1000 documents and gets 398
+// distinct values which match the query. Looks at 0 index keys.
 assert.eq( 398 , x.stats.n , "AB1" )
-assert.eq( 1000 , x.stats.nscanned , "AB2" )
+assert.eq( 0 , x.stats.nscanned , "AB2" )
 assert.eq( 1000 , x.stats.nscannedObjects , "AB3" )
 
 x = d( "b" , { a : { $gt : 5 } } );
+// Collection scan looks at all 1000 documents and gets 398
+// distinct values which match the query. Looks at 0 index keys.
 assert.eq( 398 , x.stats.n , "AC1" )
-assert.eq( 1000 , x.stats.nscanned , "AC2" )
+assert.eq( 0 , x.stats.nscanned , "AC2" )
 assert.eq( 1000 , x.stats.nscannedObjects , "AC3" )
 
 
@@ -61,12 +67,9 @@ printjson(x);
 assert.lte(x.stats.n, 171);
 assert.eq(171, x.stats.nscannedObjects , "BD3" )
 
-
-
-// Cursor name should not be empty when using $or with hashed index.
-// 
+// Should use an index scan over the hashed index.
 t.dropIndexes();
 t.ensureIndex( { a : "hashed" } );
 x = d( "a", { $or : [ { a : 3 }, { a : 5 } ] } );
 assert.eq( 188, x.stats.n, "DA1" );
-assert.neq( "", x.stats.cursor, "DA2" );
+assert.eq( "IXSCAN { a: \"hashed\" }", x.stats.planSummary );

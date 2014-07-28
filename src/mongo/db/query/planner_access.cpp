@@ -792,6 +792,14 @@ namespace mongo {
             invariant(NULL != emChild->getTag());
             scanState->ixtag = static_cast<IndexTag*>(emChild->getTag());
 
+            // If 'emChild' is a NOT, then the tag we're interested in is on the NOT's
+            // child node.
+            if (MatchExpression::NOT == emChild->matchType()) {
+                invariant(NULL != emChild->getChild(0)->getTag());
+                scanState->ixtag = static_cast<IndexTag*>(emChild->getChild(0)->getTag());
+                invariant(IndexTag::kNoIndex != scanState->ixtag->index);
+            }
+
             if (shouldMergeWithLeaf(emChild, *scanState)) {
                 // The child uses the same index we're currently building a scan for.  Merge
                 // the bounds and filters.

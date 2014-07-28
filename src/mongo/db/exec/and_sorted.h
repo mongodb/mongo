@@ -62,7 +62,7 @@ namespace mongo {
         virtual bool isEOF();
 
         virtual void prepareToYield();
-        virtual void recoverFromYield();
+        virtual void recoverFromYield(OperationContext* opCtx);
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;

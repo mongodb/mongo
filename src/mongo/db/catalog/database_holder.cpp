@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/d_concurrency.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -103,8 +104,9 @@ namespace mongo {
         cc().writeHappened();
 
         // this locks _m for defensive checks, so we don't want to be locked right here :
-        invariant( globalStorageEngine );
-        DatabaseCatalogEntry* entry = globalStorageEngine->getDatabaseCatalogEntry( txn, dbname );
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        invariant(storageEngine);
+        DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry( txn, dbname );
         invariant( entry );
         justCreated = !entry->exists();
         Database *db = new Database(txn,

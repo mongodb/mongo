@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+// THIS FILE IS DEPRECATED -- the old explain implementation is being replaced
+
 #include "mongo/db/query/explain_plan.h"
 
 #include "mongo/db/query/stage_types.h"
@@ -436,7 +438,7 @@ namespace mongo {
         }
 
         // Common details.
-        bob->append("type", stageTypeString(stats.stageType));
+        bob->append("type", stats.common.stageTypeStr);
         bob->appendNumber("works", stats.common.works);
         bob->appendNumber("yields", stats.common.yields);
         bob->appendNumber("unyields", stats.common.unyields);

@@ -36,10 +36,10 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/master_slave.h"
+#include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -178,17 +178,19 @@ namespace repl {
         return awaitReplication(txn, cc().getLastOp(), writeConcern);
     }
 
-    Status LegacyReplicationCoordinator::stepDown(bool force,
+    Status LegacyReplicationCoordinator::stepDown(OperationContext* txn, 
+                                                  bool force,
                                                   const Milliseconds& waitTime,
                                                   const Milliseconds& stepdownTime) {
-        return _stepDownHelper(force, waitTime, stepdownTime, Milliseconds(0));
+        return _stepDownHelper(txn, force, waitTime, stepdownTime, Milliseconds(0));
     }
 
     Status LegacyReplicationCoordinator::stepDownAndWaitForSecondary(
+            OperationContext* txn,
             const Milliseconds& initialWaitTime,
             const Milliseconds& stepdownTime,
             const Milliseconds& postStepdownWaitTime) {
-        return _stepDownHelper(false, initialWaitTime, stepdownTime, postStepdownWaitTime);
+        return _stepDownHelper(txn, false, initialWaitTime, stepdownTime, postStepdownWaitTime);
     }
 
 namespace {
@@ -234,7 +236,8 @@ namespace {
     }
 } // namespace
 
-    Status LegacyReplicationCoordinator::_stepDownHelper(bool force,
+    Status LegacyReplicationCoordinator::_stepDownHelper(OperationContext* txn,
+                                                         bool force,
                                                          const Milliseconds& initialWaitTime,
                                                          const Milliseconds& stepdownTime,
                                                          const Milliseconds& postStepdownWaitTime) {
@@ -251,7 +254,7 @@ namespace {
         }
 
         // step down
-        bool worked = repl::theReplSet->stepDown(stepdownTime.total_seconds());
+        bool worked = repl::theReplSet->stepDown(txn, stepdownTime.total_seconds());
         if (!worked) {
             return Status(ErrorCodes::NotMaster, "not primary so can't step down");
         }
@@ -370,7 +373,8 @@ namespace {
         return true;
     }
 
-    Status LegacyReplicationCoordinator::setLastOptime(const OID& rid,
+    Status LegacyReplicationCoordinator::setLastOptime(OperationContext* txn,
+                                                       const OID& rid,
                                                        const OpTime& ts) {
         {
             boost::lock_guard<boost::mutex> lock(_mutex);
@@ -382,7 +386,7 @@ namespace {
             LOG(2) << "received notification that node with RID " << rid << " and config " << config
                     << " has reached optime: " << ts.toStringPretty();
 
-            if (rid != getMyRID()) {
+            if (rid != getMyRID(txn)) {
                 // TODO(spencer): Remove this invariant for backwards compatibility
                 invariant(!config.isEmpty());
                 // This is what updates the progress information used for satisfying write concern
@@ -414,26 +418,26 @@ namespace {
     }
 
 
-    OID LegacyReplicationCoordinator::getMyRID() {
+    OID LegacyReplicationCoordinator::getMyRID(OperationContext* txn) {
         Mode mode = getReplicationMode();
         if (mode == modeReplSet) {
             return theReplSet->syncSourceFeedback.getMyRID();
         } else if (mode == modeMasterSlave) {
-            OperationContextImpl txn;
-            ReplSource source(&txn);
+            ReplSource source(txn);
             return source.getMyRID();
         }
         invariant(false); // Don't have an RID if no replication is enabled
     }
 
     void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommand(
+            OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {
         invariant(getReplicationMode() == modeReplSet);
         boost::lock_guard<boost::mutex> lock(_mutex);
         cmdBuilder->append("replSetUpdatePosition", 1);
         // create an array containing objects each member connected to us and for ourself
         BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
-        OID myID = getMyRID();
+        OID myID = getMyRID(txn);
         {
             for (SlaveOpTimeMap::const_iterator itr = _slaveOpTimeMap.begin();
                     itr != _slaveOpTimeMap.end(); ++itr) {
@@ -455,12 +459,43 @@ namespace {
         }
     }
 
+    void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommandHandshakes(
+            OperationContext* txn,
+            std::vector<BSONObj>* handshakes) {
+        invariant(getReplicationMode() == modeReplSet);
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        // handshake obj for us
+        BSONObjBuilder cmd;
+        cmd.append("replSetUpdatePosition", 1);
+        BSONObjBuilder sub (cmd.subobjStart("handshake"));
+        sub.append("handshake", getMyRID(txn));
+        sub.append("member", theReplSet->selfId());
+        sub.append("config", theReplSet->myConfig().asBson());
+        sub.doneFast();
+        handshakes->push_back(cmd.obj());
+
+        // handshake objs for all chained members
+        for (OIDMemberMap::const_iterator itr = _ridMemberMap.begin();
+             itr != _ridMemberMap.end(); ++itr) {
+            BSONObjBuilder cmd;
+            cmd.append("replSetUpdatePosition", 1);
+            // outer handshake indicates this is a handshake command
+            // inner is needed as part of the structure to be passed to gotHandshake
+            BSONObjBuilder subCmd (cmd.subobjStart("handshake"));
+            subCmd.append("handshake", itr->first);
+            subCmd.append("member", itr->second->id());
+            subCmd.append("config", itr->second->config().asBson());
+            subCmd.doneFast();
+            handshakes->push_back(cmd.obj());
+        }
+    }
+
     void LegacyReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
         theReplSet->summarizeStatus(*result);
     }
 
-    bool LegacyReplicationCoordinator::setMaintenanceMode(bool activate) {
-        return theReplSet->setMaintenanceMode(activate);
+    bool LegacyReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
+        return theReplSet->setMaintenanceMode(txn, activate);
     }
 
     Status LegacyReplicationCoordinator::processHeartbeat(const BSONObj& cmdObj, 
@@ -897,13 +932,14 @@ namespace {
         return Status::OK();
     }
 
-    Status LegacyReplicationCoordinator::processReplSetMaintenance(bool activate,
+    Status LegacyReplicationCoordinator::processReplSetMaintenance(OperationContext* txn,
+                                                                   bool activate,
                                                                    BSONObjBuilder* resultObj) {
         Status status = _checkReplEnabledForCommand(resultObj);
         if (!status.isOK()) {
             return status;
         }
-        if (!setMaintenanceMode(activate)) {
+        if (!setMaintenanceMode(txn, activate)) {
             if (theReplSet->isPrimary()) {
                 return Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
             }
@@ -926,7 +962,8 @@ namespace {
         return theReplSet->forceSyncFrom(target, resultObj);
     }
 
-    Status LegacyReplicationCoordinator::processReplSetUpdatePosition(const BSONArray& updates,
+    Status LegacyReplicationCoordinator::processReplSetUpdatePosition(OperationContext* txn,
+                                                                      const BSONArray& updates,
                                                                       BSONObjBuilder* resultObj) {
         Status status = _checkReplEnabledForCommand(resultObj);
         if (!status.isOK()) {
@@ -937,7 +974,7 @@ namespace {
             BSONObj entry = elem.Obj();
             OID id = entry["_id"].OID();
             OpTime ot = entry["optime"]._opTime();
-            Status status = setLastOptime(id, ot);
+            Status status = setLastOptime(txn, id, ot);
             if (!status.isOK()) {
                 return status;
             }
@@ -946,14 +983,14 @@ namespace {
     }
 
     Status LegacyReplicationCoordinator::processReplSetUpdatePositionHandshake(
-            const BSONObj& handshake,
-            BSONObjBuilder* resultObj) {
+            const OperationContext* txn, const BSONObj& cmdObj, BSONObjBuilder* resultObj) {
         Status status = _checkReplEnabledForCommand(resultObj);
         if (!status.isOK()) {
             return status;
         }
 
-        if (!cc().gotHandshake(handshake)) {
+        OID rid = cmdObj["handshake"].OID();
+        if (!processHandshake(txn, rid, cmdObj)) {
             return Status(ErrorCodes::NodeNotFound,
                           "node could not be found in replica set config during handshake");
         }
@@ -965,22 +1002,37 @@ namespace {
         return Status::OK();
     }
 
-    bool LegacyReplicationCoordinator::processHandshake(const OID& remoteID,
+    bool LegacyReplicationCoordinator::processHandshake(const OperationContext* txn,
+                                                        const OID& remoteID,
                                                         const BSONObj& handshake) {
         LOG(2) << "Received handshake " << handshake << " from node with RID " << remoteID;
 
-        {
-            boost::lock_guard<boost::mutex> lock(_mutex);
-            BSONObj configObj = handshake["config"].Obj().getOwned();
-            invariant(!configObj.isEmpty());
-            _ridConfigMap[remoteID] = configObj;
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        BSONObj configObj;
+        if (handshake.hasField("config")) {
+            configObj = handshake["config"].Obj().getOwned();
+        } else {
+            configObj = BSON("host" << txn->getClient()->clientAddress(true) <<
+                             "upgradeNeeded" << true);
         }
+        _ridConfigMap[remoteID] = configObj;
 
         if (getReplicationMode() != modeReplSet || !handshake.hasField("member")) {
             return false;
         }
 
-        return theReplSet->registerSlave(remoteID, handshake["member"].Int());
+        int memberID = handshake["member"].Int();
+        Member* member = theReplSet->getMutableMember(memberID);
+        // it is possible that a node that was removed in a reconfig tried to handshake this node
+        // in that case, the Member will no longer be in theReplSet's _members List and member
+        // will be NULL
+        if (!member) {
+            return false;
+        }
+
+        _ridMemberMap[remoteID] = member;
+        theReplSet->syncSourceFeedback.forwardSlaveHandshake();
+        return true;
     }
 
     void LegacyReplicationCoordinator::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
@@ -1007,6 +1059,13 @@ namespace {
         }
 
         return Status::OK();
+    }
+
+    BSONObj LegacyReplicationCoordinator::getGetLastErrorDefault() {
+        if (getReplicationMode() == modeReplSet) {
+            return theReplSet->getLastErrorDefault;
+        }
+        return BSONObj();
     }
 
 } // namespace repl

@@ -154,7 +154,7 @@ namespace auth {
         return _parseNamesFromBSONArray(rolesArray,
                                         dbname,
                                         AuthorizationManager::ROLE_NAME_FIELD_NAME,
-                                        AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
+                                        AuthorizationManager::ROLE_DB_FIELD_NAME,
                                         parsedRoleNames);
     }
 
@@ -434,7 +434,7 @@ namespace auth {
             status = _parseNameFromBSONElement(cmdObj["rolesInfo"],
                                                dbname,
                                                AuthorizationManager::ROLE_NAME_FIELD_NAME,
-                                               AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
+                                               AuthorizationManager::ROLE_DB_FIELD_NAME,
                                                &name);
             if (!status.isOK()) {
                 return status;

@@ -1641,6 +1641,21 @@ namespace {
         runQuery(fromjson("{a: {$elemMatch: {$not: {$gte: 6}}}}"));
     }
 
+    // SERVER-14625: Make sure we construct bounds properly for $elemMatch object with a
+    // negation inside.
+    TEST_F(QueryPlannerTest, ElemMatchWithNotInside2) {
+        addIndex(BSON("a.b" << 1 << "a.c" << 1));
+        runQuery(fromjson("{d: 1, a: {$elemMatch: {c: {$ne: 3}, b: 4}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {d: 1, a: {$elemMatch: {c: {$ne: 3}, b: 4}}}, node:"
+                                "{ixscan: {filter: null, pattern: {'a.b': 1, 'a.c': 1}, bounds:"
+                                    "{'a.b': [[4,4,true,true]],"
+                                    " 'a.c': [['MinKey',3,true,false],"
+                                             "[3,'MaxKey',false,true]]}}}}}");
+    }
+
     // SERVER-13789
     TEST_F(QueryPlannerTest, ElemMatchIndexedNestedOr) {
         addIndex(BSON("bar.baz" << 1));

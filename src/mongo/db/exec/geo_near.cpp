@@ -36,8 +36,10 @@
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/index/expression_index.h"
+#include "mongo/db/geo/geoparser.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/expression_index.h"
+#include "mongo/db/query/expression_index_knobs.h"
 
 namespace mongo {
 
@@ -134,7 +136,7 @@ namespace mongo {
         // Must have an object in order to get geometry out of it.
         invariant(member->hasObj());
 
-        CRS queryCRS = nearParams.nearQuery.getQueryCRS();
+        CRS queryCRS = nearParams.nearQuery.centroid.crs;
 
         // Extract all the geometries out of this document for the near query
         OwnedPointerVector<StoredGeometry> geometriesOwned;
@@ -171,7 +173,7 @@ namespace mongo {
         }
 
         if (nearParams.addDistMeta) {
-            if (nearParams.nearQuery.unitsAreRadians()) {
+            if (nearParams.nearQuery.unitsAreRadians) {
                 // Hack for nearSphere
                 // TODO: Remove nearSphere?
                 invariant(SPHERE == queryCRS);
@@ -190,37 +192,34 @@ namespace mongo {
         return StatusWith<double>(minDistance);
     }
 
-    static Point toPoint(const PointWithCRS& ptCRS) {
-        if (ptCRS.crs == FLAT) {
-            return ptCRS.oldPoint;
-        }
-        else {
-            S2LatLng latLng(ptCRS.point);
-            return Point(latLng.lng().degrees(), latLng.lat().degrees());
-        }
-    }
-
     static R2Annulus geoNearDistanceBounds(const NearQuery& query) {
 
-        if (FLAT == query.getQueryCRS()) {
-            return R2Annulus(toPoint(query.centroid), query.minDistance, query.maxDistance);
+        const CRS queryCRS = query.centroid.crs;
+
+        if (FLAT == queryCRS) {
+            return R2Annulus(query.centroid.oldPoint, query.minDistance, query.maxDistance);
         }
 
-        invariant(SPHERE == query.getQueryCRS());
+        invariant(SPHERE == queryCRS);
 
         // TODO: Tighten this up a bit by making a CRS for "sphere with radians"
         double minDistance = query.minDistance;
         double maxDistance = query.maxDistance;
 
-        if (query.unitsAreRadians()) {
+        if (query.unitsAreRadians) {
             // Our input bounds are in radians, convert to meters since the query CRS is actually
             // SPHERE.  We'll convert back to radians on outputting distances.
             minDistance *= kRadiusOfEarthInMeters;
             maxDistance *= kRadiusOfEarthInMeters;
         }
 
-        invariant(SPHERE == query.getQueryCRS());
-        return R2Annulus(toPoint(query.centroid),
+        // GOTCHA: oldPoint is a misnomer - it is the original point data and is in the correct
+        // CRS.  We must not try to derive the original point from the spherical S2Point generated
+        // as an optimization - the mapping is not 1->1 - [-180, 0] and [180, 0] map to the same
+        // place.
+        // TODO: Wrapping behavior should not depend on the index, which would make $near code
+        // insensitive to which direction we explore the index in.
+        return R2Annulus(query.centroid.oldPoint,
                          min(minDistance, kMaxEarthDistanceInMeters),
                          min(maxDistance, kMaxEarthDistanceInMeters));
     }
@@ -233,8 +232,9 @@ namespace mongo {
                                         const IndexDescriptor* twoDIndex) {
 
         R2Annulus fullBounds = geoNearDistanceBounds(nearParams.nearQuery);
+        const CRS queryCRS = nearParams.nearQuery.centroid.crs;
 
-        if (FLAT == nearParams.nearQuery.getQueryCRS()) {
+        if (FLAT == queryCRS) {
 
             // Reset the full bounds based on our index bounds
             GeoHashConverter::Parameters hashParams;
@@ -253,8 +253,8 @@ namespace mongo {
         else {
             // Spherical queries have upper bounds set by the earth - no-op
             // TODO: Wrapping errors would creep in here if nearSphere wasn't defined to not wrap
-            invariant(SPHERE == nearParams.nearQuery.getQueryCRS());
-            invariant(!nearParams.nearQuery.isWrappingQuery());
+            invariant(SPHERE == queryCRS);
+            invariant(!nearParams.nearQuery.isWrappingQuery);
         }
 
         return fullBounds;
@@ -262,7 +262,7 @@ namespace mongo {
 
     static double twoDBoundsIncrement(const GeoNearParams& nearParams) {
         // TODO: Revisit and tune these
-        if (FLAT == nearParams.nearQuery.getQueryCRS()) {
+        if (FLAT == nearParams.nearQuery.centroid.crs) {
             return 10;
         }
         else {
@@ -460,10 +460,11 @@ namespace mongo {
         // max radius.  This is slightly conservative for now (box diagonal vs circle radius).
         double minBoundsIncrement = hasher.getError() / 2;
 
-        if (FLAT == query.getQueryCRS())
+        const CRS queryCRS = query.centroid.crs;
+        if (FLAT == queryCRS)
             return minBoundsIncrement;
 
-        invariant(SPHERE == query.getQueryCRS());
+        invariant(SPHERE == queryCRS);
 
         // If this is a spherical query, units are in meters - this is just a heuristic
         return minBoundsIncrement * kMetersPerDegreeAtEquator;
@@ -522,8 +523,11 @@ namespace mongo {
         // Get a covering region for this interval
         //
 
+        const CRS queryCRS = _nearParams.nearQuery.centroid.crs;
+
         auto_ptr<R2Region> coverRegion;
-        if (_nearParams.nearQuery.getQueryCRS() == FLAT) {
+
+        if (FLAT == queryCRS) {
 
             // NOTE: Due to floating point math issues, FLAT searches of a 2D index need to treat
             // containment and distance separately.
@@ -567,7 +571,7 @@ namespace mongo {
                                             nextBounds.getOuter() + epsilon));
         }
         else {
-            invariant(SPHERE == _nearParams.nearQuery.getQueryCRS());
+            invariant(SPHERE == queryCRS);
             // TODO: As above, make this consistent with $within : $centerSphere
 
             // Our intervals aren't in the same CRS as our index, so we need to adjust them
@@ -598,7 +602,11 @@ namespace mongo {
 
         OrderedIntervalList coveredIntervals;
         coveredIntervals.name = scanParams.bounds.fields[twoDFieldPosition].name;
-        ExpressionMapping::cover2d(*coverRegion, _twoDIndex->infoObj(), &coveredIntervals);
+
+        ExpressionMapping::cover2d(*coverRegion,
+                                   _twoDIndex->infoObj(),
+                                   internalGeoNearQuery2DMaxCoveringCells,
+                                   &coveredIntervals);
 
         // Intersect the $near bounds we just generated into the bounds we have for anything else
         // in the scan (i.e. $within)
@@ -630,7 +638,7 @@ namespace mongo {
             _nearParams.fullFilter ? _nearParams.fullFilter->shallowClone() : NULL;
         
         // FLAT searches need to add an additional annulus $within matcher, see above
-        if (FLAT == _nearParams.nearQuery.getQueryCRS()) {
+        if (FLAT == queryCRS) {
 
             MatchExpression* withinMatcher =
                 new TwoDPtInAnnulusExpression(_fullBounds, twoDFieldName);

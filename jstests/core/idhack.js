@@ -30,8 +30,6 @@ assert.eq( 1 , explain.n , "D1" );
 assert.eq( 1 , explain.nscanned , "D2" );
 assert.neq( undefined , explain.cursor , "D3" );
 assert.neq( "" , explain.cursor , "D4" );
-assert.neq( undefined , explain.indexBounds , "D5" );
-assert.neq( {} , explain.indexBounds , "D6" );
 
 // ID hack cannot be used with hint().
 var query = { _id : { x : 2 } };

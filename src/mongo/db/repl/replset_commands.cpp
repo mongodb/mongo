@@ -268,6 +268,7 @@ namespace repl {
                 secs = 60;
 
             Status status = getGlobalReplicationCoordinator()->stepDown(
+                    txn,
                     force,
                     ReplicationCoordinator::Milliseconds(0),
                     ReplicationCoordinator::Milliseconds(secs * 1000));
@@ -293,6 +294,7 @@ namespace repl {
             return appendCommandStatus(
                     result,
                     getGlobalReplicationCoordinator()->processReplSetMaintenance(
+                            txn,
                             cmdObj["replSetMaintenance"].trueValue(),
                             &result));
         }
@@ -351,6 +353,7 @@ namespace repl {
                 return appendCommandStatus(
                         result,
                         getGlobalReplicationCoordinator()->processReplSetUpdatePositionHandshake(
+                                txn,
                                 cmdObj["handshake"].embeddedObject(),
                                 &result));
             }
@@ -361,6 +364,7 @@ namespace repl {
             return appendCommandStatus(
                     result,
                     getGlobalReplicationCoordinator()->processReplSetUpdatePosition(
+                            txn,
                             BSONArray(cmdObj["optimes"].Obj()),
                             &result));
         }

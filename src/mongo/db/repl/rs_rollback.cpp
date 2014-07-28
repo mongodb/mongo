@@ -234,7 +234,7 @@ namespace repl {
     static void syncRollbackFindCommonPoint(OperationContext* txn, DBClientConnection* them, FixUpInfo& fixUpInfo) {
         Client::Context ctx(txn, rsoplog);
 
-        boost::scoped_ptr<Runner> runner(
+        boost::scoped_ptr<PlanExecutor> exec(
                 InternalPlanner::collectionScan(txn,
                                                 rsoplog,
                                                 ctx.db()->getCollection(txn, rsoplog),
@@ -243,7 +243,7 @@ namespace repl {
         BSONObj ourObj;
         DiskLoc ourLoc;
 
-        if (Runner::RUNNER_ADVANCED != runner->getNext(&ourObj, &ourLoc)) {
+        if (PlanExecutor::ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
             throw RSFatalException("our oplog empty or unreadable");
         }
 
@@ -304,7 +304,7 @@ namespace repl {
                 theirObj = oplogCursor->nextSafe();
                 theirTime = theirObj["ts"]._opTime();
 
-                if (Runner::RUNNER_ADVANCED != runner->getNext(&ourObj, &ourLoc)) {
+                if (PlanExecutor::ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
                     log() << "replSet rollback error RS101 reached beginning of local oplog"
                           << rsLog;
                     log() << "replSet   them:      " << them->toString() << " scanned: "
@@ -331,7 +331,7 @@ namespace repl {
             else {
                 // theirTime < ourTime
                 refetch(fixUpInfo, ourObj);
-                if (Runner::RUNNER_ADVANCED != runner->getNext(&ourObj, &ourLoc)) {
+                if (PlanExecutor::ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
                     log() << "replSet rollback error RS101 reached beginning of local oplog"
                           << rsLog;
                     log() << "replSet   them:      " << them->toString() << " scanned: "
@@ -662,7 +662,7 @@ namespace repl {
         // TODO: fatal error if this throws?
         oplogCollection->temp_cappedTruncateAfter(txn, fixUpInfo.commonPointOurDiskloc, false);
 
-        Status status = getGlobalAuthorizationManager()->initialize();
+        Status status = getGlobalAuthorizationManager()->initialize(txn);
         if (!status.isOK()) {
             warning() << "Failed to reinitialize auth data after rollback: " << status;
             warn = true;
@@ -678,15 +678,14 @@ namespace repl {
             sethbmsg("rollback done");
     }
 
-    void ReplSetImpl::syncRollback(OplogReader& oplogreader) {
+    void ReplSetImpl::syncRollback(OperationContext* txn, OplogReader& oplogreader) {
         // check that we are at minvalid, otherwise we cannot rollback as we may be in an
         // inconsistent state
-        OperationContextImpl txn;
 
         {
-            Lock::DBRead lk(txn.lockState(), "local.replset.minvalid");
+            Lock::DBRead lk(txn->lockState(), "local.replset.minvalid");
             BSONObj mv;
-            if (Helpers::getSingleton(&txn, "local.replset.minvalid", mv)) {
+            if (Helpers::getSingleton(txn, "local.replset.minvalid", mv)) {
                 OpTime minvalid = mv["ts"]._opTime();
                 if (minvalid > lastOpTimeWritten) {
                     log() << "replSet need to rollback, but in inconsistent state";
@@ -698,7 +697,7 @@ namespace repl {
             }
         }
 
-        unsigned s = _syncRollback(&txn, oplogreader);
+        unsigned s = _syncRollback(txn, oplogreader);
         if (s)
             sleepsecs(s);
     }

@@ -46,19 +46,18 @@ namespace repl {
 #endif
 
     const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
+    const std::string ReplicaSetConfig::kIdFieldName = "_id";
+    const std::string ReplicaSetConfig::kVersionFieldName = "version";
+    const std::string ReplicaSetConfig::kMembersFieldName = "members";
+    const std::string ReplicaSetConfig::kSettingsFieldName = "settings";
 
 namespace {
 
-    const std::string kIdFieldName = "_id";
-    const std::string kVersionFieldName = "version";
-    const std::string kMembersFieldName = "members";
-    const std::string kSettingsFieldName = "settings";
-
     const std::string kLegalConfigTopFieldNames[] = {
-        kIdFieldName,
-        kVersionFieldName,
-        kMembersFieldName,
-        kSettingsFieldName
+        ReplicaSetConfig::kIdFieldName,
+        ReplicaSetConfig::kVersionFieldName,
+        ReplicaSetConfig::kMembersFieldName,
+        ReplicaSetConfig::kSettingsFieldName
     };
 
     const std::string kHeartbeatTimeoutFieldName = "heartbeatTimeoutSecs";
@@ -68,9 +67,10 @@ namespace {
 
 }  // namespace
 
-    ReplicaSetConfig::ReplicaSetConfig() : _heartbeatTimeoutPeriod(0) {}
+    ReplicaSetConfig::ReplicaSetConfig() : _isInitialized(false), _heartbeatTimeoutPeriod(0) {}
 
     Status ReplicaSetConfig::initialize(const BSONObj& cfg) {
+        _isInitialized = false;
         _members.clear();
         Status status = bsonCheckOnlyHasFields(
                 "replica set configuration", cfg, kLegalConfigTopFieldNames);
@@ -129,7 +129,8 @@ namespace {
         if (!status.isOK())
             return status;
 
-        _calculateMajorityNumber();
+        _calculateMajorities();
+        _isInitialized = true;
         return Status::OK();
     }
 
@@ -344,6 +345,11 @@ namespace {
         return Status::OK();
     }
 
+    const MemberConfig& ReplicaSetConfig::getMemberAt(size_t i) const { 
+        invariant(i < _members.size());
+        return _members[i]; 
+    }
+
     ReplicaSetTag ReplicaSetConfig::findTag(const StringData& key, const StringData& value) const {
         return _tagConfig.findTag(key, value);
     }
@@ -363,10 +369,10 @@ namespace {
         return StatusWith<ReplicaSetTagPattern>(iter->second);
     }
 
-    void ReplicaSetConfig::_calculateMajorityNumber() {
-        const size_t total = getNumMembers();
-        const size_t strictMajority = total/2+1;
-        const size_t nonArbiters = total - std::count_if(
+    void ReplicaSetConfig::_calculateMajorities() {
+        const int total = getNumMembers();
+        const int strictMajority = total / 2 + 1;
+        const int nonArbiters = total - std::count_if(
                 _members.begin(),
                 _members.end(),
                 stdx::bind(&MemberConfig::isArbiter, stdx::placeholders::_1));
@@ -377,7 +383,61 @@ namespace {
         // TODO(SERVER-14403): Should majority exclude hidden nodes? non-voting nodes? unelectable
         // nodes?
         _majorityNumber = (strictMajority > nonArbiters) ? nonArbiters : strictMajority;
+
+        const int voters = std::count_if(
+                _members.begin(),
+                _members.end(),
+                stdx::bind(&MemberConfig::isVoter, stdx::placeholders::_1));
+
+        _majorityVoteCount = voters / 2 + 1;
     }
+
+    BSONObj ReplicaSetConfig::toBSON() const {
+        BSONObjBuilder configBuilder;
+        configBuilder.append("_id", _replSetName);
+        configBuilder.append("version", _version);
+
+        BSONArrayBuilder members(configBuilder.subarrayStart("members"));
+        for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
+            members.append(mem->toBSON(getTagConfig()));
+        }
+        members.done();
+
+        BSONObjBuilder settingsBuilder(configBuilder.subobjStart("settings"));
+        settingsBuilder.append("chainingAllowed", _chainingAllowed);
+        settingsBuilder.append("heartbeatTimeoutSecs", _heartbeatTimeoutPeriod.total_seconds());
+
+        BSONObjBuilder gleModes(settingsBuilder.subobjStart("getLastErrorModes"));
+        for (StringMap<ReplicaSetTagPattern>::const_iterator mode =
+                    _customWriteConcernModes.begin();
+                mode != _customWriteConcernModes.end();
+                ++mode) {
+            BSONObjBuilder modeBuilder(gleModes.subobjStart(mode->first));
+            for (ReplicaSetTagPattern::ConstraintIterator itr = mode->second.constraintsBegin();
+                    itr != mode->second.constraintsEnd();
+                    itr++) {
+                modeBuilder.append(_tagConfig.getTagKey(ReplicaSetTag(itr->getKeyIndex(), 0)),
+                                   itr->getMinCount());
+            }
+            modeBuilder.done();
+        }
+        gleModes.done();
+
+        settingsBuilder.append("getLastErrorDefaults", _defaultWriteConcern.toBSON());
+        settingsBuilder.done();
+        return configBuilder.obj();
+    }
+
+     std::vector<std::string> ReplicaSetConfig::getWriteConcernNames() const {
+        std::vector<std::string> names;
+        for (StringMap<ReplicaSetTagPattern>::const_iterator mode =
+                    _customWriteConcernModes.begin();
+                mode != _customWriteConcernModes.end();
+                ++mode) {
+            names.push_back(mode->first);
+        }
+        return names;
+     }
 
 }  // namespace repl
 }  // namespace mongo

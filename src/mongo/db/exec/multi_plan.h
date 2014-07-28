@@ -64,7 +64,7 @@ namespace mongo {
 
         virtual void prepareToYield();
 
-        virtual void recoverFromYield();
+        virtual void recoverFromYield(OperationContext* opCtx);
 
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
@@ -140,7 +140,7 @@ namespace mongo {
 
         void allPlansSaveState();
 
-        void allPlansRestoreState();
+        void allPlansRestoreState(OperationContext* opCtx);
 
         static const int kNoSuchPlan = -1;
 

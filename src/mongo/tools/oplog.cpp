@@ -55,7 +55,14 @@ public:
         
         repl::OplogReader r;
         r.setTailingQueryOptions( QueryOption_SlaveOk | QueryOption_AwaitData );
-        r.connect(mongoOplogGlobalParams.from);
+
+        bool connected = r.connect(mongoOplogGlobalParams.from);
+
+        if (!connected)
+        {
+            toolInfoLog() << "unable to connect to " << mongoOplogGlobalParams.from << std::endl;
+            return -1;
+        }
 
         toolInfoLog() << "connected" << std::endl;
 

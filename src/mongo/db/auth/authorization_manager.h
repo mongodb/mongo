@@ -78,7 +78,7 @@ namespace mongo {
         static const std::string USER_NAME_FIELD_NAME;
         static const std::string USER_DB_FIELD_NAME;
         static const std::string ROLE_NAME_FIELD_NAME;
-        static const std::string ROLE_SOURCE_FIELD_NAME; // TODO: rename to ROLE_DB_FIELD_NAME
+        static const std::string ROLE_DB_FIELD_NAME;
         static const std::string PASSWORD_FIELD_NAME;
         static const std::string V1_USER_NAME_FIELD_NAME;
         static const std::string V1_USER_SOURCE_FIELD_NAME;
@@ -256,7 +256,8 @@ namespace mongo {
          * Should only be called on collections with authorization documents in them
          * (ie admin.system.users and admin.system.roles).
          */
-        Status queryAuthzDocument(const NamespaceString& collectionName,
+        Status queryAuthzDocument(OperationContext* txn,
+                                  const NamespaceString& collectionName,
                                   const BSONObj& query,
                                   const BSONObj& projection,
                                   const stdx::function<void(const BSONObj&)>& resultProcessor);
@@ -348,7 +349,7 @@ namespace mongo {
          * system is at, this may involve building up the user cache and/or the roles graph.
          * Call this function at startup and after resynchronizing a slave/secondary.
          */
-        Status initialize();
+        Status initialize(OperationContext* txn);
 
         /**
          * Invalidates all of the contents of the user cache.
