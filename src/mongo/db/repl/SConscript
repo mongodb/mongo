@@ -55,6 +55,7 @@ env.Library('repl_coordinator_impl',
 env.CppUnitTest('repl_coordinator_impl_test',
                 'repl_coordinator_impl_test.cpp',
                 LIBDEPS=['repl_coordinator_impl',
+                         'topology_coordinator_impl',
                          'replmocks'])
 
 env.CppUnitTest('replica_set_config_checks_test',

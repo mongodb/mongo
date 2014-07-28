@@ -36,7 +36,7 @@
 #include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/topology_coordinator_mock.h"
+#include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -52,7 +52,7 @@ namespace {
         settings.replSet = "mySet/node1:12345,node2:54321";
         ReplicationCoordinatorImpl coordinator(settings,
                                                new ReplicationCoordinatorExternalStateMock);
-        coordinator.startReplication(new TopologyCoordinatorMock, new NetworkInterfaceMock);
+        coordinator.startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
         coordinator.shutdown();
     }
 
@@ -283,7 +283,7 @@ namespace {
         settings.replSet = "mySet/node1:12345,node2:54321";
         ReplicationCoordinatorImpl coordinator(settings,
                                                new ReplicationCoordinatorExternalStateMock);
-        coordinator.startReplication(new TopologyCoordinatorMock, new NetworkInterfaceMock);
+        coordinator.startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
 
