@@ -46,6 +46,7 @@ namespace mongo {
                                        _depth( 0 ),
                                        _snapshot( NULL ) { }
 
+
     RocksRecoveryUnit::~RocksRecoveryUnit() {
         if ( _defaultCommit ) {
             commitUnitOfWork();
@@ -57,15 +58,19 @@ namespace mongo {
     }
 
     void RocksRecoveryUnit::beginUnitOfWork() {
-        // TODO so long as _writeBatch is lazily initialized, it doesn't need to be
-        // initialized here. Not sure that the increased code complexity is worth it, though.
-        if ( !_writeBatch ) {
-            _writeBatch.reset( new rocksdb::WriteBatch() );
-        }
+        // TODO no need to initialize _writeBatch here so long as it is lazily initialized
         _depth++;
     }
     void RocksRecoveryUnit::commitUnitOfWork() {
-        invariant( _writeBatch );
+        if ( _snapshot ) {
+            _db->ReleaseSnapshot( _snapshot );
+            _snapshot = _db->GetSnapshot();
+        }
+
+        if ( !_writeBatch ) {
+            // nothing to be committed
+            return; 
+        }
 
         rocksdb::Status status = _db->Write( rocksdb::WriteOptions(), _writeBatch.get() );
         if ( !status.ok() ) {
@@ -75,10 +80,6 @@ namespace mongo {
 
         _writeBatch.reset( new rocksdb::WriteBatch() );
 
-        if ( _snapshot ) {
-            _db->ReleaseSnapshot( _snapshot );
-            _snapshot = _db->GetSnapshot();
-        }
     }
 
     void RocksRecoveryUnit::endUnitOfWork() {
