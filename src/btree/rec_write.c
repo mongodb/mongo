@@ -2661,10 +2661,8 @@ int
 __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
-	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_RECONCILE *r;
-	WT_REF *ref;
 	uint64_t recno;
 
 	btree = S2BT(session);
