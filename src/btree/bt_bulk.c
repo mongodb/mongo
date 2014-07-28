@@ -122,7 +122,7 @@ __wt_bulk_insert_row(WT_CURSOR_BULK *cbulk)
 	 * Instead of a "first time" variable, I'm using the RLE count, because
 	 * it is set to 0 exactly once, the first time through the code.
 	 */
-	if (!F_ISSET(cbulk, WT_BC_SKIP_SORT_CHECK) && cbulk->rle != 0) {
+	if (cbulk->rle != 0) {
 		WT_RET(WT_LEX_CMP(session,
 		    btree->collator, &cursor->key, &cbulk->cmp, cmp));
 		if (cmp <= 0)
