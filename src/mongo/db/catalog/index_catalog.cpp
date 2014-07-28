@@ -1027,10 +1027,9 @@ namespace mongo {
 
             try {
                 Status s = _indexRecord( txn, entry, obj, loc );
-                uassert(s.location(), s.reason(), s.isOK() );
+                uassertStatusOK( s );
             }
             catch ( AssertionException& ae ) {
-
                 LOG(2) << "IndexCatalog::indexRecord failed: " << ae;
 
                 for ( IndexCatalogEntryContainer::const_iterator j = _entries.begin();
