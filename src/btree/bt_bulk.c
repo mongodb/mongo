@@ -150,9 +150,6 @@ __wt_bulk_insert_row_skip_check(WT_CURSOR_BULK *cbulk)
 
 	WT_STAT_FAST_DATA_INCR(session, cursor_insert_bulk);
 
-	WT_RET(__wt_buf_set(session,
-	    &cbulk->cmp, cursor->key.data, cursor->key.size));
-
 	return (__wt_rec_row_bulk_insert(cbulk));
 }
 
