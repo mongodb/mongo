@@ -900,7 +900,7 @@ namespace mongo {
                 // old version of server, ok, fall through to old code
             }
             else {
-                uasserted( 18530, str::stream() << "listCollections failed: " << res );
+                uasserted( 18630, str::stream() << "listCollections failed: " << res );
             }
 
         }
@@ -1331,7 +1331,7 @@ namespace mongo {
                 return specs;
             }
             else {
-                uasserted( 18531, str::stream() << "listIndexes failed: " << res );
+                uasserted( 18631, str::stream() << "listIndexes failed: " << res );
             }
         }
 
