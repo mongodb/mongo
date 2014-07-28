@@ -557,6 +557,10 @@ namespace mongo {
     }
 
     DiskLoc RocksRecordStore::Iterator::getNext() {
+        if ( !_iterator->Valid() ) {
+            return DiskLoc();
+        }
+        
         DiskLoc toReturn = curr();
 
         if ( _forward() )
