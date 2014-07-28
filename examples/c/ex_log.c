@@ -43,12 +43,12 @@ const char *uri = "table:logtest";
 static int
 walk_log(WT_SESSION *session)
 {
+	int i, ret;
+	/*! [log cursor] */
 	WT_CURSOR *cursor;
 	WT_LSN lsn, lsnsave;
 	WT_ITEM log_rec;
-	int i, ret;
 
-	/*! [log cursor] */
 	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
 	/*! [log cursor] */
 	i = 0;
@@ -84,32 +84,30 @@ walk_log(WT_SESSION *session)
 static int
 iterate_log(WT_SESSION *session)
 {
+	int first, i, ret;
+	/*! [log iterator open] */
 	WT_CURSOR *cursor;
 	WT_LSN lsn, lsnsave;
 	WT_ITEM log_rec;
-	uint64_t txnid;
-	uint32_t oprec;
-	int first, i, ret;
+	uint32_t opcount;
 
-	/*! [log iterator open] */
 	ret = session->open_cursor(session,
-	    "log:", NULL, "iterator=true", &cursor);
+	    "log:", NULL, "step=true", &cursor);
 	/*! [log iterator open] */
 	i = 0;
 	memset(&lsnsave, 0, sizeof(lsnsave));
 	while ((ret = cursor->next(cursor)) == 0) {
 		/*! [log iterator get_key] */
 		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset,
-		    &txnid, &oprec);
+		    &opcount);
 		/*! [log iterator get_key] */
 		if (++i == MAX_KEYS)
 			lsnsave = lsn;
 		/*! [log iterator get_value] */
 		ret = cursor->get_value(cursor, &log_rec);
 		/*! [log iterator get_value] */
-		printf("LSN [%d][%" PRIu64 "].%" PRIu64
-		    ".%d:  Size %" PRIu64 "\n",
-		    lsn.file, lsn.offset, txnid, oprec, (u_long)log_rec.size);
+		printf("LSN [%d][%" PRIu64 "].%d:  Size %" PRIu64 "\n",
+		    lsn.file, lsn.offset, opcount, (u_long)log_rec.size);
 	}
 	cursor->reset(cursor);
 	/*! [log iterator set_key] */
@@ -124,16 +122,15 @@ iterate_log(WT_SESSION *session)
 	 */
 	first = 1;
 	while ((ret = cursor->get_key(cursor,
-	    &lsn.file, &lsn.offset, &txnid, &oprec)) == 0) {
+	    &lsn.file, &lsn.offset, &opcount)) == 0) {
 		if (first) {
 			first = 0;
 			assert(lsnsave.file == lsn.file &&
 			    lsnsave.offset == lsn.offset);
 		}
 		ret = cursor->get_value(cursor, &log_rec);
-		printf("LSN [%d][%" PRIu64 "].%" PRIu64
-		    ".%d:  Size %" PRIu64 "\n",
-		    lsn.file, lsn.offset, txnid, oprec, (u_long)log_rec.size);
+		printf("LSN [%d][%" PRIu64 "].%d:  Size %" PRIu64 "\n",
+		    lsn.file, lsn.offset, opcount, (u_long)log_rec.size);
 		ret = cursor->next(cursor);
 		if (ret != 0)
 			break;

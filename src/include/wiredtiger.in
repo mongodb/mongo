@@ -977,9 +977,6 @@ struct __wt_session {
 	 * compatible with the @ref util_dump and @ref util_load commands., a
 	 * string\, chosen from the following options: \c "hex"\, \c "json"\, \c
 	 * "print"; default empty.}
-	 * @config{iterator, iterate over each individual operation within a log
-	 * record and return that rather than the entire log record itself.
-	 * Valid only for log cursors., a boolean flag; default \c false.}
 	 * @config{next_random, configure the cursor to return a pseudo-random
 	 * record from the object; valid only for row-store cursors.  Cursors
 	 * configured with \c next_random=true only support the WT_CURSOR::next
@@ -1015,6 +1012,9 @@ struct __wt_session {
 	 * cleared). See @ref statistics for more information., a list\, with
 	 * values chosen from the following options: \c "all"\, \c "fast"\, \c
 	 * "clear"; default empty.}
+	 * @config{step, step into each individual operation within a log record
+	 * and return that rather than the entire log record itself.  Valid only
+	 * for log cursors., a boolean flag; default \c false.}
 	 * @config{target, if non-empty\, backup the list of objects; valid only
 	 * for a backup data source., a list of strings; default empty.}
 	 * @configend

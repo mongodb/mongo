@@ -23,7 +23,7 @@
  * ever changes.
  */
 #define	LSN_KEY_FORMAT		WT_UNCHECKED_STRING(Iq)
-#define	LSNITER_KEY_FORMAT	WT_UNCHECKED_STRING(IqqI)
+#define	LSNSTEP_KEY_FORMAT	WT_UNCHECKED_STRING(IqI)
 
 #define	MAX_LSN(l)	do {						\
 	(l)->file = UINT32_MAX;						\

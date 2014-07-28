@@ -257,11 +257,11 @@ struct __wt_cursor_log {
 	int (*scan_cb)(WT_SESSION_IMPL *session, WT_ITEM *logrec,
 	    WT_LSN *lsnp, void *cookie);
 	WT_ITEM		*logrec;	/* Copy of record for cursor */
-	const uint8_t	*iterp, *iterp_end;	/* Pointer within record */
-	uint32_t	iter_count;	/* Intra-record count */
-	uint32_t	rectype;	/* Iterator record type */
-	uint64_t	txnid;		/* Iterator txnid */
-#define	WT_LOGC_ITERATOR	0x01
+	const uint8_t	*stepp, *stepp_end;	/* Pointer within record */
+	uint32_t	step_count;	/* Intra-record count */
+	uint32_t	rectype;	/* Step record type */
+	uint64_t	txnid;		/* Step txnid */
+#define	WT_LOGC_STEP	0x01
 	uint32_t	flags;
 };
 
