@@ -31,6 +31,7 @@
 #ifndef S_BALANCER_POLICY_HEADER
 #define S_BALANCER_POLICY_HEADER
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/type_chunk.h"
 
@@ -125,7 +126,7 @@ namespace mongo {
     };
 
     typedef std::map< std::string,ShardInfo > ShardInfoMap;
-    typedef std::map< std::string,std::vector<BSONObj> > ShardToChunksMap;
+    typedef std::map<std::string, OwnedPointerVector<ChunkType>* > ShardToChunksMap;
 
     class DistributionStatus : boost::noncopyable {
     public:
@@ -166,13 +167,13 @@ namespace mongo {
         unsigned numberOfChunksInShardWithTag( const std::string& shard, const std::string& tag ) const;
 
         /** @return chunks for the shard */
-        const std::vector<BSONObj>& getChunks( const std::string& shard ) const;
+        const std::vector<ChunkType*>& getChunks(const std::string& shard) const;
 
         /** @return all tags we know about, not include "" */
         const std::set<std::string>& tags() const { return _allTags; }
 
         /** @return the right tag for chunk, possibly "" */
-        std::string getTagForChunk( const BSONObj& chunk ) const;
+        std::string getTagForChunk(const ChunkType& chunk) const;
         
         /** @return all shards we know about */
         const std::set<std::string>& shards() const { return _shards; }
@@ -208,9 +209,6 @@ namespace mongo {
         static MigrateInfo* balance( const std::string& ns,
                                      const DistributionStatus& distribution,
                                      int balancedLastTime );
-
-    private:
-        static bool _isJumbo( const BSONObj& chunk );
     };
 
 
