@@ -1,5 +1,4 @@
 # List of functions that aren't found by s_funcs, but that's OK.
-WT_CURBULK_INSERT
 WT_CURDUMP_PASS
 __bit_ffs
 __bit_nclr
@@ -10,7 +9,6 @@ __wt_bloom_drop
 __wt_bloom_get
 __wt_bulk_insert_fix
 __wt_bulk_insert_row
-__wt_bulk_insert_row_skip_check
 __wt_bulk_insert_var
 __wt_cache_dump
 __wt_config_getone

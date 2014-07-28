@@ -17,7 +17,6 @@ src/block/block_slvg.c
 src/block/block_vrfy.c
 src/block/block_write.c
 src/bloom/bloom.c
-src/btree/bt_bulk.c
 src/btree/bt_compact.c
 src/btree/bt_curnext.c
 src/btree/bt_curprev.c
