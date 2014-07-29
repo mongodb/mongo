@@ -225,6 +225,7 @@ add_option( "no-glibc-check" , "don't check for new versions of glibc" , 0 , Fal
 # experimental features
 add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "ssl" , "Enable SSL" , 0 , True )
+add_option( "ssl-fips-capability", "Enable the ability to activate FIPS 140-2 mode", 0, True );
 add_option( "rocksdb" , "Enable RocksDB" , 0 , False )
 
 # library choices
@@ -941,6 +942,8 @@ if has_option( "ssl" ):
     else:
         env.Append( LIBS=["ssl"] )
         env.Append( LIBS=["crypto"] )
+    if has_option("ssl-fips-capability"):
+        env.Append( CPPDEFINES=["MONGO_SSL_FIPS"] )
 
 try:
     umask = os.umask(022)
