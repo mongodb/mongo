@@ -9,30 +9,30 @@ Here are the steps to build and run an existing application against WiredTiger's
 
 <ol>
 <li> choose an installation directory for WiredTiger.  The default is:
-   
+
    <code>
    WT_INSTALL=/usr/local
    </code>
-   
+
    but anywhere is fine.
-   
+
 <li> build WiredTiger with LevelDB support:
-   
+
    <code>
    ./configure --enable-leveldb --with-builtins=snappy --prefix=$WT_INSTALL
    make install
    </code>
-   
+
    To include support for Basho's version of LevelDB, change the above to <code>--enable-leveldb=basho</code>.  To include support for HyperLevelDB / HyperDex, change the above to <code>--enable-leveldb=hyper</code>.  To include support for RocksDB, change the above to <code>--enable-leveldb=rocksdb</code>.
-   
+
 <li> compile and link the application against WiredTiger's LevelDB API:
-   
+
    <code>
    ./configure CPPFLAGS="-I$WT_INSTALL/include/wiredtiger" LDFLAGS="-L$WT_INSTALL/lib/wiredtiger" ... && make
    </code>
-   
+
 <li> start the application:
-   
+
    <code>
    LD_LIBRARY_PATH=$WT_INSTALL/lib/wiredtiger \<normal start command\>
    </code>
