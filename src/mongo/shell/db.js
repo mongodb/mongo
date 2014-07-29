@@ -44,11 +44,16 @@ DB.prototype.commandHelp = function( name ){
     return res.help;
 }
 
-DB.prototype.runCommand = function( obj ){
+DB.prototype.runCommand = function( obj, extra ){
     if ( typeof( obj ) == "string" ){
         var n = {};
         n[obj] = 1;
         obj = n;
+        if ( extra && typeof( extra ) == "object" ) {
+            for ( var x in extra ) {
+                n[x] = extra[x];
+            }
+        }
     }
     return this.getCollection( "$cmd" ).findOne( obj );
 }
