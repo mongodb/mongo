@@ -1032,44 +1032,6 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
 }
 
 /*
- * __wt_eviction_force_check --
- *	Check if a page matches the criteria for forced eviction.
- */
-static inline int
-__wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
-
-	/* Pages are usually small enough, check that first. */
-	if (page->memory_footprint < btree->maxmempage)
-		return (0);
-
-	/* Leaf pages only. */
-	if (page->type != WT_PAGE_COL_FIX &&
-	    page->type != WT_PAGE_COL_VAR &&
-	    page->type != WT_PAGE_ROW_LEAF)
-		return (0);
-
-	/* Eviction may be turned off, although that's rare. */
-	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
-		return (0);
-
-	/*
-	 * It's hard to imagine a page with a huge memory footprint that has
-	 * never been modified, but check to be sure.
-	 */
-	if (page->modify == NULL)
-		return (0);
-
-	/* Trigger eviction on the next page release. */
-	page->read_gen = WT_READGEN_OLDEST;
-
-	return (1);
-}
-
-/*
  * __wt_page_hazard_check --
  *	Return if there's a hazard pointer to the page in the system.
  */
