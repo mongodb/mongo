@@ -38,6 +38,7 @@
 const char *home = NULL;
 const char *uri = "table:logtest";
 
+#define	CONN_CONFIG "create,cache_size=100MB,log=(enabled=true)"
 #define	MAX_KEYS	10
 
 static int
@@ -172,7 +173,6 @@ int main(void)
 	int i, ret;
 	char k[16], v[16];
 
-#define	CONN_CONFIG "create,cache_size=100MB,log=(enabled=true)"
 	if ((ret = wiredtiger_open(home, NULL,
 	    CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
