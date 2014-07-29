@@ -1,5 +1,9 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_230 Upgrading to Version 2.3.0
+
+There are no special upgrade steps required.
+
 @section version_221 Upgrading to Version 2.2.1
 
 <dl>
