@@ -21,7 +21,7 @@
 /*
  * Both of the macros below need to change if the content of __wt_lsn
  * ever changes.  The value is the following:
- * txnid, rectype, optype, opkey WT_ITEM, opvalue WT_ITEM
+ * txnid, record type, operation type, operation key, operation value
  */
 #define	LOGC_KEY_FORMAT		WT_UNCHECKED_STRING(Iq)
 #define	LOGCSTEP_KEY_FORMAT	WT_UNCHECKED_STRING(IqI)

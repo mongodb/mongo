@@ -31,7 +31,7 @@ __curlog_logrec(
 	    cl->logrec, logrec->data, logrec->size));
 	/*
 	 * Skip the log header.  We need to do the exact same calculation
-	 * to get the rectype out, so setup up the step cursor pointers.
+	 * to get the record type out, so setup up the step cursor pointers.
 	 */
 	cl->stepp = (const uint8_t *)cl->logrec->data +
 	    offsetof(WT_LOG_RECORD, record);
@@ -114,7 +114,6 @@ __curlog_stepkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	WT_CURSOR_LOG *cl;
 	WT_ITEM opkey, opvalue;
 	uint32_t opsize, optype;
-	size_t sz;
 
 	cl = (WT_CURSOR_LOG *)cursor;
 	/*
@@ -191,7 +190,6 @@ __curlog_next(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_ITEM opkey;
 	WT_SESSION_IMPL *session;
-	uint32_t optype;
 
 	cl = (WT_CURSOR_LOG *)cursor;
 
