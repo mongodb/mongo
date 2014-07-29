@@ -869,6 +869,9 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Should not be called with a checkpoint handle. */
 	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 
+	/* Should be holding the schema lock. */
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+
 	return (__checkpoint_worker(session, cfg, 1));
 }
 
