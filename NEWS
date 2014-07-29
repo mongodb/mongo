@@ -1,3 +1,44 @@
+WiredTiger release 2.3.0, 2014-07-29
+------------------------------------
+
+The WiredTiger 2.3.0 release contains significant new features, performance
+enhancements and bug fixes.  Significant changes are described below.
+
+Changes to the WiredTiger API (see upgrading documentation for details):
+
+* Add a LevelDB API implementation for WiredTiger.  This includes support for
+  stock LevelDB as well as Basho, HyperLevelDB and RocksDB versions of the API.
+  To build the LevelDB API include --enable-leveldb in the configure command,
+  to specify compatability with an alternative LevelDB API use
+  --enable-leveldb=[basho,hyper,rocksdb]. [#1028]
+
+* Add ability to build some common extensions into the WiredTiger library.
+  This means that the libraries for those extensions don't need to be
+  dynamically loaded at runtime. Currently supported extensions are Snappy
+  compression and zlib compression. The option can be enabled by passing
+  --with-builtins=[snappy,zlib] to the configure command line.
+
+* Add a new configuration to wiredtiger_open: statistics_log=(on_close=true),
+  that causes a set of statistics to be logged on WT_CONNECTION::close. [#1086]
+
+* Add a new configuration to wiredtiger_open: exclusive, that causes the open
+  to fail if the database already exists.
+
+Other significant changes:
+
+* Performance improvement for high throughput workloads using multiple
+  eviction threads. Performance of some workloads improves by over 15% [#1087]
+
+* Significant performance optimizations for queries, giving up to 20%
+  throughput improvement for in-memory query workloads.
+  https://github.com/wiredtiger/wiredtiger/wiki/Query-throughput
+
+* Fix an off-by-one bug that could lead to ENOMEM during commit with logging.
+  [#1104][#1121]
+
+* Allow bulk loads to multiple files to complete in parallel. [#1114][#1126]
+
+
 WiredTiger release 2.2.1, 2014-06-24
 ------------------------------------
 

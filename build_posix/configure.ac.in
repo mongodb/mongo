@@ -136,6 +136,15 @@ AC_MSG_RESULT($with_helium)
 AM_CONDITIONAL([HAVE_HELIUM], [test -d $with_helium])
 AC_SUBST(HELIUM_PATH, [$with_helium])
 
+# Sanity check the build
+AM_COND_IF([LEVELDB], [
+  AM_COND_IF([SNAPPY], [], [
+    AC_MSG_ERROR(
+      [--enable-leveldb requires --enable-snappy or --with-builtins=snappy.])
+  ])
+])
+
+
 # Warn that diagnostic builds should not be used in production
 if test "$wt_cv_enable_diagnostic" = "yes"; then
 	AC_MSG_WARN(

@@ -16,11 +16,11 @@ static int  __inmem_row_leaf_entries(
 	WT_SESSION_IMPL *, const WT_PAGE_HEADER *, uint32_t *);
 
 /*
- * eviction_force_check --
+ * __evict_force_check --
  *	Check if a page matches the criteria for forced eviction.
  */
 static int
-eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+__evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 
@@ -118,7 +118,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			/* Forcibly evict pages that are too big. */
 			if (!LF_ISSET(WT_READ_NO_GEN) &&
 			    force_attempts < 10 &&
-			    eviction_force_check(session, page)) {
+			    __evict_force_check(session, page)) {
 				++force_attempts;
 				WT_RET(__wt_page_release(session, ref));
 				break;

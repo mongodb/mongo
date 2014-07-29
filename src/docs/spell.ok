@@ -33,8 +33,10 @@ GitHub
 Google
 Google's
 HyperLevelDB
+HyperDex
 IEC
 JavaScript
+LD
 LDFLAGS
 LIBS
 LLVM
@@ -51,6 +53,7 @@ Multithreaded
 NOTFOUND
 NUMA
 NoSQL
+PRELOAD
 README
 RedHat
 RepMgr
@@ -327,6 +330,7 @@ ro
 rocksdb
 rpc
 runnable
+runtime
 rwlock
 sHQ
 sHq
