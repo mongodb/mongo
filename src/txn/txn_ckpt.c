@@ -208,6 +208,8 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session, session->dhandle == NULL);
 
 	WT_RET(__wt_scr_alloc(session, 512, &session->checkpoint));
+	p = (char *)session->checkpoint->data;
+	*p = '\0';
 
 	/*
 	 * Get a list of URIs we want to flush; this pulls closed objects into
@@ -259,7 +261,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
-	int full, started, tracking;
+	int full, logging, tracking;
 	const char *txn_cfg[] =
 	    { WT_CONFIG_BASE(session, session_begin_transaction),
 	      "isolation=snapshot", NULL };
@@ -268,7 +270,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	conn = S2C(session);
 	saved_isolation = session->isolation;
 	txn = &session->txn;
-	full = started = tracking = 0;
+	full = logging = tracking = 0;
 
 	/*
 	 * Do a pass over the configuration arguments and figure out what kind
@@ -316,7 +318,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	if (conn->logging && full) {
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_START, NULL));
-		started = 1;
+		logging = 1;
 	}
 
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint, NULL));
@@ -354,7 +356,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	session->meta_track_next = NULL;
 	WT_WITH_DHANDLE(session, dhandle, ret = __wt_checkpoint(session, cfg));
 	session->meta_track_next = saved_meta_next;
-	WT_ERR(ret);
 
 err:	/*
 	 * XXX
@@ -377,7 +378,7 @@ err:	/*
 		WT_TRET(__wt_txn_rollback(session, NULL));
 
 	/* Tell logging that we have finished a database checkpoint. */
-	if (conn->logging && started)
+	if (logging)
 		WT_TRET(__wt_txn_checkpoint_log(session, full,
 		    (ret == 0) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_FAIL,
 		    NULL));

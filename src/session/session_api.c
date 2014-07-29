@@ -731,9 +731,9 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 
 	/*
 	 * Only one checkpoint can be active at a time, and checkpoints must run
-	 * in the same order as they update the metadata, also, there are other
-	 * operations (for example, Btree compaction) that must serialize with
-	 * checkpoints.
+	 * in the same order as they update the metadata.  It's probably a bad
+	 * idea to run checkpoints out of multiple threads, but serialize them
+	 * here to ensure we don't get into trouble.
 	 */
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 1);
 	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);

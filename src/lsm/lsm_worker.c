@@ -513,39 +513,12 @@ static int
 __lsm_discard_handle(
     WT_SESSION_IMPL *session, const char *uri, const char *checkpoint)
 {
-	WT_DECL_RET;
-	int locked;
-	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
-
 	/* This will fail with EBUSY if the file is still in use. */
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 
-	/*
-	 * We need the checkpoint lock to discard in-memory handles: otherwise,
-	 * an application checkpoint could see this file locked and fail with
-	 * EBUSY.
-	 *
-	 * We can't get the checkpoint lock earlier or it will deadlock with
-	 * the schema lock.
-	 */
-	locked = 0;
-	if (checkpoint == NULL && (ret = __wt_spin_trylock(
-	    session, &S2C(session)->checkpoint_lock, &id)) == 0)
-		locked = 1;
-	if (ret == 0)
-		F_SET(session->dhandle, WT_DHANDLE_DISCARD);
-
-	/*
-	 * This check must come after taking the checkpoint lock - since
-	 * otherwise an in progress checkpoint may have set the modified
-	 * flag in the file we're discarding.
-	 */
-	WT_TRET(__wt_session_release_btree(session));
-	if (locked)
-		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
-
-	return (ret);
+	F_SET(session->dhandle, WT_DHANDLE_DISCARD);
+	return (__wt_session_release_btree(session));
 }
 
 /*
