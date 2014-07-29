@@ -25,7 +25,7 @@ WiredTiger applications:
 <h2>Performance tuning</h2>
 - @subpage tune_memory_allocator
 - @subpage tune_page_sizes
-- @subpage cache_configuration
+- @subpage tune_cache
 - @subpage bulk_load
 - @subpage tune_cursor_persist
 - @subpage tune_read_only_objects
