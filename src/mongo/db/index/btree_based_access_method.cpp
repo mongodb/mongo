@@ -239,6 +239,10 @@ namespace mongo {
         return Status::OK();
     }
 
+    long long BtreeBasedAccessMethod::getSpaceUsedBytes( OperationContext* txn ) const {
+        return _newInterface->getSpaceUsedBytes( txn );
+    }
+
     Status BtreeBasedAccessMethod::validateUpdate(OperationContext* txn,
                                                   const BSONObj &from,
                                                   const BSONObj &to,

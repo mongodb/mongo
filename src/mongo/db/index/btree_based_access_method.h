@@ -103,6 +103,8 @@ namespace mongo {
 
         virtual Status validate(OperationContext* txn, int64_t* numKeys);
 
+        virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
+
         // XXX: consider migrating callers to use IndexCursor instead
         virtual DiskLoc findSingle( OperationContext* txn, const BSONObj& key ) const;
 

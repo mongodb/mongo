@@ -231,6 +231,8 @@ namespace mongo {
         // Size constants
         //
 
+        const RecordStore* getRecordStore() const { return _recordStore; }
+
         static int lowWaterMark();
 
     private:

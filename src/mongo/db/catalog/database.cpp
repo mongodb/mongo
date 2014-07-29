@@ -46,6 +46,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/repair_database.h"
@@ -232,28 +233,24 @@ namespace mongo {
         if ( !coll )
             return 0;
 
-        IndexCatalog::IndexIterator ii =
-            coll->getIndexCatalog()->getIndexIterator( true /*includeUnfinishedIndexes*/ );
+        IndexCatalog* idxCatalog = coll->getIndexCatalog();
+
+        IndexCatalog::IndexIterator ii = idxCatalog->getIndexIterator( true );
 
         long long totalSize = 0;
 
         while ( ii.more() ) {
             IndexDescriptor* d = ii.next();
-            string indNS = d->indexNamespace();
+            IndexAccessMethod* iam = idxCatalog->getIndex( d );
 
-            // XXX creating a Collection for an index which isn't a Collection
-            Collection* indColl = getCollection( opCtx, indNS );
-            if ( ! indColl ) {
-                log() << "error: have index descriptor ["  << indNS
-                      << "] but no entry in the index collection." << endl;
-                continue;
-            }
-            totalSize += indColl->dataSize();
+            long long ds = iam->getSpaceUsedBytes( opCtx );
+
+            totalSize += ds;
             if ( details ) {
-                long long const indexSize = indColl->dataSize() / scale;
-                details->appendNumber( d->indexName() , indexSize );
+                details->appendNumber( d->indexName(), ds / scale );
             }
         }
+
         return totalSize;
     }
 

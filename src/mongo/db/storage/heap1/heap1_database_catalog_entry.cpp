@@ -198,7 +198,25 @@ namespace mongo {
                                                         const StringData& fromNS,
                                                         const StringData& toNS,
                                                         bool stayTemp ) {
-        invariant( false );
+        boost::mutex::scoped_lock lk( _entryMapLock );
+        Entry* e = _entryMap[fromNS.toString()];
+        if ( !e ) {
+            return Status( ErrorCodes::NamespaceNotFound,
+                           "cannot renameCollection missng collection" );
+        }
+
+        if ( _entryMap[toNS.toString()] ) {
+            return Status( ErrorCodes::BadValue,
+                           "target namespace exists" );
+        }
+
+        _entryMap[toNS.toString()] = e;
+        _entryMap.erase( fromNS.toString() );
+
+        if ( !stayTemp )
+            e->options.temp = false;
+
+        return Status::OK();
     }
 
     // ------------------

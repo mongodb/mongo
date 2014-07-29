@@ -295,11 +295,11 @@ namespace mongo {
         return Status::OK();
 
     }
-    
+
     void HeapRecordStore::appendCustomStats( OperationContext* txn,
                                              BSONObjBuilder* result,
                                              double scale ) const {
-        result->append( "note", "HeapRecordStore has no cusom stats yet" );
+        result->appendBool( "capped", _isCapped );
     }
 
     Status HeapRecordStore::touch(OperationContext* txn, BSONObjBuilder* output) const {
@@ -309,7 +309,7 @@ namespace mongo {
         }
         return Status::OK();
     }
-    
+
     Status HeapRecordStore::setCustomOption(
                 OperationContext* txn, const BSONElement& option, BSONObjBuilder* info) {
         invariant(!"setCustomOption not yet implemented");

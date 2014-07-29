@@ -93,6 +93,11 @@ namespace mongo {
         // TODO: expose full set of args for testing?
         virtual void fullValidate(OperationContext* txn, long long* numKeysOut) = 0;
 
+        /**
+         * @see IndexAccessMethod::getSpaceUsedBytes
+         */
+        virtual long long getSpaceUsedBytes( OperationContext* txn ) const = 0;
+
         virtual bool isEmpty() = 0;
         
         /**

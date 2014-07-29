@@ -243,10 +243,12 @@ namespace {
 
     class Heap1BtreeImpl : public SortedDataInterface {
     public:
-        Heap1BtreeImpl(const IndexCatalogEntry& info, IndexSet* data) 
+        Heap1BtreeImpl(const IndexCatalogEntry& info, IndexSet* data)
             : _info(info),
-              _data(data)
-        {}
+              _data(data) {
+            _averageSizeHelpers.totalSize = 0;
+            _averageSizeHelpers.totalDocs = 0;
+        }
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
             return new Heap1BtreeBuilderImpl(_data, dupsAllowed);
@@ -256,6 +258,10 @@ namespace {
                               const BSONObj& key,
                               const DiskLoc& loc,
                               bool dupsAllowed) {
+
+            _averageSizeHelpers.totalSize += key.objsize();
+            _averageSizeHelpers.totalDocs++;
+
             invariant(!loc.isNull());
             invariant(loc.isValid());
             invariant(!hasFieldNames(key));
@@ -276,12 +282,17 @@ namespace {
             const size_t numDeleted = _data->erase(IndexEntry(key, loc));
             invariant(numDeleted <= 1);
             return numDeleted == 1;
-            
         }
 
         virtual void fullValidate(OperationContext* txn, long long *numKeysOut) {
             // TODO check invariants?
             *numKeysOut = _data->size();
+        }
+
+        virtual long long getSpaceUsedBytes( OperationContext* txn ) const {
+            // this is a guess
+            double avg = _averageSizeHelpers.totalSize / _averageSizeHelpers.totalDocs;
+            return _data->size() * ( 24 + avg );
         }
 
         virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
@@ -397,6 +408,7 @@ namespace {
             bool _savedAtEnd;
             BSONObj _savedKey;
             DiskLoc _savedLoc;
+
         };
 
         // TODO see if this can share any code with ForwardIterator
@@ -530,6 +542,12 @@ namespace {
     private:
         const IndexCatalogEntry& _info;
         IndexSet* _data;
+
+        struct AverageSizeHelpers {
+            double totalSize;
+            double totalDocs;
+        } _averageSizeHelpers;
+
     };
 } // namespace
 
