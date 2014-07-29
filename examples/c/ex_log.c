@@ -50,7 +50,6 @@ walk_log(WT_SESSION *session)
 	WT_ITEM log_reck, log_recv;
 	uint64_t txnid;
 	uint32_t optype, rectype;
-	size_t sz;
 
 	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
 	/*! [log cursor] */
