@@ -60,7 +60,7 @@ log_defines = (
 	''.join('#define\t%s\t%d\n' % (r.macro_name(), i)
 		for i, r in enumerate(log_data.rectypes)) +
 	''.join('#define\t%s\t%d\n' % (r.macro_name(), i)
-		for i, r in enumerate(log_data.optypes))
+		for i, r in enumerate(log_data.optypes,start=1))
 )
 
 tfile = open(tmp_file, 'w')
@@ -75,6 +75,7 @@ for line in open('../src/include/log.h', 'r'):
 	if 'Log record declarations: BEGIN' in line:
 		skip = 1
 		tfile.write(' */\n')
+		tfile.write('#define\tWT_LOGOP_INVALID\t0\n')
 		tfile.write(log_defines)
 tfile.close()
 compare_srcfile(tmp_file, '../src/include/log.h')
@@ -206,6 +207,7 @@ __wt_logop_%(name)s_print(
 	WT_RET(__wt_logop_%(name)s_unpack(
 	    session, pp, end%(arg_addrs)s));
 
+	fprintf(out, "    \\"optype\\": \\"%(name)s\\",\\n");
 	%(print_args)s
 	return (0);
 }
