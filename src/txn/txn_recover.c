@@ -463,14 +463,14 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 
 	conn->next_file_id = r.max_fileid;
 
-err:	if (ret == 0)
-		/*
-		 * If recovery ran successfully forcibly log a checkpoint
-		 * so that the next open is fast and keep the metadata
-		 * up to date with the checkpoint LSN and archiving.
-		 */
-		session->iface.checkpoint(&session->iface, "force=1");
-	WT_TRET(__recovery_free(&r));
+	/*
+	 * If recovery ran successfully forcibly log a checkpoint so the next
+	 * open is fast and keep the metadata up to date with the checkpoint
+	 * LSN and archiving.
+	 */
+	WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
+
+err:	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);
 	WT_TRET(session->iface.close(&session->iface, NULL));
 
