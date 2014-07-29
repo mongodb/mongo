@@ -41,9 +41,6 @@ namespace mongo {
 
     MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
-#ifdef _WIN32
-    extern SimpleMutex globalFlushMutex; // defined in mongo/util/mmap_win.cpp
-#endif
     namespace dur {
 
         void debugValidateAllMapsMatch();
@@ -103,9 +100,6 @@ namespace mongo {
         */
 
         void WRITETODATAFILES(const JSectHeader& h, AlignedBuilder& uncompressed) {
-#ifdef _WIN32
-            SimpleMutex::scoped_lock _globalFlushMutex(globalFlushMutex);
-#endif
             Timer t;
             WRITETODATAFILES_Impl1(h, uncompressed);
             long long m = t.micros();
