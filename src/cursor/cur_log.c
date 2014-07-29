@@ -92,6 +92,10 @@ __curlog_steprec(
 	 * reserve 0 to mean the entire record.
 	 */
 	cl->step_count = 1;
+	if (cl->opkey == NULL)
+		__wt_scr_alloc(session, 0, &cl->opkey);
+	if (cl->opvalue == NULL)
+		__wt_scr_alloc(session, 0, &cl->opvalue);
 	/*
 	 * Unpack the txnid so that we can return each
 	 * individual operation for this txnid.
@@ -105,6 +109,63 @@ __curlog_steprec(
 }
 
 /*
+ * __curlog_op_read --
+ *	Read out any key/value from an individual operation record
+ *	in the log.  We're only interested in put and remove operations
+ *	since truncate is not a cursor operation.  All successful
+ *	returns from this function will have set up the cursor copy of
+ *	key and value to give the user.
+ */
+static int
+__curlog_op_read(WT_SESSION_IMPL *session,
+    WT_CURSOR_LOG *cl, uint32_t optype, uint32_t opsize)
+{
+	WT_ITEM key, value;
+	uint64_t recno;
+	uint32_t fileid;
+	const uint8_t *end, *pp;
+
+	pp = cl->stepp;
+	end = pp + opsize;
+	switch (optype) {
+	case WT_LOGOP_COL_PUT:
+		WT_RET(__wt_logop_col_put_unpack(session, &pp, end,
+		    &fileid, &recno, &value));
+		WT_RET(__wt_buf_set(session, cl->opkey, &recno, sizeof(recno)));
+		WT_RET(__wt_buf_set(session,
+		    cl->opvalue, value.data, value.size));
+		break;
+	case WT_LOGOP_COL_REMOVE:
+		WT_RET(__wt_logop_col_remove_unpack(session, &pp, end,
+		    &fileid, &recno));
+		WT_RET(__wt_buf_set(session, cl->opkey, &recno, sizeof(recno)));
+		WT_RET(__wt_buf_set(session, cl->opvalue, NULL, 0));
+		break;
+	case WT_LOGOP_ROW_PUT:
+		WT_RET(__wt_logop_row_put_unpack(session, &pp, end,
+		    &fileid, &key, &value));
+		WT_RET(__wt_buf_set(session, cl->opkey, key.data, key.size));
+		WT_RET(__wt_buf_set(session,
+		    cl->opvalue, value.data, value.size));
+		break;
+	case WT_LOGOP_ROW_REMOVE:
+		WT_RET(__wt_logop_row_remove_unpack(session, &pp, end,
+		    &fileid, &key));
+		WT_RET(__wt_buf_set(session, cl->opkey, key.data, key.size));
+		WT_RET(__wt_buf_set(session, cl->opvalue, NULL, 0));
+		break;
+	default:
+		/*
+		 * Any other operations return the record in the value
+		 * and an empty key.
+		 */
+		WT_RET(__wt_buf_set(session, cl->opkey, NULL, 0));
+		WT_RET(__wt_buf_set(session, cl->opvalue, cl->stepp, opsize));
+	}
+	return (0);
+}
+
+/*
  * __curlog_stepkv --
  *	Set the key and value to return for a step cursor.
  */
@@ -112,34 +173,28 @@ static int
 __curlog_stepkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
 	WT_CURSOR_LOG *cl;
-	WT_ITEM opkey, opvalue;
 	uint32_t opsize, optype;
 
 	cl = (WT_CURSOR_LOG *)cursor;
 	/*
-	 * If it is a commit, peek to get the size and optype.
-	 * Currently we don't do anything with the optype.
+	 * If it is a commit, peek to get the size and optype and
+	 * read out any key/value from this operation.
 	 */
-	WT_CLEAR(opkey);
-	WT_CLEAR(opvalue);
-	if (cl->rectype == WT_LOGREC_COMMIT)
-		WT_RET(__wt_logop_read(session, &cl->stepp, cl->stepp_end,
-		    &optype, &opsize));
-	else {
+	if (cl->rectype == WT_LOGREC_COMMIT) {
+		WT_RET(__wt_logop_read(session,
+		    &cl->stepp, cl->stepp_end, &optype, &opsize));
+		WT_RET(__curlog_op_read(session, cl, optype, opsize));
+	} else {
 		optype = WT_LOGOP_INVALID;
 		opsize = cl->logrec->size;
+		WT_RET(__wt_buf_set(session, cl->opkey, NULL, 0));
+		WT_RET(__wt_buf_set(session,
+		    cl->opvalue, cl->stepp, opsize));
 	}
 	__wt_cursor_set_key(cursor, cl->cur_lsn->file, cl->cur_lsn->offset,
 	    cl->step_count++);
-	/*
-	 * TODO: Need to burst the individual log record here and properly
-	 * set the key and value.
-	 */
-	opkey = *cl->logrec;
-	opvalue.data = cl->stepp;
-	opvalue.size = opsize;
 	__wt_cursor_set_value(cursor, cl->txnid, cl->rectype, optype,
-	    &opkey, &opvalue);
+	    cl->opkey, cl->opvalue);
 	cl->stepp += opsize;
 	return (0);
 }
@@ -267,8 +322,13 @@ __curlog_reset(WT_CURSOR *cursor)
 
 	cl = (WT_CURSOR_LOG *)cursor;
 	cl->stepp = cl->stepp_end = NULL;
-	if (F_ISSET(cl, WT_LOGC_STEP))
+	if (F_ISSET(cl, WT_LOGC_STEP)) {
 		cl->step_count = 0;
+		if (cl->opkey != NULL)
+			__wt_scr_free(&cl->opkey);
+		if (cl->opvalue != NULL)
+			__wt_scr_free(&cl->opvalue);
+	}
 	if (cl->logrec != NULL)
 		__wt_scr_free(&cl->logrec);
 	INIT_LSN(cl->cur_lsn);

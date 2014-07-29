@@ -257,6 +257,7 @@ struct __wt_cursor_log {
 	int (*scan_cb)(WT_SESSION_IMPL *session, WT_ITEM *logrec,
 	    WT_LSN *lsnp, void *cookie);
 	WT_ITEM		*logrec;	/* Copy of record for cursor */
+	WT_ITEM		*opkey, *opvalue;	/* Op key/value copy */
 	const uint8_t	*stepp, *stepp_end;	/* Pointer within record */
 	uint32_t	step_count;	/* Intra-record count */
 	uint32_t	rectype;	/* Step record type */
