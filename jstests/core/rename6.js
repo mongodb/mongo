@@ -16,9 +16,9 @@ dbc.ensureIndex({ "name" : 1,
                   "testing" : 1,
                   "data" : 1});
 //Checking for the newly created index and the _id index in original collection
-assert.eq(2, testDB.system.indexes.find( { "ns" : "test." + c } ).count(), "Long Rename Init");
+assert.eq(2, dbc.getIndexes().length, "Long Rename Init");
 //Should fail to rename collection as the index namespace is too long
 assert.commandFailed( dbc.renameCollection( dbd ) , "Long Rename Exec" );
 //Since we failed we should have the 2 indexes unmoved and no indexes under the new collection name
-assert.eq(2, testDB.system.indexes.find( { "ns" : "test." + c } ).count(), "Long Rename Result 1");
-assert.eq(0, testDB.system.indexes.find( { "ns" : "test." + d } ).count(), "Long Rename Result 2");
+assert.eq(2, dbc.getIndexes().length, "Long Rename Result 1");
+assert.eq(0, dbd.getIndexes().length, "Long Rename Result 2");

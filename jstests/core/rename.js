@@ -20,10 +20,10 @@ assert.commandWorked( admin.runCommand( {renameCollection:"test.jstests_rename_a
 assert.eq( 0, a.find().count() );
 
 assert.eq( 2, b.find().count() );
-assert( db.system.namespaces.findOne( {name:"test.jstests_rename_b" } ) );
-assert( !db.system.namespaces.findOne( {name:"test.jstests_rename_a" } ) );
-assert.eq( 3, db.system.indexes.find( {ns:"test.jstests_rename_b"} ).count() );
-assert.eq( 0, db.system.indexes.find( {ns:"test.jstests_rename_a"} ).count() );
+assert( db.getCollectionNames().indexOf( "jstests_rename_b" ) >= 0 );
+assert( db.getCollectionNames().indexOf( "jstests_rename_a" ) < 0 );
+assert.eq( 3, db.jstests_rename_b.getIndexes().length );
+assert.eq( 0, db.jstests_rename_a.getIndexes().length );
 assert( b.find( {a:1} ).explain().cursor.match( /^BtreeCursor/ ) );
 
 // now try renaming a capped collection
@@ -41,16 +41,18 @@ for( i = 0.1; i < 10; ++i ) {
 }
 assert.commandWorked( admin.runCommand( {renameCollection:"test.jstests_rename_a", to:"test.jstests_rename_b"} ) );
 assert.eq( 1, b.count( {i:9.1} ) );
-for( i = 10.1; i < 250; ++i ) {
+printjson( b.stats() );
+for( i = 10.1; i < 1000; ++i ) {
     b.save( { i: i } );
 }
-
+printjson( b.stats() );
 //res = b.find().sort({i:1});
 //while (res.hasNext()) printjson(res.next());
 
-assert.eq( 0, b.count( {i:9.1} ) );
-assert.eq( 1, b.count( {i:19.1} ) );
+assert.eq( 1, b.count( {i:i-1} ) ); // make sure last is there
+assert.eq( 0, b.count( {i:9.1} ) ); // make sure early one is gone
 
-assert( db.system.namespaces.findOne( {name:"test.jstests_rename_b" } ) );
-assert( !db.system.namespaces.findOne( {name:"test.jstests_rename_a" } ) );
-assert.eq( true, db.system.namespaces.findOne( {name:"test.jstests_rename_b"} ).options.capped );
+
+assert( db.getCollectionNames().indexOf( "jstests_rename_b"  ) >= 0 );
+assert( db.getCollectionNames().indexOf( "jstests_rename_a" ) < 0 );
+assert( db.jstests_rename_b.stats().capped );
