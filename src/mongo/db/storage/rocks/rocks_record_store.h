@@ -59,16 +59,16 @@ namespace mongo {
                           int64_t cappedMaxDocs = -1,
                           CappedDocumentDeleteCallback* cappedDeleteCallback = NULL );
 
-        virtual ~RocksRecordStore();
+        virtual ~RocksRecordStore() { }
 
         // name of the RecordStore implementation
         virtual const char* name() const { return "rocks"; }
 
-        virtual long long dataSize() const;
+        virtual long long dataSize() const { return _dataSize; }
 
-        virtual long long numRecords() const;
+        virtual long long numRecords() const { return _numRecords; }
 
-        virtual bool isCapped() const;
+        virtual bool isCapped() const { return _isCapped; }
 
         virtual int64_t storageSize( OperationContext* txn,
                                      BSONObjBuilder* extraInfo = NULL,

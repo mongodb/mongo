@@ -68,6 +68,13 @@ namespace mongo {
 
     string _rocksRecordStoreTestDir = "mongo-rocks-test";
 
+    Status toMongoStatus( rocksdb::Status s ) {
+        if ( s.ok() )
+            return Status::OK();
+        else
+            return Status( ErrorCodes::Error(), s.ToString() );
+    }
+
     rocksdb::DB* getDB( string path) {
         boost::filesystem::remove_all( path );
 
@@ -76,17 +83,18 @@ namespace mongo {
         // open DB
         rocksdb::DB* db;
         rocksdb::Status s = rocksdb::DB::Open(options, path, &db);
-        ASSERT(s.ok());
+        ASSERT_OK( toMongoStatus( s ) );
 
         return db;
     }
+
     rocksdb::DB* getDBPersist( string path ) {
         rocksdb::Options options = RocksEngine::dbOptions();
 
         // open DB
         rocksdb::DB* db;
         rocksdb::Status s = rocksdb::DB::Open(options, path, &db);
-        ASSERT(s.ok());
+        ASSERT_OK( toMongoStatus( s ) );
 
         return db;
     }
@@ -325,14 +333,14 @@ namespace mongo {
         rocksdb::Status status;
 
         status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1", &cf1 );
-        ASSERT( status.ok() );
+        ASSERT_OK( toMongoStatus( status ) );
         status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar2", &cf2 );
-        ASSERT( status.ok() );
+        ASSERT_OK( toMongoStatus( status ) );
 
         status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
-        ASSERT( status.ok() );
+        ASSERT_OK( toMongoStatus( status ) );
         status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar2&", &cf2_m );
-        ASSERT( status.ok() );
+        ASSERT_OK( toMongoStatus( status ) );
 
         RocksRecordStore rs1( "foo.bar1", db.get(), cf1, cf1_m );
         RocksRecordStore rs2( "foo.bar2", db.get(), cf2, cf2_m );
@@ -474,9 +482,9 @@ namespace mongo {
             rocksdb::Status status;
 
             status = db->CreateColumnFamily( getColumnFamilyOptions(), "foo.bar1", &cf1 );
-            ASSERT( status.ok() );
+            ASSERT_OK( toMongoStatus( status ) );
             status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
-            ASSERT( status.ok() );
+            ASSERT_OK( toMongoStatus( status ) );
 
             RocksRecordStore rs( "foo.bar", db.get(), cf1, cf1_m );
             string s1 = "eliot was here";
@@ -534,9 +542,9 @@ namespace mongo {
             rocksdb::Status status;
 
             status = db->CreateColumnFamily( getColumnFamilyOptions(), "foo.bar1", &cf1 );
-            ASSERT( status.ok() );
+            ASSERT_OK( toMongoStatus( status ) );
             status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
-            ASSERT( status.ok() );
+            ASSERT_OK( toMongoStatus( status ) );
 
             RocksRecordStore rs( "foo.bar", db.get(), cf1, cf1_m );
             string s1 = "eliot was here";
@@ -593,9 +601,9 @@ namespace mongo {
             rocksdb::Status status;
 
             status = db->CreateColumnFamily( getColumnFamilyOptions(), "foo.bar1", &cf1 );
-            ASSERT( status.ok() );
+            ASSERT_OK( toMongoStatus( status ) );
             status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
-            ASSERT( status.ok() );
+            ASSERT_OK( toMongoStatus( status ) );
 
             RocksRecordStore rs( "foo.bar", db.get(), cf1, cf1_m );
             string s = "antonio was here";
