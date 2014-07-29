@@ -29,7 +29,9 @@ Other significant changes:
 * Performance improvement for high throughput workloads using multiple
   eviction threads. Performance of some workloads improves by over 15% [#1087]
 
-* Several performance optimizations for queries in common paths.
+* Significant performance optimizations for queries. Giving up to 20%
+  throughput improvement for in-memory query workloads.
+  https://github.com/wiredtiger/wiredtiger/wiki/Query-throughput
 
 * Fix a bug when packing structures that include the packed size. [#1104][#1121]
 
