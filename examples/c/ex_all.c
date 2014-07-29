@@ -1007,6 +1007,25 @@ main(void)
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 
+	/*! [Eviction configuration] */
+	/*
+	 * Configure eviction to begin at 90% full, and run until the cache
+	 * is only 75% dirty.
+	 */
+	ret = wiredtiger_open(home, NULL,
+	    "create,eviction_trigger=90,eviction_dirty_target=75", &conn);
+	/*! [Eviction configuration] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Eviction worker configuration] */
+	/* Configure an additional 4 eviction support threads. */
+	ret = wiredtiger_open(home, NULL,
+	    "create,eviction_trigger=90,eviction_workers=4", &conn);
+	/*! [Eviction worker configuration] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
 	/*! [Statistics configuration] */
 	ret = wiredtiger_open(home, NULL, "create,statistics=(all)", &conn);
 	/*! [Statistics configuration] */

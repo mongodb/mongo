@@ -1585,15 +1585,16 @@ struct __wt_connection {
 	 * @config{error_prefix, prefix string for error messages., a string;
 	 * default empty.}
 	 * @config{eviction_dirty_target, continue evicting until the cache has
-	 * less dirty pages than this (as a percentage). Dirty pages will only
-	 * be evicted if the cache is full enough to trigger eviction., an
-	 * integer between 10 and 99; default \c 80.}
-	 * @config{eviction_target, continue evicting until the cache becomes
-	 * less full than this (as a percentage). Must be less than \c
-	 * eviction_trigger., an integer between 10 and 99; default \c 80.}
-	 * @config{eviction_trigger, trigger eviction when the cache becomes
-	 * this full (as a percentage)., an integer between 10 and 99; default
-	 * \c 95.}
+	 * less dirty memory than the value\, as a percentage of the total cache
+	 * size.  Dirty pages will only be evicted if the cache is full enough
+	 * to trigger eviction., an integer between 10 and 99; default \c 80.}
+	 * @config{eviction_target, continue evicting until the cache has less
+	 * total memory than the value\, as a percentage of the total cache
+	 * size.  Must be less than \c eviction_trigger., an integer between 10
+	 * and 99; default \c 80.}
+	 * @config{eviction_trigger, trigger eviction when the cache is using
+	 * this much memory\, as a percentage of the total cache size., an
+	 * integer between 10 and 99; default \c 95.}
 	 * @config{eviction_workers, additional threads to help evict pages from
 	 * cache., an integer between 0 and 20; default \c 0.}
 	 * @config{shared_cache = (, shared cache configuration options.  A
@@ -1899,14 +1900,15 @@ struct __wt_connection {
  * @config{error_prefix, prefix string for error messages., a string; default
  * empty.}
  * @config{eviction_dirty_target, continue evicting until the cache has less
- * dirty pages than this (as a percentage). Dirty pages will only be evicted if
- * the cache is full enough to trigger eviction., an integer between 10 and 99;
- * default \c 80.}
- * @config{eviction_target, continue evicting until the cache becomes less full
- * than this (as a percentage). Must be less than \c eviction_trigger., an
- * integer between 10 and 99; default \c 80.}
- * @config{eviction_trigger, trigger eviction when the cache becomes this full
- * (as a percentage)., an integer between 10 and 99; default \c 95.}
+ * dirty memory than the value\, as a percentage of the total cache size.  Dirty
+ * pages will only be evicted if the cache is full enough to trigger eviction.,
+ * an integer between 10 and 99; default \c 80.}
+ * @config{eviction_target, continue evicting until the cache has less total
+ * memory than the value\, as a percentage of the total cache size.  Must be
+ * less than \c eviction_trigger., an integer between 10 and 99; default \c 80.}
+ * @config{eviction_trigger, trigger eviction when the cache is using this much
+ * memory\, as a percentage of the total cache size., an integer between 10 and
+ * 99; default \c 95.}
  * @config{eviction_workers, additional threads to help evict pages from cache.,
  * an integer between 0 and 20; default \c 0.}
  * @config{exclusive, fail if the database already exists\, generally used with

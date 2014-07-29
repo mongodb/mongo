@@ -328,18 +328,18 @@ connection_runtime_config = [
 	Config('error_prefix', '', r'''
 	    prefix string for error messages'''),
 	Config('eviction_dirty_target', '80', r'''
-	    continue evicting until the cache has less dirty pages than this
-	    (as a percentage). Dirty pages will only be evicted if the cache
-	    is full enough to trigger eviction''',
+	    continue evicting until the cache has less dirty memory than the
+	    value, as a percentage of the total cache size. Dirty pages will
+	    only be evicted if the cache is full enough to trigger eviction''',
 	    min=10, max=99),
 	Config('eviction_target', '80', r'''
-	    continue evicting until the cache becomes less full than this
-	    (as a percentage).    Must be less than \c eviction_trigger''',
+	    continue evicting until the cache has less total memory than the
+	    value, as a percentage of the total cache size. Must be less than
+	    \c eviction_trigger''',
 	    min=10, max=99),
 	Config('eviction_trigger', '95', r'''
-	    trigger eviction when the cache becomes this full (as a
-	    percentage)''',
-	    min=10, max=99),
+	    trigger eviction when the cache is using this much memory, as a
+	    percentage of the total cache size''', min=10, max=99),
 	Config('eviction_workers', '0', r'''
 	    additional threads to help evict pages from cache''',
 	    min=0, max=20),
