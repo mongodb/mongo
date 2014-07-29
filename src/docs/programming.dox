@@ -17,15 +17,22 @@ WiredTiger applications:
 - @subpage bulk_load
 - @subpage compression
 
-<h2>Application notes</h2>
+<h2>Programming notes</h2>
 - @subpage threads
 - @subpage name_space
 - @subpage signals
 
+<h2>Application notes</h2>
+- @subpage checkpoints
+- @subpage compaction
+- @subpage hot_backup
+- @subpage statistics
+- @subpage shared_cache
+
 <h2>Performance tuning</h2>
 - @subpage tune_memory_allocator
 - @subpage tune_page_sizes
-- @subpage cache_configuration
+- @subpage tune_cache
 - @subpage bulk_load
 - @subpage tune_cursor_persist
 - @subpage tune_read_only_objects
@@ -37,12 +44,6 @@ WiredTiger applications:
 - @subpage tune_zone_reclaim
 - @subpage tune_statistics
 - @subpage tune_close
-
-<h2>Deployment considerations</h2>
-- @subpage checkpoints
-- @subpage compaction
-- @subpage hot_backup
-- @subpage statistics
 
 <h2>Extending WiredTiger</h2>
 - @subpage custom_data_sources

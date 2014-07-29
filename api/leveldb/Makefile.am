@@ -76,3 +76,6 @@ leveldb_test_SOURCES = leveldb_test.cc
 leveldb_test_LDADD = libwiredtiger_leveldb.la
 
 TESTS = $(noinst_PROGRAMS)
+
+clean-local:
+	rm -rf WTLDB_HOME

@@ -70,7 +70,7 @@ source_meta = [
 	    or simple table.  By default, a \c "file:" URI is derived from
 	    the object name.  The \c type configuration can be used to
 	    switch to a different data source, such as LSM or an extension
-	    configured by the application.'''),
+	    configured by the application'''),
 ]
 
 format_meta = column_meta + [
@@ -298,14 +298,14 @@ table_meta = format_meta + table_only_meta
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
 	Config('async', '', r'''
-	    asynchronous operations configuration options.''',
+	    asynchronous operations configuration options''',
 	    type='category', subconfig=[
 	    Config('enabled', 'false', r'''
 	        enable asynchronous operation''',
 	        type='boolean'),
 	    Config('ops_max', '1024', r'''
 	        maximum number of expected simultaneous asynchronous
-                operations.''', min='10', max='4096'),
+                operations''', min='10', max='4096'),
 	    Config('threads', '2', r'''
 	        the number of worker threads to service asynchronous
                 requests''',
@@ -328,18 +328,18 @@ connection_runtime_config = [
 	Config('error_prefix', '', r'''
 	    prefix string for error messages'''),
 	Config('eviction_dirty_target', '80', r'''
-	    continue evicting until the cache has less dirty pages than this
-	    (as a percentage). Dirty pages will only be evicted if the cache
-	    is full enough to trigger eviction''',
+	    continue evicting until the cache has less dirty memory than the
+	    value, as a percentage of the total cache size. Dirty pages will
+	    only be evicted if the cache is full enough to trigger eviction''',
 	    min=10, max=99),
 	Config('eviction_target', '80', r'''
-	    continue evicting until the cache becomes less full than this
-	    (as a percentage).    Must be less than \c eviction_trigger''',
+	    continue evicting until the cache has less total memory than the
+	    value, as a percentage of the total cache size. Must be less than
+	    \c eviction_trigger''',
 	    min=10, max=99),
 	Config('eviction_trigger', '95', r'''
-	    trigger eviction when the cache becomes this full (as a
-	    percentage)''',
-	    min=10, max=99),
+	    trigger eviction when the cache is using this much memory, as a
+	    percentage of the total cache size''', min=10, max=99),
 	Config('eviction_workers', '0', r'''
 	    additional threads to help evict pages from cache''',
 	    min=0, max=20),
@@ -538,7 +538,7 @@ methods = {
 	    only query operations are supported by this cursor. An error is
 	    returned if a modification is attempted using the cursor.  The
 	    default is false for all cursor types except for log and metadata
-	    cursors.''',
+	    cursors''',
 	    type='boolean'),
 	Config('statistics', '', r'''
 	    Specify the statistics to be gathered.  Choosing "all" gathers

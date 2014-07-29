@@ -56,7 +56,8 @@ def typedesc(c):
 
 def parseconfig(c, name_indent=''):
     ctype = gettype(c)
-    desc = whitespace_re.sub(' ', c.desc.strip()) + '.'
+    desc = whitespace_re.sub(' ', c.desc.strip())
+    desc = desc.strip('.') + '.'
     desc = desc.replace(',', '\\,')
     default = '\\c ' + str(c.default) if c.default or ctype == 'int' \
             else 'empty'
