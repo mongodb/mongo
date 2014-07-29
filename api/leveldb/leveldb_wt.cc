@@ -208,12 +208,7 @@ wtleveldb_create(
   s_table << "leaf_page_max=" << options.block_size << ",";
   s_table << "leaf_item_max=" << options.block_size / 4 << ",";
   if (options.compression == leveldb::kSnappyCompression)
-#ifdef HAVE_LIBSNAPPY
     s_table << "block_compressor=snappy,";
-#else
-    return WiredTigerErrorToStatus(ENOTSUP,
-        "WiredTiger must be built with snappy support");
-#endif
 #ifdef HAVE_ROCKSDB
   if (options.compression == leveldb::kZlibCompression)
     s_table << "block_compressor=zlib,";
@@ -280,7 +275,7 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
   else if (ret != 0)
     return WiredTigerErrorToStatus(ret, NULL);
 
-  if (options.create_if_missing) 
+  if (options.create_if_missing)
     ret = wtleveldb_create(conn, options, WT_URI);
 
   if (ret != 0) {
