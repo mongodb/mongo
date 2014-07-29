@@ -7,8 +7,9 @@
 # operations are described here.
 
 class LogRecordType:
-    def __init__(self, name, fields):
+    def __init__(self, name, desc, fields):
         self.name = name
+        self.desc = desc
         self.fields = fields
 
     def macro_name(self):
@@ -19,42 +20,44 @@ class LogRecordType:
 
 rectypes = [
     # A database-wide checkpoint.
-    LogRecordType('checkpoint', [
+    LogRecordType('checkpoint', 'checkpoint', [
         ('WT_LSN', 'ckpt_lsn'), ('uint32', 'nsnapshot'), ('item', 'snapshot')]),
 
     # Common case: a transaction commit
-    LogRecordType('commit', [('uint64', 'txnid')]),
+    LogRecordType('commit', 'transaction commit', [('uint64', 'txnid')]),
 
     # Mark the start / end of a file sync operation (usually when a file is
     # closed).  These log records aren't required during recovery, but we use
     # the allocated LSN to reduce the amount of work recovery has to do, and
     # they are useful for debugging recovery.
-    LogRecordType('file_sync', [('uint32', 'fileid'), ('int', 'start')]),
+    LogRecordType('file_sync', 'file sync', [
+        ('uint32', 'fileid'), ('int', 'start')]),
 
     # Debugging message in the log
-    LogRecordType('message', [('string', 'message')]),
+    LogRecordType('message', 'message', [('string', 'message')]),
 ]
 
 class LogOperationType:
-    def __init__(self, name, fields):
+    def __init__(self, name, desc, fields):
         self.name = name
+        self.desc = desc
         self.fields = fields
 
     def macro_name(self):
         return 'WT_LOGOP_%s' % self.name.upper()
 
 optypes = [
-    LogOperationType('col_put',
+    LogOperationType('col_put', 'column put',
         [('uint32', 'fileid'), ('recno', 'recno'), ('item', 'value')]),
-    LogOperationType('col_remove',
+    LogOperationType('col_remove', 'column remove',
         [('uint32', 'fileid'), ('recno', 'recno')]),
-    LogOperationType('col_truncate',
+    LogOperationType('col_truncate', 'column truncate',
         [('uint32', 'fileid'), ('recno', 'start'), ('recno', 'stop')]),
-    LogOperationType('row_put',
+    LogOperationType('row_put', 'row put',
         [('uint32', 'fileid'), ('item', 'key'), ('item', 'value')]),
-    LogOperationType('row_remove',
+    LogOperationType('row_remove', 'row remove',
         [('uint32', 'fileid'), ('item', 'key')]),
-    LogOperationType('row_truncate',
+    LogOperationType('row_truncate', 'row truncate',
         [('uint32', 'fileid'), ('item', 'start'), ('item', 'stop'),
             ('uint32', 'mode')]),
 ]

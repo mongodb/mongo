@@ -166,23 +166,3 @@ struct __wt_log_op_desc {
 	const char *fmt;
 	int (*print)(WT_SESSION_IMPL *session, uint8_t **pp, uint8_t *end);
 };
-
-/*
- * DO NOT EDIT: automatically built by dist/log.py.
- * Log record declarations: BEGIN
- */
-#define	WT_LOGOP_INVALID	0
-#define	WT_LOGREC_CHECKPOINT	0
-#define	WT_LOGREC_COMMIT	1
-#define	WT_LOGREC_FILE_SYNC	2
-#define	WT_LOGREC_MESSAGE	3
-#define	WT_LOGOP_COL_PUT	1
-#define	WT_LOGOP_COL_REMOVE	2
-#define	WT_LOGOP_COL_TRUNCATE	3
-#define	WT_LOGOP_ROW_PUT	4
-#define	WT_LOGOP_ROW_REMOVE	5
-#define	WT_LOGOP_ROW_TRUNCATE	6
-/*
- * Log record declarations: END
- * DO NOT EDIT: automatically built by dist/log.py.
- */
