@@ -201,6 +201,7 @@ namespace mongo {
         boost::mutex::scoped_lock lk( _entryMapLock );
         Entry* e = _entryMap[fromNS.toString()];
         if ( !e ) {
+            _entryMap.erase( fromNS.toString() );
             return Status( ErrorCodes::NamespaceNotFound,
                            "cannot renameCollection missng collection" );
         }

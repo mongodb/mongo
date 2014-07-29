@@ -246,8 +246,7 @@ namespace {
         Heap1BtreeImpl(const IndexCatalogEntry& info, IndexSet* data)
             : _info(info),
               _data(data) {
-            _averageSizeHelpers.totalSize = 0;
-            _averageSizeHelpers.totalDocs = 0;
+            _currentKeySize = 0;
         }
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
@@ -259,9 +258,6 @@ namespace {
                               const DiskLoc& loc,
                               bool dupsAllowed) {
 
-            _averageSizeHelpers.totalSize += key.objsize();
-            _averageSizeHelpers.totalDocs++;
-
             invariant(!loc.isNull());
             invariant(loc.isValid());
             invariant(!hasFieldNames(key));
@@ -271,6 +267,7 @@ namespace {
                 return dupKeyError(key);
 
             _data->insert(IndexEntry(key.getOwned(), loc));
+            _currentKeySize += key.objsize();
             return Status::OK();
         }
 
@@ -281,6 +278,9 @@ namespace {
 
             const size_t numDeleted = _data->erase(IndexEntry(key, loc));
             invariant(numDeleted <= 1);
+            if ( numDeleted == 1 )
+                _currentKeySize -= key.objsize();
+
             return numDeleted == 1;
         }
 
@@ -290,9 +290,8 @@ namespace {
         }
 
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const {
-            // this is a guess
-            double avg = _averageSizeHelpers.totalSize / _averageSizeHelpers.totalDocs;
-            return _data->size() * ( 24 + avg );
+            // 24 is a guess for DiskLoc + std::set overhead
+            return _currentKeySize + ( sizeof(IndexEntry) * _data->size() );
         }
 
         virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
@@ -542,12 +541,7 @@ namespace {
     private:
         const IndexCatalogEntry& _info;
         IndexSet* _data;
-
-        struct AverageSizeHelpers {
-            double totalSize;
-            double totalDocs;
-        } _averageSizeHelpers;
-
+        long long _currentKeySize;
     };
 } // namespace
 
