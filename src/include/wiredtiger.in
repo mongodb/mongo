@@ -980,7 +980,7 @@ struct __wt_session {
 	 * @config{readonly, only query operations are supported by this cursor.
 	 * An error is returned if a modification is attempted using the cursor.
 	 * The default is false for all cursor types except for metadata
-	 * cursors.., a boolean flag; default \c false.}
+	 * cursors., a boolean flag; default \c false.}
 	 * @config{statistics, Specify the statistics to be gathered.  Choosing
 	 * "all" gathers statistics regardless of cost and may include
 	 * traversing on-disk files; "fast" gathers a subset of relatively
@@ -1188,7 +1188,7 @@ struct __wt_session {
 	 * group\, index or simple table.  By default\, a \c "file:" URI is
 	 * derived from the object name.  The \c type configuration can be used
 	 * to switch to a different data source\, such as LSM or an extension
-	 * configured by the application.., a string; default \c file.}
+	 * configured by the application., a string; default \c file.}
 	 * @config{value_format, the format of the data packed into value items.
 	 * See @ref schema_format_types for details.  By default\, the
 	 * value_format is \c 'u' and applications use a WT_ITEM structure to
@@ -1560,12 +1560,12 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @configstart{connection.reconfigure, see dist/api_data.py}
-	 * @config{async = (, asynchronous operations configuration options.., a
+	 * @config{async = (, asynchronous operations configuration options., a
 	 * set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable asynchronous
 	 * operation., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;ops_max, maximum number of expected
-	 * simultaneous asynchronous operations.., an integer between 10 and
+	 * simultaneous asynchronous operations., an integer between 10 and
 	 * 4096; default \c 1024.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, the
 	 * number of worker threads to service asynchronous requests., an
@@ -1858,12 +1858,12 @@ struct __wt_connection {
  * @param errhandler An error handler.  If <code>NULL</code>, a builtin error
  * handler is installed that writes error messages to stderr
  * @configstart{wiredtiger_open, see dist/api_data.py}
- * @config{async = (, asynchronous operations configuration options.., a set of
+ * @config{async = (, asynchronous operations configuration options., a set of
  * related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable asynchronous operation., a
  * boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;ops_max,
- * maximum number of expected simultaneous asynchronous operations.., an integer
+ * maximum number of expected simultaneous asynchronous operations., an integer
  * between 10 and 4096; default \c 1024.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, the number of worker threads to
  * service asynchronous requests., an integer between 1 and 20; default \c 2.}
