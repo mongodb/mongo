@@ -29,6 +29,15 @@ __curlog_logrec(
 		__wt_scr_alloc(session, logrec->size, &cl->logrec);
 	WT_RET(__wt_buf_set(session,
 	    cl->logrec, logrec->data, logrec->size));
+	/*
+	 * Skip the log header.  We need to do the exact same calculation
+	 * to get the rectype out, so setup up the step cursor pointers.
+	 */
+	cl->stepp = (const uint8_t *)cl->logrec->data +
+	    offsetof(WT_LOG_RECORD, record);
+	cl->stepp_end = (const uint8_t *)cl->logrec->data + logrec->size;
+	WT_RET(__wt_logrec_read(session, &cl->stepp, cl->stepp_end,
+	    &cl->rectype));
 	return (0);
 }
 
@@ -79,18 +88,10 @@ __curlog_steprec(
 	cl = cookie;
 
 	/*
-	 * Skip the log header.
-	 */
-	cl->stepp = (const uint8_t *)cl->logrec->data +
-	    offsetof(WT_LOG_RECORD, record);
-	cl->stepp_end = (const uint8_t *)cl->logrec->data + logrec->size;
-	/*
 	 * The record count within a record starts at 1 so that we can
 	 * reserve 0 to mean the entire record.
 	 */
 	cl->step_count = 1;
-	WT_RET(__wt_logrec_read(session, &cl->stepp, cl->stepp_end,
-	    &cl->rectype));
 	/*
 	 * Unpack the txnid so that we can return each
 	 * individual operation for this txnid.
@@ -111,25 +112,36 @@ static int
 __curlog_stepkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
 	WT_CURSOR_LOG *cl;
-	WT_ITEM value;
+	WT_ITEM opkey, opvalue;
 	uint32_t opsize, optype;
+	size_t sz;
 
 	cl = (WT_CURSOR_LOG *)cursor;
 	/*
 	 * If it is a commit, peek to get the size and optype.
 	 * Currently we don't do anything with the optype.
 	 */
+	WT_CLEAR(opkey);
+	WT_CLEAR(opvalue);
 	if (cl->rectype == WT_LOGREC_COMMIT)
 		WT_RET(__wt_logop_read(session, &cl->stepp, cl->stepp_end,
 		    &optype, &opsize));
-	else
+	else {
+		optype = WT_LOGOP_INVALID;
 		opsize = cl->logrec->size;
+	}
 	__wt_cursor_set_key(cursor, cl->cur_lsn->file, cl->cur_lsn->offset,
 	    cl->step_count++);
-	value.data = cl->stepp;
-	value.size = opsize;
+	/*
+	 * TODO: Need to burst the individual log record here and properly
+	 * set the key and value.
+	 */
+	opkey = *cl->logrec;
+	opvalue.data = cl->stepp;
+	opvalue.size = opsize;
+	__wt_cursor_set_value(cursor, cl->txnid, cl->rectype, optype,
+	    &opkey, &opvalue);
 	cl->stepp += opsize;
-	__wt_cursor_set_raw_value(cursor, &value);
 	return (0);
 }
 
@@ -177,7 +189,9 @@ __curlog_next(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LOG *cl;
 	WT_DECL_RET;
+	WT_ITEM opkey;
 	WT_SESSION_IMPL *session;
+	uint32_t optype;
 
 	cl = (WT_CURSOR_LOG *)cursor;
 
@@ -186,7 +200,10 @@ __curlog_next(WT_CURSOR *cursor)
 	WT_ERR(__wt_log_scan(session, cl->next_lsn, WT_LOGSCAN_ONE,
 	    __curlog_logrec, cl));
 	__wt_cursor_set_key(cursor, cl->cur_lsn->file, cl->cur_lsn->offset);
-	__wt_cursor_set_raw_value((WT_CURSOR *)cl, cl->logrec);
+	opkey.data = NULL;
+	opkey.size = 0;
+	__wt_cursor_set_value(cursor, cl->txnid, cl->rectype, WT_LOGOP_INVALID,
+	    &opkey, cl->logrec);
 	WT_STAT_FAST_CONN_INCR(session, cursor_next);
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 
@@ -203,6 +220,7 @@ __curlog_search(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LOG *cl;
 	WT_DECL_RET;
+	WT_ITEM opkey;
 	WT_LSN key;
 	WT_SESSION_IMPL *session;
 	uint32_t counter;
@@ -228,8 +246,12 @@ __curlog_search(WT_CURSOR *cursor)
 	 */
 	if (F_ISSET(cl, WT_LOGC_STEP))
 		WT_ERR(__curlog_stepkv(session, cursor));
-	else
-		__wt_cursor_set_raw_value((WT_CURSOR *)cl, cl->logrec);
+	else {
+		opkey.data = NULL;
+		opkey.size = 0;
+		__wt_cursor_set_value(cursor, cl->txnid, cl->rectype,
+		    WT_LOGOP_INVALID, &opkey, cl->logrec);
+	}
 	WT_STAT_FAST_CONN_INCR(session, cursor_search);
 	WT_STAT_FAST_DATA_INCR(session, cursor_search);
 
@@ -246,10 +268,9 @@ __curlog_reset(WT_CURSOR *cursor)
 	WT_CURSOR_LOG *cl;
 
 	cl = (WT_CURSOR_LOG *)cursor;
-	if (F_ISSET(cl, WT_LOGC_STEP)) {
-		cl->stepp = cl->stepp_end = NULL;
+	cl->stepp = cl->stepp_end = NULL;
+	if (F_ISSET(cl, WT_LOGC_STEP))
 		cl->step_count = 0;
-	}
 	if (cl->logrec != NULL)
 		__wt_scr_free(&cl->logrec);
 	INIT_LSN(cl->cur_lsn);
@@ -270,12 +291,7 @@ __curlog_close(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, close, NULL);
 	cl = (WT_CURSOR_LOG *)cursor;
-	if (F_ISSET(cl, WT_LOGC_STEP)) {
-		cl->stepp = cl->stepp_end = NULL;
-		cl->step_count = 0;
-	}
-	if (cl->logrec != NULL)
-		__wt_scr_free(&cl->logrec);
+	WT_ERR(__curlog_reset(cursor));
 	__wt_free(session, cl->cur_lsn);
 	__wt_free(session, cl->next_lsn);
 	WT_ERR(__wt_cursor_close(cursor));
@@ -295,7 +311,7 @@ __curlog_stepinit(WT_SESSION_IMPL *session, WT_CURSOR_LOG *cl)
 	WT_UNUSED(session);
 	cursor = &cl->iface;
 	cursor->next = __curlog_stepnext;
-	cursor->key_format = LSNSTEP_KEY_FORMAT;
+	cursor->key_format = LOGCSTEP_KEY_FORMAT;
 	cl->scan_cb = __curlog_steprec;
 	F_SET(cl, WT_LOGC_STEP);
 	return (0);
@@ -352,10 +368,10 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	if (cval.val != 0) {
 		__curlog_stepinit(session, cl);
 	} else {
-		cursor->key_format = LSN_KEY_FORMAT;
+		cursor->key_format = LOGC_KEY_FORMAT;
 		cl->scan_cb = __curlog_logrec;
 	}
-	cursor->value_format = "u";
+	cursor->value_format = LOGC_VALUE_FORMAT;
 
 	INIT_LSN(cl->cur_lsn);
 	INIT_LSN(cl->next_lsn);

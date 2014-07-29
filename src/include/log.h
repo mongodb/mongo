@@ -20,10 +20,12 @@
 
 /*
  * Both of the macros below need to change if the content of __wt_lsn
- * ever changes.
+ * ever changes.  The value is the following:
+ * txnid, rectype, optype, opkey WT_ITEM, opvalue WT_ITEM
  */
-#define	LSN_KEY_FORMAT		WT_UNCHECKED_STRING(Iq)
-#define	LSNSTEP_KEY_FORMAT	WT_UNCHECKED_STRING(IqI)
+#define	LOGC_KEY_FORMAT		WT_UNCHECKED_STRING(Iq)
+#define	LOGCSTEP_KEY_FORMAT	WT_UNCHECKED_STRING(IqI)
+#define	LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIuu)
 
 #define	MAX_LSN(l)	do {						\
 	(l)->file = UINT32_MAX;						\
@@ -169,16 +171,17 @@ struct __wt_log_op_desc {
  * DO NOT EDIT: automatically built by dist/log.py.
  * Log record declarations: BEGIN
  */
+#define	WT_LOGOP_INVALID	0
 #define	WT_LOGREC_CHECKPOINT	0
 #define	WT_LOGREC_COMMIT	1
 #define	WT_LOGREC_FILE_SYNC	2
 #define	WT_LOGREC_MESSAGE	3
-#define	WT_LOGOP_COL_PUT	0
-#define	WT_LOGOP_COL_REMOVE	1
-#define	WT_LOGOP_COL_TRUNCATE	2
-#define	WT_LOGOP_ROW_PUT	3
-#define	WT_LOGOP_ROW_REMOVE	4
-#define	WT_LOGOP_ROW_TRUNCATE	5
+#define	WT_LOGOP_COL_PUT	1
+#define	WT_LOGOP_COL_REMOVE	2
+#define	WT_LOGOP_COL_TRUNCATE	3
+#define	WT_LOGOP_ROW_PUT	4
+#define	WT_LOGOP_ROW_REMOVE	5
+#define	WT_LOGOP_ROW_TRUNCATE	6
 /*
  * Log record declarations: END
  * DO NOT EDIT: automatically built by dist/log.py.

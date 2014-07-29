@@ -47,7 +47,10 @@ walk_log(WT_SESSION *session)
 	/*! [log cursor] */
 	WT_CURSOR *cursor;
 	WT_LSN lsn, lsnsave;
-	WT_ITEM log_rec;
+	WT_ITEM log_reck, log_recv;
+	uint64_t txnid;
+	uint32_t optype, rectype;
+	size_t sz;
 
 	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
 	/*! [log cursor] */
@@ -60,10 +63,13 @@ walk_log(WT_SESSION *session)
 		if (++i == 3)
 			lsnsave = lsn;
 		/*! [log cursor get_value] */
-		ret = cursor->get_value(cursor, &log_rec);
+		ret = cursor->get_value(cursor, &txnid, &rectype,
+		    &optype, &log_reck, &log_recv);
 		/*! [log cursor get_value] */
-		printf("LSN [%d][%" PRIu64 "]:  Size %" PRIu64 "\n",
-		    lsn.file, lsn.offset, (u_long)log_rec.size);
+		printf("LSN [%d][%" PRIu64
+		    "]:  Rectype %d Optype %d Size %" PRIu64 "\n",
+		    lsn.file, lsn.offset, rectype,
+		    optype, (u_long)log_recv.size);
 	}
 	cursor->reset(cursor);
 	/*! [log cursor set_key] */
@@ -72,9 +78,13 @@ walk_log(WT_SESSION *session)
 	/*! [log cursor search] */
 	ret = cursor->search(cursor);
 	/*! [log cursor search] */
-	ret = cursor->get_value(cursor, &log_rec);
-	printf("Searched LSN [%d][%" PRIu64 "]:  Size %" PRIu64 "\n",
-	    lsnsave.file, lsnsave.offset, (u_long)log_rec.size);
+	log_recv.size = 0;
+	ret = cursor->get_value(cursor, &txnid, &rectype,
+	    &optype, &log_reck, &log_recv);
+	printf("Searched LSN [%d][%" PRIu64
+	    "]:  Rectype %d Optype %d Size %" PRIu64 "\n",
+	    lsnsave.file, lsnsave.offset, rectype,
+	    optype, (u_long)log_recv.size);
 	ret = cursor->get_key(cursor, &lsn.file, &lsn.offset);
 	assert(lsnsave.file == lsn.file && lsnsave.offset == lsn.offset);
 	cursor->close(cursor);
@@ -82,40 +92,44 @@ walk_log(WT_SESSION *session)
 }
 
 static int
-iterate_log(WT_SESSION *session)
+step_log(WT_SESSION *session)
 {
 	int first, i, ret;
-	/*! [log iterator open] */
+	/*! [log step open] */
 	WT_CURSOR *cursor;
 	WT_LSN lsn, lsnsave;
-	WT_ITEM log_rec;
-	uint32_t opcount;
+	WT_ITEM log_reck, log_recv;
+	uint64_t txnid;
+	uint32_t opcount, optype, rectype;
 
 	ret = session->open_cursor(session,
 	    "log:", NULL, "step=true", &cursor);
-	/*! [log iterator open] */
+	/*! [log step open] */
 	i = 0;
 	memset(&lsnsave, 0, sizeof(lsnsave));
 	while ((ret = cursor->next(cursor)) == 0) {
-		/*! [log iterator get_key] */
+		/*! [log step get_key] */
 		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset,
 		    &opcount);
-		/*! [log iterator get_key] */
+		/*! [log step get_key] */
 		if (++i == MAX_KEYS)
 			lsnsave = lsn;
-		/*! [log iterator get_value] */
-		ret = cursor->get_value(cursor, &log_rec);
-		/*! [log iterator get_value] */
-		printf("LSN [%d][%" PRIu64 "].%d:  Size %" PRIu64 "\n",
-		    lsn.file, lsn.offset, opcount, (u_long)log_rec.size);
+		/*! [log step get_value] */
+		ret = cursor->get_value(cursor, &txnid, &rectype,
+		    &optype, &log_reck, &log_recv);
+		/*! [log step get_value] */
+		printf("LSN [%d][%" PRIu64
+		    "].%d:  Rectype %d Optype %d Size %" PRIu64 "\n",
+		    lsn.file, lsn.offset, opcount, rectype,
+		    optype, (u_long)log_recv.size);
 	}
 	cursor->reset(cursor);
-	/*! [log iterator set_key] */
+	/*! [log step set_key] */
 	cursor->set_key(cursor, lsnsave.file, lsnsave.offset, 0, 0);
-	/*! [log iterator set_key] */
-	/*! [log iterator search] */
+	/*! [log step set_key] */
+	/*! [log step search] */
 	ret = cursor->search(cursor);
-	/*! [log iterator search] */
+	/*! [log step search] */
 	printf("Searched ");
 	/*
 	 * Walk all records starting with this key.
@@ -128,9 +142,13 @@ iterate_log(WT_SESSION *session)
 			assert(lsnsave.file == lsn.file &&
 			    lsnsave.offset == lsn.offset);
 		}
-		ret = cursor->get_value(cursor, &log_rec);
-		printf("LSN [%d][%" PRIu64 "].%d:  Size %" PRIu64 "\n",
-		    lsn.file, lsn.offset, opcount, (u_long)log_rec.size);
+		ret = cursor->get_value(cursor, &txnid, &rectype,
+		    &optype, &log_reck, &log_recv);
+		printf("Searched LSN [%d][%" PRIu64
+		    "].%d:  Rectype %d Optype %d Txnid %" PRIu64
+		    " Size %" PRIu64 "\n",
+		    lsn.file, lsn.offset, opcount, rectype, optype,
+		    txnid, (u_long)log_recv.size);
 		ret = cursor->next(cursor);
 		if (ret != 0)
 			break;
@@ -185,7 +203,7 @@ int main(void)
 	cursor->close(cursor);
 
 	ret = walk_log(session);
-	ret = iterate_log(session);
+	ret = step_log(session);
 
 	ret = wt_conn->close(wt_conn, NULL);
 	return (ret);
