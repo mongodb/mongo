@@ -79,6 +79,16 @@ namespace mongo {
                 names.sort();
             }
 
+            scoped_ptr<MatchExpression> matcher;
+            if ( jsobj["filter"].isABSONObj() ) {
+                StatusWithMatchExpression parsed =
+                    MatchExpressionParser::parse( jsobj["filter"].Obj() );
+                if ( !parsed.isOK() ) {
+                    return appendCommandStatus( result, parsed.getStatus() );
+                }
+                matcher.reset( parsed.getValue() );
+            }
+
             BSONArrayBuilder arr;
 
             for ( list<string>::const_iterator i = names.begin(); i != names.end(); ++i ) {
@@ -96,7 +106,12 @@ namespace mongo {
                     dbEntry->getCollectionCatalogEntry( txn, ns )->getCollectionOptions(txn);
                 b.append( "options", options.toBSON() );
 
-                arr.append( b.obj() );
+                BSONObj maybe = b.obj();
+                if ( matcher && !matcher->matchesBSON( maybe ) ) {
+                    continue;
+                }
+
+                arr.append( maybe );
             }
 
             result.append( "collections", arr.arr() );
