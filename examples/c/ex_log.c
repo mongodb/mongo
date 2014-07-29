@@ -49,7 +49,7 @@ walk_log(WT_SESSION *session)
 	WT_LSN lsn, lsnsave;
 	WT_ITEM log_reck, log_recv;
 	uint64_t txnid;
-	uint32_t optype, rectype;
+	uint32_t fileid, optype, rectype;
 
 	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
 	/*! [log cursor] */
@@ -63,7 +63,7 @@ walk_log(WT_SESSION *session)
 			lsnsave = lsn;
 		/*! [log cursor get_value] */
 		ret = cursor->get_value(cursor, &txnid, &rectype,
-		    &optype, &log_reck, &log_recv);
+		    &optype, &fileid, &log_reck, &log_recv);
 		/*! [log cursor get_value] */
 		printf("LSN [%d][%" PRIu64
 		    "]:  record type %d size %" PRIu64 "\n",
@@ -78,7 +78,7 @@ walk_log(WT_SESSION *session)
 	/*! [log cursor search] */
 	log_recv.size = 0;
 	ret = cursor->get_value(cursor, &txnid, &rectype,
-	    &optype, &log_reck, &log_recv);
+	    &optype, &fileid, &log_reck, &log_recv);
 	assert(optype == 0);
 	printf("Searched LSN [%d][%" PRIu64
 	    "]:  record type %d size %" PRIu64 "\n",
@@ -98,7 +98,7 @@ step_log(WT_SESSION *session)
 	WT_LSN lsn, lsnsave;
 	WT_ITEM log_reck, log_recv;
 	uint64_t txnid;
-	uint32_t opcount, optype, rectype;
+	uint32_t fileid, opcount, optype, rectype;
 
 	ret = session->open_cursor(session,
 	    "log:", NULL, "step=true", &cursor);
@@ -114,11 +114,12 @@ step_log(WT_SESSION *session)
 			lsnsave = lsn;
 		/*! [log step get_value] */
 		ret = cursor->get_value(cursor, &txnid, &rectype,
-		    &optype, &log_reck, &log_recv);
+		    &optype, &fileid, &log_reck, &log_recv);
 		/*! [log step get_value] */
-		printf("LSN [%d][%" PRIu64
-		    "].%d:  record type %d optype %d txnid %" PRIu64,
-		    lsn.file, lsn.offset, opcount, rectype, optype, txnid);
+		printf("LSN [%d][%" PRIu64 "].%d: "
+		    " record type %d optype %d txnid %" PRIu64 " fileid %d",
+		    lsn.file, lsn.offset, opcount, rectype,
+		    optype, txnid, fileid);
 		if (log_reck.size != 0)
 			printf(" key size %" PRIu64, (uint64_t)log_reck.size);
 		if (log_recv.size != 0)
@@ -145,10 +146,11 @@ step_log(WT_SESSION *session)
 			    lsnsave.offset == lsn.offset);
 		}
 		ret = cursor->get_value(cursor, &txnid, &rectype,
-		    &optype, &log_reck, &log_recv);
-		printf("LSN [%d][%" PRIu64
-		    "].%d:  record type %d optype %d txnid %" PRIu64,
-		    lsn.file, lsn.offset, opcount, rectype, optype, txnid);
+		    &optype, &fileid, &log_reck, &log_recv);
+		printf("LSN [%d][%" PRIu64 "].%d: "
+		    " record type %d optype %d txnid %" PRIu64 " fileid %d",
+		    lsn.file, lsn.offset, opcount, rectype,
+		    optype, txnid, fileid);
 		if (log_reck.size != 0)
 			printf(" key size %" PRIu64, (uint64_t)log_reck.size);
 		if (log_recv.size != 0)

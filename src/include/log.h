@@ -21,11 +21,11 @@
 /*
  * Both of the macros below need to change if the content of __wt_lsn
  * ever changes.  The value is the following:
- * txnid, record type, operation type, operation key, operation value
+ * txnid, record type, operation type, file id, operation key, operation value
  */
 #define	LOGC_KEY_FORMAT		WT_UNCHECKED_STRING(Iq)
 #define	LOGCSTEP_KEY_FORMAT	WT_UNCHECKED_STRING(IqI)
-#define	LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIuu)
+#define	LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIIuu)
 
 #define	MAX_LSN(l)	do {						\
 	(l)->file = UINT32_MAX;						\

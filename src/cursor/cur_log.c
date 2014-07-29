@@ -118,11 +118,10 @@ __curlog_steprec(
  */
 static int
 __curlog_op_read(WT_SESSION_IMPL *session,
-    WT_CURSOR_LOG *cl, uint32_t optype, uint32_t opsize)
+    WT_CURSOR_LOG *cl, uint32_t optype, uint32_t opsize, uint32_t *fileid)
 {
 	WT_ITEM key, value;
 	uint64_t recno;
-	uint32_t fileid;
 	const uint8_t *end, *pp;
 
 	pp = cl->stepp;
@@ -130,27 +129,27 @@ __curlog_op_read(WT_SESSION_IMPL *session,
 	switch (optype) {
 	case WT_LOGOP_COL_PUT:
 		WT_RET(__wt_logop_col_put_unpack(session, &pp, end,
-		    &fileid, &recno, &value));
+		    fileid, &recno, &value));
 		WT_RET(__wt_buf_set(session, cl->opkey, &recno, sizeof(recno)));
 		WT_RET(__wt_buf_set(session,
 		    cl->opvalue, value.data, value.size));
 		break;
 	case WT_LOGOP_COL_REMOVE:
 		WT_RET(__wt_logop_col_remove_unpack(session, &pp, end,
-		    &fileid, &recno));
+		    fileid, &recno));
 		WT_RET(__wt_buf_set(session, cl->opkey, &recno, sizeof(recno)));
 		WT_RET(__wt_buf_set(session, cl->opvalue, NULL, 0));
 		break;
 	case WT_LOGOP_ROW_PUT:
 		WT_RET(__wt_logop_row_put_unpack(session, &pp, end,
-		    &fileid, &key, &value));
+		    fileid, &key, &value));
 		WT_RET(__wt_buf_set(session, cl->opkey, key.data, key.size));
 		WT_RET(__wt_buf_set(session,
 		    cl->opvalue, value.data, value.size));
 		break;
 	case WT_LOGOP_ROW_REMOVE:
 		WT_RET(__wt_logop_row_remove_unpack(session, &pp, end,
-		    &fileid, &key));
+		    fileid, &key));
 		WT_RET(__wt_buf_set(session, cl->opkey, key.data, key.size));
 		WT_RET(__wt_buf_set(session, cl->opvalue, NULL, 0));
 		break;
@@ -159,6 +158,7 @@ __curlog_op_read(WT_SESSION_IMPL *session,
 		 * Any other operations return the record in the value
 		 * and an empty key.
 		 */
+		*fileid = 0;
 		WT_RET(__wt_buf_set(session, cl->opkey, NULL, 0));
 		WT_RET(__wt_buf_set(session, cl->opvalue, cl->stepp, opsize));
 	}
@@ -173,7 +173,7 @@ static int
 __curlog_stepkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
 	WT_CURSOR_LOG *cl;
-	uint32_t opsize, optype;
+	uint32_t fileid, opsize, optype;
 
 	cl = (WT_CURSOR_LOG *)cursor;
 	/*
@@ -183,10 +183,11 @@ __curlog_stepkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	if (cl->rectype == WT_LOGREC_COMMIT) {
 		WT_RET(__wt_logop_read(session,
 		    &cl->stepp, cl->stepp_end, &optype, &opsize));
-		WT_RET(__curlog_op_read(session, cl, optype, opsize));
+		WT_RET(__curlog_op_read(session, cl, optype, opsize, &fileid));
 	} else {
 		optype = WT_LOGOP_INVALID;
 		opsize = cl->logrec->size;
+		fileid = 0;
 		WT_RET(__wt_buf_set(session, cl->opkey, NULL, 0));
 		WT_RET(__wt_buf_set(session,
 		    cl->opvalue, cl->stepp, opsize));
@@ -194,7 +195,7 @@ __curlog_stepkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	__wt_cursor_set_key(cursor, cl->cur_lsn->file, cl->cur_lsn->offset,
 	    cl->step_count++);
 	__wt_cursor_set_value(cursor, cl->txnid, cl->rectype, optype,
-	    cl->opkey, cl->opvalue);
+	    fileid, cl->opkey, cl->opvalue);
 	cl->stepp += opsize;
 	return (0);
 }
@@ -256,7 +257,7 @@ __curlog_next(WT_CURSOR *cursor)
 	opkey.data = NULL;
 	opkey.size = 0;
 	__wt_cursor_set_value(cursor, cl->txnid, cl->rectype, WT_LOGOP_INVALID,
-	    &opkey, cl->logrec);
+	    0, &opkey, cl->logrec);
 	WT_STAT_FAST_CONN_INCR(session, cursor_next);
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 
@@ -303,7 +304,7 @@ __curlog_search(WT_CURSOR *cursor)
 		opkey.data = NULL;
 		opkey.size = 0;
 		__wt_cursor_set_value(cursor, cl->txnid, cl->rectype,
-		    WT_LOGOP_INVALID, &opkey, cl->logrec);
+		    WT_LOGOP_INVALID, 0, &opkey, cl->logrec);
 	}
 	WT_STAT_FAST_CONN_INCR(session, cursor_search);
 	WT_STAT_FAST_DATA_INCR(session, cursor_search);
