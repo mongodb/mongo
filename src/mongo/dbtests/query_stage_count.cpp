@@ -330,10 +330,10 @@ namespace QueryStageCount {
             }
 
             // Prepare the cursor to yield
-            count.prepareToYield();
+            count.saveState();
 
             // Recover from yield
-            count.recoverFromYield(&_txn);
+            count.restoreState(&_txn);
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
@@ -382,13 +382,13 @@ namespace QueryStageCount {
             }
 
             // Prepare the cursor to yield
-            count.prepareToYield();
+            count.saveState();
 
             // Remove remaining objects
             remove(BSON("a" << GTE << 5));
 
             // Recover from yield
-            count.recoverFromYield(&_txn);
+            count.restoreState(&_txn);
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
@@ -437,7 +437,7 @@ namespace QueryStageCount {
             }
 
             // Prepare the cursor to yield
-            count.prepareToYield();
+            count.saveState();
 
             // Insert one document before the end
             insert(BSON("a" << 5.5));
@@ -446,7 +446,7 @@ namespace QueryStageCount {
             insert(BSON("a" << 6.5));
 
             // Recover from yield
-            count.recoverFromYield(&_txn);
+            count.restoreState(&_txn);
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
@@ -495,13 +495,13 @@ namespace QueryStageCount {
             }
 
             // Prepare the cursor to yield
-            count.prepareToYield();
+            count.saveState();
 
             // Insert a document with two values for 'a'
             insert(BSON("a" << BSON_ARRAY(10 << 11)));
 
             // Recover from yield
-            count.recoverFromYield(&_txn);
+            count.restoreState(&_txn);
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {
@@ -619,13 +619,13 @@ namespace QueryStageCount {
             }
 
             // Prepare the cursor to yield
-            count.prepareToYield();
+            count.saveState();
 
             // Mark the key at position 5 as 'unused'
             remove(BSON("a" << 1 << "b" << 5));
 
             // Recover from yield
-            count.recoverFromYield(&_txn);
+            count.restoreState(&_txn);
 
             // finish counting
             while (PlanStage::IS_EOF != countState) {

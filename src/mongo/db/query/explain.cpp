@@ -433,7 +433,7 @@ namespace mongo {
         //
 
         // Inspect the tree to see if there is a MultiPlanStage.
-        MultiPlanStage* mps = getMultiPlanStage(exec->getStages());
+        MultiPlanStage* mps = getMultiPlanStage(exec->getRootStage());
 
         // The executionStats verbosity level requires that we run the winning plan
         // until if finishes.
@@ -505,7 +505,7 @@ namespace mongo {
     void Explain::getSummaryStats(PlanExecutor* exec, PlanSummaryStats* statsOut) {
         invariant(NULL != statsOut);
 
-        PlanStage* root = exec->getStages();
+        PlanStage* root = exec->getRootStage();
 
         // We can get some of the fields we need from the common stats stored in the
         // root stage of the plan tree.

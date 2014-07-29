@@ -103,14 +103,14 @@ namespace mongo {
         }
     }
 
-    void KeepMutationsStage::prepareToYield() {
+    void KeepMutationsStage::saveState() {
         ++_commonStats.yields;
-        _child->prepareToYield();
+        _child->saveState();
     }
 
-    void KeepMutationsStage::recoverFromYield(OperationContext* opCtx) {
+    void KeepMutationsStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        _child->recoverFromYield(opCtx);
+        _child->restoreState(opCtx);
     }
 
     void KeepMutationsStage::invalidate(const DiskLoc& dl, InvalidationType type) {

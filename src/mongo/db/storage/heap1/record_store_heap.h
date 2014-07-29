@@ -191,9 +191,9 @@ namespace mongo {
 
         virtual void invalidate(const DiskLoc& dl);
 
-        virtual void prepareToYield();
+        virtual void saveState();
 
-        virtual bool recoverFromYield();
+        virtual bool restoreState();
 
         virtual RecordData dataFor( const DiskLoc& loc ) const;
 
@@ -223,9 +223,9 @@ namespace mongo {
 
         virtual void invalidate(const DiskLoc& dl);
 
-        virtual void prepareToYield();
+        virtual void saveState();
 
-        virtual bool recoverFromYield();
+        virtual bool restoreState();
 
         virtual RecordData dataFor( const DiskLoc& loc ) const;
 

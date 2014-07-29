@@ -89,15 +89,15 @@ namespace mongo {
                 _iterators.clear();
             }
 
-            virtual void prepareToYield() {
+            virtual void saveState() {
                 for (size_t i = 0; i < _iterators.size(); i++) {
-                    _iterators[i]->prepareToYield();
+                    _iterators[i]->saveState();
                 }
             }
 
-            virtual void recoverFromYield(OperationContext* opCtx) {
+            virtual void restoreState(OperationContext* opCtx) {
                 for (size_t i = 0; i < _iterators.size(); i++) {
-                    if (!_iterators[i]->recoverFromYield()) {
+                    if (!_iterators[i]->restoreState()) {
                         kill();
                     }
                 }
@@ -217,7 +217,7 @@ namespace mongo {
             // TODO consider using a common work queue once invalidation issues go away.
             for (size_t i = 0; i < iterators.size(); i++) {
                 PlanExecutor* theExec = execs[i % execs.size()];
-                MultiIteratorStage* mis = static_cast<MultiIteratorStage*>(theExec->getStages());
+                MultiIteratorStage* mis = static_cast<MultiIteratorStage*>(theExec->getRootStage());
                 mis->addIterator(iterators.releaseAt(i));
             }
 

@@ -182,17 +182,17 @@ namespace mongo {
         return PlanStage::ADVANCED;
     }
 
-    void MergeSortStage::prepareToYield() {
+    void MergeSortStage::saveState() {
         ++_commonStats.yields;
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->prepareToYield();
+            _children[i]->saveState();
         }
     }
 
-    void MergeSortStage::recoverFromYield(OperationContext* opCtx) {
+    void MergeSortStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->recoverFromYield(opCtx);
+            _children[i]->restoreState(opCtx);
         }
     }
 

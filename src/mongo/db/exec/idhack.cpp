@@ -130,11 +130,11 @@ namespace mongo {
         return PlanStage::ADVANCED;
     }
 
-    void IDHackStage::prepareToYield() {
+    void IDHackStage::saveState() {
         ++_commonStats.yields;
     }
 
-    void IDHackStage::recoverFromYield(OperationContext* opCtx) {
+    void IDHackStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
     }
 

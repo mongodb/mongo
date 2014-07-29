@@ -237,7 +237,7 @@ namespace mongo {
         return _hitEnd || _indexCursor->isEOF();
     }
 
-    void IndexScan::prepareToYield() {
+    void IndexScan::saveState() {
         ++_commonStats.yields;
 
         if (_hitEnd || (NULL == _indexCursor.get())) { return; }
@@ -248,7 +248,7 @@ namespace mongo {
         _indexCursor->savePosition();
     }
 
-    void IndexScan::recoverFromYield(OperationContext* opCtx) {
+    void IndexScan::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
 
         if (_hitEnd || (NULL == _indexCursor.get())) { return; }

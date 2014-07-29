@@ -62,9 +62,9 @@ namespace mongo {
 
         virtual StageState work(WorkingSetID* out);
 
-        virtual void prepareToYield();
+        virtual void saveState();
 
-        virtual void recoverFromYield(OperationContext* opCtx);
+        virtual void restoreState(OperationContext* opCtx);
 
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 

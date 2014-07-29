@@ -70,8 +70,8 @@ namespace mongo {
         virtual bool isEOF();
 
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
-        virtual void prepareToYield();
-        virtual void recoverFromYield(OperationContext* opCtx);
+        virtual void saveState();
+        virtual void restoreState(OperationContext* opCtx);
 
         virtual std::vector<PlanStage*> getChildren() const;
 

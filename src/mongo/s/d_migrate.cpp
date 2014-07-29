@@ -653,10 +653,10 @@ namespace mongo {
             }
             virtual void kill() {
             }
-            virtual void prepareToYield() {
+            virtual void saveState() {
                 invariant( false );
             }
-            virtual void recoverFromYield(OperationContext* opCtx) {
+            virtual void restoreState(OperationContext* opCtx) {
                 invariant( false );
             }
             virtual PlanStageStats* getStats() {

@@ -56,8 +56,8 @@ namespace mongo {
 
         virtual StageState work(WorkingSetID* out);
 
-        virtual void prepareToYield();
-        virtual void recoverFromYield(OperationContext* opCtx);
+        virtual void saveState();
+        virtual void restoreState(OperationContext* opCtx);
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;

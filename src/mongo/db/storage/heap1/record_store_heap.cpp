@@ -415,10 +415,10 @@ namespace mongo {
             ++_it;
     }
 
-    void HeapRecordIterator::prepareToYield() {
+    void HeapRecordIterator::saveState() {
     }
 
-    bool HeapRecordIterator::recoverFromYield() {
+    bool HeapRecordIterator::restoreState() {
         return !_killedByInvalidate;
     }
 
@@ -480,10 +480,10 @@ namespace mongo {
         }
     }
 
-    void HeapRecordReverseIterator::prepareToYield() {
+    void HeapRecordReverseIterator::saveState() {
     }
 
-    bool HeapRecordReverseIterator::recoverFromYield() {
+    bool HeapRecordReverseIterator::restoreState() {
         return !_killedByInvalidate;
     }
 

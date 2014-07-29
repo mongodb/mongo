@@ -407,7 +407,7 @@ namespace mongo {
         return state;
     }
 
-    void SubplanStage::prepareToYield() {
+    void SubplanStage::saveState() {
         ++_commonStats.yields;
         if (_killed) {
             return;
@@ -416,11 +416,11 @@ namespace mongo {
         // We're ranking a sub-plan via an MPR or we're streaming results from this stage.  Either
         // way, pass on the request.
         if (NULL != _child.get()) {
-            _child->prepareToYield();
+            _child->saveState();
         }
     }
 
-    void SubplanStage::recoverFromYield(OperationContext* opCtx) {
+    void SubplanStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
         if (_killed) {
             return;
@@ -429,7 +429,7 @@ namespace mongo {
         // We're ranking a sub-plan via an MPR or we're streaming results from this stage.  Either
         // way, pass on the request.
         if (NULL != _child.get()) {
-            _child->recoverFromYield(opCtx);
+            _child->restoreState(opCtx);
         }
     }
 

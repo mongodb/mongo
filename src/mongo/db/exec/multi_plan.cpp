@@ -400,7 +400,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void MultiPlanStage::prepareToYield() {
+    void MultiPlanStage::saveState() {
         if (_failure) return;
 
         // this logic is from multi_plan_runner
@@ -408,9 +408,9 @@ namespace mongo {
         // the _bestPlan if we've switched to the backup?
 
         if (bestPlanChosen()) {
-            _candidates[_bestPlanIdx].root->prepareToYield();
+            _candidates[_bestPlanIdx].root->saveState();
             if (hasBackupPlan()) {
-                _candidates[_backupPlanIdx].root->prepareToYield();
+                _candidates[_backupPlanIdx].root->saveState();
             }
         }
         else {
@@ -418,7 +418,7 @@ namespace mongo {
         }
     }
 
-    void MultiPlanStage::recoverFromYield(OperationContext* opCtx) {
+    void MultiPlanStage::restoreState(OperationContext* opCtx) {
         if (_failure) return;
 
         // this logic is from multi_plan_runner
@@ -426,9 +426,9 @@ namespace mongo {
         // the _bestPlan if we've switched to the backup?
 
         if (bestPlanChosen()) {
-            _candidates[_bestPlanIdx].root->recoverFromYield(opCtx);
+            _candidates[_bestPlanIdx].root->restoreState(opCtx);
             if (hasBackupPlan()) {
-                _candidates[_backupPlanIdx].root->recoverFromYield(opCtx);
+                _candidates[_backupPlanIdx].root->restoreState(opCtx);
             }
         }
         else {
@@ -502,13 +502,13 @@ namespace mongo {
 
     void MultiPlanStage::allPlansSaveState() {
         for (size_t i = 0; i < _candidates.size(); ++i) {
-            _candidates[i].root->prepareToYield();
+            _candidates[i].root->saveState();
         }
     }
 
     void MultiPlanStage::allPlansRestoreState(OperationContext* opCtx) {
         for (size_t i = 0; i < _candidates.size(); ++i) {
-            _candidates[i].root->recoverFromYield(opCtx);
+            _candidates[i].root->restoreState(opCtx);
         }
     }
 

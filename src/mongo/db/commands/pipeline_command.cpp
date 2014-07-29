@@ -116,10 +116,10 @@ namespace {
 
         // Manage our OperationContext. We intentionally don't propagate to the child
         // Runner as that is handled by DocumentSourceCursor as it needs to.
-        virtual void prepareToYield() {
+        virtual void saveState() {
             _pipeline->getContext()->opCtx = NULL;
         }
-        virtual void recoverFromYield(OperationContext* opCtx) {
+        virtual void restoreState(OperationContext* opCtx) {
             _pipeline->getContext()->opCtx = opCtx;
         }
 
@@ -234,7 +234,7 @@ namespace {
 
             if (resultsArray.len() + next.objsize() > byteLimit) {
                 // Get the pipeline proxy stage wrapped by this PlanExecutor.
-                PipelineProxyStage* proxy = static_cast<PipelineProxyStage*>(exec->getStages());
+                PipelineProxyStage* proxy = static_cast<PipelineProxyStage*>(exec->getRootStage());
                 // too big. next will be the first doc in the second batch
                 proxy->pushBack(next);
                 break;
