@@ -161,9 +161,9 @@ namespace mongo {
         boost::scoped_ptr<rocksdb::DB> _db;
 
         // TODO rename
-        ypedef StringMap< boost::shared_ptr<Entry> > Map;
+        typedef StringMap< boost::shared_ptr<Entry> > EntryMap;
         mutable boost::mutex _mapLock;
-        Map _map;
+        EntryMap _entryMap;
 
         // private methods that should usually only be called from the RocksEngine constructor
         
@@ -206,7 +206,7 @@ namespace mongo {
                                 const std::map<std::string, Ordering>& indexOrderings );
 
         /**
-         * Create a complete Entry object in _map for every ColumnFamilyDescriptor. Assumes that, if
+         * Create a complete Entry object in _entryMap for every ColumnFamilyDescriptor. Assumes that, if
          * the collectionEntry field should be initialized, that is already has been prior to this
          * function call.
          *
