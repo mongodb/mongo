@@ -192,7 +192,7 @@ struct __wt_cursor_bulk {
 	 * part of RLE compression, row-store compares keys during bulk load
 	 * to avoid corruption.
 	 */
-	WT_ITEM cmp;			/* Comparison buffer */
+	WT_ITEM last;			/* Last key/value seen */
 
 	/*
 	 * Variable-length column-store RLE counter (also overloaded to mean

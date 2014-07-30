@@ -2654,25 +2654,32 @@ err:	__wt_scr_free(&key);
 }
 
 /*
- * __wt_rec_bulk_init --
- *	Bulk insert reconciliation initialization.
+ * __wt_bulk_init --
+ *	Bulk insert initialization.
  */
 int
-__wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
+__wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
-	WT_PAGE *page;
+	WT_PAGE_INDEX *pindex;
 	WT_RECONCILE *r;
-	WT_REF *ref;
-	WT_SESSION_IMPL *session;
 	uint64_t recno;
 
-	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	btree = S2BT(session);
-	ref = cbulk->ref;
-	page = cbulk->leaf;
+	/*
+	 * Bulk-load is only permitted on newly created files, not any empty
+	 * file -- see the checkpoint code for a discussion.
+	 */
+	if (!btree->bulk_load_ok)
+		WT_RET_MSG(session, EINVAL,
+		    "bulk-load is only possible for newly created trees");
 
-	WT_RET(__rec_write_init(session, ref, 0, &cbulk->reconcile));
+	/* Set a reference to the empty leaf page. */
+	pindex = WT_INTL_INDEX_COPY(btree->root.page);
+	cbulk->ref = pindex->index[0];
+	cbulk->leaf = cbulk->ref->page;
+
+	WT_RET(__rec_write_init(session, cbulk->ref, 0, &cbulk->reconcile));
 	r = cbulk->reconcile;
 	r->bulk_load = 1;
 
@@ -2687,24 +2694,21 @@ __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_RET(__rec_split_init(session, r, page, recno, btree->maxleafpage));
-
-	return (0);
+	return (__rec_split_init(
+	    session, r, cbulk->leaf, recno, btree->maxleafpage));
 }
 
 /*
- * __wt_rec_bulk_wrapup --
- *	Bulk insert reconciliation cleanup.
+ * __wt_bulk_wrapup --
+ *	Bulk insert cleanup.
  */
 int
-__wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
+__wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
 	WT_PAGE *parent;
 	WT_RECONCILE *r;
-	WT_SESSION_IMPL *session;
 
-	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
 	btree = S2BT(session);
 
@@ -2717,7 +2721,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 		break;
 	case BTREE_COL_VAR:
 		if (cbulk->rle != 0)
-			WT_RET(__wt_rec_col_var_bulk_insert(cbulk));
+			WT_RET(__wt_bulk_insert_var(session, cbulk));
 		break;
 	case BTREE_ROW:
 		break;
@@ -2738,20 +2742,18 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 }
 
 /*
- * __wt_rec_row_bulk_insert --
+ * __wt_bulk_insert_row --
  *	Row-store bulk insert.
  */
 int
-__wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
+__wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
-	WT_SESSION_IMPL *session;
 	int ovfl_key;
 
-	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
 	btree = S2BT(session);
 	cursor = &cbulk->cbt.iface;
@@ -2839,20 +2841,18 @@ __rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
 }
 
 /*
- * __wt_rec_col_fix_bulk_insert --
+ * __wt_bulk_insert_fix --
  *	Fixed-length column-store bulk insert.
  */
 int
-__wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
+__wt_bulk_insert_fix(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_RECONCILE *r;
-	WT_SESSION_IMPL *session;
 	uint32_t entries, offset, page_entries, page_size;
 	const uint8_t *data;
 
-	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
 	btree = S2BT(session);
 	cursor = &cbulk->cbt.iface;
@@ -2889,24 +2889,27 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 }
 
 /*
- * __wt_rec_col_var_bulk_insert --
+ * __wt_bulk_insert_var --
  *	Variable-length column-store bulk insert.
  */
 int
-__wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk)
+__wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
 	WT_KV *val;
 	WT_RECONCILE *r;
-	WT_SESSION_IMPL *session;
 
-	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
 	btree = S2BT(session);
 
+	/*
+	 * Store the bulk cursor's last buffer, not the current value, we're
+	 * creating a duplicate count, which means we want the previous value
+	 * seen, not the current value.
+	 */
 	val = &r->v;
 	WT_RET(__rec_cell_build_val(
-	    session, r, cbulk->cmp.data, cbulk->cmp.size, cbulk->rle));
+	    session, r, cbulk->last.data, cbulk->last.size, cbulk->rle));
 
 	/* Boundary: split or write the page. */
 	while (val->len > r->space_avail)

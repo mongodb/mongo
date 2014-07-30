@@ -71,15 +71,19 @@ int
 __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BM *bm;
+	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_REF *ref;
-	int skip;
+	int block_manager_begin, skip;
 
 	WT_UNUSED(cfg);
 
-	bm = S2BT(session)->bm;
 	conn = S2C(session);
+	btree = S2BT(session);
+	bm = btree->bm;
+	ref = NULL;
+	block_manager_begin = 0;
 
 	WT_STAT_FAST_DATA_INCR(session, session_compact);
 
@@ -91,39 +95,53 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(bm->compact_skip(bm, session, &skip));
 	if (skip)
 		return (0);
-	session->compaction = 1;
 
 	/*
-	 * Walk the tree reviewing pages to see if they need to be re-written.
 	 * Reviewing in-memory pages requires looking at page reconciliation
 	 * results, because we care about where the page is stored now, not
 	 * where the page was stored when we first read it into the cache.
-	 *	We need to ensure we don't collide with page reconciliation as
-	 * it writes the page modify information, which means ensuring we don't
-	 * collide with page eviction or checkpoints, they are the operations
-	 * that reconcile pages.
-	 *	Lock out checkpoints and set a flag so reconciliation knows
-	 * compaction is running.  This means checkpoints block compaction, but
-	 * compaction won't block checkpoints for more than a few instructions.
-	 *	Reconciliation looks for the flag: if set, reconciliation locks
-	 * the page it's writing.  That's bad, because a page lock blocks work
-	 * on the page, but compaction is an uncommon, heavy-weight operation,
-	 * we're doing a ton of I/O, spinlocks aren't our primary concern.
-	 *	After we set the flag, wait for eviction of this file to drain,
-	 * and then let eviction continue; we don't need to block eviction, we
-	 * just need to make sure we don't race with reconciliation.
+	 * We need to ensure we don't race with page reconciliation as it's
+	 * writing the page modify information.
+	 *
+	 * There are three ways we call reconciliation: checkpoints, threads
+	 * writing leaf pages (usually in preparation for a checkpoint), and
+	 * eviction.
+	 *
+	 * We're holding the schema lock which serializes with checkpoints.
 	 */
-	__wt_spin_lock(session, &conn->checkpoint_lock);
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+
+	/*
+	 * Get the tree handle's flush lock which blocks threads writing leaf
+	 * pages.
+	 */
+	__wt_spin_lock(session, &btree->flush_lock);
+
+	/*
+	 * That leaves eviction, we don't want to block eviction.  Set a flag
+	 * so reconciliation knows compaction is running.  If reconciliation
+	 * sees the flag it locks the page it's writing, we acquire the same
+	 * lock when reading the page's modify information, serializing access.
+	 * The same page lock blocks work on the page, but compaction is an
+	 * uncommon, heavy-weight operation.  If it's ever a problem, there's
+	 * no reason we couldn't use an entirely separate lock than the page
+	 * lock.
+	 *
+	 * We also need to ensure we don't race with an on-going reconciliation.
+	 * After we set the flag, wait for eviction of this file to drain, and
+	 * then let eviction continue;
+	 */
 	conn->compact_in_memory_pass = 1;
-	__wt_spin_unlock(session, &conn->checkpoint_lock);
-	WT_RET(__wt_evict_file_exclusive_on(session));
+	WT_ERR(__wt_evict_file_exclusive_on(session));
 	__wt_evict_file_exclusive_off(session);
 
 	/* Start compaction. */
-	WT_RET(bm->compact_start(bm, session));
+	WT_ERR(bm->compact_start(bm, session));
+	block_manager_begin = 1;
 
-	/* Walk the tree. */
-	for (ref = NULL;;) {
+	/* Walk the tree reviewing pages to see if they should be re-written. */
+	session->compaction = 1;
+	for (;;) {
 		/*
 		 * Pages read for compaction aren't "useful"; don't update the
 		 * read generation of pages already in memory, and if a page is
@@ -149,12 +167,15 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 err:	if (ref != NULL)
 		WT_TRET(__wt_page_release(session, ref));
 
-	WT_TRET(bm->compact_end(bm, session));
+	if (block_manager_begin)
+		WT_TRET(bm->compact_end(bm, session));
+
+	__wt_spin_unlock(session, &btree->flush_lock);
 
 	conn->compact_in_memory_pass = 0;
 	WT_FULL_BARRIER();
 
-	return (0);
+	return (ret);
 }
 
 /*

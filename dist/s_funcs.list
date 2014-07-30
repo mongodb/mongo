@@ -7,6 +7,9 @@ __ovfl_reuse_dump
 __ovfl_txnc_dump
 __wt_bloom_drop
 __wt_bloom_get
+__wt_bulk_insert_fix
+__wt_bulk_insert_row
+__wt_bulk_insert_var
 __wt_cache_dump
 __wt_config_getone
 __wt_cursor_get_raw_value

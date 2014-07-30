@@ -104,6 +104,7 @@ struct __wt_session_impl {
 
 	void	*block_manager;		/* Block-manager support */
 	int	(*block_manager_cleanup)(WT_SESSION_IMPL *);
+	WT_ITEM *checkpoint;		/* Checkpoint support */
 	void	*reconcile;		/* Reconciliation support */
 	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
 
