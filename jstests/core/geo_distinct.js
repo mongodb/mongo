@@ -84,23 +84,23 @@ res = coll.runCommand( 'distinct', { key: 'zone',
 assert.commandWorked( res );
 assert.eq( res.values.sort(), [ 3 ] );
 
-// Test distinct with $near query predicate (recall that $near returns the closest 100 points).
+// Test distinct with $near query predicate.
 
 coll.dropIndexes();
 
 // A. Unindexed key, no geo index on query predicate.
 res = coll.runCommand( 'distinct', { key: 'zone',
-                                     query: { 'loc.coordinates': { $near: [ 0, 0 ] } } } );
+                                     query: { 'loc.coordinates': { $near: [ 0, 0 ], $maxDistance: 1 } } } );
 assert.commandFailed( res );
 // B. Unindexed key, with 2d index on query predicate.
 assert.commandWorked( coll.ensureIndex( { 'loc.coordinates': '2d' } ) );
 res = coll.runCommand( 'distinct', { key: 'zone',
-                                     query: { 'loc.coordinates': { $near: [ 0, 0 ] } } } );
+                                     query: { 'loc.coordinates': { $near: [ 0, 0 ], $maxDistance: 1 } } } );
 assert.commandWorked( res );
-assert.eq( res.values.sort(), [ 2, 3, 4 ] );
+assert.eq( res.values.sort(), [ 3 ] );
 // C. Indexed key, with 2d index on query predicate.
 assert.commandWorked( coll.ensureIndex( { zone: 1 } ) );
 res = coll.runCommand( 'distinct', { key: 'zone',
-                                     query: { 'loc.coordinates': { $near: [ 0, 0 ] } } } );
+                                     query: { 'loc.coordinates': { $near: [ 0, 0 ], $maxDistance: 1 } } } );
 assert.commandWorked( res );
-assert.eq( res.values.sort(), [ 2, 3, 4 ] );
+assert.eq( res.values.sort(), [ 3 ] );
