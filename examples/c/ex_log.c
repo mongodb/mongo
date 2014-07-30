@@ -39,7 +39,7 @@ const char *home = "./WT_EXLOG";
 const char *home2 = "./WT_EXLOG2";
 const char *uri = "table:logtest";
 
-#define	CONN_CONFIG "create,cache_size=100MB,log=(enabled=true)"
+#define	CONN_CONFIG "create,cache_size=100MB,log=(archive=false,enabled=true)"
 #define	MAX_KEYS	10
 
 #define	WALK_PRINT(lsn)							\
@@ -202,7 +202,7 @@ step_log(WT_SESSION *session)
 		/*
 		 * If the operation is a put, replay it here on the backup
 		 * connection.  Note, we cheat by looking only for fileid 1
-		 * in this example.  Fileid 0 is the metadata.
+		 * in this example.  The metadata is fileid 0.
 		 */
 		if (fileid == 1 && rectype == WT_LOGREC_COMMIT &&
 		    optype == WT_LOGOP_ROW_PUT) {
@@ -309,6 +309,20 @@ int main(void)
 	}
 	ret = session->commit_transaction(session, NULL);
 	cursor->close(cursor);
+
+	/*
+	 * Close and reopen the connection so that the log ends up with
+	 * a variety of records such as file sync and checkpoint.  We
+	 * have archiving turned off.
+	 */
+	ret = wt_conn->close(wt_conn, NULL);
+	if ((ret = wiredtiger_open(home, NULL,
+	    CONN_CONFIG, &wt_conn)) != 0) {
+		fprintf(stderr, "Error connecting to %s: %s\n",
+		    home, wiredtiger_strerror(ret));
+		return (ret);
+	}
+	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
 
 	ret = walk_log(session);
 	ret = step_log(session);
