@@ -41,7 +41,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 * threads because those may allocate and use session resources that
 	 * need to get cleaned up on close.
 	 */
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
+	WT_RET(__wt_open_internal_session(conn, 0, "connection", &session));
 	conn->default_session = session;
 
 	return (0);
