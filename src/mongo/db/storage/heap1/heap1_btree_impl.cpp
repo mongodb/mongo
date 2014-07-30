@@ -223,20 +223,28 @@ namespace {
 
     class Heap1BtreeBuilderImpl : public SortedDataBuilderInterface {
     public:
-        Heap1BtreeBuilderImpl(IndexSet* data, bool dupsAllowed)
+        Heap1BtreeBuilderImpl(IndexSet* data, long long* currentKeySize, bool dupsAllowed)
                 : _data(data),
+                  _currentKeySize( currentKeySize ),
                   _dupsAllowed(dupsAllowed),
                   _committed(false) {
             invariant(_data->empty());
         }
 
         ~Heap1BtreeBuilderImpl() {
-            if (!_committed)
+            if (!_committed) {
                 _data->clear();
+                *_currentKeySize = 0;
+            }
         }
 
         Status addKey(const BSONObj& key, const DiskLoc& loc) {
             // inserts should be in ascending order.
+
+            if ( key.objsize() >= TempKeyMaxSize ) {
+                return Status(ErrorCodes::KeyTooLong, "key too big");
+            }
+
 
             invariant(!loc.isNull());
             invariant(loc.isValid());
@@ -248,6 +256,7 @@ namespace {
                 return dupKeyError(key);
 
             _data->insert(_data->end(), IndexEntry(key.getOwned(), loc));
+            *_currentKeySize += key.objsize();
             return Status::OK();
         }
 
@@ -258,6 +267,7 @@ namespace {
 
     private:
         IndexSet* const _data;
+        long long* _currentKeySize;
         const bool _dupsAllowed;
         bool _committed;
     };
@@ -271,7 +281,7 @@ namespace {
         }
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
-            return new Heap1BtreeBuilderImpl(_data, dupsAllowed);
+            return new Heap1BtreeBuilderImpl(_data, &_currentKeySize, dupsAllowed);
         }
 
         virtual Status insert(OperationContext* txn,
@@ -283,11 +293,10 @@ namespace {
             invariant(loc.isValid());
             invariant(!hasFieldNames(key));
 
-            if ( key.objsize() > TempKeyMaxSize ) {
+            if ( key.objsize() >= TempKeyMaxSize ) {
                 string msg = mongoutils::str::stream()
                     << "Heap1Btree::insert: key too large to index, failing "
                     << ' ' << key.objsize() << ' ' << key;
-                log() << msg << endl;
                 return Status(ErrorCodes::KeyTooLong, msg);
             }
 
@@ -295,8 +304,8 @@ namespace {
             if (!dupsAllowed && isDup(*_data, key, loc))
                 return dupKeyError(key);
 
-            _data->insert(IndexEntry(key.getOwned(), loc));
-            _currentKeySize += key.objsize();
+            if ( _data->insert(IndexEntry(key.getOwned(), loc)).second )
+                _currentKeySize += key.objsize();
             return Status::OK();
         }
 
