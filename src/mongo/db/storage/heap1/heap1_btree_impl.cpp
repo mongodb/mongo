@@ -74,6 +74,8 @@ namespace {
 
             // Iterate through both BSONObjects, comparing individual elements one by one
             for (unsigned mask = 1; lhsIt.more(); mask <<= 1) {
+                invariant(rhsIt.more());
+
                 const BSONElement l = lhsIt.next();
                 const BSONElement r = rhsIt.next();
 
@@ -103,9 +105,7 @@ namespace {
 
             }
 
-            // There's no more data in lhs, but there's data in rhs. So, rhs is greater than lhs.
-            if (rhsIt.more())
-                return 1;
+            invariant(!rhsIt.more());
 
             // This means just look at the key, not the loc.
             if (lhs.loc.isNull() || rhs.loc.isNull())
@@ -372,6 +372,12 @@ namespace {
             }
 
             virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
+                // An empty key means we should seek to the front
+                if (keyRaw.isEmpty()) {
+                    _it = _data.begin();
+                    return false;
+                }
+
                 const BSONObj key = stripFieldNames(keyRaw);
                 _it = _data.lower_bound(IndexEntry(key, loc)); // lower_bound is >= key
                 return _it != _data.end() && (_it->key == key); // intentionally not comparing loc
@@ -473,6 +479,13 @@ namespace {
             }
 
             virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
+                // An empty key means we should seek to the seek to the end, 
+                // i.e. one past the lowest key in the iterator
+                if (keyRaw.isEmpty()) {
+                    _it = _data.rend();
+                    return false;
+                }
+
                 const BSONObj key = stripFieldNames(keyRaw);
                 _it = lower_bound(IndexEntry(key, loc)); // lower_bound is <= query
                 return _it != _data.rend() && (_it->key == key); // intentionally not comparing loc
