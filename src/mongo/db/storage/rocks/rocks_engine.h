@@ -160,11 +160,12 @@ namespace mongo {
         std::string _path;
         boost::scoped_ptr<rocksdb::DB> _db;
 
-        typedef StringMap< boost::shared_ptr<Entry> > Map;
+        // TODO rename
+        ypedef StringMap< boost::shared_ptr<Entry> > Map;
         mutable boost::mutex _mapLock;
         Map _map;
 
-        // private methods that should only be called from the RocksEngine constructor
+        // private methods that should usually only be called from the RocksEngine constructor
         
         // RocksDB necessitates opening a default column family. This method exists to identify
         // that column family so that it can be ignored. 

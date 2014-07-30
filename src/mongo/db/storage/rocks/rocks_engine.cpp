@@ -188,13 +188,12 @@ namespace mongo {
 
         // if we get here, then the column family doesn't exist, so we need to create it
 
-        invariant( order && "need an ordering to create a comparator for the index" );
+        invariant( order && "need an Ordering to create a comparator for the index" );
 
-        string fullName = ns.toString() + string("$") + indexName.toString();
+        const string fullName = ns.toString() + string("$") + indexName.toString();
         rocksdb::ColumnFamilyHandle* cf = NULL;
 
         rocksdb::ColumnFamilyOptions options;
-
         options.comparator = RocksSortedDataImpl::newRocksComparator( order.get() );
 
         rocksdb::Status status = _db->CreateColumnFamily( options, fullName, &cf );
@@ -208,7 +207,7 @@ namespace mongo {
                                             const StringData& indexName,
                                             const StringData& ns ) {
         Map::const_iterator i = _map.find( ns );
-        rocksdb::Status s = _db->DropColumnFamily( *cfh );
+        const rocksdb::Status s = _db->DropColumnFamily( *cfh );
         invariant( s.ok() );
         if ( i != _map.end() ) {
             i->second->indexNameToCF.erase(indexName);
@@ -218,7 +217,7 @@ namespace mongo {
 
     void RocksEngine::getCollectionNamespaces( const StringData& dbName,
                                                std::list<std::string>* out ) const {
-        string prefix = dbName.toString() + ".";
+        const string prefix = dbName.toString() + ".";
         boost::mutex::scoped_lock lk( _mapLock );
         for ( Map::const_iterator i = _map.begin(); i != _map.end(); ++i ) {
             const StringData& ns = i->first;
@@ -246,17 +245,19 @@ namespace mongo {
         boost::shared_ptr<Entry> entry( new Entry() );
 
         rocksdb::ColumnFamilyHandle* cf;
-        rocksdb::Status status = _db->CreateColumnFamily( _collectionOptions(), ns.toString(), &cf );
+        rocksdb::Status status = _db->CreateColumnFamily( _collectionOptions(),
+                                                          ns.toString(),
+                                                          &cf );
 
         _rock_status_ok( status );
         rocksdb::ColumnFamilyHandle* cf_meta;
-        string metadataName = ns.toString() + "&";
+        const string metadataName = ns.toString() + "&";
         status = _db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), metadataName, &cf_meta );
         _rock_status_ok( status );
 
-        BSONObj optionsObj = options.toBSON();
-        rocksdb::Slice key( "options" );
-        rocksdb::Slice value( optionsObj.objdata(), optionsObj.objsize() );
+        const BSONObj optionsObj = options.toBSON();
+        const rocksdb::Slice key( "options" );
+        const rocksdb::Slice value( optionsObj.objdata(), optionsObj.objsize() );
 
         reinterpret_cast<RocksRecoveryUnit*>( txn->recoveryUnit() )->writeBatch()->Put(cf_meta,
                                                                                        key, value);
