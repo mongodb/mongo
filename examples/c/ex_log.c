@@ -35,7 +35,8 @@
 
 #include <wiredtiger.h>
 
-const char *home = NULL;
+const char *home = "./WT_EXLOG";
+const char *home2 = "./WT_EXLOG2";
 const char *uri = "table:logtest";
 
 #define	CONN_CONFIG "create,cache_size=100MB,log=(enabled=true)"
@@ -103,20 +104,78 @@ walk_log(WT_SESSION *session)
 }
 
 static int
+setup_copy(WT_CONNECTION **wt_connp, WT_SESSION **sessionp)
+{
+	int ret;
+
+	if ((ret = wiredtiger_open(home2, NULL,
+	    CONN_CONFIG, wt_connp)) != 0) {
+		fprintf(stderr, "Error connecting to %s: %s\n",
+		    home, wiredtiger_strerror(ret));
+		return (ret);
+	}
+
+	ret = (*wt_connp)->open_session(*wt_connp, NULL, NULL, sessionp);
+	ret = (*sessionp)->create(*sessionp, uri,
+	    "key_format=S,value_format=S");
+	return (ret);
+}
+
+static int
+compare_tables(WT_SESSION *session, WT_SESSION *sess_copy)
+{
+	WT_CURSOR *cursor, *curs_copy;
+	int ret, ret_copy;
+	const char *key, *key_copy, *value, *value_copy;
+
+	ret = session->open_cursor(session, uri, NULL, NULL, &cursor);
+	ret = sess_copy->open_cursor(sess_copy, uri, NULL, NULL, &curs_copy);
+
+	while ((ret = cursor->next(cursor)) == 0) {
+		ret_copy = curs_copy->next(curs_copy);
+		ret = cursor->get_key(cursor, &key);
+		ret = cursor->get_value(cursor, &value);
+		ret_copy = curs_copy->get_key(curs_copy, &key_copy);
+		ret_copy = curs_copy->get_value(curs_copy, &value_copy);
+		if (strcmp(key, key_copy) != 0 ||
+		    strcmp(value, value_copy) != 0) {
+			fprintf(stderr,
+			    "Mismatched: key %s, key_copy %s "
+			    "value %s value_copy %s\n",
+			    key, key_copy, value, value_copy);
+			return (1);
+		}
+	}
+	/*
+	 * When the first cursor is done, the copy better be done too.
+	 */
+	ret_copy = curs_copy->next(curs_copy);
+	assert(ret_copy != 0);
+	cursor->close(cursor);
+	curs_copy->close(curs_copy);
+	return (0);
+}
+
+static int
 step_log(WT_SESSION *session)
 {
-	int first, i, ret;
-	/*! [log step open] */
-	WT_CURSOR *cursor;
+	WT_CONNECTION *wt_conn2;
+	WT_CURSOR *cursor, *cursor2;
 	WT_LSN lsn, lsnsave;
 	WT_ITEM log_reck, log_recv;
-	uint64_t txnid;
+	WT_SESSION *session2;
+	uint64_t prev_txnid, txnid;
 	uint32_t fileid, opcount, optype, rectype;
+	int first, i, in_txn, ret;
 
-	ret = session->open_cursor(session,
-	    "log:", NULL, "step=true", &cursor);
+	ret = setup_copy(&wt_conn2, &session2);
 	/*! [log step open] */
+	ret = session->open_cursor(session, "log:", NULL, "step=true", &cursor);
+	/*! [log step open] */
+	ret = session2->open_cursor(session2, uri, NULL, "raw=true", &cursor2);
 	i = 0;
+	in_txn = 0;
+	prev_txnid = txnid = 0;
 	memset(&lsnsave, 0, sizeof(lsnsave));
 	while ((ret = cursor->next(cursor)) == 0) {
 		/*! [log step get_key] */
@@ -130,7 +189,46 @@ step_log(WT_SESSION *session)
 		    &optype, &fileid, &log_reck, &log_recv);
 		/*! [log step get_value] */
 		STEP_PRINT;
+		/*
+		 * If we are in a transaction and this is a new one, end
+		 * the previous one.
+		 */
+		if (in_txn && prev_txnid != txnid) {
+			ret = session2->commit_transaction(session2, NULL);
+			in_txn = 0;
+		}
+
+		/*
+		 * If the operation is a put, replay it here on the backup
+		 * connection.  Note, we cheat by looking only for fileid 1
+		 * in this example.  Fileid 0 is the metadata.
+		 */
+		if (fileid == 1 && rectype == WT_LOGREC_COMMIT &&
+		    optype == WT_LOGOP_ROW_PUT) {
+			if (!in_txn) {
+				ret = session2->begin_transaction(session2,
+				    NULL);
+				in_txn = 1;
+			}
+			prev_txnid = txnid;
+			cursor2->set_key(cursor2, &log_reck);
+			cursor2->set_value(cursor2, &log_recv);
+			ret = cursor2->insert(cursor2);
+		}
 	}
+	if (in_txn) {
+		ret = session2->commit_transaction(session2, NULL);
+		in_txn = 0;
+	}
+	cursor2->close(cursor2);
+	/*
+	 * Compare the tables after replay.  They should be identical.
+	 */
+	if (compare_tables(session, session2))
+		printf("compare failed\n");
+	session2->close(session2, NULL);
+	wt_conn2->close(wt_conn2, NULL);
+
 	cursor->reset(cursor);
 	/*! [log step set_key] */
 	cursor->set_key(cursor, lsnsave.file, lsnsave.offset, 0, 0);
@@ -167,8 +265,14 @@ int main(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int i, ret;
-	char k[16], v[16];
+	char cmd_buf[256], k[16], v[16];
 
+	snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s %s && mkdir %s %s",
+	    home, home2, home, home2);
+	if ((ret = system(cmd_buf)) != 0) {
+		fprintf(stderr, "%s: failed ret %d\n", cmd_buf, ret);
+		return (ret);
+	}
 	if ((ret = wiredtiger_open(home, NULL,
 	    CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
