@@ -182,13 +182,20 @@ __curlog_stepkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 		opsize = cl->logrec->size;
 		fileid = 0;
 		WT_RET(__wt_buf_set(session, cl->opkey, NULL, 0));
-		WT_RET(__wt_buf_set(session,
-		    cl->opvalue, cl->stepp, opsize));
+		WT_RET(__wt_buf_set(session, cl->opvalue, cl->stepp, opsize));
 	}
+	/*
+	 * The log cursor sets the LSN and step count as the cursor key and
+	 * and log record related data in the value.  The data in the value
+	 * contains any operation key/value that was in the log record.
+	 */
 	__wt_cursor_set_key(cursor, cl->cur_lsn->file, cl->cur_lsn->offset,
 	    cl->step_count++);
 	__wt_cursor_set_value(cursor, cl->txnid, cl->rectype, optype,
 	    fileid, cl->opkey, cl->opvalue);
+	/*
+	 * Position on the beginning of the next record part.
+	 */
 	cl->stepp += opsize;
 	return (0);
 }
