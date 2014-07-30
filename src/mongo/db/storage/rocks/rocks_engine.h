@@ -165,6 +165,10 @@ namespace mongo {
         Map _map;
 
         // private methods that should only be called from the RocksEngine constructor
+        
+        // RocksDB necessitates opening a default column family. This method exists to identify
+        // that column family so that it can be ignored. 
+        bool _isDefaultFamily( const string& name );
 
         // See larger comment in .cpp for why this is necessary
         EntryVector _createNonIndexCatalogEntries( const std::vector<std::string>& families );

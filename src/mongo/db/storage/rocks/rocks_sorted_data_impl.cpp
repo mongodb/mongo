@@ -283,7 +283,6 @@ namespace mongo {
             }
 
             scoped_ptr<rocksdb::Iterator> _iterator;
-            OperationContext* _txn; // not owned
             const bool _forward;
 
             mutable bool _isCached;

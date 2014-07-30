@@ -1,4 +1,4 @@
-// rocks_database_catalog_entry_real.cpp
+// rocks_database_catalog_entry_mongod.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.

@@ -354,6 +354,10 @@ namespace mongo {
 
         return familyNames;
     }
+   
+   bool RocksEngine::_isDefaultFamily( const string& name ) {
+       return name.compare( rocksdb::kDefaultColumnFamilyName ) == 0;
+   }
 
     /**
      * Create Entry's for all non-index column families in the database. This method is called by
@@ -369,12 +373,18 @@ namespace mongo {
 
         for ( unsigned i = 0; i < namespaces.size(); ++i ) {
             string ns = namespaces[i];
+
+            // ignore the default column family, which RocksDB makes us keep around.
+            if ( _isDefaultFamily( ns ) ) {
+                continue;
+            }
+
             string collection = ns;
             if ( ns.find( '&' ) != string::npos ) {
                 continue;
             }
 
-            // TODO incorperate this into the above if statement (super easy)
+            // TODO incorperate this into the above if statement (super easy).
             bool isIndex = ns.find( '$' ) != string::npos;
             if ( isIndex ) {
                 continue;
@@ -449,6 +459,10 @@ namespace mongo {
                 continue;
             }
 
+            // the default family, which we want to ignore, should be caught in the above if
+            // statement.
+            invariant( !_isDefaultFamily( ns ) );
+
             collection = ns.substr( 0, sepPos );
 
             boost::shared_ptr<Entry> entry = _map[collection];
@@ -491,16 +505,10 @@ namespace mongo {
 
                 families.push_back( rocksdb::ColumnFamilyDescriptor( ns, options ) );
 
-            }
-            else if ( ns.find( '&' ) != string::npos ) {
+            } else if ( ns.find( '&' ) != string::npos || _isDefaultFamily( ns ) ) {
                 families.push_back( rocksdb::ColumnFamilyDescriptor( ns,
                                                                 rocksdb::ColumnFamilyOptions() ) );
-            }
-            else if ( ns.compare("default") == 0 ) {
-                families.push_back( rocksdb::ColumnFamilyDescriptor( ns,
-                                                                rocksdb::ColumnFamilyOptions() ) );
-            }
-            else {
+            } else {
                 families.push_back( rocksdb::ColumnFamilyDescriptor( ns, _collectionOptions() ) );
             }
         }
@@ -525,6 +533,12 @@ namespace mongo {
 
             ROCKS_TRACE << "RocksEngine found ns: " << ns;
 
+            // RocksDB specifies that the default column family must be included in the database.
+            // We want to ignore this column family.
+            if ( _isDefaultFamily( ns ) ) {
+                continue;
+            }
+
             if ( ns.find( '&' ) != string::npos ) {
                 continue;
             }
@@ -546,12 +560,6 @@ namespace mongo {
                 ROCKS_TRACE << " got index " << indexName << " for " << collection;
                 entry->indexNameToCF[indexName].reset( handles[i] );
             } else {
-                // RocksDB specifies that the default column family, which has the name "default",
-                // must be included in the database. We want to ignore this column family.
-                if ( ns.compare( "default" ) == 0 ) {
-                    continue;
-                }
-
                 CollectionOptions options;
                 rocksdb::Slice optionsKey( "options" );
                 std::string value;
