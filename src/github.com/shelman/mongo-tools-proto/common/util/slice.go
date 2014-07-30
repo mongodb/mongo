@@ -5,7 +5,7 @@ import (
 	"reflect"
 )
 
-// @return true if elt is in slice.
+// generic function that returns true if elt is in slice.
 // panics if slice is not of Kind reflect.Slice
 func SliceContains(slice, elt interface{}) bool {
 	if slice == nil {
@@ -13,7 +13,8 @@ func SliceContains(slice, elt interface{}) bool {
 	}
 	v := reflect.ValueOf(slice)
 	if v.Kind() != reflect.Slice {
-		panic(fmt.Sprintf("Cannot call SliceContains on a non-slice %#v of kind %#v", slice, v.Kind().String()))
+		panic(fmt.Sprintf("Cannot call SliceContains on a non-slice %#v of "+
+			"kind %#v", slice, v.Kind().String()))
 	}
 	for i := 0; i < v.Len(); i++ {
 		if reflect.DeepEqual(v.Index(i).Interface(), elt) {
@@ -23,12 +24,13 @@ func SliceContains(slice, elt interface{}) bool {
 	return false
 }
 
-// @return number of instances of 'elt' in 'slice'.
+// generic function taht returns number of instances of 'elt' in 'slice'.
 // panics if slice is not of Kind reflect.Slice
 func SliceCount(slice, elt interface{}) int {
 	v := reflect.ValueOf(slice)
 	if v.Kind() != reflect.Slice {
-		panic(fmt.Sprintf("Cannot call SliceCount on a non-slice %#v of kind %#v", slice, v.Kind().String()))
+		panic(fmt.Sprintf("Cannot call SliceCount on a non-slice %#v of kind "+
+			"%#v", slice, v.Kind().String()))
 	}
 	counter := 0
 	for i := 0; i < v.Len(); i++ {

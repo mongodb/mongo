@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/bson_ext"
-	"github.com/shelman/mongo-tools-proto/common/util"
 	"io"
 	"labix.org/v2/mgo/bson"
 	"strings"
@@ -29,6 +28,12 @@ type JSONImportInput struct {
 	// an opening bracket from the input source. Used to prevent errors when
 	// a JSON input source contains just '[]'
 	readOpeningBracket bool
+	// expectedByte is used to store the next expected valid character for JSON
+	// array imports
+	expectedByte byte
+	// bytesFromReader is used to store the next byte read from the Reader for
+	// JSON array imports
+	bytesFromReader []byte
 }
 
 const (
@@ -47,15 +52,6 @@ var (
 	// closing brace - returned only if --jsonArray is passed in.
 	ErrNoClosingBracket = errors.New("bad JSON array format - found no " +
 		"closing bracket ']' in input source")
-
-	// validInterObjectBytes are bytes within an input source that are valid to
-	// appear outside the context of a JSON object
-	validInterObjectBytes = []byte{
-		JSON_ARRAY_START,
-		JSON_ARRAY_SEP,
-		JSON_ARRAY_END,
-		' ',
-	}
 )
 
 // NewJSONImportInput creates a new JSONImportInput in array mode if specified,
@@ -67,6 +63,7 @@ func NewJSONImportInput(isArray bool, in io.Reader) *JSONImportInput {
 		Reader:             in,
 		NumImported:        0,
 		readOpeningBracket: false,
+		bytesFromReader:    make([]byte, 1),
 	}
 }
 
@@ -89,29 +86,27 @@ func (jsonImporter *JSONImportInput) SetHeader() error {
 // input source until it hits an error (including EOF) to ensure the entire
 // input source content is a valid JSON array
 func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
-	var readByte, expectedByte byte
-	bytesFromReader := make([]byte, 1)
-	expectedByte = JSON_ARRAY_SEP
-
+	jsonImporter.expectedByte = JSON_ARRAY_SEP
 	if jsonImporter.NumImported == 0 {
-		expectedByte = JSON_ARRAY_START
+		jsonImporter.expectedByte = JSON_ARRAY_START
 	}
 
-	for readByte != expectedByte {
-		n, err := jsonImporter.Reader.Read(bytesFromReader)
+	var readByte byte
+	for readByte != jsonImporter.expectedByte {
+		n, err := jsonImporter.Reader.Read(jsonImporter.bytesFromReader)
 		if n == 0 || err != nil {
 			if err == io.EOF {
 				return ErrNoClosingBracket
 			}
 			return err
 		}
-		readByte = bytesFromReader[0]
+		readByte = jsonImporter.bytesFromReader[0]
 
 		if readByte == JSON_ARRAY_END {
 			// if we read the end of the JSON array, ensure we have no other
 			// non-whitespace characters at the end of the array
 			for {
-				_, err = jsonImporter.Reader.Read(bytesFromReader)
+				_, err = jsonImporter.Reader.Read(jsonImporter.bytesFromReader)
 				if err != nil {
 					// takes care of the '[]' case
 					if !jsonImporter.readOpeningBracket {
@@ -119,7 +114,7 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 					}
 					return err
 				}
-				readString := string(bytesFromReader[0])
+				readString := string(jsonImporter.bytesFromReader[0])
 				if strings.TrimSpace(readString) != "" {
 					return fmt.Errorf("bad JSON array format - found '%v' "+
 						"after '%v' in input source", readString,
@@ -130,8 +125,11 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 
 		// this will catch any invalid inter JSON object byte that occurs in the
 		// input source
-		if !util.SliceContains(validInterObjectBytes, readByte) {
-			if expectedByte == JSON_ARRAY_START {
+		if !(readByte == JSON_ARRAY_SEP ||
+			readByte == ' ' ||
+			readByte == JSON_ARRAY_START ||
+			readByte == JSON_ARRAY_END) {
+			if jsonImporter.expectedByte == JSON_ARRAY_START {
 				return ErrNoOpeningBracket
 			}
 			return fmt.Errorf("bad JSON array format - found '%v' outside "+
@@ -157,6 +155,9 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 
 	// reinitialize the reader with data left in the decoder's buffer and the
 	// handle to the underlying reader
+	//
+	// TODO: this builds a massive tree - depending on the size of the input
+	// source; probably some room for optimization here?
 	jsonImporter.Reader = io.MultiReader(jsonImporter.Decoder.Buffered(),
 		jsonImporter.Reader)
 

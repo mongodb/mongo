@@ -64,16 +64,17 @@ func (mongoImport *MongoImport) ValidateSettings() error {
 	if mongoImport.InputOptions.Type == "" {
 		mongoImport.InputOptions.Type = JSON
 	} else {
-		if !util.SliceContains([]string{CSV, TSV, JSON},
-			mongoImport.InputOptions.Type) {
+		if !(mongoImport.InputOptions.Type == TSV ||
+			mongoImport.InputOptions.Type == JSON ||
+			mongoImport.InputOptions.Type == CSV) {
 			return fmt.Errorf("don't know what type [\"%v\"] is.",
 				mongoImport.InputOptions.Type)
 		}
 	}
 
 	// ensure headers are supplied for CSV/TSV
-	if util.SliceContains([]string{CSV, TSV},
-		mongoImport.InputOptions.Type) {
+	if mongoImport.InputOptions.Type == CSV ||
+		mongoImport.InputOptions.Type == TSV {
 		if !mongoImport.InputOptions.HeaderLine {
 			if mongoImport.InputOptions.Fields == "" &&
 				mongoImport.InputOptions.FieldFile == "" {
