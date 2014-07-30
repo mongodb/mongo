@@ -341,12 +341,16 @@ namespace mongo {
         AuthorizationSession* authorizationSession = client->getAuthorizationSession();
         std::string subjectName = client->port()->getX509SubjectName();
 
-        if (user.getUser() != subjectName) {
+        if (!getSSLManager()->getSSLConfiguration().hasCA) {
+            return Status(ErrorCodes::AuthenticationFailed,
+                          "Unable to verify x.509 certificate, as no CA has been provided.");
+        }
+        else if (user.getUser() != subjectName) {
             return Status(ErrorCodes::AuthenticationFailed,
                           "There is no x.509 client certificate matching the user.");
         }
         else {
-            std::string srvSubjectName = getSSLManager()->getServerSubjectName();
+            std::string srvSubjectName = getSSLManager()->getSSLConfiguration().serverSubjectName;
  
             // Handle internal cluster member auth, only applies to server-server connections
             if (_clusterIdMatch(subjectName, srvSubjectName)) {

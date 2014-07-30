@@ -504,7 +504,8 @@ namespace mongo {
                                               "MONGODB-X509" <<
                                               saslCommandUserDBFieldName << "$external" <<
                                               saslCommandUserFieldName << 
-                                              getSSLManager()->getClientSubjectName()));
+                                              getSSLManager()->getSSLConfiguration()
+                                                  .clientSubjectName));
 #endif 
                 }
                 else if (str == "x509" && 
