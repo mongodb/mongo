@@ -34,6 +34,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -411,29 +412,15 @@ namespace repl {
                                                     BSONObjBuilder* resultObj) = 0;
 
         /**
-         * Handles an incoming replSetUpdatePosition command that contains a handshake.
-         * returns the same codes as processHandshake below, as well as any of the normal replset
-         * command ErrorCodes.
-         * TODO(spencer): Remove this method in favor of just using processHandshake
-         */
-        virtual Status processReplSetUpdatePositionHandshake(const OperationContext* txn,
-                                                             const BSONObj& handshake,
-                                                             BSONObjBuilder* resultObj) = 0;
-
-        /**
          * Handles an incoming Handshake command (or a handshake from replSetUpdatePosition).
          * Associates the node's 'remoteID' with its 'handshake' object. This association is used
          * to update local.slaves and to forward the node's replication progress upstream when this
          * node is being chained through.
          *
-         * Returns ErrorCodes::ProtocolError if the handshake is missing required fields and
-         * ErrorCodes::NodeNotFound if no replica set member is found with the given member ID.
-         *
-         * TODO(spencer): Remove remoteID arg and get it from the handshake instead.
+         * Returns ErrorCodes::NodeNotFound if no replica set member exists with the given member ID
          */
         virtual Status processHandshake(const OperationContext* txn,
-                                        const OID& remoteID,
-                                        const BSONObj& handshake) = 0;
+                                        const HandshakeArgs& handshake) = 0;
 
         /**
          * Returns once the oplog's most recent entry changes or after one second, whichever

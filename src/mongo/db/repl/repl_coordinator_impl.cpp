@@ -655,33 +655,14 @@ namespace repl {
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorImpl::processReplSetUpdatePositionHandshake(
-            const OperationContext* txn,
-            const BSONObj& cmdObj,
-            BSONObjBuilder* resultObj) {
-        OID rid = cmdObj["handshake"].OID();
-        Status status = processHandshake(txn, rid, cmdObj);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        return Status::OK();
-    }
-
     Status ReplicationCoordinatorImpl::processHandshake(const OperationContext* txn,
-                                                        const OID& remoteID,
-                                                        const BSONObj& handshake) {
-        LOG(2) << "Received handshake " << handshake << " from node with RID " << remoteID;
+                                                        const HandshakeArgs& handshake) {
+        LOG(2) << "Received handshake " << handshake.toBSON();
 
         boost::lock_guard<boost::mutex> lock(_mutex);
-        SlaveInfo& slaveInfo = _slaveInfoMap[remoteID];
+        SlaveInfo& slaveInfo = _slaveInfoMap[handshake.getRid()];
         if (_getReplicationMode_inlock() == modeReplSet) {
-            if (!handshake.hasField("member")) {
-                return Status(ErrorCodes::ProtocolError,
-                              str::stream() << "Handshake object did not contain \"member\" field. "
-                                      "Handshake: " << handshake);
-            }
-            int memberID = handshake["member"].Int();
+            int memberID = handshake.getMemberId();
             const MemberConfig* member = _rsConfig.findMemberByID(memberID);
             if (!member) {
                 return Status(ErrorCodes::NodeNotFound,

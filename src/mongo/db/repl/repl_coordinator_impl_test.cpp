@@ -430,19 +430,22 @@ namespace {
         OID rid1 = OID::gen();
         OID rid2 = OID::gen();
         OID rid3 = OID::gen();
-        BSONObj handshake1 = BSON("handshake" << rid1 <<
-                                  "member" << 0 <<
-                                  "config" << BSON("_id" << 0 << "host" << "test1:1234"));
-        BSONObj handshake2 = BSON("handshake" << rid2 <<
-                                  "member" << 1 <<
-                                  "config" << BSON("_id" << 1 << "host" << "test2:1234"));
-        BSONObj handshake3 = BSON("handshake" << rid3 <<
-                                  "member" << 2 <<
-                                  "config" << BSON("_id" << 2 << "host" << "test3:1234"));
+        HandshakeArgs handshake1;
+        handshake1.initialize(BSON("handshake" << rid1 <<
+                                   "member" << 0 <<
+                                   "config" << BSON("_id" << 0 << "host" << "test1:1234")));
+        HandshakeArgs handshake2;
+        handshake2.initialize(BSON("handshake" << rid2 <<
+                                   "member" << 1 <<
+                                   "config" << BSON("_id" << 1 << "host" << "test2:1234")));
+        HandshakeArgs handshake3;
+        handshake3.initialize(BSON("handshake" << rid3 <<
+                                   "member" << 2 <<
+                                   "config" << BSON("_id" << 2 << "host" << "test3:1234")));
         OperationContextNoop txn;
-        ASSERT_OK(coordinator->processHandshake(&txn, rid1, handshake1));
-        ASSERT_OK(coordinator->processHandshake(&txn, rid2, handshake2));
-        ASSERT_OK(coordinator->processHandshake(&txn, rid3, handshake3));
+        ASSERT_OK(coordinator->processHandshake(&txn, handshake1));
+        ASSERT_OK(coordinator->processHandshake(&txn, handshake2));
+        ASSERT_OK(coordinator->processHandshake(&txn, handshake3));
         OpTime optime1(1, 1);
         OpTime optime2(1, 2);
         OpTime optime3(2, 1);
@@ -507,14 +510,16 @@ namespace {
         // Have other nodes handshake us and make sure we process it right.
         OID slave1RID = OID::gen();
         OID slave2RID = OID::gen();
-        BSONObj slave1Handshake = BSON("handshake" << slave1RID <<
-                                       "member" << 0 <<
-                                       "config" << BSON("_id" << 0 << "host" << "test1:1234"));
-        BSONObj slave2Handshake = BSON("handshake" << slave2RID <<
-                                       "member" << 2 <<
-                                       "config" << BSON("_id" << 2 << "host" << "test2:1234"));
-        ASSERT_OK(coordinator->processHandshake(&txn, slave1RID, slave1Handshake));
-        ASSERT_OK(coordinator->processHandshake(&txn, slave2RID, slave2Handshake));
+        HandshakeArgs slave1Handshake;
+        slave1Handshake.initialize(BSON("handshake" << slave1RID <<
+                                        "member" << 0 <<
+                                        "config" << BSON("_id" << 0 << "host" << "test1:1234")));
+        HandshakeArgs slave2Handshake;
+        slave2Handshake.initialize(BSON("handshake" << slave2RID <<
+                                        "member" << 2 <<
+                                        "config" << BSON("_id" << 2 << "host" << "test2:1234")));
+        ASSERT_OK(coordinator->processHandshake(&txn, slave1Handshake));
+        ASSERT_OK(coordinator->processHandshake(&txn, slave2Handshake));
 
         coordinator->prepareReplSetUpdatePositionCommandHandshakes(&txn, &handshakes);
         ASSERT_EQUALS(3U, handshakes.size());

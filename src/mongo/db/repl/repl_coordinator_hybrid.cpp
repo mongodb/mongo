@@ -287,27 +287,11 @@ namespace repl {
         return legacyStatus;
     }
 
-    Status HybridReplicationCoordinator::processReplSetUpdatePositionHandshake(
-            const OperationContext* txn,
-            const BSONObj& handshake,
-            BSONObjBuilder* resultObj) {
-        Status legacyStatus = _legacy.processReplSetUpdatePositionHandshake(txn,
-                                                                            handshake,
-                                                                            resultObj);
-        // TODO(spencer): Can't call into the impl until it can load a valid config
-        //BSONObjBuilder implResult;
-        //Status implStatus = _impl.processReplSetUpdatePositionHandshake(txn,
-        //                                                                handshake,
-        //                                                                &implResult);
-        return legacyStatus;
-    }
-
     Status HybridReplicationCoordinator::processHandshake(const OperationContext* txn,
-                                                          const OID& remoteID,
-                                                          const BSONObj& handshake) {
-        Status legacyResponse = _legacy.processHandshake(txn, remoteID, handshake);
+                                                          const HandshakeArgs& handshake) {
+        Status legacyResponse = _legacy.processHandshake(txn, handshake);
         // TODO(spencer): Can't call into the impl until it can load a valid config
-        //_impl.processHandshake(txn, remoteID, handshake);
+        //_impl.processHandshake(txn, handshake);
         return legacyResponse;
     }
 

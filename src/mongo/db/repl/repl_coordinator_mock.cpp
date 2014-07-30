@@ -215,17 +215,8 @@ namespace repl {
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorMock::processReplSetUpdatePositionHandshake(
-            const OperationContext* txn,
-            const BSONObj& handshake,
-            BSONObjBuilder* resultObj) {
-        // TODO
-        return Status::OK();
-    }
-
     Status ReplicationCoordinatorMock::processHandshake(const OperationContext* txn,
-                                                        const OID& remoteID,
-                                                        const BSONObj& handshake) {
+                                                        const HandshakeArgs& handshake) {
         return Status::OK();
     }
 

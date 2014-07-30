@@ -143,13 +143,8 @@ namespace repl {
                                                     const BSONArray& updates,
                                                     BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetUpdatePositionHandshake(const OperationContext* txn,
-                                                             const BSONObj& handshake,
-                                                             BSONObjBuilder* resultObj);
-
         virtual Status processHandshake(const OperationContext* txn,
-                                        const OID& remoteID,
-                                        const BSONObj& handshake);
+                                        const HandshakeArgs& handshake);
 
         virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
 
@@ -170,11 +165,8 @@ namespace repl {
                                const Milliseconds& stepdownTime,
                                const Milliseconds& postStepdownWaitTime);
 
-        // Mutex that protects the _ridConfigMap and the _slaveOpTimeMap;
+        // Mutex that protects the _slaveOpTimeMap
         boost::mutex _mutex;
-
-        // Map from RID to member config object
-        std::map<OID, BSONObj> _ridConfigMap;
 
         // Map from RID to Member pointer for replica set nodes
         typedef std::map<OID, Member*> OIDMemberMap;

@@ -368,12 +368,21 @@ namespace repl {
                 // we have received a handshake, not an update message
                 // handshakes are done here to ensure the receiving end supports the update command
 
+                HandshakeArgs handshake;
+                status = handshake.initialize(cmdObj["handshake"].embeddedObject());
+                if (!status.isOK())
+                    return appendCommandStatus(result, status);
+
+                if (!handshake.hasMemberId()) {
+                    return appendCommandStatus(
+                            result,
+                            Status(ErrorCodes::NoSuchKey,
+                                   "replSetUpdatePosition handshake was missing 'member' field"));
+                }
+
                 return appendCommandStatus(
                         result,
-                        getGlobalReplicationCoordinator()->processReplSetUpdatePositionHandshake(
-                                txn,
-                                cmdObj["handshake"].embeddedObject(),
-                                &result));
+                        getGlobalReplicationCoordinator()->processHandshake(txn, handshake));
             }
 
             uassert(16888, "optimes field should be an array with an object for each secondary",
