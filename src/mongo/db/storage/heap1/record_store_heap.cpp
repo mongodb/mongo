@@ -226,7 +226,7 @@ namespace mongo {
             return new HeapRecordIterator(txn, _records, *this, start, tailable);
         }
         else {
-            return new HeapRecordIterator(txn, _records, *this, start);
+            return new HeapRecordReverseIterator(txn, _records, *this, start);
         }
     }
 
