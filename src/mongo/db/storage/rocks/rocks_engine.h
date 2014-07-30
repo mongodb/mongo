@@ -166,9 +166,9 @@ namespace mongo {
         EntryMap _entryMap;
 
         // private methods that should usually only be called from the RocksEngine constructor
-        
+
         // RocksDB necessitates opening a default column family. This method exists to identify
-        // that column family so that it can be ignored. 
+        // that column family so that it can be ignored.
         bool _isDefaultFamily( const string& name );
 
         // See larger comment in .cpp for why this is necessary
@@ -184,14 +184,14 @@ namespace mongo {
          * @param metaDataCfds a vector of the column family descriptors for every column family
          * in the database representing metadata.
          */
-        std::map<std::string, Ordering> _createIndexOrderings( 
+        std::map<std::string, Ordering> _createIndexOrderings(
                 const std::vector<string>& namespaces,
                 const std::string& filepath );
 
         /**
          * @param namespaces a vector containing all the namespaces in this database
          */
-        CfdVector _createCfds ( const std::vector<std::string>& namespaces, 
+        CfdVector _createCfds ( const std::vector<std::string>& namespaces,
                                 const std::map<std::string, Ordering>& indexOrderings );
 
         /**

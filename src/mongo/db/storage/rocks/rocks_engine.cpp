@@ -350,7 +350,7 @@ namespace mongo {
 
         return familyNames;
     }
-   
+
    bool RocksEngine::_isDefaultFamily( const string& name ) {
        return name.compare( rocksdb::kDefaultColumnFamilyName ) == 0;
    }

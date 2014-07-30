@@ -243,7 +243,7 @@ namespace mongo {
              */
             bool _locate( const BSONObj& key, const DiskLoc loc ) {
                 _isCached = false;
-                // assumes fieldNames already stripped if necessary 
+                // assumes fieldNames already stripped if necessary
                 const string keyData = makeString( key, loc, false );
                 _iterator->Seek( keyData );
                 _checkStatus();
