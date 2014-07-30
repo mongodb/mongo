@@ -25,7 +25,7 @@ printjson(admin.runCommand({ shardCollection : coll + "", key : { _id : 1 } }));
 
 assert.soon( function() {
     var log = cat(mongos.fullOptions.logFile);
-    return /warning: multiVersion/.test(log);
+    return /multiVersion cluster detected/.test(log);
 }, "multiVersion warning not printed!", 30 * 16 * 60 * 1000, 5 * 1000);
 
 jsTest.log("DONE!");
