@@ -319,7 +319,8 @@ extern void __wt_free_ref_index(WT_SESSION_IMPL *session,
     int free_pages);
 extern void __wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
-extern void *__wt_cache_evict_server(void *arg);
+extern int __wt_evict_create(WT_CONNECTION_IMPL *conn);
+extern int __wt_evict_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session);
 extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);

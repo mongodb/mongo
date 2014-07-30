@@ -148,11 +148,11 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_cache_evict_server --
+ * __evict_server --
  *	Thread to evict pages from the cache.
  */
-void *
-__wt_cache_evict_server(void *arg)
+static void *
+__evict_server(void *arg)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
@@ -223,10 +223,59 @@ err:	WT_TRET(__wt_verbose(
 		    " bytes dirty and %" PRIu64 " pages dirty",
 		    cache->bytes_dirty, cache->pages_dirty);
 
-	/* Close the eviction session. */
-	(void)session->iface.close(&session->iface, NULL);
-
 	return (NULL);
+}
+
+/*
+ * __wt_evict_create --
+ *	Start the eviction server thread.
+ */
+int
+__wt_evict_create(WT_CONNECTION_IMPL *conn)
+{
+	WT_SESSION_IMPL *session;
+
+	/* Set first, the thread might run before we finish up. */
+	F_SET(conn, WT_CONN_EVICTION_RUN);
+
+	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
+	conn->evict_session = session;
+	conn->evict_session->name = "eviction-server";
+
+	WT_RET(__wt_thread_create(
+	    session, &conn->evict_tid, __evict_server, conn->evict_session));
+	conn->evict_tid_set = 1;
+
+	return (0);
+}
+
+/*
+ * __wt_evict_destroy --
+ *	Destroy the eviction server thread.
+ */
+int
+__wt_evict_destroy(WT_CONNECTION_IMPL *conn)
+{
+	WT_DECL_RET;
+	WT_SESSION *wt_session;
+	WT_SESSION_IMPL *session;
+
+	session = conn->default_session;
+
+	F_CLR(conn, WT_CONN_EVICTION_RUN);
+	if (conn->evict_tid_set) {
+		WT_TRET(__wt_evict_server_wake(session));
+		WT_TRET(__wt_thread_join(session, conn->evict_tid));
+		conn->evict_tid_set = 0;
+	}
+
+	if (conn->evict_session != NULL) {
+		wt_session = &conn->evict_session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
+
+		conn->evict_session = NULL;
+	}
+	return (ret);
 }
 
 /*
