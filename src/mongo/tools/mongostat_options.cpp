@@ -103,7 +103,7 @@ namespace mongo {
         *out << "              \t    REC - recovering\n";
         *out << "              \t    UNK - unknown\n";
         *out << "              \t    SLV - slave\n";
-        *out << "              b\t    RTR - mongos process (\"router\")\n";
+        *out << "              \t    RTR - mongos process (\"router\")\n";
         *out << std::flush;
     }
 
