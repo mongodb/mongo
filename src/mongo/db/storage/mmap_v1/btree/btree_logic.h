@@ -99,8 +99,6 @@ namespace mongo {
 
             Status addKey(const BSONObj& key, const DiskLoc& loc);
 
-            unsigned long long commit(bool mayInterrupt);
-
         private:
             friend class BtreeLogic;
 
@@ -113,17 +111,14 @@ namespace mongo {
              */
             DiskLoc newBucket(BucketType* leftSib, DiskLoc leftSibLoc);
 
-            void mayCommitProgressDurably();
             BucketType* _getModifiableBucket(DiskLoc loc);
             BucketType* _getBucket(DiskLoc loc);
 
             // Not owned.
             BtreeLogic* _logic;
 
-            DiskLoc _rightLeafLoc; // DiskLoc of _rightLeaf
-            BucketType* _rightLeaf; // This is always the right-most (highest) leaf bucket.
+            DiskLoc _rightLeafLoc; // DiskLoc of right-most (highest) leaf bucket.
             bool _dupsAllowed;
-            long long _numAdded;
             auto_ptr<KeyDataOwnedType> _keyLast;
 
             // Not owned.

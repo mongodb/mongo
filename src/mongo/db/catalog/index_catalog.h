@@ -73,6 +73,11 @@ namespace mongo {
 
         bool haveIdIndex() const;
 
+        /**
+         * Returns the spec for the id index to create by default for this collection.
+         */
+        BSONObj getDefaultIdIndexSpec() const;
+
         IndexDescriptor* findIdIndex() const;
 
         /**
@@ -104,6 +109,12 @@ namespace mongo {
         IndexAccessMethod* getIndex( const IndexDescriptor* desc );
         const IndexAccessMethod* getIndex( const IndexDescriptor* desc ) const;
 
+        /**
+         * Returns a not-ok Status if there are any unfinished index builds. No new indexes should
+         * be built when in this state.
+         */
+        Status checkUnfinished() const;
+
         class IndexIterator {
         public:
             bool more();
@@ -134,17 +145,11 @@ namespace mongo {
 
         // ---- index set modifiers ------
 
-        Status ensureHaveIdIndex(OperationContext* txn);
-
-        enum ShutdownBehavior {
-            SHUTDOWN_CLEANUP, // fully clean up this build
-            SHUTDOWN_LEAVE_DIRTY // leave as if kill -9 happened, so have to deal with on restart
-        };
-
-        Status createIndex( OperationContext* txn,
-                            BSONObj spec,
-                            bool mayInterrupt,
-                            ShutdownBehavior shutdownBehavior = SHUTDOWN_CLEANUP );
+        /**
+         * Call this only on an empty collection from inside a WriteUnitOfWork. Index creation on an
+         * empty collection can be rolled back as part of a larger WUOW.
+         */
+        Status createIndexOnEmptyCollection(OperationContext* txn, BSONObj spec);
 
         StatusWith<BSONObj> prepareSpecForCreate( OperationContext* txn,
                                                   const BSONObj& original ) const;
@@ -192,6 +197,7 @@ namespace mongo {
          * 4) system.namespaces entry for index ns
          */
         class IndexBuildBlock {
+            MONGO_DISALLOW_COPYING(IndexBuildBlock);
         public:
             IndexBuildBlock(OperationContext* txn,
                             Collection* collection,
@@ -212,12 +218,11 @@ namespace mongo {
              * we're stopping the build
              * do NOT cleanup, leave meta data as is
              */
-            void abort();
+            void abortWithoutCleanup();
 
             IndexCatalogEntry* getEntry() { return _entry; }
 
         private:
-
             Collection* _collection;
             IndexCatalog* _catalog;
             std::string _ns;
@@ -263,8 +268,6 @@ namespace mongo {
         static BSONObj fixIndexKey( const BSONObj& key );
 
     private:
-        typedef unordered_map<IndexDescriptor*, Client*> InProgressIndexesMap;
-
         bool _shouldOverridePlugin( OperationContext* txn, const BSONObj& keyPattern ) const;
 
         /**
@@ -275,11 +278,6 @@ namespace mongo {
         std::string _getAccessMethodName(OperationContext* txn, const BSONObj& keyPattern) const;
 
         void _checkMagic() const;
-
-
-        // checks if there is anything in _leftOverIndexes
-        // meaning we shouldn't modify catalog
-        Status _checkUnfinished() const;
 
         Status _indexRecord(OperationContext* txn,
                             IndexCatalogEntry* index,
@@ -326,9 +324,6 @@ namespace mongo {
         std::vector<BSONObj> _unfinishedIndexes;
 
         static const BSONObj _idObj; // { _id : 1 }
-
-        // Track in-progress index builds, in order to find and stop them when necessary.
-        InProgressIndexesMap _inProgressIndexes;
     };
 
 }

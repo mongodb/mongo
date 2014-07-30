@@ -164,6 +164,8 @@ namespace mongo {
         /**
          * this does NOT modify the doc before inserting
          * i.e. will not add an _id field for documents that are missing it
+         *
+         * If enforceQuota is false, quotas will be ignored.
          */
         StatusWith<DiskLoc> insertDocument( OperationContext* txn,
                                             const BSONObj& doc,
@@ -175,7 +177,8 @@ namespace mongo {
 
         StatusWith<DiskLoc> insertDocument( OperationContext* txn,
                                             const BSONObj& doc,
-                                            MultiIndexBlock& indexBlock );
+                                            MultiIndexBlock* indexBlock,
+                                            bool enforceQuota );
 
         /**
          * updates the document @ oldLocation with newDoc

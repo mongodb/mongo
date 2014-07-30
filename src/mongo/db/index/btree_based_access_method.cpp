@@ -37,7 +37,6 @@
 #include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/pdfile_private.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
@@ -328,13 +327,14 @@ namespace mongo {
 
     Status BtreeBasedAccessMethod::commitBulk(IndexAccessMethod* bulkRaw,
                                               bool mayInterrupt,
+                                              bool dupsAllowed,
                                               set<DiskLoc>* dupsToDrop) {
         if (!_newInterface->isEmpty()) {
             return Status(ErrorCodes::InternalError, "trying to commit but has data already");
         }
 
         BtreeBasedBulkAccessMethod* bulk = static_cast<BtreeBasedBulkAccessMethod*>(bulkRaw);
-        return bulk->commit(dupsToDrop, mayInterrupt);
+        return bulk->commit(dupsToDrop, mayInterrupt, dupsAllowed);
     }
 
 }  // namespace mongo

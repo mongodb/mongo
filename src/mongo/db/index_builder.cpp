@@ -36,6 +36,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context_impl.h"
@@ -73,7 +74,7 @@ namespace mongo {
 
         Database* db = dbHolder().get(&txn, ns.db().toString());
 
-        Status status = build(&txn, db);
+        Status status = build(&txn, db, true);
         if ( !status.isOK() ) {
             log() << "IndexBuilder could not build index: " << status.toString();
         }
@@ -82,24 +83,56 @@ namespace mongo {
         cc().shutdown();
     }
 
-    Status IndexBuilder::build(OperationContext* txn, Database* db) const {
+    Status IndexBuilder::buildInForeground(OperationContext* txn, Database* db) const {
+        return build(txn, db, false);
+    }
+
+    Status IndexBuilder::build(OperationContext* txn,
+                               Database* db,
+                               bool allowBackgroundBuilding) const {
         const string ns = _index["ns"].String();
 
         Collection* c = db->getCollection( txn, ns );
         if ( !c ) {
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             c = db->getOrCreateCollection( txn, ns );
             verify(c);
+            wunit.commit();
         }
 
         // Show which index we're building in the curop display.
         txn->getCurOp()->setQuery(_index);
 
-        Status status = c->getIndexCatalog()->createIndex( txn,
-                                                           _index, 
-                                                           true, 
-                                                           IndexCatalog::SHUTDOWN_LEAVE_DIRTY );
-        if ( status.code() == ErrorCodes::IndexAlreadyExists )
-            return Status::OK();
+
+        MultiIndexBlock indexer(txn, c);
+        indexer.allowInterruption();
+        if (allowBackgroundBuilding)
+            indexer.allowBackgroundBuilding();
+
+        Status status = Status::OK();
+        try {
+            status = indexer.init(_index);
+            if ( status.code() == ErrorCodes::IndexAlreadyExists )
+                return Status::OK();
+
+            if (status.isOK())
+                status = indexer.insertAllDocumentsInCollection();
+
+            if (status.isOK()) {
+                WriteUnitOfWork wunit(txn->recoveryUnit());
+                indexer.commit();
+                wunit.commit();
+            }
+        }
+        catch (const DBException& e) {
+            status = e.toStatus();
+        }
+        
+        if (status.code() == ErrorCodes::InterruptedAtShutdown) {
+            // leave it as-if kill -9 happened. This will be handled on restart.
+            indexer.abortWithoutCleanup();
+        }
+        
         return status;
     }
 

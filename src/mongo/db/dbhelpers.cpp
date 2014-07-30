@@ -37,6 +37,7 @@
 #include <fstream>
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/db.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/json.h"
@@ -77,10 +78,18 @@ namespace mongo {
         b.appendBool("unique", unique);
         BSONObj o = b.done();
 
-        Status status = collection->getIndexCatalog()->createIndex(txn, o, false);
+        MultiIndexBlock indexer(txn, collection);
+
+        Status status = indexer.init(o);
         if ( status.code() == ErrorCodes::IndexAlreadyExists )
             return;
         uassertStatusOK( status );
+
+        uassertStatusOK(indexer.insertAllDocumentsInCollection());
+
+        WriteUnitOfWork wunit(txn->recoveryUnit());
+        indexer.commit();
+        wunit.commit();
     }
 
     /* fetch a single object from collection ns that matches query

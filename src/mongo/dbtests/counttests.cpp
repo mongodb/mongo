@@ -31,6 +31,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/db.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/json.h"
 #include "mongo/db/commands/count.h"
 #include "mongo/db/catalog/collection.h"
@@ -66,13 +67,11 @@ namespace CountTests {
             return "unittests.counttests";
         }
         void addIndex( const BSONObj &key ) {
-            BSONObjBuilder b;
-            b.append( "name", key.firstElementFieldName() );
-            b.append( "ns", ns() );
-            b.append( "key", key );
-            BSONObj o = b.done();
-            Status s = _collection->getIndexCatalog()->createIndex(&_txn, o, false);
-            uassertStatusOK( s );
+            Helpers::ensureIndex(&_txn,
+                                 _collection,
+                                 key,
+                                 /*unique=*/ false,
+                                 /*name=*/ key.firstElementFieldName());
         }
         void insert( const char *s ) {
             insert( fromjson( s ) );

@@ -348,20 +348,23 @@ namespace mongo {
                 // Intentionally not replicating the inc collection to secondaries.
                 Client::WriteContext incCtx(_txn, _config.incLong);
                 Collection* incColl = incCtx.ctx().db()->getCollection( _txn, _config.incLong );
-                if ( !incColl ) {
-                    CollectionOptions options;
-                    options.setNoIdIndex();
-                    options.temp = true;
-                    incColl = incCtx.ctx().db()->createCollection( _txn, _config.incLong, options );
-                }
+                invariant(!incColl);
+
+                CollectionOptions options;
+                options.setNoIdIndex();
+                options.temp = true;
+                incColl = incCtx.ctx().db()->createCollection( _txn, _config.incLong, options );
+                invariant(incColl);
 
                 BSONObj indexSpec = BSON( "key" << BSON( "0" << 1 ) << "ns" << _config.incLong
                                           << "name" << "_temp_0" );
-                Status status = incColl->getIndexCatalog()->createIndex(_txn, indexSpec, false);
+                Status status = incColl->getIndexCatalog()->createIndexOnEmptyCollection(_txn,
+                                                                                         indexSpec);
                 if ( !status.isOK() ) {
                     uasserted( 17305 , str::stream() << "createIndex failed for mr incLong ns: " <<
                             _config.incLong << " err: " << status.code() );
                 }
+                incCtx.commit();
             }
 
             vector<BSONObj> indexesToInsert;
@@ -402,22 +405,31 @@ namespace mongo {
                         repl::getGlobalReplicationCoordinator()->
                         canAcceptWritesForDatabase(nsToDatabase(_config.tempNamespace.c_str())));
                 Collection* tempColl = tempCtx.ctx().db()->getCollection( _txn, _config.tempNamespace );
-                if ( !tempColl ) {
-                    CollectionOptions options;
-                    options.temp = true;
-                    tempColl = tempCtx.ctx().db()->createCollection( _txn, _config.tempNamespace, options );
+                invariant(!tempColl);
 
-                    // Log the createCollection operation.
-                    BSONObjBuilder b;
-                    b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
-                    b.appendElements( options.toBSON() );
-                    string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
-                    repl::logOp(_txn, "c", logNs.c_str(), b.obj());
-                }
+                CollectionOptions options;
+                options.temp = true;
+                tempColl = tempCtx.ctx().db()->createCollection(_txn,
+                                                                _config.tempNamespace,
+                                                                options);
+
+                // Log the createCollection operation.
+                BSONObjBuilder b;
+                b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
+                b.appendElements( options.toBSON() );
+                string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
+                repl::logOp(_txn, "c", logNs.c_str(), b.obj());
 
                 for ( vector<BSONObj>::iterator it = indexesToInsert.begin();
                         it != indexesToInsert.end(); ++it ) {
-                    tempColl->getIndexCatalog()->createIndex(_txn, *it, false );
+                    Status status =
+                        tempColl->getIndexCatalog()->createIndexOnEmptyCollection(_txn, *it);
+                    if (!status.isOK()) {
+                        if (status.code() == ErrorCodes::IndexAlreadyExists) {
+                            continue;
+                        }
+                        uassertStatusOK(status);
+                    }
                     // Log the createIndex operation.
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
                     repl::logOp(_txn, "i", logNs.c_str(), *it);

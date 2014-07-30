@@ -194,12 +194,15 @@ namespace mongo {
         virtual Status addKey(const BSONObj& key, const DiskLoc& loc) = 0;
 
         /**
-         * commit work.  if not called, destructor will clean up partially completed work
-         *  (in case exception has happened).
+         * Do any necessary work to finish building the tree.
          *
-         * Returns number of keys added.
+         * The default implementation may be used if no commit phase is necessary because addKey
+         * always leaves the tree in a valid state.
+         *
+         * This is called outside of any WriteUnitOfWork to allow implementations to split this up
+         * into multiple units.
          */
-        virtual unsigned long long commit(bool mayInterrupt) = 0;
+        virtual void commit(bool mayInterrupt) {}
     };
 
 }  // namespace mongo

@@ -48,7 +48,6 @@ namespace mongo {
     class RocksSortedDataBuilderImpl : public SortedDataBuilderInterface {
     public:
         virtual Status addKey(const BSONObj& key, const DiskLoc& loc) = 0;
-        virtual unsigned long long commit(bool mayInterrupt) = 0;
     };
 
     /**

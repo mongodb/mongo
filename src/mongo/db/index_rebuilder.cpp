@@ -32,11 +32,15 @@
 
 #include "mongo/db/index_rebuilder.h"
 
+#include <list>
+#include <string>
+
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
@@ -47,18 +51,90 @@
 
 namespace mongo {
 
-    IndexRebuilder indexRebuilder;
+namespace {
+    void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
+        bool firstTime = true;
+        for (std::list<std::string>::const_iterator it = nsToCheck.begin();
+                it != nsToCheck.end();
+                ++it) {
 
-    IndexRebuilder::IndexRebuilder() {}
+            string ns = *it;
 
-    std::string IndexRebuilder::name() const {
-        return "IndexRebuilder";
+            LOG(3) << "IndexRebuilder::checkNS: " << ns;
+
+            // This write lock is held throughout the index building process
+            // for this namespace.
+            Lock::DBWrite lk(txn->lockState(), ns);
+            Client::Context ctx(txn, ns);
+
+            Collection* collection = ctx.db()->getCollection(txn, ns);
+            if ( collection == NULL )
+                continue;
+
+            IndexCatalog* indexCatalog = collection->getIndexCatalog();
+
+            if ( collection->ns().isOplog() && indexCatalog->numIndexesTotal() > 0 ) {
+                warning() << ns << " had illegal indexes, removing";
+                indexCatalog->dropAllIndexes(txn, true);
+                continue;
+            }
+
+
+            MultiIndexBlock indexer(txn, collection);
+
+            {
+                WriteUnitOfWork wunit(txn->recoveryUnit());
+                vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(txn);
+
+                // The indexes have now been removed from system.indexes, so the only record is
+                // in-memory. If there is a journal commit between now and when insert() rewrites
+                // the entry and the db crashes before the new system.indexes entry is journalled,
+                // the index will be lost forever. Thus, we must stay in the same WriteUnitOfWork
+                // to ensure that no journaling will happen between now and the entry being
+                // re-written in MultiIndexBlock::init(). The actual index building is done outside
+                // of this WUOW.
+
+                if (indexesToBuild.empty()) {
+                    continue;
+                }
+
+                log() << "found " << indexesToBuild.size()
+                      << " interrupted index build(s) on " << ns;
+
+                if (firstTime) {
+                    log() << "note: restart the server with --noIndexBuildRetry "
+                          << "to skip index rebuilds";
+                    firstTime = false;
+                }
+
+                if (!serverGlobalParams.indexBuildRetry) {
+                    log() << "  not rebuilding interrupted indexes";
+                    continue;
+                }
+
+                uassertStatusOK(indexer.init(indexesToBuild));
+
+                wunit.commit();
+            }
+
+            try {
+                uassertStatusOK(indexer.insertAllDocumentsInCollection());
+
+                WriteUnitOfWork wunit(txn->recoveryUnit());
+                indexer.commit();
+                wunit.commit();
+            }
+            catch (...) {
+                // If anything went wrong, leave the indexes partially built so that we pick them up
+                // again on restart.
+                indexer.abortWithoutCleanup();
+                throw;
+            }
+        }
     }
+} // namespace
 
-    void IndexRebuilder::run() {
-        Client::initThread(name().c_str()); 
-        ON_BLOCK_EXIT_OBJ(cc(), &Client::shutdown);
-
+    void restartInProgressIndexesFromLastShutdown() {
         OperationContextImpl txn;
 
         cc().getAuthorizationSession()->grantInternalAuthorization();
@@ -72,7 +148,7 @@ namespace mongo {
             std::list<std::string> collNames;
             for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
                  dbName < dbNames.end();
-                 dbName++) {
+                 ++dbName) {
                 Client::ReadContext ctx(&txn, *dbName);
 
                 Database* db = ctx.ctx().db();
@@ -81,76 +157,10 @@ namespace mongo {
             checkNS(&txn, collNames);
         }
         catch (const DBException& e) {
-            warning() << "Index rebuilding did not complete: " << e.what() << endl;
+            error() << "Index rebuilding did not complete: " << e.toString();
+            log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
+            fassertFailedNoTrace(18643);
         }
         LOG(1) << "checking complete" << endl;
     }
-
-    void IndexRebuilder::checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
-        bool firstTime = true;
-        for (std::list<std::string>::const_iterator it = nsToCheck.begin();
-                it != nsToCheck.end();
-                ++it) {
-
-            string ns = *it;
-
-            LOG(3) << "IndexRebuilder::checkNS: " << ns;
-
-            // This write lock is held throughout the index building process
-            // for this namespace.
-            Client::WriteContext ctx(txn, ns);
-
-            Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
-            if ( collection == NULL )
-                continue;
-
-            IndexCatalog* indexCatalog = collection->getIndexCatalog();
-
-            if ( collection->ns().isOplog() && indexCatalog->numIndexesTotal() > 0 ) {
-                warning() << ns << " had illegal indexes, removing";
-                indexCatalog->dropAllIndexes(txn, true);
-                continue;
-            }
-
-            vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(txn);
-
-            // The indexes have now been removed from system.indexes, so the only record is
-            // in-memory. If there is a journal commit between now and when insert() rewrites
-            // the entry and the db crashes before the new system.indexes entry is journalled,
-            // the index will be lost forever.  Thus, we're assuming no journaling will happen
-            // between now and the entry being re-written.
-
-            if ( indexesToBuild.size() == 0 ) {
-                continue;
-            }
-
-            log() << "found " << indexesToBuild.size()
-                  << " interrupted index build(s) on " << ns;
-
-            if (firstTime) {
-                log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
-                firstTime = false;
-            }
-
-            if (!serverGlobalParams.indexBuildRetry) {
-                log() << "  not rebuilding interrupted indexes";
-                continue;
-            }
-
-            // TODO: these can/should/must be done in parallel
-            for ( size_t i = 0; i < indexesToBuild.size(); i++ ) {
-                BSONObj indexObj = indexesToBuild[i];
-
-                log() << "going to rebuild: " << indexObj;
-
-                Status status = indexCatalog->createIndex(txn, indexObj, false);
-                if ( !status.isOK() ) {
-                    log() << "building index failed: " << status.toString() << " index: " << indexObj;
-                }
-
-            }
-            ctx.commit();
-        }
-    }
-
 }

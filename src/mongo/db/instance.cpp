@@ -58,6 +58,7 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/commands/count.h"
 #include "mongo/db/ops/delete_executor.h"
 #include "mongo/db/ops/delete_request.h"
@@ -794,24 +795,36 @@ namespace mongo {
             Collection* collection = ctx.db()->getCollection( txn, targetNS );
             if ( !collection ) {
                 // implicitly create
+                WriteUnitOfWork wunit(txn->recoveryUnit());
                 collection = ctx.db()->createCollection( txn, targetNS );
                 verify( collection );
+                wunit.commit();
             }
 
             // Only permit interrupting an (index build) insert if the
             // insert comes from a socket client request rather than a
             // parent operation using the client interface.  The parent
             // operation might not support interrupts.
-            bool mayInterrupt = txn->getCurOp()->parent() == NULL;
+            const bool mayInterrupt = txn->getCurOp()->parent() == NULL;
 
             txn->getCurOp()->setQuery(js);
-            Status status = collection->getIndexCatalog()->createIndex(txn, js, mayInterrupt);
 
+            MultiIndexBlock indexer(txn, collection);
+            indexer.allowBackgroundBuilding();
+            if (mayInterrupt)
+                indexer.allowInterruption();
+
+            Status status = indexer.init(js);
             if ( status.code() == ErrorCodes::IndexAlreadyExists )
-                return;
+                return; // inserting an existing index is a no-op.
+            uassertStatusOK(status);
+            uassertStatusOK(indexer.insertAllDocumentsInCollection());
 
-            uassertStatusOK( status );
+            WriteUnitOfWork wunit(txn->recoveryUnit());
+            indexer.commit();
             repl::logOp(txn, "i", ns, js);
+            wunit.commit();
+
             return;
         }
 
@@ -820,6 +833,7 @@ namespace mongo {
         if ( !fixed.getValue().isEmpty() )
             js = fixed.getValue();
 
+        WriteUnitOfWork wunit(txn->recoveryUnit());
         Collection* collection = ctx.db()->getCollection( txn, ns );
         if ( !collection ) {
             collection = ctx.db()->createCollection( txn, ns );
@@ -829,6 +843,7 @@ namespace mongo {
         StatusWith<DiskLoc> status = collection->insertDocument( txn, js, true );
         uassertStatusOK( status.getStatus() );
         repl::logOp(txn, "i", ns, js);
+        wunit.commit();
     }
 
     NOINLINE_DECL void insertMulti(OperationContext* txn,
@@ -841,7 +856,6 @@ namespace mongo {
         for (i=0; i<objs.size(); i++){
             try {
                 checkAndInsert(txn, ctx, ns, objs[i]);
-                txn->recoveryUnit()->commitIfNeeded();
             } catch (const UserException& ex) {
                 if (!keepGoing || i == objs.size()-1){
                     globalOpCounters.incInsertInWriteLock(i);
@@ -891,7 +905,6 @@ namespace mongo {
         if ( handlePossibleShardedMessage( m , 0 ) )
             return;
 
-        WriteUnitOfWork wunit(txn->recoveryUnit());
         Client::Context ctx(txn, ns);
 
         if (multi.size() > 1) {
@@ -902,7 +915,6 @@ namespace mongo {
             globalOpCounters.incInsertInWriteLock(1);
             op.debug().ninserted = 1;
         }
-        wunit.commit();
     }
 
     DBDirectClient::DBDirectClient() 

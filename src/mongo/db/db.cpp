@@ -669,8 +669,7 @@ namespace mongo {
 
         getDeleter()->startWorkers();
 
-        // Starts a background thread that rebuilds all incomplete indices. 
-        indexRebuilder.go(); 
+        restartInProgressIndexesFromLastShutdown();
 
         listen(listenPort);
 

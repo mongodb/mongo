@@ -59,7 +59,7 @@ namespace mongo {
                               const InsertDeleteOptions& options,
                               int64_t* numInserted);
 
-        Status commit(std::set<DiskLoc>* dupsToDrop, bool mayInterrupt);
+        Status commit(std::set<DiskLoc>* dupsToDrop, bool mayInterrupt, bool dupsAllowed);
 
         // Exposed for testing.
         static ExternalSortComparison* getComparison(int version, const BSONObj& keyPattern);
@@ -70,6 +70,7 @@ namespace mongo {
 
         virtual Status commitBulk(IndexAccessMethod* bulk,
                                   bool mayInterrupt,
+                                  bool dupsAllowed,
                                   std::set<DiskLoc>* dups) {
             invariant(this == bulk);
             return Status::OK();

@@ -184,11 +184,13 @@ namespace mongo {
          * and should not be used.
          * @param bulk - something created from initiateBulk
          * @param mayInterrupt - is this commit interruptable (will cancel)
+         * @param dupsAllowed - if false, error or fill 'dups' if any duplicate values are found
          * @param dups - if NULL, error out on dups if not allowed
          *               if not NULL, put the bad DiskLocs there
          */
         virtual Status commitBulk( IndexAccessMethod* bulk,
                                    bool mayInterrupt,
+                                   bool dupsAllowed,
                                    std::set<DiskLoc>* dups ) = 0;
     };
 

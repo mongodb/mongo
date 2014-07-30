@@ -588,7 +588,7 @@ namespace repl {
                 }
                 else {
                     IndexBuilder builder(o);
-                    Status status = builder.build(txn, db);
+                    Status status = builder.buildInForeground(txn, db);
                     if ( status.isOK() ) {
                         // yay
                     }
@@ -633,8 +633,16 @@ namespace repl {
                 else {
                     // probably don't need this since all replicated colls have _id indexes now
                     // but keep it just in case
-                    RARELY if ( indexCatalog && !collection->isCapped() ) {
-                        indexCatalog->ensureHaveIdIndex(txn);
+                    RARELY if ( indexCatalog
+                                 && !collection->isCapped()
+                                 && !indexCatalog->haveIdIndex() ) {
+                        try {
+                            Helpers::ensureIndex(txn, collection, BSON("_id" << 1), true, "_id_");
+                        }
+                        catch (const DBException& e) {
+                            warning() << "Ignoring error building id index on " << collection->ns()
+                                      << ": " << e.toString();
+                        }
                     }
 
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
@@ -662,8 +670,14 @@ namespace repl {
 
             // probably don't need this since all replicated colls have _id indexes now
             // but keep it just in case
-            RARELY if ( indexCatalog && !collection->isCapped() ) {
-                indexCatalog->ensureHaveIdIndex(txn);
+            RARELY if ( indexCatalog && !collection->isCapped() && !indexCatalog->haveIdIndex() ) {
+                try {
+                    Helpers::ensureIndex(txn, collection, BSON("_id" << 1), true, "_id_");
+                }
+                catch (const DBException& e) {
+                    warning() << "Ignoring error building id index on " << collection->ns()
+                              << ": " << e.toString();
+                }
             }
 
             OpDebug debug;

@@ -42,6 +42,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/ops/delete_executor.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
@@ -974,14 +975,12 @@ namespace mongo {
 
         try {
             if (state->lockAndCheck(result)) {
-                WriteUnitOfWork wunit (state->txn->recoveryUnit());
                 if (!state->request->isInsertIndexRequest()) {
                     singleInsert(state->txn, insertDoc, state->getCollection(), result);
                 }
                 else {
                     singleCreateIndex(state->txn, insertDoc, state->getCollection(), result);
                 }
-                wunit.commit();
             }
         }
         catch (const DBException& ex) {
@@ -1040,6 +1039,7 @@ namespace mongo {
 
         txn->lockState()->assertWriteLocked( insertNS );
 
+        WriteUnitOfWork wunit(txn->recoveryUnit());
         StatusWith<DiskLoc> status = collection->insertDocument( txn, docToInsert, true );
 
         if ( !status.isOK() ) {
@@ -1047,8 +1047,8 @@ namespace mongo {
         }
         else {
             repl::logOp( txn, "i", insertNS.c_str(), docToInsert );
-            txn->recoveryUnit()->commitIfNeeded();
             result->getStats().n = 1;
+            wunit.commit();
         }
     }
 
@@ -1067,18 +1067,31 @@ namespace mongo {
 
         txn->lockState()->assertWriteLocked( indexNS );
 
-        Status status = collection->getIndexCatalog()->createIndex(txn, indexDesc, true);
+        MultiIndexBlock indexer(txn, collection);
+        indexer.allowBackgroundBuilding();
+        indexer.allowInterruption();
 
+        Status status = indexer.init(indexDesc);
         if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
             result->getStats().n = 0;
+            return; // inserting an existing index is a no-op.
         }
-        else if ( !status.isOK() ) {
+        if (!status.isOK()) {
             result->setError(toWriteError(status));
+            return;
         }
-        else {
-            repl::logOp( txn, "i", indexNS.c_str(), indexDesc );
-            result->getStats().n = 1;
+
+        status = indexer.insertAllDocumentsInCollection();
+        if (!status.isOK()) {
+            result->setError(toWriteError(status));
+            return;
         }
+
+        WriteUnitOfWork wunit(txn->recoveryUnit());
+        indexer.commit();
+        repl::logOp( txn, "i", indexNS.c_str(), indexDesc );
+        result->getStats().n = 1;
+        wunit.commit();
     }
 
     static void multiUpdate( OperationContext* txn,

@@ -54,9 +54,6 @@ namespace mongo {
     //   we get to the root and it is full, a new root is created above the current root. When
     //   creating a new right sibling, it is set as its parent's nextChild as all keys in the right
     //   sibling will be higher than all keys currently in the parent.
-    //
-    // Phase 3 (the commit phase):
-    //   Does nothing. This may go away soon.
 
     //
     // Public Builder logic
@@ -74,7 +71,6 @@ namespace mongo {
                                               bool dupsAllowed)
         : _logic(logic),
           _dupsAllowed(dupsAllowed),
-          _numAdded(0),
           _txn(txn) {
 
         // The normal bulk building path calls initAsEmpty, so we already have an empty root bucket.
@@ -86,10 +82,8 @@ namespace mongo {
             _logic->_headManager->setHead(_txn, _rightLeafLoc);
         }
 
-        _rightLeaf = _getModifiableBucket(_rightLeafLoc);
-
         // must be empty when starting
-        invariant(_rightLeaf->n == 0);
+        invariant(_getBucket(_rightLeafLoc)->n == 0);
     }
 
     template <class BtreeLayout>
@@ -105,7 +99,7 @@ namespace mongo {
         }
 
         // If we have a previous key to compare to...
-        if (_numAdded > 0) {
+        if (_keyLast.get()) {
             int cmp = _keyLast->woCompare(*key, _logic->_ordering);
 
             // This shouldn't happen ever.  We expect keys in sorted order.
@@ -118,23 +112,17 @@ namespace mongo {
                 return Status(ErrorCodes::DuplicateKey, _logic->dupKeyError(*_keyLast));
             }
         }
-
-        if (!_logic->pushBack(_rightLeaf, loc, *key, DiskLoc())) {
+        
+        BucketType* rightLeaf = _getModifiableBucket(_rightLeafLoc);
+        if (!_logic->pushBack(rightLeaf, loc, *key, DiskLoc())) {
             // bucket was full, so split and try with the new node.
-            _rightLeafLoc = newBucket(_rightLeaf, _rightLeafLoc);
-            _rightLeaf = _getModifiableBucket(_rightLeafLoc);
-            invariant(_logic->pushBack(_rightLeaf, loc, *key, DiskLoc()));
+            _rightLeafLoc = newBucket(rightLeaf, _rightLeafLoc);
+            rightLeaf = _getModifiableBucket(_rightLeafLoc);
+            invariant(_logic->pushBack(rightLeaf, loc, *key, DiskLoc()));
         }
 
         _keyLast = key;
-        _numAdded++;
-        mayCommitProgressDurably();
         return Status::OK();
-    }
-
-    template <class BtreeLayout>
-    unsigned long long BtreeLogic<BtreeLayout>::Builder::commit(bool mayInterrupt) {
-        return _numAdded;
     }
 
     //
@@ -184,13 +172,6 @@ namespace mongo {
         *_txn->recoveryUnit()->writing(&newBucket->parent) = parentLoc;
         *_txn->recoveryUnit()->writing(&parent->nextChild) = newBucketLoc;
         return newBucketLoc;
-    }
-
-    template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::Builder::mayCommitProgressDurably() {
-        if (_txn->recoveryUnit()->commitIfNeeded()) {
-            _rightLeaf = _getModifiableBucket(_rightLeafLoc);
-        }
     }
 
     template <class BtreeLayout>

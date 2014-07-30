@@ -52,6 +52,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
@@ -1743,41 +1744,59 @@ namespace mongo {
             {                
                 // 1. copy indexes
                 
-                vector<BSONObj> all;
+                vector<BSONObj> indexSpecs;
                 {
                     auto_ptr<DBClientCursor> indexes = conn->getIndexes( ns );
                     
                     while ( indexes->more() ) {
-                        all.push_back( indexes->nextSafe().getOwned() );
+                        indexSpecs.push_back( indexes->nextSafe().getOwned() );
                     }
                 }
 
-                for ( unsigned i=0; i<all.size(); i++ ) {
-                    BSONObj idx = all[i];
-                    Client::WriteContext ctx(txn,  ns );
-                    Database* db = ctx.ctx().db();
-                    Collection* collection = db->getCollection( txn, ns );
-                    if ( !collection ) {
-                        errmsg = str::stream() << "collection dropped during migration: " << ns;
-                        warning() << errmsg;
-                        setState(FAIL);
-                        return;
-                    }
+                Lock::DBWrite lk(txn->lockState(),  ns);
+                Client::Context ctx(txn,  ns);
+                Database* db = ctx.db();
+                Collection* collection = db->getCollection( txn, ns );
+                if ( !collection ) {
+                    errmsg = str::stream() << "collection dropped during migration: " << ns;
+                    warning() << errmsg;
+                    setState(FAIL);
+                    return;
+                }
 
-                    Status status = collection->getIndexCatalog()->createIndex(txn, idx, false);
-                    if ( !status.isOK() && status.code() != ErrorCodes::IndexAlreadyExists ) {
+                MultiIndexBlock indexer(txn, collection);
+
+                indexer.removeExistingIndexes(&indexSpecs);
+
+                if (!indexSpecs.empty()) {
+                    Status status = indexer.init(indexSpecs);
+                    if ( !status.isOK() ) {
                         errmsg = str::stream() << "failed to create index before migrating data. "
-                                               << " idx: " << idx
                                                << " error: " << status.toString();
                         warning() << errmsg;
                         setState(FAIL);
                         return;
                     }
 
-                    // make sure to create index on secondaries as well
-                    repl::logOp(txn, "i", db->getSystemIndexesName().c_str(), idx,
-                                   NULL, NULL, true /* fromMigrate */);
-                    ctx.commit();
+                    status = indexer.insertAllDocumentsInCollection();
+                    if ( !status.isOK() ) {
+                        errmsg = str::stream() << "failed to create index before migrating data. "
+                                               << " error: " << status.toString();
+                        warning() << errmsg;
+                        setState(FAIL);
+                        return;
+                    }
+
+                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    indexer.commit();
+
+                    for (size_t i = 0; i < indexSpecs.size(); i++) {
+                        // make sure to create index on secondaries as well
+                        repl::logOp(txn, "i", db->getSystemIndexesName().c_str(), indexSpecs[i],
+                                       NULL, NULL, true /* fromMigrate */);
+                    }
+
+                    wunit.commit();
                 }
 
                 timing.done(1);

@@ -510,7 +510,9 @@ namespace mongo {
             if ( collection->requiresIdIndex() ) {
                 if ( options.autoIndexId == CollectionOptions::YES ||
                      options.autoIndexId == CollectionOptions::DEFAULT ) {
-                    uassertStatusOK( collection->getIndexCatalog()->ensureHaveIdIndex(txn) );
+                    IndexCatalog* ic = collection->getIndexCatalog();
+                    uassertStatusOK(
+                        ic->createIndexOnEmptyCollection(txn, ic->getDefaultIdIndexSpec()));
                 }
             }
 

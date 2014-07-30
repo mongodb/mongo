@@ -47,10 +47,6 @@ namespace mongo {
             return _builder->addKey(key, loc);
         }
 
-        unsigned long long commit(bool mayInterrupt) {
-            return _builder->commit(mayInterrupt);
-        }
-
     private:
         typename BtreeLogic<OnDiskFormat>::Builder* _builder;
 

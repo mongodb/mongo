@@ -41,7 +41,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/pdfile_private.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
@@ -54,262 +53,71 @@
 namespace mongo {
 
     /**
-     * Add the provided (obj, dl) pair to the provided index.
+     * On rollback sets MultiIndexBlock::_needToCleanup to true.
      */
-    static void addKeysToIndex(OperationContext* txn,
-                               Collection* collection,
-                               const IndexDescriptor* descriptor,
-                               IndexAccessMethod* accessMethod,
-                               const BSONObj& obj, const DiskLoc &recordLoc ) {
+    class MultiIndexBlock::SetNeedToCleanupOnRollback : public RecoveryUnit::Change {
+    public:
+        explicit SetNeedToCleanupOnRollback(MultiIndexBlock* indexer) : _indexer(indexer) {}
 
-        InsertDeleteOptions options;
-        options.logIfError = false;
-        options.dupsAllowed = true;
+        virtual void commit() {}
+        virtual void rollback() { _indexer->_needToCleanup = true; }
 
-        if ( descriptor->isIdIndex() || descriptor->unique() ) {
-            if (!repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor)) {
-                options.dupsAllowed = false;
-            }
-        }
-
-        int64_t inserted;
-        Status ret = accessMethod->insert(txn, obj, recordLoc, options, &inserted);
-        uassertStatusOK( ret );
-    }
-
-    unsigned long long addExistingToIndex( OperationContext* txn,
-                                           Collection* collection,
-                                           const IndexDescriptor* descriptor,
-                                           IndexAccessMethod* accessMethod,
-                                           bool canBeKilled ) {
-
-        string ns = collection->ns().ns(); // our copy for sanity
-
-        bool dupsAllowed = !descriptor->unique();
-        bool dropDups = descriptor->dropDups();
-
-        string curopMessage;
-        {
-            stringstream ss;
-            ss << "Index Build";
-            if ( canBeKilled )
-                ss << "(background)";
-            curopMessage = ss.str();
-        }
-
-        ProgressMeter* progress = txn->setMessage(curopMessage.c_str(),
-                                                  curopMessage,
-                                                  collection->numRecords());
-
-        unsigned long long n = 0;
-        unsigned long long numDropped = 0;
-
-        auto_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn,ns,collection));
-
-        std::string idxName = descriptor->indexName();
-
-        // After this yields in the loop, idx may point at a different index (if indexes get
-        // flipped, see insert_makeIndex) or even an empty IndexDetails, so nothing below should
-        // depend on idx. idxNo should be recalculated after each yield.
-
-        BSONObj js;
-        DiskLoc loc;
-        while (PlanExecutor::ADVANCED == exec->getNext(&js, &loc)) {
-            try {
-                if ( !dupsAllowed && dropDups ) {
-                    LastError::Disabled led( lastError.get() );
-                    addKeysToIndex(txn, collection, descriptor, accessMethod, js, loc);
-                }
-                else {
-                    addKeysToIndex(txn, collection, descriptor, accessMethod, js, loc);
-                }
-            }
-            catch( AssertionException& e ) {
-                if (ErrorCodes::isInterruption(DBException::convertExceptionCode(e.getCode()))) {
-                    txn->checkForInterrupt();
-                }
-
-                // TODO: Does exception really imply dropDups exception?
-                if (dropDups) {
-                    bool execEOF = exec->isEOF();
-                    exec->saveState();
-                    BSONObj toDelete;
-                    collection->deleteDocument( txn, loc, false, true, &toDelete );
-                    repl::logOp(txn, "d", ns.c_str(), toDelete);
-
-                    if (!exec->restoreState(txn)) {
-                        // PlanExecutor got killed somehow.  This probably shouldn't happen.
-                        if (execEOF) {
-                            // Quote: "We were already at the end.  Normal.
-                            // TODO: Why is this normal?
-                        }
-                        else {
-                            uasserted(ErrorCodes::CursorNotFound, 
-                                      "cursor gone during bg index; dropDups");
-                        }
-                        break;
-                    }
-                    // We deleted a record, but we didn't actually yield the dblock.
-                    // TODO: Why did the old code assume we yielded the lock?
-                    numDropped++;
-                }
-                else {
-                    log() << "background addExistingToIndex exception " << e.what() << endl;
-                    throw;
-                }
-            }
-
-            n++;
-            progress->hit();
-
-            txn->recoveryUnit()->commitIfNeeded();
-
-            if (canBeKilled) {
-                // Checking for interrupt here is necessary because the bg index 
-                // interruptors can only interrupt this index build while they hold 
-                // a write lock, and yieldAndCheckIfOK only checks for
-                // interrupt prior to yielding our write lock. We need to check the kill flag
-                // here before another iteration of the loop.
-                txn->checkForInterrupt();
-            }
-
-            progress->setTotalWhileRunning( collection->numRecords() );
-        }
-
-        progress->finished();
-        if ( dropDups && numDropped )
-            log() << "\t index build dropped: " << numDropped << " dups";
-        return n;
-    }
-
-    // ---------------------------
-
-    // throws DBException
-    void buildAnIndex( OperationContext* txn,
-                       Collection* collection,
-                       IndexCatalogEntry* btreeState,
-                       bool mayInterrupt ) {
-
-        const string ns = collection->ns().ns(); // our copy
-        verify(txn->lockState()->isWriteLocked(ns));
-
-        const IndexDescriptor* idx = btreeState->descriptor();
-        const BSONObj& idxInfo = idx->infoObj();
-
-        LOG(0) << "build index on: " << ns
-               << " properties: " << idx->toString() << endl;
-        audit::logCreateIndex( currentClient.get(), &idxInfo, idx->indexName(), ns );
-
-        Timer t;
-
-        // this is so that people know there are more keys to look at when doing
-        // things like in place updates, etc...
-        collection->infoCache()->addedIndex();
-
-        if ( collection->numRecords() == 0 ) {
-            Status status = btreeState->accessMethod()->initializeAsEmpty(txn);
-            massert( 17343,
-                     str::stream() << "IndexAccessMethod::initializeAsEmpty failed" << status.toString(),
-                     status.isOK() );
-            LOG(0) << "\t added index to empty collection";
-            return;
-        }
-
-        scoped_ptr<BackgroundOperation> backgroundOperation;
-        bool doInBackground = false;
-
-        if ( idxInfo["background"].trueValue() && !inDBRepair ) {
-            doInBackground = true;
-            backgroundOperation.reset( new BackgroundOperation(ns) );
-            uassert( 13130,
-                     "can't start bg index b/c in recursive lock (db.eval?)",
-                     !txn->lockState()->isRecursive() );
-            log() << "\t building index in background";
-        }
-
-        Status status = btreeState->accessMethod()->initializeAsEmpty(txn);
-        massert( 17342,
-                 str::stream()
-                 << "IndexAccessMethod::initializeAsEmpty failed"
-                 << status.toString(),
-                 status.isOK() );
-
-        IndexAccessMethod* bulk = doInBackground ?
-            NULL : btreeState->accessMethod()->initiateBulk(txn);
-        scoped_ptr<IndexAccessMethod> bulkHolder(bulk);
-        IndexAccessMethod* iam = bulk ? bulk : btreeState->accessMethod();
-
-        if ( bulk )
-            log() << "\t building index using bulk method";
-
-        unsigned long long n = addExistingToIndex( txn,
-                                                   collection,
-                                                   btreeState->descriptor(),
-                                                   iam,
-                                                   doInBackground );
-
-        if ( bulk ) {
-            LOG(1) << "\t bulk commit starting";
-            std::set<DiskLoc> dupsToDrop;
-
-            Status status = btreeState->accessMethod()->commitBulk( bulk,
-                                                                    mayInterrupt,
-                                                                    &dupsToDrop );
-
-            // Code above us expects a uassert in case of dupkey errors.
-            if (ErrorCodes::DuplicateKey == status.code()) {
-                uassertStatusOK(status);
-            }
-
-            // Any other errors are probably bad and deserve a massert.
-            massert( 17398,
-                     str::stream() << "commitBulk failed: " << status.toString(),
-                     status.isOK() );
-
-            if ( dupsToDrop.size() )
-                log() << "\t bulk dropping " << dupsToDrop.size() << " dups";
-
-            for( set<DiskLoc>::const_iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); ++i ) {
-                BSONObj toDelete;
-                collection->deleteDocument( txn,
-                                            *i,
-                                            false /* cappedOk */,
-                                            true /* noWarn */,
-                                            &toDelete );
-                if (repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                        collection->ns().db())) {
-                    repl::logOp(txn, "d", ns.c_str(), toDelete);
-                }
-                
-                txn->recoveryUnit()->commitIfNeeded();
-
-                RARELY if ( mayInterrupt ) {
-                    txn->checkForInterrupt();
-                }
-            }
-        }
-
-        LOG(0) << "build index done.  scanned " << n << " total records. "
-               << t.millis() / 1000.0 << " secs" << endl;
-
-        // this one is so people know that the index is finished
-        collection->infoCache()->addedIndex();
-    }
-
-    // ----------------------------
+    private:
+        MultiIndexBlock* const _indexer;
+    };
 
     MultiIndexBlock::MultiIndexBlock(OperationContext* txn, Collection* collection)
-        : _collection(collection), _txn(txn) {
+        : _collection(collection),
+          _txn(txn),
+          _buildInBackground(false),
+          _allowInterruption(false),
+          _ignoreUnique(false),
+          _needToCleanup(true) {
     }
 
     MultiIndexBlock::~MultiIndexBlock() {
-        for ( size_t i = 0; i < _states.size(); i++ ) {
-            delete _states[i].bulk;
-            delete _states[i].block;
+        if (!_needToCleanup || _indexes.empty())
+            return;
+
+        try {
+            WriteUnitOfWork wunit(_txn->recoveryUnit());
+            // This cleans up all index builds. Because that may need to write, it is done inside
+            // of a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
+            for (size_t i = 0; i < _indexes.size(); i++) {
+                _indexes[i].block->fail();
+            }
+            wunit.commit();
+            return;
+        }
+        catch (const std::exception& e) {
+            error() << "Caught exception while cleaning up partially built indexes: " << e.what();
+        }
+        catch (...) {
+            error() << "Caught unknown exception while cleaning up partially built indexes.";
+        }
+        fassertFailed(18644);
+    }
+
+    void MultiIndexBlock::removeExistingIndexes(std::vector<BSONObj>* specs) const {
+        for (size_t i = 0; i < specs->size(); i++) {
+            Status status =
+                _collection->getIndexCatalog()->prepareSpecForCreate(_txn, (*specs)[i]).getStatus();
+            if (status.code() == ErrorCodes::IndexAlreadyExists) {
+                specs->erase(specs->begin() + i);
+                i--;
+            }
+            // intentionally ignoring other error codes
         }
     }
 
-    Status MultiIndexBlock::init(std::vector<BSONObj>& indexSpecs) {
+    Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
+        WriteUnitOfWork wunit(_txn->recoveryUnit());
+        const string& ns = _collection->ns().ns();
+
+        Status status = _collection->getIndexCatalog()->checkUnfinished();
+        if ( !status.isOK() )
+            return status;
+
         for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
             BSONObj info = indexSpecs[i];
 
@@ -321,6 +129,8 @@ namespace mongo {
                     return s;
             }
 
+            // Any foreground indexes make all indexes be build in the foreground.
+            _buildInBackground = (_buildInBackground && info["background"].trueValue());
         }
 
         for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
@@ -332,57 +142,162 @@ namespace mongo {
                 return status;
             info = statusWithInfo.getValue();
 
-            IndexState state;
-            state.block = new IndexCatalog::IndexBuildBlock(_txn, _collection, info);
-            status = state.block->init();
+            IndexToBuild index;
+            index.block = boost::make_shared<IndexCatalog::IndexBuildBlock>(_txn,
+                                                                            _collection,
+                                                                            info);
+            status = index.block->init();
             if ( !status.isOK() )
                 return status;
 
-            state.real = state.block->getEntry()->accessMethod();
-            status = state.real->initializeAsEmpty(_txn);
+            index.real = index.block->getEntry()->accessMethod();
+            status = index.real->initializeAsEmpty(_txn);
             if ( !status.isOK() )
                 return status;
 
-            state.bulk = state.real->initiateBulk(_txn);
+            if (!_buildInBackground) {
+                // Bulk build process requires foreground building as it assumes nothing is changing
+                // under it.
+                // TODO SERVER-14860 make background not just be a slower foreground.
+                index.bulk.reset(index.real->initiateBulk(_txn));
+            }
 
-            _states.push_back( state );
+            const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
+
+            index.options.logIfError = false; // logging happens elsewhere if needed.
+            index.options.dupsAllowed = !descriptor->unique()
+                                     || _ignoreUnique
+                                     || repl::getGlobalReplicationCoordinator()
+                                                    ->shouldIgnoreUniqueIndex(descriptor);
+
+            log() << "build index on: " << ns << " properties: " << descriptor->toString();
+            if (index.bulk)
+                log() << "\t building index using bulk method";
+
+            // TODO SERVER-14888 Suppress this in cases we don't want to audit.
+            audit::logCreateIndex(_txn->getClient(), &info, descriptor->indexName(), ns);
+
+            _indexes.push_back( index );
         }
+
+        // this is so that operations examining the list of indexes know there are more keys to look
+        // at when doing things like in place updates, etc...
+        _collection->infoCache()->addedIndex();
+
+        if (_buildInBackground)
+            _backgroundOperation.reset(new BackgroundOperation(ns));
+
+        wunit.commit();
+        return Status::OK();
+    }
+
+    Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<DiskLoc>* dupsOut) {
+        const char* curopMessage = _buildInBackground ? "Index Build (background)" : "Index Build";
+        ProgressMeter* progress = _txn->setMessage(curopMessage,
+                                                   curopMessage,
+                                                   _collection->numRecords());
+
+        Timer t;
+
+        unsigned long long n = 0;
+        scoped_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(_txn,
+                                                                      _collection->ns().ns(),
+                                                                      _collection));
+
+        BSONObj objToIndex;
+        DiskLoc loc;
+        while (PlanExecutor::ADVANCED == exec->getNext(&objToIndex, &loc)) {
+            {
+                bool shouldCommitWUnit = true;
+                WriteUnitOfWork wunit(_txn->recoveryUnit());
+                Status ret = insert(objToIndex, loc);
+                if (!ret.isOK()) {
+                    if (dupsOut && ret.code() == ErrorCodes::DuplicateKey) {
+                        // If dupsOut is non-null, we should only fail the specific insert that
+                        // led to a DuplicateKey rather than the whole index build.
+                        dupsOut->insert(loc);
+                        shouldCommitWUnit = false;
+                    }
+                    else {
+                        return ret;
+                    }
+                }
+
+                if (shouldCommitWUnit)
+                    wunit.commit();
+            }
+
+            n++;
+            progress->hit();
+
+            if (_allowInterruption)
+                _txn->checkForInterrupt();
+
+            progress->setTotalWhileRunning( _collection->numRecords() );
+        }
+
+        progress->finished();
+
+        Status ret = doneInserting(dupsOut);
+        if (!ret.isOK())
+            return ret;
+
+        log() << "build index done.  scanned " << n << " total records. "
+              << t.seconds() << " secs" << endl;
 
         return Status::OK();
     }
 
-    Status MultiIndexBlock::insert( const BSONObj& doc,
-                                    const DiskLoc& loc,
-                                    const InsertDeleteOptions& options ) {
-
-        for ( size_t i = 0; i < _states.size(); i++ ) {
-            Status idxStatus = _states[i].forInsert()->insert( _txn,
+    Status MultiIndexBlock::insert(const BSONObj& doc, const DiskLoc& loc) {
+        for ( size_t i = 0; i < _indexes.size(); i++ ) {
+            int64_t unused;
+            Status idxStatus = _indexes[i].forInsert()->insert( _txn,
                                                                doc,
                                                                loc,
-                                                               options,
-                                                               NULL );
+                                                               _indexes[i].options,
+                                                               &unused );
             if ( !idxStatus.isOK() )
                 return idxStatus;
         }
         return Status::OK();
     }
 
-    Status MultiIndexBlock::commit() {
-        for ( size_t i = 0; i < _states.size(); i++ ) {
-            if ( _states[i].bulk == NULL )
+    Status MultiIndexBlock::doneInserting(std::set<DiskLoc>* dupsOut) {
+        for ( size_t i = 0; i < _indexes.size(); i++ ) {
+            if ( _indexes[i].bulk == NULL )
                 continue;
-            Status status = _states[i].real->commitBulk( _states[i].bulk,
-                                                         false,
-                                                         NULL );
-            if ( !status.isOK() )
+            LOG(1) << "\t bulk commit starting for index: "
+                   << _indexes[i].block->getEntry()->descriptor()->indexName();
+            Status status = _indexes[i].real->commitBulk( _indexes[i].bulk.get(),
+                                                          _allowInterruption,
+                                                          _indexes[i].options.dupsAllowed,
+                                                          dupsOut );
+            if ( !status.isOK() ) {
                 return status;
-        }
-
-        for ( size_t i = 0; i < _states.size(); i++ ) {
-            _states[i].block->success();
+            }
         }
 
         return Status::OK();
+    }
+
+    void MultiIndexBlock::abortWithoutCleanup() {
+        for ( size_t i = 0; i < _indexes.size(); i++ ) {
+            _indexes[i].block->abortWithoutCleanup();
+        }
+        _indexes.clear();
+        _needToCleanup = false;
+    }
+
+    void MultiIndexBlock::commit() {
+        for ( size_t i = 0; i < _indexes.size(); i++ ) {
+            _indexes[i].block->success();
+        }
+
+        // this one is so operations examining the list of indexes know that the index is finished
+        _collection->infoCache()->addedIndex();
+
+        _txn->recoveryUnit()->registerChange(new SetNeedToCleanupOnRollback(this));
+        _needToCleanup = false;
     }
 
 }  // namespace mongo

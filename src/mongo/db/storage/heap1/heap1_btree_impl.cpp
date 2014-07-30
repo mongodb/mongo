@@ -85,16 +85,8 @@ namespace {
         Heap1BtreeBuilderImpl(IndexSet* data, long long* currentKeySize, bool dupsAllowed)
                 : _data(data),
                   _currentKeySize( currentKeySize ),
-                  _dupsAllowed(dupsAllowed),
-                  _committed(false) {
+                  _dupsAllowed(dupsAllowed) {
             invariant(_data->empty());
-        }
-
-        ~Heap1BtreeBuilderImpl() {
-            if (!_committed) {
-                _data->clear();
-                *_currentKeySize = 0;
-            }
         }
 
         Status addKey(const BSONObj& key, const DiskLoc& loc) {
@@ -120,16 +112,10 @@ namespace {
             return Status::OK();
         }
 
-        unsigned long long commit(bool mayInterrupt) {
-            _committed = true;
-            return _data->size();
-        }
-
     private:
         IndexSet* const _data;
         long long* _currentKeySize;
         const bool _dupsAllowed;
-        bool _committed;
     };
 
     class Heap1BtreeImpl : public SortedDataInterface {

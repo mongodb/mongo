@@ -53,18 +53,6 @@ namespace mongo {
 
     typedef boost::filesystem::path Path;
 
-    // TODO SERVER-4328
-    bool inDBRepair = false;
-    struct doingRepair {
-        doingRepair() {
-            verify( ! inDBRepair );
-            inDBRepair = true;
-        }
-        ~doingRepair() {
-            inDBRepair = false;
-        }
-    };
-
     // inheritable class to implement an operation that may be applied to all
     // files in a database using _applyOpToDataFiles()
     class FileOp {
@@ -285,7 +273,6 @@ namespace mongo {
         invariant( dbName.find( '.' ) == string::npos );
 
         scoped_ptr<RepairFileDeleter> repairFileDeleter;
-        doingRepair dr;
 
         log() << "repairDatabase " << dbName << endl;
 
@@ -386,7 +373,9 @@ namespace mongo {
                 Collection* tempCollection = NULL;
                 {
                     Client::Context tempContext(txn, ns, tempDatabase );
-                    tempCollection = tempDatabase->createCollection( txn, ns, options, true, false );
+                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    tempCollection = tempDatabase->createCollection(txn, ns, options, true, false);
+                    wunit.commit();
                 }
 
                 Client::Context readContext(txn, ns, originalDatabase);
@@ -395,7 +384,8 @@ namespace mongo {
 
                 // data
 
-                MultiIndexBlock indexBlock(txn, tempCollection );
+                // TODO SERVER-14812 add a mode that drops duplicates rather than failing
+                MultiIndexBlock indexer(txn, tempCollection );
                 {
                     vector<BSONObj> indexes;
                     IndexCatalog::IndexIterator ii =
@@ -406,10 +396,9 @@ namespace mongo {
                     }
 
                     Client::Context tempContext(txn, ns, tempDatabase);
-                    Status status = indexBlock.init( indexes );
+                    Status status = indexer.init( indexes );
                     if ( !status.isOK() )
                         return status;
-
                 }
 
                 scoped_ptr<RecordIterator> iterator(
@@ -422,19 +411,28 @@ namespace mongo {
                     BSONObj doc = originalCollection->docFor( loc );
 
                     Client::Context tempContext(txn, ns, tempDatabase);
-                    StatusWith<DiskLoc> result = tempCollection->insertDocument( txn, doc, indexBlock );
+                    
+                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    StatusWith<DiskLoc> result = tempCollection->insertDocument(txn,
+                                                                                doc,
+                                                                                &indexer,
+                                                                                false);
                     if ( !result.isOK() )
                         return result.getStatus();
 
-                    txn->recoveryUnit()->commitIfNeeded();
+                    wunit.commit();
                     txn->checkForInterrupt(false);
                 }
+                
+                Status status = indexer.doneInserting();
+                if (!status.isOK())
+                    return status;
 
                 {
                     Client::Context tempContext(txn, ns, tempDatabase);
-                    Status status = indexBlock.commit();
-                    if ( !status.isOK() )
-                        return status;
+                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    indexer.commit();
+                    wunit.commit();
                 }
 
             }

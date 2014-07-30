@@ -153,7 +153,7 @@ namespace mongo {
         fassertFailed(17198);
     }
 
-    Status IndexCatalog::_checkUnfinished() const {
+    Status IndexCatalog::checkUnfinished() const {
         if ( _unfinishedIndexes.size() == 0 )
             return Status::OK();
 
@@ -272,14 +272,40 @@ namespace mongo {
         return StatusWith<BSONObj>( fixed );
     }
 
-    Status IndexCatalog::createIndex( OperationContext* txn,
-                                      BSONObj spec,
-                                      bool mayInterrupt,
-                                      ShutdownBehavior shutdownBehavior ) {
+namespace {
+    class IndexCleanupOnRollback : public RecoveryUnit::Change {
+    public:
+        /**
+         * None of these pointers are owned by this class.
+         */
+        IndexCleanupOnRollback(Collection* collection,
+                               IndexCatalogEntryContainer* entries,
+                               const IndexDescriptor* desc)
+            : _collection(collection),
+              _entries(entries),
+              _desc(desc) {
+        }
+
+        virtual void commit() {}
+
+        virtual void rollback() {
+            _entries->remove(_desc);
+            _collection->infoCache()->reset();
+        }
+
+    private:
+        Collection* _collection;
+        IndexCatalogEntryContainer* _entries;
+        const IndexDescriptor* _desc;
+    };
+} // namespace
+
+    Status IndexCatalog::createIndexOnEmptyCollection(OperationContext* txn, BSONObj spec) {
         txn->lockState()->assertWriteLocked( _collection->_database->name() );
+        invariant(_collection->numRecords() == 0);
 
         _checkMagic();
-        Status status = _checkUnfinished();
+        Status status = checkUnfinished();
         if ( !status.isOK() )
             return status;
 
@@ -307,55 +333,21 @@ namespace mongo {
         invariant( entry );
         IndexDescriptor* descriptor = entry->descriptor();
         invariant( descriptor );
-
-        string idxName = descriptor->indexName(); // out copy for yields, etc...
-
         invariant( entry == _entries.find( descriptor ) );
 
-        try {
-            Client& client = cc();
+        status = entry->accessMethod()->initializeAsEmpty(txn);
+        if (!status.isOK())
+            return status;
 
-            _inProgressIndexes[descriptor] = &client;
+        txn->recoveryUnit()->registerChange(new IndexCleanupOnRollback(_collection,
+                                                                       &_entries,
+                                                                       entry->descriptor()));
+        indexBuildBlock.success();
 
-            // buildAnIndex can yield.  During a yield, the Collection that owns this
-            // IndexCatalog can be dropped, which means both the Collection and IndexCatalog
-            // can be destructed out from under us.  The runner used by the index build will
-            // throw a particular exception when it detects that this occurred.
-            buildAnIndex( txn, _collection, entry, mayInterrupt );
-            indexBuildBlock.success();
+        // sanity check
+        invariant(_collection->getCatalogEntry()->isIndexReady(descriptor->indexName()));
 
-            InProgressIndexesMap::iterator it = _inProgressIndexes.find(descriptor);
-            _inProgressIndexes.erase(it);
-
-            // sanity check
-            invariant( _collection->getCatalogEntry()->isIndexReady( idxName ) );
-
-            return Status::OK();
-        }
-        catch ( const AssertionException& exc ) {
-            // At this point, *this may have been destructed, if we dropped the collection
-            // while we were yielding.  indexBuildBlock will not touch an invalid _collection
-            // pointer if you call abort() on it.
-
-            log() << "index build failed." << " spec: " << spec << " error: " << exc;
-
-            if ( shutdownBehavior == SHUTDOWN_LEAVE_DIRTY &&
-                 exc.getCode() == ErrorCodes::InterruptedAtShutdown ) {
-                indexBuildBlock.abort();
-            }
-            else if ( exc.getCode() == ErrorCodes::CursorNotFound ) {
-                // The cursor was killed because the collection was dropped. No need to clean up.
-                indexBuildBlock.abort();
-            }
-            else {
-                indexBuildBlock.fail();
-
-                InProgressIndexesMap::iterator it = _inProgressIndexes.find(descriptor);
-                _inProgressIndexes.erase(it);            
-            }
-
-            return exc.toStatus();
-        }
+        return Status::OK();
     }
 
     IndexCatalog::IndexBuildBlock::IndexBuildBlock(OperationContext* txn,
@@ -420,24 +412,14 @@ namespace mongo {
     }
 
     void IndexCatalog::IndexBuildBlock::fail() {
-        if ( !_inProgress ) {
-            // taken care of already when success() is called
-            return;
-        }
-
-        Client::Context context( _txn,
-                                 _collection->ns().ns(),
-                                 _collection->_database );
-
-        // if we're here, the index build failed or was interrupted
-
-        _inProgress = false; // defensive
-        fassert( 17204, _catalog->_collection->ok() ); // defensive
-
-        IndexCatalogEntry* entry = _catalog->_entries.find( _indexName );
-        invariant( entry == _entry );
-
         try {
+            fassert( 17204, _catalog->_collection->ok() ); // defensive
+
+            _inProgress = false;
+
+            IndexCatalogEntry* entry = _catalog->_entries.find( _indexName );
+            invariant( entry == _entry );
+
             if ( entry ) {
                 _catalog->_dropIndex(_txn, entry);
             }
@@ -451,15 +433,13 @@ namespace mongo {
             error() << "exception while cleaning up in-progress index build: " << exc.what();
             fassertFailedWithStatus(17493, exc.toStatus());
         }
-
     }
 
-    void IndexCatalog::IndexBuildBlock::abort() {
+    void IndexCatalog::IndexBuildBlock::abortWithoutCleanup() {
         _inProgress = false;
     }
 
     void IndexCatalog::IndexBuildBlock::success() {
-
         fassert( 17206, _inProgress );
         _inProgress = false;
 
@@ -475,7 +455,6 @@ namespace mongo {
         fassert( 17331, entry && entry == _entry );
 
         entry->setIsReady( true );
-
     }
 
 
@@ -624,24 +603,14 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status IndexCatalog::ensureHaveIdIndex(OperationContext* txn) {
-        if ( haveIdIndex() )
-            return Status::OK();
-
+    BSONObj IndexCatalog::getDefaultIdIndexSpec() const {
         dassert( _idObj["_id"].type() == NumberInt );
 
         BSONObjBuilder b;
         b.append( "name", "_id_" );
         b.append( "ns", _collection->ns().ns() );
         b.append( "key", _idObj );
-        BSONObj o = b.done();
-
-        Status s = createIndex(txn, o, false);
-        if ( s.isOK() || s.code() == ErrorCodes::IndexAlreadyExists ) {
-            return Status::OK();
-        }
-
-        return s;
+        return b.obj();
     }
 
     Status IndexCatalog::dropAllIndexes(OperationContext* txn,
@@ -747,7 +716,7 @@ namespace mongo {
             return Status( ErrorCodes::BadValue, "IndexCatalog::_dropIndex passed NULL" );
 
         _checkMagic();
-        Status status = _checkUnfinished();
+        Status status = checkUnfinished();
         if ( !status.isOK() )
             return status;
 
@@ -1147,12 +1116,12 @@ namespace mongo {
                 if ( s == "_id" ) {
                     // skip
                 }
+                else if ( s == "dropDup" ) {
+                    // dropDups is silently ignored and removed from the spec as of SERVER-14710.
+                }
                 else if ( s == "v" || s == "unique" ||
                           s == "key" || s == "name" ) {
                     // covered above
-                }
-                else if ( s == "key" ) {
-                    b.append( "key", fixIndexKey( e.Obj() ) );
                 }
                 else {
                     b.append(e);
@@ -1163,39 +1132,10 @@ namespace mongo {
         return b.obj();
     }
 
-    std::vector<BSONObj> 
-    IndexCatalog::killMatchingIndexBuilds(const IndexCatalog::IndexKillCriteria& criteria) {
-        std::vector<BSONObj> indexes;
-        for (InProgressIndexesMap::iterator it = _inProgressIndexes.begin();
-             it != _inProgressIndexes.end();
-             it++) {
-            // check criteria
-            IndexDescriptor* desc = it->first;
-            Client* client = it->second;
-            if (!criteria.ns.empty() && (desc->parentNS() != criteria.ns)) {
-                continue;
-            }
-            if (!criteria.name.empty() && (desc->indexName() != criteria.name)) {
-                continue;
-            }
-            if (!criteria.key.isEmpty() && (desc->keyPattern() != criteria.key)) {
-                continue;
-            }
-            indexes.push_back(desc->keyPattern());
-            CurOp* op = client->curop();
-            log() << "halting index build: " << desc->keyPattern();
-            // Note that we can only be here if the background index build in question is
-            // yielding.  The bg index code is set up specially to check for interrupt
-            // immediately after it recovers from yield, such that no further work is done
-            // on the index build.  Thus this thread does not have to synchronize with the
-            // bg index operation; we can just assume that it is safe to proceed.
-            getGlobalEnvironment()->killOperation(op->opNum());
-        }
-
-        if (indexes.size() > 0) {
-            log() << "halted " << indexes.size() << " index build(s)" << endl;
-        }
-
-        return indexes;
+    std::vector<BSONObj> IndexCatalog::killMatchingIndexBuilds(
+            const IndexCatalog::IndexKillCriteria& criteria) {
+        // This is just a no-op stub. When SERVER-14860 is resolved, this will either be filled out
+        // or removed entirely.
+        return std::vector<BSONObj>();
     }
 }

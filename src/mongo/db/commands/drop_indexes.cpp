@@ -32,6 +32,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <string>
+#include <vector>
+
 #include "mongo/db/background.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index_builder.h"
@@ -41,6 +44,7 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/operation_context_impl.h"
@@ -234,7 +238,6 @@ namespace mongo {
             LOG(0) << "CMD: reIndex " << toDeleteNs << endl;
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            WriteUnitOfWork wunit(txn->recoveryUnit());
             Client::Context ctx(txn, toDeleteNs);
 
             Collection* collection = ctx.db()->getCollection( txn, toDeleteNs );
@@ -255,31 +258,53 @@ namespace mongo {
                 for ( size_t i = 0; i < indexNames.size(); i++ ) {
                     const string& name = indexNames[i];
                     BSONObj spec = collection->getCatalogEntry()->getIndexSpec( name );
-                    all.push_back( spec.getOwned() );
+                    all.push_back(spec.removeField("v").getOwned());
+
+                    const BSONObj key = spec.getObjectField("key");
+                    const Status keyStatus = validateKeyPattern(key);
+                    if (!keyStatus.isOK()) {
+                        errmsg = str::stream()
+                            << "Cannot rebuild index " << spec << ": " << keyStatus.reason()
+                            << " For more info see http://dochub.mongodb.org/core/index-validation";
+                        return false;
+                    }
                 }
             }
 
             result.appendNumber( "nIndexesWas", all.size() );
 
-            Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
-            if ( !s.isOK() ) {
-                errmsg = "dropIndexes failed";
-                return appendCommandStatus( result, s );
+            {
+                WriteUnitOfWork wunit(txn->recoveryUnit());
+                Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
+                if ( !s.isOK() ) {
+                    errmsg = "dropIndexes failed";
+                    return appendCommandStatus( result, s );
+                }
+                wunit.commit();
             }
 
-            for ( size_t i = 0; i < all.size(); i++ ) {
-                BSONObj o = all[i];
-                LOG(1) << "reIndex ns: " << toDeleteNs << " index: " << o << endl;
-                Status s = collection->getIndexCatalog()->createIndex(txn, o, false);
-                if ( !s.isOK() )
-                    return appendCommandStatus( result, s );
+            MultiIndexBlock indexer(txn, collection);
+            indexer.allowBackgroundBuilding();
+            // do not want interruption as that will leave us without indexes.
+
+            Status status = indexer.init(all);
+            if (!status.isOK())
+                return appendCommandStatus( result, status );
+
+            status = indexer.insertAllDocumentsInCollection();
+            if (!status.isOK())
+                return appendCommandStatus( result, status );
+
+            {
+                WriteUnitOfWork wunit(txn->recoveryUnit());
+                indexer.commit();
+                wunit.commit();
             }
 
             result.append( "nIndexes", (int)all.size() );
             result.append( "indexes", all );
 
             IndexBuilder::restoreIndexes(indexesInProg);
-            wunit.commit();
             return true;
         }
     } cmdReIndex;

@@ -83,7 +83,8 @@ namespace ReplTests {
                 c = ctx.ctx().db()->createCollection(&_txn, ns());
             }
 
-            c->getIndexCatalog()->ensureHaveIdIndex(&_txn);
+            ASSERT(c->getIndexCatalog()->haveIdIndex());
+            ctx.commit();
         }
         ~Base() {
             try {

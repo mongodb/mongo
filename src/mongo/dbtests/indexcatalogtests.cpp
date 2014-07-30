@@ -18,6 +18,7 @@
 
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
@@ -54,17 +55,8 @@ namespace IndexCatalogTests {
 
             int numFinishedIndexesStart = _catalog->numIndexesReady();
 
-            BSONObjBuilder b1;
-            b1.append("key", BSON("x" << 1));
-            b1.append("ns", _ns);
-            b1.append("name", "_x_0");
-            _catalog->createIndex(&txn, b1.obj(), true);
-
-            BSONObjBuilder b2;
-            b2.append("key", BSON("y" << 1));
-            b2.append("ns", _ns);
-            b2.append("name", "_y_0");
-            _catalog->createIndex(&txn, b2.obj(), true);
+            Helpers::ensureIndex(&txn, _coll, BSON("x" << 1), false, "_x_0");
+            Helpers::ensureIndex(&txn, _coll, BSON("y" << 1), false, "_y_0");
 
             ASSERT_TRUE(_catalog->numIndexesReady() == numFinishedIndexesStart+2);
 

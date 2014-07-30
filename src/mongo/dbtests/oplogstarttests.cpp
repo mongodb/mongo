@@ -44,7 +44,7 @@ namespace OplogStartTests {
             if (!c) {
                 c = _context.db()->createCollection(&_txn, ns());
             }
-            c->getIndexCatalog()->ensureHaveIdIndex(&_txn);
+            ASSERT(c->getIndexCatalog()->haveIdIndex());
         }
 
         ~Base() {

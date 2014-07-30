@@ -33,8 +33,6 @@
 #include "mongo/db/index/btree_based_bulk_access_method.h"
 
 #include "mongo/db/curop.h"
-#include "mongo/db/pdfile_private.h"  // This is for inDBRepair.
-#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
@@ -117,18 +115,9 @@ namespace mongo {
     }
 
     Status BtreeBasedBulkAccessMethod::commit(set<DiskLoc>* dupsToDrop,
-                                              bool mayInterrupt) {
-        if (_isMultiKey) {
-            _real->_btreeState->setMultikey( _txn );
-        }
-
+                                              bool mayInterrupt,
+                                              bool dupsAllowed) {
         Timer timer;
-        IndexCatalogEntry* entry = _real->_btreeState;
-
-        bool dupsAllowed = !entry->descriptor()->unique() ||
-            repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(entry->descriptor());
-
-        bool dropDups = entry->descriptor()->dropDups() || inDBRepair;
 
         scoped_ptr<BSONObjExternalSorter::Iterator> i(_sorter->done());
 
@@ -140,11 +129,22 @@ namespace mongo {
 
         scoped_ptr<SortedDataBuilderInterface> builder;
 
-        builder.reset(_interface->getBulkBuilder(_txn, dupsAllowed));
+        {
+            WriteUnitOfWork wunit(_txn->recoveryUnit());
+
+            if (_isMultiKey) {
+                _real->_btreeState->setMultikey( _txn );
+            }
+
+            builder.reset(_interface->getBulkBuilder(_txn, dupsAllowed));
+            wunit.commit();
+        }
 
         while (i->more()) {
             if (mayInterrupt)
                 _txn->checkForInterrupt(/*heedMutex*/ false);
+
+            WriteUnitOfWork wunit(_txn->recoveryUnit());
 
             // Get the next datum and add it to the builder.
             BSONObjExternalSorter::Data d = i->next();
@@ -155,23 +155,21 @@ namespace mongo {
                     return status;
                 }
 
+                invariant(!dupsAllowed); // shouldn't be getting DupKey errors if dupsAllowed.
+
                 // If we're here it's a duplicate key.
-                if (dropDups) {
-                    static const size_t kMaxDupsToStore = 1000000;
+                if (dupsToDrop) {
                     dupsToDrop->insert(d.second);
-                    if (dupsToDrop->size() > kMaxDupsToStore) {
-                        return Status(ErrorCodes::InternalError,
-                                      "Too many dups on index build with dropDups = true");
-                    }
+                    continue;
                 }
-                else if (!dupsAllowed) {
-                    return status;
-                }
+
+                return status;
             }
 
             // If we're here either it's a dup and we're cool with it or the addKey went just
             // fine.
             pm.hit();
+            wunit.commit();
         }
 
         pm.finished();
@@ -181,12 +179,7 @@ namespace mongo {
 
         LOG(timer.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit";
 
-        unsigned long long keysCommit = builder->commit(mayInterrupt);
-
-        if (!dropDups && (keysCommit != _keysInserted)) {
-            warning() << "not all entries were added to the index, probably some "
-                      << "keys were too large" << endl;
-        }
+        builder->commit(mayInterrupt);
         return Status::OK();
     }
 

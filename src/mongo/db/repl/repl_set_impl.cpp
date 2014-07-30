@@ -470,7 +470,6 @@ namespace {
     void ReplSetImpl::_go() {
         OperationContextImpl txn;
 
-        indexRebuilder.wait();
         try {
             loadLastOpTimeWritten(&txn);
         }

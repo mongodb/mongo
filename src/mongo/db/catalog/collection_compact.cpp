@@ -84,11 +84,7 @@ namespace mongo {
             }
 
             virtual void inserted( const RecordData& recData, const DiskLoc& newLocation ) {
-                InsertDeleteOptions options;
-                options.logIfError = false;
-                options.dupsAllowed = true; // in compact we should be doing no checking
-
-                _multiIndexBlock->insert( recData.toBson(), newLocation, options );
+                _multiIndexBlock->insert( recData.toBson(), newLocation );
             }
 
         private:
@@ -148,19 +144,28 @@ namespace mongo {
 
         CompactStats stats;
 
-        MultiIndexBlock multiIndexBlock(txn, this);
-        status = multiIndexBlock.init( indexSpecs );
+        MultiIndexBlock indexer(txn, this);
+        indexer.allowInterruption();
+        indexer.ignoreUniqueConstraint(); // in compact we should be doing no checking
+
+        status = indexer.init( indexSpecs );
         if ( !status.isOK() )
             return StatusWith<CompactStats>( status );
 
-        MyCompactAdaptor adaptor(this, &multiIndexBlock);
+        MyCompactAdaptor adaptor(this, &indexer);
 
         _recordStore->compact( txn, &adaptor, compactOptions, &stats );
 
         log() << "starting index commits";
-        status = multiIndexBlock.commit();
+        status = indexer.doneInserting();
         if ( !status.isOK() )
             return StatusWith<CompactStats>( status );
+
+        {
+            WriteUnitOfWork wunit(txn->recoveryUnit());
+            indexer.commit();
+            wunit.commit();
+        }
 
         return StatusWith<CompactStats>( stats );
     }
