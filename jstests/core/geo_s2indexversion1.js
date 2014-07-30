@@ -71,7 +71,7 @@ coll.drop();
 
 res = coll.ensureIndex({geo: "2dsphere"});
 assert.commandWorked(res);
-var specObj = coll.getDB().system.indexes.findOne({ns: coll.getFullName(), name: "geo_2dsphere"});
+var specObj = coll.getIndexes().filter( function(z){ return z.name == "geo_2dsphere"; } )[0];
 assert.eq(2, specObj["2dsphereIndexVersion"]);
 coll.drop();
 

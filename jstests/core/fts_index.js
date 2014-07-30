@@ -15,22 +15,22 @@ coll.getDB().createCollection(coll.getName());
 
 // Spec passes text-specific index validation.
 assert.commandWorked(coll.ensureIndex({a: "text"}, {name: indexName, default_language: "spanish"}));
-assert.eq(1, coll.getDB().system.indexes.count({ns: coll.getFullName(), name: indexName}));
+assert.eq( 1, coll.getIndexes().filter( function(z){ return z.name == indexName; } ).length );
 coll.dropIndexes();
 
 // Spec fails text-specific index validation ("spanglish" unrecognized).
 assert.commandFailed(coll.ensureIndex({a: "text"}, {name: indexName, default_language: "spanglish"}));
-assert.eq(0, coll.system.indexes.count({ns: coll.getFullName(), name: indexName}));
+assert.eq( 0, coll.getIndexes().filter( function(z){ return z.name == indexName; } ).length );
 coll.dropIndexes();
 
 // Spec passes general index validation.
 assert.commandWorked(coll.ensureIndex({"$**": "text"}, {name: indexName}));
-assert.eq(1, coll.getDB().system.indexes.count({ns: coll.getFullName(), name: indexName}));
+assert.eq( 1, coll.getIndexes().filter( function(z){ return z.name == indexName; } ).length );
 coll.dropIndexes();
 
 // Spec fails general index validation ("a.$**" invalid field name for key).
 assert.commandFailed(coll.ensureIndex({"a.$**": "text"}, {name: indexName}));
-assert.eq(0, coll.getDB().system.indexes.count({ns: coll.getFullName(), name: indexName}));
+assert.eq( 0, coll.getIndexes().filter( function(z){ return z.name == indexName; } ).length );
 coll.dropIndexes();
 
 //
