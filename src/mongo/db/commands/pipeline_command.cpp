@@ -38,7 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -51,126 +51,6 @@
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
-
-namespace {
-
-    /**
-     * Stage for pulling results out from an aggregation pipeline.
-     *
-     * XXX: move this stage to the exec/ directory.
-     */
-    class PipelineProxyStage : public PlanStage {
-    public:
-        PipelineProxyStage(intrusive_ptr<Pipeline> pipeline,
-                           const boost::shared_ptr<PlanExecutor>& child,
-                           WorkingSet* ws)
-            : _pipeline(pipeline)
-            , _includeMetaData(_pipeline->getContext()->inShard) // send metadata to merger
-            , _childExec(child)
-            , _ws(ws)
-        {}
-
-        virtual StageState work(WorkingSetID* out) {
-            if (!out) {
-                return PlanStage::FAILURE;
-            }
-
-            if (!_stash.empty()) {
-                *out = _ws->allocate();
-                WorkingSetMember* member = _ws->get(*out);
-                member->obj = _stash.back();
-                _stash.pop_back();
-                member->state = WorkingSetMember::OWNED_OBJ;
-                return PlanStage::ADVANCED;
-            }
-
-            if (boost::optional<BSONObj> next = getNextBson()) {
-                *out = _ws->allocate();
-                WorkingSetMember* member = _ws->get(*out);
-                member->obj = *next;
-                member->state = WorkingSetMember::OWNED_OBJ;
-                return PlanStage::ADVANCED;
-            }
-
-            return PlanStage::IS_EOF;
-        }
-
-        virtual bool isEOF() {
-            if (!_stash.empty())
-                return false;
-
-            if (boost::optional<BSONObj> next = getNextBson()) {
-                _stash.push_back(*next);
-                return false;
-            }
-
-            return true;
-        }
-
-        // propagate to child executor if still in use
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type) {
-            if (boost::shared_ptr<PlanExecutor> exec = _childExec.lock()) {
-                exec->invalidate(dl, type);
-            }
-        }
-
-        // Manage our OperationContext. We intentionally don't propagate to the child
-        // Runner as that is handled by DocumentSourceCursor as it needs to.
-        virtual void saveState() {
-            _pipeline->getContext()->opCtx = NULL;
-        }
-        virtual void restoreState(OperationContext* opCtx) {
-            _pipeline->getContext()->opCtx = opCtx;
-        }
-
-        /**
-         * Make obj the next object returned by getNext().
-         */
-        void pushBack(const BSONObj& obj) {
-            _stash.push_back(obj);
-        }
-
-        //
-        // These should not be used.
-        //
-
-        virtual PlanStageStats* getStats() { return NULL; }
-        virtual CommonStats* getCommonStats() { return NULL; }
-        virtual SpecificStats* getSpecificStats() { return NULL; }
-
-        // Not used.
-        virtual std::vector<PlanStage*> getChildren() const {
-            vector<PlanStage*> empty;
-            return empty;
-        }
-
-        // Not used.
-        virtual StageType stageType() const { return STAGE_PIPELINE_PROXY; }
-
-    private:
-        boost::optional<BSONObj> getNextBson() {
-            if (boost::optional<Document> next = _pipeline->output()->getNext()) {
-                if (_includeMetaData) {
-                    return next->toBsonWithMetaData();
-                }
-                else {
-                    return next->toBson();
-                }
-            }
-
-            return boost::none;
-        }
-
-        // Things in the _stash sould be returned before pulling items from _pipeline.
-        const intrusive_ptr<Pipeline> _pipeline;
-        vector<BSONObj> _stash;
-        const bool _includeMetaData;
-        boost::weak_ptr<PlanExecutor> _childExec;
-
-        // Not owned by us.
-        WorkingSet* _ws;
-    };
-}
 
     static bool isCursorCommand(BSONObj cmdObj) {
         BSONElement cursorElem = cmdObj["cursor"];
