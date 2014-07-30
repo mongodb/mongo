@@ -338,9 +338,7 @@ void processMessage( Connection& c , Message& m ) {
             break;
         }
         case mongo::dbKillCursors: {
-            int *x = (int *) m.singleData()->_data;
-            x++; // reserved
-            int n = *x;
+            int n = d.pullInt();
             out() << "\tkillCursors n: " << n << endl;
             break;
         }
@@ -366,7 +364,7 @@ void processMessage( Connection& c , Message& m ) {
                 if ( m.operation() == mongo::dbGetMore ) {
                     DbMessage d( m );
                     d.pullInt();
-                    long long &cId = d.pullInt64();
+                    long long cId = d.pullInt64();
                     cId = mapCursor[ c ][ cId ];
                 }
                 Message response;
