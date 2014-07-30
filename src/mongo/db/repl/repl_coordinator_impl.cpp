@@ -475,8 +475,21 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
-        // TODO
-        return Status::OK();
+        Status result(ErrorCodes::InternalError, "didn't set status in prepareFreezeResponse");
+        CBHStatus cbh = _replExecutor->scheduleWork(
+            stdx::bind(&TopologyCoordinator::prepareFreezeResponse,
+                       _topCoord.get(),
+                       stdx::placeholders::_1,
+                       Date_t(curTimeMillis64()),
+                       secs,
+                       resultObj,
+                       &result));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+        }
+        fassert(18641, cbh.getStatus());
+        _replExecutor->wait(cbh.getValue());
+        return result;
     }
 
     Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& args,

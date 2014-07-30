@@ -467,6 +467,7 @@ namespace {
     }
 
     // TODO(spencer): Unit test processReplSetGetStatus
+    // TODO(spencer): Unit test replSetFreeze
 
 }  // namespace
 }  // namespace repl

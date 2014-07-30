@@ -1022,19 +1022,25 @@ namespace repl {
         */
         *result = Status::OK();
     }
-    void TopologyCoordinatorImpl::prepareFreezeResponse(Date_t now,
-                                                        const BSONObj& cmdObj,
-                                                        BSONObjBuilder& result) {
-        int secs = cmdObj.firstElement().numberInt();
+    void TopologyCoordinatorImpl::prepareFreezeResponse(
+            const ReplicationExecutor::CallbackData& data,
+            Date_t now,
+            int secs,
+            BSONObjBuilder* response,
+            Status* result) {
+        if (data.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
 
         if (secs == 0) {
             _stepDownUntil = now;
             log() << "replSet info 'unfreezing'";
-            result.append("info","unfreezing");
+            response->append("info", "unfreezing");
         }
         else {
             if ( secs == 1 )
-                result.append("warning", "you really want to freeze for only 1 second?");
+                response->append("warning", "you really want to freeze for only 1 second?");
 
             if (_memberState != MemberState::RS_PRIMARY) {
                 _stepDownUntil = now + secs;
@@ -1044,6 +1050,7 @@ namespace repl {
                 log() << "replSet info received freeze command but we are primary";
             }
         }
+        *result = Status::OK();
     }
 
     // This function installs a new config object and recreates MemberHeartbeatData objects 

@@ -134,9 +134,11 @@ namespace repl {
                                            Status* result) = 0;
 
         // produce a reply to a freeze request
-        virtual void prepareFreezeResponse(Date_t now,
-                                           const BSONObj& cmdObj,
-                                           BSONObjBuilder& result) = 0;
+        virtual void prepareFreezeResponse(const ReplicationExecutor::CallbackData& data,
+                                           Date_t now,
+                                           int secs,
+                                           BSONObjBuilder* response,
+                                           Status* result) = 0;
 
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn) = 0;

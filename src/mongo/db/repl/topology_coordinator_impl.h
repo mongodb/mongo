@@ -107,9 +107,11 @@ namespace repl {
                                            Status* result);
 
         // produces a reply to a freeze request
-        virtual void prepareFreezeResponse(Date_t now,
-                                           const BSONObj& cmdObj,
-                                           BSONObjBuilder& result);
+        virtual void prepareFreezeResponse(const ReplicationExecutor::CallbackData& data,
+                                           Date_t now,
+                                           int secs,
+                                           BSONObjBuilder* response,
+                                           Status* result);
 
         // transitions PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn);
@@ -144,7 +146,7 @@ namespace repl {
         // Scans the electable set and returns the highest priority member index
         int _getHighestPriorityElectableIndex() const;
 
-        // Changes _memberState to newMemberState, then calls all registered callbacks 
+        // Changes _memberState to newMemberState, then calls all registered callbacks
         // for state changes.
         void _changeMemberState(const MemberState& newMemberState);
 
