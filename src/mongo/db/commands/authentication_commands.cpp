@@ -346,7 +346,7 @@ namespace mongo {
                           "There is no x.509 client certificate matching the user.");
         }
         else {
-            std::string srvSubjectName = getSSLManager()->getServerSubjectName();
+            std::string srvSubjectName = getSSLManager()->getSSLConfiguration().serverSubjectName;
  
             // Handle internal cluster member auth, only applies to server-server connections
             if (_clusterIdMatch(subjectName, srvSubjectName)) {

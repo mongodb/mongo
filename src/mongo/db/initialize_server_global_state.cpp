@@ -361,7 +361,7 @@ namespace mongo {
             setInternalUserAuthParams(BSON(saslCommandMechanismFieldName << "MONGODB-X509" <<
                                            saslCommandUserDBFieldName << "$external" <<
                                            saslCommandUserFieldName << 
-                                           getSSLManager()->getClientSubjectName()));
+                                           getSSLManager()->getSSLConfiguration().clientSubjectName));
         }
 #endif
         return true;
