@@ -89,40 +89,31 @@ namespace mongo {
 
         // load metadata
         std::string value;
+        bool metadataPresent = true;
         // XXX not using a Snapshot here
         if (!_db->Get( _readOptions(),
                        _metadataColumnFamily,
                        rocksdb::Slice("numRecords"),
                        &value ).ok()) {
             _numRecords = 0;
+            metadataPresent = false;
         }
-        else
-            _numRecords = *((long long *) value.data());
+        else {
+            memcpy( &_numRecords, value.data(), sizeof( long long ));
+        }
+
         // XXX not using a Snapshot here
         if (!_db->Get( _readOptions(),
                        _metadataColumnFamily,
                        rocksdb::Slice("dataSize"),
                        &value ).ok()) {
             _dataSize = 0;
+            invariant(!metadataPresent);
         }
         else {
             memcpy( &_dataSize, value.data(), sizeof( long long ));
             invariant( _dataSize >= 0 );
         }
-    }
-
-    RocksRecordStore::~RocksRecordStore() { }
-
-    long long RocksRecordStore::dataSize() const {
-        return _dataSize;
-    }
-
-    long long RocksRecordStore::numRecords() const {
-        return _numRecords;
-    }
-
-    bool RocksRecordStore::isCapped() const {
-        return _isCapped;
     }
 
     int64_t RocksRecordStore::storageSize( OperationContext* txn,
@@ -131,7 +122,7 @@ namespace mongo {
         uint64_t storageSize;
         rocksdb::Range wholeRange( _makeKey( minDiskLoc ), _makeKey( maxDiskLoc ) );
         _db->GetApproximateSizes( _columnFamily, &wholeRange, 0, &storageSize);
-        return dataSize(); // todo: this isn't very good
+        return static_cast<int64_t>( storageSize );
     }
 
     RecordData RocksRecordStore::dataFor( const DiskLoc& loc) const {
@@ -159,8 +150,7 @@ namespace mongo {
         _db->Get( _readOptions( txn ), _columnFamily, _makeKey( dl ), &oldValue );
         int oldLength = oldValue.size();
 
-        ru->writeBatch()->Delete( _columnFamily,
-                                  _makeKey( dl ) );
+        ru->writeBatch()->Delete( _columnFamily, _makeKey( dl ) );
 
         _changeNumRecords(txn, false);
         _increaseDataSize(txn, -oldLength);
@@ -180,13 +170,20 @@ namespace mongo {
     }
 
     void RocksRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
+        if (!cappedAndNeedDelete())
+            return;
         // This persistent iterator is necessary since you can't read your own writes
-        boost::scoped_ptr<rocksdb::Iterator> iter( _db->NewIterator( rocksdb::ReadOptions(),
+        boost::scoped_ptr<rocksdb::Iterator> iter( _db->NewIterator( _readOptions( txn ),
                                                                      _columnFamily ) );
         iter->SeekToFirst();
+
+        // XXX TODO there is a bug here where if the size of the write batch exceeds the cap size
+        // then iter will not be valid and it will crash. To fix this we need the ability to 
+        // query the write batch, and delete the oldest record in the write batch until the
+        // size of the write batch is less than the cap
         while ( cappedAndNeedDelete() ) {
             invariant(_numRecords > 0);
-            invariant (iter->Valid());
+            invariant(iter->Valid());
 
             rocksdb::Slice slice = iter->key();
             DiskLoc oldest = reinterpret_cast<const DiskLoc*>( slice.data() )[0];
@@ -275,10 +272,10 @@ namespace mongo {
         rocksdb::Status status;
         status = _db->Get( _readOptions( txn ), _columnFamily, key, &value );
 
-        if ( !status.ok() ) {
-            if ( status.IsNotFound() )
-                return Status( ErrorCodes::InternalError, "doc not found for update in place" );
 
+        if ( status.IsNotFound() )
+            return Status( ErrorCodes::InternalError, "doc not found for update in place" );
+        if ( !status.ok() ) {
             log() << "rocks Get failed, blowing up: " << status.ToString();
             invariant( false );
         }
@@ -345,7 +342,8 @@ namespace mongo {
     }
 
     Status RocksRecordStore::validate( OperationContext* txn,
-                                       bool full, bool scanData,
+                                       bool full, 
+                                       bool scanData,
                                        ValidateAdaptor* adaptor,
                                        ValidateResults* results,
                                        BSONObjBuilder* output ) const {
@@ -400,8 +398,9 @@ namespace mongo {
         else if ( optionName.compare("tailing") == 0 ) {
             _defaultReadOptions.tailing = option.boolean();
         }
-        else
+        else {
             return Status( ErrorCodes::BadValue, "Invalid Option" );
+        }
 
         return Status::OK();
     }
@@ -467,6 +466,7 @@ namespace mongo {
     DiskLoc RocksRecordStore::_nextId() {
         const uint64_t myId = _nextIdNum.fetchAndAdd(1);
         int a = myId >> 32;
+        // This masks the lowest 8 bytes of myId
         int ofs = myId & 0x00000000FFFFFFFF;
         DiskLoc loc( a, ofs );
         return loc;
@@ -491,8 +491,8 @@ namespace mongo {
             _numRecords--;
         }
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
-        char* nr_ptr = reinterpret_cast<char*>( &_numRecords );
-        std::string nr_key_string = "numRecords";
+        const char* nr_ptr = reinterpret_cast<char*>( &_numRecords );
+        const std::string nr_key_string = "numRecords";
 
         ru->writeBatch()->Put( _metadataColumnFamily,
                                rocksdb::Slice( nr_key_string ),
@@ -505,8 +505,8 @@ namespace mongo {
 
         _dataSize += amount;
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
-        char* ds_ptr = reinterpret_cast<char*>( &_dataSize );
-        std::string ds_key_string = "dataSize";
+        const char* ds_ptr = reinterpret_cast<char*>( &_dataSize );
+        const std::string ds_key_string = "dataSize";
 
         ru->writeBatch()->Put( _metadataColumnFamily,
                                rocksdb::Slice( ds_key_string ),
@@ -521,8 +521,7 @@ namespace mongo {
         : _rs( rs ),
           _dir( dir ),
           // XXX not using a snapshot here
-          _iterator( _rs->_db->NewIterator( rs->_readOptions(),
-                                            rs->_columnFamily ) ) {
+          _iterator( _rs->_db->NewIterator( rs->_readOptions(), rs->_columnFamily ) ) {
         _iterator->Seek( rs->_makeKey( start ) );
 
         if ( !_forward() && !_iterator->Valid() )

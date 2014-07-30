@@ -323,7 +323,7 @@ namespace mongo {
 
     rocksdb::ColumnFamilyOptions RocksEngine::_collectionOptions() const {
         rocksdb::ColumnFamilyOptions options;
-        options.comparator = RocksRecordStore::newRocksCollectionComparator( );
+        options.comparator = RocksRecordStore::newRocksCollectionComparator();
         return options;
     }
 
@@ -436,7 +436,6 @@ namespace mongo {
 
         // open all the metadata column families so that we can retrieve information about
         // each index, which is needed in order to open the index column families
-        rocksdb::DB* db = nullptr;
         vector<rocksdb::ColumnFamilyHandle*> metaDataHandles;
         rocksdb::DB* dbPtr;
         rocksdb::Status openROStatus = rocksdb::DB::OpenForReadOnly( dbOptions(),
@@ -477,8 +476,7 @@ namespace mongo {
             indexOrderings.insert( std::make_pair( indexName, order ) );
         }
 
-        // close the database
-        delete db;
+        _db.reset( NULL );
 
         return indexOrderings;
     }

@@ -82,7 +82,7 @@ namespace mongo {
          * by the bytes of a DiskLoc
          */
         IndexKeyEntry makeIndexKeyEntry( const rocksdb::Slice& slice ) {
-            BSONObj key = BSONObj(slice.data() ).getOwned();
+            BSONObj key = BSONObj( slice.data() ).getOwned();
             DiskLoc loc = reinterpret_cast<const DiskLoc*>( slice.data() + key.objsize() )[0];
             return IndexKeyEntry( key, loc );
         }
@@ -231,7 +231,7 @@ namespace mongo {
              */
             bool _locate( const BSONObj& key, const DiskLoc loc ) {
                 _isCached = false;
-                //assumes fieldNames already stripped if necessary
+                // assumes fieldNames already stripped if necessary 
                 string keyData = makeString( key, loc, false );
                 _iterator->Seek( keyData );
                 _checkStatus();
