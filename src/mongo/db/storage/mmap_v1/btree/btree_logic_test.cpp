@@ -1974,6 +1974,44 @@ namespace mongo {
         }
     };
 
+    template<class OnDiskFormat>
+    class LocateEmptyForward : public BtreeLogicTestBase<OnDiskFormat> {
+    public:
+        void run() {
+            OperationContextNoop txn;
+            this->_helper.btree.initAsEmpty(&txn);
+
+            BSONObj key1 = simpleKey('a');
+            this->insert(key1, this->_helper.dummyDiskLoc);
+            BSONObj key2 = simpleKey('b');
+            this->insert(key2, this->_helper.dummyDiskLoc);
+            BSONObj key3 = simpleKey('c');
+            this->insert(key3, this->_helper.dummyDiskLoc);
+
+            this->checkValidNumKeys(3);
+            this->locate(BSONObj(), 0, false, this->_helper.headManager.getHead(), 1);
+        }
+    };
+
+    template<class OnDiskFormat>
+    class LocateEmptyReverse : public BtreeLogicTestBase<OnDiskFormat> {
+    public:
+        void run() {
+            OperationContextNoop txn;
+            this->_helper.btree.initAsEmpty(&txn);
+
+            BSONObj key1 = simpleKey('a');
+            this->insert(key1, this->_helper.dummyDiskLoc);
+            BSONObj key2 = simpleKey('b');
+            this->insert(key2, this->_helper.dummyDiskLoc);
+            BSONObj key3 = simpleKey('c');
+            this->insert(key3, this->_helper.dummyDiskLoc);
+
+            this->checkValidNumKeys(3);
+            this->locate(BSONObj(), -1, false, DiskLoc(), -1);
+        }
+    };
+
     /* This test requires the entire server to be linked-in and it is better implemented using
        the JS framework. Disabling here and will put in jsCore.
 
@@ -2198,6 +2236,9 @@ namespace mongo {
             add< DelInternalReplacementNextNonNull<OnDiskFormat> >();
             add< DelInternalSplitPromoteLeft<OnDiskFormat> >();
             add< DelInternalSplitPromoteRight<OnDiskFormat> >();
+
+            add< LocateEmptyForward<OnDiskFormat> >();
+            add< LocateEmptyReverse<OnDiskFormat> >();
         }
     };
 
