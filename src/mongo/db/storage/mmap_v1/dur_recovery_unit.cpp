@@ -39,7 +39,7 @@
 #include "mongo/util/log.h"
 
 // Remove once we are ready to enable
-#define ROLLBACK_ENABLED 0
+#define ROLLBACK_ENABLED 1
 
 namespace mongo {
 

@@ -48,12 +48,20 @@ function checkDecreasing( i ) {
 for( i = 0 ;; ++i ) {
     debug( "capped 2: " + i );
     tzz.insert( val[ i ] );
-    if ( tzz.count() == 0 ) {
+    var err = db.getLastError();
+    if ( err ) {
+        debug(err);
+        debug(tzz.count());
     	assert( i > 100, "K" );
         break;
     }
     checkIncreasing( i );
 }
+
+// drop and recreate. Test used to rely on the last insert emptying the collection, which it no
+// longer does now that we rollback on failed inserts.
+tzz.drop();
+db._dbCommand( { create: "capped2", capped: true, size: 1000, $nExtents: 11, autoIndexId: false } );
 
 for( i = 600 ; i >= 0 ; --i ) {
     debug( "capped 2: " + i );
