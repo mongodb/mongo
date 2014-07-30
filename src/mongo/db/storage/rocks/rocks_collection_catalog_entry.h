@@ -126,15 +126,9 @@ namespace mongo {
         };
 
     private:
-        /**
-         * Currently, always returns an optional containing an initialized MetaData.
-         */
-        boost::optional<MetaData> _getMetaData() const;
+        MetaData _getMetaData() const;
 
-        /**
-         * Same as _getMetaData(), but must be called with _metaDataMutex acquired.
-         */
-        boost::optional<MetaData> _getMetaData_inlock() const;
+        MetaData _getMetaData_inlock() const;
 
         void _putMetaData_inlock( const MetaData& in );
 

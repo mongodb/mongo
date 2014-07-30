@@ -30,7 +30,6 @@
 
 #include "mongo/db/storage/rocks/rocks_collection_catalog_entry.h"
 
-#include <boost/optional.hpp>
 #include <rocksdb/db.h>
 
 #include "mongo/db/index/index_descriptor.h"
@@ -65,19 +64,17 @@ namespace mongo {
     // ------- indexes ----------
 
     int RocksCollectionCatalogEntry::getTotalIndexCount() const {
-        boost::optional<MetaData> md = _getMetaData();
-        invariant( md );
+        MetaData md = _getMetaData();
 
-        return static_cast<int>( md->indexes.size() );
+        return static_cast<int>( md.indexes.size() );
     }
 
     int RocksCollectionCatalogEntry::getCompletedIndexCount() const {
-        boost::optional<MetaData> md = _getMetaData();
-        invariant( md );
+        MetaData md = _getMetaData();
 
         int num = 0;
-        for ( unsigned i = 0; i < md->indexes.size(); i++ ) {
-            if ( md->indexes[i].ready )
+        for ( unsigned i = 0; i < md.indexes.size(); i++ ) {
+            if ( md.indexes[i].ready )
                 num++;
         }
         return num;
@@ -88,58 +85,57 @@ namespace mongo {
     }
 
     void RocksCollectionCatalogEntry::getAllIndexes( std::vector<std::string>* names ) const {
-        boost::optional<MetaData> md = _getMetaData();
-        invariant( md );
+        MetaData md = _getMetaData();
 
-        for ( unsigned i = 0; i < md->indexes.size(); i++ ) {
-            names->push_back( md->indexes[i].spec["name"].String() );
+        for ( unsigned i = 0; i < md.indexes.size(); i++ ) {
+            names->push_back( md.indexes[i].spec["name"].String() );
         }
     }
 
     BSONObj RocksCollectionCatalogEntry::getIndexSpec( const StringData& indexName ) const {
-        boost::optional<MetaData> md = _getMetaData();
-        invariant( md );
-        int offset = md->findIndexOffset( indexName );
+        MetaData md = _getMetaData();
+
+        int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
-        return md->indexes[offset].spec.getOwned();
+        return md.indexes[offset].spec.getOwned();
     }
 
     bool RocksCollectionCatalogEntry::isIndexMultikey( const StringData& indexName) const {
-        boost::optional<MetaData> md = _getMetaData();
-        invariant( md );
-        int offset = md->findIndexOffset( indexName );
+        MetaData md = _getMetaData();
+
+        int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
-        return md->indexes[offset].multikey;
+        return md.indexes[offset].multikey;
     }
 
     DiskLoc RocksCollectionCatalogEntry::getIndexHead( const StringData& indexName ) const {
-        boost::optional<MetaData> md = _getMetaData();
-        invariant( md );
-        int offset = md->findIndexOffset( indexName );
+        MetaData md = _getMetaData();
+
+        int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
-        return md->indexes[offset].head;
+        return md.indexes[offset].head;
     }
 
     bool RocksCollectionCatalogEntry::isIndexReady( const StringData& indexName ) const {
-        boost::optional<MetaData> md = _getMetaData();
-        invariant( md );
-        int offset = md->findIndexOffset( indexName );
+        MetaData md = _getMetaData();
+
+        int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
-        return md->indexes[offset].ready;
+        return md.indexes[offset].ready;
     }
 
     bool RocksCollectionCatalogEntry::setIndexIsMultikey(OperationContext* txn,
                                                          const StringData& indexName,
                                                          bool multikey ) {
         boost::mutex::scoped_lock lk( _metaDataMutex );
-        boost::optional<MetaData> md = _getMetaData_inlock();
-        invariant( md );
-        int offset = md->findIndexOffset( indexName );
+        MetaData md = _getMetaData_inlock();
+
+        int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
-        if ( md->indexes[offset].multikey == multikey )
+        if ( md.indexes[offset].multikey == multikey )
             return false;
-        md->indexes[offset].multikey = multikey;
-        _putMetaData_inlock( md.get() );
+        md.indexes[offset].multikey = multikey;
+        _putMetaData_inlock( md );
         return true;
     }
 
@@ -147,23 +143,23 @@ namespace mongo {
                                                     const StringData& indexName,
                                                     const DiskLoc& newHead ) {
         boost::mutex::scoped_lock lk( _metaDataMutex );
-        boost::optional<MetaData> md = _getMetaData_inlock();
-        invariant( md );
-        int offset = md->findIndexOffset( indexName );
+        MetaData md = _getMetaData_inlock();
+
+        int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
-        md->indexes[offset].head = newHead;
-        _putMetaData_inlock( md.get() );
+        md.indexes[offset].head = newHead;
+        _putMetaData_inlock( md );
     }
 
     void RocksCollectionCatalogEntry::indexBuildSuccess( OperationContext* txn,
                                                          const StringData& indexName ) {
         boost::mutex::scoped_lock lk( _metaDataMutex );
-        boost::optional<MetaData> md = _getMetaData_inlock();
-        invariant( md );
-        int offset = md->findIndexOffset( indexName );
+        MetaData md = _getMetaData_inlock();
+
+        int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
-        md->indexes[offset].ready = true;
-        _putMetaData_inlock( md.get() );
+        md.indexes[offset].ready = true;
+        _putMetaData_inlock( md );
     }
 
 
@@ -171,12 +167,11 @@ namespace mongo {
                                                      const StringData& indexName ) {
         boost::mutex::scoped_lock lk( _metaDataMutex );
 
-        boost::optional<MetaData> md = _getMetaData_inlock();
-        invariant( md );
+        MetaData md = _getMetaData_inlock();
 
         // remove info from meta data
-        invariant( md->eraseIndex( indexName ) );
-        _putMetaData_inlock( md.get() );
+        invariant( md.eraseIndex( indexName ) );
+        _putMetaData_inlock( md );
 
         // drop the actual index in rocksdb
         rocksdb::ColumnFamilyHandle* cfh = _engine->getIndexColumnFamily( ns().ns(), indexName );
@@ -191,10 +186,10 @@ namespace mongo {
     Status RocksCollectionCatalogEntry::prepareForIndexBuild( OperationContext* txn,
                                                               const IndexDescriptor* spec ) {
         boost::mutex::scoped_lock lk( _metaDataMutex );
-        boost::optional<MetaData> md = _getMetaData_inlock();
-        invariant( md );
-        md->indexes.push_back( IndexMetaData( spec->infoObj(), false, DiskLoc(), false ) );
-        _putMetaData_inlock( md.get() );
+        MetaData md = _getMetaData_inlock();
+
+        md.indexes.push_back( IndexMetaData( spec->infoObj(), false, DiskLoc(), false ) );
+        _putMetaData_inlock( md );
         return Status::OK();
     }
 
@@ -233,18 +228,14 @@ namespace mongo {
         invariant( status.ok() );
     }
 
-    boost::optional<RocksCollectionCatalogEntry::MetaData>
-        RocksCollectionCatalogEntry::_getMetaData() const {
-
+    RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData() const {
         boost::mutex::scoped_lock lk( _metaDataMutex );
         return _getMetaData_inlock();
     }
 
     // The metadata in a column family with a specific name. This method reads from that column
     // family
-    boost::optional<RocksCollectionCatalogEntry::MetaData>
-        RocksCollectionCatalogEntry::_getMetaData_inlock() const {
-
+    RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData_inlock() const {
         string result;
         // XXX not using a snapshot here
         rocksdb::Status status = _engine->getDB()->Get( rocksdb::ReadOptions(),
@@ -253,9 +244,9 @@ namespace mongo {
         invariant( !status.IsNotFound() );
         invariant( status.ok() );
 
-        MetaData ret;
-        ret.parse( BSONObj( result.c_str() ) );
-        return boost::optional<MetaData>(ret);
+        MetaData md;
+        md.parse( BSONObj( result.c_str() ) );
+        return md;
     }
 
     void RocksCollectionCatalogEntry::_putMetaData_inlock( const MetaData& in ) {
