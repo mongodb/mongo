@@ -130,6 +130,18 @@ namespace mongo {
             }
 
             bool locate(const BSONObj& key, const DiskLoc& loc) {
+                // if key is an empty BSONObj, the default behavior is to seek to the
+                // beginning of the iterator and return false.
+                if ( key == BSONObj() ) {
+                    if ( _forward ) {
+                        _iterator->SeekToFirst();
+                    } else {
+                        _iterator->SeekToLast();
+                    }
+
+                    return false;
+                }
+
                 return _locate( stripFieldNames( key ), loc );
             }
 

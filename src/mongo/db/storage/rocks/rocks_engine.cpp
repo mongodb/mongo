@@ -59,14 +59,10 @@ namespace mongo {
             // go through and create RocksCollectionCatalogEntries for all non-indexes
             EntryVector nonIndexEntries = _createNonIndexCatalogEntries( familyNames );
 
-            CfdVector metaDataCfds = _generateMetaDataCfds( nonIndexEntries, familyNames );
-
             // Create a mapping from index names to the Ordering object for each index.
             // These Ordering objects will be used to create RocksIndexEntryComparators to be used
             // with each column family representing a namespace
-            map<string, Ordering> indexOrderings = _createIndexOrderings( familyNames,
-                                                                          metaDataCfds,
-                                                                          path );
+            map<string, Ordering> indexOrderings = _createIndexOrderings( familyNames, path );
 
             // get ColumnFamilyDescriptors for all the column families
             families = _createCfds( familyNames, indexOrderings );
@@ -397,49 +393,15 @@ namespace mongo {
         return entries;
     }
 
-    RocksEngine::CfdVector RocksEngine::_generateMetaDataCfds( const EntryVector& entries,
-                                                       const vector<string>& familyNameVec ) const {
-        unordered_set<string> familyNames( familyNameVec.begin(), familyNameVec.end() );
-
-        CfdVector cfds;
-
-        // the default column family must always be included, as per rocksdb specifications
-        cfds.push_back( rocksdb::ColumnFamilyDescriptor( rocksdb::kDefaultColumnFamilyName,
-                                                         rocksdb::ColumnFamilyOptions() ) );
-
-        for ( unsigned i = 0; i < entries.size(); ++i ) {
-            string columnFamilyName = entries[i]->collectionEntry->metaDataKey();
-
-            // some column families don't have corresponding metadata column families,
-            // so before blindly opening a metadata column family, we check to see that it exists
-            if ( familyNames.find( columnFamilyName ) == familyNames.end() ) {
-                continue;
-            }
-
-            cfds.push_back(rocksdb::ColumnFamilyDescriptor( columnFamilyName,
-                                                            rocksdb::ColumnFamilyOptions() ) );
-        }
-
-        return cfds;
-    }
-
     map<string, Ordering> RocksEngine::_createIndexOrderings( const vector<string>& namespaces,
-                                                              const CfdVector& metaDataCfds,
                                                               const string& filepath ) {
-
-
-        // open all the metadata column families so that we can retrieve information about
+        // open the default column families so that we can retrieve information about
         // each index, which is needed in order to open the index column families
-        vector<rocksdb::ColumnFamilyHandle*> metaDataHandles;
         rocksdb::DB* dbPtr;
-        rocksdb::Status openROStatus = rocksdb::DB::OpenForReadOnly( dbOptions(),
-                                                                     filepath,
-                                                                     metaDataCfds,
-                                                                     &metaDataHandles,
-                                                                     &dbPtr );
+        rocksdb::Status status = rocksdb::DB::OpenForReadOnly( dbOptions(), filepath, &dbPtr );
         _db.reset( dbPtr );
 
-        _rock_status_ok( openROStatus );
+        _rock_status_ok( status );
 
         map<string, Ordering> indexOrderings;
 

@@ -175,16 +175,6 @@ namespace mongo {
         EntryVector _createNonIndexCatalogEntries( const std::vector<std::string>& families );
 
         /**
-         * @param entries a vector containing Entry structs for every non-index column family in
-         * the database. These Entry structs do not need to be fully initialized, but the
-         * collectionEntry field must be.
-         *
-         * @param nsVec a vector containing all the namespaces in this database
-         */
-        CfdVector _generateMetaDataCfds( const EntryVector& entries,
-                                         const std::vector<std::string>& familyNameVec ) const;
-
-        /**
          * Return a vector containing the name of every column family in the database
          */
         std::vector<std::string> _listFamilyNames( std::string filepath );
@@ -196,7 +186,6 @@ namespace mongo {
          */
         std::map<std::string, Ordering> _createIndexOrderings( 
                 const std::vector<string>& namespaces,
-                const CfdVector& metaDataCfds,
                 const std::string& filepath );
 
         /**
