@@ -29,6 +29,8 @@
 
 #include "mongo/db/storage/heap1/record_store_heap.h"
 
+#include "mongo/util/mongoutils/str.h"
+
 namespace mongo {
 
     //
@@ -312,7 +314,16 @@ namespace mongo {
 
     Status HeapRecordStore::setCustomOption(
                 OperationContext* txn, const BSONElement& option, BSONObjBuilder* info) {
-        invariant(!"setCustomOption not yet implemented");
+        StringData name = option.fieldName();
+        if ( name == "usePowerOf2Sizes" ) {
+            // we ignore, so just say ok
+            return Status::OK();
+        }
+
+        return Status( ErrorCodes::BadValue,
+                       mongoutils::str::stream()
+                       << "unknown custom option to HeapRecordStore: "
+                       << name );
     }
 
     void HeapRecordStore::increaseStorageSize(OperationContext* txn,  int size, bool enforceQuota) {
