@@ -381,9 +381,10 @@ COMPARE_OK(__wt_cursor::compare)
 COMPARE_OK(__wt_cursor::search_near)
 
 /* Lastly, some methods need no (additional) error checking. */
-%exception __wt_connection::search_near;
+%exception __wt_connection::diagnostic_build;
 %exception __wt_connection::get_home;
 %exception __wt_connection::is_new;
+%exception __wt_connection::search_near;
 %exception __wt_async_op::_set_key;
 %exception __wt_async_op::_set_value;
 %exception __wt_cursor::_set_key;
@@ -783,6 +784,14 @@ typedef int int_void;
 	int _freecb() {
 		return (0);
 	}
+
+        int diagnostic_build() {
+%#ifdef HAVE_DIAGNOSTIC
+                return 1;
+%#else
+                return 0;
+%#endif
+        }
 };
 
 /* Remove / rename parts of the C API that we don't want in Python. */
