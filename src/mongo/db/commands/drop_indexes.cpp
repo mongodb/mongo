@@ -36,6 +36,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -247,24 +248,16 @@ namespace mongo {
 
             std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, ctx.db(), jsobj);
 
-            list<BSONObj> all;
-            auto_ptr<DBClientCursor> i = db.query( dbname + ".system.indexes" , BSON( "ns" << toDeleteNs ) , 0 , 0 , 0 , QueryOption_SlaveOk );
-            BSONObjBuilder b;
-            while ( i->more() ) {
-                const BSONObj spec = i->next().removeField("v").getOwned();
-                const BSONObj key = spec.getObjectField("key");
-                const Status keyStatus = validateKeyPattern(key);
-                if (!keyStatus.isOK()) {
-                    errmsg = str::stream()
-                        << "Cannot rebuild index " << spec << ": " << keyStatus.reason()
-                        << " For more info see http://dochub.mongodb.org/core/index-validation";
-                    return false;
+            vector<BSONObj> all;
+            {
+                vector<string> indexNames;
+                collection->getCatalogEntry()->getAllIndexes( &indexNames );
+                for ( size_t i = 0; i < indexNames.size(); i++ ) {
+                    all.push_back( collection->getCatalogEntry()->getIndexSpec( indexNames[i] ) );
                 }
-
-                b.append( BSONObjBuilder::numStr( all.size() ) , spec );
-                all.push_back( spec );
             }
-            result.appendNumber( "nIndexesWas", collection->getIndexCatalog()->numIndexesTotal() );
+
+            result.appendNumber( "nIndexesWas", all.size() );
 
             Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
             if ( !s.isOK() ) {
@@ -272,16 +265,16 @@ namespace mongo {
                 return appendCommandStatus( result, s );
             }
 
-            for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
-                BSONObj o = *i;
+            for ( size_t i = 0; i < all.size(); i++ ) {
+                BSONObj o = all[i];
                 LOG(1) << "reIndex ns: " << toDeleteNs << " index: " << o << endl;
                 Status s = collection->getIndexCatalog()->createIndex(txn, o, false);
                 if ( !s.isOK() )
                     return appendCommandStatus( result, s );
             }
 
-            result.append( "nIndexes" , (int)all.size() );
-            result.appendArray( "indexes" , b.obj() );
+            result.append( "nIndexes", (int)all.size() );
+            result.append( "indexes", all );
 
             IndexBuilder::restoreIndexes(indexesInProg);
             wunit.commit();
