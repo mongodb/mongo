@@ -44,27 +44,28 @@ const char *uri = "table:logtest";
 
 #define	WALK_PRINT(lsn)							\
     printf("LSN [%d][%" PRIu64 "]:  record type %d size %" PRIu64 "\n",	\
-	lsn.file, lsn.offset, rectype, (uint64_t)log_recv.size);
+	lsn.file, lsn.offset, rectype, (uint64_t)logrec_value.size);
 
 #define	STEP_PRINT							\
     printf("LSN [%d][%" PRIu64 "].%d: "					\
 	" record type %d optype %d txnid %" PRIu64 " fileid %d",	\
 	lsn.file, lsn.offset, opcount, rectype,				\
 	optype, txnid, fileid);						\
-    if (log_reck.size != 0)						\
-	printf(" key size %" PRIu64, (uint64_t)log_reck.size);		\
-    if (log_recv.size != 0)						\
-	printf(" value size %" PRIu64, (uint64_t)log_recv.size);	\
+    if (logrec_key.size != 0)						\
+	printf(" key size %" PRIu64, (uint64_t)logrec_key.size);	\
+    if (logrec_value.size != 0)						\
+	printf(" value size %" PRIu64, (uint64_t)logrec_value.size);	\
     printf("\n");
 
 static int
 walk_log(WT_SESSION *session)
 {
 	int i, ret;
+	WT_LSN lsnsave;
 	/*! [log cursor] */
 	WT_CURSOR *cursor;
-	WT_LSN lsn, lsnsave;
-	WT_ITEM log_reck, log_recv;
+	WT_LSN lsn;
+	WT_ITEM logrec_key, logrec_value;
 	uint64_t txnid;
 	uint32_t fileid, optype, rectype;
 
@@ -80,7 +81,7 @@ walk_log(WT_SESSION *session)
 			lsnsave = lsn;
 		/*! [log cursor get_value] */
 		ret = cursor->get_value(cursor, &txnid, &rectype,
-		    &optype, &fileid, &log_reck, &log_recv);
+		    &optype, &fileid, &logrec_key, &logrec_value);
 		/*! [log cursor get_value] */
 		WALK_PRINT(lsn);
 	}
@@ -91,9 +92,9 @@ walk_log(WT_SESSION *session)
 	/*! [log cursor search] */
 	ret = cursor->search(cursor);
 	/*! [log cursor search] */
-	log_recv.size = 0;
+	logrec_value.size = 0;
 	ret = cursor->get_value(cursor, &txnid, &rectype,
-	    &optype, &fileid, &log_reck, &log_recv);
+	    &optype, &fileid, &logrec_key, &logrec_value);
 	assert(optype == 0);
 	printf("Searched ");
 	WALK_PRINT(lsnsave);
@@ -162,7 +163,7 @@ step_log(WT_SESSION *session)
 	WT_CONNECTION *wt_conn2;
 	WT_CURSOR *cursor, *cursor2;
 	WT_LSN lsn, lsnsave;
-	WT_ITEM log_reck, log_recv;
+	WT_ITEM logrec_key, logrec_value;
 	WT_SESSION *session2;
 	uint64_t prev_txnid, txnid;
 	uint32_t fileid, opcount, optype, rectype;
@@ -186,7 +187,7 @@ step_log(WT_SESSION *session)
 			lsnsave = lsn;
 		/*! [log step get_value] */
 		ret = cursor->get_value(cursor, &txnid, &rectype,
-		    &optype, &fileid, &log_reck, &log_recv);
+		    &optype, &fileid, &logrec_key, &logrec_value);
 		/*! [log step get_value] */
 		STEP_PRINT;
 		/*
@@ -211,8 +212,8 @@ step_log(WT_SESSION *session)
 				in_txn = 1;
 			}
 			prev_txnid = txnid;
-			cursor2->set_key(cursor2, &log_reck);
-			cursor2->set_value(cursor2, &log_recv);
+			cursor2->set_key(cursor2, &logrec_key);
+			cursor2->set_value(cursor2, &logrec_value);
 			ret = cursor2->insert(cursor2);
 		}
 	}
@@ -249,7 +250,7 @@ step_log(WT_SESSION *session)
 			    lsnsave.offset == lsn.offset);
 		}
 		ret = cursor->get_value(cursor, &txnid, &rectype,
-		    &optype, &fileid, &log_reck, &log_recv);
+		    &optype, &fileid, &logrec_key, &logrec_value);
 		STEP_PRINT;
 		ret = cursor->next(cursor);
 		if (ret != 0)

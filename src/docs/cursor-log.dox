@@ -1,0 +1,58 @@
+/*! @page cursor_log Log cursors
+
+WiredTiger cursors provide access to data from a variety of sources.
+One of these sources is the set of records in the transaction log files.
+WiredTiger log records can be made up of multiple operations from a
+single transaction.  One can use a log cursor to access an entire
+log record, or the \c step mode of a log cursor to access each
+individual operation record within a single transactional log record.
+
+When using a log cursor the key is a Log Sequence Number (LSN).
+When using a log cursor in \c step mode, the key is
+the LSN and also an operation counter within that log record.
+
+In both forms, the value returned contains the following:
+
+- transaction id (if applicable, otherwise 0)
+- record type
+- operation type (if applicable, step-mode only)
+- file id (if applicable, step-mode only)
+- operation key (if applicable, step-mode only)
+- operation value
+
+The following example opens a normal log cursor on the database:
+
+@snippet ex_log.c log cursor
+
+and using the key:
+
+@snippet ex_log.c log cursor get_key
+
+and using the value:
+
+@snippet ex_log.c log cursor get_value
+
+The following examples shows a step log cursor:
+
+@snippet ex_log.c log step open
+
+and using the key:
+
+@snippet ex_log.c log step get_key
+
+Notes:
+
+- Performing a WT_CURSOR::search on any form of a log cursor only
+operates on the LSN portion of the given key.  The following is an
+example of setting the key in \c step mode:
+
+@snippet ex_log.c log step set_key
+
+- Performing a WT_CURSOR::next call on a log cursor moves to the
+next log record.  When using \c step mode, it will move to the
+next operation within the current record, or move to the first
+operation in the next record when the current record is exhausted.
+
+- Log cursors are always read-only.
+
+*/
