@@ -66,7 +66,7 @@ namespace mongo {
         // FTS
         //
 
-        static void getFTSKeys(const BSONObj &obj, const fts::FTSSpec& ftsSpec, BSONObjSet* keys);
+        static void getFTSKeys(const BSONObj &obj, fts::FTSSpec& ftsSpec, BSONObjSet* keys);
 
         //
         // Hash

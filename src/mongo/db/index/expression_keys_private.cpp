@@ -306,7 +306,7 @@ namespace mongo {
 
     // static
     void ExpressionKeysPrivate::getFTSKeys(const BSONObj &obj,
-                                           const fts::FTSSpec& ftsSpec,
+                                           fts::FTSSpec& ftsSpec,
                                            BSONObjSet* keys) {
         fts::FTSIndexFormat::getKeys(ftsSpec, obj, keys);
     }

@@ -138,6 +138,11 @@ namespace mongo {
                 }
 
             }
+
+            // initialize the stemmer cache
+            Stemmer defaultStemmer( defaultLanguage() );
+            _stemmerCache.insert(std::pair<std::string, const Stemmer&>(
+                        defaultLanguage().str(), defaultStemmer));
         }
 
         const FTSLanguage* FTSSpec::_getLanguageToUseV2( const BSONObj& userDoc,
@@ -156,7 +161,7 @@ namespace mongo {
             return swl.getValue();
         }
 
-        void FTSSpec::scoreDocument( const BSONObj& obj, TermFrequencyMap* term_freqs ) const {
+        void FTSSpec::scoreDocument( const BSONObj& obj, TermFrequencyMap* term_freqs ) {
             if ( _textIndexVersion == TEXT_INDEX_VERSION_1 ) {
                 return _scoreDocumentV1( obj, term_freqs );
             }
@@ -165,8 +170,21 @@ namespace mongo {
 
             while ( it.more() ) {
                 FTSIteratorValue val = it.next();
-                Stemmer stemmer( *val._language );
-                Tools tools( *val._language, &stemmer, StopWords::getStopWords( *val._language ) );
+                const Stemmer* stemmer;
+                std::map<std::string, const Stemmer&>::const_iterator cache_it;
+                cache_it = _stemmerCache.find(val._language->str());
+
+                if (cache_it != _stemmerCache.end()) {
+                    stemmer = &cache_it->second;
+                }
+                else {
+                    // If a stemmer for this language doesn't exist, make one
+                    Stemmer newLanguageStemmer( *val._language );
+                    _stemmerCache.insert(std::pair<std::string, const Stemmer&>(
+                                val._language->str(), newLanguageStemmer));
+                    stemmer = &newLanguageStemmer;
+                }
+                Tools tools( *val._language, stemmer, StopWords::getStopWords( *val._language ) );
                 _scoreStringV2( tools, val._text, term_freqs, val._weight );
             }
         }

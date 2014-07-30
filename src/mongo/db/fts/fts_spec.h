@@ -95,7 +95,7 @@ namespace mongo {
              * @arg obj  document to traverse; can be a subdocument or array
              * @arg term_freqs  output parameter to store (term,score) results
              */
-            void scoreDocument( const BSONObj& obj, TermFrequencyMap* term_freqs ) const;
+            void scoreDocument( const BSONObj& obj, TermFrequencyMap* term_freqs );
 
             /**
              * given a query, pulls out the pieces (in order) that go in the index first
@@ -163,6 +163,9 @@ namespace mongo {
             const FTSLanguage* _defaultLanguage;
             std::string _languageOverrideField;
             bool _wildcard;
+
+            // mapping : languagename -> stemmer
+            std::map<std::string, const Stemmer&> _stemmerCache;
 
             // mapping : fieldname -> weight
             Weights _weights;
