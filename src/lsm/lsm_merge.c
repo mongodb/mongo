@@ -288,7 +288,7 @@ __wt_lsm_merge(
 	F_SET(session, WT_SESSION_NO_CACHE);
 
 	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
-	cfg[1] = "bulk,raw";
+	cfg[1] = "bulk,raw,skip_sort_check";
 	cfg[2] = NULL;
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
 

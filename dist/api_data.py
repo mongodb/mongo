@@ -535,6 +535,9 @@ methods = {
 	    default is false for all cursor types except for metadata
 	    cursors''',
 	    type='boolean'),
+	Config('skip_sort_check', 'false', r'''
+	    skip the check of the sort order of each bulk-loaded key''',
+	    type='boolean', undoc=True),
 	Config('statistics', '', r'''
 	    Specify the statistics to be gathered.  Choosing "all" gathers
 	    statistics regardless of cost and may include traversing
