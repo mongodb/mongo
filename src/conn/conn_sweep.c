@@ -135,8 +135,6 @@ __wt_sweep_create(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
 
-	F_SET(conn, WT_CONN_SERVER_SWEEP);
-
 	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
 	conn->sweep_session = session;
 	conn->sweep_session->name = "sweep-server";
@@ -148,6 +146,7 @@ __wt_sweep_create(WT_CONNECTION_IMPL *conn)
 	    session, &conn->sweep_tid, __sweep_server, session));
 	conn->sweep_tid_set = 1;
 
+	F_SET(conn, WT_CONN_SERVER_SWEEP);
 	return (0);
 }
 
