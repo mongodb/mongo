@@ -17,16 +17,13 @@ __curlog_logrec(
 {
 	WT_CURSOR_LOG *cl;
 
-	WT_UNUSED(session);
 	cl = cookie;
 	/*
 	 * Set up the LSNs and take a copy of the log record for the cursor.
 	 */
 	*cl->cur_lsn = *lsnp;
 	*cl->next_lsn = *lsnp;
-	cl->next_lsn->offset += logrec->size;
-	if (cl->logrec == NULL)
-		__wt_scr_alloc(session, logrec->size, &cl->logrec);
+	cl->next_lsn->offset += (off_t)logrec->size;
 	WT_RET(__wt_buf_set(session,
 	    cl->logrec, logrec->data, logrec->size));
 	/*
@@ -92,10 +89,6 @@ __curlog_steprec(
 	 * reserve 0 to mean the entire record.
 	 */
 	cl->step_count = 1;
-	if (cl->opkey == NULL)
-		__wt_scr_alloc(session, 0, &cl->opkey);
-	if (cl->opvalue == NULL)
-		__wt_scr_alloc(session, 0, &cl->opvalue);
 	/*
 	 * Unpack the txnid so that we can return each
 	 * individual operation for this txnid.
@@ -220,8 +213,7 @@ __curlog_stepnext(WT_CURSOR *cursor)
 	 * have, or we are in the zero-fill portion of the record, get a
 	 * new one.
 	 */
-	if (cl->logrec == NULL || cl->stepp >= cl->stepp_end ||
-	    !(*cl->stepp)) {
+	if (cl->stepp == NULL || cl->stepp >= cl->stepp_end || !*cl->stepp) {
 		cl->txnid = 0;
 		WT_ERR(__wt_log_scan(session, cl->next_lsn, WT_LOGSCAN_ONE,
 		    cl->scan_cb, cl));
@@ -323,15 +315,8 @@ __curlog_reset(WT_CURSOR *cursor)
 
 	cl = (WT_CURSOR_LOG *)cursor;
 	cl->stepp = cl->stepp_end = NULL;
-	if (F_ISSET(cl, WT_LOGC_STEP)) {
+	if (F_ISSET(cl, WT_LOGC_STEP))
 		cl->step_count = 0;
-		if (cl->opkey != NULL)
-			__wt_scr_free(&cl->opkey);
-		if (cl->opvalue != NULL)
-			__wt_scr_free(&cl->opvalue);
-	}
-	if (cl->logrec != NULL)
-		__wt_scr_free(&cl->logrec);
 	INIT_LSN(cl->cur_lsn);
 	INIT_LSN(cl->next_lsn);
 	return (0);
@@ -353,6 +338,9 @@ __curlog_close(WT_CURSOR *cursor)
 	WT_ERR(__curlog_reset(cursor));
 	__wt_free(session, cl->cur_lsn);
 	__wt_free(session, cl->next_lsn);
+	__wt_scr_free(&cl->logrec);
+	__wt_scr_free(&cl->opkey);
+	__wt_scr_free(&cl->opvalue);
 	WT_ERR(__wt_cursor_close(cursor));
 
 err:	API_END_RET(session, ret);
@@ -367,11 +355,12 @@ __curlog_stepinit(WT_SESSION_IMPL *session, WT_CURSOR_LOG *cl)
 {
 	WT_CURSOR *cursor;
 
-	WT_UNUSED(session);
 	cursor = &cl->iface;
 	cursor->next = __curlog_stepnext;
 	cursor->key_format = LOGCSTEP_KEY_FORMAT;
 	cl->scan_cb = __curlog_steprec;
+	__wt_scr_alloc(session, 0, &cl->opkey);
+	__wt_scr_alloc(session, 0, &cl->opvalue);
 	F_SET(cl, WT_LOGC_STEP);
 	return (0);
 }
@@ -415,9 +404,10 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc_def(session, 1, &cl));
 	cursor = &cl->iface;
 	*cursor = iface;
+	cursor->session = &session->iface;
 	WT_ERR(__wt_calloc_def(session, 1, &cl->cur_lsn));
 	WT_ERR(__wt_calloc_def(session, 1, &cl->next_lsn));
-	cursor->session = &session->iface;
+	__wt_scr_alloc(session, 0, &cl->logrec);
 
 	/*
 	 * We return a record's LSN as the key, and the raw WT_ITEM
@@ -434,7 +424,6 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 
 	INIT_LSN(cl->cur_lsn);
 	INIT_LSN(cl->next_lsn);
-	WT_CLEAR(cl->logrec);
 
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
@@ -445,8 +434,11 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 err:		if (F_ISSET(cursor, WT_CURSTD_OPEN))
 			WT_TRET(cursor->close(cursor));
 		else {
-			if (cl->next_lsn)
-				__wt_free(session, cl->next_lsn);
+			__wt_free(session, cl->cur_lsn);
+			__wt_free(session, cl->next_lsn);
+			__wt_scr_free(&cl->logrec);
+			__wt_scr_free(&cl->opkey);
+			__wt_scr_free(&cl->opvalue);
 			__wt_free(session, cl);
 		}
 		*cursorp = NULL;
