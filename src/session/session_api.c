@@ -701,6 +701,9 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_STAT_FAST_CONN_INCR(session, txn_checkpoint);
 	SESSION_API_CALL(session, checkpoint, config, cfg);
 
+	/* Don't highjack the session checkpoint thread for eviction. */
+	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
+
 	/*
 	 * Checkpoints require a snapshot to write a transactionally consistent
 	 * snapshot of the data.
@@ -719,18 +722,29 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 		    "Checkpoint not permitted in a transaction");
 
 	/*
-	 * Reset open cursors.
-	 *
-	 * We do this here explicitly even though it will happen implicitly in
-	 * the call to begin_transaction for the checkpoint, in case some
-	 * implementation of WT_CURSOR::reset needs the schema lock.
+	 * Reset open cursors.  Do this explicitly, even though it will happen
+	 * implicitly in the call to begin_transaction for the checkpoint, the
+	 * checkpoint code will acquire the schema lock before we do that, and
+	 * some implementation of WT_CURSOR::reset might need the schema lock.
 	 */
 	WT_ERR(__wt_session_reset_cursors(session));
 
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_txn_checkpoint(session, cfg));
+	/*
+	 * Only one checkpoint can be active at a time, and checkpoints must run
+	 * in the same order as they update the metadata.  It's probably a bad
+	 * idea to run checkpoints out of multiple threads, but serialize them
+	 * here to ensure we don't get into trouble.
+	 */
+	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 1);
+	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 
-err:	API_END_RET_NOTFOUND_MAP(session, ret);
+	ret = __wt_txn_checkpoint(session, cfg);
+
+	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
+	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
+
+err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
+	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*

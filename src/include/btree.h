@@ -120,6 +120,13 @@ struct __wt_btree {
 
 	int checkpointing;		/* Checkpoint in progress */
 
+	/*
+	 * We flush pages from the tree (in order to make checkpoint faster),
+	 * without a high-level lock.  To avoid multiple threads flushing at
+	 * the same time, lock the tree.
+	 */
+	WT_SPINLOCK	flush_lock;	/* Lock to flush the tree's pages */
+
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
 #define	WT_BTREE_BULK		0x00100	/* Bulk-load handle */
 #define	WT_BTREE_NO_EVICTION	0x00200	/* Disable eviction */
