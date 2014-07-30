@@ -16,7 +16,7 @@ function mkStr(length) {
 }
 
 function canMakeCollectionWithName(name) {
-    assert.eq(myDb.stats().fileSize, 0, "initial conditions");
+    assert.eq(myDb.stats().storageSize, 0, "initial conditions");
 
     var success = false;
     try {
@@ -27,7 +27,7 @@ function canMakeCollectionWithName(name) {
     }
 
     if (!success) {
-        assert.eq(myDb.stats().fileSize, 0, "no files should be created on error");
+        assert.eq(myDb.stats().storageSize, 0, "no files should be created on error");
         return false;
     }
 
