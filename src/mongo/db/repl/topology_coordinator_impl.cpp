@@ -75,7 +75,9 @@ namespace repl {
     }
 
     HostAndPort TopologyCoordinatorImpl::getSyncSourceAddress() const {
-        invariant(_syncSourceIndex >= 0);
+        if (_syncSourceIndex == -1) {
+            return HostAndPort();
+        }
         return _currentConfig.getMemberAt(_syncSourceIndex).getHostAndPort();
     }
 
@@ -102,8 +104,9 @@ namespace repl {
 
         // If we are only allowed to sync from the primary, set that
         if (!_currentConfig.isChainingAllowed()) {
-            // Sets NULL if we cannot reach the primary
+            // Sets -1 if there is no current primary
             _syncSourceIndex = _currentPrimaryIndex;
+            return;
         }
 
         // find the member with the lowest ping time that has more data than me
@@ -186,7 +189,7 @@ namespace repl {
 
                     // if this was on the veto list, check if it was vetoed in the last "while".
                     // if it was, skip.
-                    if (vetoed->second >= now) {
+                    if (vetoed->second > now) {
                         if (now % 5 == 0) {
                             log() << "replSet not trying to sync from " << vetoed->first
                                   << ", it is vetoed for " << (vetoed->second - now) 
@@ -206,9 +209,10 @@ namespace repl {
         if (closestIndex == -1) {
             return;
         }
-
-        _sethbmsg( str::stream() << "syncing to: " << 
-                  _currentConfig.getMemberAt(closestIndex).getHostAndPort().toString(), 0);
+        std::string msg(str::stream() << "syncing to: " << 
+                        _currentConfig.getMemberAt(closestIndex).getHostAndPort().toString(), 0);
+        _sethbmsg(msg);
+        log() << msg;
         _syncSourceIndex = closestIndex;
     }
     
