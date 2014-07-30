@@ -88,6 +88,7 @@ ERET
 ESET
 ETIME
 ETIMEDOUT
+EXLOG
 EXTLIST
 Enqueue
 Env
@@ -623,6 +624,7 @@ lognum
 logput
 logread
 logrec
+logtest
 lookup
 lookups
 lr
