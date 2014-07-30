@@ -170,12 +170,17 @@ namespace mongo {
     }
 
     void RocksRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
+        if (!cappedAndNeedDelete())
+            return;
         // This persistent iterator is necessary since you can't read your own writes
-        rocksdb::ReadOptions options;
-        options.snapshot = _getRecoveryUnit( txn )->snapshot();
-        boost::scoped_ptr<rocksdb::Iterator> iter( _db->NewIterator( options,
+        boost::scoped_ptr<rocksdb::Iterator> iter( _db->NewIterator( _readOptions( txn ),
                                                                      _columnFamily ) );
         iter->SeekToFirst();
+
+        // XXX TODO there is a bug here where if the size of the write batch exceeds the cap size
+        // then iter will not be valid and it will crash. To fix this we need the ability to 
+        // query the write batch, and delete the oldest record in the write batch until the
+        // size of the write batch is less than the cap
         while ( cappedAndNeedDelete() ) {
             invariant(_numRecords > 0);
             invariant(iter->Valid());
