@@ -264,6 +264,16 @@ namespace mongo {
 
     };
 
+    struct DeleteStats : public SpecificStats {
+        DeleteStats() : docsDeleted(0) { }
+
+        virtual SpecificStats* clone() const {
+            return new DeleteStats(*this);
+        }
+
+        size_t docsDeleted;
+    };
+
     struct DistinctScanStats : public SpecificStats {
         DistinctScanStats() : keysExamined(0) { }
 

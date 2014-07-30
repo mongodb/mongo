@@ -44,6 +44,8 @@ namespace mongo {
         // them.
         STAGE_COUNT,
 
+        STAGE_DELETE,
+
         // If we're running a distinct, we only care about one value for each key.  The distinct
         // stage is an ixscan with some key-skipping behvaior that only distinct uses.
         STAGE_DISTINCT,

@@ -220,9 +220,8 @@ namespace mongo {
         void kill();
 
         /**
-         * Execute the plan to completion, throwing out the results.
-         *
-         * Used by explain.
+         * Execute the plan to completion, throwing out the results.  Used when you want to work the
+         * underlying tree without getting results back.
          */
         Status executePlan();
 

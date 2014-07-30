@@ -35,6 +35,7 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/exec/cached_plan.h"
+#include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/multi_plan.h"
@@ -456,6 +457,76 @@ namespace mongo {
 
         *out = new PlanExecutor(ws, root, collection);
         return Status::OK();
+    }
+
+    Status getExecutorDelete(OperationContext* txn,
+                             Collection* collection,
+                             CanonicalQuery* rawCanonicalQuery,
+                             bool isMulti,
+                             bool shouldCallLogOp,
+                             PlanExecutor** out) {
+        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
+        auto_ptr<WorkingSet> ws(new WorkingSet());
+        PlanStage* root;
+        QuerySolution* querySolution;
+        Status status = prepareExecution(txn, collection, ws.get(), canonicalQuery.get(), 0, &root,
+                                         &querySolution);
+        if (!status.isOK()) {
+            return status;
+        }
+        invariant(root);
+        DeleteStageParams deleteStageParams;
+        deleteStageParams.isMulti = isMulti;
+        deleteStageParams.shouldCallLogOp = shouldCallLogOp;
+        root = new DeleteStage(txn, deleteStageParams, ws.get(), collection, root);
+        // We must have a tree of stages in order to have a valid plan executor, but the query
+        // solution may be null.
+        *out = new PlanExecutor(ws.release(), root, querySolution, canonicalQuery.release(),
+                                collection);
+        return Status::OK();
+    }
+
+    Status getExecutorDelete(OperationContext* txn,
+                             Collection* collection,
+                             const std::string& ns,
+                             const BSONObj& unparsedQuery,
+                             bool isMulti,
+                             bool shouldCallLogOp,
+                             PlanExecutor** out) {
+        auto_ptr<WorkingSet> ws(new WorkingSet());
+        DeleteStageParams deleteStageParams;
+        deleteStageParams.isMulti = isMulti;
+        deleteStageParams.shouldCallLogOp = shouldCallLogOp;
+        if (!collection) {
+            LOG(2) << "Collection " << ns << " does not exist."
+                   << " Using EOF stage: " << unparsedQuery.toString();
+            DeleteStage* deleteStage = new DeleteStage(txn, deleteStageParams, ws.get(), NULL,
+                                                       new EOFStage());
+            *out = new PlanExecutor(ws.release(), deleteStage, ns);
+            return Status::OK();
+        }
+
+        if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
+            collection->getIndexCatalog()->findIdIndex()) {
+            LOG(2) << "Using idhack: " << unparsedQuery.toString();
+
+            PlanStage* idHackStage = new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(),
+                                                     ws.get());
+            DeleteStage* root = new DeleteStage(txn, deleteStageParams, ws.get(), collection,
+                                                idHackStage);
+            *out = new PlanExecutor(ws.release(), root, collection);
+            return Status::OK();
+        }
+
+        const WhereCallbackReal whereCallback(txn, collection->ns().db());
+        CanonicalQuery* cq;
+        Status status = CanonicalQuery::canonicalize(collection->ns(), unparsedQuery, &cq,
+                                                     whereCallback);
+        if (!status.isOK())
+            return status;
+
+        // Takes ownership of 'cq'.
+        return getExecutorDelete(txn, collection, cq, isMulti, shouldCallLogOp, out);
     }
 
     //

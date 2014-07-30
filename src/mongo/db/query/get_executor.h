@@ -121,4 +121,39 @@ namespace mongo {
                             const BSONObj& hintObj,
                             PlanExecutor** execOut);
 
+    /**
+     * Get a PlanExecutor for a delete operation.  'rawCanonicalQuery' describes the predicate for
+     * the documents to be deleted.  A write lock is required to execute the returned plan.
+     *
+     * Takes ownership of 'rawCanonicalQuery'.
+     *
+     * If the query is valid and an executor could be created, returns Status::OK() and populates
+     * *out with the PlanExecutor.
+     *
+     * If the query cannot be executed, returns a Status indicating why.
+     */
+    Status getExecutorDelete(OperationContext* txn,
+                             Collection* collection,
+                             CanonicalQuery* rawCanonicalQuery,
+                             bool isMulti,
+                             bool shouldCallLogOp,
+                             PlanExecutor** execOut);
+
+    /**
+     * Overload of getExecutorDelete() above, for when a canonicalQuery is not available.  Used to
+     * support idhack-powered deletes.
+     *
+     * If the query is valid and an executor could be created, returns Status::OK() and populates
+     * *out with the PlanExecutor.
+     *
+     * If the query cannot be executed, returns a Status indicating why.
+     */
+    Status getExecutorDelete(OperationContext* txn,
+                             Collection* collection,
+                             const std::string& ns,
+                             const BSONObj& unparsedQuery,
+                             bool isMulti,
+                             bool shouldCallLogOp,
+                             PlanExecutor** execOut);
+
 }  // namespace mongo
