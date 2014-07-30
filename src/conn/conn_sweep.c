@@ -49,8 +49,8 @@ __sweep(WT_SESSION_IMPL *session)
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			WT_WITH_DHANDLE(session, dhandle,
-			    (ret = __wt_cache_op(
-			    session, NULL, WT_SYNC_WRITE_LEAVES)));
+			    ret = __wt_cache_op(
+			    session, NULL, WT_SYNC_WRITE_LEAVES));
 			if (ret == EBUSY) {
 				ret = 0;
 				continue;
@@ -70,7 +70,7 @@ __sweep(WT_SESSION_IMPL *session)
 			WT_RET(ret);
 
 			WT_WITH_DHANDLE(session, dhandle,
-			    (ret = __wt_conn_btree_sync_and_close(session)));
+			    ret = __wt_conn_btree_sync_and_close(session));
 			if (ret == EBUSY)
 				ret = 0;
 
