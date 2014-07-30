@@ -783,14 +783,6 @@ typedef int int_void;
 	int _freecb() {
 		return (0);
 	}
-
-        int diagnostic_build() {
-#ifdef HAVE_DIAGNOSTIC
-                return 1;
-#else
-                return 0;
-#endif
-        }
 };
 
 /* Remove / rename parts of the C API that we don't want in Python. */
