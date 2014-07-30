@@ -457,7 +457,8 @@ namespace mongo {
         PlanExecutor* rawExec;
         Status status = cq ?
             getExecutor(request.getOpCtx(), collection, cqHolder.release(), &rawExec) :
-            getExecutor(request.getOpCtx(), collection, nsString.ns(), request.getQuery(), &rawExec);
+            getExecutor(request.getOpCtx(), collection, nsString.ns(), request.getQuery(),
+                        &rawExec);
 
         uassert(17243,
                 "could not get executor" + request.getQuery().toString() + "; " + causedBy(status),

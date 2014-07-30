@@ -87,18 +87,6 @@ namespace mongo {
                        size_t plannerOptions = 0);
 
     /**
-     * Get a plan executor for a simple id query. The executor will wrap an execution
-     * tree whose root stage is the idhack stage.
-     *
-     * Takes ownership of 'rawCanonicalQuery'.
-     */
-    Status getExecutorIDHack(OperationContext* txn,
-                             Collection* collection,
-                             CanonicalQuery* rawCanonicalQuery,
-                             const QueryPlannerParams& plannerParams,
-                             PlanExecutor** out);
-
-    /**
      * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode
      * to provide results for the distinct command.
      *
@@ -132,19 +120,5 @@ namespace mongo {
                             const BSONObj& query,
                             const BSONObj& hintObj,
                             PlanExecutor** execOut);
-
-    /**
-     * Get a plan executor for a query. Ignores the cache and always plans the full query.
-     *
-     * Takes ownership of 'rawCanonicalQuery'.
-     *
-     * Returns the resulting executor through 'execOut'. The caller must delete 'execOut',
-     * if an OK status is returned.
-     */
-    Status getExecutorAlwaysPlan(OperationContext* txn,
-                                 Collection* collection,
-                                 CanonicalQuery* rawCanonicalQuery,
-                                 const QueryPlannerParams& plannerParams,
-                                 PlanExecutor** execOut);
 
 }  // namespace mongo

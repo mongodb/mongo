@@ -162,13 +162,264 @@ namespace mongo {
         plannerParams->options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
     }
 
+    namespace {
+
+        /**
+         * Build an execution tree for the query described in 'canonicalQuery'.  Does not take
+         * ownership of arguments.
+         *
+         * If an execution tree could be created, then returns Status::OK() and sets 'rootOut' to
+         * the root of the constructed execution tree, and sets 'querySolutionOut' to the associated
+         * query solution (if applicable) or NULL.
+         *
+         * If an execution tree could not be created, returns a Status indicating why and sets both
+         * 'rootOut' and 'querySolutionOut' to NULL.
+         */
+        Status prepareExecution(OperationContext* opCtx,
+                                Collection* collection,
+                                WorkingSet* ws,
+                                CanonicalQuery* canonicalQuery,
+                                size_t plannerOptions,
+                                PlanStage** rootOut,
+                                QuerySolution** querySolutionOut) {
+            invariant(canonicalQuery);
+            *rootOut = NULL;
+            *querySolutionOut = NULL;
+
+            // This can happen as we're called by internal clients as well.
+            if (NULL == collection) {
+                const string& ns = canonicalQuery->ns();
+                LOG(2) << "Collection " << ns << " does not exist."
+                       << " Using EOF plan: " << canonicalQuery->toStringShort();
+                *rootOut = new EOFStage();
+                return Status::OK();
+            }
+
+            // Fill out the planning params.  We use these for both cached solutions and non-cached.
+            QueryPlannerParams plannerParams;
+            plannerParams.options = plannerOptions;
+            fillOutPlannerParams(collection, canonicalQuery, &plannerParams);
+
+            // If we have an _id index we can use an idhack plan.
+            if (IDHackStage::supportsQuery(*canonicalQuery) &&
+                collection->getIndexCatalog()->findIdIndex()) {
+
+                LOG(2) << "Using idhack: " << canonicalQuery->toStringShort();
+
+                *rootOut = new IDHackStage(opCtx, collection, canonicalQuery, ws);
+
+                // Might have to filter out orphaned docs.
+                if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+                    *rootOut =
+                        new ShardFilterStage(shardingState.getCollectionMetadata(collection->ns()),
+                                             ws, *rootOut);
+                }
+
+                // There might be a projection. The idhack stage will always fetch the full
+                // document, so we don't support covered projections. However, we might use the
+                // simple inclusion fast path.
+                if (NULL != canonicalQuery->getProj()) {
+                    ProjectionStageParams params(WhereCallbackReal(opCtx, collection->ns().db()));
+                    params.projObj = canonicalQuery->getProj()->getProjObj();
+
+                    // Stuff the right data into the params depending on what proj impl we use.
+                    if (canonicalQuery->getProj()->requiresDocument()
+                        || canonicalQuery->getProj()->wantIndexKey()) {
+                        params.fullExpression = canonicalQuery->root();
+                        params.projImpl = ProjectionStageParams::NO_FAST_PATH;
+                    }
+                    else {
+                        params.projImpl = ProjectionStageParams::SIMPLE_DOC;
+                    }
+
+                    *rootOut = new ProjectionStage(params, ws, *rootOut);
+                }
+
+                return Status::OK();
+            }
+
+            // Tailable: If the query requests tailable the collection must be capped.
+            if (canonicalQuery->getParsed().hasOption(QueryOption_CursorTailable)) {
+                if (!collection->isCapped()) {
+                    return Status(ErrorCodes::BadValue,
+                                  "error processing query: " + canonicalQuery->toString() +
+                                  " tailable cursor requested on non capped collection");
+                }
+
+                // If a sort is specified it must be equal to expectedSort.
+                const BSONObj expectedSort = BSON("$natural" << 1);
+                const BSONObj& actualSort = canonicalQuery->getParsed().getSort();
+                if (!actualSort.isEmpty() && !(actualSort == expectedSort)) {
+                    return Status(ErrorCodes::BadValue,
+                                  "error processing query: " + canonicalQuery->toString() +
+                                  " invalid sort specified for tailable cursor: "
+                                  + actualSort.toString());
+                }
+            }
+
+            // Try to look up a cached solution for the query.
+            CachedSolution* rawCS;
+            if (PlanCache::shouldCacheQuery(*canonicalQuery) &&
+                collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
+                // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
+                boost::scoped_ptr<CachedSolution> cs(rawCS);
+                QuerySolution *qs, *backupQs;
+                QuerySolution*& chosenSolution=qs; // either qs or backupQs
+                Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs,
+                                                            &qs, &backupQs);
+
+                if (status.isOK()) {
+                    PlanStage *backupRoot=NULL;
+                    // The working set is shared by the root and backupRoot plans.
+                    verify(StageBuilder::build(opCtx, collection, *qs, ws, rootOut));
+                    if ((plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT)
+                        && turnIxscanIntoCount(qs)) {
+                        LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
+                               << ", planSummary: " << getPlanSummary(*qs);
+
+                        if (NULL != backupQs) {
+                            delete backupQs;
+                        }
+                    }
+                    else if (NULL != backupQs) {
+                        verify(StageBuilder::build(opCtx, collection, *backupQs, ws, &backupRoot));
+                    }
+
+                    // add a CachedPlanStage on top of the previous root
+                    *rootOut = new CachedPlanStage(collection, canonicalQuery, *rootOut,
+                                                   backupRoot);
+                    *querySolutionOut = chosenSolution;
+                    return Status::OK();
+                }
+            }
+
+            if (internalQueryPlanOrChildrenIndependently
+                && SubplanStage::canUseSubplanning(*canonicalQuery)) {
+
+                QLOG() << "Running query as sub-queries: " << canonicalQuery->toStringShort();
+
+                SubplanStage* subPlan;
+                Status subplanStatus = SubplanStage::make(opCtx, collection, ws, plannerParams,
+                                                          canonicalQuery, &subPlan);
+                if (subplanStatus.isOK()) {
+                    LOG(2) << "Running query as sub-queries: " << canonicalQuery->toStringShort();
+                    *rootOut = subPlan;
+                    return Status::OK();
+                }
+                else {
+                    QLOG() << "Subplanner: " << subplanStatus.reason();
+                    // Fall back on non-subplan execution.
+                }
+            }
+
+            vector<QuerySolution*> solutions;
+            Status status = QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);
+            if (!status.isOK()) {
+                return Status(ErrorCodes::BadValue,
+                              "error processing query: " + canonicalQuery->toString() +
+                              " planner returned error: " + status.reason());
+            }
+
+            // We cannot figure out how to answer the query.  Perhaps it requires an index
+            // we do not have?
+            if (0 == solutions.size()) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream()
+                              << "error processing query: "
+                              << canonicalQuery->toString()
+                              << " No query solutions");
+            }
+
+            // See if one of our solutions is a fast count hack in disguise.
+            if (plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT) {
+                for (size_t i = 0; i < solutions.size(); ++i) {
+                    if (turnIxscanIntoCount(solutions[i])) {
+                        // Great, we can use solutions[i].  Clean up the other QuerySolution(s).
+                        for (size_t j = 0; j < solutions.size(); ++j) {
+                            if (j != i) {
+                                delete solutions[j];
+                            }
+                        }
+
+                        LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
+                               << ", planSummary: " << getPlanSummary(*solutions[i]);
+
+                        // We're not going to cache anything that's fast count.
+                        verify(StageBuilder::build(opCtx, collection, *solutions[i], ws, rootOut));
+                        *querySolutionOut = solutions[i];
+                        return Status::OK();
+                    }
+                }
+            }
+
+            if (1 == solutions.size()) {
+                LOG(2) << "Only one plan is available; it will be run but will not be cached. "
+                       << canonicalQuery->toStringShort()
+                       << ", planSummary: " << getPlanSummary(*solutions[0]);
+
+                // Only one possible plan.  Run it.  Build the stages from the solution.
+                verify(StageBuilder::build(opCtx, collection, *solutions[0], ws, rootOut));
+                *querySolutionOut = solutions[0];
+                return Status::OK();
+            }
+            else {
+                // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
+                // and so on. The working set will be shared by all candidate plans.
+                MultiPlanStage* multiPlanStage = new MultiPlanStage(collection, canonicalQuery);
+
+                for (size_t ix = 0; ix < solutions.size(); ++ix) {
+                    if (solutions[ix]->cacheData.get()) {
+                        solutions[ix]->cacheData->indexFilterApplied =
+                            plannerParams.indexFiltersApplied;
+                    }
+
+                    // version of StageBuild::build when WorkingSet is shared
+                    PlanStage* nextPlanRoot;
+                    verify(StageBuilder::build(opCtx, collection, *solutions[ix], ws,
+                                               &nextPlanRoot));
+
+                    // Owns none of the arguments
+                    multiPlanStage->addPlan(solutions[ix], nextPlanRoot, ws);
+                }
+
+                // Do the plan selection up front.
+                multiPlanStage->pickBestPlan();
+
+                *rootOut = multiPlanStage;
+                return Status::OK();
+            }
+        }
+
+    }  // namespace
+
+    Status getExecutor(OperationContext* txn,
+                       Collection* collection,
+                       CanonicalQuery* rawCanonicalQuery,
+                       PlanExecutor** out,
+                       size_t plannerOptions) {
+        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
+        auto_ptr<WorkingSet> ws(new WorkingSet());
+        PlanStage* root;
+        QuerySolution* querySolution;
+        Status status = prepareExecution(txn, collection, ws.get(), canonicalQuery.get(),
+                                         plannerOptions, &root, &querySolution);
+        if (!status.isOK()) {
+            return status;
+        }
+        invariant(root);
+        // We must have a tree of stages in order to have a valid plan executor, but the query
+        // solution may be null.
+        *out = new PlanExecutor(ws.release(), root, querySolution, canonicalQuery.release(),
+                                collection);
+        return Status::OK();
+    }
+
     Status getExecutor(OperationContext* txn,
                        Collection* collection,
                        const std::string& ns,
                        const BSONObj& unparsedQuery,
                        PlanExecutor** out,
                        size_t plannerOptions) {
-
         if (!collection) {
             LOG(2) << "Collection " << ns << " does not exist."
                    << " Using EOF stage: " << unparsedQuery.toString();
@@ -183,8 +434,8 @@ namespace mongo {
 
             const WhereCallbackReal whereCallback(txn, collection->ns().db());
             CanonicalQuery* cq;
-            Status status = CanonicalQuery::canonicalize(
-                        collection->ns(), unparsedQuery, &cq, whereCallback);
+            Status status = CanonicalQuery::canonicalize(collection->ns(), unparsedQuery, &cq,
+                                                         whereCallback);
             if (!status.isOK())
                 return status;
 
@@ -199,273 +450,12 @@ namespace mongo {
 
         // Might have to filter out orphaned docs.
         if (plannerOptions & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-            root = new ShardFilterStage(shardingState.getCollectionMetadata(collection->ns()),
-                                        ws, root);
+            root = new ShardFilterStage(shardingState.getCollectionMetadata(collection->ns()), ws,
+                                        root);
         }
 
         *out = new PlanExecutor(ws, root, collection);
         return Status::OK();
-    }
-
-    Status getExecutorIDHack(OperationContext* txn,
-                             Collection* collection,
-                             CanonicalQuery* rawCanonicalQuery,
-                             const QueryPlannerParams& plannerParams,
-                             PlanExecutor** out) {
-        invariant(collection);
-        invariant(rawCanonicalQuery);
-        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
-
-        LOG(2) << "Using idhack: " << canonicalQuery->toStringShort();
-        WorkingSet* ws = new WorkingSet();
-        PlanStage* root = new IDHackStage(txn, collection, canonicalQuery.get(), ws);
-
-        // Might have to filter out orphaned docs.
-        if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-            root = new ShardFilterStage(shardingState.getCollectionMetadata(collection->ns()),
-                                        ws, root);
-        }
-
-        // There might be a projection. The idhack stage will always fetch the full document,
-        // so we don't support covered projections. However, we might use the simple inclusion
-        // fast path.
-        if (NULL != canonicalQuery->getProj()) {
-            ProjectionStageParams params(WhereCallbackReal(txn, collection->ns().db()));
-            params.projObj = canonicalQuery->getProj()->getProjObj();
-
-            // Stuff the right data into the params depending on what proj impl we use.
-            if (canonicalQuery->getProj()->requiresDocument()
-                || canonicalQuery->getProj()->wantIndexKey()) {
-                params.fullExpression = canonicalQuery->root();
-                params.projImpl = ProjectionStageParams::NO_FAST_PATH;
-            }
-            else {
-                params.projImpl = ProjectionStageParams::SIMPLE_DOC;
-            }
-
-            root = new ProjectionStage(params, ws, root);
-        }
-
-        *out = new PlanExecutor(ws, root, canonicalQuery.release(), collection);
-        return Status::OK();
-    }
-
-    Status getExecutor(OperationContext* txn,
-                      Collection* collection,
-                      CanonicalQuery* rawCanonicalQuery,
-                      PlanExecutor** out,
-                      size_t plannerOptions) {
-        invariant(rawCanonicalQuery);
-        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
-
-        // This can happen as we're called by internal clients as well.
-        if (NULL == collection) {
-            const string& ns = canonicalQuery->ns();
-            LOG(2) << "Collection " << ns << " does not exist."
-                   << " Using EOF plan: " << canonicalQuery->toStringShort();
-            EOFStage* eofStage = new EOFStage();
-            WorkingSet* ws = new WorkingSet();
-            *out = new PlanExecutor(ws, eofStage, canonicalQuery.release(), collection);
-            return Status::OK();
-        }
-
-        // Fill out the planning params.  We use these for both cached solutions and non-cached.
-        QueryPlannerParams plannerParams;
-        plannerParams.options = plannerOptions;
-        fillOutPlannerParams(collection, canonicalQuery.get(), &plannerParams);
-
-        // If we have an _id index we can use an idhack plan.
-        if (IDHackStage::supportsQuery(*canonicalQuery.get()) &&
-            collection->getIndexCatalog()->findIdIndex()) {
-            return getExecutorIDHack(txn, collection, canonicalQuery.release(), plannerParams, out);
-        }
-
-        // Tailable: If the query requests tailable the collection must be capped.
-        if (canonicalQuery->getParsed().hasOption(QueryOption_CursorTailable)) {
-            if (!collection->isCapped()) {
-                return Status(ErrorCodes::BadValue,
-                              "error processing query: " + canonicalQuery->toString() +
-                              " tailable cursor requested on non capped collection");
-            }
-
-            // If a sort is specified it must be equal to expectedSort.
-            const BSONObj expectedSort = BSON("$natural" << 1);
-            const BSONObj& actualSort = canonicalQuery->getParsed().getSort();
-            if (!actualSort.isEmpty() && !(actualSort == expectedSort)) {
-                return Status(ErrorCodes::BadValue,
-                              "error processing query: " + canonicalQuery->toString() +
-                              " invalid sort specified for tailable cursor: "
-                              + actualSort.toString());
-            }
-        }
-
-        // Try to look up a cached solution for the query.
-
-        CachedSolution* rawCS;
-        if (PlanCache::shouldCacheQuery(*canonicalQuery) &&
-            collection->infoCache()->getPlanCache()->get(*canonicalQuery.get(), &rawCS).isOK()) {
-            // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
-            boost::scoped_ptr<CachedSolution> cs(rawCS);
-            QuerySolution *qs, *backupQs;
-            QuerySolution*& chosenSolution=qs; // either qs or backupQs
-            Status status = QueryPlanner::planFromCache(*canonicalQuery.get(), plannerParams, *cs,
-                                                        &qs, &backupQs);
-
-            if (status.isOK()) {
-                // The working set will be shared by the root and backupRoot plans
-                // and owned by the containing PlanExecutor.
-                WorkingSet* sharedWs = new WorkingSet();
-
-                PlanStage *root, *backupRoot=NULL;
-                verify(StageBuilder::build(txn, collection, *qs, sharedWs, &root));
-                if ((plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT)
-                    && turnIxscanIntoCount(qs)) {
-                    LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
-                           << ", planSummary: " << getPlanSummary(*qs);
-
-                    if (NULL != backupQs) {
-                        delete backupQs;
-                    }
-                }
-                else if (NULL != backupQs) {
-                    verify(StageBuilder::build(txn, collection, *backupQs, sharedWs, &backupRoot));
-                }
-
-                // add a CachedPlanStage on top of the previous root
-                root = new CachedPlanStage(collection, canonicalQuery.get(), root, backupRoot);
-
-                *out = new PlanExecutor(sharedWs, root, chosenSolution, canonicalQuery.release(),
-                                        collection);
-                return Status::OK();
-            }
-        }
-
-        if (internalQueryPlanOrChildrenIndependently
-            && SubplanStage::canUseSubplanning(*canonicalQuery)) {
-
-            QLOG() << "Running query as sub-queries: " << canonicalQuery->toStringShort();
-
-            auto_ptr<WorkingSet> ws(new WorkingSet());
-
-            SubplanStage* subplan;
-            Status subplanStatus = SubplanStage::make(txn, collection, ws.get(), plannerParams,
-                                                      canonicalQuery.get(), &subplan);
-            if (subplanStatus.isOK()) {
-                LOG(2) << "Running query as sub-queries: " << canonicalQuery->toStringShort();
-                *out = new PlanExecutor(ws.release(), subplan, canonicalQuery.release(),
-                                        collection);
-                return Status::OK();
-            }
-            else {
-                QLOG() << "Subplanner: " << subplanStatus.reason();
-            }
-        }
-
-        return getExecutorAlwaysPlan(txn, collection, canonicalQuery.release(), plannerParams, out);
-    }
-
-    Status getExecutorAlwaysPlan(OperationContext* txn,
-                                 Collection* collection,
-                                 CanonicalQuery* rawCanonicalQuery,
-                                 const QueryPlannerParams& plannerParams,
-                                 PlanExecutor** execOut) {
-        invariant(collection);
-        invariant(rawCanonicalQuery);
-        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
-
-        *execOut = NULL;
-
-        vector<QuerySolution*> solutions;
-        Status status = QueryPlanner::plan(*canonicalQuery.get(), plannerParams, &solutions);
-        if (!status.isOK()) {
-            return Status(ErrorCodes::BadValue,
-                          "error processing query: " + canonicalQuery->toString() +
-                          " planner returned error: " + status.reason());
-        }
-
-        // We cannot figure out how to answer the query.  Perhaps it requires an index
-        // we do not have?
-        if (0 == solutions.size()) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream()
-                          << "error processing query: "
-                          << canonicalQuery->toString()
-                          << " No query solutions");
-        }
-
-        // See if one of our solutions is a fast count hack in disguise.
-        if (plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT) {
-            for (size_t i = 0; i < solutions.size(); ++i) {
-                if (turnIxscanIntoCount(solutions[i])) {
-                    // Great, we can use solutions[i].  Clean up the other QuerySolution(s).
-                    for (size_t j = 0; j < solutions.size(); ++j) {
-                        if (j != i) {
-                            delete solutions[j];
-                        }
-                    }
-
-                    LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
-                           << ", planSummary: " << getPlanSummary(*solutions[i]);
-
-                    // We're not going to cache anything that's fast count.
-                    WorkingSet* ws = new WorkingSet();
-                    PlanStage* root;
-
-                    verify(StageBuilder::build(txn, collection, *solutions[i], ws, &root));
-
-                    *execOut = new PlanExecutor(ws, root, solutions[i], canonicalQuery.release(),
-                                                collection);
-                    return Status::OK();
-                }
-            }
-        }
-
-        if (1 == solutions.size()) {
-            LOG(2) << "Only one plan is available; it will be run but will not be cached. "
-                   << canonicalQuery->toStringShort()
-                   << ", planSummary: " << getPlanSummary(*solutions[0]);
-
-            // Only one possible plan.  Run it.  Build the stages from the solution.
-            WorkingSet* ws = new WorkingSet();
-            PlanStage* root;
-
-            verify(StageBuilder::build(txn, collection, *solutions[0], ws, &root));
-
-            *execOut = new PlanExecutor(ws, root, solutions[0], canonicalQuery.release(),
-                                        collection);
-            return Status::OK();
-        }
-        else {
-            // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
-            // and so on. The working set will be shared by all candidate plans and owned by
-            // the containing PlanExecutor.
-            WorkingSet* sharedWorkingSet = new WorkingSet();
-
-            MultiPlanStage* multiPlanStage = new MultiPlanStage(collection, canonicalQuery.get());
-
-            for (size_t ix = 0; ix < solutions.size(); ++ix) {
-                if (solutions[ix]->cacheData.get()) {
-                    solutions[ix]->cacheData->indexFilterApplied = plannerParams.indexFiltersApplied;
-                }
-
-                // version of StageBuild::build when WorkingSet is shared
-                PlanStage* nextPlanRoot;
-                verify(StageBuilder::build(txn, collection, *solutions[ix],
-                                           sharedWorkingSet, &nextPlanRoot));
-
-                // Owns none of the arguments
-                multiPlanStage->addPlan(solutions[ix], nextPlanRoot, sharedWorkingSet);
-            }
-
-            // Do the plan selection up front.
-            multiPlanStage->pickBestPlan();
-
-            PlanExecutor* exec = new PlanExecutor(sharedWorkingSet, multiPlanStage,
-                                                  canonicalQuery.release(), collection);
-
-            *execOut = exec;
-            return Status::OK();
-        }
     }
 
     //
