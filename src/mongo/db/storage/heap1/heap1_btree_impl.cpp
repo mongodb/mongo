@@ -33,11 +33,14 @@
 #include <set>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/util/mongoutils/str.h"
 
 
 namespace mongo {
 namespace {
-    
+
+    const int TempKeyMaxSize = 1024; // this goes away with SERVER-3372
+
     struct IndexEntry {
         IndexEntry(const BSONObj& key, DiskLoc loc) :key(key), loc(loc) {}
 
@@ -280,6 +283,14 @@ namespace {
             invariant(loc.isValid());
             invariant(!hasFieldNames(key));
 
+            if ( key.objsize() > TempKeyMaxSize ) {
+                string msg = mongoutils::str::stream()
+                    << "Heap1Btree::insert: key too large to index, failing "
+                    << ' ' << key.objsize() << ' ' << key;
+                log() << msg << endl;
+                return Status(ErrorCodes::KeyTooLong, msg);
+            }
+
             // TODO optimization: save the iterator from the dup-check to speed up insert
             if (!dupsAllowed && isDup(*_data, key, loc))
                 return dupKeyError(key);
@@ -308,7 +319,6 @@ namespace {
         }
 
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const {
-            // 24 is a guess for DiskLoc + std::set overhead
             return _currentKeySize + ( sizeof(IndexEntry) * _data->size() );
         }
 
