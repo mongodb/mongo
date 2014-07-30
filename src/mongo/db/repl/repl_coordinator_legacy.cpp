@@ -487,8 +487,9 @@ namespace {
         }
     }
 
-    void LegacyReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
+    Status LegacyReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
         theReplSet->summarizeStatus(*result);
+        return Status::OK();
     }
 
     void LegacyReplicationCoordinator::processReplSetGetConfig(BSONObjBuilder* result) {

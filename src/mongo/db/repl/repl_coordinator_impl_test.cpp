@@ -466,6 +466,8 @@ namespace {
         ASSERT_EQUALS(3U, rids.size()); // Make sure we saw all 3 nodes
     }
 
+    // TODO(spencer): Unit test processReplSetGetStatus
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

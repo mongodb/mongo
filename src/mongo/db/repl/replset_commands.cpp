@@ -147,9 +147,8 @@ namespace repl {
             if (!status.isOK())
                 return appendCommandStatus(result, status);
 
-            getGlobalReplicationCoordinator()->processReplSetGetStatus(&result);
-
-            return true;
+            status = getGlobalReplicationCoordinator()->processReplSetGetStatus(&result);
+            return appendCommandStatus(result, status);
         }
     } cmdReplSetGetStatus;
 

@@ -102,7 +102,7 @@ namespace repl {
                 OperationContext* txn,
                 std::vector<BSONObj>* handshakes);
 
-        virtual void processReplSetGetStatus(BSONObjBuilder* result);
+        virtual Status processReplSetGetStatus(BSONObjBuilder* result);
 
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 

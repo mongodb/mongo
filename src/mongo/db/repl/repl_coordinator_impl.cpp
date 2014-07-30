@@ -434,8 +434,22 @@ namespace repl {
         }
     }
 
-    void ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* result) {
-        // TODO
+    Status ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* response) {
+        Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
+        CBHStatus cbh = _replExecutor->scheduleWork(
+            stdx::bind(&TopologyCoordinator::prepareStatusResponse,
+                       _topCoord.get(),
+                       stdx::placeholders::_1,
+                       Date_t(curTimeMillis64()),
+                       time(0) - serverGlobalParams.started,
+                       response,
+                       &result));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+        }
+        fassert(18640, cbh.getStatus());
+        _replExecutor->wait(cbh.getValue());
+        return result;
     }
 
     void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result) {

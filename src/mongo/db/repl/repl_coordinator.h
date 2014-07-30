@@ -269,7 +269,7 @@ namespace repl {
         /**
          * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.
          */
-        virtual void processReplSetGetStatus(BSONObjBuilder* result) = 0;
+        virtual Status processReplSetGetStatus(BSONObjBuilder* result) = 0;
 
         /**
          * Handles an incoming replSetGetConfig command. Adds BSON to 'result'.

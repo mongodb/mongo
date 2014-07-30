@@ -171,10 +171,11 @@ namespace repl {
         //_impl.prepareReplSetUpdatePositionCommandHandshakes(&implResult);
     }
 
-    void HybridReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
-        _legacy.processReplSetGetStatus(result);
+    Status HybridReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
+        Status legacyStatus = _legacy.processReplSetGetStatus(result);
         BSONObjBuilder implResult;
         _impl.processReplSetGetStatus(&implResult);
+        return legacyStatus;
     }
 
     void HybridReplicationCoordinator::processReplSetGetConfig(BSONObjBuilder* result) {

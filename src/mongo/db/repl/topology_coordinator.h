@@ -127,10 +127,11 @@ namespace repl {
                                                           int id) = 0;
 
         // produce a reply to a status request
-        virtual void prepareStatusResponse(Date_t now,
-                                           const BSONObj& cmdObj,
-                                           BSONObjBuilder& result,
-                                           unsigned uptime) = 0;
+        virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,
+                                           Date_t now,
+                                           unsigned uptime,
+                                           BSONObjBuilder* response,
+                                           Status* result) = 0;
 
         // produce a reply to a freeze request
         virtual void prepareFreezeResponse(Date_t now,

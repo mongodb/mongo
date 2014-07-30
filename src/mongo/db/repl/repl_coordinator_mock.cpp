@@ -145,8 +145,8 @@ namespace repl {
         // TODO
     }
 
-    void ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
-        // TODO
+    Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
+        return Status::OK();
     }
 
     bool ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* txn, bool activate) {

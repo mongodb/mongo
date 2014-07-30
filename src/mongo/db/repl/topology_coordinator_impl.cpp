@@ -904,10 +904,17 @@ namespace repl {
         }
     }
 
-    void TopologyCoordinatorImpl::prepareStatusResponse(Date_t now,
-                                                        const BSONObj& cmdObj,
-                                                        BSONObjBuilder& result,
-                                                        unsigned uptime) {
+    void TopologyCoordinatorImpl::prepareStatusResponse(
+            const ReplicationExecutor::CallbackData& data,
+            Date_t now,
+            unsigned uptime,
+            BSONObjBuilder* response,
+            Status* result) {
+        if (data.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+
         // output for each member
         vector<BSONObj> membersOut;
         MemberState myState = _memberState;
@@ -995,24 +1002,25 @@ namespace repl {
         // sort members bson
         sort(membersOut.begin(), membersOut.end());
 
-        result.append("set", _currentConfig.getReplSetName());
-        result.appendTimeT("date", now);
-        result.append("myState", myState.s);
+        response->append("set", _currentConfig.getReplSetName());
+        response->appendTimeT("date", now);
+        response->append("myState", myState.s);
 
         // Add sync source info
         if ((_syncSourceIndex != -1) && 
             (myState != MemberState::RS_PRIMARY) &&
             (myState != MemberState::RS_SHUNNED) ) {
-            result.append("syncingTo", _currentConfig.getMemberAt(_syncSourceIndex)
+            response->append("syncingTo", _currentConfig.getMemberAt(_syncSourceIndex)
                           .getHostAndPort().toString());
         }
 
-        result.append("members", membersOut);
+        response->append("members", membersOut);
         /* TODO: decide where this lands
         if( replSetBlind )
             result.append("blind",true); // to avoid confusion if set...
                                          // normally never set except for testing.
         */
+        *result = Status::OK();
     }
     void TopologyCoordinatorImpl::prepareFreezeResponse(Date_t now,
                                                         const BSONObj& cmdObj,
