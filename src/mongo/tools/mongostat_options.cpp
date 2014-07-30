@@ -84,10 +84,10 @@ namespace mongo {
         *out << "   getmore    \t- # of get mores (cursor batch) per second\n";
         *out << "   command    \t- # of commands per second, on a slave its local|replicated\n";
         *out << "   flushes    \t- # of fsync flushes per second\n";
-        *out << "   mapped     \t- amount of data mmaped (total data size) megabytes\n";
+        *out << "   mapped     \t- amount of data mmapped (total data size) in megabytes\n";
         *out << "   vsize      \t- virtual size of process in megabytes\n";
         *out << "   res        \t- resident size of process in megabytes\n";
-        *out << "   non-mapped \t- amount virtual memeory less mapped memory (only with --all)\n";
+        *out << "   non-mapped \t- amount virtual memory less mapped memory in megabytes (only with --all)\n";
         *out << "   faults     \t- # of pages faults per sec\n";
         *out << "   locked     \t- name of and percent time for most locked database\n";
         *out << "   idx miss   \t- percent of btree page misses (sampled)\n";
