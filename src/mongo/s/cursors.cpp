@@ -333,19 +333,20 @@ namespace mongo {
     }
 
     void CursorCache::gotKillCursors(Message& m ) {
-        int *x = (int *) m.singleData()->_data;
-        x++; // reserved
-        int n = *x++;
+        DbMessage dbmessage(m);
+        int n = dbmessage.pullInt();
 
         if ( n > 2000 ) {
             ( n < 30000 ? warning() : error() ) << "receivedKillCursors, n=" << n << endl;
         }
 
-
         uassert( 13286 , "sent 0 cursors to kill" , n >= 1 );
         uassert( 13287 , "too many cursors to kill" , n < 30000 );
+        massert( 18632 , str::stream() << "bad kill cursors size: " << m.dataSize(), 
+                    m.dataSize() == 8 + ( 8 * n ) );
 
-        long long * cursors = (long long *)x;
+
+        const long long* cursors = dbmessage.getArray(n);
         ClientBasic* client = ClientBasic::getCurrent();
         AuthorizationSession* authSession = client->getAuthorizationSession();
         for ( int i=0; i<n; i++ ) {

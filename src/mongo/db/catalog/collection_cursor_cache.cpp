@@ -236,11 +236,13 @@ namespace mongo {
 
     // ---
 
-    std::size_t CollectionCursorCache::timeoutCursorsGlobal(OperationContext* txn, int millisSinceLastCall) {;
+    std::size_t CollectionCursorCache::timeoutCursorsGlobal(OperationContext* txn, 
+        int millisSinceLastCall) {;
     return _globalCursorIdCache.timeoutCursors(txn, millisSinceLastCall);
     }
 
-    int CollectionCursorCache::eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, long long* ids) {
+    int CollectionCursorCache::eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, 
+        const long long* ids) {
         int numDeleted = 0;
         for ( int i = 0; i < n; i++ ) {
             if ( eraseCursorGlobalIfAuthorized(txn, ids[i] ) )
@@ -377,7 +379,8 @@ namespace mongo {
                 toDelete.push_back( cc );
         }
 
-        for ( vector<ClientCursor*>::const_iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
+        for ( vector<ClientCursor*>::const_iterator i = toDelete.begin();
+                i != toDelete.end(); ++i ) {
             ClientCursor* cc = *i;
             _deregisterCursor_inlock( cc );
             cc->kill();

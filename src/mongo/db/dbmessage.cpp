@@ -65,6 +65,107 @@ namespace mongo {
         return ss.str();
     }
 
+    DbMessage::DbMessage(const Message& msg) : _msg(msg), _nsStart(NULL), _mark(NULL), _nsLen(0) {
+        // for received messages, Message has only one buffer
+        _theEnd = _msg.singleData()->_data + _msg.singleData()->dataLen();
+        _nextjsobj = _msg.singleData()->_data;
+
+        _reserved = readAndAdvance<int>();
+
+        // Read packet for NS
+        if (messageShouldHaveNs()) {
+
+            // Limit = buffer size of message -
+            //        (first int4 in message which is either flags or a zero constant)
+            size_t limit = _msg.singleData()->dataLen() - sizeof(int);
+
+            _nsStart = _nextjsobj;
+            _nsLen = strnlen(_nsStart, limit);
+
+            // Validate there is room for a null byte in the buffer
+            // Strings can be zero length
+            uassert(18633, "Failed to parse ns string", _nsLen <= (limit - 1));
+
+            _nextjsobj += _nsLen + 1; // skip namespace + null
+        }
+    }
+
+    const char * DbMessage::getns() const {
+        verify(messageShouldHaveNs());
+        return _nsStart;
+    }
+
+    int DbMessage::getQueryNToReturn() const {
+        verify(messageShouldHaveNs());
+        const char* p = _nsStart + _nsLen + 1;
+        checkRead<int>(p, 2);
+
+        return ((reinterpret_cast<const int*>(p)))[1];
+    }
+
+    int DbMessage::pullInt() {
+        return readAndAdvance<int>();
+    }
+
+    long long DbMessage::pullInt64() {
+        return readAndAdvance<long long>();
+    }
+
+    const long long* DbMessage::getArray(size_t count) const {
+        checkRead<long long>(_nextjsobj, count);
+        return reinterpret_cast<const long long*>(_nextjsobj);
+    }
+
+    BSONObj DbMessage::nextJsObj() {
+        massert(10304,
+            "Client Error: Remaining data too small for BSON object",
+            _nextjsobj != NULL && _theEnd - _nextjsobj >= 5);
+
+        if (serverGlobalParams.objcheck) {
+            Status status = validateBSON(_nextjsobj, _theEnd - _nextjsobj);
+            massert(10307,
+                str::stream() << "Client Error: bad object in message: " << status.reason(),
+                status.isOK());
+        }
+
+        BSONObj js(_nextjsobj);
+        verify(js.objsize() >= 5);
+        verify(js.objsize() <= (_theEnd - _nextjsobj));
+
+        _nextjsobj += js.objsize();
+        if (_nextjsobj >= _theEnd)
+            _nextjsobj = NULL;
+        return js;
+    }
+
+    void DbMessage::markReset(const char * toMark = NULL) {
+        if (toMark == NULL) {
+            toMark = _mark;
+        }
+
+        verify(toMark);
+        _nextjsobj = toMark;
+    }
+
+    template<typename T>
+    void DbMessage::checkRead(const char* start, size_t count) const {
+        if ((_theEnd - start) < static_cast<int>(sizeof(T) * count)) {
+            uassert(18634, "Not enough data to read", false);
+        }
+    }
+
+    template<typename T>
+    T DbMessage::read() const {
+        checkRead<T>(_nextjsobj, 1);
+
+        return *(reinterpret_cast<const T*>(_nextjsobj));
+    }
+
+    template<typename T> T DbMessage::readAndAdvance() {
+        T t = read<T>();
+        _nextjsobj += sizeof(T);
+        return t;
+    }
 
     void replyToQuery(int queryResultFlags,
                       AbstractMessagingPort* p, Message& requestMsg,

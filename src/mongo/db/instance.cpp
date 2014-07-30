@@ -330,7 +330,8 @@ namespace mongo {
         // before we lock...
         int op = m.operation();
         bool isCommand = false;
-        const char *ns = m.singleData()->_data + 4;
+
+        DbMessage dbmsg(m);
 
         Client& c = cc();
         if (!c.isGod()) {
@@ -341,7 +342,9 @@ namespace mongo {
         }
 
         if ( op == dbQuery ) {
-            if( strstr(ns, ".$cmd") ) {
+            const char *ns = dbmsg.getns();
+
+            if (strstr(ns, ".$cmd")) {
                 isCommand = true;
                 opwrite(m);
                 if( strstr(ns, ".$cmd.sys.") ) {
@@ -426,7 +429,8 @@ namespace mongo {
         }
         else if ( op == dbMsg ) {
             // deprecated - replaced by commands
-            char *p = m.singleData()->_data;
+            const char *p = dbmsg.getns();
+
             int len = strlen(p);
             if ( len > 400 )
                 log() << curTimeMillis64() % 10000 <<
@@ -443,8 +447,6 @@ namespace mongo {
         }
         else {
             try {
-                const NamespaceString nsString( ns );
-
                 // The following operations all require authorization.
                 // dbInsert, dbUpdate and dbDelete can be easily pre-authorized,
                 // here, but dbKillCursors cannot.
@@ -453,25 +455,32 @@ namespace mongo {
                     logThreshold = 10;
                     receivedKillCursors(txn, m);
                 }
-                else if ( !nsString.isValid() ) {
-                    // Only killCursors doesn't care about namespaces
-                    uassert( 16257, str::stream() << "Invalid ns [" << ns << "]", false );
-                }
-                else if ( op == dbInsert ) {
-                    receivedInsert(txn, m, currentOp);
-                }
-                else if ( op == dbUpdate ) {
-                    receivedUpdate(txn, m, currentOp);
-                }
-                else if ( op == dbDelete ) {
-                    receivedDelete(txn, m, currentOp);
-                }
-                else {
+                else if (op != dbInsert && op != dbUpdate && op != dbDelete) {
                     mongo::log() << "    operation isn't supported: " << op << endl;
                     currentOp.done();
                     shouldLog = true;
                 }
-            }
+                else {
+                    const char* ns = dbmsg.getns();
+                    const NamespaceString nsString(ns);
+
+                    if (!nsString.isValid()) {
+                        uassert(16257, str::stream() << "Invalid ns [" << ns << "]", false);
+                    }
+                    else if (op == dbInsert) {
+                        receivedInsert(txn, m, currentOp);
+                    }
+                    else if (op == dbUpdate) {
+                        receivedUpdate(txn, m, currentOp);
+                    }
+                    else if (op == dbDelete) {
+                        receivedDelete(txn, m, currentOp);
+                    }
+                    else {
+                        invariant(false);
+                    }
+                }
+             }
             catch (const UserException& ue) {
                 setLastError(ue.getCode(), ue.getInfo().msg.c_str());
                 LOG(3) << " Caught Assertion in " << opToString(op) << ", continuing "
@@ -514,9 +523,8 @@ namespace mongo {
     } /* assembleResponse() */
 
     void receivedKillCursors(OperationContext* txn, Message& m) {
-        int *x = (int *) m.singleData()->_data;
-        x++; // reserved
-        int n = *x++;
+        DbMessage dbmessage(m);
+        int n = dbmessage.pullInt();
 
         uassert( 13659 , "sent 0 cursors to kill" , n != 0 );
         massert( 13658 , str::stream() << "bad kill cursors size: " << m.dataSize() , m.dataSize() == 8 + ( 8 * n ) );
@@ -527,7 +535,9 @@ namespace mongo {
             verify( n < 30000 );
         }
 
-        int found = CollectionCursorCache::eraseCursorGlobalIfAuthorized(txn, n, (long long *) x);
+        const long long* cursorArray = dbmessage.getArray(n);
+
+        int found = CollectionCursorCache::eraseCursorGlobalIfAuthorized(txn, n, cursorArray);
 
         if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) || found != n ) {
             LOG( found == n ? 1 : 0 ) << "killcursors: found " << found << " of " << n << endl;
