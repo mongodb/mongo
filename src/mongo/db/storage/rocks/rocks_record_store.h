@@ -179,6 +179,8 @@ namespace mongo {
 
         static RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx );
 
+        DiskLoc _makeDiskLoc( const rocksdb::Slice& slice );
+
         DiskLoc _nextId();
         bool cappedAndNeedDelete() const;
         void cappedDeleteAsNeeded(OperationContext* txn);

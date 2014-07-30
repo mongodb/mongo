@@ -480,6 +480,10 @@ namespace mongo {
         return dynamic_cast<RocksRecoveryUnit*>( opCtx->recoveryUnit() );
     }
 
+    DiskLoc RocksRecordStore::_makeDiskLoc( const rocksdb::Slice& slice ) {
+        return reinterpret_cast<const DiskLoc*>( slice.data() )[0];
+    }
+
     // XXX make sure these work with rollbacks (I don't think they will)
     void RocksRecordStore::_changeNumRecords( OperationContext* txn, bool insert ) {
         boost::mutex::scoped_lock lk( _numRecordsLock );
