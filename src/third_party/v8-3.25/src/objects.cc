@@ -8728,6 +8728,7 @@ static inline bool CompareRawStringContents(const Char* const a,
                                             const Char* const b,
                                             int length) {
   int i = 0;
+#if 0 // (SERVER-13824)
 #ifndef V8_HOST_CAN_READ_UNALIGNED
   // If this architecture isn't comfortable reading unaligned ints
   // then we have to check that the strings are aligned before
@@ -8750,6 +8751,7 @@ static inline bool CompareRawStringContents(const Char* const a,
 #ifndef V8_HOST_CAN_READ_UNALIGNED
   }
 #endif
+#endif // (SERVER-13824)
   // Compare the remaining characters that didn't fit into a block.
   for (; i < length; i++) {
     if (a[i] != b[i]) {

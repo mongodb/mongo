@@ -6876,9 +6876,10 @@ template <typename Char>
 static inline bool CompareRawStringContents(Vector<Char> a, Vector<Char> b) {
   int length = a.length();
   ASSERT_EQ(length, b.length());
-  const Char* pa = a.start();
-  const Char* pb = b.start();
+// (SERVER-13824)   const Char* pa = a.start();
+// (SERVER-13824)   const Char* pb = b.start();
   int i = 0;
+#if 0 // (SERVER-13824)
 #ifndef V8_HOST_CAN_READ_UNALIGNED
   // If this architecture isn't comfortable reading unaligned ints
   // then we have to check that the strings are aligned before
@@ -6901,6 +6902,7 @@ static inline bool CompareRawStringContents(Vector<Char> a, Vector<Char> b) {
 #ifndef V8_HOST_CAN_READ_UNALIGNED
   }
 #endif
+#endif // (SERVER-13824)
   // Compare the remaining characters that didn't fit into a block.
   for (; i < length; i++) {
     if (a[i] != b[i]) {
