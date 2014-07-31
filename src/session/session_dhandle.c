@@ -266,7 +266,18 @@ __session_discard_btree(
 	session->dhandle = dhandle_cache->dhandle;
 
 	__wt_overwrite_and_free(session, dhandle_cache);
-	__wt_conn_btree_close(session);
+
+	/*
+	 * Some internal sessions are closed after the underlying connection
+	 * handles are forcibly closed and the underlying memory freed. Skip
+	 * this step when discarding entries from internal sessions to avoid
+	 * that problem.  This implies that any handle opened by an internal
+	 * session will never be closed or discarded, but is cached forever.
+	 * That should be OK, internal servers mostly care about the metadata
+	 * file.
+	 */
+	if (!F_ISSET(session, WT_SESSION_INTERNAL))
+		__wt_conn_btree_close(session);
 
 	/* Restore the original handle in the session. */
 	session->dhandle = saved_dhandle;
