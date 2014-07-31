@@ -190,7 +190,7 @@ __evict_server(void *arg)
 		 * number of eviction workers running, shut one down.
 		 */
 		if (cache->eviction_workers > 2) {
-			worker = &workers[cache->eviction_workers--];
+			worker = &workers[--cache->eviction_workers];
 			F_CLR(worker, WT_EVICT_WORKER_RUN);
 			WT_TRET(__wt_cond_signal(
 			    session, cache->evict_waiter_cond));
