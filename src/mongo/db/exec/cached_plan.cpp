@@ -46,9 +46,13 @@ namespace mongo {
     CachedPlanStage::CachedPlanStage(const Collection* collection,
                                      CanonicalQuery* cq,
                                      PlanStage* mainChild,
-                                     PlanStage* backupChild)
+                                     QuerySolution* mainQs,
+                                     PlanStage* backupChild,
+                                     QuerySolution* backupQs)
         : _collection(collection),
           _canonicalQuery(cq),
+          _mainQs(mainQs),
+          _backupQs(backupQs),
           _mainChildPlan(mainChild),
           _backupChildPlan(backupChild),
           _usingBackupChild(false),

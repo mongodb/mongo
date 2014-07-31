@@ -265,12 +265,11 @@ namespace mongo {
                 // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
                 boost::scoped_ptr<CachedSolution> cs(rawCS);
                 QuerySolution *qs, *backupQs;
-                QuerySolution*& chosenSolution=qs; // either qs or backupQs
                 Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs,
                                                             &qs, &backupQs);
 
                 if (status.isOK()) {
-                    PlanStage *backupRoot=NULL;
+                    PlanStage *backupRoot = NULL;
                     // The working set is shared by the root and backupRoot plans.
                     verify(StageBuilder::build(opCtx, collection, *qs, ws, rootOut));
                     if ((plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT)
@@ -278,19 +277,16 @@ namespace mongo {
 
                         LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
                                << ", planSummary: " << Explain::getPlanSummary(*rootOut);
-
-                        if (NULL != backupQs) {
-                            delete backupQs;
-                        }
                     }
                     else if (NULL != backupQs) {
                         verify(StageBuilder::build(opCtx, collection, *backupQs, ws, &backupRoot));
                     }
 
-                    // add a CachedPlanStage on top of the previous root
-                    *rootOut = new CachedPlanStage(collection, canonicalQuery, *rootOut,
-                                                   backupRoot);
-                    *querySolutionOut = chosenSolution;
+                    // Add a CachedPlanStage on top of the previous root. Takes ownership of
+                    // '*rootOut', 'backupRoot', 'qs', and 'backupQs'.
+                    *rootOut = new CachedPlanStage(collection, canonicalQuery,
+                                                   *rootOut, qs,
+                                                   backupRoot, backupQs);
                     return Status::OK();
                 }
             }

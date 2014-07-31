@@ -33,6 +33,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 
@@ -45,10 +46,15 @@ namespace mongo {
      */
     class CachedPlanStage : public PlanStage {
     public:
+        /**
+         * Takes ownership of 'mainChild', 'mainQs', 'backupChild', and 'backupQs'.
+         */
         CachedPlanStage(const Collection* collection,
                         CanonicalQuery* cq,
                         PlanStage* mainChild,
-                        PlanStage* backupChild=NULL);
+                        QuerySolution* mainQs,
+                        PlanStage* backupChild = NULL,
+                        QuerySolution* backupQs = NULL);
 
         virtual ~CachedPlanStage();
 
@@ -82,7 +88,13 @@ namespace mongo {
         // not owned
         CanonicalQuery* _canonicalQuery;
 
-        // owned by us
+        // Owned by us. Must be deleted after the corresponding PlanStage trees, as
+        // those trees point into the query solutions.
+        boost::scoped_ptr<QuerySolution> _mainQs;
+        boost::scoped_ptr<QuerySolution> _backupQs;
+
+        // Owned by us. Must be deleted before the QuerySolutions above, as these
+        // can point into the QuerySolutions.
         boost::scoped_ptr<PlanStage> _mainChildPlan;
         boost::scoped_ptr<PlanStage> _backupChildPlan;
 
