@@ -106,9 +106,6 @@ struct __wt_connection_impl {
 
 	WT_FH *lock_fh;			/* Lock file handle */
 
-	pthread_t cache_evict_tid;	/* Eviction server thread ID */
-	int	  cache_evict_tid_set;	/* Eviction server thread ID set */
-
 	uint64_t  split_gen;		/* Generation number for splits */
 
 	WT_SPINLOCK dhandle_lock;	/* Locked: dhandle sweep */
@@ -201,6 +198,10 @@ struct __wt_connection_impl {
 	int		 async_cfg;	/* Global async configuration */
 	uint32_t	 async_size;	/* Async op array size */
 	uint32_t	 async_workers;	/* Number of async workers */
+
+	WT_SESSION_IMPL *evict_session;	/* Eviction server session */
+	pthread_t	 evict_tid;	/* Eviction server thread ID */
+	int		 evict_tid_set;	/* Eviction server thread ID set */
 
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	pthread_t	 stat_tid;	/* Statistics log thread */

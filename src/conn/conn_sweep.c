@@ -135,6 +135,7 @@ __wt_sweep_create(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
 
+	/* Set first, the thread might run before we finish up. */
 	F_SET(conn, WT_CONN_SERVER_SWEEP);
 
 	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
