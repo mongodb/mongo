@@ -79,6 +79,7 @@ namespace mongo {
 
         public:
             FTSSpec( const BSONObj& indexInfo );
+            ~FTSSpec();
 
             bool wildcard() const { return _wildcard; }
             const FTSLanguage& defaultLanguage() const { return *_defaultLanguage; }
@@ -89,6 +90,18 @@ namespace mongo {
 
             size_t numExtraAfter() const { return _extraAfter.size(); }
             const std::string& extraAfter( unsigned i ) const { return _extraAfter[i]; }
+
+            /**
+             * Get a stemmer for the given language. If the stemmer
+             * doesn't exist, it makes a new one.
+             */
+            const Stemmer* findStemmer(const FTSLanguage& language);
+
+            /**
+             * Insert a new stemmer to the stemmer cache.
+             * @return a reference to the inserted stemmer
+             */
+            const Stemmer* addStemmer(const FTSLanguage& language);
 
             /**
              * Calculates term/score pairs for a BSONObj as applied to this spec.

@@ -42,7 +42,7 @@ namespace mongo {
     const char* TextStage::kStageType = "TEXT";
 
     TextStage::TextStage(OperationContext* txn,
-                         const TextStageParams& params,
+                         TextStageParams& params,
                          WorkingSet* ws,
                          const MatchExpression* filter)
         : _txn(txn),

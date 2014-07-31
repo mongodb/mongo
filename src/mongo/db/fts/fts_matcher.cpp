@@ -38,7 +38,7 @@ namespace mongo {
 
     namespace fts {
 
-        FTSMatcher::FTSMatcher( const FTSQuery& query, const FTSSpec& spec )
+        FTSMatcher::FTSMatcher( const FTSQuery& query, FTSSpec& spec )
             : _query( query ),
               _spec( spec ) {
         }
@@ -47,7 +47,7 @@ namespace mongo {
          * Checks if the obj contains any of the negTerms, if so returns true, otherwise false
          * @param obj, object to be checked
          */
-        bool FTSMatcher::hasNegativeTerm(const BSONObj& obj ) const {
+        bool FTSMatcher::hasNegativeTerm(const BSONObj& obj ) {
             // called during search. deals with the case in which we have a term
             // flagged for exclusion, i.e. "hello -world" we want to remove all
             // results that include "world"
@@ -73,15 +73,15 @@ namespace mongo {
          * @param raw, the raw string to be tokenized
          */
         bool FTSMatcher::_hasNegativeTerm_string( const FTSLanguage* language,
-                                                  const string& raw ) const {
+                                                  const string& raw ) {
 
             Tokenizer i( *language, raw );
-            Stemmer stemmer( *language );
+            const Stemmer* stemmer = _spec.findStemmer(*language);
             while ( i.more() ) {
                 Token t = i.next();
                 if ( t.type != Token::TEXT )
                     continue;
-                string word = stemmer.stem( tolowerString( t.data ) );
+                string word = stemmer->stem( tolowerString( t.data ) );
                 if ( _query.getNegatedTerms().count( word ) > 0 )
                     return true;
             }

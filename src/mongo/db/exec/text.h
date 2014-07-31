@@ -106,7 +106,7 @@ namespace mongo {
         };
 
         TextStage(OperationContext* txn,
-                  const TextStageParams& params,
+                  TextStageParams& params,
                   WorkingSet* ws,
                   const MatchExpression* filter);
 
