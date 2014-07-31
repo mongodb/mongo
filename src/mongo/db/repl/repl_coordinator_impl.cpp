@@ -85,8 +85,8 @@ namespace repl {
     ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
                                             const ReplSettings& settings,
                                             ReplicationCoordinatorExternalState* externalState) :
-            _inShutdown(false),
             _settings(settings),
+            _inShutdown(false),
             _externalState(externalState),
             _thisMembersConfigIndex(-1) {
 
