@@ -114,7 +114,7 @@ walk_log(WT_SESSION *session)
 	WT_LSN lsn, lsnsave;
 	WT_ITEM logrec_key, logrec_value;
 	WT_SESSION *session2;
-	uint64_t prev_txnid, txnid;
+	uint64_t txnid;
 	uint32_t fileid, opcount, optype, rectype;
 	int first, i, in_txn, ret;
 
@@ -125,7 +125,7 @@ walk_log(WT_SESSION *session)
 	ret = session2->open_cursor(session2, uri, NULL, "raw=true", &cursor2);
 	i = 0;
 	in_txn = 0;
-	prev_txnid = txnid = 0;
+	txnid = 0;
 	memset(&lsnsave, 0, sizeof(lsnsave));
 	while ((ret = cursor->next(cursor)) == 0) {
 		/*! [log cursor get_key] */
@@ -149,7 +149,7 @@ walk_log(WT_SESSION *session)
 		 * If we are in a transaction and this is a new one, end
 		 * the previous one.
 		 */
-		if (in_txn && prev_txnid != txnid) {
+		if (in_txn && (opcount == 0 || opcount == 1)) {
 			ret = session2->commit_transaction(session2, NULL);
 			in_txn = 0;
 		}
@@ -166,7 +166,6 @@ walk_log(WT_SESSION *session)
 				    NULL);
 				in_txn = 1;
 			}
-			prev_txnid = txnid;
 			cursor2->set_key(cursor2, &logrec_key);
 			cursor2->set_value(cursor2, &logrec_value);
 			ret = cursor2->insert(cursor2);
