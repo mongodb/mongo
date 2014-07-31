@@ -37,6 +37,7 @@
 #include <rocksdb/db.h>
 #include <rocksdb/options.h>
 #include <rocksdb/slice.h>
+#include <rocksdb/status.h>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_noop.h"
@@ -66,6 +67,23 @@ namespace mongo {
         return options;
     }
 
+    // the name of the column family that will be used to back the data in all the record stores
+    // created during tests.
+    const string columnFamilyName = "myColumnFamily";
+
+    boost::shared_ptr<rocksdb::ColumnFamilyHandle> _createCfh(rocksdb::DB* db ) {
+
+        rocksdb::ColumnFamilyHandle* cfh;
+
+        rocksdb::Status s = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(),
+                                                    columnFamilyName,
+                                                    &cfh );
+
+        invariant( s.ok() );
+
+        return boost::shared_ptr<rocksdb::ColumnFamilyHandle>( cfh );
+    }
+
     string _rocksRecordStoreTestDir = "mongo-rocks-test";
 
     rocksdb::DB* getDB( string path) {
@@ -81,15 +99,27 @@ namespace mongo {
         return db;
     }
 
-    rocksdb::DB* getDBPersist( string path ) {
-        rocksdb::Options options = RocksEngine::dbOptions();
+    typedef std::pair<shared_ptr<rocksdb::DB>, shared_ptr<rocksdb::ColumnFamilyHandle> > DbAndCfh;
+    DbAndCfh getDBPersist( string path ) {
+        // Need to pass a vector with cfd's for every column family, which should just be
+        // columnFamilyName (for data) and the rocks default column family (for metadata).
+        vector<rocksdb::ColumnFamilyDescriptor> descriptors;
+        descriptors.push_back( rocksdb::ColumnFamilyDescriptor() );
+        descriptors.push_back( rocksdb::ColumnFamilyDescriptor( columnFamilyName,
+                                                                rocksdb::ColumnFamilyOptions() ) );
 
         // open DB
         rocksdb::DB* db;
-        rocksdb::Status s = rocksdb::DB::Open(options, path, &db);
+        rocksdb::Options options = RocksEngine::dbOptions();
+        vector<rocksdb::ColumnFamilyHandle*> handles;
+        rocksdb::Status s = rocksdb::DB::Open(options, path, descriptors, &handles, &db);
         ASSERT_OK( toMongoStatus( s ) );
 
-        return db;
+        // so that the caller of this function has access to the column family handle backing the
+        // record store data.
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfhPtr( handles[1] );
+
+        return std::make_pair( boost::shared_ptr<rocksdb::DB>( db ), cfhPtr );
     }
 
     TEST( RocksRecoveryUnitTest, Simple1 ) {
@@ -150,12 +180,11 @@ namespace mongo {
     TEST( RocksRecordStoreTest, Insert1 ) {
         unittest::TempDir td( _rocksRecordStoreTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = _createCfh( db.get() );
         int size;
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(),
-                                 db->DefaultColumnFamily(),
-                                 db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
             string s = "eliot was here";
             size = s.length() + 1;
 
@@ -172,9 +201,7 @@ namespace mongo {
         }
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(),
-                                 db->DefaultColumnFamily(),
-                                 db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
             ASSERT_EQUALS( 1, rs.numRecords() );
             ASSERT_EQUALS( size, rs.dataSize() );
         }
@@ -183,11 +210,10 @@ namespace mongo {
     TEST( RocksRecordStoreTest, Delete1 ) {
         unittest::TempDir td( _rocksRecordStoreTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = _createCfh( db.get() );
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(),
-                                 db->DefaultColumnFamily(),
-                                 db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
             string s = "eliot was here";
 
             DiskLoc loc;
@@ -224,11 +250,10 @@ namespace mongo {
     TEST( RocksRecordStoreTest, Update1 ) {
         unittest::TempDir td( _rocksRecordStoreTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = _createCfh( db.get() );
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(),
-                                 db->DefaultColumnFamily(),
-                                 db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
             string s1 = "eliot1";
             string s2 = "eliot2 and more";
 
@@ -271,11 +296,10 @@ namespace mongo {
     TEST( RocksRecordStoreTest, UpdateInPlace1 ) {
         unittest::TempDir td( _rocksRecordStoreTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = _createCfh( db.get() );
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(),
-                                 db->DefaultColumnFamily(),
-                                 db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
             string s1 = "aaa111bbb";
             string s2 = "aaa222bbb";
 
@@ -369,10 +393,9 @@ namespace mongo {
     TEST( RocksRecordStoreTest, Stats1 ) {
         unittest::TempDir td( _rocksRecordStoreTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = _createCfh( db.get() );
 
-        RocksRecordStore rs( "foo.bar", db.get(),
-                             db->DefaultColumnFamily(),
-                             db->DefaultColumnFamily() );
+        RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
         string s = "eliot was here";
 
         {
@@ -405,9 +428,9 @@ namespace mongo {
 
         {
             scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+            boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = _createCfh( db.get() );
 
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(),
-                                                      db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -424,10 +447,13 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<rocksdb::DB> db( getDBPersist( td.path() ) );
+            DbAndCfh dbAndCfh = getDBPersist( td.path() );
+            boost::shared_ptr<rocksdb::DB> db = dbAndCfh.first;
 
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(),
-                                                      db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar",
+                                 db.get(),
+                                 dbAndCfh.second.get(),
+                                 db->DefaultColumnFamily() );
 
             ASSERT_EQUALS( static_cast<long long> ( origStr.size() + 1 ), rs.dataSize() );
             ASSERT_EQUALS( 1, rs.numRecords() );
@@ -446,10 +472,13 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<rocksdb::DB> db( getDBPersist( td.path() ) );
+            DbAndCfh dbAndCfh = getDBPersist( td.path() );
+            boost::shared_ptr<rocksdb::DB> db = dbAndCfh.first;
 
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(),
-                                                      db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar",
+                                 db.get(),
+                                 dbAndCfh.second.get(),
+                                 db->DefaultColumnFamily() );
 
             ASSERT_EQUALS( static_cast<long long>( newStr.size() + 1 ), rs.dataSize() );
             ASSERT_EQUALS( 1, rs.numRecords() );
@@ -639,14 +668,13 @@ namespace mongo {
     TEST( RocksRecordStoreTest, Snapshots1 ) {
         unittest::TempDir td( _rocksRecordStoreTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = _createCfh( db.get() );
 
         DiskLoc loc;
         int size = -1;
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(),
-                                 db->DefaultColumnFamily(),
-                                 db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
             string s = "test string";
             size = s.length() + 1;
 
@@ -663,9 +691,7 @@ namespace mongo {
             MyOperationContext opCtx( db.get() );
             MyOperationContext opCtx2( db.get() );
 
-            RocksRecordStore rs( "foo.bar", db.get(),
-                                 db->DefaultColumnFamily(),
-                                 db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
 
             rs.deleteRecord( &opCtx, loc );
 

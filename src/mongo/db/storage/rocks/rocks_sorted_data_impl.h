@@ -32,6 +32,7 @@
 
 #include <rocksdb/db.h>
 
+#include "mongo/bson/ordering.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 
 #pragma once
@@ -61,7 +62,7 @@ namespace mongo {
     class RocksSortedDataImpl : public SortedDataInterface {
         MONGO_DISALLOW_COPYING( RocksSortedDataImpl );
     public:
-        RocksSortedDataImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf );
+        RocksSortedDataImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf, Ordering order );
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
@@ -102,6 +103,9 @@ namespace mongo {
         // Each index is stored as a single column family, so this stores the handle to the
         // relevant column family
         rocksdb::ColumnFamilyHandle* _columnFamily; // not owned
+
+        // used to construct RocksCursors
+        const Ordering _order;
 
         /**
          * Creates an error code message out of a key

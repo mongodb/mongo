@@ -60,6 +60,7 @@ namespace rocksdb {
 namespace mongo {
 
     class RocksCollectionCatalogEntry;
+    class RocksDatabaseCatalogEntry;
     class RocksRecordStore;
 
     struct CollectionOptions;
@@ -134,7 +135,6 @@ namespace mongo {
 
         struct Entry {
             boost::scoped_ptr<rocksdb::ColumnFamilyHandle> cfHandle;
-            boost::scoped_ptr<rocksdb::ColumnFamilyHandle> metaCfHandle;
             boost::scoped_ptr<RocksCollectionCatalogEntry> collectionEntry;
             boost::scoped_ptr<RocksRecordStore> recordStore;
             // These ColumnFamilyHandles must be deleted by removeIndex
@@ -150,6 +150,8 @@ namespace mongo {
         static rocksdb::Options dbOptions();
 
     private:
+        Status _dropCollection_inlock( OperationContext* opCtx, const StringData& ns );
+
         rocksdb::ColumnFamilyOptions _collectionOptions() const;
         rocksdb::ColumnFamilyOptions _indexOptions() const;
 
@@ -157,9 +159,17 @@ namespace mongo {
         boost::scoped_ptr<rocksdb::DB> _db;
         boost::scoped_ptr<rocksdb::Comparator> _collectionComparator;
 
+        // Default column family is owned by the rocksdb::DB instance.
+        rocksdb::ColumnFamilyHandle* _defaultHandle;
+
         typedef StringMap< boost::shared_ptr<Entry> > EntryMap;
         mutable boost::mutex _entryMapMutex;
         EntryMap _entryMap;
+
+        typedef StringMap<boost::shared_ptr<RocksDatabaseCatalogEntry> > DbCatalogMap;
+        // illegal to hold at the same time as _entryMapMutex
+        boost::mutex _dbCatalogMapMutex;
+        DbCatalogMap _dbCatalogMap;
 
         // private methods that should usually only be called from the RocksEngine constructor
 
