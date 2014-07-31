@@ -113,7 +113,6 @@ namespace mongo {
 
     string dbExecCommand;
 
-
     MONGO_FP_DECLARE(rsStopGetMore);
 
     static void inProgCmd(OperationContext* txn, Message &m, DbResponse &dbresponse) {
@@ -432,7 +431,7 @@ namespace mongo {
         bool shouldLog = logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1));
 
         if ( op == dbQuery ) {
-            if ( handlePossibleShardedMessage( m , &dbresponse ) )
+            if (!checkShardVersion(m, &dbresponse))
                 return;
             receivedQuery(txn, c , dbresponse, m );
         }
@@ -476,6 +475,17 @@ namespace mongo {
                 else {
                     const char* ns = dbmsg.getns();
                     const NamespaceString nsString(ns);
+
+                    if (remote != DBDirectClient::dummyHost) {
+                        const ShardedConnectionInfo* connInfo = ShardedConnectionInfo::get(false);
+                        uassert(18663,
+                                str::stream() << "legacy writeOps not longer supported for "
+                                              << "versioned connections, ns: " << string(ns)
+                                              << ", op: " << opToString(op)
+                                              << ", remote: " << remote.toString()
+                                              << ", serverId: " << connInfo->getID(),
+                                connInfo == NULL);
+                    }
 
                     if (!nsString.isValid()) {
                         uassert(16257, str::stream() << "Invalid ns [" << ns << "]", false);
@@ -604,12 +614,6 @@ namespace mongo {
         uassertStatusOK(executor.prepare());
 
         Lock::DBWrite lk(txn->lockState(), ns.ns());
-
-        // if this ever moves to outside of lock, need to adjust check
-        // Client::Context::_finishInit
-        if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-            return;
-
         Client::Context ctx(txn,  ns );
 
         UpdateResult res = executor.execute(ctx.db());
@@ -626,7 +630,6 @@ namespace mongo {
         op.debug().ns = ns.ns().c_str();
         int flags = d.pullInt();
         bool justOne = flags & RemoveOption_JustOne;
-        bool broadcast = flags & RemoveOption_Broadcast;
         verify( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
 
@@ -643,12 +646,8 @@ namespace mongo {
         request.setUpdateOpLog(true);
         DeleteExecutor executor(&request);
         uassertStatusOK(executor.prepare());
+
         Lock::DBWrite lk(txn->lockState(), ns.ns());
-
-        // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
-        if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-            return;
-
         Client::Context ctx(txn, ns);
 
         long long n = executor.execute(ctx.db());
@@ -910,9 +909,6 @@ namespace mongo {
         uassert(10058 , "not master",
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db()));
 
-        if ( handlePossibleShardedMessage( m , 0 ) )
-            return;
-
         Client::Context ctx(txn, ns);
 
         if (multi.size() > 1) {
@@ -957,7 +953,7 @@ namespace {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
-        assembleResponse( _txn, toSend, dbResponse , _clientHost );
+        assembleResponse(_txn, toSend, dbResponse, dummyHost);
         verify( dbResponse.response );
         dbResponse.response->concat(); // can get rid of this if we make response handling smarter
         response = *dbResponse.response;
@@ -969,7 +965,7 @@ namespace {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
-        assembleResponse( _txn, toSend, dbResponse , _clientHost );
+        assembleResponse(_txn, toSend, dbResponse, dummyHost);
     }
 
     auto_ptr<DBClientCursor> DBDirectClient::query(const string &ns, Query query, int nToReturn , int nToSkip ,
@@ -988,7 +984,7 @@ namespace {
         verify(!"killCursor should not be used in MongoD");
     }
 
-    HostAndPort DBDirectClient::_clientHost = HostAndPort( "0.0.0.0" , 0 );
+    const HostAndPort DBDirectClient::dummyHost("0.0.0.0", 0);
 
     unsigned long long DBDirectClient::count(const string &ns, const BSONObj& query, int options, int limit, int skip ) {
         if ( skip < 0 ) {

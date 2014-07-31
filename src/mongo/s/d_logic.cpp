@@ -40,24 +40,19 @@
 
 #include "mongo/s/d_logic.h"
 
-#include <map>
 #include <string>
 
-#include "mongo/client/connpool.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/d_writeback.h"
 #include "mongo/s/shard.h"
 #include "mongo/util/log.h"
-#include "mongo/util/queue.h"
 
 using namespace std;
 
 namespace mongo {
 
-    bool _handlePossibleShardedMessage( Message &m, DbResponse* dbresponse ) {
+    bool _checkShardVersion(Message &m, DbResponse* dbresponse) {
         DEV verify( shardingState.enabled() );
 
         int op = m.operation();
@@ -65,94 +60,53 @@ namespace mongo {
                 || op >= 3000
                 || op == dbGetMore  // cursors are weird
            )
-            return false;
+            return true;
 
         DbMessage d(m);
         const char *ns = d.getns();
         string errmsg;
-        // We don't care about the version here, since we're returning it later in the writeback
         ChunkVersion received, wanted;
         if ( shardVersionOk( ns , errmsg, received, wanted ) ) {
-            return false;
-        }
-
-        bool getsAResponse = doesOpGetAResponse( op );
-
-        LOG(1) << "connection sharding metadata does not match for collection " << ns
-               << ", will retry (wanted : " << wanted << ", received : " << received << ")"
-               << ( getsAResponse ? "" : " (queuing writeback)" ) << endl;
-
-        if( getsAResponse ){
-            verify( dbresponse );
-            BufBuilder b( 32768 );
-            b.skip( sizeof( QueryResult::Value ) );
-            {
-                BSONObjBuilder bob;
-
-                bob.append( "$err", errmsg );
-                bob.append( "ns", ns );
-                wanted.addToBSON( bob, "vWanted" );
-                received.addToBSON( bob, "vReceived" );
-
-                BSONObj obj = bob.obj();
-
-                b.appendBuf( obj.objdata() , obj.objsize() );
-            }
-
-            QueryResult::View qr = b.buf();
-            qr.setResultFlags(ResultFlag_ErrSet | ResultFlag_ShardConfigStale);
-            qr.msgdata().setLen(b.len());
-            qr.msgdata().setOperation( opReply );
-            qr.setCursorId(0);
-            qr.setStartingFrom(0);
-            qr.setNReturned(1);
-            b.decouple();
-
-            Message * resp = new Message();
-            resp->setData( qr.view2ptr() , true );
-
-            dbresponse->response = resp;
-            dbresponse->responseTo = m.header().getId();
             return true;
         }
 
-        uassert(9517, "cannot queue a writeback operation to the writeback queue",
-                (d.reservedField() & Reserved_FromWriteback) == 0);
+        LOG(1) << "connection sharding metadata does not match for collection " << ns
+               << ", will retry (wanted : " << wanted
+               << ", received : " << received << ")" << endl;
 
-        const OID& clientID = ShardedConnectionInfo::get(false)->getID();
-        massert( 10422 ,  "write with bad shard config and no server id!" , clientID.isSet() );
+        fassert(18664, op == dbQuery || op == dbGetMore);
 
-        // We need to check this here, since otherwise we'll get errors wrapping the writeback -
-        // not just here, but also when returning as a command result.
-        // We choose 1/2 the overhead of the internal maximum so that we can still handle ops of
-        // 16MB exactly.
-        massert( 16437, "data size of operation is too large to queue for writeback",
-                 m.dataSize() < BSONObjMaxInternalSize - (8 * 1024));
+        verify( dbresponse );
+        BufBuilder b( 32768 );
+        b.skip( sizeof( QueryResult::Value ) );
+        {
+            BSONObjBuilder bob;
 
-        LOG(1) << "writeback queued for " << m.toString() << endl;
+            bob.append( "$err", errmsg );
+            bob.append( "ns", ns );
+            wanted.addToBSON( bob, "vWanted" );
+            received.addToBSON( bob, "vReceived" );
 
-        BSONObjBuilder b;
-        b.appendBool( "writeBack" , true );
-        b.append( "ns" , ns );
-        b.append( "connectionId" , cc().getConnectionId() );
-        b.append( "instanceIdent" , prettyHostName() );
-        wanted.addToBSON( b );
-        received.addToBSON( b, "yourVersion" );
+            BSONObj obj = bob.obj();
 
-        b.appendBinData( "msg" , m.header().getLen() , bdtCustom , m.singleData().view2ptr() );
+            b.appendBuf( obj.objdata() , obj.objsize() );
+        }
 
-        LOG(2) << "writing back msg with len: " << m.header().getLen()
-               << " op: " << m.operation() << endl;
-        
-        // we pass the builder to queueWriteBack so that it can select the writebackId
-        // this is important so that the id is guaranteed to be ascending 
-        // that is important since mongos assumes if its seen a greater writeback
-        // that all former have been processed
-        OID writebackID = writeBackManager.queueWriteBack( clientID.str() , b );
+        QueryResult::View qr = b.buf();
+        qr.setResultFlags(ResultFlag_ErrSet | ResultFlag_ShardConfigStale);
+        qr.msgdata().setLen(b.len());
+        qr.msgdata().setOperation( opReply );
+        qr.setCursorId(0);
+        qr.setStartingFrom(0);
+        qr.setNReturned(1);
+        b.decouple();
 
-        lastError.getSafe()->writeback( writebackID );
+        Message * resp = new Message();
+        resp->setData(qr.view2ptr(), true);
 
-        return true;
+        dbresponse->response = resp;
+        dbresponse->responseTo = m.header().getId();
+        return false;
     }
 
 }

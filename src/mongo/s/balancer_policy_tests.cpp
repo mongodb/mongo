@@ -40,9 +40,9 @@ namespace mongo {
         typedef OwnedPointerMap<string, OwnedPointerVector<ChunkType> > OwnedShardToChunksMap;
 
         TEST( BalancerPolicyTests , SizeMaxedShardTest ) {
-            ASSERT( ! ShardInfo( 0, 0, false, false ).isSizeMaxed() );
-            ASSERT( ! ShardInfo( 100LL, 80LL, false, false ).isSizeMaxed() );
-            ASSERT( ShardInfo( 100LL, 110LL, false, false ).isSizeMaxed() );
+            ASSERT( ! ShardInfo(0, 0, false).isSizeMaxed() );
+            ASSERT( ! ShardInfo(100LL, 80LL, false).isSizeMaxed() );
+            ASSERT( ShardInfo(100LL, 110LL, false).isSizeMaxed() );
         }
 
         TEST( BalancerPolicyTests , BalanceNormalTest  ) {
@@ -65,8 +65,8 @@ namespace mongo {
 
             // no limits
             ShardInfoMap info;
-            info["shard0"] = ShardInfo( 0, 2, false, false );
-            info["shard1"] = ShardInfo( 0, 0, false, false );
+            info["shard0"] = ShardInfo(0, 2, false);
+            info["shard1"] = ShardInfo(0, 0, false);
 
             MigrateInfo* c = NULL;
             DistributionStatus status(info, chunkMap.map());
@@ -113,8 +113,8 @@ namespace mongo {
 
             // no limits
             ShardInfoMap info;
-            info["shard0"] = ShardInfo( 0, 2, false, false );
-            info["shard1"] = ShardInfo( 0, 0, false, false );
+            info["shard0"] = ShardInfo(0, 2, false);
+            info["shard1"] = ShardInfo(0, 0, false);
 
             MigrateInfo* c = NULL;
             DistributionStatus status(info, chunkMap.map());
@@ -145,8 +145,8 @@ namespace mongo {
 
             // shard0 is draining
             ShardInfoMap limitsMap;
-            limitsMap["shard0"] = ShardInfo( 0LL, 2LL, true, false );
-            limitsMap["shard1"] = ShardInfo( 0LL, 0LL, false, false );
+            limitsMap["shard0"] = ShardInfo(0LL, 2LL, true);
+            limitsMap["shard1"] = ShardInfo(0LL, 0LL, false);
 
             DistributionStatus status(limitsMap, chunkMap.map());
             MigrateInfo* c = BalancerPolicy::balance( "ns", status, 0 );
@@ -176,8 +176,8 @@ namespace mongo {
 
             // no limits
             ShardInfoMap limitsMap;
-            limitsMap["shard0"] = ShardInfo( 0, 2, false, false );
-            limitsMap["shard1"] = ShardInfo( 0, 0, true, false );
+            limitsMap["shard0"] = ShardInfo(0, 2, false);
+            limitsMap["shard1"] = ShardInfo(0, 0, true);
 
             DistributionStatus status(limitsMap, chunkMap.map());
             MigrateInfo* c = BalancerPolicy::balance( "ns", status, 0 );
@@ -206,9 +206,9 @@ namespace mongo {
 
             // shard0 is draining, shard1 is maxed out, shard2 has writebacks pending
             ShardInfoMap limitsMap;
-            limitsMap["shard0"] = ShardInfo( 0, 2, true, false );
-            limitsMap["shard1"] = ShardInfo( 1, 1, false, false );
-            limitsMap["shard2"] = ShardInfo( 0, 1, true, false );
+            limitsMap["shard0"] = ShardInfo(0, 2, true);
+            limitsMap["shard1"] = ShardInfo(1, 1, false);
+            limitsMap["shard2"] = ShardInfo(0, 1, true);
 
             DistributionStatus status(limitsMap, chunkMap.map());
             MigrateInfo* c = BalancerPolicy::balance( "ns", status, 0 );
@@ -269,9 +269,9 @@ namespace mongo {
             addShard( chunks, 5 , true );
 
             ShardInfoMap shards;
-            shards["shard0"] = ShardInfo( 0, 5, true, false );
-            shards["shard1"] = ShardInfo( 0, 5, true, false );
-            shards["shard2"] = ShardInfo( 0, 5, false, false );
+            shards["shard0"] = ShardInfo(0, 5, true);
+            shards["shard1"] = ShardInfo(0, 5, true);
+            shards["shard2"] = ShardInfo(0, 5, false);
             
             DistributionStatus d(shards, chunks.map());
             MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
@@ -288,9 +288,9 @@ namespace mongo {
             addShard( chunks, 5 , true );
             
             ShardInfoMap shards;
-            shards["shard0"] = ShardInfo( 0, 5, false, false );
-            shards["shard1"] = ShardInfo( 0, 5, true, false );
-            shards["shard2"] = ShardInfo( 0, 5, false, false );
+            shards["shard0"] = ShardInfo(0, 5, false);
+            shards["shard1"] = ShardInfo(0, 5, true);
+            shards["shard2"] = ShardInfo(0, 5, false);
             
             shards["shard0"].addTag( "a" );
             shards["shard1"].addTag( "a" );
@@ -327,9 +327,9 @@ namespace mongo {
             addShard( chunks, 5 , true );
             
             ShardInfoMap shards;
-            shards["shard0"] = ShardInfo( 0, 5, false, false );
-            shards["shard1"] = ShardInfo( 0, 5, false, false );
-            shards["shard2"] = ShardInfo( 0, 5, false, false );
+            shards["shard0"] = ShardInfo(0, 5, false);
+            shards["shard1"] = ShardInfo(0, 5, false);
+            shards["shard2"] = ShardInfo(0, 5, false);
             
             shards["shard0"].addTag( "a" );
             shards["shard1"].addTag( "a" );
@@ -407,9 +407,9 @@ namespace mongo {
 
             ShardInfoMap shards;
             // ShardInfo(maxSize, currSize, draining, opsQueued)
-            shards["shard0"] = ShardInfo( 1, 3, false, false );
-            shards["shard1"] = ShardInfo( 0, 4, false, false );
-            shards["shard2"] = ShardInfo( 0, 6, false, false );
+            shards["shard0"] = ShardInfo(1, 3, false);
+            shards["shard1"] = ShardInfo(0, 4, false);
+            shards["shard2"] = ShardInfo(0, 6, false);
 
             DistributionStatus d(shards, chunks.map());
             MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
@@ -436,9 +436,9 @@ namespace mongo {
 
             ShardInfoMap shards;
             // ShardInfo(maxSize, currSize, draining, opsQueued)
-            shards["shard0"] = ShardInfo( 1, 4, false, false );
-            shards["shard1"] = ShardInfo( 0, 4, false, false );
-            shards["shard2"] = ShardInfo( 0, 4, false, false );
+            shards["shard0"] = ShardInfo(1, 4, false);
+            shards["shard1"] = ShardInfo(0, 4, false);
+            shards["shard2"] = ShardInfo(0, 4, false);
 
             DistributionStatus d(shards, chunks.map());
             MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
@@ -494,7 +494,7 @@ namespace mongo {
 
                     shards[str::stream() << "shard" << i] =
                             ShardInfo(maxed ? numShardChunks + 1 : 0,
-                                              numShardChunks, draining, false);
+                                              numShardChunks, draining);
                 }
 
                 for (ShardInfoMap::iterator it = shards.begin(); it != shards.end(); ++it) {
@@ -521,16 +521,14 @@ namespace mongo {
                         ShardInfo& info = shards[m->from];
                         shards[m->from] = ShardInfo(info.getMaxSize(),
                                                     info.getCurrSize() - 1,
-                                                    info.isDraining(),
-                                                    info.hasOpsQueued());
+                                                    info.isDraining());
                     }
 
                     {
                         ShardInfo& info = shards[m->to];
                         shards[m->to] = ShardInfo(info.getMaxSize(),
                                                   info.getCurrSize() + 1,
-                                                  info.isDraining(),
-                                                  info.hasOpsQueued());
+                                                  info.isDraining());
                     }
                 }
 

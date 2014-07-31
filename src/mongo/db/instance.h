@@ -86,6 +86,8 @@ namespace mongo {
      */
     class DBDirectClient : public DBClientBase {
     public:
+        static const HostAndPort dummyHost;
+
         DBDirectClient(); // DEPRECATED
         DBDirectClient(OperationContext* txn);
 
@@ -134,7 +136,6 @@ namespace mongo {
         virtual QueryOptions _lookupAvailableOptions();
 
     private:
-        static HostAndPort _clientHost;
         boost::scoped_ptr<OperationContext> _txnOwned;
         OperationContext* _txn; // Points either to _txnOwned or a passed-in transaction.
     };
