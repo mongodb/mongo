@@ -115,8 +115,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_conn_remove_data_source(conn, ndsrc));
 
 	/*
-	 * Complain if files weren't closed, ignoring the lock and logging
-	 * files, we'll close them in a minute.
+	 * Complain if files weren't closed, ignoring the lock file, we'll
+	 * close it in a minute.
 	 */
 	TAILQ_FOREACH(fh, &conn->fhqh, q) {
 		if (fh == conn->lock_fh)
