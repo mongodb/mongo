@@ -42,11 +42,7 @@ const char *uri = "table:logtest";
 #define	CONN_CONFIG "create,cache_size=100MB,log=(archive=false,enabled=true)"
 #define	MAX_KEYS	10
 
-#define	WALK_PRINT(lsn)							\
-    printf("LSN [%d][%" PRIu64 "]:  record type %d size %" PRIu64 "\n",	\
-	lsn.file, lsn.offset, rectype, (uint64_t)logrec_value.size);
-
-#define	STEP_PRINT							\
+#define	RECORD_PRINT							\
     printf("LSN [%d][%" PRIu64 "].%d: "					\
 	" record type %d optype %d txnid %" PRIu64 " fileid %d",	\
 	lsn.file, lsn.offset, opcount, rectype,				\
@@ -56,62 +52,6 @@ const char *uri = "table:logtest";
     if (logrec_value.size != 0)						\
 	printf(" value size %" PRIu64, (uint64_t)logrec_value.size);	\
     printf("\n");
-
-static int
-walk_log(WT_SESSION *session)
-{
-	int i, ret;
-	WT_LSN lsnsave;
-	/*! [log cursor] */
-	WT_CURSOR *cursor;
-	WT_LSN lsn;
-	WT_ITEM logrec_key, logrec_value;
-	uint64_t txnid;
-	uint32_t fileid, optype, rectype;
-
-	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
-	/*! [log cursor] */
-	i = 0;
-	memset(&lsnsave, 0, sizeof(lsnsave));
-	while ((ret = cursor->next(cursor)) == 0) {
-		/*! [log cursor get_key] */
-		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset);
-		/*! [log cursor get_key] */
-		/*
-		 * Save one of the LSNs we get back to search for it
-		 * later.  Doesn't matter which one.  We know there are
-		 * more than 3, so just pick 3 here.
-		 */
-		if (++i == 3)
-			lsnsave = lsn;
-		/*! [log cursor get_value] */
-		ret = cursor->get_value(cursor, &txnid, &rectype,
-		    &optype, &fileid, &logrec_key, &logrec_value);
-		/*! [log cursor get_value] */
-		WALK_PRINT(lsn);
-	}
-	cursor->reset(cursor);
-	/*
-	 * Search for the LSN we saved earlier.  Confirm the key
-	 * does not change.
-	 */
-	/*! [log cursor set_key] */
-	cursor->set_key(cursor, lsnsave.file, lsnsave.offset);
-	/*! [log cursor set_key] */
-	/*! [log cursor search] */
-	ret = cursor->search(cursor);
-	/*! [log cursor search] */
-	logrec_value.size = 0;
-	ret = cursor->get_value(cursor, &txnid, &rectype,
-	    &optype, &fileid, &logrec_key, &logrec_value);
-	assert(optype == 0);
-	printf("Searched ");
-	WALK_PRINT(lsnsave);
-	ret = cursor->get_key(cursor, &lsn.file, &lsn.offset);
-	assert(lsnsave.file == lsn.file && lsnsave.offset == lsn.offset);
-	cursor->close(cursor);
-	return (ret);
-}
 
 static int
 setup_copy(WT_CONNECTION **wt_connp, WT_SESSION **sessionp)
@@ -167,7 +107,7 @@ compare_tables(WT_SESSION *session, WT_SESSION *sess_copy)
 }
 
 static int
-step_log(WT_SESSION *session)
+walk_log(WT_SESSION *session)
 {
 	WT_CONNECTION *wt_conn2;
 	WT_CURSOR *cursor, *cursor2;
@@ -179,19 +119,19 @@ step_log(WT_SESSION *session)
 	int first, i, in_txn, ret;
 
 	ret = setup_copy(&wt_conn2, &session2);
-	/*! [log step open] */
-	ret = session->open_cursor(session, "log:", NULL, "step=true", &cursor);
-	/*! [log step open] */
+	/*! [log cursor open] */
+	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
+	/*! [log cursor open] */
 	ret = session2->open_cursor(session2, uri, NULL, "raw=true", &cursor2);
 	i = 0;
 	in_txn = 0;
 	prev_txnid = txnid = 0;
 	memset(&lsnsave, 0, sizeof(lsnsave));
 	while ((ret = cursor->next(cursor)) == 0) {
-		/*! [log step get_key] */
+		/*! [log cursor get_key] */
 		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset,
 		    &opcount);
-		/*! [log step get_key] */
+		/*! [log cursor get_key] */
 		/*
 		 * Save one of the LSNs we get back to search for it
 		 * later.  Pick a later one because we want to walk from
@@ -200,11 +140,11 @@ step_log(WT_SESSION *session)
 		 */
 		if (++i == MAX_KEYS)
 			lsnsave = lsn;
-		/*! [log step get_value] */
+		/*! [log cursor get_value] */
 		ret = cursor->get_value(cursor, &txnid, &rectype,
 		    &optype, &fileid, &logrec_key, &logrec_value);
-		/*! [log step get_value] */
-		STEP_PRINT;
+		/*! [log cursor get_value] */
+		RECORD_PRINT;
 		/*
 		 * If we are in a transaction and this is a new one, end
 		 * the previous one.
@@ -246,13 +186,13 @@ step_log(WT_SESSION *session)
 	wt_conn2->close(wt_conn2, NULL);
 
 	cursor->reset(cursor);
-	/*! [log step set_key] */
+	/*! [log cursor set_key] */
 	cursor->set_key(cursor, lsnsave.file, lsnsave.offset, 0, 0);
-	/*! [log step set_key] */
-	/*! [log step search] */
+	/*! [log cursor set_key] */
+	/*! [log cursor search] */
 	ret = cursor->search(cursor);
-	/*! [log step search] */
-	printf("Searched ");
+	/*! [log cursor search] */
+	printf("Reset to saved ");
 	/*
 	 * Walk all records starting with this key.
 	 */
@@ -266,7 +206,7 @@ step_log(WT_SESSION *session)
 		}
 		ret = cursor->get_value(cursor, &txnid, &rectype,
 		    &optype, &fileid, &logrec_key, &logrec_value);
-		STEP_PRINT;
+		RECORD_PRINT;
 		ret = cursor->next(cursor);
 		if (ret != 0)
 			break;
@@ -337,11 +277,9 @@ int main(void)
 		    home, wiredtiger_strerror(ret));
 		return (ret);
 	}
+
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
-
 	ret = walk_log(session);
-	ret = step_log(session);
-
 	ret = wt_conn->close(wt_conn, NULL);
 	return (ret);
 }

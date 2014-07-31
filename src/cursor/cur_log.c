@@ -27,14 +27,28 @@ __curlog_logrec(
 	WT_RET(__wt_buf_set(session,
 	    cl->logrec, logrec->data, logrec->size));
 	/*
-	 * Skip the log header.  We need to do the exact same calculation
-	 * to get the record type out, so setup up the step cursor pointers.
+	 * Skip the log header.  Setup the step pointers to walk the
+	 * operations inside the record.  Get the record type.
 	 */
 	cl->stepp = (const uint8_t *)cl->logrec->data +
 	    offsetof(WT_LOG_RECORD, record);
 	cl->stepp_end = (const uint8_t *)cl->logrec->data + logrec->size;
 	WT_RET(__wt_logrec_read(session, &cl->stepp, cl->stepp_end,
 	    &cl->rectype));
+	/*
+	 * The record count within a record starts at 1 so that we can
+	 * reserve 0 to mean the entire record.
+	 */
+	cl->step_count = 1;
+	/*
+	 * Unpack the txnid so that we can return each
+	 * individual operation for this txnid.
+	 */
+	if (cl->rectype == WT_LOGREC_COMMIT)
+		WT_RET(__wt_vunpack_uint(&cl->stepp,
+		    WT_PTRDIFF(cl->stepp_end, cl->stepp), &cl->txnid));
+	else
+		cl->txnid = 0;
 	return (0);
 }
 
@@ -56,49 +70,13 @@ __curlog_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_ASSERT(session, cmpp != NULL);
 	*cmpp = LOG_CMP(acl->cur_lsn, bcl->cur_lsn);
 	/*
-	 * If these are step cursors, compare the count
-	 * within the record if they are both on the same LSN.
+	 * If both are on the same LSN, compare step counter.
 	 */
-	if (*cmpp == 0 && F_ISSET(acl, WT_LOGC_STEP)) {
-		WT_ASSERT(session, F_ISSET(bcl, WT_LOGC_STEP));
+	if (*cmpp == 0)
 		*cmpp = (acl->step_count != bcl->step_count ?
 		    (acl->step_count < bcl->step_count ? -1 : 1) : 0);
-	}
 err:	API_END_RET(session, ret);
 
-}
-
-/*
- * __curlog_steprec --
- *	Callback function from log_scan to get a log record for stepping.
- */
-static int
-__curlog_steprec(
-    WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
-{
-	WT_CURSOR_LOG *cl;
-
-	/*
-	 * We need to do the common things a non-step cursor does first.
-	 */
-	WT_RET(__curlog_logrec(session, logrec, lsnp, cookie));
-	cl = cookie;
-
-	/*
-	 * The record count within a record starts at 1 so that we can
-	 * reserve 0 to mean the entire record.
-	 */
-	cl->step_count = 1;
-	/*
-	 * Unpack the txnid so that we can return each
-	 * individual operation for this txnid.
-	 */
-	if (cl->rectype == WT_LOGREC_COMMIT)
-		WT_RET(__wt_vunpack_uint(&cl->stepp,
-		    WT_PTRDIFF(cl->stepp_end, cl->stepp), &cl->txnid));
-	else
-		cl->txnid = 0;
-	return (0);
 }
 
 /*
@@ -159,14 +137,14 @@ __curlog_op_read(WT_SESSION_IMPL *session,
 }
 
 /*
- * __curlog_stepkv --
- *	Set the key and value to return for a step cursor.
+ * __curlog_kv --
+ *	Set the key and value of the log cursor to return to the user.
  */
 static int
-__curlog_stepkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
+__curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
 	WT_CURSOR_LOG *cl;
-	uint32_t fileid, opsize, optype;
+	uint32_t fileid, key_count, opsize, optype;
 
 	cl = (WT_CURSOR_LOG *)cursor;
 	/*
@@ -177,10 +155,12 @@ __curlog_stepkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 		WT_RET(__wt_logop_read(session,
 		    &cl->stepp, cl->stepp_end, &optype, &opsize));
 		WT_RET(__curlog_op_read(session, cl, optype, opsize, &fileid));
+		key_count = cl->step_count++;
 	} else {
 		optype = WT_LOGOP_INVALID;
 		opsize = cl->logrec->size;
 		fileid = 0;
+		key_count = 0;
 		WT_RET(__wt_buf_set(session, cl->opkey, NULL, 0));
 		WT_RET(__wt_buf_set(session, cl->opvalue, cl->stepp, opsize));
 	}
@@ -190,7 +170,7 @@ __curlog_stepkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	 * contains any operation key/value that was in the log record.
 	 */
 	__wt_cursor_set_key(cursor, cl->cur_lsn->file, cl->cur_lsn->offset,
-	    cl->step_count++);
+	    key_count);
 	__wt_cursor_set_value(cursor, cl->txnid, cl->rectype, optype,
 	    fileid, cl->opkey, cl->opvalue);
 	/*
@@ -201,11 +181,11 @@ __curlog_stepkv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 }
 
 /*
- * __curlog_stepnext --
+ * __curlog_next --
  *	WT_CURSOR.next method for the step log cursor type.
  */
 static int
-__curlog_stepnext(WT_CURSOR *cursor)
+__curlog_next(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LOG *cl;
 	WT_DECL_RET;
@@ -223,40 +203,10 @@ __curlog_stepnext(WT_CURSOR *cursor)
 	if (cl->stepp == NULL || cl->stepp >= cl->stepp_end || !*cl->stepp) {
 		cl->txnid = 0;
 		WT_ERR(__wt_log_scan(session, cl->next_lsn, WT_LOGSCAN_ONE,
-		    cl->scan_cb, cl));
+		    __curlog_logrec, cl));
 	}
 	WT_ASSERT(session, cl->logrec->data != NULL);
-	WT_STAT_FAST_CONN_INCR(session, cursor_next);
-	WT_STAT_FAST_DATA_INCR(session, cursor_next);
-	WT_ERR(__curlog_stepkv(session, cursor));
-
-err:	API_END_RET(session, ret);
-
-}
-
-/*
- * __curlog_next --
- *	WT_CURSOR.next method for the log cursor type.
- */
-static int
-__curlog_next(WT_CURSOR *cursor)
-{
-	WT_CURSOR_LOG *cl;
-	WT_DECL_RET;
-	WT_ITEM opkey;
-	WT_SESSION_IMPL *session;
-
-	cl = (WT_CURSOR_LOG *)cursor;
-
-	CURSOR_API_CALL(cursor, session, next, NULL);
-
-	WT_ERR(__wt_log_scan(session, cl->next_lsn, WT_LOGSCAN_ONE,
-	    __curlog_logrec, cl));
-	__wt_cursor_set_key(cursor, cl->cur_lsn->file, cl->cur_lsn->offset);
-	opkey.data = NULL;
-	opkey.size = 0;
-	__wt_cursor_set_value(cursor, cl->txnid, cl->rectype, WT_LOGOP_INVALID,
-	    0, &opkey, cl->logrec);
+	WT_ERR(__curlog_kv(session, cursor));
 	WT_STAT_FAST_CONN_INCR(session, cursor_next);
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 
@@ -273,7 +223,6 @@ __curlog_search(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LOG *cl;
 	WT_DECL_RET;
-	WT_ITEM opkey;
 	WT_LSN key;
 	WT_SESSION_IMPL *session;
 	uint32_t counter;
@@ -283,28 +232,13 @@ __curlog_search(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, search, NULL);
 
 	/*
-	 * !!! We are ignoring the counter on a step cursor
-	 * and only searching based on the LSN.
+	 * !!! We are ignoring the counter and only searching based on the LSN.
 	 */
-	if (F_ISSET(cl, WT_LOGC_STEP))
-		WT_ERR(__wt_cursor_get_key((WT_CURSOR *)cl,
-		    &key.file, &key.offset, &counter));
-	else
-		WT_ERR(__wt_cursor_get_key((WT_CURSOR *)cl,
-		    &key.file, &key.offset));
+	WT_ERR(__wt_cursor_get_key((WT_CURSOR *)cl,
+	    &key.file, &key.offset, &counter));
 	WT_ERR(__wt_log_scan(session, &key, WT_LOGSCAN_ONE,
-	    cl->scan_cb, cl));
-	/*
-	 * If it is a step cursor set the key and value.
-	 */
-	if (F_ISSET(cl, WT_LOGC_STEP))
-		WT_ERR(__curlog_stepkv(session, cursor));
-	else {
-		opkey.data = NULL;
-		opkey.size = 0;
-		__wt_cursor_set_value(cursor, cl->txnid, cl->rectype,
-		    WT_LOGOP_INVALID, 0, &opkey, cl->logrec);
-	}
+	    __curlog_logrec, cl));
+	WT_ERR(__curlog_kv(session, cursor));
 	WT_STAT_FAST_CONN_INCR(session, cursor_search);
 	WT_STAT_FAST_DATA_INCR(session, cursor_search);
 
@@ -322,8 +256,7 @@ __curlog_reset(WT_CURSOR *cursor)
 
 	cl = (WT_CURSOR_LOG *)cursor;
 	cl->stepp = cl->stepp_end = NULL;
-	if (F_ISSET(cl, WT_LOGC_STEP))
-		cl->step_count = 0;
+	cl->step_count = 0;
 	INIT_LSN(cl->cur_lsn);
 	INIT_LSN(cl->next_lsn);
 	return (0);
@@ -354,25 +287,6 @@ err:	API_END_RET(session, ret);
 }
 
 /*
- * __curlog_stepinit --
- *	Initialize the step portion of the log cursor.
- */
-static int
-__curlog_stepinit(WT_SESSION_IMPL *session, WT_CURSOR_LOG *cl)
-{
-	WT_CURSOR *cursor;
-
-	cursor = &cl->iface;
-	cursor->next = __curlog_stepnext;
-	cursor->key_format = LOGCSTEP_KEY_FORMAT;
-	cl->scan_cb = __curlog_steprec;
-	__wt_scr_alloc(session, 0, &cl->opkey);
-	__wt_scr_alloc(session, 0, &cl->opvalue);
-	F_SET(cl, WT_LOGC_STEP);
-	return (0);
-}
-
-/*
  * __wt_curlog_open --
  *	Initialize a log cursor.
  */
@@ -396,7 +310,6 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_notsup,		/* update */
 	    __wt_cursor_notsup,		/* remove */
 	    __curlog_close);		/* close */
-	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_LOG *cl;
 	WT_DECL_RET;
@@ -415,18 +328,9 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_calloc_def(session, 1, &cl->cur_lsn));
 	WT_ERR(__wt_calloc_def(session, 1, &cl->next_lsn));
 	__wt_scr_alloc(session, 0, &cl->logrec);
-
-	/*
-	 * We return a record's LSN as the key, and the raw WT_ITEM
-	 * that is the record as the value.
-	 */
-	WT_ERR(__wt_config_gets_def(session, cfg, "step", 0, &cval));
-	if (cval.val != 0) {
-		__curlog_stepinit(session, cl);
-	} else {
-		cursor->key_format = LOGC_KEY_FORMAT;
-		cl->scan_cb = __curlog_logrec;
-	}
+	__wt_scr_alloc(session, 0, &cl->opkey);
+	__wt_scr_alloc(session, 0, &cl->opvalue);
+	cursor->key_format = LOGC_KEY_FORMAT;
 	cursor->value_format = LOGC_VALUE_FORMAT;
 
 	INIT_LSN(cl->cur_lsn);

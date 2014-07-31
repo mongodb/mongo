@@ -254,15 +254,12 @@ struct __wt_cursor_log {
 
 	WT_LSN		*cur_lsn;	/* LSN of current record */
 	WT_LSN		*next_lsn;	/* LSN of next record */
-	int (*scan_cb)(WT_SESSION_IMPL *session, WT_ITEM *logrec,
-	    WT_LSN *lsnp, void *cookie);
 	WT_ITEM		*logrec;	/* Copy of record for cursor */
 	WT_ITEM		*opkey, *opvalue;	/* Op key/value copy */
 	const uint8_t	*stepp, *stepp_end;	/* Pointer within record */
 	uint32_t	step_count;	/* Intra-record count */
-	uint32_t	rectype;	/* Step record type */
-	uint64_t	txnid;		/* Step txnid */
-#define	WT_LOGC_STEP	0x01
+	uint32_t	rectype;	/* Record type */
+	uint64_t	txnid;		/* Record txnid */
 	uint32_t	flags;
 };
 

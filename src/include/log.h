@@ -23,8 +23,7 @@
  * ever changes.  The value is the following:
  * txnid, record type, operation type, file id, operation key, operation value
  */
-#define	LOGC_KEY_FORMAT		WT_UNCHECKED_STRING(Iq)
-#define	LOGCSTEP_KEY_FORMAT	WT_UNCHECKED_STRING(IqI)
+#define	LOGC_KEY_FORMAT		WT_UNCHECKED_STRING(IqI)
 #define	LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIIuu)
 
 #define	MAX_LSN(l)	do {						\
