@@ -331,9 +331,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 			    session, chunk->uri, NULL, NULL, 0)) == 0) {
 				saved_isolation = session->txn.isolation;
 				session->txn.isolation = TXN_ISO_EVICTION;
-				if ((ret = __wt_cache_op(session,
-				    NULL, WT_SYNC_WRITE_LEAVES)) == EBUSY)
-					ret = 0;
+				ret = __wt_cache_op(
+				    session, NULL, WT_SYNC_WRITE_LEAVES);
 				session->txn.isolation = saved_isolation;
 				WT_TRET(__wt_session_release_btree(session));
 			}

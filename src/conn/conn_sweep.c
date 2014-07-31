@@ -51,10 +51,6 @@ __sweep(WT_SESSION_IMPL *session)
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __wt_cache_op(
 			    session, NULL, WT_SYNC_WRITE_LEAVES));
-			if (ret == EBUSY) {
-				ret = 0;
-				continue;
-			}
 			WT_RET(ret);
 
 			/*

@@ -225,6 +225,7 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 	/*
 	 * Walk the list, flushing the leaf pages from each file.  If the file
 	 * is busy that's fine, we'll deal with it once we get the schema lock.
+	 * If the file has been removed, simply ignore it.
 	 */
 	for (p = t = (char *)session->checkpoint->data; *p != '\0'; p = t + 1)
 		if ((t = strchr(p, ',')) != NULL) {
@@ -237,9 +238,8 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 			}
 			WT_ERR(ret);
 
-			if ((ret = __wt_cache_op(
-			    session, NULL, WT_SYNC_WRITE_LEAVES)) == EBUSY)
-				ret = 0;
+			ret = __wt_cache_op(
+			    session, NULL, WT_SYNC_WRITE_LEAVES);
 
 			WT_TRET(__wt_session_release_btree(session));
 			WT_ERR(ret);
