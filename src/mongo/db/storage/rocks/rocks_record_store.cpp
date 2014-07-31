@@ -58,11 +58,12 @@ namespace mongo {
           _cappedMaxSize( cappedMaxSize ),
           _cappedMaxDocs( cappedMaxDocs ),
           _cappedDeleteCallback( cappedDeleteCallback ),
-          // Set default options (XXX should custom options be persistent?)
-          _defaultReadOptions( ) {
+          _dataSizeKey( ns.toString() + "-dataSize" ),
+          _numRecordsKey( ns.toString() + "-numRecords" ) {
         invariant( _db );
         invariant( _columnFamily );
         invariant( _metadataColumnFamily );
+        invariant( _columnFamily != _metadataColumnFamily );
 
         if (_isCapped) {
             invariant(_cappedMaxSize > 0);
@@ -94,7 +95,7 @@ namespace mongo {
         // XXX not using a Snapshot here
         if (!_db->Get( _readOptions(),
                        _metadataColumnFamily,
-                       rocksdb::Slice("numRecords"),
+                       rocksdb::Slice( _numRecordsKey ),
                        &value ).ok()) {
             _numRecords = 0;
             metadataPresent = false;
@@ -106,7 +107,7 @@ namespace mongo {
         // XXX not using a Snapshot here
         if (!_db->Get( _readOptions(),
                        _metadataColumnFamily,
-                       rocksdb::Slice("dataSize"),
+                       rocksdb::Slice( _dataSizeKey ),
                        &value ).ok()) {
             _dataSize = 0;
             invariant(!metadataPresent);
@@ -391,27 +392,12 @@ namespace mongo {
     Status RocksRecordStore::setCustomOption( OperationContext* txn,
                                               const BSONElement& option,
                                               BSONObjBuilder* info ) {
-        // TODO make these options persistent
-        // NOTE can't do write options here as writes are done in a write batch which is held in
-        // a recovery unit
         string optionName = option.fieldName();
-        if ( !option.isBoolean() ) {
-            return Status( ErrorCodes::BadValue, "Invalid Value" );
-        }
-        if ( optionName.compare( "verify_checksums" ) == 0 ) {
-            _defaultReadOptions.verify_checksums = option.boolean();
-        }
-        else if ( optionName.compare( "fill_cache" ) == 0 ) {
-            _defaultReadOptions.fill_cache = option.boolean();
-        }
-        else if ( optionName.compare("tailing") == 0 ) {
-            _defaultReadOptions.tailing = option.boolean();
-        }
-        else {
-            return Status( ErrorCodes::BadValue, "Invalid Option" );
+        if ( optionName == "usePowerOf2Sizes" ) {
+            return Status::OK();
         }
 
-        return Status::OK();
+        return Status( ErrorCodes::BadValue, "Invalid option: " + optionName );
     }
 
     namespace {
@@ -456,7 +442,7 @@ namespace mongo {
                 getIterator( txn, maxDiskLoc, false, CollectionScanParams::BACKWARD ) );
 
         while( !iter->isEOF() ) {
-            WriteUnitOfWork wu( _getRecoveryUnit( txn ) );
+            WriteUnitOfWork wu( txn );
             DiskLoc loc = iter->getNext();
             if ( loc < end || ( !inclusive && loc == end))
                 return;
@@ -466,8 +452,18 @@ namespace mongo {
         }
     }
 
+    void RocksRecordStore::dropRsMetaData( OperationContext* opCtx ) {
+        RocksRecoveryUnit* ru = _getRecoveryUnit( opCtx );
+
+        boost::mutex::scoped_lock dataSizeLk( _dataSizeLock );
+        ru->writeBatch()->Delete( _metadataColumnFamily, _dataSizeKey );
+
+        boost::mutex::scoped_lock numRecordsLk( _numRecordsLock );
+        ru->writeBatch()->Delete( _metadataColumnFamily, _numRecordsKey );
+    }
+
     rocksdb::ReadOptions RocksRecordStore::_readOptions( OperationContext* opCtx ) const {
-        rocksdb::ReadOptions options( _defaultReadOptions );
+        rocksdb::ReadOptions options;
         if ( opCtx ) {
             options.snapshot = _getRecoveryUnit( opCtx )->snapshot();
         }
@@ -507,10 +503,9 @@ namespace mongo {
         }
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
         const char* nr_ptr = reinterpret_cast<char*>( &_numRecords );
-        const std::string nr_key_string = "numRecords";
 
         ru->writeBatch()->Put( _metadataColumnFamily,
-                               rocksdb::Slice( nr_key_string ),
+                               rocksdb::Slice( _numRecordsKey ),
                                rocksdb::Slice( nr_ptr, sizeof(long long) ) );
     }
 
@@ -521,10 +516,9 @@ namespace mongo {
         _dataSize += amount;
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
         const char* ds_ptr = reinterpret_cast<char*>( &_dataSize );
-        const std::string ds_key_string = "dataSize";
 
         ru->writeBatch()->Put( _metadataColumnFamily,
-                               rocksdb::Slice( ds_key_string ),
+                               rocksdb::Slice( _dataSizeKey ),
                                rocksdb::Slice( ds_ptr, sizeof(long long) ) );
     }
 

@@ -28,7 +28,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/storage/rocks/rocks_database_catalog_entry.h"
 
 #include <boost/optional.hpp>
@@ -45,7 +44,7 @@
 #include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 #include "mongo/db/storage/rocks/rocks_collection_catalog_entry.h"
 #include "mongo/db/storage/rocks/rocks_engine.h"
-
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -53,13 +52,15 @@ namespace mongo {
                                                            const CollectionCatalogEntry* collection,
                                                            IndexCatalogEntry* index ) {
         const IndexDescriptor* desc = index->descriptor();
-        const boost::optional<Ordering> order( Ordering::make( desc->keyPattern() ) );
+        const Ordering order( Ordering::make( desc->keyPattern() ) );
 
         rocksdb::ColumnFamilyHandle* cf = _engine->getIndexColumnFamily( collection->ns().ns(),
                                                                          desc->indexName(),
                                                                          order );
 
-        std::auto_ptr<RocksSortedDataImpl> raw( new RocksSortedDataImpl( _engine->getDB(), cf ) );
+        std::auto_ptr<RocksSortedDataImpl> raw( new RocksSortedDataImpl( _engine->getDB(),
+                                                                         cf,
+                                                                         order ) );
 
         const string& type = index->descriptor()->getAccessMethodName();
 

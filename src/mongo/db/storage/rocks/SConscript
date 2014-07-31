@@ -16,6 +16,7 @@ if has_option("rocksdb"):
         LIBDEPS= [
             '$BUILD_DIR/mongo/bson',
             '$BUILD_DIR/mongo/db/catalog/collection_options',
+            '$BUILD_DIR/mongo/db/index/index_descriptor',
             '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
             '$BUILD_DIR/mongo/foundation',
             '$BUILD_DIR/third_party/shim_snappy',

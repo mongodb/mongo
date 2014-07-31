@@ -39,6 +39,7 @@
 #include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -92,8 +93,8 @@ namespace mongo {
          */
         class RocksCursor : public SortedDataInterface::Cursor {
         public:
-            RocksCursor( rocksdb::Iterator* iterator, bool forward )
-                : _iterator( iterator ), _forward( forward ), _isCached( false ) {
+            RocksCursor( rocksdb::Iterator* iterator, bool forward, Ordering o )
+                : _iterator( iterator ), _forward( forward ), _isCached( false ), _comparator( o ) {
 
                 // TODO: maybe don't seek until we know we need to?
                 if ( _forward )
@@ -232,12 +233,70 @@ namespace mongo {
 
         private:
 
+            // _locate() for reverse iterators
+            bool _reverseLocate( const BSONObj& key, const DiskLoc loc ) {
+                invariant( !_forward );
+
+                const IndexKeyEntry keyEntry( key, loc );
+
+                _isCached = false;
+                // assumes fieldNames already stripped if necessary
+                const string keyData = makeString( key, loc, false );
+                _iterator->Seek( keyData );
+                _checkStatus();
+
+                if ( !_iterator->Valid() ) { // seeking outside the range of the index
+                    _iterator->SeekToFirst();
+                    _checkStatus();
+
+                    if ( _iterator->Valid() ) {
+                        _load();
+                        IndexKeyEntry smallestEntry( _cachedKey, _cachedLoc );
+
+                        if ( _comparator.compare( keyEntry, smallestEntry ) < 0 ) {
+                            // a reverse iterator seeking lower than the lowest key is left in an
+                            // invalid position.
+                            advance();
+                            invariant( isEOF() );
+                        } else {
+                            // a reverse iterator seeking higher than highest key is positioned on
+                            // the highest key.
+                            _iterator->SeekToLast();
+                            _checkStatus();
+                            _load();
+                            IndexKeyEntry largestEntry( _cachedKey, _cachedLoc );
+                            invariant( _comparator.compare( keyEntry, largestEntry ) > 0 );
+                        }
+                    }
+
+                    return false;
+                }
+
+                _load();
+                IndexKeyEntry foundEntry( _cachedKey, _cachedLoc );
+                if ( _comparator.compare( keyEntry, foundEntry ) == 0 ) {
+                    return true;
+                }
+
+                // if we can't find the exact result, we need to call advance() so that we're at the
+                // first value less than (to the left of) what we were searching for, rather than
+                // the first value greater than (to the right of) the value we were searching for.
+                invariant( !isEOF() );
+                advance();
+
+                return false;
+            }
+
             /**
              * locate function which takes in a IndexKeyEntry. This logic is abstracted out into a
              * helper so that its possible to choose whether or not to strip the fieldnames before
              * performing the actual locate logic.
              */
             bool _locate( const BSONObj& key, const DiskLoc loc ) {
+                if ( !_forward ) {
+                    return _reverseLocate( key, loc );
+                }
+
                 _isCached = false;
                 // assumes fieldNames already stripped if necessary
                 const string keyData = makeString( key, loc, false );
@@ -245,24 +304,10 @@ namespace mongo {
                 _checkStatus();
                 if ( !_iterator->Valid() )
                     return false;
+
                 _load();
-
-                bool isExactMatch = key.woCompare( _cachedKey, BSONObj(), false ) == 0;
-
-                // if we can't find the result and we have a reverse iterator, we need to call
-                // advance() so that we're at the first value less than (to the left of) what we
-                // were searching for, rather than the first value greater than (to the right of)
-                // the value we were searching for
-                if ( !isExactMatch && !_forward ) {
-                    if ( isEOF() ) {
-                        _iterator->SeekToLast();
-                    } else {
-                        advance();
-                    }
-                    invariant( !_isCached );
-                }
-
-                return isExactMatch;
+                return _comparator.compare( IndexKeyEntry( key, loc ),
+                                            IndexKeyEntry( _cachedKey, _cachedLoc ) ) == 0;
             }
 
             void _checkStatus() {
@@ -301,6 +346,11 @@ namespace mongo {
             bool _savedAtEnd;
             BSONObj _savePositionObj;
             DiskLoc _savePositionLoc;
+
+            // Used for comparing elements in reverse iterators. Because the rocksdb::Iterator is
+            // only a forward iterator, it is sometimes necessary to compare index keys manually
+            // when implementing a reverse iterator.
+            IndexEntryComparison _comparator;
         };
 
         /**
@@ -331,13 +381,13 @@ namespace mongo {
             private:
                 const IndexEntryComparison _indexComparator;
         };
-
     } // namespace
 
     // RocksSortedDataImpl***********
 
-    RocksSortedDataImpl::RocksSortedDataImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf )
-        : _db( db ), _columnFamily( cf ) {
+    RocksSortedDataImpl::RocksSortedDataImpl( rocksdb::DB* db,
+            rocksdb::ColumnFamilyHandle* cf,
+            Ordering order ) : _db( db ), _columnFamily( cf ), _order( order ) {
         invariant( _db );
         invariant( _columnFamily );
     }
@@ -430,7 +480,8 @@ namespace mongo {
                                                                 int direction) const {
         invariant( ( direction == 1 || direction == -1 ) && "invalid value for direction" );
         rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
-        return new RocksCursor( _db->NewIterator( options, _columnFamily ), direction == 1 );
+        return new RocksCursor(
+                _db->NewIterator( options, _columnFamily ), direction == 1, _order );
     }
 
     Status RocksSortedDataImpl::initAsEmpty(OperationContext* txn) {
