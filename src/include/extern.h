@@ -1385,6 +1385,7 @@ extern int __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     uint32_t flags);
+extern void __wt_session_close_cache(WT_SESSION_IMPL *session);
 extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *uri,
     const char *checkpoint,
@@ -1392,8 +1393,6 @@ extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     uint32_t flags);
 extern int __wt_session_lock_checkpoint(WT_SESSION_IMPL *session,
     const char *checkpoint);
-extern void __wt_session_discard_btree( WT_SESSION_IMPL *session,
-    WT_DATA_HANDLE_CACHE *dhandle_cache);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern void __wt_cksum_init(void);

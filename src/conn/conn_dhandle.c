@@ -643,7 +643,6 @@ int
 __wt_conn_dhandle_discard(WT_CONNECTION_IMPL *conn)
 {
 	WT_DATA_HANDLE *dhandle;
-	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
@@ -671,8 +670,7 @@ restart:
 	 * any of the files were dirty.  Clean up that list before we shut down
 	 * the metadata entry, for good.
 	 */
-	while ((dhandle_cache = SLIST_FIRST(&session->dhandles)) != NULL)
-		__wt_session_discard_btree(session, dhandle_cache);
+	__wt_session_close_cache(session);
 
 	/* Close the metadata file handle. */
 	while ((dhandle = SLIST_FIRST(&conn->dhlh)) != NULL)

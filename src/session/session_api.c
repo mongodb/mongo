@@ -26,19 +26,6 @@ __wt_session_reset_cursors(WT_SESSION_IMPL *session)
 }
 
 /*
- * __session_close_cache --
- *	Close any cached handles in a session.
- */
-static void
-__session_close_cache(WT_SESSION_IMPL *session)
-{
-	WT_DATA_HANDLE_CACHE *dhandle_cache;
-
-	while ((dhandle_cache = SLIST_FIRST(&session->dhandles)) != NULL)
-		__wt_session_discard_btree(session, dhandle_cache);
-}
-
-/*
  * __session_clear --
  *	Clear a session structure.
  */
@@ -99,7 +86,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_ASSERT(session, session->ncursors == 0);
 
 	/* Discard cached handles. */
-	__session_close_cache(session);
+	__wt_session_close_cache(session);
 
 	/* Close all tables. */
 	__wt_schema_close_tables(session);
