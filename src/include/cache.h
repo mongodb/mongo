@@ -30,6 +30,19 @@ struct __wt_evict_entry {
 };
 
 /*
+ * WT_EVICTION_WORKER --
+ *	Encapsulation of an eviction worker thread.
+ */
+
+struct __wt_eviction_worker {
+	WT_CONNECTION_IMPL *conn;
+	u_int id;
+	pthread_t tid;
+#define	WT_EVICT_WORKER_RUN	0x01
+	uint32_t flags;
+};
+
+/*
  * WiredTiger cache structure.
  */
 struct __wt_cache {
@@ -65,7 +78,9 @@ struct __wt_cache {
 	u_int eviction_target;		/* Percent to end eviction */
 	u_int eviction_dirty_target;    /* Percent to allow dirty */
 
+	u_int eviction_workers_max;	/* Max additional eviction threads */
 	u_int eviction_workers;		/* Additional eviction threads */
+	WT_EVICTION_WORKER *workers;
 
 	/*
 	 * LRU eviction list information.

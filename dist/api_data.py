@@ -340,8 +340,10 @@ connection_runtime_config = [
 	Config('eviction_trigger', '95', r'''
 	    trigger eviction when the cache is using this much memory, as a
 	    percentage of the total cache size''', min=10, max=99),
-	Config('eviction_workers', '0', r'''
-	    additional threads to help evict pages from cache''',
+	Config('eviction_worker_max', '0', r'''
+	    maximum number of additional threads WiredTiger will start to help
+		evict pages from cache. The number of threads currently running
+		will vary depending on the current eviction load''',
 	    min=0, max=20),
 	Config('shared_cache', '', r'''
 	    shared cache configuration options. A database should configure

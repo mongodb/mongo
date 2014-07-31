@@ -17,13 +17,6 @@ static int   __evict_walk(WT_SESSION_IMPL *, uint32_t *, uint32_t);
 static int   __evict_walk_file(WT_SESSION_IMPL *, u_int *, uint32_t);
 static void *__evict_worker(void *);
 
-typedef struct {
-	WT_CONNECTION_IMPL *conn;
-	u_int id;
-
-	pthread_t tid;
-} WT_EVICTION_WORKER;
-
 /*
  * __evict_read_gen --
  *	Get the adjusted read generation for an eviction entry.
@@ -157,7 +150,7 @@ __evict_server(void *arg)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_EVICTION_WORKER *workers;
+	WT_EVICTION_WORKER *workers, *worker;
 	WT_SESSION_IMPL *session;
 	u_int i;
 
@@ -166,16 +159,24 @@ __evict_server(void *arg)
 	cache = conn->cache;
 	workers = NULL;
 
-	if (cache->eviction_workers > 0)
+	if (cache->eviction_workers_max > 0)
 		WT_ERR(__wt_calloc_def(
-		    session, cache->eviction_workers, &workers));
+		    session, cache->eviction_workers_max, &workers));
 
-	for (i = 0; i < cache->eviction_workers; i++) {
-		workers[i].conn = conn;
-		workers[i].id = i;
+	/*
+	 * If eviction workers are configured, start with at most two - we'll
+	 * launch new threads if there is work for them to do.
+	 */
+	for (i = 0; i < cache->eviction_workers_max && i < 2; i++) {
+		worker = &workers[cache->eviction_workers++];
+		worker->conn = conn;
+		worker->id = i;
+		F_SET(worker, WT_EVICT_WORKER_RUN);
 		WT_ERR(__wt_thread_create(session,
-		    &workers[i].tid, __evict_worker, &workers[i]));
+		    &worker->tid, __evict_worker, worker));
 	}
+
+	cache->workers = workers;
 
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
 		/* Evict pages from the cache as needed. */
@@ -184,6 +185,17 @@ __evict_server(void *arg)
 		if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
 			break;
 
+		/*
+		 * If we have caught up and there are more than the minimum
+		 * number of eviction workers running, shut one down.
+		 */
+		if (cache->eviction_workers > 2) {
+			worker = &workers[cache->eviction_workers--];
+			F_CLR(worker, WT_EVICT_WORKER_RUN);
+			WT_TRET(__wt_cond_signal(
+			    session, cache->evict_waiter_cond));
+			WT_TRET(__wt_thread_join(session, worker->tid));
+		}
 		F_CLR(cache, WT_EVICT_ACTIVE);
 		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "sleeping"));
 		/* Don't rely on signals: check periodically. */
@@ -303,15 +315,14 @@ __evict_worker(void *arg)
 	session = conn->default_session;
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &session));
 
-	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
+	while (F_ISSET(conn, WT_CONN_EVICTION_RUN) &&
+	    F_ISSET(worker, WT_EVICT_WORKER_RUN)) {
 		/* Don't spin in a busy loop if there is no work to do */
 		WT_ERR(__evict_has_work(session, &flags));
-		if (flags == 0) {
+		if (flags == 0)
 			WT_ERR(__wt_cond_wait(
 			    session, cache->evict_waiter_cond, 10000));
-			if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
-				break;
-		} else
+		else
 			WT_ERR(__evict_lru_pages(session, 1));
 	}
 
@@ -379,6 +390,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
+	WT_EVICTION_WORKER *worker;
 	int loop;
 	uint32_t flags;
 	uint64_t bytes_inuse;
@@ -412,10 +424,21 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * evicted.  This will be cleared by the next thread to
 		 * successfully evict a page.
 		 */
-		if (bytes_inuse > conn->cache_size)
+		if (bytes_inuse > conn->cache_size) {
 			F_SET(cache, WT_EVICT_NO_PROGRESS);
-		else
+		} else
 			F_CLR(cache, WT_EVICT_NO_PROGRESS);
+
+		/* Start a worker if we have capacity and the cache is full. */
+		if (bytes_inuse > conn->cache_size &&
+		    cache->eviction_workers < cache->eviction_workers_max) {
+			worker = &cache->workers[cache->eviction_workers++];
+			worker->conn = conn;
+			worker->id = cache->eviction_workers - 1;
+			F_SET(worker, WT_EVICT_WORKER_RUN);
+			WT_RET(__wt_thread_create(session,
+			    &worker->tid, __evict_worker, worker));
+		}
 
 		F_SET(cache, WT_EVICT_ACTIVE);
 		WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,

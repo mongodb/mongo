@@ -147,6 +147,8 @@ struct __wt_dsrc_stats;
     typedef struct __wt_dsrc_stats WT_DSRC_STATS;
 struct __wt_evict_entry;
     typedef struct __wt_evict_entry WT_EVICT_ENTRY;
+struct __wt_eviction_worker;
+    typedef struct __wt_eviction_worker WT_EVICTION_WORKER;
 struct __wt_ext;
     typedef struct __wt_ext WT_EXT;
 struct __wt_extlist;

@@ -1,7 +1,7 @@
 # wtperf options file: medium btree configuration
-conn_config="cache_size=1G"
+conn_config="cache_size=100M,eviction_worker_max=6"
 table_config="type=file"
-icount=50000000
+icount=5000000
 report_interval=5
 run_time=120
 populate_threads=1
