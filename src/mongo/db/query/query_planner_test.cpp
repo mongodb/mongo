@@ -3952,6 +3952,93 @@ namespace {
                                 "{ixscan: {pattern: {'a.b.endDate': 1}}}]}}}}");
     }
 
+    // SERVER-14718
+    TEST_F(QueryPlannerTest, NegationBelowElemMatchValue) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        // true means multikey
+        addIndex(BSON("a" << 1), true);
+
+        runQuery(fromjson("{a: {$elemMatch: {$ne: 2}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {a:{$elemMatch:{$ne:2}}}, node: "
+                                "{ixscan: {filter: null, pattern: {a: 1}, bounds: "
+                                    "{a: [['MinKey',2,true,false], [2,'MaxKey',false,true]]}}}}}");
+    }
+
+    // SERVER-14718
+    TEST_F(QueryPlannerTest, AndWithNegationBelowElemMatchValue) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        // true means multikey
+        addIndex(BSON("a" << 1), true);
+        addIndex(BSON("b" << 1), true);
+
+        runQuery(fromjson("{b: 10, a: {$elemMatch: {$not: {$gt: 4}}}}"));
+
+        // One solution using index on 'b' and one using index on 'a'.
+        assertNumSolutions(2U);
+        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, pattern: {b: 1}}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, pattern: {a: 1}, bounds: {a: "
+                                    "[['MinKey',4,true,true],[Infinity,'MaxKey',false,true]]}}}}}");
+    }
+
+    // SERVER-14718
+    TEST_F(QueryPlannerTest, AndWithNegationBelowElemMatchValue2) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        // true means multikey
+        addIndex(BSON("a" << 1), true);
+
+        runQuery(fromjson("{b: 10, a: {$elemMatch: {$not: {$gt: 4}, $gt: 2}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, pattern: {a: 1}, bounds: "
+                                "{a: [[2, 4, false, true]]}}}}}");
+    }
+
+    // SERVER-14718
+    TEST_F(QueryPlannerTest, NegationBelowElemMatchValueBelowElemMatchObject) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        // true means multikey
+        addIndex(BSON("a.b" << 1), true);
+
+        runQuery(fromjson("{a: {$elemMatch: {b: {$elemMatch: {$ne: 4}}}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, pattern: {'a.b': 1}, bounds: "
+                                "{'a.b': [['MinKey',4,true,false],[4,'MaxKey',false,true]]}}}}}");
+    }
+
+    // SERVER-14718
+    TEST_F(QueryPlannerTest, NegationBelowElemMatchValueBelowOrBelowAnd) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        // true means multikey
+        addIndex(BSON("a" << 1), true);
+        addIndex(BSON("b" << 1));
+
+        runQuery(fromjson("{c: 3, $or: [{a: {$elemMatch: {$ne: 4, $ne: 3}}}, {b: 5}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {c:3}, node: {or: {nodes: ["
+                                "{fetch: {node: {ixscan: {filter: null, pattern: {a: 1}, bounds: "
+                                    "{a: [['MinKey',3,true,false],"
+                                         "[3,4,false,false],"
+                                         "[4,'MaxKey',false,true]]}}}}}, "
+                                "{ixscan: {filter: null, pattern: {b: 1}, bounds: "
+                                    "{b: [[5,5,true,true]]}}}]}}}}");
+    }
+
+    // SERVER-14718
+    TEST_F(QueryPlannerTest, CantIndexNegationBelowElemMatchValue) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        // true means multikey
+        addIndex(BSON("a" << 1), true);
+
+        runQuery(fromjson("{a: {$elemMatch: {$not: {$mod: [2, 0]}}}}"));
+
+        // There are no indexed solutions, because negations of $mod are not indexable.
+        assertNumSolutions(0);
+    }
+
     //
     // QueryPlannerParams option tests
     //

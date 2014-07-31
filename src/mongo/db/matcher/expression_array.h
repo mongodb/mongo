@@ -123,6 +123,8 @@ namespace mongo {
 
         virtual void toBSON(BSONObjBuilder* out) const;
 
+        virtual std::vector<MatchExpression*>* getChildVector() { return &_subs; }
+
         virtual size_t numChildren() const { return _subs.size(); }
 
         virtual MatchExpression* getChild( size_t i ) const { return _subs[i]; }

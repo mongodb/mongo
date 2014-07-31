@@ -29,6 +29,7 @@
 #include "mongo/db/query/canonical_query.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/query_planner_common.h"
 
@@ -623,6 +624,12 @@ namespace mongo {
             // normalizeTree(...) takes ownership of 'child', and then
             // transfers ownership of its return value to 'nme'.
             nme->resetChild(normalizeTree(child));
+        }
+        else if (MatchExpression::ELEM_MATCH_VALUE == root->matchType()) {
+            // Just normalize our children.
+            for (size_t i = 0; i < root->getChildVector()->size(); ++i) {
+                (*root->getChildVector())[i] = normalizeTree(root->getChild(i));
+            }
         }
 
         return root;
