@@ -35,6 +35,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/chunk_diff.h"

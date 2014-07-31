@@ -752,7 +752,6 @@ mongosLibraryFiles = [
     "s/s_only.cpp",
     "s/balance.cpp",
     "s/balancer_policy.cpp",
-    "s/writeback_listener.cpp",
     "s/version_manager.cpp",
     "s/version_mongos.cpp",
     "s/mongos_persistence_stubs.cpp",

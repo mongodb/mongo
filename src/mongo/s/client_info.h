@@ -37,7 +37,6 @@
 
 #include "mongo/db/client_basic.h"
 #include "mongo/s/chunk.h"
-#include "mongo/s/writeback_listener.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/util/net/hostandport.h"
 
