@@ -243,7 +243,19 @@ namespace repl {
         typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
         HeartbeatHandles _heartbeatHandles;
 
-        // Protects all member data of this ReplicationCoordinator.
+        // Parsed command line arguments related to replication.  Set once at startup and then
+        // never modified again, which makes it safe to read outside of _mutex.
+        // TODO(spencer): Currently this actually is not true, there is global mutable state
+        // in ReplSettings, but we should be able to get rid of that after the legacy repl
+        // coordinator is gone. At that point we can make this const.
+        ReplSettings _settings;
+
+        // Our RID, used to identify us to our sync source when sending replication progress
+        // updates upstream.  Set once at startup and then never modified again, which makes it
+        // safe to read outside of _mutex.
+        OID _myRID;
+
+        // Protects all member data of this ReplicationCoordinator except _settings and _myRID.
         mutable boost::mutex _mutex;
 
         // list of information about clients waiting on replication.  Does *not* own the
@@ -252,13 +264,6 @@ namespace repl {
 
         // Set to true when we are in the process of shutting down replication.
         bool _inShutdown;
-
-        // Parsed command line arguments related to replication.
-        ReplSettings _settings;
-
-        // Our RID, used to identify us to our sync source when sending replication progress
-        // updates upstream.  Set once at startup and then never modified again.
-        OID _myRID;
 
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
         boost::scoped_ptr<TopologyCoordinator> _topCoord;

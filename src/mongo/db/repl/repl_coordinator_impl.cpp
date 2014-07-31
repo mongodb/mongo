@@ -322,7 +322,9 @@ namespace repl {
 
     bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
         if (_settings.usingReplSets()) {
-            if (getReplicationMode() == modeReplSet && getCurrentMemberState().primary()) {
+            boost::lock_guard<boost::mutex> lock(_mutex);
+            if (_getReplicationMode_inlock() == modeReplSet &&
+                    _getCurrentMemberState_inlock().primary()) {
                 return true;
             }
             return false;
@@ -350,7 +352,8 @@ namespace repl {
         // until a valid replica set config has been loaded
         boost::lock_guard<boost::mutex> lk(_mutex);
         if (_settings.usingReplSets()) {
-            if (_getReplicationMode_inlock() == modeReplSet && _currentState.primary()) {
+            if (_getReplicationMode_inlock() == modeReplSet &&
+                    _getCurrentMemberState_inlock().primary()) {
                 return true;
             }
             return dbName == "local";
@@ -390,7 +393,7 @@ namespace repl {
             if (replMode == modeMasterSlave || replMode == modeNone) {
                 return Status::OK();
             }
-            if (_currentState.secondary()) {
+            if (_getCurrentMemberState_inlock().secondary()) {
                 return Status::OK();
             }
             return Status(ErrorCodes::NotMasterOrSecondaryCode,
@@ -408,11 +411,12 @@ namespace repl {
         if (idx->isIdIndex()) {
             return false;
         }
-        if (getReplicationMode() != modeReplSet) {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        if (_getReplicationMode_inlock() != modeReplSet) {
             return false;
         }
         // see SERVER-6671
-        MemberState ms = getCurrentMemberState();
+        MemberState ms = _getCurrentMemberState_inlock();
         if (! ((ms == MemberState::RS_STARTUP2) ||
                (ms == MemberState::RS_RECOVERING) ||
                (ms == MemberState::RS_ROLLBACK))) {
@@ -521,6 +525,7 @@ namespace repl {
     }
 
     void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result) {
+        boost::lock_guard<boost::mutex> lock(_mutex);
         result->append("config", _rsConfig.toBSON());
     }
 
