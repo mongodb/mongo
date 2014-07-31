@@ -30,14 +30,14 @@ replTest.partition(4,1);
 replTest.partition(4,3);
 
 jsTestLog("Checking that ops still replicate correctly");
-var option = { writeConcern: { w: 5, wtimeout: 30000 }};
+var option = { writeConcern: { w: 5, wtimeout: 60000 }};
 assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, option));
 
 // 4 is connected to 3
 replTest.partition(4,2);
 replTest.unPartition(4,3);
 
-option = { writeConcern: { w: 5, wtimeout: 30000 }};
+option = { writeConcern: { w: 5, wtimeout: 60000 }};
 assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, option));
 
 replTest.stopSet();

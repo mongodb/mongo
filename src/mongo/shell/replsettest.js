@@ -366,7 +366,7 @@ ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
 ReplSetTest.prototype.getMaster = function( timeout ) {
   var tries = 0;
   var sleepTime = 500;
-  var tmo = timeout || 60000;
+  var tmo = timeout ||  2 * 60 * 1000; // 2 mins
   var master = null;
 
   try {
@@ -438,7 +438,7 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     var config  = cfg || this.getReplSetConfig();
     var cmd     = {};
     var cmdKey  = initCmd || 'replSetInitiate';
-    var timeout = timeout || 60000;
+    var timeout = timeout || 2 * 60 * 1000; // 2 mins
     cmd[cmdKey] = config;
     printjson(cmd);
 
@@ -462,7 +462,7 @@ ReplSetTest.prototype.reInitiate = function(timeout) {
     var master  = this.nodes[0];
     var c = master.getDB("local")['system.replset'].findOne();
     var config  = this.getReplSetConfig();
-    var timeout = timeout || 60000;
+    var timeout = timeout || 2 * 60 * 1000; // 2 mins
     config.version = c.version + 1;
     this.initiate( config , 'replSetReconfig', timeout );
 }
@@ -485,7 +485,7 @@ ReplSetTest.prototype.getLastOpTimeWritten = function() {
 };
 
 ReplSetTest.prototype.awaitReplication = function(timeout) {
-    timeout = timeout || 30000;
+    timeout = timeout || 60000;
 
     this.getLastOpTimeWritten();
 

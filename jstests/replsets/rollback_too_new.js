@@ -56,6 +56,6 @@ assert.soon(function() {
     catch (e) {
         return false;
     }
-}, "B failed to go FATAL");
+}, "B failed to go FATAL", 60 * 1000);
 
 replTest.stopSet();
