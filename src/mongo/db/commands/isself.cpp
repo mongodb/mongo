@@ -28,155 +28,17 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
-#include <boost/algorithm/string.hpp>
-#include <string>
-#include <vector>
-
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/security_key.h"
+#include "mongo/base/init.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/isself.h"
-#include "mongo/db/server_options.h"
-#include "mongo/util/net/listen.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/client/dbclientinterface.h"
-
-#ifndef _WIN32
-# ifndef __sunos__
-#  include <ifaddrs.h>
-# endif
-# include <sys/resource.h>
-# include <sys/stat.h>
-
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <errno.h>
-#include <netdb.h>
-#ifdef __openbsd__
-# include <sys/uio.h>
-#endif
-
-#endif
-
 
 namespace mongo {
 
-#if !defined(_WIN32) && !defined(__sunos__)
-
-    static vector<string> getMyAddrs() {
-        vector<string> out;
-        ifaddrs * addrs;
-        
-        if (!serverGlobalParams.bind_ip.empty()) {
-            boost::split(out, serverGlobalParams.bind_ip, boost::is_any_of(", "));
-            return out;
-        }
-
-        int status = getifaddrs(&addrs);
-        massert(13469, "getifaddrs failure: " + errnoWithDescription(errno), status == 0);
-
-        // based on example code from linux getifaddrs manpage
-        for (ifaddrs * addr = addrs; addr != NULL; addr = addr->ifa_next) {
-            if ( addr->ifa_addr == NULL ) continue;
-            int family = addr->ifa_addr->sa_family;
-            char host[NI_MAXHOST];
-
-            if (family == AF_INET || family == AF_INET6) {
-                status = getnameinfo(addr->ifa_addr,
-                                     (family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)),
-                                     host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-                if ( status != 0 ) {
-                    freeifaddrs( addrs );
-                    addrs = NULL;
-                    msgasserted( 13470, string("getnameinfo() failed: ") + gai_strerror(status) );
-                }
-
-                out.push_back(host);
-            }
-
-        }
-
-        freeifaddrs( addrs );
-        addrs = NULL;
-
-        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
-            LogstreamBuilder builder(logger::globalLogDomain(),
-                                     getThreadName(),
-                                     logger::LogSeverity::Debug(1));
-            builder << "getMyAddrs():";
-            for (vector<string>::const_iterator it=out.begin(), end=out.end(); it!=end; ++it) {
-                builder << " [" << *it << ']';
-            }
-            builder << endl;
-        }
-
-        return out;
-    }
-
-    static vector<string> getAllIPs(const string& iporhost) {
-        addrinfo* addrs = NULL;
-        addrinfo hints;
-        memset(&hints, 0, sizeof(addrinfo));
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_family = (IPv6Enabled() ? AF_UNSPEC : AF_INET);
-
-        static string portNum = BSONObjBuilder::numStr(serverGlobalParams.port);
-
-        vector<string> out;
-
-        int ret = getaddrinfo(iporhost.c_str(), portNum.c_str(), &hints, &addrs);
-        if ( ret ) {
-            warning() << "getaddrinfo(\"" << iporhost << "\") failed: " << gai_strerror(ret) << endl;
-            return out;
-        }
-
-        for (addrinfo* addr = addrs; addr != NULL; addr = addr->ai_next) {
-            int family = addr->ai_family;
-            char host[NI_MAXHOST];
-
-            if (family == AF_INET || family == AF_INET6) {
-                int status = getnameinfo(addr->ai_addr, addr->ai_addrlen, host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-
-                massert(13472, string("getnameinfo() failed: ") + gai_strerror(status), status == 0);
-
-                out.push_back(host);
-            }
-
-        }
-
-        freeaddrinfo(addrs);
-
-        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
-            LogstreamBuilder builder(logger::globalLogDomain(),
-                                     getThreadName(),
-                                     logger::LogSeverity::Debug(1));
-            builder << "getallIPs(\"" << iporhost << "\"):";
-            for (vector<string>::const_iterator it=out.begin(), end=out.end(); it!=end; ++it) {
-                builder << " [" << *it << ']';
-            }
-            builder << endl;
-        }
-
-        return out;
-    }
-#endif
-
-
     class IsSelfCommand : public Command {
     public:
-        IsSelfCommand() : Command("_isSelf") , _cacheLock( "IsSelfCommand::_cacheLock" ) {}
+        IsSelfCommand() : Command("_isSelf") {}
         virtual bool slaveOk() const { return true; }
         virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream &help ) const {
@@ -186,101 +48,16 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            init();
-            result.append( "id" , _id );
+            result.append( "id" , repl::instanceId );
             return true;
         }
+    };
 
-        void init() {
-            scoped_lock lk( _cacheLock );
-            if ( ! _id.isSet() )
-                _id.init();
-        }
-
-        OID _id;
-
-        mongo::mutex _cacheLock;
-        map<string,bool> _cache;
-    } isSelfCommand;
-
-    bool repl::isSelf(const HostAndPort& hostAndPort) {
-
-        int p = hostAndPort.port();
-
-        string host = str::stream() << hostAndPort.host() << ":" << p;
-
-        {
-            // check cache for this host
-            // debatably something _could_ change, but I'm not sure right now (erh 10/14/2010)
-            scoped_lock lk( isSelfCommand._cacheLock );
-            map<string,bool>::const_iterator i = isSelfCommand._cache.find( host );
-            if ( i != isSelfCommand._cache.end() )
-                return i->second;
-        }
-
-#if !defined(_WIN32) && !defined(__sunos__)
-        // on linux and os x we can do a quick check for an ip match
-
-        // no need for ip match if the ports do not match
-        if (p == serverGlobalParams.port) {
-            const vector<string> myaddrs = getMyAddrs();
-            const vector<string> addrs = getAllIPs(hostAndPort.host());
-
-            for (vector<string>::const_iterator i=myaddrs.begin(), iend=myaddrs.end();
-                 i!=iend; ++i) {
-                for (vector<string>::const_iterator j=addrs.begin(), jend=addrs.end();
-                     j!=jend; ++j) {
-                    string a = *i;
-                    string b = *j;
-
-                    if (a == b) {
-                        // add to cache
-                        scoped_lock lk( isSelfCommand._cacheLock );
-                        isSelfCommand._cache[host] = true;
-                        return true;
-                    }
-                }
-            }
-        }
-
-#endif
-
-        if ( ! Listener::getTimeTracker() ) {
-            // this ensures we are actually running a server
-            // this may return true later, so may want to retry
-            return false;
-        }
-
-        try {
-            isSelfCommand.init();
-            DBClientConnection conn;
-            string errmsg;
-            if ( ! conn.connect( hostAndPort , errmsg ) ) {
-                // should this go in the cache?
-                return false;
-            }
-
-            if (getGlobalAuthorizationManager()->isAuthEnabled() && isInternalAuthSet()) {
-                if (!authenticateInternalUser(&conn)) {
-                    return false;
-                }
-            }
-
-            BSONObj out;
-            bool ok = conn.simpleCommand( "admin" , &out , "_isSelf" );
-            bool me = ok && out["id"].type() == jstOID && isSelfCommand._id == out["id"].OID();
-
-            // add to cache
-            scoped_lock lk( isSelfCommand._cacheLock );
-            isSelfCommand._cache[host] = me;
-
-            return me;
-        }
-        catch ( std::exception& e ) {
-            warning() << "could't check isSelf (" << host << ") " << e.what() << endl;
-        }
-
-        return false;
+    MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterIsSelfCommand, ("GenerateInstanceId"))
+        (InitializerContext* context) {
+        // Leaked intentionally: a Command registers itself when constructed
+        new IsSelfCommand();
+        return Status::OK();
     }
 
 }

@@ -842,7 +842,13 @@ elif windows:
     # This gives 32-bit programs 4 GB of user address space in WOW64, ignored in 64-bit builds
     env.Append( LINKFLAGS=["/LARGEADDRESSAWARE"] )
 
-    env.Append(LIBS=['ws2_32.lib', 'kernel32.lib', 'advapi32.lib', 'Psapi.lib', 'DbgHelp.lib', 'shell32.lib'])
+    env.Append(LIBS=['ws2_32.lib',
+                     'kernel32.lib',
+                     'advapi32.lib',
+                     'Psapi.lib',
+                     'DbgHelp.lib',
+                     'shell32.lib',
+                     'Iphlpapi.lib'])
 
     # v8 calls timeGetTime()
     if usev8:
