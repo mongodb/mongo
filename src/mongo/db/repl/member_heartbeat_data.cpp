@@ -63,6 +63,32 @@ namespace repl {
         _electionTime = newInfo.getElectionTime();
     }
 
+    void MemberHeartbeatData::setUpValues(time_t now,
+                                          MemberState state,
+                                          OpTime electionTime,
+                                          OpTime optime,
+                                          const std::string& syncingTo,
+                                          const std::string& heartbeatMessage) {
+        _authIssue = false;
+        _health = 1;
+
+        _lastHeartbeat = now;
+        _state = state;
+        _electionTime = electionTime;
+        _opTime = optime;
+        _syncSource = syncingTo;
+        _lastHeartbeatMsg = heartbeatMessage;
+    }
+
+    void MemberHeartbeatData::setDownValues(time_t now,
+                                            const std::string& heartbeatMessage) {
+        _authIssue = false;
+        _health = 0;
+        _state = MemberState::RS_DOWN;
+
+        _lastHeartbeat = now;
+        _lastHeartbeatMsg = heartbeatMessage;
+    }
 
 } // namespace repl
 } // namespace mongo

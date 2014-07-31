@@ -75,6 +75,26 @@ namespace repl {
          * the last heartbeat command.
          */
         void updateFrom(const MemberHeartbeatData& newInfo);
+
+        /**
+         * Sets values in this object from the results of a successful heartbeat command.
+         * _authIssues is set to false, _health is set to 1, other values are set as specified.
+         */
+        void setUpValues(time_t now,
+                         MemberState state,
+                         OpTime electionTime,
+                         OpTime optime,
+                         const std::string& syncingTo,
+                         const std::string& heartbeatMessage);
+
+
+        /**
+         * Sets values in this object from the results of a erroring/failed heartbeat command.
+         * _authIssues is set to false, _health is set to 0, _state is set to RS_DOWN, and
+         * other values are set as specified.
+         */
+        void setDownValues(time_t now, const std::string& heartbeatMessage);
+
     private:
         // This member's index into the ReplicaSetConfig
         int _configIndex;
