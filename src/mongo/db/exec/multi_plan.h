@@ -45,6 +45,7 @@ namespace mongo {
      *
      * Preconditions: Valid DiskLoc.
      *
+     * Owns the query solutions and PlanStage roots for all candidate plans.
      */
     class MultiPlanStage : public PlanStage {
     public:
@@ -52,11 +53,6 @@ namespace mongo {
         MultiPlanStage(const Collection* collection, CanonicalQuery* cq);
 
         virtual ~MultiPlanStage();
-
-        /**
-         * Helper used by the destructor to delete losing candidate plans.
-         */
-        void clearCandidates();
 
         virtual bool isEOF();
 
@@ -78,7 +74,9 @@ namespace mongo {
 
         virtual const SpecificStats* getSpecificStats();
 
-        /** Takes ownership of QuerySolution and PlanStage. not of WorkingSet */
+        /**
+         * Takes ownership of QuerySolution and PlanStage. not of WorkingSet
+         */
         void addPlan(QuerySolution* solution, PlanStage* root, WorkingSet* sharedWs);
 
         /**
@@ -87,13 +85,18 @@ namespace mongo {
          */
         void pickBestPlan();
 
-	/** Return true if a best plan has been chosen  */
+        /** Return true if a best plan has been chosen  */
         bool bestPlanChosen() const;
 
         /** Return the index of the best plan chosen, for testing */
         int bestPlanIdx() const;
 
-        /** Returns the QuerySolution for the best plan, or NULL if no best plan */
+        /**
+         * Returns the QuerySolution for the best plan, or NULL if no best plan
+         *
+         * The MultiPlanStage retains ownership of the winning QuerySolution and returns an
+         * unowned pointer.
+         */
         QuerySolution* bestSolution();
 
         /**
@@ -151,7 +154,9 @@ namespace mongo {
         // not owned here
         CanonicalQuery* _query;
 
-        // Candidate plans.  Owned here.
+        // Candidate plans. Each candidate includes a child PlanStage tree and QuerySolution which
+        // are owned here. Ownership of all QuerySolutions is retained here, and will *not* be
+        // tranferred to the PlanExecutor that wraps this stage.
         std::vector<CandidatePlan> _candidates;
 
         // Candidate plans' stats. Owned here.

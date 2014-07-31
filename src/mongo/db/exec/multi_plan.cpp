@@ -63,23 +63,9 @@ namespace mongo {
           _commonStats(kStageType) { }
 
     MultiPlanStage::~MultiPlanStage() {
-        if (bestPlanChosen()) {
-            delete _candidates[_bestPlanIdx].root;
-
-            // for now, the runner that executes this multi-plan-stage wants to own
-            // the query solution for the best plan.  So we won't delete it here.
-            // eventually, plan stages may own their query solutions.
-            // 
-            // delete _candidates[_bestPlanIdx].solution; // (owned by containing runner)
-
-            // Clean up the losing candidates.
-            clearCandidates();
-        }
-        else {
-            for (size_t ix = 0; ix < _candidates.size(); ++ix) {
-                delete _candidates[ix].solution;
-                delete _candidates[ix].root;
-            }
+        for (size_t ix = 0; ix < _candidates.size(); ++ix) {
+            delete _candidates[ix].solution;
+            delete _candidates[ix].root;
         }
 
         for (vector<PlanStageStats*>::iterator it = _candidateStats.begin();
@@ -308,17 +294,6 @@ namespace mongo {
         }
 
         return _candidateStats;
-    }
-
-    void MultiPlanStage::clearCandidates() {
-        // Clear out the candidate plans, leaving only stats as we're all done w/them.
-        // Traverse candidate plans in order or score
-        for (size_t ix = 0; ix < _candidates.size(); ix++) {
-            if (ix == (size_t)_bestPlanIdx) { continue; }
-
-            delete _candidates[ix].root;
-            delete _candidates[ix].solution;
-        }
     }
 
     bool MultiPlanStage::workAllPlans(size_t numResults) {
