@@ -77,6 +77,11 @@ walk_log(WT_SESSION *session)
 		/*! [log cursor get_key] */
 		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset);
 		/*! [log cursor get_key] */
+		/*
+		 * Save one of the LSNs we get back to search for it
+		 * later.  Doesn't matter which one.  We know there are
+		 * more than 3, so just pick 3 here.
+		 */
 		if (++i == 3)
 			lsnsave = lsn;
 		/*! [log cursor get_value] */
@@ -86,6 +91,10 @@ walk_log(WT_SESSION *session)
 		WALK_PRINT(lsn);
 	}
 	cursor->reset(cursor);
+	/*
+	 * Search for the LSN we saved earlier.  Confirm the key
+	 * does not change.
+	 */
 	/*! [log cursor set_key] */
 	cursor->set_key(cursor, lsnsave.file, lsnsave.offset);
 	/*! [log cursor set_key] */
@@ -183,6 +192,12 @@ step_log(WT_SESSION *session)
 		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset,
 		    &opcount);
 		/*! [log step get_key] */
+		/*
+		 * Save one of the LSNs we get back to search for it
+		 * later.  Pick a later one because we want to walk from
+		 * that LSN to the end (where the multi-step transaction
+		 * was performed).  Just choose the record that is MAX_KEYS.
+		 */
 		if (++i == MAX_KEYS)
 			lsnsave = lsn;
 		/*! [log step get_value] */
