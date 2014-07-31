@@ -40,4 +40,4 @@ assert.eq(5, doc.a);
 assert.eq(count, t.count(), "bad count");
 
 var stats = db.runCommand({ collstats: "insert1" });
-assert(stats.paddingFactor == 1.0);
+assert( stats.paddingFactor == undefined || stats.paddingFactor == 1.0);
