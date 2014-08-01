@@ -325,9 +325,9 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	cursor->session = &session->iface;
 	WT_ERR(__wt_calloc_def(session, 1, &cl->cur_lsn));
 	WT_ERR(__wt_calloc_def(session, 1, &cl->next_lsn));
-	__wt_scr_alloc(session, 0, &cl->logrec);
-	__wt_scr_alloc(session, 0, &cl->opkey);
-	__wt_scr_alloc(session, 0, &cl->opvalue);
+	WT_ERR(__wt_scr_alloc(session, 0, &cl->logrec));
+	WT_ERR(__wt_scr_alloc(session, 0, &cl->opkey));
+	WT_ERR(__wt_scr_alloc(session, 0, &cl->opvalue));
 	cursor->key_format = LOGC_KEY_FORMAT;
 	cursor->value_format = LOGC_VALUE_FORMAT;
 
