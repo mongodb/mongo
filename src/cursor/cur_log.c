@@ -30,9 +30,9 @@ __curlog_logrec(
 	 * Read the log header.  Set up the step pointers to walk the
 	 * operations inside the record.  Get the record type.
 	 */
-	cl->stepp = (const uint8_t *)cl->logrec->data +
+	cl->stepp = (uint8_t *)cl->logrec->data +
 	    offsetof(WT_LOG_RECORD, record);
-	cl->stepp_end = (const uint8_t *)cl->logrec->data + logrec->size;
+	cl->stepp_end = (uint8_t *)cl->logrec->data + logrec->size;
 	WT_RET(__wt_logrec_read(session, &cl->stepp, cl->stepp_end,
 	    &cl->rectype));
 
