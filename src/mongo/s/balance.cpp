@@ -48,12 +48,15 @@
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/s/type_tags.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
 
     MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+
+    MONGO_FP_DECLARE(skipBalanceRound);
 
     Balancer balancer;
 
@@ -259,17 +262,7 @@ namespace mongo {
         }
         
         ShardInfoMap shardInfo;
-        for ( vector<Shard>::const_iterator it = allShards.begin(); it != allShards.end(); ++it ) {
-            const Shard& s = *it;
-            ShardStatus status = s.getStatus();
-            shardInfo[ s.getName() ] = ShardInfo( s.getMaxSize(),
-                                                  status.mapped(),
-                                                  s.isDraining(),
-                                                  status.hasOpsQueued(),
-                                                  s.tags(),
-                                                  status.mongoVersion()
-                                                  );
-        }
+        DistributionStatus::populateShardInfoMap(allShards, &shardInfo);
 
         OCCASIONALLY warnOnMultiVersion( shardInfo );
 
@@ -487,8 +480,9 @@ namespace mongo {
                 }
 
                 // now make sure we should even be running
-                if (balancerConfig.isKeySet() && // balancer config doc exists
-                        !grid.shouldBalance(balancerConfig)) {
+                if ((balancerConfig.isKeySet() && // balancer config doc exists
+                        !grid.shouldBalance(balancerConfig)) ||
+                        MONGO_FAIL_POINT(skipBalanceRound)) {
 
                     LOG(1) << "skipping balancing round because balancing is disabled" << endl;
 

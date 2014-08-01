@@ -32,12 +32,14 @@
 
 #include "mongo/s/chunk.h"
 
+#include "mongo/base/owned_pointer_map.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/platform/random.h"
+#include "mongo/s/balancer_policy.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client_info.h"
@@ -79,6 +81,82 @@ namespace mongo {
 
     // Can be overridden from command line
     bool Chunk::ShouldAutoSplit = true;
+
+    /**
+     * Attempts to move the given chunk to another shard.
+     *
+     * Returns true if the chunk was actually moved.
+     */
+    static bool tryMoveToOtherShard(const ChunkManager& manager, const ChunkType& chunk) {
+        // reload sharding metadata before starting migration
+        Shard::reloadShardInfo();
+        ChunkManagerPtr chunkMgr = manager.reload(false /* just reloaded in mulitsplit */);
+
+        vector<Shard> allShards;
+        Shard::getAllShards(allShards);
+        if (allShards.size() < 2) {
+            LOG(0) << "no need to move top chunk since there's only 1 shard" << endl;
+            return false;
+        }
+
+        ShardInfoMap shardInfo;
+        DistributionStatus::populateShardInfoMap(allShards, &shardInfo);
+
+        OwnedPointerMap<string, OwnedPointerVector<ChunkType> > shardToChunkMap;
+        DistributionStatus::populateShardToChunksMap(allShards,
+                                                     *chunkMgr,
+                                                     &shardToChunkMap.mutableMap());
+
+        DistributionStatus chunkDistribution(shardInfo, shardToChunkMap.map());
+
+        const string configServerStr = configServer.getConnectionString().toString();
+        StatusWith<string> tagStatus =
+                DistributionStatus::getTagForSingleChunk(configServerStr,
+                                                         manager.getns(),
+                                                         chunk);
+        if (!tagStatus.isOK()) {
+            warning() << "Not auto-moving chunk because of an error encountered while "
+                      << "checking tag for chunk: " << tagStatus.toString() << endl;
+            return false;
+        }
+
+        const string newLocation(
+                chunkDistribution.getBestReceieverShard(tagStatus.getValue()));
+
+        if (chunk.getShard() == newLocation) {
+            // if this is the best shard, then we shouldn't do anything.
+            LOG(1) << "recently split chunk: " << chunk
+                   << " already in the best shard: " << endl;
+            return false; // we did split even if we didn't migrate
+        }
+
+        ChunkPtr toMove = chunkMgr->findIntersectingChunk(chunk.getMin());
+
+        if (!(toMove->getMin() == chunk.getMin() && toMove->getMax() == chunk.getMax())) {
+            LOG(1) << "recently split chunk: " << chunk
+                   << " modified before we could migrate " << toMove->toString() << endl;
+            return false;
+        }
+
+        log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation << endl;
+
+        BSONObj res;
+
+        WriteConcernOptions noThrottle;
+        massert(10412,
+                str::stream() << "moveAndCommit failed: " << res,
+                toMove->moveAndCommit(newLocation,
+                                      Chunk::MaxChunkSize,
+                                      &noThrottle, /* secondaryThrottle */
+                                      false, /* waitForDelete - small chunk, no need */
+                                      0, /* maxTimeMS - don't time out */
+                                      res));
+
+        // update our config
+        manager.reload();
+
+        return true;
+    }
 
     Chunk::Chunk(const ChunkManager * manager, BSONObj from)
         : _manager(manager), _lastmod(0, 0, OID()), _dataWritten(mkDataWritten())
@@ -483,46 +561,19 @@ namespace mongo {
                   << ( res["shouldMigrate"].eoo() ? "" : (string)" (migrate suggested" +
                      ( shouldBalance ? ")" : ", but no migrations allowed)" ) ) << endl;
 
+            // Top chunk optimization - try to move the top chunk out of this shard
+            // to prevent the hot spot from staying on a single shard. This is based on
+            // the assumption that succeeding inserts will fall on the top chunk.
             BSONElement shouldMigrate = res["shouldMigrate"]; // not in mongod < 1.9.1 but that is ok
             if ( ! shouldMigrate.eoo() && shouldBalance ){
                 BSONObj range = shouldMigrate.embeddedObject();
-                BSONObj min = range["min"].embeddedObject();
-                BSONObj max = range["max"].embeddedObject();
-                
-                // reload sharding metadata before starting migration
-                Shard::reloadShardInfo();
 
-                Shard newLocation = Shard::pick( getShard() );
-                if ( getShard() == newLocation ) {
-                    // if this is the best shard, then we shouldn't do anything (Shard::pick already logged our shard).
-                    LOG(1) << "recently split chunk: " << range << " already in the best shard: " << getShard() << endl;
-                    return true; // we did split even if we didn't migrate
-                }
+                ChunkType chunkToMove;
+                chunkToMove.setShard(getShard().toString());
+                chunkToMove.setMin(range["min"].embeddedObject());
+                chunkToMove.setMax(range["max"].embeddedObject());
 
-                ChunkManagerPtr cm = _manager->reload(false/*just reloaded in mulitsplit*/);
-                ChunkPtr toMove = cm->findIntersectingChunk(min);
-
-                if ( ! (toMove->getMin() == min && toMove->getMax() == max) ){
-                    LOG(1).stream() << "recently split chunk: " << range << " modified before we could migrate " << toMove << endl;
-                    return true;
-                }
-
-                log().stream() << "moving chunk (auto): " << toMove << " to: " << newLocation.toString() << endl;
-
-                BSONObj res;
-
-                WriteConcernOptions noThrottle;
-                massert( 10412 ,
-                         str::stream() << "moveAndCommit failed: " << res ,
-                         toMove->moveAndCommit( newLocation , 
-                                                MaxChunkSize , 
-                                                &noThrottle, /* secondaryThrottle */
-                                                false, /* waitForDelete - small chunk, no need */
-                                                0, /* maxTimeMS - don't time out */
-                                                res ) );
-                
-                // update our config
-                _manager->reload();
+                tryMoveToOtherShard(*_manager, chunkToMove);
             }
 
             return true;

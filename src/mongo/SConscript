@@ -724,7 +724,9 @@ serverOnlyFiles += mmapFiles
 
 serverOnlyFiles += [ "db/stats/snapshots.cpp", "db/stats/range_deleter_server_status.cpp" ]
 
-env.Library('coreshard', ['s/distlock.cpp',
+env.Library('coreshard', [# This is only here temporarily for auto-split logic in chunk.cpp.
+                          's/balancer_policy.cpp',
+                          's/distlock.cpp',
                           's/config.cpp',
                           's/grid.cpp',
                           's/chunk.cpp',
@@ -750,7 +752,6 @@ mongosLibraryFiles = [
     "s/cursors.cpp",
     "s/s_only.cpp",
     "s/balance.cpp",
-    "s/balancer_policy.cpp",
     "s/version_manager.cpp",
     "s/version_mongos.cpp",
     "s/mongos_persistence_stubs.cpp",

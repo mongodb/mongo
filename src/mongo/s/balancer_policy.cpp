@@ -32,7 +32,9 @@
 #include <algorithm>
 
 #include "mongo/s/balancer_policy.h"
+#include "mongo/s/chunk.h"
 #include "mongo/s/config.h"
+#include "mongo/s/type_tags.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"
@@ -239,6 +241,84 @@ namespace mongo {
                   ++i )
                 log() << i->second.toString() << endl;
         }
+    }
+
+    void DistributionStatus::populateShardInfoMap(const vector<Shard> allShards,
+                                                  ShardInfoMap* shardInfo) {
+        for (vector<Shard>::const_iterator it = allShards.begin();
+                it != allShards.end(); ++it ) {
+            const Shard& shard = *it;
+            ShardStatus status = shard.getStatus();
+            shardInfo->insert(make_pair(shard.getName(),
+                                        ShardInfo(shard.getMaxSize(),
+                                                  status.mapped(),
+                                                  shard.isDraining(),
+                                                  status.hasOpsQueued(),
+                                                  shard.tags(),
+                                                  status.mongoVersion())));
+        }
+    }
+
+    void DistributionStatus::populateShardToChunksMap(const vector<Shard>& allShards,
+                                                      const ChunkManager& chunkMgr,
+                                                      ShardToChunksMap* shardToChunksMap) {
+        // Makes sure there is an entry in shardToChunksMap for every shard.
+        for (vector<Shard>::const_iterator it = allShards.begin();
+                it != allShards.end(); ++it) {
+
+            OwnedPointerVector<ChunkType>*& chunkList =
+                    (*shardToChunksMap)[it->getName()];
+
+            if (chunkList == NULL) {
+                chunkList = new OwnedPointerVector<ChunkType>();
+            }
+        }
+
+        const ChunkMap& chunkMap = chunkMgr.getChunkMap();
+        for (ChunkMap::const_iterator it = chunkMap.begin(); it != chunkMap.end(); ++it) {
+            const ChunkPtr chunkPtr = it->second;
+
+            auto_ptr<ChunkType> chunk(new ChunkType());
+            chunk->setNS(chunkPtr->getns());
+            chunk->setMin(chunkPtr->getMin().getOwned());
+            chunk->setMax(chunkPtr->getMax().getOwned());
+            chunk->setJumbo(chunkPtr->isJumbo()); // TODO: is this reliable?
+            const string shardName(chunkPtr->getShard().getName());
+            chunk->setShard(shardName);
+
+            (*shardToChunksMap)[shardName]->push_back(chunk.release());
+        }
+    }
+
+    StatusWith<string> DistributionStatus::getTagForSingleChunk(const string& configServer,
+                                                                const string& ns,
+                                                                const ChunkType& chunk) {
+        BSONObj tagRangeDoc;
+
+        try {
+            ScopedDbConnection conn(configServer, 30);
+
+            Query query(QUERY(TagsType::ns(ns)
+                              << TagsType::min() << BSON("$lte" << chunk.getMin())
+                              << TagsType::max() << BSON("$gte" << chunk.getMax())));
+            tagRangeDoc = conn->findOne(TagsType::ConfigNS, query);
+            conn.done();
+        }
+        catch (const DBException& excep) {
+            return StatusWith<string>(excep.toStatus());
+        }
+
+        if (tagRangeDoc.isEmpty()) {
+            return StatusWith<string>("");
+        }
+
+        TagsType tagRange;
+        string errMsg;
+        if (!tagRange.parseBSON(tagRangeDoc, &errMsg)) {
+            return StatusWith<string>(ErrorCodes::FailedToParse, errMsg);
+        }
+
+        return StatusWith<string>(tagRange.getTag());
     }
 
     MigrateInfo* BalancerPolicy::balance( const string& ns,

@@ -460,7 +460,7 @@ namespace mongo {
         //   =>  { a: (0, 1), (2, 3), b: (0, 1), (2, 3) }
         static IndexBounds collapseQuerySolution( const QuerySolutionNode* node );
 
-        ChunkMap getChunkMap() const { return _chunkMap; }
+        const ChunkMap& getChunkMap() const { return _chunkMap; }
 
         /**
          * Returns true if, for this shard, the chunks are identical in both chunk managers
