@@ -248,6 +248,10 @@ namespace {
                 privileges, Privilege(ResourcePattern::forDatabaseName(dbName), readRoleActions));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
+                Privilege(ResourcePattern::forAnyResource(), ActionType::listCollections));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
                 Privilege(ResourcePattern::forExactNamespace(
                                   NamespaceString(dbName, "system.indexes")),
                           readRoleActions));
@@ -485,6 +489,9 @@ namespace {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forAnyNormalResource(), ActionType::find));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forAnyResource(), ActionType::listCollections));
 
         ActionSet clusterActions;
         clusterActions << ActionType::getParameter // To check authSchemaVersion
@@ -555,6 +562,9 @@ namespace {
                 privileges,
                 Privilege(ResourcePattern::forCollectionName("system.namespaces"),
                           ActionType::find));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forAnyResource(), ActionType::listCollections));
 
         // Privileges for user/role management
         Privilege::addPrivilegeToPrivilegeVector(
