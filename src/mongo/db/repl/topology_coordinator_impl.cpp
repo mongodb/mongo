@@ -938,8 +938,8 @@ namespace repl {
                 bb.append("stateStr", myState.toString());
                 bb.append("uptime", uptime);
                 if (!_selfConfig().isArbiter()) {
-                    bb.appendTimestamp("optime", lastOpApplied.asDate());
-                    bb.appendDate("optimeDate", lastOpApplied.getSecs() * 1000LL);
+                    bb.append("optime", lastOpApplied);
+                    bb.appendDate("optimeDate", lastOpApplied.asDate());
                 }
 
                 if (_maintenanceModeCalls) {
@@ -965,7 +965,8 @@ namespace repl {
                           .getHostAndPort().toString());
                 double h = it->getHealth();
                 bb.append("health", h);
-                bb.append("state", static_cast<int>(it->getState().s));
+                MemberState state = it->getState();
+                bb.append("state", static_cast<int>(state.s));
                 if( h == 0 ) {
                     // if we can't connect the state info is from the past
                     // and could be confusing to show
@@ -974,34 +975,40 @@ namespace repl {
                 else {
                     bb.append("stateStr", it->getState().toString());
                 }
-                bb.append("uptime",
-                          static_cast<unsigned int> ((it->getUpSince() ? 
-                                                      (now - it->getUpSince()) : 0)));
-                if (!_currentConfig.getMemberAt(it->getConfigIndex()).isArbiter()) {
-                    bb.appendTimestamp("optime", it->getOpTime().asDate());
-                    bb.appendDate("optimeDate", it->getOpTime().getSecs() * 1000LL);
-                }
-                bb.appendTimeT("lastHeartbeat", it->getLastHeartbeat());
-                bb.appendTimeT("lastHeartbeatRecv", it->getLastHeartbeatRecv());
-                bb.append("pingMs",
-                          _getPing(_currentConfig.getMemberAt(
-                                  it->getConfigIndex()).getHostAndPort()));
-                std::string s = it->getLastHeartbeatMsg();
-                if( !s.empty() )
-                    bb.append("lastHeartbeatMessage", s);
 
-                if (it->hasAuthIssue()) {
-                    bb.append("authenticated", false);
-                }
+                if (state != MemberState::RS_UNKNOWN) {
+                    // If state is UNKNOWN we haven't received any heartbeats and thus don't have
+                    // meaningful values for these fields
 
-                std::string syncSource = it->getSyncSource();
-                if (!syncSource.empty()) {
-                    bb.append("syncingTo", syncSource);
-                }
+                    unsigned int uptime = static_cast<unsigned int> ((it->getUpSince() ?
+                            (now - it->getUpSince()) / 1000 /* convert millis to secs */ : 0));
+                    bb.append("uptime", uptime);
+                    if (!_currentConfig.getMemberAt(it->getConfigIndex()).isArbiter()) {
+                        bb.append("optime", it->getOpTime());
+                        bb.appendDate("optimeDate", it->getOpTime().asDate());
+                    }
+                    bb.appendDate("lastHeartbeat", it->getLastHeartbeat());
+                    bb.appendDate("lastHeartbeatRecv", it->getLastHeartbeatRecv());
+                    bb.append("pingMs",
+                              _getPing(_currentConfig.getMemberAt(
+                                      it->getConfigIndex()).getHostAndPort()));
+                    std::string s = it->getLastHeartbeatMsg();
+                    if( !s.empty() )
+                        bb.append("lastHeartbeatMessage", s);
 
-                if (it->getState() == MemberState::RS_PRIMARY) {
-                    bb.appendTimestamp("electionTime", it->getElectionTime().asDate());
-                    bb.appendDate("electionDate", it->getElectionTime().getSecs() * 1000LL);
+                    if (it->hasAuthIssue()) {
+                        bb.append("authenticated", false);
+                    }
+
+                    std::string syncSource = it->getSyncSource();
+                    if (!syncSource.empty()) {
+                        bb.append("syncingTo", syncSource);
+                    }
+
+                    if (state == MemberState::RS_PRIMARY) {
+                        bb.append("electionTime", it->getElectionTime());
+                        bb.appendDate("electionDate", it->getElectionTime().asDate());
+                    }
                 }
                 membersOut.push_back(bb.obj());
             }

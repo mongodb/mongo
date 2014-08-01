@@ -155,6 +155,12 @@ namespace repl {
         // Record a ping in millis based on the round-trip time of the heartbeat for the member
         virtual void recordPing(const HostAndPort& host, const int elapsedMillis);
 
+        // Changes _memberState to newMemberState, then calls all registered callbacks
+        // for state changes.
+        // NOTE: The only reason this method is public instead of private is for testing.  Do not
+        // call this method from outside of TopologyCoordinatorImpl or a unit test.
+        void _changeMemberState(const MemberState& newMemberState);
+
     private:
 
         // Returns the number of heartbeat pings which have occurred.
@@ -187,10 +193,6 @@ namespace repl {
 
         // Scans the electable set and returns the highest priority member index
         int _getHighestPriorityElectableIndex() const;
-
-        // Changes _memberState to newMemberState, then calls all registered callbacks
-        // for state changes.
-        void _changeMemberState(const MemberState& newMemberState);
 
         OpTime _commitOkayThrough; // the primary's latest op that won't get rolled back
         OpTime _lastReceived; // the last op we have received from our sync source
