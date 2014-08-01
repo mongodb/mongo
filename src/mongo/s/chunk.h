@@ -426,7 +426,7 @@ namespace mongo {
         /** @param shards set to the shards covered by the interval [min, max], see SERVER-4791 */
         void getShardsForRange( set<Shard>& shards, const BSONObj& min, const BSONObj& max ) const;
 
-        ChunkMap getChunkMap() const { return _chunkMap; }
+        const ChunkMap& getChunkMap() const { return _chunkMap; }
 
         /**
          * Returns true if, for this shard, the chunks are identical in both chunk managers
