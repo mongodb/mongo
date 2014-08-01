@@ -225,17 +225,16 @@ __wt_evict_create(WT_CONNECTION_IMPL *conn)
 	conn->evict_session = session;
 
 	if (conn->evict_workers > 0) {
-		WT_RET(__wt_calloc_def(
-		    session, conn->evict_workers, &workers));
+		WT_RET(__wt_calloc_def(session, conn->evict_workers, &workers));
 		conn->evict_workctx = workers;
-	}
 
-	for (i = 0; i < conn->evict_workers; i++) {
-		WT_RET(__wt_open_internal_session(
-		    conn, "eviction-worker", 0, 0, &workers[i].session));
-		workers[i].id = i;
-		WT_RET(__wt_thread_create(session,
-		    &workers[i].tid, __evict_worker, &workers[i]));
+		for (i = 0; i < conn->evict_workers; i++) {
+			WT_RET(__wt_open_internal_session(conn,
+			    "eviction-worker", 0, 0, &workers[i].session));
+			workers[i].id = i;
+			WT_RET(__wt_thread_create(session,
+			    &workers[i].tid, __evict_worker, &workers[i]));
+		}
 	}
 
 	WT_RET(__wt_thread_create(
