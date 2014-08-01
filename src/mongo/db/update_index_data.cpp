@@ -1,4 +1,4 @@
-// index_set.cpp
+// update_index_data.cpp
 
 /**
 *    Copyright (C) 2013 10gen Inc.
@@ -29,32 +29,47 @@
 */
 
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/index_set.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/update_index_data.h"
 
 namespace mongo {
 
-    void IndexPathSet::addPath( const StringData& path ) {
+    UpdateIndexData::UpdateIndexData() : _allPathsIndexed( false ) { }
+
+    void UpdateIndexData::addPath( const StringData& path ) {
         string s;
         if ( getCanonicalIndexField( path, &s ) ) {
-            _canonical.insert( s );
+            _canonicalPaths.insert( s );
         }
         else {
-            _canonical.insert( path.toString() );
+            _canonicalPaths.insert( path.toString() );
         }
     }
 
-    void IndexPathSet::clear() {
-        _canonical.clear();
+    void UpdateIndexData::addPathComponent( const StringData& pathComponent ) {
+        _pathComponents.insert( pathComponent.toString() );
     }
 
-    bool IndexPathSet::mightBeIndexed( const StringData& path ) const {
+    void UpdateIndexData::allPathsIndexed() {
+        _allPathsIndexed = true;
+    }
+
+    void UpdateIndexData::clear() {
+        _canonicalPaths.clear();
+    }
+
+    bool UpdateIndexData::mightBeIndexed( const StringData& path ) const {
+        if ( _allPathsIndexed ) {
+            return true;
+        }
+
         StringData use = path;
         string x;
         if ( getCanonicalIndexField( path, &x ) )
             use = StringData( x );
 
-        for ( std::set<string>::const_iterator i = _canonical.begin();
-              i != _canonical.end();
+        for ( std::set<string>::const_iterator i = _canonicalPaths.begin();
+              i != _canonicalPaths.end();
               ++i ) {
 
             StringData idx( *i );
@@ -66,10 +81,22 @@ namespace mongo {
                 return true;
         }
 
+        FieldRef pathFieldRef( path );
+        for ( std::set<string>::const_iterator i = _pathComponents.begin();
+              i != _pathComponents.end();
+              ++i ) {
+            const string& pathComponent = *i;
+            for ( size_t partIdx = 0; partIdx < pathFieldRef.numParts(); ++partIdx ) {
+                if ( pathComponent == pathFieldRef.getPart( partIdx ) ) {
+                    return true;
+                }
+            }
+        }
+
         return false;
     }
 
-    bool IndexPathSet::_startsWith( const StringData& a, const StringData& b ) const {
+    bool UpdateIndexData::_startsWith( const StringData& a, const StringData& b ) const {
         if ( !a.startsWith( b ) )
             return false;
 

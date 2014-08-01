@@ -39,7 +39,6 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/index_set.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_executor.h"
@@ -56,6 +55,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/update_index_data.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {

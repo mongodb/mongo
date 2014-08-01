@@ -132,8 +132,8 @@ env.CppUnitTest('namespacestring_test', ['db/namespace_string_test.cpp'],
 env.CppUnitTest('namespace_test', ['db/structure/catalog/namespace_test.cpp'],
                 LIBDEPS=['foundation'])
 
-env.CppUnitTest('index_set_test', ['db/index_set_test.cpp'],
-                LIBDEPS=['bson','index_set'])
+env.CppUnitTest('update_index_data_test', ['db/update_index_data_test.cpp'],
+                LIBDEPS=['bson','update_index_data','db/common'])
 
 env.Library('path',
             ['db/matcher/path.cpp',
@@ -525,7 +525,7 @@ else:
 if has_option( "asio" ):
     coreServerFiles += [ "util/net/message_server_asio.cpp" ]
 
-env.Library('index_set', [ 'db/index_set.cpp' ] )
+env.Library('update_index_data', [ 'db/update_index_data.cpp' ], LIPDEPS=[ 'db/common' ])
 
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
@@ -885,8 +885,8 @@ env.Library("serveronly", serverOnlyFiles,
                      "geoparser",
                      "geoquery",
                      "index_key_validate",
-                     "index_set",
                      'range_deleter',
+                     "update_index_data",
                      's/metadata',
                      's/batch_write_types',
                      "db/exec/working_set",
