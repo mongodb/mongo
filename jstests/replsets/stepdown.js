@@ -85,7 +85,7 @@ assert.soon(function() {
     } catch (x) {
         return false;
     }
-}, 'wait for 31000 to be primary', 2 * 60 * 1000);
+}, 'wait for 31000 to be primary', 60000);
 
 master = replTest.getMaster();
 var firstMaster = master;

@@ -5,7 +5,7 @@ var baseName = "jstests_repl6test";
 soonCount = function( m, count ) {
     assert.soon( function() { 
                 return m.getDB( baseName ).a.find().count() == count; 
-                }, "expected count: " + count + " from : " + m, 60 * 1000);
+                }, "expected count: " + count + " from : " + m );    
 }
 
 doTest = function( signal ) {

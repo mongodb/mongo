@@ -75,7 +75,7 @@ var checkPrimaryIs = function (node) {
         }, 15);
 
         return ok;
-    }, node.host + '==1', 2 * 60 * 1000, 1000);
+    }, node.host + '==1', 60000, 1000);
 
     everyoneOkSoon();
 };
@@ -150,7 +150,7 @@ for (i=0; i<n; i++) {
     assert.soon(function() {
         rs.getMaster();
         return rs.liveNodes.slaves.length == 2;
-    }, "2 slaves", 60 * 1000);
+    }, "2 slaves");
 
     print("\nreplsets_priority1.js wait for new config version " + config.version);
 
