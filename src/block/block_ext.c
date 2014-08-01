@@ -1083,20 +1083,37 @@ int
 __wt_block_extlist_read_avail(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, off_t ckpt_size)
 {
+	WT_DECL_RET;
+
 	/* If there isn't a list, we're done. */
 	if (el->offset == WT_BLOCK_INVALID_OFFSET)
 		return (0);
 
-	WT_RET(__wt_block_extlist_read(session, block, el, ckpt_size));
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * In diagnostic mode, reads are checked against the available and
+	 * discard lists (a block being read should never appear on either).
+	 * Checkpoint threads may be running in the file, don't race with
+	 * them.
+	 */
+	__wt_spin_lock(session, &block->live_lock);
+#endif
+
+	WT_ERR(__wt_block_extlist_read(session, block, el, ckpt_size));
 
 	/*
 	 * Extent blocks are allocated from the available list: if reading the
 	 * avail list, the extent blocks might be included, remove them.
 	 */
-	WT_RET_NOTFOUND_OK(
+	WT_ERR_NOTFOUND_OK(
 	    __wt_block_off_remove_overlap(session, el, el->offset, el->size));
 
-	return (0);
+err:
+#ifdef HAVE_DIAGNOSTIC
+	__wt_spin_unlock(session, &block->live_lock);
+#endif
+
+	return (ret);
 }
 
 /*
