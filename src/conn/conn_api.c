@@ -665,7 +665,7 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, open_session, config, cfg);
 	WT_UNUSED(cfg);
 
-	WT_ERR(__wt_open_session(conn, 0, event_handler, config, &session_ret));
+	WT_ERR(__wt_open_session(conn, event_handler, config, &session_ret));
 
 	*wt_sessionp = &session_ret->iface;
 
@@ -1354,7 +1354,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/*
 	 * Check on the turtle and metadata files, creating them if necessary
 	 * (which avoids application threads racing to create the metadata file
-	 * later).
+	 * later).  Once the metadata file exists, get a reference to it in
+	 * the connection's session.
 	 */
 	WT_ERR(__wt_turtle_init(session));
 	WT_ERR(__wt_metadata_open(session));

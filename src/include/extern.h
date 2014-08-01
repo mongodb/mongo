@@ -1363,8 +1363,12 @@ extern int __wt_session_create_strip(WT_SESSION *wt_session,
     const char *v1,
     const char *v2,
     const char **value_ret);
+extern int __wt_open_internal_session(WT_CONNECTION_IMPL *conn,
+    const char *name,
+    int uses_dhandles,
+    int open_metadata,
+    WT_SESSION_IMPL **sessionp);
 extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
-    int internal,
     WT_EVENT_HANDLER *event_handler,
     const char *config,
     WT_SESSION_IMPL **sessionp);
@@ -1382,6 +1386,7 @@ extern int __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     uint32_t flags);
+extern void __wt_session_close_cache(WT_SESSION_IMPL *session);
 extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *uri,
     const char *checkpoint,
@@ -1389,8 +1394,6 @@ extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     uint32_t flags);
 extern int __wt_session_lock_checkpoint(WT_SESSION_IMPL *session,
     const char *checkpoint);
-extern void __wt_session_discard_btree( WT_SESSION_IMPL *session,
-    WT_DATA_HANDLE_CACHE *dhandle_cache);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern void __wt_cksum_init(void);

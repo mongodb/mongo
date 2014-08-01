@@ -55,9 +55,9 @@ struct __wt_named_data_source {
 
 /*
  * Allocate some additional slots for internal sessions.  There is a default
- * session for each connection, plus a session for the eviction thread.
+ * session for each connection, plus a session for each server thread.
  */
-#define	WT_NUM_INTERNAL_SESSIONS	2
+#define	WT_NUM_INTERNAL_SESSIONS	10
 
 /*
  * WT_CONNECTION_IMPL --
