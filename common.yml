@@ -229,8 +229,6 @@ buildvariants:
   - name: lint
   - name: db
   - name: util
-  - name: dist
-  - name: smoke
 
 - name: ubuntu-ssl
   display_name: Ubuntu SSL
