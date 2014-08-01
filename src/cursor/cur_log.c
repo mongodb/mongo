@@ -18,16 +18,16 @@ __curlog_logrec(
 	WT_CURSOR_LOG *cl;
 
 	cl = cookie;
-	/*
-	 * Set up the LSNs and take a copy of the log record for the cursor.
-	 */
+
+	/* Set up the LSNs and take a copy of the log record for the cursor. */
 	*cl->cur_lsn = *lsnp;
 	*cl->next_lsn = *lsnp;
 	cl->next_lsn->offset += (off_t)logrec->size;
 	WT_RET(__wt_buf_set(session,
 	    cl->logrec, logrec->data, logrec->size));
+
 	/*
-	 * Skip the log header.  Setup the step pointers to walk the
+	 * Read the log header.  Set up the step pointers to walk the
 	 * operations inside the record.  Get the record type.
 	 */
 	cl->stepp = (const uint8_t *)cl->logrec->data +
@@ -35,11 +35,10 @@ __curlog_logrec(
 	cl->stepp_end = (const uint8_t *)cl->logrec->data + logrec->size;
 	WT_RET(__wt_logrec_read(session, &cl->stepp, cl->stepp_end,
 	    &cl->rectype));
-	/*
-	 * The record count within a record starts at 1 so that we can
-	 * reserve 0 to mean the entire record.
-	 */
-	cl->step_count = 1;
+
+	/* A step count of 0 means the entire record. */
+	cl->step_count = 0;
+
 	/*
 	 * Unpack the txnid so that we can return each
 	 * individual operation for this txnid.
@@ -148,21 +147,24 @@ __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 
 	cl = (WT_CURSOR_LOG *)cursor;
 	/*
-	 * If it is a commit, peek to get the size and optype and
-	 * read out any key/value from this operation.
+	 * If it is a commit and we have stepped over the header, peek to get
+	 * the size and optype and read out any key/value from this operation.
 	 */
-	if (cl->rectype == WT_LOGREC_COMMIT) {
+	if ((key_count = cl->step_count++) > 0) {
 		WT_RET(__wt_logop_read(session,
 		    &cl->stepp, cl->stepp_end, &optype, &opsize));
 		WT_RET(__curlog_op_read(session, cl, optype, opsize, &fileid));
-		key_count = cl->step_count++;
+		/* Position on the beginning of the next record part. */
+		cl->stepp += opsize;
 	} else {
 		optype = WT_LOGOP_INVALID;
 		opsize = cl->logrec->size;
 		fileid = 0;
-		key_count = 0;
 		WT_RET(__wt_buf_set(session, cl->opkey, NULL, 0));
 		WT_RET(__wt_buf_set(session, cl->opvalue, cl->stepp, opsize));
+		/* Step into a commit, over anything else. */
+		if (cl->rectype != WT_LOGREC_COMMIT)
+			cl->stepp = NULL;
 	}
 	/*
 	 * The log cursor sets the LSN and step count as the cursor key and
@@ -173,10 +175,6 @@ __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	    key_count);
 	__wt_cursor_set_value(cursor, cl->txnid, cl->rectype, optype,
 	    fileid, cl->opkey, cl->opvalue);
-	/*
-	 * Position on the beginning of the next record part.
-	 */
-	cl->stepp += opsize;
 	return (0);
 }
 

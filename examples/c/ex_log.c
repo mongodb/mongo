@@ -149,7 +149,7 @@ walk_log(WT_SESSION *session)
 		 * If we are in a transaction and this is a new one, end
 		 * the previous one.
 		 */
-		if (in_txn && (opcount == 0 || opcount == 1)) {
+		if (in_txn && opcount == 0) {
 			ret = session2->commit_transaction(session2, NULL);
 			in_txn = 0;
 		}
