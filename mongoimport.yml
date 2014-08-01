@@ -5,7 +5,7 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        import GOPATH=`pwd`
+        export GOPATH=`pwd`
         ./gpm install
 
   "generate coverage html + text":
@@ -14,7 +14,7 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        import GOPATH=`pwd`
+        export GOPATH=`pwd`
         go tool cover -html=coverage.out -o coverage.html
         go tool cover -func=coverage.out -o coverage.txt
 
@@ -126,7 +126,7 @@ tasks:
         working_dir: src
         script: |
           set -o verbose
-          import GOPATH=`pwd`
+          export GOPATH=`pwd`
           go build -o mongoimport github.com/shelman/mongo-tools-proto/mongoimport/main
     - command: s3.put
       params:

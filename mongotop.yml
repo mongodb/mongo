@@ -89,7 +89,7 @@ tasks:
           set -o verbose
           wget https://s3.amazonaws.com/mciuploads/mcitools/binaries/${build_id}/mongotop
           chmod 755 mongotop
-          ./github.com/shelman/mongo-tools-proto/mongotop/smoke.sh
+          ./src/github.com/shelman/mongo-tools-proto/mongotop/smoke.sh
 
 buildvariants:
 - name: ubuntu
