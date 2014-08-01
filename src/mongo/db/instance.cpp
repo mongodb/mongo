@@ -150,6 +150,8 @@ namespace mongo {
                     verify( co );
                     if( all || co->displayInCurop() ) {
                         BSONObjBuilder infoBuilder;
+
+                        c->reportState(infoBuilder);
                         co->reportState(&infoBuilder);
 
                         const BSONObj info = infoBuilder.obj();

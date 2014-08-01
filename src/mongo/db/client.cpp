@@ -307,6 +307,17 @@ namespace mongo {
         }
     }
 
+    void Client::reportState(BSONObjBuilder& builder) {
+        builder.append("desc", desc());
+        if (_threadId.size()) {
+            builder.append("threadId", _threadId);
+        }
+
+        if (_connectionId) {
+            builder.appendNumber("connectionId", _connectionId);
+        }
+    }
+
     string Client::clientAddress(bool includePort) const {
         if( _curOp )
             return _curOp->getRemoteString(includePort);
