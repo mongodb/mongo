@@ -209,8 +209,6 @@ namespace mongo {
 
         // Temporary score data filled out by sub-scans.  Used in READING_TERMS and
         // RETURNING_RESULTS.
-        // Maps from diskloc -> aggregate score for doc.
-        typedef unordered_map<DiskLoc, double, DiskLoc::Hasher> ScoreMap;
         ScoreMap _scores;
         // In queries with negative terms, we do an index scan for each one 
         ScoreMap _negativeScores;

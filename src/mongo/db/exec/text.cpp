@@ -83,6 +83,9 @@ namespace mongo {
         case READING_TERMS:
             stageState = readFromSubScanners(out);
             break;
+        case FILTER_NEGATIVES:
+            stageState = filterNegatives(out);
+            break;
         case RETURNING_RESULTS:
             stageState = returnResults(out);
             break;
@@ -204,6 +207,8 @@ namespace mongo {
 
         // Transition to the next state.
         _internalState = READING_TERMS;
+        _curScanner = &_scanners;
+        _curScoreMap = &_scores;
         return PlanStage::NEED_TIME;
     }
 
@@ -226,18 +231,18 @@ namespace mongo {
 
     PlanStage::StageState TextStage::readFromSubScanners(WorkingSetID* out) {
         // This should be checked before we get here.
-        invariant(_currentIndexScanner < _scanners.size());
+        invariant(_currentIndexScanner < _curScanner->size());
 
         // Read the next result from our current scanner.
         WorkingSetID id = WorkingSet::INVALID_ID;
-        PlanStage::StageState childState = _scanners.vector()[_currentIndexScanner]->work(&id);
+        PlanStage::StageState childState = _curScanner->vector()[_currentIndexScanner]->work(&id);
 
         if (PlanStage::ADVANCED == childState) {
             WorkingSetMember* wsm = _ws->get(id);
             invariant(1 == wsm->keyData.size());
             invariant(wsm->hasLoc());
             IndexKeyDatum& keyDatum = wsm->keyData.back();
-            addTerm(keyDatum.keyData, wsm->loc);
+            addTerm(keyDatum.keyData, wsm->loc, _curScoreMap);
             _ws->free(id);
             return PlanStage::NEED_TIME;
         }
@@ -245,7 +250,7 @@ namespace mongo {
             // Done with this scan.
             ++_currentIndexScanner;
 
-            if (_currentIndexScanner < _scanners.size()) {
+            if (_currentIndexScanner < _curScanner->size()) {
                 // We have another scan to read from.
                 return PlanStage::NEED_TIME;
             }
@@ -279,8 +284,6 @@ namespace mongo {
                 _internalState = RETURNING_RESULTS;
             }
 
-            // Don't need to keep these around.
-            _scanners.clear();
             return PlanStage::NEED_TIME;
         }
         else {
@@ -324,6 +327,7 @@ namespace mongo {
 
         // Filter for phrases and negative terms, score and truncate.
         DiskLoc loc = _scoreIterator->first;
+        const BSONObj obj = _params.index->getCollection()->docFor(loc);
         double score = _scoreIterator->second;
         _scoreIterator++;
 
@@ -350,17 +354,10 @@ namespace mongo {
             return PlanStage::NEED_TIME;
         }
 
-        // Filter for phrases and negated terms
-        if (_params.query.hasNonTermPieces()) {
-            if (!_ftsMatcher.matchesNonTerm(_params.index->getCollection()->docFor(loc))) {
-                return PlanStage::NEED_TIME;
-            }
-        }
-
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
         member->loc = loc;
-        member->obj = _params.index->getCollection()->docFor(member->loc);
+        member->obj = obj;
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
         member->addComputed(new TextScoreComputedData(score));
         return PlanStage::ADVANCED;
