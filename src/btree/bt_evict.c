@@ -212,12 +212,9 @@ err:
 int
 __wt_evict_create(WT_CONNECTION_IMPL *conn)
 {
-	WT_CACHE *cache;
 	WT_SESSION_IMPL *session;
 	WT_EVICTION_WORKER *workers;
 	u_int i;
-
-	cache = conn->cache;
 
 	/* Set first, the thread might run before we finish up. */
 	F_SET(conn, WT_CONN_EVICTION_RUN);
@@ -227,13 +224,13 @@ __wt_evict_create(WT_CONNECTION_IMPL *conn)
 	    conn, "eviction-server", 0, 0, &session));
 	conn->evict_session = session;
 
-	if (cache->eviction_nworkers > 0) {
+	if (conn->evict_workers > 0) {
 		WT_RET(__wt_calloc_def(
-		    session, cache->eviction_nworkers, &workers));
-		cache->eviction_workers = workers;
+		    session, conn->evict_workers, &workers));
+		conn->evict_workctx = workers;
 	}
 
-	for (i = 0; i < cache->eviction_nworkers; i++) {
+	for (i = 0; i < conn->evict_workers; i++) {
 		WT_RET(__wt_open_internal_session(
 		    conn, "eviction-worker", 0, 0, &workers[i].session));
 		workers[i].id = i;
@@ -264,17 +261,17 @@ __wt_evict_destroy(WT_CONNECTION_IMPL *conn)
 
 	cache = conn->cache;
 	session = conn->default_session;
-	workers = cache->eviction_workers;
+	workers = conn->evict_workctx;
 
 	F_CLR(conn, WT_CONN_EVICTION_RUN);
 
 	WT_TRET(__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "waiting for helper threads"));
-	for (i = 0; i < cache->eviction_nworkers; i++) {
+	for (i = 0; i < conn->evict_workers; i++) {
 		WT_TRET(__wt_cond_signal(session, cache->evict_waiter_cond));
 		WT_TRET(__wt_thread_join(session, workers[i].tid));
 	}
-	__wt_free(session, workers);
+	__wt_free(session, conn->evict_workctx);
 
 	if (conn->evict_tid_set) {
 		WT_TRET(__wt_evict_server_wake(session));
@@ -288,6 +285,7 @@ __wt_evict_destroy(WT_CONNECTION_IMPL *conn)
 
 		conn->evict_session = NULL;
 	}
+
 	return (ret);
 }
 
@@ -729,7 +727,7 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 	 */
 	WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
 
-	if (cache->eviction_nworkers > 0) {
+	if (S2C(session)->evict_workers > 0) {
 		WT_STAT_FAST_CONN_INCR(
 		    session, cache_eviction_server_not_evicting);
 		/*

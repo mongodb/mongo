@@ -203,6 +203,9 @@ struct __wt_connection_impl {
 	pthread_t	 evict_tid;	/* Eviction server thread ID */
 	int		 evict_tid_set;	/* Eviction server thread ID set */
 
+	uint32_t	 evict_workers;	/* Number of eviction workers */
+	void		*evict_workctx; /* Eviction worker context */
+
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	pthread_t	 stat_tid;	/* Statistics log thread */
 	int		 stat_tid_set;	/* Statistics log thread set */
