@@ -201,6 +201,11 @@ namespace repl {
         struct WaiterInfo;
 
         /*
+         * Returns the OpTime of the last applied operation on this node.
+         */
+        OpTime _getLastOpApplied();
+
+        /*
          * Returns true if the given writeConcern is satisfied up to "optime".
          */
         bool _opReplicatedEnough_inlock(const OpTime& opTime,

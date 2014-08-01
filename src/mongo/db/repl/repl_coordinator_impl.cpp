@@ -34,6 +34,7 @@
 #include <boost/thread.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -215,6 +216,11 @@ namespace repl {
         return Status::OK();
     }
 
+    OpTime ReplicationCoordinatorImpl::_getLastOpApplied() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        OperationContextNoop txn;
+        return _slaveInfoMap[getMyRID(&txn)].opTime;
+    }
 
     bool ReplicationCoordinatorImpl::_opReplicatedEnough_inlock(
             const OpTime& opId, const WriteConcernOptions& writeConcern) {
@@ -515,6 +521,7 @@ namespace repl {
                        stdx::placeholders::_1,
                        Date_t(curTimeMillis64()),
                        time(0) - serverGlobalParams.started,
+                       _getLastOpApplied(),
                        response,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -576,6 +583,7 @@ namespace repl {
                        Date_t(curTimeMillis64()),
                        args,
                        _settings.ourSetName(),
+                       _getLastOpApplied(),
                        response,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {

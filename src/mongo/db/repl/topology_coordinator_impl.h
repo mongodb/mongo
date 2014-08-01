@@ -78,7 +78,6 @@ namespace repl {
     public:
         explicit TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs);
 
-        virtual void setLastApplied(const OpTime& optime);
         virtual void setCommitOkayThrough(const OpTime& optime);
         virtual void setLastReceived(const OpTime& optime);
         virtual void setForceSyncSourceIndex(int index);
@@ -86,7 +85,7 @@ namespace repl {
         // Looks up syncSource's address and returns it, for use by the Applier
         virtual HostAndPort getSyncSourceAddress() const;
         // Chooses and sets a new sync source, based on our current knowledge of the world
-        virtual void chooseNewSyncSource(Date_t now);
+        virtual void chooseNewSyncSource(Date_t now, const OpTime& lastOpApplied);
         // Does not choose a member as a sync source until time given; 
         // call this when we have reason to believe it's a bad choice
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
@@ -104,6 +103,7 @@ namespace repl {
         // produces a reply to a RAFT-style RequestVote RPC
         virtual void prepareRequestVoteResponse(const Date_t now,
                                                 const BSONObj& cmdObj,
+                                                const OpTime& lastOpApplied,
                                                 std::string& errmsg, 
                                                 BSONObjBuilder& result);
 
@@ -117,18 +117,21 @@ namespace repl {
                                               Date_t now,
                                               const ReplSetHeartbeatArgs& args,
                                               const std::string& ourSetName,
+                                              const OpTime& lastOpApplied,
                                               ReplSetHeartbeatResponse* response,
                                               Status* result);
 
         // updates internal state with heartbeat response
         HeartbeatResultAction updateHeartbeatData(Date_t now,
                                                   const MemberHeartbeatData& newInfo,
-                                                  int id);
+                                                  int id,
+                                                  const OpTime& lastOpApplied);
 
         // produces a reply to a status request
         virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,
                                            Date_t now,
                                            unsigned uptime,
+                                           const OpTime& lastOpApplied,
                                            BSONObjBuilder* response,
                                            Status* result);
 
@@ -146,7 +149,8 @@ namespace repl {
         virtual void updateConfig(const ReplicationExecutor::CallbackData& cbData,
                                   const ReplicaSetConfig& newConfig,
                                   int selfIndex,
-                                  Date_t now);
+                                  Date_t now,
+                                  const OpTime& lastOpApplied);
 
         // Record a ping in millis based on the round-trip time of the heartbeat for the member
         virtual void recordPing(const HostAndPort& host, const int elapsedMillis);
@@ -188,7 +192,6 @@ namespace repl {
         // for state changes.
         void _changeMemberState(const MemberState& newMemberState);
 
-        OpTime _lastApplied;  // the last op that the applier has actually written to the data
         OpTime _commitOkayThrough; // the primary's latest op that won't get rolled back
         OpTime _lastReceived; // the last op we have received from our sync source
 

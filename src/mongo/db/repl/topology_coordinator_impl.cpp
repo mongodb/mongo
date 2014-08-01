@@ -57,10 +57,6 @@ namespace repl {
     {
     }
 
-    void TopologyCoordinatorImpl::setLastApplied(const OpTime& optime) {
-        _lastApplied = optime;
-    }
-
     void TopologyCoordinatorImpl::setCommitOkayThrough(const OpTime& optime) {
         _commitOkayThrough = optime;
     }
@@ -81,7 +77,7 @@ namespace repl {
         return _currentConfig.getMemberAt(_syncSourceIndex).getHostAndPort();
     }
 
-    void TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now) {
+    void TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now, const OpTime& lastOpApplied) {
         // if we have a target we've requested to sync from, use it
         if (_forceSyncSourceIndex != -1) {
             invariant(_forceSyncSourceIndex < _currentConfig.getNumMembers());
@@ -160,7 +156,7 @@ namespace repl {
 
                 if (it->getState() == MemberState::RS_SECONDARY) {
                     // only consider secondaries that are ahead of where we are
-                    if (it->getOpTime() <= _lastApplied)
+                    if (it->getOpTime() <= lastOpApplied)
                         continue;
                     // omit secondaries that are excessively behind, on the first attempt at least.
                     if (attempts == 0 &&
@@ -277,6 +273,7 @@ namespace repl {
     // The caller should validate that the message is for the correct set, and has the required data
     void TopologyCoordinatorImpl::prepareRequestVoteResponse(const Date_t now,
                                                              const BSONObj& cmdObj,
+                                                             const OpTime& lastOpApplied,
                                                              std::string& errmsg,
                                                              BSONObjBuilder& result) {
 
@@ -296,7 +293,7 @@ namespace repl {
                  opTime < _latestKnownOpTime())  {
             weAreFresher = true;
         }
-        result.appendDate("opTime", _lastApplied.asDate());
+        result.appendDate("opTime", lastOpApplied.asDate());
         result.append("fresher", weAreFresher);
 
         bool doVeto = _shouldVeto(cmdObj, errmsg);
@@ -454,6 +451,7 @@ namespace repl {
             Date_t now,
             const ReplSetHeartbeatArgs& args,
             const std::string& ourSetName,
+            const OpTime& lastOpApplied,
             ReplSetHeartbeatResponse* response,
             Status* result) {
         if (data.status == ErrorCodes::CallbackCanceled) {
@@ -504,7 +502,7 @@ namespace repl {
         // Heartbeat status message
         response->setHbMsg(_getHbmsg());
         response->setTime(now);
-        response->setOpTime(_lastApplied.asDate());
+        response->setOpTime(lastOpApplied.asDate());
 
         if (_syncSourceIndex != -1) {
             response->setSyncingTo(
@@ -554,7 +552,7 @@ namespace repl {
 
     // update internal state with heartbeat response, and run topology checks
     HeartbeatResultAction TopologyCoordinatorImpl::updateHeartbeatData(
-        Date_t now, const MemberHeartbeatData& newInfo, int id) {
+        Date_t now, const MemberHeartbeatData& newInfo, int id, const OpTime& lastOpApplied) {
         // Fill in the new heartbeat data for the appropriate member
         for (std::vector<MemberHeartbeatData>::iterator it = _hbdata.begin(); 
              it != _hbdata.end(); 
@@ -577,7 +575,7 @@ namespace repl {
             && (_stepDownUntil <= now)        // stepDown timer has expired
             && (_memberState == MemberState::RS_SECONDARY)
             // we are within 10 seconds of primary
-            && (latestOp == 0 || _lastApplied.getSecs() >= latestOp - 10)) {
+            && (latestOp == 0 || lastOpApplied.getSecs() >= latestOp - 10)) {
             _electableSet.insert(_selfConfig().getId());
         }
         else {
@@ -915,6 +913,7 @@ namespace repl {
             const ReplicationExecutor::CallbackData& data,
             Date_t now,
             unsigned uptime,
+            const OpTime& lastOpApplied,
             BSONObjBuilder* response,
             Status* result) {
         if (data.status == ErrorCodes::CallbackCanceled) {
@@ -939,8 +938,8 @@ namespace repl {
                 bb.append("stateStr", myState.toString());
                 bb.append("uptime", uptime);
                 if (!_selfConfig().isArbiter()) {
-                    bb.appendTimestamp("optime", _lastApplied.asDate());
-                    bb.appendDate("optimeDate", _lastApplied.getSecs() * 1000LL);
+                    bb.appendTimestamp("optime", lastOpApplied.asDate());
+                    bb.appendDate("optimeDate", lastOpApplied.getSecs() * 1000LL);
                 }
 
                 if (_maintenanceModeCalls) {
@@ -1067,7 +1066,8 @@ namespace repl {
     void TopologyCoordinatorImpl::updateConfig(const ReplicationExecutor::CallbackData& cbData,
                                                const ReplicaSetConfig& newConfig,
                                                int selfIndex,
-                                               Date_t now) {
+                                               Date_t now,
+                                               const OpTime& lastOpApplied) {
 
         if (cbData.status == ErrorCodes::CallbackCanceled)
             return;
@@ -1089,7 +1089,7 @@ namespace repl {
             _hbdata.push_back(MemberHeartbeatData(index));
         }
 
-        chooseNewSyncSource(now);
+        chooseNewSyncSource(now, lastOpApplied);
 
         // call registered callbacks for config changes
         // TODO(emilkie): Applier should register a callback to reconnect its oplog reader.
