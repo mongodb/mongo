@@ -217,7 +217,7 @@ __wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	} else {
 		/* The log archive server gets its own session. */
 		WT_RET(__wt_open_internal_session(
-		    conn, 1, "archive-server", &conn->arch_session));
+		    conn, "archive-server", 0, 0, &conn->arch_session));
 		WT_RET(__wt_cond_alloc(
 		    session, "log archiving server", 0, &conn->arch_cond));
 

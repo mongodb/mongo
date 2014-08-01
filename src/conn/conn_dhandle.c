@@ -665,12 +665,13 @@ restart:
 	}
 
 	/*
-	 * Closing the files may have resulted in entries on our session's list
-	 * of open data handles, specifically, we added the metadata file if
-	 * any of the files were dirty.  Clean up that list before we shut down
-	 * the metadata entry, for good.
+	 * Closing the files may have resulted in entries on our default
+	 * session's list of open data handles, specifically, we added the
+	 * metadata file if any of the files were dirty.  Clean up that list
+	 * before we shut down the metadata entry, for good.
 	 */
 	__wt_session_close_cache(session);
+	F_SET(session, WT_SESSION_NO_DATA_HANDLES);
 
 	/* Close the metadata file handle. */
 	while ((dhandle = SLIST_FIRST(&conn->dhlh)) != NULL)

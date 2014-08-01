@@ -264,34 +264,35 @@ __wt_lsm_tree_setup_chunk(
 static int
 __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-	WT_CONNECTION *wt_conn;
+	WT_CONNECTION_IMPL *conn;
 	WT_LSM_WORKER_ARGS *wargs;
-	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *s;
 	uint32_t i;
 
-	wt_conn = &S2C(session)->iface;
+	conn = S2C(session);
 
 	/*
+	 * Open internal sessions for LSM worker threads: they will be managed
+	 * along with the LSM tree structure, not with application sessions.
+	 * We can't open the metadata here: our session may hold the schema
+	 * lock, which would block the new session from open the handle.
+	 *
 	 * All the LSM worker threads do their operations on read-only files.
 	 * Use read-uncommitted isolation to avoid keeping updates in cache
 	 * unnecessarily.
 	 */
-	WT_RET(wt_conn->open_session(
-	    wt_conn, NULL, "isolation=read-uncommitted", &wt_session));
-	lsm_tree->ckpt_session = (WT_SESSION_IMPL *)wt_session;
-	F_SET(lsm_tree->ckpt_session, WT_SESSION_INTERNAL);
+	WT_RET(__wt_open_internal_session(
+	    conn, "lsm-worker", 1, 0, &lsm_tree->ckpt_session));
+	lsm_tree->ckpt_session->isolation = TXN_ISO_READ_UNCOMMITTED;
 
 	F_SET(lsm_tree, WT_LSM_TREE_WORKING);
 	/* The new thread will rely on the WORKING value being visible. */
 	WT_FULL_BARRIER();
 	if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
 		for (i = 0; i < lsm_tree->merge_threads; i++) {
-			WT_RET(wt_conn->open_session(
-			    wt_conn, NULL, "isolation=read-uncommitted",
-			    &wt_session));
-			s = (WT_SESSION_IMPL *)wt_session;
-			F_SET(s, WT_SESSION_INTERNAL);
+			WT_RET(__wt_open_internal_session(
+			    conn, "lsm-merge", 1, 0, &s));
+			s->isolation = TXN_ISO_READ_UNCOMMITTED;
 			lsm_tree->worker_sessions[i] = s;
 
 			WT_RET(__wt_calloc_def(session, 1, &wargs));

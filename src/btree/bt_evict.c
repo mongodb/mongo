@@ -239,7 +239,7 @@ __wt_evict_create(WT_CONNECTION_IMPL *conn)
 	F_SET(conn, WT_CONN_EVICTION_RUN);
 
 	WT_RET(__wt_open_internal_session(
-	    conn, 1, "eviction-server", &session));
+	    conn, "eviction-server", 0, 0, &session));
 	conn->evict_session = session;
 
 	WT_RET(__wt_thread_create(
@@ -302,7 +302,7 @@ __evict_worker(void *arg)
 	 */
 	session = conn->default_session;
 	WT_ERR(__wt_open_internal_session(
-	    conn, 1, "eviction-worker", &session));
+	    conn, "eviction-worker", 0, 0, &session));
 
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
 		/* Don't spin in a busy loop if there is no work to do */

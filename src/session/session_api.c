@@ -739,8 +739,8 @@ err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
  *	Allocate a session for WiredTiger's use.
  */
 int
-__wt_open_internal_session(WT_CONNECTION_IMPL *conn,
-    int open_metadata, const char *name, WT_SESSION_IMPL **sessionp)
+__wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
+    int uses_dhandles, int open_metadata, WT_SESSION_IMPL **sessionp)
 {
 	WT_SESSION_IMPL *session;
 
@@ -758,6 +758,13 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn,
 	F_SET(session, WT_SESSION_INTERNAL);
 
 	/*
+	 * Some internal threads must keep running after we close all data
+	 * handles.  Make sure these threads don't open their own handles.
+	 */
+	if (!uses_dhandles)
+		F_SET(session, WT_SESSION_NO_DATA_HANDLES);
+
+	/*
 	 * Acquiring the metadata handle requires the schema lock; we've seen
 	 * problems in the past where a worker thread has acquired the schema
 	 * lock unexpectedly, relatively late in the run, and deadlocked. Be
@@ -765,8 +772,10 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn,
 	 * connection first creates its default session or the shared cache
 	 * pool creates its sessions, let our caller decline this work.
 	 */
-	if (open_metadata)
+	if (open_metadata) {
+		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 		WT_RET(__wt_metadata_open(session));
+	}
 
 	*sessionp = session;
 	return (0);
