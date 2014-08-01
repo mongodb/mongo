@@ -178,7 +178,7 @@ namespace mongo {
         iter->SeekToFirst();
 
         // XXX TODO there is a bug here where if the size of the write batch exceeds the cap size
-        // then iter will not be valid and it will crash. To fix this we need the ability to 
+        // then iter will not be valid and it will crash. To fix this we need the ability to
         // query the write batch, and delete the oldest record in the write batch until the
         // size of the write batch is less than the cap
         while ( cappedAndNeedDelete() ) {
@@ -342,7 +342,7 @@ namespace mongo {
     }
 
     Status RocksRecordStore::validate( OperationContext* txn,
-                                       bool full, 
+                                       bool full,
                                        bool scanData,
                                        ValidateAdaptor* adaptor,
                                        ValidateResults* results,
@@ -478,6 +478,10 @@ namespace mongo {
 
     RocksRecoveryUnit* RocksRecordStore::_getRecoveryUnit( OperationContext* opCtx ) {
         return dynamic_cast<RocksRecoveryUnit*>( opCtx->recoveryUnit() );
+    }
+
+    DiskLoc RocksRecordStore::_makeDiskLoc( const rocksdb::Slice& slice ) {
+        return reinterpret_cast<const DiskLoc*>( slice.data() )[0];
     }
 
     // XXX make sure these work with rollbacks (I don't think they will)

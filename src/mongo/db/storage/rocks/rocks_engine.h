@@ -163,28 +163,19 @@ namespace mongo {
         boost::scoped_ptr<rocksdb::DB> _db;
         boost::scoped_ptr<rocksdb::Comparator> _collectionComparator;
 
-        typedef StringMap< boost::shared_ptr<Entry> > Map;
+        // TODO rename
+        typedef StringMap< boost::shared_ptr<Entry> > EntryMap;
         mutable boost::mutex _mapLock;
-        Map _map;
+        EntryMap _entryMap;
 
-        // private methods that should only be called from the RocksEngine constructor
-        
+        // private methods that should usually only be called from the RocksEngine constructor
+
         // RocksDB necessitates opening a default column family. This method exists to identify
-        // that column family so that it can be ignored. 
+        // that column family so that it can be ignored.
         bool _isDefaultFamily( const string& name );
 
         // See larger comment in .cpp for why this is necessary
         EntryVector _createNonIndexCatalogEntries( const std::vector<std::string>& families );
-
-        /**
-         * @param entries a vector containing Entry structs for every non-index column family in
-         * the database. These Entry structs do not need to be fully initialized, but the
-         * collectionEntry field must be.
-         *
-         * @param nsVec a vector containing all the namespaces in this database
-         */
-        CfdVector _generateMetaDataCfds( const EntryVector& entries,
-                                         const std::vector<std::string>& familyNameVec ) const;
 
         /**
          * Return a vector containing the name of every column family in the database
@@ -196,19 +187,18 @@ namespace mongo {
          * @param metaDataCfds a vector of the column family descriptors for every column family
          * in the database representing metadata.
          */
-        std::map<std::string, Ordering> _createIndexOrderings( 
+        std::map<std::string, Ordering> _createIndexOrderings(
                 const std::vector<string>& namespaces,
-                const CfdVector& metaDataCfds,
                 const std::string& filepath );
 
         /**
          * @param namespaces a vector containing all the namespaces in this database
          */
-        CfdVector _createCfds ( const std::vector<std::string>& namespaces, 
+        CfdVector _createCfds ( const std::vector<std::string>& namespaces,
                                 const std::map<std::string, Ordering>& indexOrderings );
 
         /**
-         * Create a complete Entry object in _map for every ColumnFamilyDescriptor. Assumes that, if
+         * Create a complete Entry object in _entryMap for every ColumnFamilyDescriptor. Assumes that, if
          * the collectionEntry field should be initialized, that is already has been prior to this
          * function call.
          *

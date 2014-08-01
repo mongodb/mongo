@@ -49,7 +49,7 @@ namespace mongo {
 
     // This should behave the same as customBSONCmp from btree_logic.cpp.
     //
-    // Reading the comment in the .h file is HIGHLY recommended if you need to understand what this
+    // Reading the comment in the .h file is highly recommended if you need to understand what this
     // function is doing
     int IndexEntryComparison::compare(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const {
         BSONObjIterator lhsIt(lhs.key);
@@ -57,18 +57,14 @@ namespace mongo {
 
         // Iterate through both BSONObjects, comparing individual elements one by one
         for (unsigned mask = 1; lhsIt.more(); mask <<= 1) {
-            // XXX: commented this out since we found cases where lhs and rhs are not of the
-            //      same length. Is this a horrible decision? It seems to be allowed in mmap
-            // invariant(rhsIt.more());
+             invariant(rhsIt.more());
 
             const BSONElement l = lhsIt.next();
             const BSONElement r = rhsIt.next();
 
             if (int cmp = l.woCompare(r, /*compareFieldNames=*/false)) {
                 invariant(cmp != std::numeric_limits<int>::min()); // can't be negated
-                return _order.descending(mask)
-                    ? -cmp
-                    : cmp;
+                return _order.descending(mask) ? -cmp : cmp;
             }
 
             // Here is where the weirdness begins. We sometimes want to fudge the comparison
@@ -89,12 +85,8 @@ namespace mongo {
             }
 
         }
-        // XXX we commented this out for the same reason that we commented out the invariant at
-        // the beginning of the for loop. Is that okay?
-        // invariant(!rhsIt.more());
 
-        if (rhsIt.more())
-            return 1;
+        invariant(!rhsIt.more());
 
         // This means just look at the key, not the loc.
         if (lhs.loc.isNull() || rhs.loc.isNull())
@@ -103,7 +95,7 @@ namespace mongo {
         return lhs.loc.compare(rhs.loc); // is supposed to ignore ordering
     }
 
-    // Reading the comment in the .h file is HIGHLY recommended if you need to understand what this
+    // reading the comment in the .h file is highly recommended if you need to understand what this
     // function is doing
     BSONObj IndexEntryComparison::makeQueryObject(const BSONObj& keyPrefix,
                                                         int prefixLen,
@@ -112,15 +104,13 @@ namespace mongo {
                                                         const vector<bool>& suffixInclusive,
                                                         const int cursorDirection) {
 
-        // Read the comments in the header file for why this is done.
+        // Please read the comments in the header file to see why this is done.
         // The basic idea is that we use the field name to store a byte which indicates whether
         // each field in the query object is inclusive and exclusive, and if it is exclusive, in
         // which direction.
         const char exclusiveByte = (cursorDirection == 1 ? greater : less);
 
         const StringData exclusiveFieldName(&exclusiveByte, 1);
-
-        bool seenExclusive = prefixExclusive;
 
         BSONObjBuilder bb;
 
@@ -140,10 +130,18 @@ namespace mongo {
             }
         }
 
+        // have we seen a field in the query object that represents an exclusve bound (i.e., have we
+        // inserted an 'l' or a 'g' into a field name already).
+        bool seenExclusive = prefixExclusive;
+
         // Handle the suffix. Note that the useful parts of the suffix start at index prefixLen
         // rather than at 0.
         invariant(keySuffix.size() == suffixInclusive.size());
         for (size_t i = prefixLen; i < keySuffix.size(); i++) {
+            // if an exclusive field has already been encountered, then nothing after it matters
+            // and the rest of the elements in the vector can be NULL. We want the query object
+            // to have as many elements as the vector, so we append empty elements to the BSON when
+            // we encounter NULL vector elements.
             if (!keySuffix[i]) {
                 invariant(seenExclusive);
                 bb.append(StringData(), false);

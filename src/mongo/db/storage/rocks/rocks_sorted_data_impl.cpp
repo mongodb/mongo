@@ -65,7 +65,7 @@ namespace mongo {
         /**
          * Constructs a string containing the bytes of key followed by the bytes of loc.
          *
-         * @param removeFieldNames true if the field names in key should be replaces with empty
+         * @param removeFieldNames true if the field names in key should be replaced with empty
          * strings, and false otherwise. Useful because field names are not necessary in an index
          * key, because the ordering of the fields is already known.
          */
@@ -83,7 +83,7 @@ namespace mongo {
          */
         IndexKeyEntry makeIndexKeyEntry( const rocksdb::Slice& slice ) {
             BSONObj key = BSONObj( slice.data() ).getOwned();
-            DiskLoc loc = reinterpret_cast<const DiskLoc*>( slice.data() + key.objsize() )[0];
+            DiskLoc loc = *reinterpret_cast<const DiskLoc*>( slice.data() + key.objsize() );
             return IndexKeyEntry( key, loc );
         }
 
@@ -93,9 +93,7 @@ namespace mongo {
         class RocksCursor : public SortedDataInterface::Cursor {
         public:
             RocksCursor( rocksdb::Iterator* iterator, bool forward )
-                : _iterator( iterator ),
-                  _forward( forward ),
-                  _isCached( false ) {
+                : _iterator( iterator ), _forward( forward ), _isCached( false ) {
 
                 // TODO: maybe don't seek until we know we need to?
                 if ( _forward )
@@ -132,15 +130,28 @@ namespace mongo {
             }
 
             bool locate(const BSONObj& key, const DiskLoc& loc) {
+                // if key is an empty BSONObj, the default behavior is to seek to the
+                // beginning of the iterator and return false.
+                if ( key == BSONObj() ) {
+                    if ( _forward ) {
+                        _iterator->SeekToFirst();
+                    } else {
+                        _iterator->SeekToLast();
+                    }
+
+                    return false;
+                }
+
                 return _locate( stripFieldNames( key ), loc );
             }
 
-
+            // same first five args as IndexEntryComparison::makeQueryObject (which is commented).
             void advanceTo(const BSONObj &keyBegin,
                            int keyBeginLen,
                            bool afterKey,
                            const vector<const BSONElement*>& keyEnd,
                            const vector<bool>& keyEndInclusive) {
+                // make a key representing the location to which we want to advance.
                 BSONObj key = IndexEntryComparison::makeQueryObject(
                                          keyBegin,
                                          keyBeginLen,
@@ -154,7 +165,8 @@ namespace mongo {
 
             /**
              * Locate a key with fields comprised of a combination of keyBegin fields and keyEnd
-             * fields.
+             * fields. Also same first five args as IndexEntryComparison::makeQueryObject (which is
+             * commented).
              */
             void customLocate(const BSONObj& keyBegin,
                               int keyBeginLen,
@@ -231,8 +243,8 @@ namespace mongo {
              */
             bool _locate( const BSONObj& key, const DiskLoc loc ) {
                 _isCached = false;
-                // assumes fieldNames already stripped if necessary 
-                string keyData = makeString( key, loc, false );
+                // assumes fieldNames already stripped if necessary
+                const string keyData = makeString( key, loc, false );
                 _iterator->Seek( keyData );
                 _checkStatus();
                 if ( !_iterator->Valid() )
@@ -278,8 +290,8 @@ namespace mongo {
                 _isCached = true;
                 rocksdb::Slice slice = _iterator->key();
                 _cachedKey = BSONObj( slice.data() ).getOwned();
-                _cachedLoc = *reinterpret_cast<const DiskLoc*>(
-                        slice.data() + _cachedKey.objsize() );
+                _cachedLoc = *reinterpret_cast<const DiskLoc*>( slice.data() +
+                                                                _cachedKey.objsize() );
             }
 
             scoped_ptr<rocksdb::Iterator> _iterator;
@@ -300,12 +312,12 @@ namespace mongo {
          */
         class RocksIndexEntryComparator : public rocksdb::Comparator {
             public:
-                RocksIndexEntryComparator(const Ordering& order): _indexComparator(order) { }
+                RocksIndexEntryComparator( const Ordering& order ): _indexComparator( order ) { }
 
                 virtual int Compare( const rocksdb::Slice& a, const rocksdb::Slice& b ) const {
-                    IndexKeyEntry lhs = makeIndexKeyEntry( a );
-                    IndexKeyEntry rhs = makeIndexKeyEntry( b );
-                    return _indexComparator.compare(lhs, rhs);
+                    const IndexKeyEntry lhs = makeIndexKeyEntry( a );
+                    const IndexKeyEntry rhs = makeIndexKeyEntry( b );
+                    return _indexComparator.compare( lhs, rhs );
                 }
 
                 virtual const char* Name() const {
@@ -316,12 +328,12 @@ namespace mongo {
                 }
 
                 virtual void FindShortestSeparator( std::string* start,
-                        const rocksdb::Slice& limit) const { }
+                        const rocksdb::Slice& limit ) const { }
 
-                virtual void FindShortSuccessor(std::string* key) const { }
+                virtual void FindShortSuccessor( std::string* key ) const { }
 
             private:
-                IndexEntryComparison _indexComparator;
+                const IndexEntryComparison _indexComparator;
         };
 
     } // namespace
@@ -364,10 +376,10 @@ namespace mongo {
                                       const DiskLoc& loc) {
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
-        string keyData = makeString( key, loc );
+        const string keyData = makeString( key, loc );
 
         string dummy;
-        rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
+        const rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
         if ( !_db->KeyMayExist( options,_columnFamily, keyData, &dummy ) ) {
             return false;
         }
@@ -390,17 +402,18 @@ namespace mongo {
         boost::scoped_ptr<SortedDataInterface::Cursor> cursor( newCursor( txn, 1 ) );
         cursor->locate( key, DiskLoc() );
 
-        if ( cursor->isEOF() )
+        if ( cursor->isEOF() || cursor->getDiskLoc() == loc ) {
             return Status::OK();
-
-        return cursor->getDiskLoc() == loc ? Status::OK() :
-                Status(ErrorCodes::DuplicateKey, dupKeyError(key));
+        } else {
+            return Status( ErrorCodes::DuplicateKey, dupKeyError( key ) );
+        }
     }
 
     void RocksSortedDataImpl::fullValidate(OperationContext* txn, long long* numKeysOut) {
         // XXX: no key counts
-        if ( numKeysOut )
-            numKeysOut[0] = -1;
+        if ( numKeysOut ) {
+            *numKeysOut = -1;
+        }
     }
 
     bool RocksSortedDataImpl::isEmpty() {
