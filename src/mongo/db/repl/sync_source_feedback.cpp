@@ -207,12 +207,6 @@ namespace repl {
         bool handshakeNeeded = false;
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         while (!inShutdown()) { // TODO(spencer): Remove once legacy repl coordinator is gone.
-            {
-                boost::unique_lock<boost::mutex> lock(_mtx);
-                if (_shutdownSignaled) {
-                    break;
-                }
-            }
             if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet) {
                 sleepsecs(1);
                 continue;
@@ -223,9 +217,14 @@ namespace repl {
             }
             {
                 boost::unique_lock<boost::mutex> lock(_mtx);
-                while (!_positionChanged && !_handshakeNeeded) {
+                while (!_positionChanged && !_handshakeNeeded && !_shutdownSignaled) {
                     _cond.wait(lock);
                 }
+
+                if (_shutdownSignaled) {
+                    break;
+                }
+
                 positionChanged = _positionChanged;
                 handshakeNeeded = _handshakeNeeded;
                 _positionChanged = false;
