@@ -33,6 +33,7 @@
 
 #include <boost/filesystem/operations.hpp>
 
+#include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
 #include <rocksdb/slice.h>
 #include <rocksdb/options.h>
@@ -54,6 +55,9 @@ namespace mongo {
         std::vector<rocksdb::ColumnFamilyDescriptor> families;
 
         vector<string> familyNames = _listFamilyNames( path );
+
+        // Create the shared collection comparator
+        _collectionComparator.reset( RocksRecordStore::newRocksCollectionComparator() );
 
         if ( !familyNames.empty() ) {
             // go through and create RocksCollectionCatalogEntries for all non-indexes
@@ -91,6 +95,8 @@ namespace mongo {
         _db.reset( dbPtr );
 
         invariant( handles.size() == families.size() );
+
+        
 
         // Create an Entry object for every ColumnFamilyHandle
         _createEntries( families, handles );
@@ -141,6 +147,7 @@ namespace mongo {
     void RocksEngine::cleanShutdown(OperationContext* txn) {
         boost::mutex::scoped_lock lk( _mapLock );
         _map = Map();
+        _collectionComparator.reset( NULL );
         _db.reset( NULL );
     }
 
@@ -195,11 +202,14 @@ namespace mongo {
 
         rocksdb::ColumnFamilyOptions options;
 
-        options.comparator = RocksSortedDataImpl::newRocksComparator( order.get() );
+        rocksdb::Comparator* comparator = RocksSortedDataImpl::newRocksComparator( order.get() );
+        invariant( comparator );
+        options.comparator = comparator;
 
         rocksdb::Status status = _db->CreateColumnFamily( options, fullName, &cf );
         _rock_status_ok( status );
         invariant( cf != NULL);
+        entry->indexNameToComparator[indexName].reset( comparator );
         entry->indexNameToCF[indexName].reset( cf );
         return cf;
     }
@@ -323,7 +333,8 @@ namespace mongo {
 
     rocksdb::ColumnFamilyOptions RocksEngine::_collectionOptions() const {
         rocksdb::ColumnFamilyOptions options;
-        options.comparator = RocksRecordStore::newRocksCollectionComparator();
+        invariant( _collectionComparator.get() );
+        options.comparator = _collectionComparator.get();
         return options;
     }
 
@@ -557,6 +568,9 @@ namespace mongo {
                 string indexName = ns.substr( sepPos + 1 );
                 ROCKS_TRACE << " got index " << indexName << " for " << collection;
                 entry->indexNameToCF[indexName].reset( handles[i] );
+
+                invariant( families[i].options.comparator );
+                entry->indexNameToComparator[indexName].reset( families[i].options.comparator );
             } else {
                 CollectionOptions options;
                 rocksdb::Slice optionsKey( "options" );

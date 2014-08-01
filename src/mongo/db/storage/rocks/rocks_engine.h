@@ -52,6 +52,7 @@ namespace rocksdb {
     struct ColumnFamilyOptions;
     class DB;
     class Status;
+    class Comparator;
     struct Options;
     struct ReadOptions;
 }
@@ -138,6 +139,7 @@ namespace mongo {
             boost::scoped_ptr<RocksRecordStore> recordStore;
             // These ColumnFamilyHandles must be deleted by removeIndex
             StringMap<boost::shared_ptr<rocksdb::ColumnFamilyHandle>> indexNameToCF;
+            StringMap<boost::shared_ptr<const rocksdb::Comparator>> indexNameToComparator;
         };
 
         Entry* getEntry( const StringData& ns );
@@ -159,6 +161,7 @@ namespace mongo {
 
         std::string _path;
         boost::scoped_ptr<rocksdb::DB> _db;
+        boost::scoped_ptr<rocksdb::Comparator> _collectionComparator;
 
         typedef StringMap< boost::shared_ptr<Entry> > Map;
         mutable boost::mutex _mapLock;
