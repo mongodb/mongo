@@ -138,6 +138,15 @@ namespace mongo {
                 }
 
             }
+
+            addStemmer(defaultLanguage());
+        }
+
+        FTSSpec::~FTSSpec() {
+            std::map<std::string, const Stemmer&>::iterator it;
+            for (it = _stemmerCache.begin(); it != _stemmerCache.end(); ++it) {
+                delete &it->second;
+            }
         }
 
         const FTSLanguage* FTSSpec::_getLanguageToUseV2( const BSONObj& userDoc,
@@ -156,7 +165,27 @@ namespace mongo {
             return swl.getValue();
         }
 
-        void FTSSpec::scoreDocument( const BSONObj& obj, TermFrequencyMap* term_freqs ) const {
+        const Stemmer* FTSSpec::addStemmer(const FTSLanguage& language) {
+            // allocate on the heap
+            Stemmer* newLanguageStemmer = new Stemmer( language );
+            _stemmerCache.insert(std::pair<std::string, const Stemmer&>(
+                        language.str(), *newLanguageStemmer));
+            return newLanguageStemmer;
+        }
+
+        const Stemmer* FTSSpec::findStemmer(const FTSLanguage& language) {
+            std::map<std::string, const Stemmer&>::const_iterator cache_it;
+            cache_it = _stemmerCache.find(language.str());
+
+            if (cache_it != _stemmerCache.end()) {
+                return &cache_it->second;
+            }
+            else {
+                return addStemmer(language);
+            }
+        }
+
+        void FTSSpec::scoreDocument( const BSONObj& obj, TermFrequencyMap* term_freqs ) {
             if ( _textIndexVersion == TEXT_INDEX_VERSION_1 ) {
                 return _scoreDocumentV1( obj, term_freqs );
             }
@@ -165,8 +194,8 @@ namespace mongo {
 
             while ( it.more() ) {
                 FTSIteratorValue val = it.next();
-                Stemmer stemmer( *val._language );
-                Tools tools( *val._language, &stemmer, StopWords::getStopWords( *val._language ) );
+                const Stemmer* stemmer = findStemmer(*val._language);
+                Tools tools( *val._language, stemmer, StopWords::getStopWords( *val._language ) );
                 _scoreStringV2( tools, val._text, term_freqs, val._weight );
             }
         }

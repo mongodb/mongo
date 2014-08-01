@@ -85,7 +85,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        void FTSIndexFormat::getKeys( const FTSSpec& spec,
+        void FTSIndexFormat::getKeys( FTSSpec& spec,
                                       const BSONObj& obj,
                                       BSONObjSet* keys ) {
 

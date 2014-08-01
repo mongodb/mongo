@@ -54,6 +54,13 @@ namespace mongo {
 
     class OperationContext;
 
+    // The number of positive documents required to do an
+    // additional index scan for negative terms.
+    // If the number of documents is very small, an extra
+    // scan could incur huge additional I/O costs when it would
+    // be simpler to just scan all the documents manually.
+    const int NEGATION_SCAN_THRESHOLD = 1000;
+
     struct TextStageParams {
         TextStageParams(const FTSSpec& s) : spec(s) {}
 
@@ -88,15 +95,18 @@ namespace mongo {
             // 2. Read the terms/scores from the text index.
             READING_TERMS,
 
-            // 3. Return results to our parent.
+            // 3. If the query had negative terms, remove them.
+            FILTER_NEGATIVES,
+
+            // 4. Return results to our parent.
             RETURNING_RESULTS,
 
-            // 4. Done.
+            // 5. Done.
             DONE,
         };
 
         TextStage(OperationContext* txn,
-                  const TextStageParams& params,
+                  TextStageParams& params,
                   WorkingSet* ws,
                   const MatchExpression* filter);
 
@@ -120,6 +130,16 @@ namespace mongo {
         virtual const SpecificStats* getSpecificStats();
 
         static const char* kStageType;
+    protected:
+        // Maps from diskloc -> aggregate score for doc.
+        typedef map<DiskLoc, double> ScoreMap;
+        // Comparator class
+        class ScoreMapCompare {
+            public:
+                bool operator()(const std::pair<DiskLoc,double>& a, const std::pair<DiskLoc,double>& b) {
+                    return a.first < b.first;
+                }
+        };
 
     private:
         /**
@@ -134,11 +154,20 @@ namespace mongo {
         StageState readFromSubScanners(WorkingSetID* out);
 
         /**
+         * Helper method to build an index scan and insert it into the given vector.
+         */
+        void addScanner(OwnedPointerVector<PlanStage>* scannerVector, const string& term);
+        /**
          * Helper called from readFromSubScanners to update aggregate score with a new-found (term,
          * score) pair for this document.  Also rejects documents that don't match this stage's
          * filter.
          */
-        void addTerm(const BSONObj& key, const DiskLoc& loc);
+        void addTerm(const BSONObj& key, const DiskLoc& loc, ScoreMap* curMap);
+
+        /**
+         * Removes any results that were in a negative scan from the result set.
+         */
+        StageState filterNegatives(WorkingSetID* out);
 
         /**
          * Possibly return a result.  FYI, this may perform a fetch directly if it is needed to
@@ -171,16 +200,23 @@ namespace mongo {
         // Used in INIT_SCANS and READING_TERMS.  The index scans we're using to retrieve text
         // terms.
         OwnedPointerVector<PlanStage> _scanners;
+        OwnedPointerVector<PlanStage> _negativeScanners;
+        OwnedPointerVector<PlanStage>* _curScanner;
 
         // Which _scanners are we currently reading from?
         size_t _currentIndexScanner;
+        bool _startedNegativeScans;
 
         // Temporary score data filled out by sub-scans.  Used in READING_TERMS and
         // RETURNING_RESULTS.
-        // Maps from diskloc -> aggregate score for doc.
-        typedef unordered_map<DiskLoc, double, DiskLoc::Hasher> ScoreMap;
         ScoreMap _scores;
+        // In queries with negative terms, we do an index scan for each one 
+        ScoreMap _negativeScores;
+        // Set difference of pos and neg scores
+        ScoreMap _filteredScores;
+        ScoreMap* _curScoreMap;
         ScoreMap::const_iterator _scoreIterator;
+
     };
 
 } // namespace mongo

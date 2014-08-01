@@ -39,7 +39,7 @@ namespace mongo {
         class FTSIndexFormat {
         public:
 
-            static void getKeys( const FTSSpec& spec,
+            static void getKeys( FTSSpec& spec,
                                  const BSONObj& document,
                                  BSONObjSet* keys );
 

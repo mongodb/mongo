@@ -42,7 +42,7 @@ namespace mongo {
     const char* TextStage::kStageType = "TEXT";
 
     TextStage::TextStage(OperationContext* txn,
-                         const TextStageParams& params,
+                         TextStageParams& params,
                          WorkingSet* ws,
                          const MatchExpression* filter)
         : _txn(txn),
@@ -52,7 +52,9 @@ namespace mongo {
           _filter(filter),
           _commonStats(kStageType),
           _internalState(INIT_SCANS),
-          _currentIndexScanner(0) {
+          _currentIndexScanner(0),
+          _startedNegativeScans(false) {
+        _curScanner = &_scanners;
         _scoreIterator = _scores.end();
         _specificStats.indexPrefix = _params.indexPrefix;
     }
@@ -80,6 +82,9 @@ namespace mongo {
             break;
         case READING_TERMS:
             stageState = readFromSubScanners(out);
+            break;
+        case FILTER_NEGATIVES:
+            stageState = filterNegatives(out);
             break;
         case RETURNING_RESULTS:
             stageState = returnResults(out);
@@ -169,33 +174,35 @@ namespace mongo {
     }
 
     PlanStage::StageState TextStage::initScans(WorkingSetID* out) {
-        invariant(0 == _scanners.size());
+        invariant(0 == _curScanner->size());
 
         _specificStats.parsedTextQuery = _params.query.toBSON();
 
         // Get all the index scans for each term in our query.
-        for (size_t i = 0; i < _params.query.getTerms().size(); i++) {
-            const string& term = _params.query.getTerms()[i];
-            IndexScanParams params;
-            params.bounds.startKey = FTSIndexFormat::getIndexKey(MAX_WEIGHT,
-                                                                 term,
-                                                                 _params.indexPrefix,
-                                                                 _params.spec.getTextIndexVersion());
-            params.bounds.endKey = FTSIndexFormat::getIndexKey(0,
-                                                               term,
-                                                                _params.indexPrefix,
-                                                               _params.spec.getTextIndexVersion());
-            params.bounds.endKeyInclusive = true;
-            params.bounds.isSimpleRange = true;
-            params.descriptor = _params.index;
-            params.direction = -1;
-            _scanners.mutableVector().push_back(new IndexScan(_txn, params, _ws, NULL));
+        if (!_startedNegativeScans) {
+            for (size_t i = 0; i < _params.query.getTerms().size(); i++) {
+                const string& term = _params.query.getTerms()[i];
+                addScanner(&_scanners, term);
+            }
+
+            // If we have no terms we go right to EOF.
+            if (0 == _scanners.size()) {
+                _internalState = DONE;
+                return PlanStage::IS_EOF;
+            }
+
+            _curScanner = &_scanners;
+            _curScoreMap = &_scores;
         }
 
-        // If we have no terms we go right to EOF.
-        if (0 == _scanners.size()) {
-            _internalState = DONE;
-            return PlanStage::IS_EOF;
+        else {
+            // Get index scans for negated terms as well.
+            std::set<std::string>::const_iterator it;
+            for (it = _params.query.getNegatedTerms().begin();
+                    it != _params.query.getNegatedTerms().end(); ++it) {
+                const string& term = *it;
+                addScanner(&_negativeScanners, term);
+            }
         }
 
         // Transition to the next state.
@@ -203,20 +210,37 @@ namespace mongo {
         return PlanStage::NEED_TIME;
     }
 
+    void TextStage::addScanner(OwnedPointerVector<PlanStage>* scannerVector, const string& term) {
+        IndexScanParams params;
+        params.bounds.startKey = FTSIndexFormat::getIndexKey(MAX_WEIGHT,
+                                                             term,
+                                                             _params.indexPrefix,
+                                                             _params.spec.getTextIndexVersion());
+        params.bounds.endKey = FTSIndexFormat::getIndexKey(0,
+                                                           term,
+                                                            _params.indexPrefix,
+                                                           _params.spec.getTextIndexVersion());
+        params.bounds.endKeyInclusive = true;
+        params.bounds.isSimpleRange = true;
+        params.descriptor = _params.index;
+        params.direction = -1;
+        scannerVector->mutableVector().push_back(new IndexScan(_txn, params, _ws, NULL));
+    }
+
     PlanStage::StageState TextStage::readFromSubScanners(WorkingSetID* out) {
         // This should be checked before we get here.
-        invariant(_currentIndexScanner < _scanners.size());
+        invariant(_currentIndexScanner < _curScanner->size());
 
         // Read the next result from our current scanner.
         WorkingSetID id = WorkingSet::INVALID_ID;
-        PlanStage::StageState childState = _scanners.vector()[_currentIndexScanner]->work(&id);
+        PlanStage::StageState childState = _curScanner->vector()[_currentIndexScanner]->work(&id);
 
         if (PlanStage::ADVANCED == childState) {
             WorkingSetMember* wsm = _ws->get(id);
             invariant(1 == wsm->keyData.size());
             invariant(wsm->hasLoc());
             IndexKeyDatum& keyDatum = wsm->keyData.back();
-            addTerm(keyDatum.keyData, wsm->loc);
+            addTerm(keyDatum.keyData, wsm->loc, _curScoreMap);
             _ws->free(id);
             return PlanStage::NEED_TIME;
         }
@@ -224,17 +248,40 @@ namespace mongo {
             // Done with this scan.
             ++_currentIndexScanner;
 
-            if (_currentIndexScanner < _scanners.size()) {
+            if (_currentIndexScanner < _curScanner->size()) {
                 // We have another scan to read from.
                 return PlanStage::NEED_TIME;
             }
 
-            // If we're here we are done reading results.  Move to the next state.
-            _scoreIterator = _scores.begin();
-            _internalState = RETURNING_RESULTS;
-
             // Don't need to keep these around.
-            _scanners.clear();
+            _curScanner->clear();
+
+            // If we have negated terms, we need to scan them unless there
+            // are so few documents that the potential I/O overhead of
+            // an additional scan overwhelms the cost of parsing
+            // all of the documents.
+            if ( !_startedNegativeScans && _params.query.getNegatedTerms().size() > 0
+                 && _curScoreMap->size() >= NEGATION_SCAN_THRESHOLD) {
+                _startedNegativeScans = true;
+                _curScanner = &_negativeScanners;
+                _curScoreMap = &_negativeScores;
+                _currentIndexScanner = 0;
+
+                // Return to INIT_SCANS to set up negative scans.
+                _internalState = INIT_SCANS;
+                return PlanStage::NEED_TIME;
+            }
+
+            // If we're here we are done reading results.  Move to the next state.
+            if (_startedNegativeScans) {
+                _internalState = FILTER_NEGATIVES;
+            }
+
+            else {
+                _scoreIterator = _scores.begin();
+                _internalState = RETURNING_RESULTS;
+            }
+
             return PlanStage::NEED_TIME;
         }
         else {
@@ -255,33 +302,60 @@ namespace mongo {
         }
     }
 
+    PlanStage::StageState TextStage::filterNegatives(WorkingSetID* out) {
+        // Get the set difference of positive and negative results.
+        std::set_difference(_scores.begin(), _scores.end(),
+                            _negativeScores.begin(), _negativeScores.end(),
+                            std::inserter(_filteredScores, _filteredScores.begin()),
+                            ScoreMapCompare());
+
+        _negativeScanners.clear();
+        _scoreIterator = _filteredScores.begin();
+        _curScoreMap = &_filteredScores;
+        _internalState = RETURNING_RESULTS;
+        return PlanStage::NEED_TIME;
+    }
+
     PlanStage::StageState TextStage::returnResults(WorkingSetID* out) {
-        if (_scoreIterator == _scores.end()) {
+        if (_scoreIterator == _curScoreMap->end()) {
+            _startedNegativeScans = false;
             _internalState = DONE;
             return PlanStage::IS_EOF;
         }
 
         // Filter for phrases and negative terms, score and truncate.
         DiskLoc loc = _scoreIterator->first;
+        const BSONObj obj = _params.index->getCollection()->docFor(loc);
         double score = _scoreIterator->second;
         _scoreIterator++;
+
+        // If negated terms were present but we opted not to scan
+        // (due to threshold constraint), do a manual scan for all
+        // negative terms and all phrases.
+        if (!_startedNegativeScans && _params.query.getNegatedTerms().size() > 0) {
+            if (_params.query.hasNonTermPieces()) {
+                if (!_ftsMatcher.matchesNonTerm(obj)) {
+                    return PlanStage::NEED_TIME;
+                }
+            }
+        }
+        // Otherwise, just scan for phrases.
+        else if (_params.query.getPhr().size() > 0 ||
+            _params.query.getNegatedPhr().size() > 0) {
+            if (!_ftsMatcher.phrasesMatch(obj)) {
+                return PlanStage::NEED_TIME;
+            }
+        }
 
         // Ignore non-matched documents.
         if (score < 0) {
             return PlanStage::NEED_TIME;
         }
 
-        // Filter for phrases and negated terms
-        if (_params.query.hasNonTermPieces()) {
-            if (!_ftsMatcher.matchesNonTerm(_params.index->getCollection()->docFor(loc))) {
-                return PlanStage::NEED_TIME;
-            }
-        }
-
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
         member->loc = loc;
-        member->obj = _params.index->getCollection()->docFor(member->loc);
+        member->obj = obj;
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
         member->addComputed(new TextScoreComputedData(score));
         return PlanStage::ADVANCED;
@@ -342,10 +416,11 @@ namespace mongo {
         bool* _fetched;
     };
 
-    void TextStage::addTerm(const BSONObj& key, const DiskLoc& loc) {
-        double *documentAggregateScore = &_scores[loc];
+    void TextStage::addTerm(const BSONObj& key, const DiskLoc& loc, ScoreMap* curMap) {
+        double *documentAggregateScore = &(*curMap)[loc];
 
-        ++_specificStats.keysExamined;
+        if (curMap != &_negativeScores)
+            ++_specificStats.keysExamined;
 
         // Locate score within possibly compound key: {prefix,term,score,suffix}.
         BSONObjIterator keyIt(key);
@@ -376,7 +451,7 @@ namespace mongo {
 
                 if (!_filter->matches(&tdoc)) {
                     // We had to fetch but we're not going to return it.
-                    if (fetched) {
+                    if (fetched && curMap != &_negativeScores) {
                         ++_specificStats.fetches;
                     }
                     *documentAggregateScore = -1;
@@ -385,7 +460,8 @@ namespace mongo {
             }
             else {
                 // If we're here, we're going to return the doc, and we do a fetch later.
-                ++_specificStats.fetches;
+                if (curMap != &_negativeScores)
+                    ++_specificStats.fetches;
             }
         }
 
