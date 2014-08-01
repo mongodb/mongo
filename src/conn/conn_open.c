@@ -41,7 +41,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 * threads because those may allocate and use session resources that
 	 * need to get cleaned up on close.
 	 */
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
+	WT_RET(__wt_open_internal_session(conn, "connection", 1, 0, &session));
 	conn->default_session = session;
 
 	return (0);
@@ -115,8 +115,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_conn_remove_data_source(conn, ndsrc));
 
 	/*
-	 * Complain if files weren't closed, ignoring the lock and logging
-	 * files, we'll close them in a minute.
+	 * Complain if files weren't closed, ignoring the lock file, we'll
+	 * close it in a minute.
 	 */
 	TAILQ_FOREACH(fh, &conn->fhqh, q) {
 		if (fh == conn->lock_fh)

@@ -26,19 +26,6 @@ __wt_session_reset_cursors(WT_SESSION_IMPL *session)
 }
 
 /*
- * __session_close_cache --
- *	Close any cached handles in a session.  Called holding the schema lock.
- */
-static void
-__session_close_cache(WT_SESSION_IMPL *session)
-{
-	WT_DATA_HANDLE_CACHE *dhandle_cache;
-
-	while ((dhandle_cache = SLIST_FIRST(&session->dhandles)) != NULL)
-		__wt_session_discard_btree(session, dhandle_cache);
-}
-
-/*
  * __session_clear --
  *	Clear a session structure.
  */
@@ -99,7 +86,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_ASSERT(session, session->ncursors == 0);
 
 	/* Discard cached handles. */
-	__session_close_cache(session);
+	__wt_session_close_cache(session);
 
 	/* Close all tables. */
 	__wt_schema_close_tables(session);
@@ -750,12 +737,59 @@ err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
 }
 
 /*
+ * __wt_open_internal_session --
+ *	Allocate a session for WiredTiger's use.
+ */
+int
+__wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
+    int uses_dhandles, int open_metadata, WT_SESSION_IMPL **sessionp)
+{
+	WT_SESSION_IMPL *session;
+
+	*sessionp = NULL;
+
+	WT_RET(__wt_open_session(conn, NULL, NULL, &session));
+	session->name = name;
+
+	/*
+	 * Public sessions are automatically closed during WT_CONNECTION->close.
+	 * If the session handles for internal threads were to go on the public
+	 * list, there would be complex ordering issues during close.  Set a
+	 * flag to avoid this: internal sessions are not closed automatically.
+	 */
+	F_SET(session, WT_SESSION_INTERNAL);
+
+	/*
+	 * Some internal threads must keep running after we close all data
+	 * handles.  Make sure these threads don't open their own handles.
+	 */
+	if (!uses_dhandles)
+		F_SET(session, WT_SESSION_NO_DATA_HANDLES);
+
+	/*
+	 * Acquiring the metadata handle requires the schema lock; we've seen
+	 * problems in the past where a worker thread has acquired the schema
+	 * lock unexpectedly, relatively late in the run, and deadlocked. Be
+	 * defensive, get it now.  The metadata file may not exist when the
+	 * connection first creates its default session or the shared cache
+	 * pool creates its sessions, let our caller decline this work.
+	 */
+	if (open_metadata) {
+		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+		WT_RET(__wt_metadata_open(session));
+	}
+
+	*sessionp = session;
+	return (0);
+}
+
+/*
  * __wt_open_session --
  *	Allocate a session handle.  The internal parameter is used for sessions
  *	opened by WiredTiger for its own use.
  */
 int
-__wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
+__wt_open_session(WT_CONNECTION_IMPL *conn,
     WT_EVENT_HANDLER *event_handler, const char *config,
     WT_SESSION_IMPL **sessionp)
 {
@@ -839,15 +873,6 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	 * reset the starting size on each open.
 	 */
 	session_ret->hazard_size = WT_HAZARD_INCR;
-
-	/*
-	 * Public sessions are automatically closed during WT_CONNECTION->close.
-	 * If the session handles for internal threads were to go on the public
-	 * list, there would be complex ordering issues during close.  Set a
-	 * flag to avoid this: internal sessions are not closed automatically.
-	 */
-	if (internal)
-		F_SET(session_ret, WT_SESSION_INTERNAL);
 
 	/*
 	 * Configuration: currently, the configuration for open_session is the
