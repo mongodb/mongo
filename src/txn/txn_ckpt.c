@@ -231,6 +231,8 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	u_int i;
 
+	i = 0;
+
 	/* Should not be called with any handle reference. */
 	WT_ASSERT(session, session->dhandle == NULL);
 
@@ -247,7 +249,7 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 	 * the file.  Note that we increment inside the loop to simplify error
 	 * handling.
 	 */
-	for (i = 0; i < session->ckpt_handle_next;) {
+	while (i < session->ckpt_handle_next) {
 		dhandle = session->ckpt_handle[i++];
 		WT_WITH_DHANDLE(session, dhandle,
 		    ret = __wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES));
