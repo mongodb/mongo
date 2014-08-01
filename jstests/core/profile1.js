@@ -49,10 +49,7 @@ try {
     db.runCommand({profile: 2});
     assert.eq(2, db.runCommand({profile: -1}).was, "B");
     assert.eq(1, db.system.profile.stats().capped, "C");
-    var capped_size = db.system.profile.storageSize();
-    assert.gt(capped_size, 31 * 1024 * 1024, "D");
-    assert.lt(capped_size, 65 * 1024 * 1024, "E");
-    
+
     db.foo.findOne()
 
     var profileItems = profileCursor().toArray();
@@ -63,7 +60,7 @@ try {
     msg += tojson(db.system.profile.stats());
 
     // If these nunmbers don't match, it is possible the collection has rolled over (set to 32MB above in the hope this doesn't happen)
-    assert.eq( 4 , profileItems.length , "E2 -- " + msg  );
+    assert.eq( 3, profileItems.length , "E2 -- " + msg  );
     
     /* Make sure we can't drop if profiling is still on */
     assert.throws( function(z){ db.getCollection("system.profile").drop(); } )
@@ -76,7 +73,7 @@ try {
     db.createCollection("system.profile");
     assert.eq( 0, db.runCommand({profile: 2}).ok );
     assert.eq( 0, db.runCommand({profile: -1}).was, "G");
-    assert.eq(null, db.system.profile.stats().capped, "G1");
+    assert( !db.system.profile.stats().capped, "G1");
     
     /* With no system.profile collection */
     db.runCommand({profile: 0});
@@ -86,9 +83,6 @@ try {
     db.runCommand({profile: 2});
     assert.eq(2, db.runCommand({profile: -1}).was, "I");
     assert.eq(1, db.system.profile.stats().capped, "J");
-    var auto_size = db.system.profile.storageSize();
-    assert.lt(auto_size, capped_size, "K");
-    
 
     db.eval("sleep(1)") // pre-load system.js
 
