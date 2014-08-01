@@ -11,17 +11,29 @@ t.drop();
 
 db.createCollection( coll );
 
-function findTTL( key, expireAfterSeconds ) {
-    var all = t.getIndexes();
-    all = all.filter( function(z) {
-        return z.expireAfterSeconds == expireAfterSeconds &&
-            friendlyEqual( z.key, key ); } );
-    return all.length == 1;
-}
+
+// Verify the new collection has userFlags set to 1
+printjson(t.stats());
+assert.eq( t.stats().userFlags , 1 , "fresh collection doesn't have userFlags = 1 ");
+
+// Modify the collection with the usePowerOf2Sizes flag. Verify userFlags now = 0.
+var res = db.runCommand( { "collMod" : coll,  "usePowerOf2Sizes" : false } );
+debug( res );
+assert.eq( res.ok , 1 , "collMod failed" );
+assert.eq( t.stats().userFlags , 0 , "modified collection should have userFlags = 0 ");
+var nso = db.system.namespaces.findOne( { name : t.getFullName() } );
+debug( nso );
+assert.eq( 0, nso.options.flags, "options didn't sync to system.namespaces: " + tojson( nso ) );
+
+// Try to modify it with some unrecognized value
+var res = db.runCommand( { "collMod" : coll,  "unrecognized" : true } );
+debug( res );
+assert.eq( res.ok , 0 , "collMod shouldn't return ok with unrecognized value" );
 
 // add a TTL index
 t.ensureIndex( {a : 1}, { "expireAfterSeconds": 50 } )
-assert( findTTL( { a : 1 }, 50 ), "TTL index not added" );
+assert.eq( 1, db.system.indexes.count( { key : {a:1}, expireAfterSeconds : 50 } ),
+           "TTL index not added" );
 
 // try to modify it with a bad key pattern
 var res = db.runCommand( { "collMod" : coll,
@@ -45,7 +57,8 @@ assert.eq( 0 , res.ok , "TTL mod shouldn't work with non-numeric expireAfterSeco
 var res = db.runCommand( { "collMod" : coll,
                            "index" : { "keyPattern" : {a : 1}, "expireAfterSeconds" : 100 } } );
 debug( res );
-assert( findTTL( {a:1}, 100  ), "TTL index not modified" );
+assert.eq( 1, db.system.indexes.count( { key : {a:1}, expireAfterSeconds : 100 } ),
+           "TTL index not modified" );
 
 // try to modify a faulty TTL index with a non-numeric expireAfterSeconds field
 t.dropIndex( {a : 1 } );
@@ -62,5 +75,8 @@ var res = db.runCommand( { "collMod" : coll ,
                            "usePowerOf2Sizes" : true,
                            "index" : { "keyPattern" : {a : 1} , "expireAfterSeconds" : 100 } } );
 debug( res );
-assert( findTTL( {a:1}, 100), "TTL index should be 100 now" );
+assert.eq( 1, res.ok, "should be able to modify both userFlags and expireAfterSeconds" );
+assert.eq( t.stats().userFlags , 1 , "userflags should be 1 now");
+assert.eq( 1, db.system.indexes.count( { key : {a:1}, expireAfterSeconds : 100 } ),
+           "TTL index should be 100 now" );
 
