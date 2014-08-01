@@ -115,7 +115,10 @@ namespace repl {
         virtual void relinquishPrimary(OperationContext* txn);
 
         // updates internal config with new config (already validated)
-        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex, Date_t now);
+        virtual void updateConfig(const ReplicationExecutor::CallbackData& cbData,
+                                  const ReplicaSetConfig& newConfig,
+                                  int selfIndex,
+                                  Date_t now);
 
     private:
 
