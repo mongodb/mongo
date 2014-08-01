@@ -158,10 +158,10 @@ __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 		cl->stepp += opsize;
 	} else {
 		optype = WT_LOGOP_INVALID;
-		opsize = cl->logrec->size;
 		fileid = 0;
 		WT_RET(__wt_buf_set(session, cl->opkey, NULL, 0));
-		WT_RET(__wt_buf_set(session, cl->opvalue, cl->stepp, opsize));
+		WT_RET(__wt_buf_set(
+		    session, cl->opvalue, cl->stepp, cl->logrec->size));
 		/* Step into a commit, over anything else. */
 		if (cl->rectype != WT_LOGREC_COMMIT)
 			cl->stepp = NULL;
