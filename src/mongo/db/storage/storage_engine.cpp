@@ -30,6 +30,7 @@
 
 #include "mongo/db/storage/storage_engine.h"
 
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/heap1/heap1_engine.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
@@ -63,6 +64,23 @@ namespace mongo {
                     factory);
             globalStorageEngine = factory->create( storageGlobalParams );
         }
+    }
+
+    namespace {
+        class StorageSSS : public ServerStatusSection {
+        public:
+            StorageSSS() : ServerStatusSection( "storageEngine" ) {
+            }
+
+            virtual ~StorageSSS() {}
+
+            virtual bool includeByDefault() const { return true; }
+
+            virtual BSONObj generateSection(const BSONElement& configElement) const {
+                return BSON( "name" << storageGlobalParams.engine );
+            }
+
+        } storageSSS;
     }
 }
 
