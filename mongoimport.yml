@@ -1,0 +1,154 @@
+functions:
+  "setup go env":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        import GOPATH=`pwd`
+        ./gpm install
+
+  "generate coverage html + text":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        import GOPATH=`pwd`
+        go tool cover -html=coverage.out -o coverage.html
+        go tool cover -func=coverage.out -o coverage.txt
+
+  "upload coverage html report":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/coverage.html
+      remote_file: mongo-tools-proto/coverage/${task_id}.html
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/html
+
+  "upload coverage txt report":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/coverage.txt
+      remote_file: mongo-tools-proto/coverage/${task_id}.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+
+  "attach coverage reports" :
+    command: attach.task_files
+    params:
+      "Coverage Report (HTML)": https://s3.amazonaws.com/mciuploads/mongo-tools-proto/coverage/${task_id}.html
+      "Coverage Report (TXT)": https://s3.amazonaws.com/mciuploads/mongo-tools-proto/coverage/${task_id}.txt
+
+  "download mongod":
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
+        rm -rf mongodb
+        mkdir mongodb
+        cd mongodb
+        wget -q ${mongo_url} -O mongodb.tgz
+        tar xvf mongodb.tgz --strip-components=1
+
+  "start mongod":
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
+        rm -rf mongodb/${db_files_dir|db_files}
+        rm -f mongodb/${logfile|run.log}
+        mkdir mongodb/${db_files_dir|db_files}
+        ./mongodb/bin/mongod --dbpath ./mongodb/${db_files_dir|db_files} --logpath ./mongodb/${logfile|run.log} --port ${port|27017} --fork ${mongod_extra_options|}
+
+  "kill mongod":
+    command: shell.exec
+    params:
+      script: |
+        pkill -9 mongod;
+
+  "run tests":
+    - command: gotest.run
+      params:
+        working_dir: src
+        tests:
+          - dir: src/github.com/shelman/mongo-tools-proto/mongoimport
+            args: -coverprofile=coverage.out
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          mv src/github.com/shelman/mongo-tools-proto/mongoimport/coverage.out $GOPATH
+
+pre:
+  - command: expansions.fetch
+    params:
+      keys:
+        - local_key: "aws_key"
+          remote_key: "project_aws_key"
+        - local_key: "aws_secret"
+          remote_key: "project_aws_secret"
+post:
+  - func: "kill mongod"
+
+tasks:
+- name: unit
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - func: "download mongod"
+    - func: "start mongod"
+    - func: "run tests"
+    - func: "generate coverage html + text"
+    - func: "upload coverage html report"
+    - func: "upload coverage txt report"
+    - func: "attach coverage reports"
+
+- name: dist
+  depends_on:
+  - name: "unit"
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          import GOPATH=`pwd`
+          go build -o mongoimport github.com/shelman/mongo-tools-proto/mongoimport/main
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongoimport
+        remote_file: mongo-tools-proto/binaries/${build_id}/mongoimport
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/octet-stream
+    - command: attach.task_files
+      params:
+        "mongoimport": https://s3.amazonaws.com/mciuploads/mongo-tools-proto/binaries/${build_id}/mongoimport
+
+
+buildvariants:
+- name: ubuntu
+  display_name: Ubuntu
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    mongo_url: http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-2.6.1.tgz
+  tasks:
+  - name: dist
+  - name: unit
