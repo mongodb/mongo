@@ -31,7 +31,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/index_set.h"
+#include "mongo/db/update_index_data.h"
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 
@@ -39,7 +39,7 @@ namespace {
 
     using mongo::BSONObj;
     using mongo::fromjson;
-    using mongo::IndexPathSet;
+    using mongo::UpdateIndexData;
     using mongo::mutablebson::Document;
     using mongo::StringData;
     using mongo::UpdateDriver;

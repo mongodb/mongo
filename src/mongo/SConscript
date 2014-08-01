@@ -149,8 +149,8 @@ env.CppUnitTest('bsonobjbuilder_test', ['bson/bsonobjbuilder_test.cpp'],
 env.CppUnitTest('namespacestring_test', ['db/namespace_string_test.cpp'],
                 LIBDEPS=['bson'])
 
-env.CppUnitTest('index_set_test', ['db/index_set_test.cpp'],
-                LIBDEPS=['bson','index_set'])
+env.CppUnitTest('update_index_data_test', ['db/update_index_data_test.cpp'],
+                LIBDEPS=['bson','update_index_data','db/common'])
 
 env.Library('path',
             ['db/matcher/path.cpp',
@@ -547,7 +547,7 @@ if has_option( "mm" ):
 else:
     mmapFiles += [ "util/mmap_${OS_FAMILY}.cpp" ]
 
-env.Library('index_set', [ 'db/index_set.cpp' ] )
+env.Library('update_index_data', [ 'db/update_index_data.cpp' ], LIPDEPS=[ 'db/common' ])
 
 # Global Configuration.  Used by both mongos and mongod.
 env.Library('global_environment_experiment',
@@ -907,8 +907,8 @@ serveronlyLibdeps = ["coreshard",
                      "defaultversion",
                      "global_optime",
                      "index_key_validate",
-                     "index_set",
                      'range_deleter',
+                     "update_index_data",
                      's/metadata',
                      's/batch_write_types',
                      "db/catalog/collection_options",

@@ -32,10 +32,12 @@
 
 #include "mongo/db/catalog/collection_info_cache.h"
 
-#include "mongo/db/d_concurrency.h"
-#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_legacy.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 
@@ -61,13 +63,40 @@ namespace mongo {
     void CollectionInfoCache::computeIndexKeys() {
         _indexedPaths.clear();
 
-        IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator( true );
-        while( i.more() ) {
-            BSONObj key = i.next()->keyPattern();
-            BSONObjIterator j( key );
-            while ( j.more() ) {
-                BSONElement e = j.next();
-                _indexedPaths.addPath( e.fieldName() );
+        IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator(true);
+        while (i.more()) {
+            IndexDescriptor* descriptor = i.next();
+
+            if (descriptor->getAccessMethodName() != IndexNames::TEXT) {
+                BSONObj key = descriptor->keyPattern();
+                BSONObjIterator j(key);
+                while (j.more()) {
+                    BSONElement e = j.next();
+                    _indexedPaths.addPath(e.fieldName());
+                }
+            }
+            else {
+                fts::FTSSpec ftsSpec(descriptor->infoObj());
+
+                if (ftsSpec.wildcard()) {
+                    _indexedPaths.allPathsIndexed();
+                }
+                else {
+                    for (size_t i = 0; i < ftsSpec.numExtraBefore(); ++i) {
+                        _indexedPaths.addPath(ftsSpec.extraBefore(i));
+                    }
+                    for (fts::Weights::const_iterator it = ftsSpec.weights().begin();
+                         it != ftsSpec.weights().end();
+                         ++it) {
+                        _indexedPaths.addPath(it->first);
+                    }
+                    for (size_t i = 0; i < ftsSpec.numExtraAfter(); ++i) {
+                        _indexedPaths.addPath(ftsSpec.extraAfter(i));
+                    }
+                    // Any update to a path containing "language" as a component could change the
+                    // language of a subdocument.  Add the override field as a path component.
+                    _indexedPaths.addPathComponent(ftsSpec.languageOverrideField());
+                }
             }
         }
 

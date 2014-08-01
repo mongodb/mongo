@@ -390,7 +390,7 @@ namespace mongo {
         return _affectIndices;
     }
 
-    void UpdateDriver::refreshIndexKeys(const IndexPathSet* indexedFields) {
+    void UpdateDriver::refreshIndexKeys(const UpdateIndexData* indexedFields) {
         _indexedFields = indexedFields;
     }
 
