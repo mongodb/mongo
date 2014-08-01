@@ -92,7 +92,7 @@ namespace repl {
         }
 
         // wait for 2N pings before choosing a sync target
-        int needMorePings = _hbdata.size()*2 - MemberHeartbeatData::numPings;
+        int needMorePings = _hbdata.size()*2 - _getTotalPings();
 
         if (needMorePings > 0) {
             OCCASIONALLY log() << "waiting for " << needMorePings 
@@ -166,8 +166,10 @@ namespace repl {
 
                 // omit nodes that are more latent than anything we've already considered
                 if ((closestIndex != -1) &&
-                    (it->getPing() > _hbdata[closestIndex].getPing()))
+                    (_getPing(_currentConfig.getMemberAt(it->getConfigIndex()).getHostAndPort())
+                     > _getPing(_currentConfig.getMemberAt(closestIndex).getHostAndPort()))) {
                     continue;
+                }
 
                 if (attempts == 0 &&
                     (_selfConfig().getSlaveDelay() < 
@@ -977,7 +979,9 @@ namespace repl {
                 }
                 bb.appendTimeT("lastHeartbeat", it->getLastHeartbeat());
                 bb.appendTimeT("lastHeartbeatRecv", it->getLastHeartbeatRecv());
-                bb.append("pingMs", static_cast<int>(it->getPing().total_milliseconds()));
+                bb.append("pingMs",
+                          _getPing(_currentConfig.getMemberAt(
+                                  it->getConfigIndex()).getHostAndPort()));
                 std::string s = it->getLastHeartbeatMsg();
                 if( !s.empty() )
                     bb.append("lastHeartbeatMessage", s);
@@ -1118,6 +1122,25 @@ namespace repl {
     
     const MemberConfig& TopologyCoordinatorImpl::_selfConfig() {
         return _currentConfig.getMemberAt(_selfIndex);
+    }
+
+    void TopologyCoordinatorImpl::recordPing(const HostAndPort& host, const int elapsedMillis) {
+        _pings[host].hit(elapsedMillis);
+    }
+
+    int TopologyCoordinatorImpl::_getPing(const HostAndPort& host) {
+        return _pings[host].getMillis();
+    }
+
+    int TopologyCoordinatorImpl::_getTotalPings() {
+        PingMap::iterator it = _pings.begin();
+        PingMap::iterator end = _pings.end();
+        int totalPings = 0;
+        while (it != end) {
+            totalPings += it->second.getCount();
+            it++;
+        }
+        return totalPings;
     }
 
 } // namespace repl

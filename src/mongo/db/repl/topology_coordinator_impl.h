@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -45,6 +46,33 @@ namespace mongo {
     class OperationContext;
 
 namespace repl {
+
+    /**
+     * Represents a latency measurement for each replica set member based on heartbeat requests.
+     * The measurement is an average weighted 80% to the old value, and 20% to the new value.
+     */
+    class PingStats {
+    public:
+        PingStats() : count(0), value(std::numeric_limits<int>::max()) {}
+
+        void hit(int millis) {
+            ++count;
+            value = value == 0 ? millis :
+                                 static_cast<unsigned long>((value * .8) + (millis * .2));
+        }
+
+        unsigned int getCount() {
+            return count;
+        }
+
+        unsigned int getMillis() {
+            return value;
+        }
+    private:
+        unsigned int count;
+        unsigned int value;
+    };
+
 
     class TopologyCoordinatorImpl : public TopologyCoordinator {
     public:
@@ -120,7 +148,16 @@ namespace repl {
                                   int selfIndex,
                                   Date_t now);
 
+        // Record a ping in millis based on the round-trip time of the heartbeat for the member
+        virtual void recordPing(const HostAndPort& host, const int elapsedMillis);
+
     private:
+
+        // Returns the number of heartbeat pings which have occurred.
+        virtual int _getTotalPings();
+
+        // Returns the current "ping" value for the given member by their address
+        virtual int _getPing(const HostAndPort& host);
 
         // Determines if we will veto the member in the "fresh" command response
         // If we veto, the errmsg will be filled in with a reason
@@ -218,6 +255,10 @@ namespace repl {
 
         // Functions to call when a state change happens.  We pass the new state.
         std::vector<StateChangeCallbackFn> _stateChangeCallbacks;
+
+        typedef std::map<HostAndPort, PingStats> PingMap;
+        // Ping stats for each member by HostAndPort;
+        PingMap _pings;
 
         // do these need settors?  the current code has no way to change these values.
         struct HeartbeatOptions {

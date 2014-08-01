@@ -149,6 +149,9 @@ namespace repl {
                                   int selfIndex,
                                   Date_t now) = 0;
 
+        // Record a "ping" based on the round-trip time of the heartbeat for the member
+        virtual void recordPing(const HostAndPort& host, const int elapsedMillis) = 0;
+
     protected:
         TopologyCoordinator() {}
     };
