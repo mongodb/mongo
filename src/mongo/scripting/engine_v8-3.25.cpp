@@ -617,13 +617,11 @@ namespace mongo {
         string exceptionText;
         v8::EscapableHandleScope handle_scope(args.GetIsolate());
         try {
-            v8::Local<v8::External> f =
-                v8::Local<v8::External>::Cast(args.Callee()->Get(
-                    scope->strLitToV8("_native_function")));
+            v8::Local<v8::External> f = args.Callee()->GetHiddenValue(
+                scope->strLitToV8("_native_function")).As<v8::External>();
             NativeFunction function = (NativeFunction)(f->Value());
-            v8::Local<v8::External> data =
-                v8::Local<v8::External>::Cast(args.Callee()->Get(
-                    scope->strLitToV8("_native_data")));
+            v8::Local<v8::External> data = args.Callee()->GetHiddenValue(
+                scope->strLitToV8("_native_data")).As<v8::External>();
             BSONObjBuilder b;
             for (int i = 0; i < args.Length(); ++i)
                 scope->v8ToMongoElement(b, BSONObjBuilder::numStr(i), args[i]);
@@ -1205,16 +1203,17 @@ namespace mongo {
         injectNative(field, func, global, data);
     }
 
-    void V8Scope::injectNative(const char *field, NativeFunction func, v8::Local<v8::Object>& obj,
+    void V8Scope::injectNative(const char* field,
+                               NativeFunction nativeFunc,
+                               v8::Local<v8::Object>& obj,
                                void* data) {
         v8::Local<v8::FunctionTemplate> ft = createV8Function(nativeCallback);
-        ft->Set(strLitToV8("_native_function"),
-                           v8::External::New(_isolate, (void*)func),
-                           v8::PropertyAttribute(v8::DontEnum | v8::ReadOnly));
-        ft->Set(strLitToV8("_native_data"),
-                           v8::External::New(_isolate, data),
-                           v8::PropertyAttribute(v8::DontEnum | v8::ReadOnly));
         injectV8Function(field, ft, obj);
+        v8::Local<v8::Function> func = ft->GetFunction();
+        func->SetHiddenValue(strLitToV8("_native_function"),
+                             v8::External::New(_isolate, (void*)nativeFunc));
+        func->SetHiddenValue(strLitToV8("_native_data"),
+                             v8::External::New(_isolate, data));
     }
 
     v8::Local<v8::FunctionTemplate> V8Scope::injectV8Function(const char *field,
