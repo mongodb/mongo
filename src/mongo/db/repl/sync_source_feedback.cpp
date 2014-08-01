@@ -202,19 +202,10 @@ namespace repl {
         Client::initThread("SyncSourceFeedbackThread");
         OperationContextImpl txn;
 
-        bool sleepNeeded = false;
         bool positionChanged = false;
         bool handshakeNeeded = false;
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         while (!inShutdown()) { // TODO(spencer): Remove once legacy repl coordinator is gone.
-            if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet) {
-                sleepsecs(1);
-                continue;
-            }
-            if (sleepNeeded) {
-                sleepmillis(500);
-                sleepNeeded = false;
-            }
             {
                 boost::unique_lock<boost::mutex> lock(_mtx);
                 while (!_positionChanged && !_handshakeNeeded && !_shutdownSignaled) {
@@ -243,11 +234,11 @@ namespace repl {
             if (!hasConnection()) {
                 // fix connection if need be
                 if (!target) {
-                    sleepNeeded = true;
+                    sleepmillis(500);
                     continue;
                 }
                 if (!_connect(&txn, target->fullName())) {
-                    sleepNeeded = true;
+                    sleepmillis(500);
                     continue;
                 }
             }
