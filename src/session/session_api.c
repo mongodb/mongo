@@ -206,6 +206,8 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 		ret = __wt_curmetadata_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
 		ret = __wt_curindex_open(session, uri, owner, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "log:"))
+		ret = __wt_curlog_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "statistics:"))
 		ret = __wt_curstat_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
@@ -213,7 +215,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->open_cursor == NULL ?
 		    __wt_object_unsupported(session, uri) :
-		    __wt_curds_create(session, uri, owner, cfg, dsrc, cursorp);
+		    __wt_curds_open(session, uri, owner, cfg, dsrc, cursorp);
 	else
 		ret = __wt_bad_object_type(session, uri);
 

@@ -249,6 +249,20 @@ struct __wt_cursor_json {
 	WT_CONFIG_ITEM value_names;	/* Names of value columns */
 };
 
+struct __wt_cursor_log {
+	WT_CURSOR iface;
+
+	WT_LSN		*cur_lsn;	/* LSN of current record */
+	WT_LSN		*next_lsn;	/* LSN of next record */
+	WT_ITEM		*logrec;	/* Copy of record for cursor */
+	WT_ITEM		*opkey, *opvalue;	/* Op key/value copy */
+	const uint8_t	*stepp, *stepp_end;	/* Pointer within record */
+	uint32_t	step_count;	/* Intra-record count */
+	uint32_t	rectype;	/* Record type */
+	uint64_t	txnid;		/* Record txnid */
+	uint32_t	flags;
+};
+
 struct __wt_cursor_metadata {
 	WT_CURSOR iface;
 

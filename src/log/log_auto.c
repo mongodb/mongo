@@ -94,6 +94,7 @@ __wt_logop_col_put_print(
 	WT_RET(__wt_logop_col_put_unpack(
 	    session, pp, end, &fileid, &recno, &value));
 
+	fprintf(out, "    \"optype\": \"col_put\",\n");
 	fprintf(out, "    \"fileid\": \"%" PRIu32 "\",\n", fileid);
 	fprintf(out, "    \"recno\": \"%" PRIu64 "\",\n", recno);
 	fprintf(out, "    \"value\": \"%.*s\",\n",
@@ -151,6 +152,7 @@ __wt_logop_col_remove_print(
 	WT_RET(__wt_logop_col_remove_unpack(
 	    session, pp, end, &fileid, &recno));
 
+	fprintf(out, "    \"optype\": \"col_remove\",\n");
 	fprintf(out, "    \"fileid\": \"%" PRIu32 "\",\n", fileid);
 	fprintf(out, "    \"recno\": \"%" PRIu64 "\",\n", recno);
 	return (0);
@@ -207,6 +209,7 @@ __wt_logop_col_truncate_print(
 	WT_RET(__wt_logop_col_truncate_unpack(
 	    session, pp, end, &fileid, &start, &stop));
 
+	fprintf(out, "    \"optype\": \"col_truncate\",\n");
 	fprintf(out, "    \"fileid\": \"%" PRIu32 "\",\n", fileid);
 	fprintf(out, "    \"start\": \"%" PRIu64 "\",\n", start);
 	fprintf(out, "    \"stop\": \"%" PRIu64 "\",\n", stop);
@@ -264,6 +267,7 @@ __wt_logop_row_put_print(
 	WT_RET(__wt_logop_row_put_unpack(
 	    session, pp, end, &fileid, &key, &value));
 
+	fprintf(out, "    \"optype\": \"row_put\",\n");
 	fprintf(out, "    \"fileid\": \"%" PRIu32 "\",\n", fileid);
 	fprintf(out, "    \"key\": \"%.*s\",\n",
 	    (int)key.size, (const char *)key.data);
@@ -322,6 +326,7 @@ __wt_logop_row_remove_print(
 	WT_RET(__wt_logop_row_remove_unpack(
 	    session, pp, end, &fileid, &key));
 
+	fprintf(out, "    \"optype\": \"row_remove\",\n");
 	fprintf(out, "    \"fileid\": \"%" PRIu32 "\",\n", fileid);
 	fprintf(out, "    \"key\": \"%.*s\",\n",
 	    (int)key.size, (const char *)key.data);
@@ -380,6 +385,7 @@ __wt_logop_row_truncate_print(
 	WT_RET(__wt_logop_row_truncate_unpack(
 	    session, pp, end, &fileid, &start, &stop, &mode));
 
+	fprintf(out, "    \"optype\": \"row_truncate\",\n");
 	fprintf(out, "    \"fileid\": \"%" PRIu32 "\",\n", fileid);
 	fprintf(out, "    \"start\": \"%.*s\",\n",
 	    (int)start.size, (const char *)start.data);

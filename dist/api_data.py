@@ -532,7 +532,7 @@ methods = {
 	Config('readonly', 'false', r'''
 	    only query operations are supported by this cursor. An error is
 	    returned if a modification is attempted using the cursor.  The
-	    default is false for all cursor types except for metadata
+	    default is false for all cursor types except for log and metadata
 	    cursors''',
 	    type='boolean'),
 	Config('skip_sort_check', 'false', r'''

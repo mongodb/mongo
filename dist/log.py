@@ -57,15 +57,15 @@ def printf_arg(f):
 # Update log.h with #defines for types
 #####################################################################
 log_defines = (
-	''.join('#define\t%s\t%d\n' % (r.macro_name(), i)
+	''.join('/*! %s */\n#define\t%s\t%d\n' % (r.desc, r.macro_name(), i)
 		for i, r in enumerate(log_data.rectypes)) +
-	''.join('#define\t%s\t%d\n' % (r.macro_name(), i)
-		for i, r in enumerate(log_data.optypes))
+	''.join('/*! %s */\n#define\t%s\t%d\n' % (r.desc, r.macro_name(), i)
+		for i, r in enumerate(log_data.optypes,start=1))
 )
 
 tfile = open(tmp_file, 'w')
 skip = 0
-for line in open('../src/include/log.h', 'r'):
+for line in open('../src/include/wiredtiger.in', 'r'):
 	if skip:
 		if 'Log record declarations: END' in line:
 			tfile.write('/*\n' + line)
@@ -75,9 +75,11 @@ for line in open('../src/include/log.h', 'r'):
 	if 'Log record declarations: BEGIN' in line:
 		skip = 1
 		tfile.write(' */\n')
+		tfile.write('/*! invalid operation */\n')
+		tfile.write('#define\tWT_LOGOP_INVALID\t0\n')
 		tfile.write(log_defines)
 tfile.close()
-compare_srcfile(tmp_file, '../src/include/log.h')
+compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
 
 #####################################################################
 # Create log_auto.c with handlers for each record / operation type.
@@ -206,6 +208,7 @@ __wt_logop_%(name)s_print(
 	WT_RET(__wt_logop_%(name)s_unpack(
 	    session, pp, end%(arg_addrs)s));
 
+	fprintf(out, "    \\"optype\\": \\"%(name)s\\",\\n");
 	%(print_args)s
 	return (0);
 }

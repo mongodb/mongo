@@ -11,22 +11,20 @@
 #define	LOG_ALIGN		128
 #define	WT_LOG_SLOT_BUF_INIT_SIZE	64 * 1024
 
-/*
- * We rely on this structure being aligned at 64 bits by the compiler,
- * if we were paranoid we could add an unused field to ensure the padding
- * is correct.
- */
-struct __wt_lsn {
-	uint32_t	file;		/* Log file number */
-	off_t		offset;		/* Log file offset */
-};
-
 #define	INIT_LSN(l)	do {						\
 	(l)->file = 1;							\
 	(l)->offset = 0;						\
 } while (0)
 
 #define	IS_INIT_LSN(l)	((l)->file == 1 && (l)->offset == 0)
+
+/*
+ * Both of the macros below need to change if the content of __wt_lsn
+ * ever changes.  The value is the following:
+ * txnid, record type, operation type, file id, operation key, operation value
+ */
+#define	LOGC_KEY_FORMAT		WT_UNCHECKED_STRING(IqI)
+#define	LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIIuu)
 
 #define	MAX_LSN(l)	do {						\
 	(l)->file = UINT32_MAX;						\
@@ -167,22 +165,3 @@ struct __wt_log_op_desc {
 	const char *fmt;
 	int (*print)(WT_SESSION_IMPL *session, uint8_t **pp, uint8_t *end);
 };
-
-/*
- * DO NOT EDIT: automatically built by dist/log.py.
- * Log record declarations: BEGIN
- */
-#define	WT_LOGREC_CHECKPOINT	0
-#define	WT_LOGREC_COMMIT	1
-#define	WT_LOGREC_FILE_SYNC	2
-#define	WT_LOGREC_MESSAGE	3
-#define	WT_LOGOP_COL_PUT	0
-#define	WT_LOGOP_COL_REMOVE	1
-#define	WT_LOGOP_COL_TRUNCATE	2
-#define	WT_LOGOP_ROW_PUT	3
-#define	WT_LOGOP_ROW_REMOVE	4
-#define	WT_LOGOP_ROW_TRUNCATE	5
-/*
- * Log record declarations: END
- * DO NOT EDIT: automatically built by dist/log.py.
- */
