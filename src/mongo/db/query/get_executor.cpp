@@ -42,6 +42,7 @@
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/subplan.h"
+#include "mongo/db/exec/update.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/query_settings.h"
@@ -458,6 +459,10 @@ namespace mongo {
         return Status::OK();
     }
 
+    //
+    // Delete
+    //
+
     Status getExecutorDelete(OperationContext* txn,
                              Collection* collection,
                              CanonicalQuery* rawCanonicalQuery,
@@ -526,6 +531,84 @@ namespace mongo {
 
         // Takes ownership of 'cq'.
         return getExecutorDelete(txn, collection, cq, isMulti, shouldCallLogOp, out);
+    }
+
+    //
+    // Update
+    //
+
+    Status getExecutorUpdate(OperationContext* txn,
+                             Database* db,
+                             CanonicalQuery* rawCanonicalQuery,
+                             const UpdateRequest* request,
+                             UpdateDriver* driver,
+                             OpDebug* opDebug,
+                             PlanExecutor** execOut) {
+        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
+        auto_ptr<WorkingSet> ws(new WorkingSet());
+        Collection* collection = db->getCollection(request->getOpCtx(),
+                                                   request->getNamespaceString().ns());
+
+        PlanStage* root;
+        QuerySolution* querySolution;
+        Status status = prepareExecution(txn, collection, ws.get(), canonicalQuery.get(), 0, &root,
+                                         &querySolution);
+        if (!status.isOK()) {
+            return status;
+        }
+        invariant(root);
+        UpdateStageParams updateStageParams(request, driver, opDebug);
+        updateStageParams.canonicalQuery = rawCanonicalQuery;
+        root = new UpdateStage(updateStageParams, ws.get(), db, root);
+        // We must have a tree of stages in order to have a valid plan executor, but the query
+        // solution may be null. Takes ownership of all args other than 'collection'.
+        *execOut = new PlanExecutor(ws.release(), root, querySolution, canonicalQuery.release(),
+                                    collection);
+        return Status::OK();
+    }
+
+    Status getExecutorUpdate(OperationContext* txn,
+                             Database* db,
+                             const std::string& ns,
+                             const UpdateRequest* request,
+                             UpdateDriver* driver,
+                             OpDebug* opDebug,
+                             PlanExecutor** execOut) {
+        auto_ptr<WorkingSet> ws(new WorkingSet());
+        Collection* collection = db->getCollection(request->getOpCtx(),
+                                                   request->getNamespaceString().ns());
+        const BSONObj& unparsedQuery = request->getQuery();
+
+        UpdateStageParams updateStageParams(request, driver, opDebug);
+        if (!collection) {
+            LOG(2) << "Collection " << ns << " does not exist."
+                   << " Using EOF stage: " << unparsedQuery.toString();
+            UpdateStage* updateStage = new UpdateStage(updateStageParams, ws.get(), db,
+                                                       new EOFStage());
+            *execOut = new PlanExecutor(ws.release(), updateStage, ns);
+            return Status::OK();
+        }
+
+        if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
+            collection->getIndexCatalog()->findIdIndex()) {
+            LOG(2) << "Using idhack: " << unparsedQuery.toString();
+
+            PlanStage* idHackStage = new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(),
+                                                     ws.get());
+            UpdateStage* root = new UpdateStage(updateStageParams, ws.get(), db, idHackStage);
+            *execOut = new PlanExecutor(ws.release(), root, collection);
+            return Status::OK();
+        }
+
+        const WhereCallbackReal whereCallback(txn, collection->ns().db());
+        CanonicalQuery* cq;
+        Status status = CanonicalQuery::canonicalize(collection->ns(), unparsedQuery, &cq,
+                                                     whereCallback);
+        if (!status.isOK())
+            return status;
+
+        // Takes ownership of 'cq'.
+        return getExecutorUpdate(txn, db, cq, request, driver, opDebug, execOut);
     }
 
     //

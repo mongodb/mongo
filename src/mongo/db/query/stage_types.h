@@ -88,6 +88,8 @@ namespace mongo {
         STAGE_SUBPLAN,
         STAGE_TEXT,
         STAGE_UNKNOWN,
+
+        STAGE_UPDATE,
     };
 
 }  // namespace mongo
