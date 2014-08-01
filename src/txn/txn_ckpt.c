@@ -263,7 +263,8 @@ err:	while (i < session->ckpt_handle_next) {
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_session_release_btree(session)));
 	}
-	session->ckpt_handle_next = 0;
+	__wt_free(session, session->ckpt_handle);
+	session->ckpt_handle_allocated = session->ckpt_handle_next = 0;
 	return (ret);
 }
 
