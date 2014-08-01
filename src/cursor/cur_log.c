@@ -46,8 +46,11 @@ __curlog_logrec(
 	if (cl->rectype == WT_LOGREC_COMMIT)
 		WT_RET(__wt_vunpack_uint(&cl->stepp,
 		    WT_PTRDIFF(cl->stepp_end, cl->stepp), &cl->txnid));
-	else
+	else {
+		/* Step over anything else. */
+		cl->stepp = NULL;
 		cl->txnid = 0;
+	}
 	return (0);
 }
 
@@ -159,12 +162,10 @@ __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	} else {
 		optype = WT_LOGOP_INVALID;
 		fileid = 0;
-		WT_RET(__wt_buf_set(session, cl->opkey, NULL, 0));
-		WT_RET(__wt_buf_set(
-		    session, cl->opvalue, cl->stepp, cl->logrec->size));
-		/* Step into a commit, over anything else. */
-		if (cl->rectype != WT_LOGREC_COMMIT)
-			cl->stepp = NULL;
+		cl->opkey->data = NULL;
+		cl->opkey->size = 0;
+		cl->opvalue->data = cl->logrec->data;
+		cl->opvalue->size = cl->logrec->size;
 	}
 	/*
 	 * The log cursor sets the LSN and step count as the cursor key and
