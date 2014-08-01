@@ -229,6 +229,7 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	u_int i;
 
 	/* Should not be called with any handle reference. */
 	WT_ASSERT(session, session->dhandle == NULL);
@@ -243,10 +244,11 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * Walk the list, flushing the leaf pages from each file, then releasing
-	 * the file.
+	 * the file.  Note that we increment inside the loop to simplify error
+	 * handling.
 	 */
-	while (session->ckpt_handle_next > 0) {
-		dhandle = session->ckpt_handle[--session->ckpt_handle_next];
+	for (i = 0; i < session->ckpt_handle_next;) {
+		dhandle = session->ckpt_handle[i++];
 		WT_WITH_DHANDLE(session, dhandle,
 		    ret = __wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES));
 		WT_WITH_DHANDLE(session, dhandle,
@@ -254,8 +256,8 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(ret);
 	}
 
-err:	while (session->ckpt_handle_next > 0) {
-		dhandle = session->ckpt_handle[--session->ckpt_handle_next];
+err:	while (i < session->ckpt_handle_next) {
+		dhandle = session->ckpt_handle[i++];
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_session_release_btree(session)));
 	}
