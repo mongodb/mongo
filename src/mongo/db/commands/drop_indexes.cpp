@@ -253,7 +253,9 @@ namespace mongo {
                 vector<string> indexNames;
                 collection->getCatalogEntry()->getAllIndexes( &indexNames );
                 for ( size_t i = 0; i < indexNames.size(); i++ ) {
-                    all.push_back( collection->getCatalogEntry()->getIndexSpec( indexNames[i] ) );
+                    const string& name = indexNames[i];
+                    BSONObj spec = collection->getCatalogEntry()->getIndexSpec( name );
+                    all.push_back( spec.getOwned() );
                 }
             }
 
