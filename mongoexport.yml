@@ -74,20 +74,20 @@ functions:
         pkill -9 mongod;
 
   "run tests":
-    - command: gotest.run
-      params:
-        working_dir: src
-        tests:
-          - dir: src/github.com/shelman/mongo-tools-proto/mongoexport
-            args: -coverprofile=coverage.out
+    command: gotest.run
+    params:
+      working_dir: src
+      tests:
+        - dir: src/github.com/shelman/mongo-tools-proto/mongoexport
+          args: -coverprofile=coverage.out
 
   "move coverage data":
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o verbose
-          mv src/github.com/shelman/mongo-tools-proto/mongoexport/coverage.out $GOPATH
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        mv src/github.com/shelman/mongo-tools-proto/mongoexport/coverage.out $GOPATH
 
 pre:
   - command: expansions.fetch
