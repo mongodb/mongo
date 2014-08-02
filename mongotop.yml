@@ -29,6 +29,16 @@ functions:
         mkdir mongodb/${db_files_dir|db_files}
         ./mongodb/bin/mongod --dbpath ./mongodb/${db_files_dir|db_files} --logpath ./mongodb/${logfile|run.log} --port ${port|27017} --fork ${mongod_extra_options|}
 
+  "run smoke tests":
+    command: shell.exec
+    params:
+      working_dir: src/src/github.com/shelman/mongo-tools-proto/mongotop
+      script: |
+        set -o verbose
+        wget https://s3.amazonaws.com/mciuploads/mcitools/binaries/${build_id}/mongotop
+        chmod 755 mongotop
+        ./smoke.sh
+
   "kill mongod":
     command: shell.exec
     params:
@@ -82,14 +92,7 @@ tasks:
         directory: src
     - func: "download mongod"
     - func: "start mongod"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o verbose
-          wget https://s3.amazonaws.com/mciuploads/mcitools/binaries/${build_id}/mongotop
-          chmod 755 mongotop
-          ./src/github.com/shelman/mongo-tools-proto/mongotop/smoke.sh
+    - func: "run smoke tests"
 
 buildvariants:
 - name: ubuntu
