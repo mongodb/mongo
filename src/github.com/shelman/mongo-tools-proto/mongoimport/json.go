@@ -175,7 +175,7 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 	if err := bson_ext.ConvertSubdocsFromJSON(document); err != nil {
 		return nil, err
 	}
-	jsonImporter.NumImported += 1
+	jsonImporter.NumImported++
 
 	// reinitialize the decoder with its existing buffer and the underlying
 	// reader

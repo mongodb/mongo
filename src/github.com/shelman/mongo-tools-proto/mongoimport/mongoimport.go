@@ -57,7 +57,7 @@ type ImportInput interface {
 func (mongoImport *MongoImport) ValidateSettings() error {
 	// Namespace must have a valid database
 	if mongoImport.ToolOptions.Namespace.DB == "" {
-		return fmt.Errorf("must specify a database.")
+		return fmt.Errorf("must specify a database")
 	}
 
 	// use JSON as default input type
@@ -67,7 +67,7 @@ func (mongoImport *MongoImport) ValidateSettings() error {
 		if !(mongoImport.InputOptions.Type == TSV ||
 			mongoImport.InputOptions.Type == JSON ||
 			mongoImport.InputOptions.Type == CSV) {
-			return fmt.Errorf("don't know what type [\"%v\"] is.",
+			return fmt.Errorf("don't know what type [\"%v\"] is",
 				mongoImport.InputOptions.Type)
 		}
 	}
@@ -78,8 +78,8 @@ func (mongoImport *MongoImport) ValidateSettings() error {
 		if !mongoImport.InputOptions.HeaderLine {
 			if mongoImport.InputOptions.Fields == "" &&
 				mongoImport.InputOptions.FieldFile == "" {
-				return fmt.Errorf(" You need to specify fields or have a " +
-					"headerline to import this file type.")
+				return fmt.Errorf("You need to specify fields or have a " +
+					"header line to import this file type")
 			}
 		}
 	}
@@ -87,7 +87,7 @@ func (mongoImport *MongoImport) ValidateSettings() error {
 	// ensure we have a valid string to use for the collection
 	if mongoImport.ToolOptions.Namespace.Collection == "" {
 		if mongoImport.InputOptions.File == "" {
-			return fmt.Errorf("must specify a collection or filename.")
+			return fmt.Errorf("must specify a collection or filename")
 		}
 		fileBaseName := filepath.Base(mongoImport.InputOptions.File)
 		lastDotIndex := strings.LastIndex(fileBaseName, ".")
@@ -96,7 +96,7 @@ func (mongoImport *MongoImport) ValidateSettings() error {
 		}
 		mongoImport.ToolOptions.Namespace.Collection = fileBaseName
 		util.PrintlnTimeStamped("no collection specified!")
-		util.PrintfTimeStamped("using filename '%v' as collection.\n", fileBaseName)
+		util.PrintfTimeStamped("using filename '%v' as collection\n", fileBaseName)
 	}
 	return nil
 }
