@@ -214,6 +214,7 @@ struct __config_thread {		/* Per-thread structure */
 
 int	 config_assign(CONFIG *, const CONFIG *);
 int	 config_compress(CONFIG *);
+void	 config_doxygen(void);
 void	 config_free(CONFIG *);
 int	 config_opt_file(CONFIG *, const char *);
 int	 config_opt_line(CONFIG *, const char *);

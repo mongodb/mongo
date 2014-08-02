@@ -32,8 +32,8 @@ Gimpel
 GitHub
 Google
 Google's
-HyperLevelDB
 HyperDex
+HyperLevelDB
 IEC
 JavaScript
 LD
@@ -81,6 +81,7 @@ apiflags
 ar
 archiver
 arg
+async
 autoconf
 automake
 basecfg
@@ -196,6 +197,7 @@ html
 huffman
 hugepage
 hyperleveldb
+icount
 iflag
 indices
 init
@@ -208,6 +210,7 @@ jemalloc
 jni
 jrx
 json
+kb
 keyexist
 keyfmt
 keyname
@@ -292,6 +295,7 @@ oltp
 oob
 os
 ovfl
+pareto
 pcoll
 pdf
 perf
@@ -326,6 +330,7 @@ recs
 rerequests
 ret
 rf
+rmw
 ro
 rocksdb
 rpc
@@ -340,6 +345,7 @@ schemas
 selectable
 seqname
 serializable
+sess
 skiplist
 spinlock
 spinlocks
@@ -355,9 +361,11 @@ strget
 struct
 structs
 subdatabases
+subdirectory
 subpage
 superset
 sys
+sz
 tablename
 tcl
 tcmalloc
@@ -396,6 +404,7 @@ valuefmt
 vec
 versa
 vm
+warmup
 whitespace
 wiredtiger
 workQ
