@@ -69,9 +69,8 @@ func (jsonExporter *JSONExportOutput) ExportDocument(document bson.M) error {
 		jsonOut, err := json.Marshal(bson_ext.GetExtendedBSON(document))
 		if err != nil {
 			return nil
-		} else {
-			jsonExporter.Out.Write(jsonOut)
 		}
+		jsonExporter.Out.Write(jsonOut)
 	} else {
 		err := jsonExporter.Encoder.Encode(bson_ext.GetExtendedBSON(document))
 		if err != nil {

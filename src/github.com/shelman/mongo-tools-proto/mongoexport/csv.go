@@ -83,9 +83,8 @@ func extractFieldByName(fieldName string, document interface{}) (interface{}, er
 			subdocVal := docValue.MapIndex(reflect.ValueOf(path))
 			if subdocVal.Kind() == reflect.Invalid {
 				return "", nil
-			} else {
-				subdoc = subdocVal.Interface()
 			}
+			subdoc = subdocVal.Interface()
 		} else if docKind == reflect.Slice {
 			// check that the path can be converted to int
 			arrayIndex, err := strconv.Atoi(path)
@@ -99,9 +98,8 @@ func extractFieldByName(fieldName string, document interface{}) (interface{}, er
 			subdocVal := docValue.Index(arrayIndex)
 			if subdocVal.Kind() == reflect.Invalid {
 				return "", nil
-			} else {
-				subdoc = subdocVal.Interface()
 			}
+			subdoc = subdocVal.Interface()
 		} else {
 			//trying to index into a non-compound type - just return blank.
 			return "", nil

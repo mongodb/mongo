@@ -164,17 +164,15 @@ func ParseExtendedJSON(doc map[string]interface{}) (interface{}, error) {
 					break
 				}
 				return date, err
-			} else {
-				return nil, fmt.Errorf("Invalid date string.")
 			}
+			return nil, fmt.Errorf("Invalid date string")
 		}
 
 		if oidValue, ok := doc["$oid"]; ok {
 			if oidStr, isStr := oidValue.(string); isStr {
 				return bson.ObjectIdHex(oidStr), nil
-			} else {
-				return nil, fmt.Errorf("Value is not a valid ObjectId hex string: %v", oidValue)
 			}
+			return nil, fmt.Errorf("Value is not a valid ObjectId hex string: %v", oidValue)
 		}
 
 		if _, ok := doc["$undefined"]; ok {

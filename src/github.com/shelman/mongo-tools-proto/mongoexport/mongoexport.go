@@ -43,7 +43,7 @@ func (exp *MongoExport) ValidateSettings() error {
 
 	//Namespace must have a valid database and collection
 	if exp.ToolOptions.Namespace.DB == "" || exp.ToolOptions.Namespace.Collection == "" {
-		return fmt.Errorf("must specify a database and collection.")
+		return fmt.Errorf("must specify a database and collection")
 	}
 
 	if exp.InputOpts != nil && exp.InputOpts.Query != "" {
@@ -147,10 +147,8 @@ func (exp *MongoExport) getExportOutput(out io.Writer) (ExportOutput, error) {
 			}
 		}
 		return NewCSVExportOutput(fields, out), nil
-	} else {
-		return NewJSONExportOutput(exp.OutputOpts.JSONArray, out), nil
 	}
-
+	return NewJSONExportOutput(exp.OutputOpts.JSONArray, out), nil
 }
 
 //ExportOutput is an interface that specifies how a document should be formatted
