@@ -80,6 +80,8 @@ functions:
         tests:
           - dir: src/github.com/shelman/mongo-tools-proto/mongoimport
             args: -coverprofile=coverage.out
+
+  "move coverage data":
     - command: shell.exec
       params:
         working_dir: src
@@ -108,6 +110,7 @@ tasks:
     - func: "download mongod"
     - func: "start mongod"
     - func: "run tests"
+    - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage html report"
     - func: "upload coverage txt report"
