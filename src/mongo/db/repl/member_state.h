@@ -56,7 +56,7 @@ namespace repl {
             RS_ARBITER = 7,
             RS_DOWN = 8, /* node not reachable for a report */
             RS_ROLLBACK = 9,
-            RS_SHUNNED = 10, /* node shunned from replica set */
+            RS_REMOVED = 10, /* node removed from replica set */
         } s;
 
         MemberState(MS ms = RS_UNKNOWN) : s(ms) { }
@@ -70,7 +70,7 @@ namespace repl {
         bool fatal() const { return s == RS_FATAL; }
         bool rollback() const { return s == RS_ROLLBACK; }
         bool readable() const { return s == RS_PRIMARY || s == RS_SECONDARY; }
-        bool shunned() const { return s == RS_SHUNNED; }
+        bool removed() const { return s == RS_REMOVED; }
 
         std::string toString() const;
 
@@ -90,7 +90,7 @@ namespace repl {
         case RS_DOWN: return "DOWN";
         case RS_ROLLBACK: return "ROLLBACK";
         case RS_UNKNOWN: return "UNKNOWN";
-        case RS_SHUNNED: return "REMOVED";
+        case RS_REMOVED: return "REMOVED";
         }
         return "";
     }
