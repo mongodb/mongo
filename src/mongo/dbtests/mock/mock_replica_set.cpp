@@ -244,7 +244,7 @@ namespace mongo {
 
     int MockReplicaSet::getState(const std::string& hostAndPort) const {
         if (_replConfig.count(hostAndPort) < 1) {
-            return static_cast<int>(MemberState::RS_SHUNNED);
+            return static_cast<int>(MemberState::RS_REMOVED);
         }
         else if (hostAndPort == getPrimary()) {
             return static_cast<int>(MemberState::RS_PRIMARY);

@@ -1024,7 +1024,7 @@ namespace repl {
         // Add sync source info
         if ((_syncSourceIndex != -1) && 
             (myState != MemberState::RS_PRIMARY) &&
-            (myState != MemberState::RS_SHUNNED) ) {
+            (myState != MemberState::RS_REMOVED) ) {
             response->append("syncingTo", _currentConfig.getMemberAt(_syncSourceIndex)
                           .getHostAndPort().toString());
         }
