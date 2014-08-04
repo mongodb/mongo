@@ -37,8 +37,8 @@ namespace mongo {
      * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
      * the memory pointed to by _data is owned by the RecordStore. If _dataPtr is not NULL, then
      * it must point to _data. This means that the memory pointed to by _data is owned by the
-     * RecordData class, and will be cleaned up automatically when the RecordData destructor
-     * calls the _dataPtr destructor.
+     * RecordData class, and will be cleaned up automatically when the RecordData destructor calls
+     * the _dataPtr destructor.
      */
     class RecordData {
     public:

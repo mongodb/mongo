@@ -1,4 +1,4 @@
-// rocks_database_catalog_entry_real.cpp
+// rocks_database_catalog_entry_mongod.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -31,10 +31,11 @@
 
 #include "mongo/db/storage/rocks/rocks_database_catalog_entry.h"
 
+#include <boost/optional.hpp>
 #include <rocksdb/db.h>
 
 #include "mongo/db/index/btree_access_method.h"
-#include "mongo/db/storage/rocks/rocks_btree_impl.h"
+#include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 #include "mongo/db/storage/rocks/rocks_collection_catalog_entry.h"
 #include "mongo/db/storage/rocks/rocks_engine.h"
 
@@ -42,16 +43,15 @@
 namespace mongo {
 
     IndexAccessMethod* RocksDatabaseCatalogEntry::getIndex( OperationContext* txn,
-                                                            const CollectionCatalogEntry* collection,
-                                                            IndexCatalogEntry* index ) {
+                                                           const CollectionCatalogEntry* collection,
+                                                           IndexCatalogEntry* index ) {
         const IndexDescriptor* desc = index->descriptor();
-        const string& type = desc->getAccessMethodName();
-
-        invariant( type == "" ); // temp
+        const boost::optional<Ordering> order( Ordering::make( desc->keyPattern() ) );
 
         rocksdb::ColumnFamilyHandle* cf = _engine->getIndexColumnFamily( collection->ns().ns(),
-                                                                         desc->indexName() );
-        std::auto_ptr<RocksBtreeImpl> raw( new RocksBtreeImpl( _engine->getDB(), cf ) );
+                                                                         desc->indexName(),
+                                                                         order );
+        std::auto_ptr<RocksSortedDataImpl> raw( new RocksSortedDataImpl( _engine->getDB(), cf ) );
         return new BtreeAccessMethod( index, raw.release() );
     }
 }

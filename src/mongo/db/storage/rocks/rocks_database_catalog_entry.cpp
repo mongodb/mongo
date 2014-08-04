@@ -28,8 +28,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/storage/rocks/rocks_database_catalog_entry.h"
+
+#include <rocksdb/options.h>
+
+#include "mongo/db/jsobj.h"
 #include "mongo/db/storage/rocks/rocks_collection_catalog_entry.h"
 #include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
@@ -49,7 +52,7 @@ namespace mongo {
         // TODO(XXX): make this fast
         std::list<std::string> lst;
         getCollectionNamespaces( &lst );
-        return lst.size() == 0;
+        return lst.empty();
     }
 
     void RocksDatabaseCatalogEntry::appendExtraStats( OperationContext* opCtx,
@@ -68,8 +71,9 @@ namespace mongo {
         _engine->getCollectionNamespaces( name(), out );
     }
 
-    CollectionCatalogEntry* RocksDatabaseCatalogEntry::getCollectionCatalogEntry( OperationContext* txn,
-                                                                                  const StringData& ns ) const {
+    CollectionCatalogEntry* RocksDatabaseCatalogEntry::getCollectionCatalogEntry(
+                                                                      OperationContext* txn,
+                                                                      const StringData& ns ) const {
         RocksEngine::Entry* entry = _engine->getEntry( ns );
         if ( !entry )
             return NULL;

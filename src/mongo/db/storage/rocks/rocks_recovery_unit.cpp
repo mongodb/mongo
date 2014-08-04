@@ -40,24 +40,37 @@
 namespace mongo {
 
     RocksRecoveryUnit::RocksRecoveryUnit( rocksdb::DB* db, bool defaultCommit )
-        : _db( db ), _defaultCommit( defaultCommit ), _writeBatch(  ), _depth( 0 ) {
-        _writeBatch.reset( new rocksdb::WriteBatch() );
-    }
+                                       : _db( db ),
+                                       _defaultCommit( defaultCommit ),
+                                       _writeBatch(  ),
+                                       _depth( 0 ),
+                                       _snapshot( NULL ) { }
+
 
     RocksRecoveryUnit::~RocksRecoveryUnit() {
         if ( _defaultCommit ) {
             commitUnitOfWork();
         }
+
+        if ( _snapshot ) {
+            _db->ReleaseSnapshot( _snapshot );
+        }
     }
 
     void RocksRecoveryUnit::beginUnitOfWork() {
-        if ( !_writeBatch ) {
-            _writeBatch.reset( new rocksdb::WriteBatch() );
-        }
+        // TODO no need to initialize _writeBatch here so long as it is lazily initialized
         _depth++;
     }
     void RocksRecoveryUnit::commitUnitOfWork() {
-        invariant( _writeBatch );
+        if ( _snapshot ) {
+            _db->ReleaseSnapshot( _snapshot );
+            _snapshot = _db->GetSnapshot();
+        }
+
+        if ( !_writeBatch ) {
+            // nothing to be committed
+            return;
+        }
 
         rocksdb::Status status = _db->Write( rocksdb::WriteOptions(), _writeBatch.get() );
         if ( !status.ok() ) {
@@ -66,6 +79,7 @@ namespace mongo {
         }
 
         _writeBatch.reset( new rocksdb::WriteBatch() );
+
     }
 
     void RocksRecoveryUnit::endUnitOfWork() {
@@ -103,9 +117,28 @@ namespace mongo {
         log() << "RocksRecoveryUnit::syncDataAndTruncateJournal() does nothing";
     }
 
+    // lazily initialized because Recovery Units are sometimes initialized just for reading,
+    // which does not require write batches
     rocksdb::WriteBatch* RocksRecoveryUnit::writeBatch() {
-        invariant( _writeBatch );
+        if ( !_writeBatch ) {
+            // XXX change to _writeBatch->Clear() everywhere
+            _writeBatch.reset( new rocksdb::WriteBatch() );
+        }
+
         return _writeBatch.get();
+    }
+
+    // XXX lazily initialized for now
+    // This is lazily initialized for simplicity so long as we still
+    // have database-level locking. If a method needs to access the snapshot,
+    // and it has not been initialized, then it knows it is the first
+    // method to access the snapshot, and can initialize it before using it.
+    const rocksdb::Snapshot* RocksRecoveryUnit::snapshot() {
+        if ( !_snapshot ) {
+            _snapshot = _db->GetSnapshot();
+        }
+
+        return _snapshot;
     }
 
 }
