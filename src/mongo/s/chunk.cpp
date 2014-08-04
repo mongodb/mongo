@@ -668,7 +668,7 @@ namespace mongo {
 
     // -------  ChunkManager --------
 
-    AtomicUInt ChunkManager::NextSequenceNumber = 1;
+    AtomicUInt32 ChunkManager::NextSequenceNumber(1U);
 
     ChunkManager::ChunkManager( const string& ns, const ShardKeyPattern& pattern , bool unique ) :
         _ns( ns ),
@@ -676,7 +676,7 @@ namespace mongo {
         _unique( unique ),
         _chunkRanges(),
         _mutex("ChunkManager"),
-        _sequenceNumber(++NextSequenceNumber)
+        _sequenceNumber(NextSequenceNumber.addAndFetch(1))
     {
         //
         // Sets up a chunk manager from new data
@@ -698,7 +698,7 @@ namespace mongo {
         // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
         // Increasing this number here will prompt checkShardVersion() to refresh the connection-level versions to
         // the most up to date value.
-        _sequenceNumber(++NextSequenceNumber)
+        _sequenceNumber(NextSequenceNumber.addAndFetch(1))
     {
 
         //
@@ -717,7 +717,7 @@ namespace mongo {
         _unique( oldManager->isUnique() ),
         _chunkRanges(),
         _mutex("ChunkManager"),
-        _sequenceNumber(++NextSequenceNumber)
+        _sequenceNumber(NextSequenceNumber.addAndFetch(1))
     {
         //
         // Sets up a chunk manager based on an older manager

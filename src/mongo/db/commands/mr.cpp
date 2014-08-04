@@ -64,7 +64,7 @@ namespace mongo {
 
     namespace mr {
 
-        AtomicUInt Config::JOB_NUMBER;
+        AtomicUInt32 Config::JOB_NUMBER;
 
         JSFunction::JSFunction( const std::string& type , const BSONElement& e ) {
             _type = type;
@@ -276,7 +276,7 @@ namespace mongo {
                         << ".tmp.mr."
                         << cmdObj.firstElement().String()
                         << "_"
-                        << JOB_NUMBER++;
+                        << JOB_NUMBER.fetchAndAdd(1);
                 incLong = tempNamespace + "_inc";
             }
 

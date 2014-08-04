@@ -44,9 +44,9 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/logfile.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
@@ -68,7 +68,7 @@ const unsigned PG = 4096;
 unsigned nThreadsRunning = 0;
 
 // as this is incremented A LOT, at some point this becomes a bottleneck if very high ops/second (in cache) things are happening.
-AtomicUInt iops;
+AtomicUInt32 iops;
 
 SimpleMutex m("mperf");
 
@@ -116,7 +116,7 @@ void workerThread() {
                         dummy += mmf[rofs];
                     rofs += PG;
                 }
-                iops++;
+                iops.fetchAndAdd(1);
             }
             if( w ) {
                 for( unsigned p = P; p <= recSizeKB; p += P ) {
@@ -124,17 +124,17 @@ void workerThread() {
                         mmf[wofs] = 3;
                     wofs += PG;
                 }
-                iops++;
+                iops.fetchAndAdd(1);
             }
         }
         else {
             if( r ) {
                 lf->readAt(rofs, a.addr(), recSizeKB * 1024);
-                iops++;
+                iops.fetchAndAdd(1);
             }
             if( w ) {
                 lf->writeAt(wofs, a.addr(), recSizeKB * 1024);
-                iops++;
+                iops.fetchAndAdd(1);
             }
         }
         long long micros = su / nThreadsRunning;
@@ -225,8 +225,8 @@ void go() {
             }
         }
         sleepsecs(1);
-        unsigned long long w = iops.get();
-        iops.zero();
+        unsigned long long w = iops.loadRelaxed();
+        iops.store(0);
         w /= 1; // 1 secs
         cout << w << " ops/sec ";
         if( mmf == 0 ) 

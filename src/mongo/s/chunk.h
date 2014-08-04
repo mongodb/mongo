@@ -31,7 +31,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/util/atomic_int.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/shard.h"
@@ -574,7 +574,7 @@ namespace mongo {
 
         friend class Chunk;
         friend class ChunkRangeManager; // only needed for CRM::assertValid()
-        static AtomicUInt NextSequenceNumber;
+        static AtomicUInt32 NextSequenceNumber;
         
         /** Just for testing */
         friend class TestableChunkManager;

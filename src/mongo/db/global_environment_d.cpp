@@ -30,7 +30,6 @@
 
 #include <set>
 
-#include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context_impl.h"
@@ -56,7 +55,7 @@ namespace mongo {
     }
 
     namespace {
-        void interruptJs(AtomicUInt* op) {
+        void interruptJs(unsigned int op) {
             if (!globalScriptEngine) {
                 return;
             }
@@ -65,7 +64,7 @@ namespace mongo {
                 globalScriptEngine->interruptAll();
             }
             else {
-                globalScriptEngine->interrupt(*op);
+                globalScriptEngine->interrupt(op);
             }
         }
     }  // namespace
@@ -79,7 +78,7 @@ namespace mongo {
         return _globalKill;
     }
 
-    bool GlobalEnvironmentMongoD::killOperation(AtomicUInt opId) {
+    bool GlobalEnvironmentMongoD::killOperation(unsigned int opId) {
         scoped_lock clientLock(Client::clientsMutex);
         bool found = false;
 
@@ -103,7 +102,7 @@ namespace mongo {
             }
         }
         if ( found ) {
-            interruptJs( &opId );
+            interruptJs( opId );
         }
         return found;
     }

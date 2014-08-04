@@ -39,37 +39,37 @@ namespace mongo {
 
     void OpCounters::incInsertInWriteLock(int n) {
         RARELY _checkWrap();
-        _insert.x += n;
+        _insert.fetchAndAdd(n);
     }
 
     void OpCounters::gotInsert() {
         RARELY _checkWrap();
-        _insert++;
+        _insert.fetchAndAdd(1);
     }
 
     void OpCounters::gotQuery() {
         RARELY _checkWrap();
-        _query++;
+        _query.fetchAndAdd(1);
     }
 
     void OpCounters::gotUpdate() {
         RARELY _checkWrap();
-        _update++;
+        _update.fetchAndAdd(1);
     }
 
     void OpCounters::gotDelete() {
         RARELY _checkWrap();
-        _delete++;
+        _delete.fetchAndAdd(1);
     }
 
     void OpCounters::gotGetMore() {
         RARELY _checkWrap();
-        _getmore++;
+        _getmore.fetchAndAdd(1);
     }
 
     void OpCounters::gotCommand() {
         RARELY _checkWrap();
-        _command++;
+        _command.fetchAndAdd(1);
     }
 
     void OpCounters::gotOp( int op , bool isCommand ) {
@@ -97,31 +97,31 @@ namespace mongo {
         const unsigned MAX = 1 << 30;
         
         bool wrap =
-            _insert.get() > MAX ||
-            _query.get() > MAX ||
-            _update.get() > MAX ||
-            _delete.get() > MAX ||
-            _getmore.get() > MAX ||
-            _command.get() > MAX;
+            _insert.loadRelaxed() > MAX ||
+            _query.loadRelaxed() > MAX ||
+            _update.loadRelaxed() > MAX ||
+            _delete.loadRelaxed() > MAX ||
+            _getmore.loadRelaxed() > MAX ||
+            _command.loadRelaxed() > MAX;
         
         if ( wrap ) {
-            _insert.zero();
-            _query.zero();
-            _update.zero();
-            _delete.zero();
-            _getmore.zero();
-            _command.zero();
+            _insert.store(0);
+            _query.store(0);
+            _update.store(0);
+            _delete.store(0);
+            _getmore.store(0);
+            _command.store(0);
         }
     }
 
     BSONObj OpCounters::getObj() const {
         BSONObjBuilder b;
-        b.append( "insert" , _insert.get() );
-        b.append( "query" , _query.get() );
-        b.append( "update" , _update.get() );
-        b.append( "delete" , _delete.get() );
-        b.append( "getmore" , _getmore.get() );
-        b.append( "command" , _command.get() );
+        b.append( "insert" , _insert.loadRelaxed() );
+        b.append( "query" , _query.loadRelaxed() );
+        b.append( "update" , _update.loadRelaxed() );
+        b.append( "delete" , _delete.loadRelaxed() );
+        b.append( "getmore" , _getmore.loadRelaxed() );
+        b.append( "command" , _command.loadRelaxed() );
         return b.obj();
     }
 

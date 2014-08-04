@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/bson/util/atomic_int.h"
 
 namespace mongo {
 
@@ -71,7 +70,7 @@ namespace mongo {
          * @param i opid of operation to kill
          * @return if operation was found 
          **/
-        virtual bool killOperation(AtomicUInt opId) = 0;
+        virtual bool killOperation(unsigned int opId) = 0;
 
         /**
          * Registers the specified operation context on the global environment, so it is

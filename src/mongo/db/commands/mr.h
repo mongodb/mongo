@@ -38,6 +38,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {
@@ -227,7 +228,7 @@ namespace mongo {
             // true when called from mongos to do phase-1 of M/R
             bool shardedFirstPass;
 
-            static AtomicUInt JOB_NUMBER;
+            static AtomicUInt32 JOB_NUMBER;
         }; // end MRsetup
 
         /**

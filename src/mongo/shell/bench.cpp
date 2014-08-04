@@ -250,7 +250,7 @@ namespace mongo {
     }
 
     void BenchRunState::tellWorkersToFinish() {
-        _isShuttingDown.set( 1 );
+        _isShuttingDown.store( 1 );
     }
 
     void BenchRunState::assertFinished() {
@@ -259,7 +259,7 @@ namespace mongo {
     }
 
     bool BenchRunState::shouldWorkerFinish() {
-        return bool(_isShuttingDown.get());
+        return (_isShuttingDown.loadRelaxed() == 1);
     }
 
     void BenchRunState::onWorkerStarted() {

@@ -50,7 +50,7 @@ namespace mongo {
 
         bool getKillAllOperations();
 
-        bool killOperation(AtomicUInt opId);
+        bool killOperation(unsigned int opId);
 
         void registerOperationContext(OperationContext* txn);
 

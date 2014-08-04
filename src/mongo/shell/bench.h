@@ -34,9 +34,9 @@
 #include <boost/thread/condition.hpp>
 #include <boost/thread/mutex.hpp>
 
-#include "mongo/bson/util/atomic_int.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/timer.h"
 
 namespace pcrecpp {
@@ -305,7 +305,7 @@ namespace mongo {
         boost::condition _stateChangeCondition;
         unsigned _numUnstartedWorkers;
         unsigned _numActiveWorkers;
-        AtomicUInt _isShuttingDown;
+        AtomicUInt32 _isShuttingDown;
     };
 
     /**
