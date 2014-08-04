@@ -1,7 +1,13 @@
 /*! @page programming Writing WiredTiger applications
 
 This section covers topics of interest for programmers writing
-WiredTiger applications:
+WiredTiger applications.
+
+We follow SQL terminology: a database is set of tables managed together.
+Tables consist of rows, where each row is a key and its associated
+value.  Tables may optionally have an associated schema, splitting the
+value into a set of columns.  Tables may also have associated indices,
+each of which is ordered by one or more columns.
 
 <h2>Using the API</h2>
 - @subpage basic_api
@@ -45,13 +51,18 @@ WiredTiger applications:
 - @subpage tune_statistics
 - @subpage tune_close
 
+<h2>Simulating workloads in Wiredtiger</h2>
+- @subpage wtperf
+
 <h2>Extending WiredTiger</h2>
 - @subpage custom_data_sources
 - @subpage helium
 
-<h2>Administering a WiredTiger database</h2>
+<h2>Managing WiredTiger databases</h2>
 - @subpage home
 - @subpage database_config
+- @subpage hot_backup
+- @subpage filesystems
 - @subpage security
 
  */
