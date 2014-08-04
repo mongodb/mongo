@@ -1909,7 +1909,7 @@ main(int argc, char *argv[])
 	CONFIG *cfg, _cfg;
 	size_t req_len;
 	int ch, monitor_set, ret;
-	const char *opts = "C:H:h:m:O:o:T:Q";
+	const char *opts = "C:H:h:m:O:o:T:";
 	const char *config_opts;
 	char *cc_buf, *tc_buf, *user_cconfig, *user_tconfig;
 
@@ -1959,14 +1959,6 @@ main(int argc, char *argv[])
 			cfg->monitor_dir = optarg;
 			monitor_set = 1;
 			break;
-		case 'Q':
-			/*
-			 * Hack to output configuration options for the
-			 * documentation -- deliberately not included in
-			 * the usage statement.
-			 */
-			config_doxygen();
-			return (0);
 		case '?':
 			fprintf(stderr, "Invalid option\n");
 			usage();

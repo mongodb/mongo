@@ -700,44 +700,6 @@ config_opt_usage(void)
 }
 
 /*
- * config_doxygen --
- *	Output the configuration information for doxgen.
- */
-void
-config_doxygen(void)
-{
-	size_t i, nopt;
-	const char *defaultval, *typestr;
-
-	nopt = sizeof(config_opts)/sizeof(config_opts[0]);
-	for (i = 0; i < nopt; i++) {
-		defaultval = config_opts[i].defaultval;
-		typestr = "string";
-		switch (config_opts[i].type) {
-		case BOOL_TYPE:
-			typestr = "boolean";
-			if (strcmp(defaultval, "0") == 0)
-				defaultval = "false";
-			else
-				defaultval = "true";
-			break;
-		case CONFIG_STRING_TYPE:
-		case STRING_TYPE:
-			break;
-		case INT_TYPE:
-			typestr = "int";
-			break;
-		case UINT32_TYPE:
-			typestr = "unsigned int";
-			break;
-		}
-		printf("@par %s (%s, default=%s)\n",
-		    config_opts[i].name, typestr, defaultval);
-		pretty_print(config_opts[i].description, NULL);
-	}
-}
-
-/*
  * usage --
  *	wtperf usage print, no error.
  */
