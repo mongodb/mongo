@@ -20,7 +20,6 @@ each of which is ordered by one or more columns.
 - @subpage schema
 - @subpage lsm
 - @subpage file_formats
-- @subpage bulk_load
 - @subpage compression
 
 <h2>Programming notes</h2>
@@ -39,7 +38,7 @@ each of which is ordered by one or more columns.
 - @subpage tune_memory_allocator
 - @subpage tune_page_sizes
 - @subpage tune_cache
-- @subpage bulk_load
+- @subpage tune_bulk_load
 - @subpage tune_cursor_persist
 - @subpage tune_read_only_objects
 - @subpage tune_checksum
