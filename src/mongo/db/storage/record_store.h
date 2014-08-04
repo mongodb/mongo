@@ -123,6 +123,8 @@ namespace mongo {
         // name of the RecordStore implementation
         virtual const char* name() const = 0;
 
+        virtual const std::string& ns() const { return _ns; }
+
         virtual long long dataSize() const = 0;
 
         virtual long long numRecords() const = 0;
