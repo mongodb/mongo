@@ -81,8 +81,8 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		/*! [Get the operation's string value] */
 		t_ret = op->get_value(op, &v);
 		value = v.data;
-		ATOMIC_ADD(asynckey->num_keys, 1);
 		/*! [Get the operation's string value] */
+		ATOMIC_ADD(asynckey->num_keys, 1);
 		printf("Id %" PRIu64 " got record: %s : %s\n", id, key, value);
 	}
 	return (t_ret);
@@ -95,13 +95,13 @@ static ASYNC_KEYS ex_asynckeys = { {cb_asyncop}, 0 };
 
 int main(void)
 {
-	/*! [example connection] */
 	WT_ASYNC_OP *op;
 	WT_CONNECTION *wt_conn;
 	WT_SESSION *session;
 	int i, ret;
 	char k[MAX_KEYS][16], v[MAX_KEYS][16];
 
+	/*! [example connection] */
 #define	CONN_CONFIG "create,cache_size=100MB," \
     "async=(enabled=true,ops_max=10,threads=2)"
 	if ((ret = wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn)) != 0) {
@@ -134,12 +134,12 @@ retry:
 			goto retry;
 		}
 		/*! [Allocate a handle] */
-		snprintf(k[i], sizeof(k), "key%d", i);
-		snprintf(v[i], sizeof(v), "value%d", i);
 		/*! [Set the operation's string key] */
+		snprintf(k[i], sizeof(k), "key%d", i);
 		op->set_key(op, k[i]);
 		/*! [Set the operation's string key] */
 		/*! [Set the operation's string value] */
+		snprintf(v[i], sizeof(v), "value%d", i);
 		op->set_value(op, v[i]);
 		/*! [Set the operation's string value] */
 		/*! [example insert] */

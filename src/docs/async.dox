@@ -1,0 +1,42 @@
+/*! @page async Asynchronous operation handles
+
+There is a class of applications that wants or requires asynchronous
+manipulation of the data in the tables.  For example, a server
+application pulling requests off a network as fast as possible wants
+to fire-and-forget.  WiredTiger provides asynchronous operations
+through the WT_ASYNC_OP handle.  The work unit contained in the
+WT_ASYNC_OP handle is queued by the application and performed by
+an internal WiredTiger worker thread.  When the work is complete,
+the worker thread will invoke a callback to notify the application
+that the operation is finished, along with providing any results
+and error values.
+
+An asynchronous operation handle operates in a manner somewhat similar to
+a WT_CURSOR handle.  An async op includes:
+
+- getter/setters for key and value fields
+- encoding of fields to store in the data source
+- methods to modify and retrieve specific data
+- method to compact a table asynchronously
+
+See @subpage async_ops for a description of how to use asynchronous
+operation methods.
+
+The WT_ASYNC_OP handle does not survive after the callback function
+returns into the WiredTiger library.  When the application callback
+returns that handle is returned to the system pool.  The application
+callback must copy out any key, value or other information that it
+needs.
+
+@section async_transactions Async and Transactions
+
+Each asynchronous worker thread operates with its own session and will
+execute a single asynchronous operation with the context of a transaction.
+Therefore, there is currently no way to combine multiple, related updates
+into a single transaction when using asynchronous operations.
+
+The transaction will be committed if the operation was successful and
+the application callback returns success.  Otherwise the transaction
+is rolled back.
+
+*/

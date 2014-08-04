@@ -14,6 +14,7 @@ each of which is ordered by one or more columns.
 - @subpage config_strings
 - @subpage cursors
 - @subpage transactions
+- @subpage async
 - @subpage error_handling
 
 <h2>Storage options</h2>

@@ -1,0 +1,74 @@
+/*! @page async_ops Asynchronous operations
+
+Asynchronous operations must first be configured when the connection
+is opened in wiredtiger_open.  The user must enable the asynchronous
+subsystem in order to be able to use asynchronous operations.  The
+user may define the number of internal worker threads handling the
+incoming queue of operations and how many operation handles WiredTiger
+should allocate, internally.
+
+@snippet ex_async.c example connection
+
+@section async_alloc Allocating an async operations handle
+
+An WT_ASYNC_OP handle is allocated using the WT_CONNECTION::async_new_op
+method.  This method requires a URI that must already exist and
+should have been created by a previous call to WT_SESSION::create.
+The callback is provided at this time also.  For example:
+
+@snippet ex_async.c Allocate a handle
+
+To aid the application in matching up an asynchronous operation
+with a later call to the callback, every call to allocate a handle
+contains a unique identifier.  The user can access that value that
+is one of WT_ASYNC_OPTYPE:
+
+@snippet ex_async.c Get identifier
+
+Here is an example callback implementation, WT_ASYNC_CALLBACK:
+
+@snippet ex_async.c example callback implementation
+
+@section async_set Setting the async key/value
+
+The key and value format used for the WT_ASYNC_OP handle must match the
+formats provided when the table was created via WT_SESSION::create.
+
+@snippet ex_async.c Set the operation's string key
+
+@snippet ex_async.c Set the operation's string value
+
+Cursors remain open until either WT_CURSOR::close is called or the cursor's
+session is closed, which may either be in WT_SESSION::close or
+WT_CONNECTION::close.
+
+@section async_flush Waiting for all outstanding operations
+
+When an application needs to wait for all previous operations to
+complete before continuing on, it calls the WT_CONNECTION::async_flush method.
+When that call returns all previously queued operations are
+guaranteed to have been completed and the callback functions have returned.
+
+@snippet ex_async.c flush
+
+@section async_compact Compacting a table
+
+When a database contains multiple tables, it may be desired to compact
+several tables in parallel without having to manage separate threads
+to each call WT_SESSION::compact.  Alternatively, compacting several
+tables serially may take much longer.  The WT_ASYNC_OP::compact method
+allows the application to compact a URI in the background.
+
+@snippet ex_async.c Compact a table
+
+@section async_misc Methods allowed in callback
+
+WiredTiger allows a limited number of method calls back into the library
+from the callback function.  The application is allowed to retrieve the
+key, value, identifier and the operation type from the WT_ASYNC_OP handle.
+The operation type is a WT_ASYNC_OPTYPE.
+
+@snippet ex_async.c Get identifier
+@snippet ex_async.c Get type
+
+*/
