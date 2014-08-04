@@ -28,3 +28,25 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	return (0);
 }
+
+/*
+ * __wt_fsync_async --
+ *	Flush a file handle and don't wait for the result.
+ */
+int
+__wt_fsync_async(WT_SESSION_IMPL *session, WT_FH *fh)
+{
+#ifdef	HAVE_SYNC_FILE_RANGE
+	WT_DECL_RET;
+
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_FILEOPS, "%s: sync_file_range", fh->name));
+
+	if ((ret = sync_file_range(fh->fd,
+	    (off64_t)0, (off64_t)0, SYNC_FILE_RANGE_WRITE)) == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "%s: sync_file_range", fh->name);
+#else
+	return (0);
+#endif
+}

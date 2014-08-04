@@ -15,6 +15,7 @@ static int
 __sync_file(WT_SESSION_IMPL *session, int syncop)
 {
 	struct timespec end, start;
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -26,6 +27,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	uint32_t flags;
 
 	btree = S2BT(session);
+	bm = btree->bm;
 
 	walk = NULL;
 	txn = &session->txn;
@@ -179,6 +181,14 @@ err:	/* On error, clear any left-over tree walk. */
 	}
 
 	__wt_spin_unlock(session, &btree->flush_lock);
+
+	/*
+	 * Leaves are written before a checkpoint (or as part of a file close,
+	 * before checkpointing the file).  Start a flush to stable storage,
+	 * but don't wait for it.
+	 */
+	if (ret == 0 && syncop == WT_SYNC_WRITE_LEAVES)
+		WT_RET(bm->sync(bm, session, 1));
 
 	return (ret);
 }
