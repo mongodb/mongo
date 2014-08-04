@@ -153,7 +153,7 @@ namespace mongo {
         // Need the Head to be non-Null to avoid asserts. TODO remove the asserts.
         index->headManager()->setHead(txn, DiskLoc(0xDEAD, 0xBEAF));
 
-        std::auto_ptr<SortedDataInterface> wtidx(getWiredTigerIndex(index, &i->second->data));
+        std::auto_ptr<SortedDataInterface> wtidx(getWiredTigerIndex(_db, collection->ns().ns(), index->descriptor()->indexName(), *index, &i->second->data));
 
         if ("" == type)
             return new BtreeAccessMethod( index, wtidx.release() );

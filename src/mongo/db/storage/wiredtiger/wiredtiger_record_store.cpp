@@ -439,11 +439,11 @@ namespace mongo {
 	invariant(ret == 0);
     }
 
-    void WiredTigerRecordStore::Iterator::prepareToYield() {
+    void WiredTigerRecordStore::Iterator::saveState() {
         // TODO delete iterator, store information
     }
 
-    bool WiredTigerRecordStore::Iterator::recoverFromYield() {
+    bool WiredTigerRecordStore::Iterator::restoreState() {
         // TODO set iterator to same place as before, but with new snapshot
         return true;
     }

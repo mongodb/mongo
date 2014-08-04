@@ -39,6 +39,6 @@ namespace mongo {
      * Caller takes ownership.
      * All permanent data will be stored and fetch from dataInOut.
      */
-    SortedDataInterface* getWiredTigerIndex(IndexCatalogEntry* info, boost::shared_ptr<void>* dataInOut);
+    SortedDataInterface* getWiredTigerIndex(WiredTigerDatabase *db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info, boost::shared_ptr<void>* dataInOut);
 
 }  // namespace mongo
