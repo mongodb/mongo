@@ -451,8 +451,9 @@ namespace mongo {
         if ( repairFileDeleter.get() )
             repairFileDeleter->success();
 
+        dbHolder().close( txn, dbName );
+
         Client::Context ctx(txn, dbName);
-        Database::closeDatabase(txn, dbName);
 
         if ( backupOriginalFiles ) {
             _renameForBackup( dbName, reservedPath );

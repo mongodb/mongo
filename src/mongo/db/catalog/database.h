@@ -61,14 +61,11 @@ namespace mongo {
                  const StringData& name,
                  DatabaseCatalogEntry* dbEntry );
 
-        /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
-           thus the destructor is private.  this could be cleaned up one day...
-        */
-        static void closeDatabase(OperationContext* txn,
-                                  const StringData& db);
+        // must call close first
+        ~Database();
 
-        // do not use!
-        ~Database(); // closes files and other cleanup see below.
+        // closes files and other cleanup see below.
+        void close( OperationContext* txn );
 
         const std::string& name() const { return _name; }
 

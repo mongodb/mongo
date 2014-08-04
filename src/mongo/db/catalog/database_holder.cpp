@@ -121,12 +121,20 @@ namespace mongo {
         return db;
     }
 
-    void DatabaseHolder::erase(OperationContext* txn,
+    void DatabaseHolder::close(OperationContext* txn,
                                const StringData& ns) {
         invariant(txn->lockState()->isW());
 
+        StringData db = _todb(ns);
+
         SimpleMutex::scoped_lock lk(_m);
-        _dbs.erase(_todb(ns));
+        DBs::const_iterator it = _dbs.find(db);
+        if ( it == _dbs.end() )
+            return;
+
+        it->second->close( txn );
+        delete it->second;
+        _dbs.erase( db );
     }
 
     bool DatabaseHolder::closeAll(OperationContext* txn,
@@ -136,32 +144,38 @@ namespace mongo {
 
         getDur().commitNow(txn); // bad things happen if we close a DB with outstanding writes
 
+        SimpleMutex::scoped_lock lk(_m);
+
         set< string > dbs;
         for ( DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i ) {
             dbs.insert( i->first );
         }
 
-        BSONObjBuilder bb( result.subarrayStart( "dbs" ) );
-        int n = 0;
+        BSONArrayBuilder bb( result.subarrayStart( "dbs" ) );
         int nNotClosed = 0;
         for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
             string name = *i;
 
             LOG(2) << "DatabaseHolder::closeAll name:" << name;
-            Client::Context ctx(txn, name);
 
             if( !force && BackgroundOperation::inProgForDb(name) ) {
                 log() << "WARNING: can't close database "
                       << name
-                      << " because a bg job is in progress - try killOp command" 
+                      << " because a bg job is in progress - try killOp command"
                       << endl;
                 nNotClosed++;
+                continue;
             }
-            else {
-                Database::closeDatabase(txn, name.c_str());
-                bb.append( bb.numStr( n++ ) , name );
-            }
+
+            Database* db = _dbs[name];
+            db->close( txn );
+            delete db;
+
+            _dbs.erase( name );
+
+            bb.append( name );
         }
+
         bb.done();
         if( nNotClosed ) {
             result.append("nNotClosed", nNotClosed);

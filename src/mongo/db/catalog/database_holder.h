@@ -56,7 +56,8 @@ namespace mongo {
                               const StringData& ns,
                               bool& justCreated);
 
-        void erase(OperationContext* txn, const StringData& ns);
+
+        void close(OperationContext* txn, const StringData& ns);
 
         /** @param force - force close even if something underway - use at shutdown */
         bool closeAll(OperationContext* txn,

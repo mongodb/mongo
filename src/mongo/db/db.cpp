@@ -409,7 +409,7 @@ namespace mongo {
                     warning() << "Internal error while reading collection " << systemIndexes;
                 }
 
-                Database::closeDatabase(&txn, dbName.c_str());
+                dbHolder().close( &txn, dbName );
             }
         }
         wunit.commit();
