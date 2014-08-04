@@ -54,7 +54,7 @@ function insertAndTruncate( first ) {
     insertManyRollingOver( 150 );
     myFiftyCount = t.count();
     // Insert documents that are too big to fit in the smaller extents.
-    insertManyRollingOver( 5000 );
+    insertManyRollingOver( 3000 );
     myTwokCount = t.count();
     if ( first ) {
         initialCount = myInitialCount;
