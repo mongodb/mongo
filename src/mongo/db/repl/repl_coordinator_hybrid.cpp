@@ -277,13 +277,12 @@ namespace repl {
         return legacyStatus;
     }
 
-    Status HybridReplicationCoordinator::processReplSetUpdatePosition(OperationContext* txn,
-                                                                      const BSONArray& updates,
-                                                                      BSONObjBuilder* resultObj) {
-        Status legacyStatus = _legacy.processReplSetUpdatePosition(txn, updates, resultObj);
+    Status HybridReplicationCoordinator::processReplSetUpdatePosition(
+            OperationContext* txn,
+            const UpdatePositionArgs& updates) {
+        Status legacyStatus = _legacy.processReplSetUpdatePosition(txn, updates);
         // TODO(spencer): Can't uncomment this until we uncomment processHandshake below
-        //BSONObjBuilder implResult;
-        //Status implStatus = _impl.processReplSetUpdatePosition(txn, updates, &implResult);
+        //Status implStatus = _impl.processReplSetUpdatePosition(txn, updates);
         return legacyStatus;
     }
 

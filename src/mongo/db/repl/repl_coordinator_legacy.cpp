@@ -49,6 +49,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/rs_initiate.h"
+#include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
@@ -950,14 +951,14 @@ namespace {
         return theReplSet->forceSyncFrom(target, resultObj);
     }
 
-    Status LegacyReplicationCoordinator::processReplSetUpdatePosition(OperationContext* txn,
-                                                                      const BSONArray& updates,
-                                                                      BSONObjBuilder* resultObj) {
-        BSONForEach(elem, updates) {
-            BSONObj entry = elem.Obj();
-            OID id = entry["_id"].OID();
-            OpTime ot = entry["optime"]._opTime();
-            Status status = setLastOptime(txn, id, ot);
+    Status LegacyReplicationCoordinator::processReplSetUpdatePosition(
+            OperationContext* txn,
+            const UpdatePositionArgs& updates) {
+
+        for (UpdatePositionArgs::UpdateIterator update = updates.updatesBegin();
+                update != updates.updatesEnd();
+                ++update) {
+            Status status = setLastOptime(txn, update->rid, update->ts);
             if (!status.isOK()) {
                 return status;
             }

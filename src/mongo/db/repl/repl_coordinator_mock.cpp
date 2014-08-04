@@ -208,9 +208,9 @@ namespace repl {
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorMock::processReplSetUpdatePosition(OperationContext* txn,
-                                                                    const BSONArray& updates,
-                                                                    BSONObjBuilder* resultObj) {
+    Status ReplicationCoordinatorMock::processReplSetUpdatePosition(
+            OperationContext* txn,
+            const UpdatePositionArgs& updates) {
         // TODO
         return Status::OK();
     }

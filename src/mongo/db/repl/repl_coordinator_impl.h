@@ -154,8 +154,7 @@ namespace repl {
                                            BSONObjBuilder* resultObj);
 
         virtual Status processReplSetUpdatePosition(OperationContext* txn,
-                                                    const BSONArray& updates,
-                                                    BSONObjBuilder* resultObj);
+                                                    const UpdatePositionArgs& updates);
 
         virtual Status processHandshake(const OperationContext* txn,
                                         const HandshakeArgs& handshake);

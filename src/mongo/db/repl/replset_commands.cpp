@@ -38,6 +38,7 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs_config.h"
+#include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/write_concern.h"
 
 namespace mongo {
@@ -385,15 +386,15 @@ namespace repl {
                         getGlobalReplicationCoordinator()->processHandshake(txn, handshake));
             }
 
-            uassert(16888, "optimes field should be an array with an object for each secondary",
-                    cmdObj["optimes"].type() == Array);
-
+            UpdatePositionArgs args;
+            status = args.initialize(cmdObj);
+            if (!status.isOK())
+                return appendCommandStatus(result, status);
+            
             return appendCommandStatus(
                     result,
-                    getGlobalReplicationCoordinator()->processReplSetUpdatePosition(
-                            txn,
-                            BSONArray(cmdObj["optimes"].Obj()),
-                            &result));
+                    getGlobalReplicationCoordinator()->processReplSetUpdatePosition(txn, args));
+                    
         }
     } cmdReplSetUpdatePosition;
 

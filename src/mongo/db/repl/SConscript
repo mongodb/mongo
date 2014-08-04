@@ -88,6 +88,7 @@ env.Library('replica_set_messages',
                 'repl_set_heartbeat_response.cpp',
                 'replica_set_config.cpp',
                 'replica_set_tag.cpp',
+                'update_position_args.cpp',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/bson',

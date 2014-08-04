@@ -54,6 +54,7 @@ namespace repl {
 
     class ReplSetHeartbeatArgs;
     class ReplSetHeartbeatResponse;
+    class UpdatePositionArgs;
     class TopologyCoordinator;
 
     /**
@@ -403,13 +404,9 @@ namespace repl {
          * returns Status::OK() if the all updates are processed correctly, ErrorCodes::NodeNotFound
          * if any updating node cannot be found in the config, or any of the normal replset
          * command ErrorCodes.
-         *
-         * TODO(spencer): Remove this method in favor of parsing BSON in the command body and
-         * calling setLastOptime directly.
          */
         virtual Status processReplSetUpdatePosition(OperationContext* txn,
-                                                    const BSONArray& updates,
-                                                    BSONObjBuilder* resultObj) = 0;
+                                                    const UpdatePositionArgs& updates) = 0;
 
         /**
          * Handles an incoming Handshake command (or a handshake from replSetUpdatePosition).

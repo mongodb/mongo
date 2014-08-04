@@ -40,6 +40,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
@@ -640,14 +641,14 @@ namespace repl {
 
     }
 
-    Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(OperationContext* txn,
-                                                                    const BSONArray& updates,
-                                                                    BSONObjBuilder* resultObj) {
-        BSONForEach(elem, updates) {
-            BSONObj entry = elem.Obj();
-            OID id = entry["_id"].OID();
-            OpTime ot = entry["optime"]._opTime();
-            Status status = setLastOptime(txn, id, ot);
+    Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
+            OperationContext* txn,
+            const UpdatePositionArgs& updates) {
+
+        for (UpdatePositionArgs::UpdateIterator update = updates.updatesBegin();
+                update != updates.updatesEnd();
+                ++update) {
+            Status status = setLastOptime(txn, update->rid, update->ts);
             if (!status.isOK()) {
                 return status;
             }
