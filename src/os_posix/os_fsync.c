@@ -47,6 +47,8 @@ __wt_fsync_async(WT_SESSION_IMPL *session, WT_FH *fh)
 		return (0);
 	WT_RET_MSG(session, ret, "%s: sync_file_range", fh->name);
 #else
+	WT_UNUSED(session);
+	WT_UNUSED(fh);
 	return (0);
 #endif
 }
