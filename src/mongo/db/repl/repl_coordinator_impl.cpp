@@ -103,6 +103,10 @@ namespace repl {
             return;
         }
 
+        // this is ok but micros or combo with some rand() and/or 64 bits might be better --
+        // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
+        _rbid = static_cast<int>(curTimeMillis64());
+
         _topCoord->registerStateChangeCallback(
                 stdx::bind(&ReplicationCoordinatorImpl::_onSelfStateChange,
                            this,
@@ -708,11 +712,15 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorImpl::processReplSetGetRBID(BSONObjBuilder* resultObj) {
-        // TODO
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        resultObj->append("rbid", _rbid);
         return Status::OK();
     }
 
-    void ReplicationCoordinatorImpl::incrementRollbackID() { /* TODO */ }
+    void ReplicationCoordinatorImpl::incrementRollbackID() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        ++_rbid;
+    }
 
     Status ReplicationCoordinatorImpl::processReplSetFresh(const ReplSetFreshArgs& args,
                                                            BSONObjBuilder* resultObj) {

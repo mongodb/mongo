@@ -251,6 +251,19 @@ namespace {
         ASSERT_OK(statusAndDur.status);
     }
 
+    TEST_F(ReplCoordTest, BasicRBIDUsage) {
+        start();
+        BSONObjBuilder result;
+        getReplCoord()->processReplSetGetRBID(&result);
+        long long initialValue = result.obj()["rbid"].Int();
+        getReplCoord()->incrementRollbackID();
+
+        BSONObjBuilder result2;
+        getReplCoord()->processReplSetGetRBID(&result2);
+        long long incrementedValue = result2.obj()["rbid"].Int();
+        ASSERT_EQUALS(incrementedValue, initialValue + 1);
+    }
+
     TEST_F(ReplCoordTest, AwaitReplicationNumberOfNodesNonBlocking) {
         assertStartSuccess(
                 BSON("_id" << "mySet" <<

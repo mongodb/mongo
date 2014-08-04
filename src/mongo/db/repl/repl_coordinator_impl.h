@@ -314,6 +314,10 @@ namespace repl {
 
         /// ============= All members below this line are guarded by _mutex ==================== ///
 
+        // Rollback ID. Used to check if a rollback happened during some interval of time
+        // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.
+        int _rbid;
+
         // list of information about clients waiting on replication.  Does *not* own the
         // WaiterInfos.
         std::vector<WaiterInfo*> _replicationWaiterList;
