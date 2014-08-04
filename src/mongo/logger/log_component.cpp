@@ -101,6 +101,7 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
         case kStorage: return createStringData("storage");
         case kJournaling: return createStringData("journaling");
         case kWrites: return createStringData("writes");
+        case kS2: return createStringData("S2");
         case kNumLogComponents: return createStringData("total");
         // No default. Compiler should complain if there's a log component that's not handled.
         }
@@ -144,6 +145,7 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
         case kStorage:              return createStringData("STORAGE ");
         case kJournaling:           return createStringData("JOURNAL ");
         case kWrites:               return createStringData("WRITES  ");
+        case kS2:                   return createStringData("S2      ");
         case kNumLogComponents:     return createStringData("TOTAL   ");
         // No default. Compiler should complain if there's a log component that's not handled.
         }
