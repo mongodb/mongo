@@ -56,6 +56,8 @@ namespace mongo {
 
     void UpdateIndexData::clear() {
         _canonicalPaths.clear();
+        _pathComponents.clear();
+        _allPathsIndexed = false;
     }
 
     bool UpdateIndexData::mightBeIndexed( const StringData& path ) const {
