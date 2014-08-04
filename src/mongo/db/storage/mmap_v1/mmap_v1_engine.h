@@ -59,6 +59,8 @@ namespace mongo {
 
         Status closeDatabase(OperationContext* txn, const StringData& db );
 
+        Status dropDatabase(OperationContext* txn, const StringData& db );
+
         void cleanShutdown(OperationContext* txn);
 
     private:
@@ -69,4 +71,6 @@ namespace mongo {
         typedef std::map<std::string,MMAPV1DatabaseCatalogEntry*> EntryMap;
         EntryMap _entryMap;
     };
+
+    void _deleteDataFiles(const std::string& database);
 }

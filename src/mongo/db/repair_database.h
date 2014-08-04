@@ -41,7 +41,4 @@ namespace mongo {
     // TODO: move
     intmax_t dbSize( const std::string& database );
 
-    // TODO: move
-    void _deleteDataFiles(const std::string& database);
-
 } // namespace mongo

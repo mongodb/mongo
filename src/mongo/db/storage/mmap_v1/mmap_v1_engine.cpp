@@ -337,6 +337,16 @@ namespace {
         return Status::OK();
     }
 
+    Status MMAPV1Engine::dropDatabase( OperationContext* txn, const StringData& db ) {
+        Status status = closeDatabase( txn, db );
+        if ( !status.isOK() )
+            return status;
+
+        _deleteDataFiles( db.toString() );
+
+        return Status::OK();
+    }
+
     void MMAPV1Engine::_listDatabases( const std::string& directory,
                                        std::vector<std::string>* out ) {
         boost::filesystem::path path( directory );

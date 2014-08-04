@@ -90,6 +90,11 @@ namespace mongo {
         virtual Status closeDatabase( OperationContext* txn, const StringData& db ) = 0;
 
         /**
+         * Deletes all data and metadata for a database.
+         */
+        virtual Status dropDatabase( OperationContext* txn, const StringData& db ) = 0;
+
+        /**
          * @return number of files flushed
          */
         virtual int flushAllFiles( bool sync ) = 0;

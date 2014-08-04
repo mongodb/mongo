@@ -571,7 +571,7 @@ namespace mongo {
         dbHolder().close( txn, name );
         db = 0; // d is now deleted
 
-        _deleteDataFiles( name );
+        getGlobalEnvironment()->getGlobalStorageEngine()->dropDatabase( txn, name );
     }
 
     /** { ..., capped: true, size: ..., max: ... }

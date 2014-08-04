@@ -63,8 +63,18 @@ namespace mongo {
         return db;
     }
 
-    Status Heap1Engine::closeDatabase(OperationContext* txn, const StringData& db ) {
+    Status Heap1Engine::closeDatabase(OperationContext* txn, const StringData& dbName ) {
         // no-op as not file handles
+        return Status::OK();
+    }
+
+    Status Heap1Engine::dropDatabase(OperationContext* txn, const StringData& dbName ) {
+        boost::mutex::scoped_lock lk( _dbLock );
+
+        Heap1DatabaseCatalogEntry*& db = _dbs[dbName.toString()];
+        delete db;
+        _dbs.erase( dbName.toString() );
+
         return Status::OK();
     }
 }
