@@ -981,7 +981,18 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorImpl::checkReplEnabledForCommand(BSONObjBuilder* result) {
-        //TODO
+        if (!_settings.usingReplSets()) {
+            if (serverGlobalParams.configsvr) {
+                result->append("info", "configsvr"); // for shell prompt
+            }
+            return Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet");
+        }
+
+        if (getReplicationMode() != modeReplSet) {
+            result->append("info", "run rs.initiate(...) if not yet done for the set");
+            return Status(ErrorCodes::NotYetInitialized, "no replset config has been received");
+        }
+
         return Status::OK();
     }
 
