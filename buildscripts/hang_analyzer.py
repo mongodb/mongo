@@ -16,9 +16,12 @@ import csv
 import itertools
 import os
 import platform
+import signal
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from distutils import spawn
 from optparse import OptionParser
 
@@ -325,13 +328,34 @@ def get_hang_analyzers():
         ps = DarwinProcessList()
     return [ps, dbg]
 
-interesting_processes = ["mongo", "mongod", "mongos", "_test"]
+
+interesting_processes = ["mongo", "mongod", "mongos", "_test", "dbtest", "python"]
 
 def is_interesting_process(p):
     for ip in interesting_processes:
         if p.find(ip) != -1:
             return True
     return False
+
+
+def signal_process(pid):
+    """Signal python process with SIGUSR1, N/A on Windows"""
+    try:
+        os.kill(pid, signal.SIGUSR1)
+
+        print "Waiting for python process to report"
+        time.sleep(5)
+    except OSError,e:
+        print "Hit OS error trying to signal python process: " + str(e)
+
+    except AttributeError:
+        print "Cannot send signal to python on Windows"
+
+
+def timeout_protector():
+    print "Script timeout has been hit, terminating"
+    os.kill(os.getpid(), signal.SIGKILL)
+
 
 # Basic procedure
 #
@@ -366,10 +390,15 @@ def main():
         sys.stderr.write("hang_analyzer.py: Unsupported platform: %s\n" % (sys.platform))
         exit(1)
 
+    # Make sure the script does not hang
+    timer = threading.Timer(120, timeout_protector)
+    timer.start()
+
     processes_orig = ps.dump_processes()
 
     # Pick unit tests which include the phrase "_test"
-    processes = [a for a in processes_orig if is_interesting_process(a[1])]
+    processes = [a for a in processes_orig
+                    if is_interesting_process(a[1]) and a[0] != os.getpid()]
 
     sys.stdout.write("Found %d interesting processes\n" % len(processes))
 
@@ -377,9 +406,18 @@ def main():
         for process in processes_orig:
             sys.stdout.write("Ignoring process %d of %s\n" % (process[0], process[1]))
     else:
-        for process in processes:
+        # Dump all other processes first since signaling the python script interrupts it
+        for process in [a for a in processes if a[1] != "python"]:
             sys.stdout.write("Dumping process %d of %s\n" % (process[0], process[1]))
             dbg.dump_info(process[0], sys.stdout)
+
+        for process in [a for a in processes if a[1] == "python"]:
+            signal_process(process[0])
+
+            dbg.dump_info(process[0], sys.stdout)
+
+    # Suspend the timer so we can exit cleanly
+    timer.cancel()
 
     sys.stdout.write("Done analyzing processes for hangs\n")
 

@@ -41,11 +41,14 @@ import os
 import pprint
 import re
 import shlex
+import signal
 import socket
 import stat
 from subprocess import (PIPE, Popen, STDOUT)
 import sys
 import time
+import threading
+import traceback
 
 from pymongo import Connection
 from pymongo.errors import OperationFailure
@@ -119,6 +122,20 @@ class NullMongod(object):
     def __exit__(self, type, value, traceback):
         self.stop()
         return not isinstance(value, Exception)
+
+
+def dump_stacks(signal, frame):
+    print "======================================"
+    print "DUMPING STACKS due to SIGUSR1 signal"
+    print "======================================"
+    threads = threading.enumerate();
+
+    print "Total Threads: " + str(len(threads))
+
+    for id, stack in sys._current_frames().items():
+        print "Thread %d" % (id)
+        print "".join(traceback.format_stack(stack))
+    print "======================================"
 
 
 def buildlogger(cmd, is_global=False):
@@ -1143,6 +1160,11 @@ def main():
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog
     global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth, storage_engine
     global keyFile, smoke_db_prefix, test_path, use_write_commands
+
+    try:
+        signal.signal(signal.SIGUSR1, dump_stacks)
+    except AttributeError:
+        print "Cannot catch signals on Windows"
 
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
     parser.add_option('--mode', dest='mode', default='suite',
