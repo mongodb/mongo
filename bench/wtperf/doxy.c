@@ -28,26 +28,12 @@
 #include <string.h>
 #include <stdio.h>
 
-#define	DEF_OPT_AS_BOOL(name, initval, desc)				\
-	{ #name, desc, #initval, BOOL_TYPE },
-#define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
-	{ #name, desc, initval, CONFIG_STRING_TYPE },
-#define	DEF_OPT_AS_STRING(name, initval, desc)				\
-	{ #name, desc, initval, STRING_TYPE },
-#define	DEF_OPT_AS_UINT32(name, initval, desc)				\
-	{ #name, desc, #initval, UINT32_TYPE },
+#include "config_opt.h"
 
-typedef enum {
-	BOOL_TYPE, CONFIG_STRING_TYPE, INT_TYPE, STRING_TYPE, UINT32_TYPE
-} CONFIG_OPT_TYPE;
-
-static struct __config {
-	const char *name;
-	const char *description;
-	const char *defaultval;
-	CONFIG_OPT_TYPE type;
-} const config_opts[] = {
+static const CONFIG_OPT config_opts[] = {
+#define	OPT_DEFINE_DOXYGEN
 #include "wtperf_opt.i"
+#undef	OPT_DEFINE_DOXYGEN
 };
 
 /*

@@ -24,6 +24,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -46,6 +47,8 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 #include <gcc.h>			/* WiredTiger internal */
+
+#include "config_opt.h"
 
 typedef struct __config CONFIG;
 typedef struct __config_thread CONFIG_THREAD;
@@ -129,18 +132,6 @@ struct __config {			/* Configuration struction */
 #include "wtperf_opt.i"
 #undef OPT_DECLARE_STRUCT
 };
-
-typedef enum {
-	BOOL_TYPE, CONFIG_STRING_TYPE, INT_TYPE, STRING_TYPE, UINT32_TYPE
-} CONFIG_OPT_TYPE;
-
-typedef struct {
-	const char *name;
-	const char *description;
-	const char *defaultval;
-	CONFIG_OPT_TYPE type;
-	size_t offset;
-} CONFIG_OPT;
 
 #define	ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
 

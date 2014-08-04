@@ -54,6 +54,17 @@
 #define	DEF_OPT_AS_UINT32(name, initval, desc)		initval,
 #endif
 
+#ifdef OPT_DEFINE_DOXYGEN
+#define	DEF_OPT_AS_BOOL(name, initval, desc)				\
+	{ #name, desc, #initval, BOOL_TYPE, 0 },
+#define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
+	{ #name, desc, initval, CONFIG_STRING_TYPE, 0 },
+#define	DEF_OPT_AS_STRING(name, initval, desc)				\
+	{ #name, desc, initval, STRING_TYPE, 0 },
+#define	DEF_OPT_AS_UINT32(name, initval, desc)				\
+	{ #name, desc, #initval, UINT32_TYPE, 0 },
+#endif
+
 /*
  * Each option listed here represents a CONFIG struct field that may be
  * altered on command line via -o and -O.  Each option appears here as:
