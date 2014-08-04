@@ -670,6 +670,20 @@ namespace {
         // TODO(spencer): Test electionTime and pingMs are set properly
     }
 
+    TEST_F(ReplicationCoordinatorTestWithShutdown, TestGetElectionId) {
+        ReplSettings settings;
+        settings.replSet = "mySet:/test1:1234,test2:1234,test3:1234";
+        coordinator.reset(new ReplicationCoordinatorImpl(
+                settings, new ReplicationCoordinatorExternalStateMock));
+        TopologyCoordinatorImpl* topCoord = new TopologyCoordinatorImpl(zeroSecs);
+        coordinator->startReplication(topCoord, new NetworkInterfaceMock);
+
+        OID electionID1 = coordinator->getElectionId();
+        topCoord->_changeMemberState(MemberState::RS_PRIMARY);
+        OID electionID2 = coordinator->getElectionId();
+        ASSERT_NOT_EQUALS(electionID1, electionID2);
+    }
+
     // TODO(spencer): Unit test replSetFreeze
 
 }  // namespace

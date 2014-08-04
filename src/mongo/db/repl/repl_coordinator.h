@@ -250,8 +250,9 @@ namespace repl {
         virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts) = 0;
 
         /**
-         * Retrieves and returns the current election id, which is a unique id which changes after
-         * every election.
+         * Retrieves and returns the current election id, which is a unique id that is local to
+         * this node and changes every time we become primary.
+         * TODO(spencer): Use term instead.
          */
         virtual OID getElectionId() = 0;
 

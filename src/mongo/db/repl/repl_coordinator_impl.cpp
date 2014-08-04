@@ -175,6 +175,12 @@ namespace repl {
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_settings.usingReplSets());
         _currentState = newState;
+        if (newState.primary()) {
+            _electionID = OID::gen();
+        }
+        else {
+            _electionID.clear();
+        }
     }
 
     MemberState ReplicationCoordinatorImpl::getCurrentMemberState() const {
@@ -441,10 +447,9 @@ namespace repl {
     }
 
     OID ReplicationCoordinatorImpl::getElectionId() {
-        // TODO
-        return OID();
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        return _electionID;
     }
-
 
     OID ReplicationCoordinatorImpl::getMyRID(OperationContext* txn) {
         return _myRID;

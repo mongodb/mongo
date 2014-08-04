@@ -264,6 +264,9 @@ namespace repl {
         // Set to true when we are in the process of shutting down replication.
         bool _inShutdown;
 
+        // Election ID of the last election that resulted in this node becoming primary.
+        OID _electionID;
+
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
         boost::scoped_ptr<TopologyCoordinator> _topCoord;
 
