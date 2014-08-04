@@ -302,6 +302,10 @@ namespace mongo {
                                              BSONObjBuilder* result,
                                              double scale ) const {
         result->appendBool( "capped", _isCapped );
+        if ( _isCapped ) {
+            result->appendIntOrLL( "max", _cappedMaxDocs );
+            result->appendIntOrLL( "maxSize", _cappedMaxSize );
+        }
     }
 
     Status HeapRecordStore::touch(OperationContext* txn, BSONObjBuilder* output) const {
