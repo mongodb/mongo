@@ -79,9 +79,12 @@ namespace mongo {
 
         // how much data to ignore because it won't fit anyway
         // datasize and extentSize can't be compared exactly, so add some padding to 'size'
-        long long excessSize =
-            static_cast<long long>( fromCollection->dataSize() -
-                                    ( toCollection->getRecordStore()->storageSize( txn ) * 2 ) );
+
+        long long allocatedSpaceGuess =
+            std::max( static_cast<long long>(size * 2),
+                      static_cast<long long>(toCollection->getRecordStore()->storageSize(txn) * 2));
+
+        long long excessSize = fromCollection->dataSize() - allocatedSpaceGuess;
 
         scoped_ptr<PlanExecutor> exec( InternalPlanner::collectionScan(txn,
                                                                        fromNs,
