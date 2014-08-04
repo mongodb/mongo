@@ -78,10 +78,16 @@ namespace mongo {
         /**
          * Return the DatabaseCatalogEntry that describes the database indicated by 'db'.
          *
-         * Caller owns pointer.
+         * StorageEngine owns returned pointer.
+         * It should not be deleted by any caller.
          */
         virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                const StringData& db ) = 0;
+
+        /**
+         * Closes all file handles associated with a database.
+         */
+        virtual Status closeDatabase( OperationContext* txn, const StringData& db ) = 0;
 
         /**
          * @return number of files flushed

@@ -524,7 +524,7 @@ namespace mongo {
     }
 
     const DatabaseCatalogEntry* Database::getDatabaseCatalogEntry() const {
-        return _dbEntry.get();
+        return _dbEntry;
     }
 
     void dropAllDatabasesExceptLocal(OperationContext* txn) {

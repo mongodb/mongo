@@ -59,7 +59,7 @@ namespace mongo {
         // you probably need to be in dbHolderMutex when constructing this
         Database(OperationContext* txn,
                  const StringData& name,
-                 DatabaseCatalogEntry* dbEntry );
+                 DatabaseCatalogEntry* dbEntry ); // not owner here
 
         // must call close first
         ~Database();
@@ -144,7 +144,7 @@ namespace mongo {
 
         const std::string _name; // "alleyinsider"
 
-        boost::scoped_ptr<DatabaseCatalogEntry> _dbEntry;
+        DatabaseCatalogEntry* _dbEntry; // not owned here
 
         const std::string _profileName; // "alleyinsider.system.profile"
         const std::string _indexesName; // "alleyinsider.system.indexes"

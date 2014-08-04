@@ -301,6 +301,10 @@ namespace {
     }
 
     MMAPV1Engine::~MMAPV1Engine() {
+        for ( EntryMap::const_iterator it = _entryMap.begin(); it != _entryMap.end(); ++it ) {
+            delete it->second;
+        }
+        _entryMap.clear();
     }
 
     RecoveryUnit* MMAPV1Engine::newRecoveryUnit( OperationContext* opCtx ) {
@@ -313,11 +317,24 @@ namespace {
 
     DatabaseCatalogEntry* MMAPV1Engine::getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                  const StringData& db ) {
-        return new MMAPV1DatabaseCatalogEntry( opCtx,
-                                               db,
-                                               storageGlobalParams.dbpath,
-                                               storageGlobalParams.directoryperdb,
-                                               false );
+        boost::mutex::scoped_lock lk( _entryMapMutex );
+        MMAPV1DatabaseCatalogEntry*& entry = _entryMap[db.toString()];
+        if ( !entry ) {
+            entry =  new MMAPV1DatabaseCatalogEntry( opCtx,
+                                                     db,
+                                                     storageGlobalParams.dbpath,
+                                                     storageGlobalParams.directoryperdb,
+                                                     false );
+        }
+        return entry;
+    }
+
+    Status MMAPV1Engine::closeDatabase( OperationContext* txn, const StringData& db ) {
+        boost::mutex::scoped_lock lk( _entryMapMutex );
+        MMAPV1DatabaseCatalogEntry* entry = _entryMap[db.toString()];
+        delete entry;
+        _entryMap.erase( db.toString() );
+        return Status::OK();
     }
 
     void MMAPV1Engine::_listDatabases( const std::string& directory,

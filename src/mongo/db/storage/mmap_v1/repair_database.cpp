@@ -324,18 +324,18 @@ namespace mongo {
                 return Status(ErrorCodes::NamespaceNotFound, "database does not exist to repair");
             }
 
+            scoped_ptr<MMAPV1DatabaseCatalogEntry> dbEntry;
             scoped_ptr<Database> tempDatabase;
             {
-                MMAPV1DatabaseCatalogEntry* entry =
-                    new MMAPV1DatabaseCatalogEntry( txn,
-                                                    dbName,
-                                                    reservedPathString,
-                                                    storageGlobalParams.directoryperdb,
-                                                    true );
-                invariant( !entry->exists() );
+                dbEntry.reset( new MMAPV1DatabaseCatalogEntry( txn,
+                                                               dbName,
+                                                               reservedPathString,
+                                                               storageGlobalParams.directoryperdb,
+                                                               true ) );
+                invariant( !dbEntry->exists() );
                 tempDatabase.reset( new Database( txn,
                                                   dbName,
-                                                  entry ) );
+                                                  dbEntry.get() ) );
 
             }
 

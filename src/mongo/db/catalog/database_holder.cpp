@@ -135,6 +135,8 @@ namespace mongo {
         it->second->close( txn );
         delete it->second;
         _dbs.erase( db );
+
+        getGlobalEnvironment()->getGlobalStorageEngine()->closeDatabase( txn, db.toString() );
     }
 
     bool DatabaseHolder::closeAll(OperationContext* txn,
@@ -172,6 +174,8 @@ namespace mongo {
             delete db;
 
             _dbs.erase( name );
+
+            getGlobalEnvironment()->getGlobalStorageEngine()->closeDatabase( txn, name );
 
             bb.append( name );
         }

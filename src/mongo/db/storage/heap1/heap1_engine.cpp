@@ -35,14 +35,21 @@
 
 namespace mongo {
 
+    Heap1Engine::~Heap1Engine() {
+        for ( DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it ) {
+            delete it->second;
+        }
+        _dbs.clear();
+    }
+
     RecoveryUnit* Heap1Engine::newRecoveryUnit( OperationContext* opCtx ) {
         return new Heap1RecoveryUnit();
     }
 
     void Heap1Engine::listDatabases( std::vector<std::string>* out ) const {
         boost::mutex::scoped_lock lk( _dbLock );
-        for ( DBMap::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i ) {
-            out->push_back( *i );
+        for ( DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it ) {
+            out->push_back( it->first );
         }
     }
 
@@ -50,15 +57,14 @@ namespace mongo {
                                                                 const StringData& dbName ) {
         boost::mutex::scoped_lock lk( _dbLock );
 
-        // THIS is temporary I think
-        _dbs.insert( dbName.toString() );
-        return new Heap1DatabaseCatalogEntry( dbName );
-        /*
         Heap1DatabaseCatalogEntry*& db = _dbs[dbName.toString()];
         if ( !db )
             db = new Heap1DatabaseCatalogEntry( dbName );
         return db;
-        */
     }
 
+    Status Heap1Engine::closeDatabase(OperationContext* txn, const StringData& db ) {
+        // no-op as not file handles
+        return Status::OK();
+    }
 }
