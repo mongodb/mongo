@@ -21,6 +21,13 @@ const (
 	JSON = "json"
 )
 
+// compile-time interface sanity check
+var (
+	_ ImportInput = (*CSVImportInput)(nil)
+	_ ImportInput = (*TSVImportInput)(nil)
+	_ ImportInput = (*JSONImportInput)(nil)
+)
+
 var (
 	errNsNotFound = errors.New("ns not found")
 )

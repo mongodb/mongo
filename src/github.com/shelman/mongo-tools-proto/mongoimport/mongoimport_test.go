@@ -391,12 +391,12 @@ func TestGetUpsertValue(t *testing.T) {
 				value := getUpsertValue("a.b", bsonDocument)
 				So(value, ShouldEqual, 4)
 			})
-			Convey("the value of the key should be nil for unnested document"+
+			Convey("the value of the key should be nil for unnested document "+
 				"fields that do not exist", func() {
 				bsonDocument := bson.M{"a": 4}
 				So(getUpsertValue(testCollection, bsonDocument), ShouldBeNil)
 			})
-			Convey("the value of the key should be nil for nested document"+
+			Convey("the value of the key should be nil for nested document "+
 				"fields that do not exist", func() {
 				bsonDocument := bson.M{"a": bson.M{"b": 4}}
 				So(getUpsertValue("a.c", bsonDocument), ShouldBeNil)

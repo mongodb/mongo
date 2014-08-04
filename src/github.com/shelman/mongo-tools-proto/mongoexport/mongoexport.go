@@ -19,6 +19,12 @@ const (
 	JSON_ARRAY_END   = "]"
 )
 
+// compile-time interface sanity check
+var (
+	_ ExportOutput = (*CSVExportOutput)(nil)
+	_ ExportOutput = (*JSONExportOutput)(nil)
+)
+
 // Wrapper for mongoexport functionality
 type MongoExport struct {
 	// generic mongo tool options
