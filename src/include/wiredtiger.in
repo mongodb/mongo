@@ -418,7 +418,7 @@ struct __wt_cursor {
 	 * When loading a large amount of data into a new object, using
 	 * a cursor with the \c bulk configuration string enabled and
 	 * loading the data in sorted order will be much faster than doing
-	 * out-of-order inserts.  See @ref bulk_load for more information.
+	 * out-of-order inserts.  See @ref tune_bulk_load for more information.
 	 *
 	 * The maximum length of a single column stored in a table is not fixed
 	 * (as it partially depends on the underlying file configuration), but
@@ -951,7 +951,7 @@ struct __wt_session {
 	 * record number key; valid only for cursors with record number keys., a
 	 * boolean flag; default \c false.}
 	 * @config{bulk, configure the cursor for bulk-loading\, a fast\,
-	 * initial load path (see @ref bulk_load for more information).
+	 * initial load path (see @ref tune_bulk_load for more information).
 	 * Bulk-load may only be used for newly created objects and cursors
 	 * configured for bulk-load only support the WT_CURSOR::insert and
 	 * WT_CURSOR::close methods.  When bulk-loading row-store objects\, keys

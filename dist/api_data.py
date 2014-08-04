@@ -483,7 +483,7 @@ methods = {
 	    type='boolean'),
 	Config('bulk', 'false', r'''
 	    configure the cursor for bulk-loading, a fast, initial load
-	    path (see @ref bulk_load for more information).  Bulk-load
+	    path (see @ref tune_bulk_load for more information).  Bulk-load
 	    may only be used for newly created objects and cursors
 	    configured for bulk-load only support the WT_CURSOR::insert
 	    and WT_CURSOR::close methods.  When bulk-loading row-store
