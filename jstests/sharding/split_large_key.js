@@ -15,7 +15,7 @@ function verifyChunk(keys, expectFail) {
 }
 
 function runTest(test) {
-    var collName = test.name;
+    var collName = "split_large_key_"+test.name;
     var midKey = {};
     var chunkKeys = {min: {}, max: {}};
     for (var k in test.key) {
