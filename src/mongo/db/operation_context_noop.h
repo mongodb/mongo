@@ -85,6 +85,10 @@ namespace mongo {
             return true;
         }
 
+        virtual bool isGod() const {
+            return false;
+        }
+
         virtual string getNS() const {
             return string();
         };

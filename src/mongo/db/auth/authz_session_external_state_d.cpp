@@ -53,6 +53,7 @@ namespace mongo {
     }
 
     bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {
+        // TODO(spencer): get "isGod" from OperationContext
         return cc().isGod() || AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks();
     }
 

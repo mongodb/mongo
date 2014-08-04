@@ -322,7 +322,7 @@ namespace {
     Status LegacyReplicationCoordinator::canServeReadsFor(OperationContext* txn,
                                                           const NamespaceString& ns,
                                                           bool slaveOk) {
-        if (txn->getClient()->isGod()) {
+        if (txn->isGod()) {
             return Status::OK();
         }
         if (canAcceptWritesForDatabase(ns.db())) {

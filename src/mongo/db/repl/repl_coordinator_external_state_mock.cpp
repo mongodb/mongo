@@ -64,9 +64,5 @@ namespace repl {
         return HostAndPort();
     }
 
-    bool ReplicationCoordinatorExternalStateMock::isGod(OperationContext* txn) {
-        return false;
-    }
-
 } // namespace repl
 } // namespace mongo

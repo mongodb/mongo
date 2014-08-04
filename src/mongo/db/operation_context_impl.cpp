@@ -70,6 +70,10 @@ namespace mongo {
         return getCurOp()->getNS();
     }
 
+    bool OperationContextImpl::isGod() const {
+        return cc().isGod();
+    }
+
     Client* OperationContextImpl::getClient() const {
         return &cc();
     }

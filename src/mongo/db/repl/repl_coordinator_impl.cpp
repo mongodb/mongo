@@ -378,7 +378,7 @@ namespace repl {
     Status ReplicationCoordinatorImpl::canServeReadsFor(OperationContext* txn,
                                                         const NamespaceString& ns,
                                                         bool slaveOk) {
-        if (_externalState->isGod(txn)) {
+        if (txn->isGod()) {
             return Status::OK();
         }
         if (canAcceptWritesForDatabase(ns.db())) {

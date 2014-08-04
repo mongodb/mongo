@@ -334,7 +334,7 @@ namespace mongo {
         DbMessage dbmsg(m);
 
         Client& c = cc();
-        if (!c.isGod()) {
+        if (!txn->isGod()) {
             c.getAuthorizationSession()->startRequest(txn);
 
             // We should not be holding any locks at this point
