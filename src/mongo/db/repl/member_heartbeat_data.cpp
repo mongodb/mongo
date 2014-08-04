@@ -35,8 +35,6 @@
 namespace mongo {
 namespace repl {
 
-    unsigned int MemberHeartbeatData::numPings;
-
     MemberHeartbeatData::MemberHeartbeatData(int configIndex) :
         _configIndex(configIndex),
         _state(MemberState::RS_UNKNOWN), 
@@ -45,8 +43,7 @@ namespace repl {
         _lastHeartbeat(0),
         _lastHeartbeatRecv(0),
         _skew(INT_MIN), 
-        _authIssue(false), 
-        _ping(0) { 
+        _authIssue(false) {
     }
 
     void MemberHeartbeatData::updateFrom(const MemberHeartbeatData& newInfo) {
@@ -59,7 +56,6 @@ namespace repl {
         _opTime = newInfo.getOpTime();
         _skew = newInfo.getSkew();
         _authIssue = newInfo.hasAuthIssue();
-        _ping = newInfo.getPing();
         _electionTime = newInfo.getElectionTime();
     }
 
