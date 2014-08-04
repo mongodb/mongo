@@ -54,6 +54,42 @@ threads=((count=2,inserts=1),(count=2,reads=1),(count=2,updates=1))
 Some of the standard \c wtperf configurations we run can be found in the
 \c bench/wtperf/runners/ directory.
 
+@section monitor Monitoring performance
+
+In addition to testing a particular configuration, \c wtperf can monitor
+performance and operation latency times.  Monitoring can be enabled using
+the \c sample_interval configuration setting.  For example to record
+every 10 seconds, add the following to the \c wtperf configuration file:
+
+@code
+sample_interval=10
+@endcode
+
+Enabling monitoring causes \c wtperf to create a file \c monitor in
+the database home directory, or another directory as specified in
+the \c -m option to \c wtperf.
+
+A visualization tool to see the performance over the course of the
+\c wtperf run can be found in \c tools/wtperf_stats.py.
+
+The following example shows how to run the \c fruit-short.wtperf
+stock configuration to a subdirectory of \c build_posix called
+\c WT_TEST with monitoring enabled and then generate a graph.
+This example assumes you have all the necessary tools
+already installed to build WiredTiger, Python and python-nvd3.
+
+@code
+mkdir WT_TEST && ./bench/wtperf/wtperf -O ../bench/wtperf/runners/fruit-short.wtperf -o "sample_interval=10"
+cd WT_TEST; python ../../tools/wtperf_stats.py monitor
+@endcode
+
+Once the python tool completes, you will find a file \c wtperf_stats.html
+that will look something like this:
+
+\htmlinclude wtperf-sample.html
+
+@section config Configuration options
+
 The following is a list of the currently available \c wtperf
 configuration options:
 
