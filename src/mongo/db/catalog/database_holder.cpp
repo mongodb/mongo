@@ -99,6 +99,17 @@ namespace mongo {
             massert(15927, "can't open database in a read lock. if db was just closed, consider retrying the query. might otherwise indicate an internal error", !cant);
         }
 
+        // we know we have a db exclusive lock here
+        { // check casing
+            string duplicate = Database::duplicateUncasedName(dbname.toString());
+            if ( !duplicate.empty() ) {
+                stringstream ss;
+                ss << "db already exists with different case already have: [" << duplicate
+                   << "] trying to create [" << dbname.toString() << "]";
+                uasserted( DatabaseDifferCaseCode , ss.str() );
+            }
+        }
+
         // we mark our thread as having done writes now as we do not want any exceptions
         // once we start creating a new database
         cc().writeHappened();
