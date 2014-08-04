@@ -27,6 +27,8 @@ changelog()
 
 wtperf_config()
 {
+	# The Linux ed command writes line numbers to stderr, redirect both
+	# stdout and stderr to keep things quiet.
 	cc -o /tmp/__doxy ../bench/wtperf/doxy.c &&
 	(echo '/START_AUTO_GENERATED_WTPERF_CONFIGURATION/+3,/STOP_AUTO_GENERATED_WTPERF_CONFIGURATION/-1d'
 	 echo 'i'
@@ -37,7 +39,7 @@ wtperf_config()
 	 echo ''
 	 echo '.'
 	 echo 'w'
-	 echo 'q') | ed ../src/docs/wtperf.dox > /dev/null &&
+	 echo 'q') | ed ../src/docs/wtperf.dox 1>/dev/null 2>/dev/null &&
 	 rm -f /tmp/__doxy
 }
 
