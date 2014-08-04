@@ -65,6 +65,10 @@ namespace repl {
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
+            Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+            if (!status.isOK())
+                return appendCommandStatus(result, status);
+
             ReplicationCoordinator::ReplSetFreshArgs parsedArgs;
             parsedArgs.id = cmdObj["id"].Int();
             parsedArgs.setName = cmdObj["set"].checkAndGetStringData();
@@ -72,8 +76,7 @@ namespace repl {
             parsedArgs.cfgver = cmdObj["cfgver"].Int();
             parsedArgs.opTime = OpTime(cmdObj["opTime"].Date());
 
-            Status status = getGlobalReplicationCoordinator()->processReplSetFresh(parsedArgs,
-                                                                                   &result);
+            status = getGlobalReplicationCoordinator()->processReplSetFresh(parsedArgs, &result);
             return appendCommandStatus(result, status);
         }
     } cmdReplSetFresh;
@@ -100,14 +103,17 @@ namespace repl {
             DEV log() << "replSet received elect msg " << cmdObj.toString() << rsLog;
             else LOG(2) << "replSet received elect msg " << cmdObj.toString() << rsLog;
 
+            Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+            if (!status.isOK())
+                return appendCommandStatus(result, status);
+
             ReplicationCoordinator::ReplSetElectArgs parsedArgs;
             parsedArgs.set = cmdObj["set"].checkAndGetStringData();
             parsedArgs.whoid = cmdObj["whoid"].Int();
             parsedArgs.cfgver = cmdObj["cfgver"].Int();
             parsedArgs.round = cmdObj["round"].OID();
 
-            Status status = getGlobalReplicationCoordinator()->processReplSetElect(parsedArgs,
-                                                                                   &result);
+            status = getGlobalReplicationCoordinator()->processReplSetElect(parsedArgs, &result);
             return appendCommandStatus(result, status);
         }
     } cmdReplSetElect;

@@ -38,27 +38,31 @@ namespace mongo {
 
     class DBClientWithCommands;
     class DBClientBase;
+    class OperationContext;
 
     struct JSFile {
         const char* name;
         const StringData& source;
     };
 
-    class Scope : boost::noncopyable {
+    class Scope {
+        MONGO_DISALLOW_COPYING(Scope);
     public:
         Scope();
         virtual ~Scope();
 
         virtual void reset() = 0;
         virtual void init(const BSONObj* data) = 0;
+
         void init(const char* data) {
             BSONObj o(data);
             init(&o);
         }
 
-        virtual void localConnect(const char* dbName) = 0;
+        virtual void localConnectForDbEval(OperationContext* txn, const char* dbName) = 0;
         virtual void externalSetup() = 0;
         virtual void setLocalDB(const std::string& localDBName) { _localDBName = localDBName; }
+
         virtual BSONObj getObject(const char* field) = 0;
         virtual std::string getString(const char* field) = 0;
         virtual bool getBoolean(const char* field) = 0;
@@ -135,7 +139,7 @@ namespace mongo {
 
         void execCoreFiles();
 
-        virtual void loadStored(bool ignoreNotConnected = false);
+        virtual void loadStored(OperationContext* txn, bool ignoreNotConnected = false);
 
         /**
          * if any changes are made to .system.js, call this
@@ -149,7 +153,7 @@ namespace mongo {
         void incTimesUsed() { ++_numTimesUsed; }
 
         /** gets the number of times a scope was used */
-        int getTimesUsed() { return _numTimesUsed; }
+        int getTimesUsed() const { return _numTimesUsed; }
 
         /** return true if last invoke() return'd native code */
         virtual bool isLastRetNativeCode() { return _lastRetIsNativeCode; }
@@ -183,7 +187,8 @@ namespace mongo {
         bool _lastRetIsNativeCode; // v8 only: set to true if eval'd script returns a native func
     };
 
-    class ScriptEngine : boost::noncopyable {
+    class ScriptEngine {
+        MONGO_DISALLOW_COPYING(ScriptEngine);
     public:
         ScriptEngine();
         virtual ~ScriptEngine();
@@ -204,7 +209,9 @@ namespace mongo {
          *                  This must include authenticated users.
          * @return the scope
          */
-        std::auto_ptr<Scope> getPooledScope(const std::string& db, const std::string& scopeType);
+        std::auto_ptr<Scope> getPooledScope(OperationContext* txn,
+                                            const std::string& db,
+                                            const std::string& scopeType);
 
         void setScopeInitCallback(void (*func)(Scope&)) { _scopeInitCallback = func; }
         static void setConnectCallback(void (*func)(DBClientWithCommands&)) {
@@ -254,6 +261,8 @@ namespace mongo {
     void installGlobalUtils(Scope& scope);
     bool hasJSReturn(const std::string& s);
     const char* jsSkipWhiteSpace(const char* raw);
+
+    DBClientBase* createDirectClient(OperationContext* txn);
 
     extern ScriptEngine* globalScriptEngine;
 }

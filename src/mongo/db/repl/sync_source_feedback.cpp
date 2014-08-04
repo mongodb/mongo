@@ -40,7 +40,6 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/rs.h"  // theReplSet
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 
@@ -52,6 +51,12 @@ namespace repl {
 
     // used in replAuthenticate
     static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
+
+    SyncSourceFeedback::SyncSourceFeedback() : _syncTarget(NULL),
+                                               _positionChanged(false),
+                                               _handshakeNeeded(false),
+                                               _shutdownSignaled(false) {}
+    SyncSourceFeedback::~SyncSourceFeedback() {}
 
     bool SyncSourceFeedback::replAuthenticate() {
         if (!getGlobalAuthorizationManager()->isAuthEnabled())
@@ -129,10 +134,17 @@ namespace repl {
         log() << "replset setting syncSourceFeedback to " << hostName << rsLog;
         _connection.reset(new DBClientConnection(false, 0, OplogReader::tcp_timeout));
         string errmsg;
-        if (!_connection->connect(hostName.c_str(), errmsg) ||
-            (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate())) {
+        try {
+            if (!_connection->connect(hostName.c_str(), errmsg) ||
+                (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate())) {
+                _resetConnection();
+                log() << "repl: " << errmsg << endl;
+                return false;
+            }
+        }
+        catch (const DBException& e) {
+            log() << "Error connecting to " << hostName << ": " << e.what();
             _resetConnection();
-            log() << "repl: " << errmsg << endl;
             return false;
         }
 
@@ -187,34 +199,37 @@ namespace repl {
         return true;
     }
 
+    void SyncSourceFeedback::shutdown() {
+        boost::unique_lock<boost::mutex> lock(_mtx);
+        _shutdownSignaled = true;
+        _cond.notify_all();
+    }
+
     void SyncSourceFeedback::run() {
         Client::initThread("SyncSourceFeedbackThread");
         OperationContextImpl txn;
 
-        bool sleepNeeded = false;
         bool positionChanged = false;
         bool handshakeNeeded = false;
-        while (!inShutdown()) {
-            if (!theReplSet) {
-                sleepsecs(5);
-                continue;
-            }
-            if (sleepNeeded) {
-                sleepmillis(500);
-                sleepNeeded = false;
-            }
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        while (!inShutdown()) { // TODO(spencer): Remove once legacy repl coordinator is gone.
             {
                 boost::unique_lock<boost::mutex> lock(_mtx);
-                while (!_positionChanged && !_handshakeNeeded) {
+                while (!_positionChanged && !_handshakeNeeded && !_shutdownSignaled) {
                     _cond.wait(lock);
                 }
+
+                if (_shutdownSignaled) {
+                    break;
+                }
+
                 positionChanged = _positionChanged;
                 handshakeNeeded = _handshakeNeeded;
                 _positionChanged = false;
                 _handshakeNeeded = false;
             }
 
-            MemberState state = theReplSet->state();
+            MemberState state = replCoord->getCurrentMemberState();
             if (state.primary() || state.fatal() || state.startup()) {
                 continue;
             }
@@ -226,11 +241,11 @@ namespace repl {
             if (!hasConnection()) {
                 // fix connection if need be
                 if (!target) {
-                    sleepNeeded = true;
+                    sleepmillis(500);
                     continue;
                 }
                 if (!_connect(&txn, target->fullName())) {
-                    sleepNeeded = true;
+                    sleepmillis(500);
                     continue;
                 }
             }

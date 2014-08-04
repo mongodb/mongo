@@ -113,6 +113,12 @@ namespace repl {
         const MemberConfig& getMemberAt(size_t i) const;
 
         /**
+         * Returns a pointer to the MemberConfig corresponding to the member with the given _id in
+         * the config, or NULL if there is no member with that ID.
+         */
+        const MemberConfig* findMemberByID(int id) const;
+
+        /**
          * Gets the default write concern for the replica set described by this configuration.
          */
         const WriteConcernOptions& getDefaultWriteConcern() const { return _defaultWriteConcern; }

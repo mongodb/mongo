@@ -28,12 +28,14 @@
 
 #pragma once
 
+#include <limits>
 #include <string>
 #include <vector>
 
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/util/concurrency/list.h"
@@ -45,12 +47,37 @@ namespace mongo {
 
 namespace repl {
 
+    /**
+     * Represents a latency measurement for each replica set member based on heartbeat requests.
+     * The measurement is an average weighted 80% to the old value, and 20% to the new value.
+     */
+    class PingStats {
+    public:
+        PingStats() : count(0), value(std::numeric_limits<int>::max()) {}
+
+        void hit(int millis) {
+            ++count;
+            value = value == 0 ? millis :
+                                 static_cast<unsigned long>((value * .8) + (millis * .2));
+        }
+
+        unsigned int getCount() {
+            return count;
+        }
+
+        unsigned int getMillis() {
+            return value;
+        }
+    private:
+        unsigned int count;
+        unsigned int value;
+    };
+
+
     class TopologyCoordinatorImpl : public TopologyCoordinator {
     public:
+        explicit TopologyCoordinatorImpl(int maxSyncSourceLagSecs);
 
-        TopologyCoordinatorImpl();
-        virtual ~TopologyCoordinatorImpl() {};
-        
         virtual void setLastApplied(const OpTime& optime);
         virtual void setCommitOkayThrough(const OpTime& optime);
         virtual void setLastReceived(const OpTime& optime);
@@ -59,12 +86,12 @@ namespace repl {
         // Looks up syncSource's address and returns it, for use by the Applier
         virtual HostAndPort getSyncSourceAddress() const;
         // Chooses and sets a new sync source, based on our current knowledge of the world
-        virtual void chooseNewSyncSource(Date_t now); // this is basically getMemberToSyncTo()
-        // Do not choose a member as a sync source until time given; 
+        virtual void chooseNewSyncSource(Date_t now);
+        // Does not choose a member as a sync source until time given; 
         // call this when we have reason to believe it's a bad choice
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
 
-        // Add function pointer to callback list; call function when config changes
+        // Adds function pointer to callback list; calls function when config changes
         // Applier needs to know when things like chainingAllowed or slaveDelay change. 
         // ReplCoord needs to know when things like the tag sets change.
         virtual void registerConfigChangeCallback(const ConfigChangeCallbackFn& fn);
@@ -74,47 +101,63 @@ namespace repl {
         // Applier calls this to notify that it's now safe to transition from SECONDARY to PRIMARY
         virtual void signalDrainComplete();
 
-        // produce a reply to a RAFT-style RequestVote RPC; this is MongoDB ReplSetFresh command
+        // produces a reply to a RAFT-style RequestVote RPC
         virtual void prepareRequestVoteResponse(const Date_t now,
                                                 const BSONObj& cmdObj,
                                                 std::string& errmsg, 
                                                 BSONObjBuilder& result);
 
-        // produce a reply to a received electCmd
+        // produces a reply to a received electCmd
         virtual void prepareElectCmdResponse(const Date_t now,
                                              const BSONObj& cmdObj,
                                              BSONObjBuilder& result);
 
-        // produce a reply to a heartbeat
+        // produces a reply to a heartbeat
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
                                               Date_t now,
-                                              const BSONObj& cmdObj, 
-                                              BSONObjBuilder* resultObj,
+                                              const ReplSetHeartbeatArgs& args,
+                                              const std::string& ourSetName,
+                                              ReplSetHeartbeatResponse* response,
                                               Status* result);
 
-        // update internal state with heartbeat response
+        // updates internal state with heartbeat response
         HeartbeatResultAction updateHeartbeatData(Date_t now,
                                                   const MemberHeartbeatData& newInfo,
                                                   int id);
 
-        // produce a reply to a status request
-        virtual void prepareStatusResponse(Date_t now,
-                                           const BSONObj& cmdObj,
-                                           BSONObjBuilder& result,
-                                           unsigned uptime);
+        // produces a reply to a status request
+        virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,
+                                           Date_t now,
+                                           unsigned uptime,
+                                           BSONObjBuilder* response,
+                                           Status* result);
 
-        // produce a reply to a freeze request
-        virtual void prepareFreezeResponse(Date_t now,
-                                           const BSONObj& cmdObj,
-                                           BSONObjBuilder& result);
+        // produces a reply to a freeze request
+        virtual void prepareFreezeResponse(const ReplicationExecutor::CallbackData& data,
+                                           Date_t now,
+                                           int secs,
+                                           BSONObjBuilder* response,
+                                           Status* result);
 
-        // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
+        // transitions PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn);
 
-        // update internal config with new config (already validated)
-        virtual void updateConfig(const ReplicaSetConfig& newConfig, int selfIndex, Date_t now);
+        // updates internal config with new config (already validated)
+        virtual void updateConfig(const ReplicationExecutor::CallbackData& cbData,
+                                  const ReplicaSetConfig& newConfig,
+                                  int selfIndex,
+                                  Date_t now);
+
+        // Record a ping in millis based on the round-trip time of the heartbeat for the member
+        virtual void recordPing(const HostAndPort& host, const int elapsedMillis);
 
     private:
+
+        // Returns the number of heartbeat pings which have occurred.
+        virtual int _getTotalPings();
+
+        // Returns the current "ping" value for the given member by their address
+        virtual int _getPing(const HostAndPort& host);
 
         // Determines if we will veto the member in the "fresh" command response
         // If we veto, the errmsg will be filled in with a reason
@@ -126,23 +169,23 @@ namespace repl {
         // Logic to determine if we should step down as primary
         bool _shouldRelinquish() const;
 
-        // See if a majority number of votes are held by members who are currently "up"
+        // Sees if a majority number of votes are held by members who are currently "up"
         bool _aMajoritySeemsToBeUp() const;
 
-        // Return the total number of votes in the current config
+        // Returns the total number of votes in the current config
         int _totalVotes() const;
 
-        // Scan through all members that are 'up' and return the latest known optime
+        // Scans through all members that are 'up' and return the latest known optime
         OpTime _latestKnownOpTime() const;
 
-        // Begin election proceedings
+        // Begins election proceedings
         void _electSelf(Date_t now);
 
         // Scans the electable set and returns the highest priority member index
         int _getHighestPriorityElectableIndex() const;
 
-        // Change _memberState, if state is different from _memberState.
-        // Call all registered callbacks for state changes.
+        // Changes _memberState to newMemberState, then calls all registered callbacks
+        // for state changes.
         void _changeMemberState(const MemberState& newMemberState);
 
         OpTime _lastApplied;  // the last op that the applier has actually written to the data
@@ -172,6 +215,8 @@ namespace repl {
         std::map<HostAndPort, Date_t> _syncSourceBlacklist;
         // The next sync source to be chosen, requested via a replSetSyncFrom command
         int _forceSyncSourceIndex;
+        // How far this node must fall behind before considering switching sync sources
+        int _maxSyncSourceLagSecs;
 
         // insanity follows
 
@@ -210,6 +255,10 @@ namespace repl {
 
         // Functions to call when a state change happens.  We pass the new state.
         std::vector<StateChangeCallbackFn> _stateChangeCallbacks;
+
+        typedef std::map<HostAndPort, PingStats> PingMap;
+        // Ping stats for each member by HostAndPort;
+        PingMap _pings;
 
         // do these need settors?  the current code has no way to change these values.
         struct HeartbeatOptions {

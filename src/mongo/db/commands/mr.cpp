@@ -732,7 +732,7 @@ namespace mongo {
             const string userToken = ClientBasic::getCurrent()->getAuthorizationSession()
                                                               ->getAuthenticatedUserNamesToken();
             _scope.reset(globalScriptEngine->getPooledScope(
-                            _config.dbname, "mapreduce" + userToken).release());
+                            _txn, _config.dbname, "mapreduce" + userToken).release());
 
             if ( ! _config.scopeSetup.isEmpty() )
                 _scope->init( &_config.scopeSetup );

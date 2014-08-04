@@ -545,9 +545,9 @@ namespace QueryStageMergeSortTests {
             }
 
             // Invalidate locs[11].  Should force a fetch.  We don't get it back.
-            ms->prepareToYield();
+            ms->saveState();
             ms->invalidate(*it, INVALIDATION_DELETION);
-            ms->recoverFromYield(&_txn);
+            ms->restoreState(&_txn);
 
             // Make sure locs[11] was fetched for us.
             {

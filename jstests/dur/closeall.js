@@ -1,5 +1,5 @@
 // testing closealldatabases concurrency
-// this is also a test of recoverFromYield() as that will get exercised by the update
+// this is also a test of saveState() as that will get exercised by the update
 
 function f(variant, quickCommits, paranoid) {
     var path = MongoRunner.dataDir + "/closeall";

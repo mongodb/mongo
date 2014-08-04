@@ -87,18 +87,6 @@ namespace mongo {
                        size_t plannerOptions = 0);
 
     /**
-     * Get a plan executor for a simple id query. The executor will wrap an execution
-     * tree whose root stage is the idhack stage.
-     *
-     * Takes ownership of 'rawCanonicalQuery'.
-     */
-    Status getExecutorIDHack(OperationContext* txn,
-                             Collection* collection,
-                             CanonicalQuery* rawCanonicalQuery,
-                             const QueryPlannerParams& plannerParams,
-                             PlanExecutor** out);
-
-    /**
      * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode
      * to provide results for the distinct command.
      *
@@ -134,17 +122,38 @@ namespace mongo {
                             PlanExecutor** execOut);
 
     /**
-     * Get a plan executor for a query. Ignores the cache and always plans the full query.
+     * Get a PlanExecutor for a delete operation.  'rawCanonicalQuery' describes the predicate for
+     * the documents to be deleted.  A write lock is required to execute the returned plan.
      *
      * Takes ownership of 'rawCanonicalQuery'.
      *
-     * Returns the resulting executor through 'execOut'. The caller must delete 'execOut',
-     * if an OK status is returned.
+     * If the query is valid and an executor could be created, returns Status::OK() and populates
+     * *out with the PlanExecutor.
+     *
+     * If the query cannot be executed, returns a Status indicating why.
      */
-    Status getExecutorAlwaysPlan(OperationContext* txn,
-                                 Collection* collection,
-                                 CanonicalQuery* rawCanonicalQuery,
-                                 const QueryPlannerParams& plannerParams,
-                                 PlanExecutor** execOut);
+    Status getExecutorDelete(OperationContext* txn,
+                             Collection* collection,
+                             CanonicalQuery* rawCanonicalQuery,
+                             bool isMulti,
+                             bool shouldCallLogOp,
+                             PlanExecutor** execOut);
+
+    /**
+     * Overload of getExecutorDelete() above, for when a canonicalQuery is not available.  Used to
+     * support idhack-powered deletes.
+     *
+     * If the query is valid and an executor could be created, returns Status::OK() and populates
+     * *out with the PlanExecutor.
+     *
+     * If the query cannot be executed, returns a Status indicating why.
+     */
+    Status getExecutorDelete(OperationContext* txn,
+                             Collection* collection,
+                             const std::string& ns,
+                             const BSONObj& unparsedQuery,
+                             bool isMulti,
+                             bool shouldCallLogOp,
+                             PlanExecutor** execOut);
 
 }  // namespace mongo

@@ -120,13 +120,18 @@ namespace mongo {
 
 #pragma pack(1)
     /* todo merge this with MSGHEADER (or inherit from it). */
-    struct MsgData {
+    class MsgData {
+        friend class Message;
+        friend class DbMessage;
+        friend class MessagingPort;
+    public:
         int len; /* len of the msg, including this field */
         MSGID id; /* request/reply id's match... */
         MSGID responseTo; /* id of the message we are responding to */
         short _operation;
         char _flags;
         char _version;
+
         int operation() const {
             return _operation;
         }
@@ -135,7 +140,6 @@ namespace mongo {
             _version = 0;
             _operation = o;
         }
-        char _data[4];
 
         int& dataAsInt() {
             return *((int *) _data);
@@ -157,6 +161,8 @@ namespace mongo {
         }
 
         int dataLen(); // len without header
+    private:
+        char _data[4]; //must be last member
     };
     const int MsgDataHeaderSize = sizeof(MsgData) - 4;
     inline int MsgData::dataLen() {

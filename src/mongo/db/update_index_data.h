@@ -1,4 +1,4 @@
-// index_set.h
+// update_index_data.h
 
 /**
 *    Copyright (C) 2013 10gen Inc.
@@ -42,9 +42,32 @@ namespace mongo {
      */
     bool getCanonicalIndexField( const StringData& fullName, std::string* out );
 
-    class IndexPathSet {
+
+    /**
+     * Holds pre-processed index spec information to allow update to quickly determine if an update
+     * can be applied as a delta to a document, or if the document must be re-indexed.
+     */
+    class UpdateIndexData {
     public:
+        UpdateIndexData();
+
+        /**
+         * Register a path.  Any update targeting this path (or a parent of this path) will
+         * trigger a recomputation of the document's index keys.
+         */
         void addPath( const StringData& path );
+
+        /**
+         * Register a path component.  Any update targeting a path that contains this exact
+         * component will trigger a recomputation of the document's index keys.
+         */
+        void addPathComponent( const StringData& pathComponent );
+
+        /**
+         * Register the "wildcard" path.  All updates will trigger a recomputation of the document's
+         * index keys.
+         */
+        void allPathsIndexed();
 
         void clear();
 
@@ -54,7 +77,10 @@ namespace mongo {
 
         bool _startsWith( const StringData& a, const StringData& b ) const;
 
-        std::set<std::string> _canonical;
+        std::set<std::string> _canonicalPaths;
+        std::set<std::string> _pathComponents;
+
+        bool _allPathsIndexed;
     };
 
 }

@@ -154,23 +154,23 @@ namespace mongo {
         }
     }
 
-    void OplogStart::prepareToYield() {
+    void OplogStart::saveState() {
         if (_cs) {
-            _cs->prepareToYield();
+            _cs->saveState();
         }
 
         for (size_t i = 0; i < _subIterators.size(); i++) {
-            _subIterators[i]->prepareToYield();
+            _subIterators[i]->saveState();
         }
     }
 
-    void OplogStart::recoverFromYield(OperationContext* opCtx) {
+    void OplogStart::restoreState(OperationContext* opCtx) {
         if (_cs) {
-            _cs->recoverFromYield(opCtx);
+            _cs->restoreState(opCtx);
         }
 
         for (size_t i = 0; i < _subIterators.size(); i++) {
-            if (!_subIterators[i]->recoverFromYield()) {
+            if (!_subIterators[i]->restoreState()) {
                 _subIterators.erase(_subIterators.begin() + i);
                 // need to hit same i on next pass through loop
                 i--;

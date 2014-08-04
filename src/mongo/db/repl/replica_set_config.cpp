@@ -350,6 +350,16 @@ namespace {
         return _members[i]; 
     }
 
+    const MemberConfig* ReplicaSetConfig::findMemberByID(int id) const {
+        for (std::vector<MemberConfig>::const_iterator it = _members.begin();
+                it != _members.end(); ++it) {
+            if (it->getId() == id) {
+                return &(*it);
+            }
+        }
+        return NULL;
+    }
+
     ReplicaSetTag ReplicaSetConfig::findTag(const StringData& key, const StringData& value) const {
         return _tagConfig.findTag(key, value);
     }

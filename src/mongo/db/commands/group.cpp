@@ -102,7 +102,8 @@ namespace mongo {
 
             const string userToken = ClientBasic::getCurrent()->getAuthorizationSession()
                                                               ->getAuthenticatedUserNamesToken();
-            auto_ptr<Scope> s = globalScriptEngine->getPooledScope(db->name(), "group" + userToken);
+            auto_ptr<Scope> s = globalScriptEngine->getPooledScope(
+                                                        txn, db->name(), "group" + userToken);
 
             if ( reduceScope )
                 s->init( reduceScope );

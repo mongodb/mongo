@@ -38,7 +38,6 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/query/explain_plan.h"
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
@@ -177,6 +176,7 @@ namespace mongo {
         // reads are allowed is PRIMARY (or master in master/slave).  This function uasserts if
         // reads are not okay.
         Status status = repl::getGlobalReplicationCoordinator()->canServeReadsFor(
+                txn,
                 NamespaceString(ns),
                 true);
         uassertStatusOK(status);
@@ -288,7 +288,7 @@ namespace mongo {
                 if (PlanExecutor::EXEC_ERROR == state) {
                     scoped_ptr<PlanStageStats> stats(exec->getStats());
                     error() << "Plan executor error, stats: "
-                            << statsToBSON(*stats);
+                            << Explain::statsToBSON(*stats);
                     uasserted(17406, "getMore executor error: " +
                               WorkingSetCommon::toStatusString(obj));
                 }
@@ -614,6 +614,7 @@ namespace mongo {
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
         bool slaveOK = pq.hasOption(QueryOption_SlaveOk) || pq.hasReadPref();
         status = repl::getGlobalReplicationCoordinator()->canServeReadsFor(
+                txn,
                 NamespaceString(cq->ns()),
                 slaveOK);
         uassertStatusOK(status);
@@ -713,7 +714,7 @@ namespace mongo {
         if (PlanExecutor::EXEC_ERROR == state) {
             scoped_ptr<PlanStageStats> stats(exec->getStats());
             error() << "Plan executor error, stats: "
-                    << statsToBSON(*stats);
+                    << Explain::statsToBSON(*stats);
             uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
         }
 

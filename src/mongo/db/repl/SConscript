@@ -2,6 +2,13 @@
 
 Import("env")
 
+env.Library('repl_settings',
+            'repl_settings.cpp',
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/base/base',
+                '$BUILD_DIR/mongo/server_parameters'
+            ])
+
 env.Library(
     'network_interface_impl',
     'network_interface_impl.cpp',
@@ -23,8 +30,8 @@ env.CppUnitTest('replication_executor_test',
 env.Library('topology_coordinator_impl',
             ['topology_coordinator_impl.cpp',
              'member_heartbeat_data.cpp'],
-            LIBDEPS=['replica_set_config',
-                     'replication_executor'])
+            LIBDEPS=['replication_executor',
+                     'repl_settings'])
 
 env.Library('repl_coordinator_impl',
             [
@@ -36,13 +43,14 @@ env.Library('repl_coordinator_impl',
                      '$BUILD_DIR/mongo/foundation',
                      '$BUILD_DIR/mongo/server_options_core',
                      'repl_coordinator_interface',
-                     'replica_set_config',
+                     'replica_set_messages',
                      'replication_executor'
                  ])
 
 env.CppUnitTest('repl_coordinator_impl_test',
                 'repl_coordinator_impl_test.cpp',
                 LIBDEPS=['repl_coordinator_impl',
+                         'topology_coordinator_impl',
                          'replmocks'])
 
 env.CppUnitTest('replica_set_config_checks_test',
@@ -66,16 +74,17 @@ env.Library('repl_coordinator_global',
 env.Library('replmocks',
             ['repl_coordinator_mock.cpp',
              'repl_coordinator_external_state_mock.cpp',
-             'network_interface_mock.cpp',
-             'topology_coordinator_mock.cpp'],
+             'network_interface_mock.cpp'],
             LIBDEPS=[
                 'repl_coordinator_interface',
                 'replication_executor',
             ])
 
-env.Library('replica_set_config',
+env.Library('replica_set_messages',
             [
                 'member_config.cpp',
+                'repl_set_heartbeat_args.cpp',
+                'repl_set_heartbeat_response.cpp',
                 'replica_set_config.cpp',
                 'replica_set_tag.cpp',
             ],
@@ -91,4 +100,4 @@ env.CppUnitTest('replica_set_config_test',
                     'replica_set_config_test.cpp',
                     'replica_set_tag_test.cpp',
                 ],
-                LIBDEPS=['replica_set_config'])
+                LIBDEPS=['replica_set_messages'])

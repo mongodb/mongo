@@ -104,6 +104,10 @@ namespace mongo {
             return _notAllowed();
         }
 
+        virtual long long getSpaceUsedBytes( OperationContext* txn ) const {
+            return -1;
+        }
+
         virtual Status update(OperationContext* txn,
                               const UpdateTicket& ticket,
                               int64_t* numUpdated) {

@@ -23,10 +23,10 @@ a.ensureIndex( {b: 1} );
 assert.commandWorked( admin.runCommand( {renameCollection: "db_a.rename7", to: "db_b.rename7"} ) );
 
 assert.eq( 0, a.find().count() );
-assert( !db_a.system.namespaces.findOne( {name: "db_a.rename7"} ) );
+assert( db_a.getCollectionNames().indexOf( "rename7" ) < 0 );
 
 assert.eq( 3, b.find().count() );
-assert( db_b.system.namespaces.findOne( {name: "db_b.rename7"} ) );
+assert( db_b.getCollectionNames().indexOf( "rename7" ) >= 0 );
 assert( b.find( {a: 1} ).explain().cursor.match( /^BtreeCursor/ ) );
 
 a.drop();
@@ -41,16 +41,19 @@ a.save( {a: 1} );
 a.save( {a: 2} );
 a.save( {a: 3} );
 
+previousStorageSize = a.stats().storageSize
+
 assert.commandWorked( admin.runCommand( {renameCollection: "db_a.rename7_capped",
                                          to: "db_b.rename7_capped"} ) );
 
 assert.eq( 0, a.find().count() );
-assert( !db_a.system.namespaces.findOne( {name: "db_a.rename7_capped"} ) );
+assert( db_a.getCollectionNames().indexOf( "rename7_capped" ) < 0 );
 
 assert.eq( 3, b.find().count() );
-assert( db_b.system.namespaces.findOne( {name: "db_b.rename7_capped"} ) );
-assert.eq( true, db_b.system.namespaces.findOne( {name:"db_b.rename7_capped"} ).options.capped );
-assert.eq( 12288, b.stats().storageSize );
+assert( db_b.getCollectionNames().indexOf( "rename7_capped" ) >= 0 );
+printjson( db_b.rename7_capped.stats() );
+assert( db_b.rename7_capped.stats().capped );
+assert.eq( previousStorageSize, b.stats().storageSize );
 
 a.drop();
 b.drop();

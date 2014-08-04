@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     const char * curNs = "in client mode";
 
     bool dbexitCalled = false;
@@ -68,7 +70,7 @@ namespace mongo {
         return false;
     }
 
-    DBClientBase * createDirectClient() {
+    DBClientBase* createDirectClient(OperationContext* txn) {
         uassert( 10256 ,  "no createDirectClient in clientOnly" , 0 );
         return 0;
     }

@@ -37,9 +37,10 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/index_set.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_lifecycle.h"
@@ -47,10 +48,9 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/update_index_data.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/log.h"
 
@@ -457,7 +457,8 @@ namespace mongo {
         PlanExecutor* rawExec;
         Status status = cq ?
             getExecutor(request.getOpCtx(), collection, cqHolder.release(), &rawExec) :
-            getExecutor(request.getOpCtx(), collection, nsString.ns(), request.getQuery(), &rawExec);
+            getExecutor(request.getOpCtx(), collection, nsString.ns(), request.getQuery(),
+                        &rawExec);
 
         uassert(17243,
                 "could not get executor" + request.getQuery().toString() + "; " + causedBy(status),
@@ -622,6 +623,8 @@ namespace mongo {
                 }
             }
 
+            WriteUnitOfWork wunit(request.getOpCtx()->recoveryUnit());
+
             // Save state before making changes
             exec->saveState();
 
@@ -678,6 +681,8 @@ namespace mongo {
                 repl::logOp(request.getOpCtx(), "u", nsString.ns().c_str(), logObj, &idQuery,
                       NULL, request.isFromMigration());
             }
+
+            wunit.commit();
 
             // Only record doc modifications if they wrote (exclude no-ops)
             if (docWasModified)
@@ -774,6 +779,13 @@ namespace mongo {
                                      driver->modOptions()) );
         }
 
+        // Insert the doc
+        BSONObj newObj = doc.getObject();
+        uassert(17420,
+                str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
+                newObj.objsize() <= BSONObjMaxUserSize);
+
+        WriteUnitOfWork wunit(request.getOpCtx()->recoveryUnit());
         // Only create the collection if the doc will be inserted.
         if (!collection) {
             collection = db->getCollection(request.getOpCtx(), request.getNamespaceString().ns());
@@ -782,11 +794,6 @@ namespace mongo {
             }
         }
 
-        // Insert the doc
-        BSONObj newObj = doc.getObject();
-        uassert(17420,
-                str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
-                newObj.objsize() <= BSONObjMaxUserSize);
 
         StatusWith<DiskLoc> newLoc = collection->insertDocument(request.getOpCtx(),
                                                                 newObj,
@@ -801,6 +808,8 @@ namespace mongo {
                         NULL,
                         request.isFromMigration());
         }
+
+        wunit.commit();
 
         opDebug->nMatched = 1;
         return UpdateResult(false /* updated a non existing document */,

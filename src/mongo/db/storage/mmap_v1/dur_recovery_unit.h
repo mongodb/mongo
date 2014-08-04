@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include <string>
+#include <boost/shared_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/storage/recovery_unit.h"
@@ -59,6 +59,9 @@ namespace mongo {
 
         virtual void* writingPtr(void* data, size_t len);
 
+        //  The recovery unit takes ownership of change.
+        virtual void registerChange(Change* change);
+
         virtual void syncDataAndTruncateJournal();
 
     private:
@@ -88,16 +91,12 @@ namespace mongo {
         };
         State _state;
 
-        struct Change {
-            char* base;
-            std::string preimage; // TODO consider storing out-of-line
-        };
-
         // Changes are ordered from oldest to newest. Overlapping and duplicate regions are allowed,
         // since rollback undoes changes in reverse order.
         // TODO compare performance against a data-structure that coalesces overlapping/adjacent
         // changes.
-        typedef std::vector<Change> Changes;
+        typedef boost::shared_ptr<Change> ChangePtr;
+        typedef std::vector<ChangePtr> Changes;
         Changes _changes;
 
         // Index of the first uncommited change in _changes for each nesting level. Index 0 in this

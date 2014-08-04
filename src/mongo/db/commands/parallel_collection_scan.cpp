@@ -33,7 +33,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/multi_iterator.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
@@ -48,111 +48,6 @@ namespace mongo {
             }
             DiskLoc diskLoc;
             size_t size;
-        };
-
-        // XXX: move this to the exec/ directory.
-        class MultiIteratorStage : public PlanStage {
-        public:
-            MultiIteratorStage(WorkingSet* ws, Collection* collection)
-                : _collection(collection),
-                  _ws(ws) { }
-
-            ~MultiIteratorStage() { }
-
-            // takes ownership of it
-            void addIterator(RecordIterator* it) {
-                _iterators.push_back(it);
-            }
-
-            virtual StageState work(WorkingSetID* out) {
-                if ( _collection == NULL )
-                    return PlanStage::DEAD;
-
-                DiskLoc next = _advance();
-                if (next.isNull())
-                    return PlanStage::IS_EOF;
-
-                *out = _ws->allocate();
-                WorkingSetMember* member = _ws->get(*out);
-                member->loc = next;
-                member->obj = _collection->docFor(next);
-                member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-                return PlanStage::ADVANCED;
-            }
-
-            virtual bool isEOF() {
-                return _collection == NULL || _iterators.empty();
-            }
-
-            void kill() {
-                _collection = NULL;
-                _iterators.clear();
-            }
-
-            virtual void prepareToYield() {
-                for (size_t i = 0; i < _iterators.size(); i++) {
-                    _iterators[i]->prepareToYield();
-                }
-            }
-
-            virtual void recoverFromYield(OperationContext* opCtx) {
-                for (size_t i = 0; i < _iterators.size(); i++) {
-                    if (!_iterators[i]->recoverFromYield()) {
-                        kill();
-                    }
-                }
-            }
-
-            virtual void invalidate(const DiskLoc& dl, InvalidationType type) {
-                switch ( type ) {
-                case INVALIDATION_DELETION:
-                    for (size_t i = 0; i < _iterators.size(); i++) {
-                        _iterators[i]->invalidate(dl);
-                    }
-                    break;
-                case INVALIDATION_MUTATION:
-                    // no-op
-                    break;
-                }
-            }
-
-            //
-            // These should not be used.
-            //
-
-            virtual PlanStageStats* getStats() { return NULL; }
-            virtual CommonStats* getCommonStats() { return NULL; }
-            virtual SpecificStats* getSpecificStats() { return NULL; }
-
-            virtual std::vector<PlanStage*> getChildren() const {
-                vector<PlanStage*> empty;
-                return empty;
-            }
-
-            virtual StageType stageType() const { return STAGE_MULTI_ITERATOR; }
-
-        private:
-
-            /**
-             * @return if more data
-             */
-            DiskLoc _advance() {
-                while (!_iterators.empty()) {
-                    DiskLoc out = _iterators.back()->getNext();
-                    if (!out.isNull())
-                        return out;
-
-                    _iterators.popAndDeleteBack();
-                }
-
-                return DiskLoc();
-            }
-
-            Collection* _collection;
-            OwnedPointerVector<RecordIterator> _iterators;
-
-            // Not owned by us.
-            WorkingSet* _ws;
         };
 
         // ------------------------------------------------
@@ -217,7 +112,7 @@ namespace mongo {
             // TODO consider using a common work queue once invalidation issues go away.
             for (size_t i = 0; i < iterators.size(); i++) {
                 PlanExecutor* theExec = execs[i % execs.size()];
-                MultiIteratorStage* mis = static_cast<MultiIteratorStage*>(theExec->getStages());
+                MultiIteratorStage* mis = static_cast<MultiIteratorStage*>(theExec->getRootStage());
                 mis->addIterator(iterators.releaseAt(i));
             }
 

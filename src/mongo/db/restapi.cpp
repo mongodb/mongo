@@ -288,6 +288,7 @@ namespace mongo {
                 ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>"
                    << replSettings.replSet;
             }
+            // TODO(dannenberg) replAllDead is bad and should be removed when masterslave is removed
             if (repl::replAllDead)
                 ss << "\n<b>replication replAllDead=" << repl::replAllDead << "</b>\n";
             else {

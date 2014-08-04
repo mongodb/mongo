@@ -29,11 +29,12 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/bson/oid.h"
 
 namespace mongo {
 
     struct HostAndPort;
+    class OID;
+    class OperationContext;
 
 namespace repl {
 
@@ -50,6 +51,32 @@ namespace repl {
         virtual ~ReplicationCoordinatorExternalState();
 
         /**
+         * Simple wrapper around SyncSourceFeedback::run().  Loops continuously until shutdown() is
+         * called.
+         */
+        virtual void runSyncSourceFeedback() = 0;
+
+        /**
+         * Performs any necessary external state specific shutdown tasks, such as signaling
+         * the SyncSourceFeedback thread to terminate.
+         */
+        virtual void shutdown() = 0;
+
+        /**
+         * Simple wrapper around SyncSourceFeedback::forwardSlaveHandshake.  Signals to the
+         * SyncSourceFeedback thread that it needs to wake up and send a replication handshake
+         * upstream.
+         */
+        virtual void forwardSlaveHandshake() = 0;
+
+        /**
+         * Simple wrapper around SyncSourceFeedback::forwardSlaveProgress.  Signals to the
+         * SyncSourceFeedback thread that it needs to wake up and send a replSetUpdatePosition
+         * command upstream.
+         */
+        virtual void forwardSlaveProgress() = 0;
+
+        /**
          * Queries the singleton document in local.me.  If it exists and our hostname has not
          * changed since we wrote, returns the RID stored in the object.  If the document does not
          * exist or our hostname doesn't match what was recorded in local.me, generates a new OID
@@ -61,6 +88,17 @@ namespace repl {
          * Returns true if "host" is one of the network identities of this node.
          */
         virtual bool isSelf(const HostAndPort& host) = 0;
+
+        /**
+         * Returns the HostAndPort of the remote client connected to us that initiated the operation
+         * represented by "txn".
+         */
+        virtual HostAndPort getClientHostAndPort(const OperationContext* txn) = 0;
+
+        /**
+         * Returns true if the client associated with 'txn' is using godmode.
+         */
+        virtual bool isGod(OperationContext* txn) = 0;
     };
 
 } // namespace repl

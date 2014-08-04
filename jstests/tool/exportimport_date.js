@@ -18,6 +18,9 @@ var nonformatable = ISODate("3001-01-01T00:00:00Z");
 assert.eq(nonformatable.valueOf(), 32535216000000);
 src.insert({ "_id" : nonformatable });
 
+// Verify number of documents inserted
+assert.eq(2, src.find().itcount());
+
 data = 'data/exportimport_date_test.json';
 
 print('About to call mongoexport on: ' + exportimport_db.getName() + '.' + src.getName() +

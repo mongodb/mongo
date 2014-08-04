@@ -99,7 +99,6 @@ namespace mongo {
 
             Status addKey(const BSONObj& key, const DiskLoc& loc);
 
-            // XXX: status, outparam for # keys?
             unsigned long long commit(bool mayInterrupt);
 
         private:
@@ -107,22 +106,22 @@ namespace mongo {
 
             Builder(BtreeLogic* logic, OperationContext* txn, bool dupsAllowed);
 
-            // Direct ports of functionality
-            void newBucket();
-            void buildNextLevel(DiskLoc loc, bool mayInterrupt);
+            /**
+             * Creates and returns a new empty bucket to the right of leftSib, maintaining the
+             * internal consistency of the tree. leftSib must be the right-most child of its parent
+             * or it must be the root.
+             */
+            DiskLoc newBucket(BucketType* leftSib, DiskLoc leftSibLoc);
+
             void mayCommitProgressDurably();
             BucketType* _getModifiableBucket(DiskLoc loc);
             BucketType* _getBucket(DiskLoc loc);
-            // Direct ports of functionality
 
             // Not owned.
             BtreeLogic* _logic;
 
-            // Direct port of names.
-            DiskLoc _cur;
-            DiskLoc _first;
-            BucketType* _b;
-            bool _committed;
+            DiskLoc _rightLeafLoc; // DiskLoc of _rightLeaf
+            BucketType* _rightLeaf; // This is always the right-most (highest) leaf bucket.
             bool _dupsAllowed;
             long long _numAdded;
             auto_ptr<KeyDataOwnedType> _keyLast;
@@ -231,6 +230,8 @@ namespace mongo {
         //
         // Size constants
         //
+
+        const RecordStore* getRecordStore() const { return _recordStore; }
 
         static int lowWaterMark();
 
@@ -551,18 +552,19 @@ namespace mongo {
                           const Ordering& o,
                           int direction) const;
 
-        // TODO needs 'this' for _ordering for sanity check
-        bool _pushBack(BucketType* bucket,
-                       const DiskLoc recordLoc,
-                       const KeyDataType& key,
-                       const DiskLoc prevChild);
-
-        void pushBack(BucketType* bucket,
+        /**
+         * Tries to push key into bucket. Return false if it can't because key doesn't fit.
+         *
+         * bucket must be declared as writable by the caller.
+         * The new key/recordLoc pair must be higher than any others in bucket.
+         *
+         * TODO needs 'this' for _ordering for sanity check
+         */
+        bool pushBack(BucketType* bucket,
                       const DiskLoc recordLoc,
                       const KeyDataType& key,
-                      const DiskLoc prevChild) {
-            invariant(_pushBack(bucket, recordLoc, key, prevChild));
-        }
+                      const DiskLoc prevChild);
+
 
         BucketType* childForPos(BucketType* bucket, int pos) const;
 

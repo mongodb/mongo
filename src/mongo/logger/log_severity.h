@@ -89,6 +89,14 @@ namespace logger {
          */
         StringData toStringData() const;
 
+        /**
+         * Returns a single capital letter naming this severity level.
+         * Equivalent to upper-case of first letter of toStringData() result.
+         *
+         * Not all levels are uniquely named.
+         */
+        char toChar() const;
+
         //
         // Comparison operations.
         //

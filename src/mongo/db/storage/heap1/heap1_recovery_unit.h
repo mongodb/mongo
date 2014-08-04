@@ -57,6 +57,9 @@ namespace mongo {
             return false;
         }
 
+        virtual void registerChange(Change* change) {
+        }
+
         virtual void* writingPtr(void* data, size_t len) {
             return data;
         }

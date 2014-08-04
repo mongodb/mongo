@@ -87,14 +87,14 @@ namespace mongo {
         }
     }
 
-    void SkipStage::prepareToYield() {
+    void SkipStage::saveState() {
         ++_commonStats.yields;
-        _child->prepareToYield();
+        _child->saveState();
     }
 
-    void SkipStage::recoverFromYield(OperationContext* opCtx) {
+    void SkipStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        _child->recoverFromYield(opCtx);
+        _child->restoreState(opCtx);
     }
 
     void SkipStage::invalidate(const DiskLoc& dl, InvalidationType type) {

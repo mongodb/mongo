@@ -69,11 +69,11 @@ namespace internal {
 #if defined(_M_X64) || defined(__x86_64__)
 #define V8_HOST_ARCH_X64 1
 #define V8_HOST_ARCH_64_BIT 1
-#define V8_HOST_CAN_READ_UNALIGNED 1
+// (SERVER-13824) #define V8_HOST_CAN_READ_UNALIGNED 1
 #elif defined(_M_IX86) || defined(__i386__)
 #define V8_HOST_ARCH_IA32 1
 #define V8_HOST_ARCH_32_BIT 1
-#define V8_HOST_CAN_READ_UNALIGNED 1
+// (SERVER-13824) #define V8_HOST_CAN_READ_UNALIGNED 1
 #elif defined(__ARMEL__)
 #define V8_HOST_ARCH_ARM 1
 #define V8_HOST_ARCH_32_BIT 1
@@ -81,7 +81,7 @@ namespace internal {
 // that unaligned accesses are not allowed unless the build system
 // defines the CAN_USE_UNALIGNED_ACCESSES macro to be non-zero.
 #if CAN_USE_UNALIGNED_ACCESSES
-#define V8_HOST_CAN_READ_UNALIGNED 1
+// (SERVER-13824) #define V8_HOST_CAN_READ_UNALIGNED 1
 #endif
 #elif defined(__MIPSEL__)
 #define V8_HOST_ARCH_MIPS 1

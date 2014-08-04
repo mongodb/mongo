@@ -41,6 +41,8 @@
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replset_commands.h"
@@ -89,11 +91,6 @@ namespace repl {
         if (getReplicationMode() == modeReplSet) {
             theReplSet->shutdown();
         }
-    }
-
-    bool LegacyReplicationCoordinator::isShutdownOkay() const {
-        // TODO
-        return false;
     }
 
     ReplSettings& LegacyReplicationCoordinator::getSettings() {
@@ -309,6 +306,7 @@ namespace {
         if (!_settings.slave)
             return true;
 
+        // TODO(dannenberg) replAllDead is bad and should be removed when master slave is removed
         if (replAllDead) {
             return dbName == "local";
         }
@@ -321,8 +319,10 @@ namespace {
         return dbName == "local";
     }
 
-    Status LegacyReplicationCoordinator::canServeReadsFor(const NamespaceString& ns, bool slaveOk) {
-        if (cc().isGod()) {
+    Status LegacyReplicationCoordinator::canServeReadsFor(OperationContext* txn,
+                                                          const NamespaceString& ns,
+                                                          bool slaveOk) {
+        if (txn->getClient()->isGod()) {
             return Status::OK();
         }
         if (canAcceptWritesForDatabase(ns.db())) {
@@ -490,76 +490,80 @@ namespace {
         }
     }
 
-    void LegacyReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
+    Status LegacyReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
         theReplSet->summarizeStatus(*result);
+        return Status::OK();
+    }
+
+    void LegacyReplicationCoordinator::processReplSetGetConfig(BSONObjBuilder* result) {
+        result->append("config", theReplSet->config().asBson());
     }
 
     bool LegacyReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
         return theReplSet->setMaintenanceMode(txn, activate);
     }
 
-    Status LegacyReplicationCoordinator::processHeartbeat(const BSONObj& cmdObj, 
-                                                          BSONObjBuilder* resultObj) {
-        if( cmdObj["pv"].Int() != 1 ) {
+    Status LegacyReplicationCoordinator::processHeartbeat(const ReplSetHeartbeatArgs& args,
+                                                          ReplSetHeartbeatResponse* response) {
+        if (args.getProtocolVersion() != 1) {
             return Status(ErrorCodes::BadValue, "incompatible replset protocol version");
         }
 
         {
-            string s = string(cmdObj.getStringField("replSetHeartbeat"));
-            if (_settings.ourSetName() != s) {
+            if (_settings.ourSetName() != args.getSetName()) {
                 log() << "replSet set names do not match, our cmdline: " << _settings.replSet
                       << rsLog;
-                log() << "replSet s: " << s << rsLog;
-                resultObj->append("mismatch", true);
+                log() << "replSet s: " << args.getSetName() << rsLog;
+                response->noteMismatched();
                 return Status(ErrorCodes::BadValue, "repl set names do not match");
             }
         }
 
-        resultObj->append("rs", true);
+        response->noteReplSet();
         if( (theReplSet == 0) || (theReplSet->startupStatus == ReplSetImpl::LOADINGCONFIG) ) {
-            string from( cmdObj.getStringField("from") );
-            if( !from.empty() ) {
+            if (!args.getSenderHost().empty()) {
                 scoped_lock lck( _settings.discoveredSeeds_mx );
-                _settings.discoveredSeeds.insert(from);
+                _settings.discoveredSeeds.insert(args.getSenderHost().toString());
             }
-            resultObj->append("hbmsg", "still initializing");
+            response->setHbMsg("still initializing");
             return Status::OK();
         }
 
-        if( theReplSet->name() != cmdObj.getStringField("replSetHeartbeat") ) {
-            resultObj->append("mismatch", true);
+        if (theReplSet->name() != args.getSetName()) {
+            response->noteMismatched();
             return Status(ErrorCodes::BadValue, "repl set names do not match (2)");
         }
-        resultObj->append("set", theReplSet->name());
+        response->setSetName(theReplSet->name());
 
         MemberState currentState = theReplSet->state();
-        resultObj->append("state", currentState.s);
+        response->setState(currentState.s);
         if (currentState == MemberState::RS_PRIMARY) {
-            resultObj->appendDate("electionTime", theReplSet->getElectionTime().asDate());
+            response->setElectionTime(theReplSet->getElectionTime().asDate());
         }
 
-        resultObj->append("e", theReplSet->iAmElectable());
-        resultObj->append("hbmsg", theReplSet->hbmsg());
-        resultObj->append("time", (long long) time(0));
-        resultObj->appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
+        response->setElectable(theReplSet->iAmElectable());
+        response->setHbMsg(theReplSet->hbmsg());
+        response->setTime((long long) time(0));
+        response->setOpTime(theReplSet->lastOpTimeWritten.asDate());
         const Member *syncTarget = BackgroundSync::get()->getSyncTarget();
         if (syncTarget) {
-            resultObj->append("syncingTo", syncTarget->fullName());
+            response->setSyncingTo(syncTarget->fullName());
         }
 
         int v = theReplSet->config().version;
-        resultObj->append("v", v);
-        if( v > cmdObj["v"].Int() )
-            *resultObj << "config" << theReplSet->config().asBson();
+        response->setVersion(v);
+        if (v > args.getConfigVersion()) {
+            ReplicaSetConfig config;
+            fassert(18635, config.initialize(theReplSet->config().asBson()));
+            response->setConfig(config);
+        }
 
         Member* from = NULL;
-        if (cmdObj.hasField("fromId")) {
-            if (v == cmdObj["v"].Int()) {
-                from = theReplSet->getMutableMember(cmdObj["fromId"].Int());
-            }
+        if (v == args.getConfigVersion() && args.getSenderId() != -1) {
+            from = theReplSet->getMutableMember(args.getSenderId());
         }
         if (!from) {
-            from = theReplSet->findByName(cmdObj.getStringField("from"));
+            from = theReplSet->findByName(args.getSenderHost().toString());
             if (!from) {
                 return Status::OK();
             }
@@ -567,7 +571,7 @@ namespace {
 
         // if we thought that this node is down, let it know
         if (!from->hbinfo().up()) {
-            resultObj->append("stateDisagreement", true);
+            response->noteStateDisagreement();
         }
 
         // note that we got a heartbeat from this node
@@ -578,7 +582,7 @@ namespace {
         return Status::OK();
     }
 
-    Status LegacyReplicationCoordinator::_checkReplEnabledForCommand(BSONObjBuilder* result) {
+    Status LegacyReplicationCoordinator::checkReplEnabledForCommand(BSONObjBuilder* result) {
         if (!_settings.usingReplSets()) {
             if (serverGlobalParams.configsvr) {
                 result->append("info", "configsvr"); // for shell prompt
@@ -609,7 +613,9 @@ namespace {
             return Status::OK();
         }
 
-        Status status = _checkReplEnabledForCommand(resultObj);
+        // TODO(dannenberg) once reconfig processing has been figured out in the impl, this should
+        // be moved out of processReplSetReconfig and into the command body like all other cmds
+        Status status = checkReplEnabledForCommand(resultObj);
         if (!status.isOK()) {
             return status;
         }
@@ -810,10 +816,6 @@ namespace {
     }
 
     Status LegacyReplicationCoordinator::processReplSetGetRBID(BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
         resultObj->append("rbid", _rbid);
         return Status::OK();
     }
@@ -865,12 +867,7 @@ namespace {
 } // namespace
 
     Status LegacyReplicationCoordinator::processReplSetFresh(const ReplSetFreshArgs& args,
-                                                             BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
-
+                                                             BSONObjBuilder* resultObj){
         if( args.setName != theReplSet->name() ) {
             return Status(ErrorCodes::ReplicaSetNotFound,
                           str::stream() << "wrong repl set name. Expected: " <<
@@ -904,10 +901,6 @@ namespace {
 
     Status LegacyReplicationCoordinator::processReplSetElect(const ReplSetElectArgs& args,
                                                              BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
         theReplSet->electCmdReceived(args.set, args.whoid, args.cfgver, args.round, resultObj);
         return Status::OK();
     }
@@ -917,10 +910,6 @@ namespace {
     }
 
     Status LegacyReplicationCoordinator::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
         if (theReplSet->freeze(secs)) {
             if (secs == 0) {
                 resultObj->append("info","unfreezing");
@@ -935,10 +924,6 @@ namespace {
     Status LegacyReplicationCoordinator::processReplSetMaintenance(OperationContext* txn,
                                                                    bool activate,
                                                                    BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
         if (!setMaintenanceMode(txn, activate)) {
             if (theReplSet->isPrimary()) {
                 return Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
@@ -953,10 +938,6 @@ namespace {
 
     Status LegacyReplicationCoordinator::processReplSetSyncFrom(const std::string& target,
                                                                 BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
         resultObj->append("syncFromRequested", target);
 
         return theReplSet->forceSyncFrom(target, resultObj);
@@ -965,11 +946,6 @@ namespace {
     Status LegacyReplicationCoordinator::processReplSetUpdatePosition(OperationContext* txn,
                                                                       const BSONArray& updates,
                                                                       BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
-
         BSONForEach(elem, updates) {
             BSONObj entry = elem.Obj();
             OID id = entry["_id"].OID();
@@ -984,27 +960,23 @@ namespace {
 
     Status LegacyReplicationCoordinator::processReplSetUpdatePositionHandshake(
             const OperationContext* txn, const BSONObj& cmdObj, BSONObjBuilder* resultObj) {
-        Status status = _checkReplEnabledForCommand(resultObj);
+
+        OID rid = cmdObj["handshake"].OID();
+        Status status = processHandshake(txn, rid, cmdObj);
         if (!status.isOK()) {
             return status;
         }
 
-        OID rid = cmdObj["handshake"].OID();
-        if (!processHandshake(txn, rid, cmdObj)) {
-            return Status(ErrorCodes::NodeNotFound,
-                          "node could not be found in replica set config during handshake");
-        }
-
-        // if we aren't primary, pass the handshake along
-        if (!theReplSet->isPrimary()) {
+        // if we're a replset and aren't primary, pass the handshake along
+        if (theReplSet && !theReplSet->isPrimary()) {
             theReplSet->syncSourceFeedback.forwardSlaveHandshake();
         }
         return Status::OK();
     }
 
-    bool LegacyReplicationCoordinator::processHandshake(const OperationContext* txn,
-                                                        const OID& remoteID,
-                                                        const BSONObj& handshake) {
+    Status LegacyReplicationCoordinator::processHandshake(const OperationContext* txn,
+                                                          const OID& remoteID,
+                                                          const BSONObj& handshake) {
         LOG(2) << "Received handshake " << handshake << " from node with RID " << remoteID;
 
         boost::lock_guard<boost::mutex> lock(_mutex);
@@ -1017,8 +989,14 @@ namespace {
         }
         _ridConfigMap[remoteID] = configObj;
 
-        if (getReplicationMode() != modeReplSet || !handshake.hasField("member")) {
-            return false;
+        if (getReplicationMode() != modeReplSet) {
+            return Status::OK();
+        }
+
+        if (!handshake.hasField("member")) {
+            return Status(ErrorCodes::ProtocolError,
+                          str::stream() << "Handshake object did not contain \"member\" field.  "
+                                  "Handshake" << handshake);
         }
 
         int memberID = handshake["member"].Int();
@@ -1027,12 +1005,14 @@ namespace {
         // in that case, the Member will no longer be in theReplSet's _members List and member
         // will be NULL
         if (!member) {
-            return false;
+            return Status(ErrorCodes::NodeNotFound,
+                          str::stream() << "Node with replica set member ID " << memberID <<
+                                  " could not be found in replica set config during handshake");
         }
 
         _ridMemberMap[remoteID] = member;
         theReplSet->syncSourceFeedback.forwardSlaveHandshake();
-        return true;
+        return Status::OK();
     }
 
     void LegacyReplicationCoordinator::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
@@ -1066,6 +1046,10 @@ namespace {
             return theReplSet->getLastErrorDefault;
         }
         return BSONObj();
+    }
+
+    bool LegacyReplicationCoordinator::isReplEnabled() const {
+        return _settings.usingReplSets() || _settings.slave || _settings.master;
     }
 
 } // namespace repl

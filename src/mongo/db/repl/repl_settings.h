@@ -38,6 +38,8 @@
 namespace mongo {
 namespace repl {
 
+    extern int maxSyncSourceLagSecs;
+
     bool anyReplEnabled();
 
     /* replication slave? (possibly with slave)

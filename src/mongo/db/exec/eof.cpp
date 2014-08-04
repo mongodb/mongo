@@ -50,11 +50,11 @@ namespace mongo {
         return PlanStage::IS_EOF;
     }
 
-    void EOFStage::prepareToYield() {
+    void EOFStage::saveState() {
         ++_commonStats.yields;
     }
 
-    void EOFStage::recoverFromYield(OperationContext* opCtx) {
+    void EOFStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
     }
 

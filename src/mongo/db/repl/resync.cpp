@@ -88,7 +88,8 @@ namespace repl {
                     return false;
                 replAllDead = "resync forced";
             }
-            if ( !replAllDead ) {
+            // TODO(dannenberg) replAllDead is bad and should be removed when masterslave is removed
+            if (!replAllDead) {
                 errmsg = "not dead, no need to resync";
                 return false;
             }

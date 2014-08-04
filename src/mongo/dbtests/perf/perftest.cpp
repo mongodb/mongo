@@ -29,7 +29,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 
@@ -37,10 +37,12 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/unittest/unittest.h"
+
 
 namespace mongo {
     // This specifies default dbpath for our testing framework
@@ -780,7 +782,9 @@ int main( int argc, char **argv, char** envp ) {
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
     mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(mongo::logger::LogSeverity::Log());
-    client_ = new DBDirectClient();
+
+    OperationContextImpl txn;
+    client_ = new DBDirectClient(&txn);
 
     return mongo::dbtests::runDbTests(argc, argv);
 }

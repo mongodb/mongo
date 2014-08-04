@@ -48,6 +48,7 @@ namespace mongo {
 namespace repl {
 
     struct FixUpInfo;
+    class OplogReader;
     class ReplSetSeedList;
     class ReplSetHealthPollTask;
 

@@ -171,10 +171,11 @@ namespace mongo {
                     return false;
                 }
 
-                // Can't index negations of MOD, REGEX, or ELEM_MATCH_VALUE.
+                // Can't index negations of MOD, REGEX, TYPE_OPERATOR, or ELEM_MATCH_VALUE.
                 MatchExpression::MatchType childtype = node->getChild(0)->matchType();
                 if (MatchExpression::REGEX == childtype ||
                     MatchExpression::MOD == childtype ||
+                    MatchExpression::TYPE_OPERATOR == childtype ||
                     MatchExpression::ELEM_MATCH_VALUE == childtype) {
                     return false;
                 }

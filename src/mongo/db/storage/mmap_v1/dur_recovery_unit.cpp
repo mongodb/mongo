@@ -31,6 +31,7 @@
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 
 #include <algorithm>
+#include <string>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
@@ -39,6 +40,21 @@
 #define ROLLBACK_ENABLED 0
 
 namespace mongo {
+
+
+    /**
+     *  A MemoryWrite provides rollback by keeping a pre-image.
+     */
+    class MemoryWrite : public RecoveryUnit::Change {
+    public:
+        MemoryWrite(char* base, size_t len) : _base(base), _preimage(base, len) { }
+        virtual void commit();
+        virtual void rollback();
+
+    private:
+        char* _base;
+        std::string _preimage;  // TODO consider storing out-of-line
+    };
 
     DurRecoveryUnit::DurRecoveryUnit(OperationContext* txn)
         : _txn(txn),
@@ -91,11 +107,8 @@ namespace mongo {
     }
 
     void DurRecoveryUnit::publishChanges() {
-        if (getDur().isDurable()) {
-            for (Changes::iterator it=_changes.begin(), end=_changes.end(); it != end; ++it) {
-                // TODO don't go through getDur() interface.
-                getDur().writingPtr(it->base, it->preimage.size());
-            }
+        for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
+            (*it)->commit();
         }
 
         // We now reset to a "clean" state without any uncommited changes, while keeping the same
@@ -113,9 +126,7 @@ namespace mongo {
         invariant(_changes.size() <= size_t(std::numeric_limits<int>::max()));
         const int rollbackTo = _startOfUncommittedChangesForLevel.back();
         for (int i = _changes.size() - 1; i >= rollbackTo; i--) {
-            // TODO need to add these pages to our "dirty count" somehow.
-            const Change& change = _changes[i];
-            change.preimage.copy(change.base, change.preimage.size());
+            _changes[i]->rollback();
         }
         _changes.erase(_changes.begin() + rollbackTo, _changes.end());
     }
@@ -123,10 +134,7 @@ namespace mongo {
     void DurRecoveryUnit::recordPreimage(char* data, size_t len) {
         invariant(len > 0);
 
-        Change change;
-        change.base = data;
-        change.preimage.assign(data, len);
-        _changes.push_back(change);
+        registerChange(new MemoryWrite(data, len));
     }
 
     bool DurRecoveryUnit::awaitCommit() {
@@ -152,9 +160,11 @@ namespace mongo {
     }
 
     void* DurRecoveryUnit::writingPtr(void* data, size_t len) {
+        invariant(len > 0);
 #if ROLLBACK_ENABLED
         invariant(inAUnitOfWork());
-        recordPreimage(static_cast<char*>(data), len);
+        // TODO need to call MemoryMappedFile::makeWritable()
+        registerChange(new MemoryWrite(static_cast<char*>(data), len));
         return data;
 #else
         invariant(_txn->lockState()->isWriteLocked());
@@ -163,11 +173,33 @@ namespace mongo {
 #endif
     }
 
+    void DurRecoveryUnit::registerChange(Change* change) {
+#if ROLLBACK_ENABLED
+        invariant(inAUnitOfWork());
+        _changes.push_back(ChangePtr(change));
+#else
+        change->commit();
+        delete change;
+#endif
+    }
+
     void DurRecoveryUnit::syncDataAndTruncateJournal() {
 #if ROLLBACK_ENABLED
         publishChanges();
 #endif
         return getDur().syncDataAndTruncateJournal(_txn);
+    }
+
+    void MemoryWrite::commit() {
+        // TODO don't go through getDur() interface.
+        if (getDur().isDurable()) {
+            getDur().writingPtr(_base, _preimage.size());
+        }
+    }
+
+    void MemoryWrite::rollback() {
+        // TODO need to add these pages to our "dirty count" somehow.
+       _preimage.copy(_base, _preimage.size());
     }
 
 }  // namespace mongo

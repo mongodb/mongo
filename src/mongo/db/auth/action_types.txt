@@ -82,6 +82,7 @@
 "renameCollectionSameDB",
 "repairDatabase",
 "replSetConfigure",
+"replSetGetConfig",
 "replSetGetStatus",
 "replSetHeartbeat",
 "replSetReconfig",  # Not used for permissions checks, but to id the event in logs.

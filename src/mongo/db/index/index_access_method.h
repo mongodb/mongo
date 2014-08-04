@@ -150,6 +150,12 @@ namespace mongo {
          */
         virtual Status validate(OperationContext* txn, int64_t* numKeys) = 0;
 
+        /**
+         * @return The number of bytes consumed by this index.
+         *         Exactly what is counted is not defined based on padding, re-use, etc...
+         */
+        virtual long long getSpaceUsedBytes( OperationContext* txn ) const = 0;
+
         //
         // Bulk operations support
         //

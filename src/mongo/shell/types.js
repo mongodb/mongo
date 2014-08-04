@@ -376,9 +376,7 @@ ObjectId.fromDate = function(source) {
     var seconds = Math.floor(sourceDate.getTime()/1000);
 
     // Generate hex timestamp with padding.
-    var hexSeconds = seconds.toString(16);
-    var padding = "0000000000000000";
-    var hexTimestamp = hexSeconds + padding;
+    var hexTimestamp = seconds.toString(16).pad(8,false,'0') + "0000000000000000";
 
     // Create an ObjectId with hex timestamp.
     var objectId = ObjectId(hexTimestamp);

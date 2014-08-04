@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_coordinator_hybrid.h"
+
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 
 namespace mongo {
@@ -53,11 +54,6 @@ namespace repl {
         _impl.shutdown();
     }
 
-    bool HybridReplicationCoordinator::isShutdownOkay() const {
-        bool legacyResponse = _legacy.isShutdownOkay();
-        return legacyResponse;
-    }
-
     ReplSettings& HybridReplicationCoordinator::getSettings() {
         ReplSettings& legacySettings = _legacy.getSettings();
         return legacySettings;
@@ -65,6 +61,9 @@ namespace repl {
 
     ReplicationCoordinator::Mode HybridReplicationCoordinator::getReplicationMode() const {
         Mode legacyMode = _legacy.getReplicationMode();
+        // TODO(dannenberg) uncomment below once impl has implemented mode related functionality
+        // Mode implMode = _impl.getReplicationMode();
+        // invariant(legacyMode == implMode);
         return legacyMode;
     }
 
@@ -116,19 +115,27 @@ namespace repl {
 
     bool HybridReplicationCoordinator::isMasterForReportingPurposes() {
         bool legacyResponse = _legacy.isMasterForReportingPurposes();
-        _impl.isMasterForReportingPurposes();
+        // TODO(dannenberg) uncomment below once the impl state changes are fully implemented
+        // bool implResponse = _impl.isMasterForReportingPurposes();
+        // invariant(legacyResponse == implResponse);
         return legacyResponse;
     }
 
     bool HybridReplicationCoordinator::canAcceptWritesForDatabase(const StringData& dbName) {
         bool legacyResponse = _legacy.canAcceptWritesForDatabase(dbName);
-        _impl.canAcceptWritesForDatabase(dbName);
+        // TODO(dannenberg) uncomment below once the impl state changes are fully implemented
+        // bool implResponse = _impl.canAcceptWritesForDatabase(dbName);
+        // invariant(legacyResponse == implResponse);
         return legacyResponse;
     }
 
-    Status HybridReplicationCoordinator::canServeReadsFor(const NamespaceString& ns, bool slaveOk) {
-        Status legacyStatus = _legacy.canServeReadsFor(ns, slaveOk);
-        Status implStatus = _impl.canServeReadsFor(ns, slaveOk);
+    Status HybridReplicationCoordinator::canServeReadsFor(OperationContext* txn,
+                                                          const NamespaceString& ns,
+                                                          bool slaveOk) {
+        Status legacyStatus = _legacy.canServeReadsFor(txn, ns, slaveOk);
+        // TODO(dannenberg) uncomment below once the impl state changes are full implemeneted
+        // Status implStatus = _impl.canServeReadsFor(txn, ns, slaveOk);
+        // invariant(legacyStatus == implStatus);
         return legacyStatus;
     }
 
@@ -161,22 +168,31 @@ namespace repl {
     void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                                            BSONObjBuilder* result) {
         _legacy.prepareReplSetUpdatePositionCommand(txn, result);
-        BSONObjBuilder implResult;
-        _impl.prepareReplSetUpdatePositionCommand(txn, &implResult);
+        // TODO(spencer): Can't call into the impl until it can load a valid config
+        //BSONObjBuilder implResult;
+        //_impl.prepareReplSetUpdatePositionCommand(&implResult);
     }
 
     void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommandHandshakes(
             OperationContext* txn,
             std::vector<BSONObj>* handshakes) {
         _legacy.prepareReplSetUpdatePositionCommandHandshakes(txn, handshakes);
-        std::vector<BSONObj> implResult;
-        _impl.prepareReplSetUpdatePositionCommandHandshakes(txn, &implResult);
+        // TODO(spencer): Can't call into the impl until it can load a valid config
+        //std::vector<BSONObj> implResult;
+        //_impl.prepareReplSetUpdatePositionCommandHandshakes(&implResult);
     }
 
-    void HybridReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
-        _legacy.processReplSetGetStatus(result);
+    Status HybridReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
+        Status legacyStatus = _legacy.processReplSetGetStatus(result);
         BSONObjBuilder implResult;
         _impl.processReplSetGetStatus(&implResult);
+        return legacyStatus;
+    }
+
+    void HybridReplicationCoordinator::processReplSetGetConfig(BSONObjBuilder* result) {
+        _legacy.processReplSetGetConfig(result);
+        BSONObjBuilder implResult;
+        _impl.processReplSetGetConfig(&implResult);
     }
 
     bool HybridReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
@@ -185,10 +201,9 @@ namespace repl {
         return legacyResponse;
     }
 
-    Status HybridReplicationCoordinator::processHeartbeat(const BSONObj& cmdObj, 
-                                                          BSONObjBuilder* resultObj) {
-        Status legacyStatus = _legacy.processHeartbeat(cmdObj, resultObj);
-        BSONObjBuilder implResult;
+    Status HybridReplicationCoordinator::processHeartbeat(const ReplSetHeartbeatArgs& args,
+                                                          ReplSetHeartbeatResponse* response) {
+        Status legacyStatus = _legacy.processHeartbeat(args, response);
         return legacyStatus;
     }
 
@@ -266,8 +281,9 @@ namespace repl {
                                                                       const BSONArray& updates,
                                                                       BSONObjBuilder* resultObj) {
         Status legacyStatus = _legacy.processReplSetUpdatePosition(txn, updates, resultObj);
-        BSONObjBuilder implResult;
-        Status implStatus = _impl.processReplSetUpdatePosition(txn, updates, &implResult);
+        // TODO(spencer): Can't uncomment this until we uncomment processHandshake below
+        //BSONObjBuilder implResult;
+        //Status implStatus = _impl.processReplSetUpdatePosition(txn, updates, &implResult);
         return legacyStatus;
     }
 
@@ -278,18 +294,20 @@ namespace repl {
         Status legacyStatus = _legacy.processReplSetUpdatePositionHandshake(txn,
                                                                             handshake,
                                                                             resultObj);
-        BSONObjBuilder implResult;
-        Status implStatus = _impl.processReplSetUpdatePositionHandshake(txn,
-                                                                        handshake,
-                                                                        &implResult);
+        // TODO(spencer): Can't call into the impl until it can load a valid config
+        //BSONObjBuilder implResult;
+        //Status implStatus = _impl.processReplSetUpdatePositionHandshake(txn,
+        //                                                                handshake,
+        //                                                                &implResult);
         return legacyStatus;
     }
 
-    bool HybridReplicationCoordinator::processHandshake(const OperationContext* txn,
-                                                        const OID& remoteID,
-                                                        const BSONObj& handshake) {
-        bool legacyResponse = _legacy.processHandshake(txn, remoteID, handshake);
-        _impl.processHandshake(txn, remoteID, handshake);
+    Status HybridReplicationCoordinator::processHandshake(const OperationContext* txn,
+                                                          const OID& remoteID,
+                                                          const BSONObj& handshake) {
+        Status legacyResponse = _legacy.processHandshake(txn, remoteID, handshake);
+        // TODO(spencer): Can't call into the impl until it can load a valid config
+        //_impl.processHandshake(txn, remoteID, handshake);
         return legacyResponse;
     }
 
@@ -300,7 +318,9 @@ namespace repl {
 
     bool HybridReplicationCoordinator::buildsIndexes() {
         bool legacyResponse = _legacy.buildsIndexes();
-        _impl.buildsIndexes();
+        // TODO(dannenberg) uncomment once config loading is working properly in impl
+        // bool implResponse = _impl.buildsIndexes();
+        // invariant(legacyResponse == implResponse);
         return legacyResponse;
     }
 
@@ -321,6 +341,20 @@ namespace repl {
         BSONObj legacyGLE = _legacy.getGetLastErrorDefault();
         BSONObj implGLE = _impl.getGetLastErrorDefault();
         return legacyGLE;
+    }
+
+    Status HybridReplicationCoordinator::checkReplEnabledForCommand(BSONObjBuilder* result) {
+        Status legacyStatus = _legacy.checkReplEnabledForCommand(result);
+        Status implStatus = _impl.checkReplEnabledForCommand(result);
+        return legacyStatus;
+    }
+
+    bool HybridReplicationCoordinator::isReplEnabled() const {
+        bool legacyResponse = _legacy.isReplEnabled();
+        // TODO(dannenberg) uncomment once config loading is working properly in impl
+        // bool implResponse = _impl.isReplEnabled();
+        // invariant(legacyResponse == implResponse);
+        return legacyResponse;
     }
 
 } // namespace repl

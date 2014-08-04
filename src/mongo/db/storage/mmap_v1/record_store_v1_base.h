@@ -286,9 +286,9 @@ namespace mongo {
 
         virtual void invalidate(const DiskLoc& dl);
 
-        virtual void prepareToYield() {}
+        virtual void saveState() {}
 
-        virtual bool recoverFromYield() { return true; }
+        virtual bool restoreState() { return true; }
 
         virtual RecordData dataFor( const DiskLoc& loc ) const { return _rs->dataFor(loc); }
 

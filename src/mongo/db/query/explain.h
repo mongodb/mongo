@@ -100,9 +100,17 @@ namespace mongo {
             // execution tree. String alias is "execStats".
             EXEC_STATS = 1,
 
-            // At this highest verbosity level, we generate the execution stats for each rejected
-            // plan as well as the winning plan. String alias is "allPlansExecution".
-            EXEC_ALL_PLANS = 2
+            // At this second-highest verbosity level, we generate the execution stats for each
+            // rejected plan as well as the winning plan. String alias is "allPlansExecution".
+            EXEC_ALL_PLANS = 2,
+
+            // This is the highest verbosity level. It has the same behavior as EXEC_ALL_PLANS,
+            // except it includes more detailed stats. String alias is "full".
+            //
+            // The FULL verbosity level is used to generate detailed debug information for the
+            // plan cache and for logging. It includes metrics like "works", "isEOF", and "advanced"
+            // that are omitted at lesser verbosities.
+            FULL = 3,
         };
 
         /**
@@ -120,6 +128,32 @@ namespace mongo {
         static Status explainStages(PlanExecutor* exec,
                                     Explain::Verbosity verbosity,
                                     BSONObjBuilder* out);
+
+        /**
+         * Converts the stats tree 'stats' into a corresponding BSON object containing
+         * explain information.
+         *
+         * Generates the BSON stats at a verbosity specified by 'verbosity'. Defaults
+         * to the highest verbosity (FULL).
+         */
+        static BSONObj statsToBSON(const PlanStageStats& stats,
+                                   Explain::Verbosity verbosity = FULL);
+
+        /**
+         * This version of stats tree to BSON conversion returns the result through the
+         * out-parameter 'bob' rather than returning a BSONObj.
+         *
+         * Generates the BSON stats at a verbosity specified by 'verbosity'. Defaults
+         * to the highest verbosity (FULL).
+         */
+        static void statsToBSON(const PlanStageStats& stats,
+                                BSONObjBuilder* bob,
+                                Explain::Verbosity verbosity = FULL);
+
+        /**
+         * Returns a short plan summary std::string describing the leaves of the query plan.
+         */
+        static std::string getPlanSummary(PlanStage* root);
 
         /**
          * Fills out 'statsOut' with summary stats using the execution tree contained
@@ -159,18 +193,15 @@ namespace mongo {
 
     private:
         /**
-         * Converts the stats tree 'stats' into a corresponding BSON object containing
-         * explain information.
+         * Private helper that does the heavy-lifting for the public statsToBSON(...) functions
+         * declared above.
          *
-         * Explain info is added to 'bob' according to the verbosity level passed in
-         * 'verbosity'.
-         *
-         * This is a helper for generating explain BSON. It it used by generatePlannerInfo(...)
-         * and generateExecStats(...).
+         * Not used except as a helper to the public statsToBSON(...) functions.
          */
-        static void explainStatsTree(const PlanStageStats& stats,
-                                     Explain::Verbosity verbosity,
-                                     BSONObjBuilder* bob);
+        static void statsToBSON(const PlanStageStats& stats,
+                                Explain::Verbosity verbosity,
+                                BSONObjBuilder* bob,
+                                BSONObjBuilder* topLevelBob);
 
         /**
          * Adds the 'queryPlanner' explain section to the BSON object being built
@@ -191,9 +222,12 @@ namespace mongo {
          * Generates the execution stats section for the stats tree 'stats',
          * adding the resulting BSON to 'out'.
          *
+         * Stats are generated at the verbosity specified by 'verbosity'.
+         *
          * This is a helper for generating explain BSON. It is used by explainStages(...).
          */
         static void generateExecStats(PlanStageStats* stats,
+                                      Explain::Verbosity verbosity,
                                       BSONObjBuilder* out);
 
         /**

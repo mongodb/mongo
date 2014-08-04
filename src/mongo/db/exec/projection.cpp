@@ -235,14 +235,14 @@ namespace mongo {
         return status;
     }
 
-    void ProjectionStage::prepareToYield() {
+    void ProjectionStage::saveState() {
         ++_commonStats.yields;
-        _child->prepareToYield();
+        _child->saveState();
     }
 
-    void ProjectionStage::recoverFromYield(OperationContext* opCtx) {
+    void ProjectionStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        _child->recoverFromYield(opCtx);
+        _child->restoreState(opCtx);
     }
 
     void ProjectionStage::invalidate(const DiskLoc& dl, InvalidationType type) {

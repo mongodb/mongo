@@ -51,8 +51,6 @@ namespace repl {
 
         virtual void shutdown();
 
-        virtual bool isShutdownOkay() const;
-
         virtual ReplSettings& getSettings();
 
         virtual bool isReplEnabled() const;
@@ -87,7 +85,9 @@ namespace repl {
         virtual Status checkIfWriteConcernCanBeSatisfied(
                 const WriteConcernOptions& writeConcern) const;
 
-        virtual Status canServeReadsFor(const NamespaceString& ns, bool slaveOk);
+        virtual Status canServeReadsFor(OperationContext* txn,
+                                        const NamespaceString& ns,
+                                        bool slaveOk);
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
@@ -104,7 +104,9 @@ namespace repl {
                 OperationContext* txn,
                 std::vector<BSONObj>* handshakes);
 
-        virtual void processReplSetGetStatus(BSONObjBuilder* result);
+        virtual Status processReplSetGetStatus(BSONObjBuilder* result);
+
+        virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
         virtual bool setMaintenanceMode(OperationContext* txn, bool activate);
 
@@ -117,8 +119,8 @@ namespace repl {
 
         virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj);
 
-        virtual Status processHeartbeat(const BSONObj& cmdObj, 
-                                        BSONObjBuilder* resultObj);
+        virtual Status processHeartbeat(const ReplSetHeartbeatArgs& args,
+                                        ReplSetHeartbeatResponse* response);
 
         virtual Status processReplSetReconfig(OperationContext* txn,
                                               const ReplSetReconfigArgs& args,
@@ -146,9 +148,9 @@ namespace repl {
                                                              const BSONObj& handshake,
                                                              BSONObjBuilder* resultObj);
 
-        virtual bool processHandshake(const OperationContext* txn,
-                                      const OID& remoteID,
-                                      const BSONObj& handshake);
+        virtual Status processHandshake(const OperationContext* txn,
+                                        const OID& remoteID,
+                                        const BSONObj& handshake);
 
         virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
 
@@ -157,6 +159,8 @@ namespace repl {
         virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
 
         virtual BSONObj getGetLastErrorDefault();
+
+        virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
 
     private:
 

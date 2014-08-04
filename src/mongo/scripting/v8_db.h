@@ -36,13 +36,6 @@
 
 namespace mongo {
 
-    class DBClientBase;
-
-    /**
-     * get the DBClientBase connection from JS args
-     */
-    boost::shared_ptr<mongo::DBClientBase> getConnection(V8Scope* scope, const v8::Arguments& args);
-
     // Internal Cursor
     v8::Handle<v8::FunctionTemplate> getInternalCursorFunctionTemplate(V8Scope* scope);
 

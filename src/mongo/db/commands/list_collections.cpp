@@ -67,14 +67,27 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool /*fromRepl*/) {
 
-            Client::ReadContext ctx( txn, dbname );
-            const Database* d = ctx.ctx().db();
-            const DatabaseCatalogEntry* dbEntry = d->getDatabaseCatalogEntry();
+            Lock::DBRead lk( txn->lockState(), dbname );
+
+            const Database* d = dbHolder().get( txn, dbname );
+            const DatabaseCatalogEntry* dbEntry = NULL;
 
             list<string> names;
-            dbEntry->getCollectionNamespaces( &names );
+            if ( d ) {
+                dbEntry = d->getDatabaseCatalogEntry();
+                dbEntry->getCollectionNamespaces( &names );
+                names.sort();
+            }
 
-            names.sort();
+            scoped_ptr<MatchExpression> matcher;
+            if ( jsobj["filter"].isABSONObj() ) {
+                StatusWithMatchExpression parsed =
+                    MatchExpressionParser::parse( jsobj["filter"].Obj() );
+                if ( !parsed.isOK() ) {
+                    return appendCommandStatus( result, parsed.getStatus() );
+                }
+                matcher.reset( parsed.getValue() );
+            }
 
             BSONArrayBuilder arr;
 
@@ -93,7 +106,12 @@ namespace mongo {
                     dbEntry->getCollectionCatalogEntry( txn, ns )->getCollectionOptions(txn);
                 b.append( "options", options.toBSON() );
 
-                arr.append( b.obj() );
+                BSONObj maybe = b.obj();
+                if ( matcher && !matcher->matchesBSON( maybe ) ) {
+                    continue;
+                }
+
+                arr.append( maybe );
             }
 
             result.append( "collections", arr.arr() );

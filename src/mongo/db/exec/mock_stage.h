@@ -58,8 +58,8 @@ namespace mongo {
         // These don't really mean anything here.
         // Some day we could count the # of calls to the yield functions to check that other stages
         // have correct yielding behavior.
-        virtual void prepareToYield() { }
-        virtual void recoverFromYield(OperationContext* opCtx) { }
+        virtual void saveState() { }
+        virtual void restoreState(OperationContext* opCtx) { }
         virtual void invalidate(const DiskLoc& dl, InvalidationType type) { }
 
         virtual std::vector<PlanStage*> getChildren() const;

@@ -201,7 +201,7 @@ namespace mongo {
         server->run();
     }
 
-    DBClientBase *createDirectClient() {
+    DBClientBase* createDirectClient(OperationContext* txn) {
         uassert( 10197 ,  "createDirectClient not implemented for sharding yet" , 0 );
         return 0;
     }

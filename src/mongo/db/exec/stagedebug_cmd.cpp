@@ -35,6 +35,7 @@
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/limit.h"
@@ -78,6 +79,7 @@ namespace mongo {
      * node -> {skip: {args: {node: node, num: posint}}}
      * node -> {sort: {args: {node: node, pattern: objWithSortCriterion }}}
      * node -> {mergeSort: {args: {nodes: [node, node], pattern: objWithSortCriterion}}}
+     * node -> {delete: {args: {node: node, isMulti: bool, shouldCallLogOp: bool}}}
      *
      * Forthcoming Nodes:
      *
@@ -116,7 +118,10 @@ namespace mongo {
             string collName = collElt.String();
 
             // Need a context to get the actual Collection*
-            Client::ReadContext ctx(txn, dbname);
+            // TODO A write lock is currently taken here to accommodate stages that perform writes
+            //      (e.g. DeleteStage).  This should be changed to use a read lock for read-only
+            //      execution trees.
+            Client::WriteContext ctx(txn, dbname);
 
             // Make sure the collection is valid.
             Database* db = ctx.ctx().db();
@@ -408,6 +413,25 @@ namespace mongo {
                 }
 
                 return new TextStage(txn, params, workingSet, matcher);
+            }
+            else if ("delete" == nodeName) {
+                uassert(18636, "Delete stage doesn't have a filter (put it on the child)",
+                        NULL == matcher);
+                uassert(18637, "node argument must be provided to delete",
+                        nodeArgs["node"].isABSONObj());
+                uassert(18638, "isMulti argument must be provided to delete",
+                        nodeArgs["isMulti"].type() == Bool);
+                uassert(18639, "shouldCallLogOp argument must be provided to delete",
+                        nodeArgs["shouldCallLogOp"].type() == Bool);
+                PlanStage* subNode = parseQuery(txn,
+                                                collection,
+                                                nodeArgs["node"].Obj(),
+                                                workingSet,
+                                                exprs);
+                DeleteStageParams params;
+                params.isMulti = nodeArgs["isMulti"].Bool();
+                params.shouldCallLogOp = nodeArgs["shouldCallLogOp"].Bool();
+                return new DeleteStage(txn, params, workingSet, collection, subNode);
             }
             else {
                 return NULL;

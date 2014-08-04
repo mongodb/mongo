@@ -144,7 +144,7 @@ namespace mongo {
         return _hitEnd || _btreeCursor->isEOF();
     }
 
-    void Count::prepareToYield() {
+    void Count::saveState() {
         ++_commonStats.yields;
         if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
 
@@ -152,7 +152,7 @@ namespace mongo {
         _endCursor->savePosition();
     }
 
-    void Count::recoverFromYield(OperationContext* opCtx) {
+    void Count::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
         if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
 

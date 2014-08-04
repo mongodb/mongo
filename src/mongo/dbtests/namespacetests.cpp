@@ -29,6 +29,10 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include <string>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/db.h"
 #include "mongo/db/index/expression_keys_private.h"
@@ -45,8 +49,8 @@
 #include "mongo/db/storage/mmap_v1/catalog/namespace.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/dbtests/dbtests.h"
-
 
 namespace NamespaceTests {
 
@@ -508,6 +512,99 @@ namespace NamespaceTests {
 #endif // SERVER-13640
     } // namespace NamespaceDetailsTests
 
+    namespace DatabaseTests {
+
+        class RollbackCreateCollection {
+        public:
+            void run() {
+                const string dbName = "rollback_create_collection";
+                const string committedName = dbName + ".committed";
+                const string rolledBackName = dbName + ".rolled_back";
+
+                OperationContextImpl txn;
+
+                Lock::DBWrite lk(txn.lockState(), dbName);
+
+                bool justCreated;
+                Database* db = dbHolder().getOrCreate(&txn, dbName, justCreated);
+                ASSERT(justCreated);
+
+                Collection* committedColl;
+                {
+                    WriteUnitOfWork wunit(txn.recoveryUnit());
+                    ASSERT_FALSE(db->getCollection(&txn, committedName));
+                    committedColl = db->createCollection(&txn, committedName);
+                    ASSERT_EQUALS(db->getCollection(&txn, committedName), committedColl);
+                    wunit.commit();
+                }
+
+                ASSERT_EQUALS(db->getCollection(&txn, committedName), committedColl);
+
+                {
+                    WriteUnitOfWork wunit(txn.recoveryUnit());
+                    ASSERT_FALSE(db->getCollection(&txn, rolledBackName));
+                    Collection* rolledBackColl = db->createCollection(&txn, rolledBackName);
+                    ASSERT_EQUALS(db->getCollection(&txn, rolledBackName), rolledBackColl);
+                    // not committing so creation should be rolled back
+                }
+
+                // The rolledBackCollection creation should have been rolled back
+                ASSERT_FALSE(db->getCollection(&txn, rolledBackName));
+
+                // The committedCollection should not have been affected by the rollback. Holders
+                // of the original Collection pointer should still be valid.
+                ASSERT_EQUALS(db->getCollection(&txn, committedName), committedColl);
+            }
+        };
+
+        class RollbackDropCollection {
+        public:
+            void run() {
+                const string dbName = "rollback_drop_collection";
+                const string droppedName = dbName + ".dropped";
+                const string rolledBackName = dbName + ".rolled_back";
+
+                OperationContextImpl txn;
+
+                Lock::DBWrite lk(txn.lockState(), dbName);
+
+                bool justCreated;
+                Database* db = dbHolder().getOrCreate(&txn, dbName, justCreated);
+                ASSERT(justCreated);
+
+                {
+                    WriteUnitOfWork wunit(txn.recoveryUnit());
+                    ASSERT_FALSE(db->getCollection(&txn, droppedName));
+                    Collection* droppedColl;
+                    droppedColl = db->createCollection(&txn, droppedName);
+                    ASSERT_EQUALS(db->getCollection(&txn, droppedName), droppedColl);
+                    db->dropCollection(&txn, droppedName);
+                    wunit.commit();
+                }
+
+                //  Should have been really dropped
+                ASSERT_FALSE(db->getCollection(&txn, droppedName));
+
+                {
+                    WriteUnitOfWork wunit(txn.recoveryUnit());
+                    ASSERT_FALSE(db->getCollection(&txn, rolledBackName));
+                    Collection* rolledBackColl = db->createCollection(&txn, rolledBackName);
+                    wunit.commit();
+                    ASSERT_EQUALS(db->getCollection(&txn, rolledBackName), rolledBackColl);
+                    db->dropCollection(&txn, rolledBackName);
+                    // not committing so dropping should be rolled back
+                }
+
+                // The rolledBackCollection dropping should have been rolled back.
+                // Original Collection pointers are no longer valid.
+                ASSERT(db->getCollection(&txn, rolledBackName));
+
+                // The droppedCollection should not have been restored by the rollback.
+                ASSERT_FALSE(db->getCollection(&txn, droppedName));
+            }
+        };
+    }  // namespace DatabaseTests
+
     class All : public Suite {
     public:
         All() : Suite( "namespace" ) {
@@ -528,6 +625,12 @@ namespace NamespaceTests {
             //add< NamespaceDetailsTests::Migrate >();
             //add< NamespaceDetailsTests::SwapIndexEntriesTest >();
             //            add< NamespaceDetailsTests::BigCollection >();
+
+#if 0
+            // until ROLLBACK_ENABLED
+            add< DatabaseTests::RollbackCreateCollection >();
+            add< DatabaseTests::RollbackDropCollection >();
+#endif
         }
     } myall;
 } // namespace NamespaceTests

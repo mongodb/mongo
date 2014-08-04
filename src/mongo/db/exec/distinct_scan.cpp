@@ -145,7 +145,7 @@ namespace mongo {
         return _hitEnd || _btreeCursor->isEOF();
     }
 
-    void DistinctScan::prepareToYield() {
+    void DistinctScan::saveState() {
         ++_commonStats.yields;
 
         if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
@@ -158,7 +158,7 @@ namespace mongo {
         _btreeCursor->savePosition();
     }
 
-    void DistinctScan::recoverFromYield(OperationContext* opCtx) {
+    void DistinctScan::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
 
         if (_hitEnd || (NULL == _btreeCursor.get())) { return; }

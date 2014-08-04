@@ -239,6 +239,10 @@ namespace mongo {
         return Status::OK();
     }
 
+    long long BtreeBasedAccessMethod::getSpaceUsedBytes( OperationContext* txn ) const {
+        return _newInterface->getSpaceUsedBytes( txn );
+    }
+
     Status BtreeBasedAccessMethod::validateUpdate(OperationContext* txn,
                                                   const BSONObj &from,
                                                   const BSONObj &to,
@@ -290,12 +294,18 @@ namespace mongo {
             _btreeState->setMultikey( txn );
         }
 
-        for (size_t i = 0; i < data->added.size(); ++i) {
-            _newInterface->insert(txn, *data->added[i], data->loc, data->dupsAllowed);
-        }
-
         for (size_t i = 0; i < data->removed.size(); ++i) {
             _newInterface->unindex(txn, *data->removed[i], data->loc);
+        }
+
+        for (size_t i = 0; i < data->added.size(); ++i) {
+            Status status = _newInterface->insert(txn,
+                                                  *data->added[i],
+                                                  data->loc,
+                                                  data->dupsAllowed);
+            if ( !status.isOK() ) {
+                return status;
+            }
         }
 
         *numUpdated = data->added.size();

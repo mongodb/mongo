@@ -82,10 +82,10 @@ namespace {
             return _pos == static_cast<int>(_data.size());
         }
 
-        virtual void prepareToYield() {
+        virtual void saveState() {
         }
 
-        virtual void recoverFromYield(OperationContext* opCtx) {
+        virtual void restoreState(OperationContext* opCtx) {
         }
 
         virtual void invalidate(const DiskLoc& dl, InvalidationType type) {

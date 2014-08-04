@@ -34,6 +34,7 @@
 
 #include "mongo/client/export_macros.h"
 #include "mongo/logger/labeled_level.h"
+#include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/logger/message_log_domain.h"
 #include "mongo/util/exit_code.h"
@@ -56,11 +57,23 @@ namespace logger {
          * Construct a LogstreamBuilder that writes to "domain" on destruction.
          *
          * "contextName" is a short name of the thread or other context.
-         * "severity" is the logging priority/severity of the message.
+         * "severity" is the logging severity of the message.
          */
         LogstreamBuilder(MessageLogDomain* domain,
                          const std::string& contextName,
                          LogSeverity severity);
+
+        /**
+         * Construct a LogstreamBuilder that writes to "domain" on destruction.
+         *
+         * "contextName" is a short name of the thread or other context.
+         * "severity" is the logging severity of the message.
+         * "component" is the primary log component of the message.
+         */
+        LogstreamBuilder(MessageLogDomain* domain,
+                         const std::string& contextName,
+                         LogSeverity severity,
+                         LogComponent component);
 
         /**
          * Deprecated.
@@ -142,6 +155,7 @@ namespace logger {
         MessageLogDomain* _domain;
         std::string _contextName;
         LogSeverity _severity;
+        LogComponent _component;
         std::string _baseMessage;
         std::ostringstream* _os;
         Tee* _tee;

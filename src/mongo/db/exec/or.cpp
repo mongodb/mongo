@@ -137,17 +137,17 @@ namespace mongo {
         }
     }
 
-    void OrStage::prepareToYield() {
+    void OrStage::saveState() {
         ++_commonStats.yields;
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->prepareToYield();
+            _children[i]->saveState();
         }
     }
 
-    void OrStage::recoverFromYield(OperationContext* opCtx) {
+    void OrStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->recoverFromYield(opCtx);
+            _children[i]->restoreState(opCtx);
         }
     }
 

@@ -286,10 +286,10 @@ namespace QueryStageSortTests {
             }
 
             // We should have read in the first 'firstRead' locs.  Invalidate the first.
-            ss->prepareToYield();
+            ss->saveState();
             set<DiskLoc>::iterator it = locs.begin();
             ss->invalidate(*it++, INVALIDATION_DELETION);
-            ss->recoverFromYield(&_txn);
+            ss->restoreState(&_txn);
 
             // Read the rest of the data from the mock stage.
             while (!ms->isEOF()) {
@@ -301,11 +301,11 @@ namespace QueryStageSortTests {
             ms.release();
 
             // Let's just invalidate everything now.
-            ss->prepareToYield();
+            ss->saveState();
             while (it != locs.end()) {
                 ss->invalidate(*it++, INVALIDATION_DELETION);
             }
-            ss->recoverFromYield(&_txn);
+            ss->restoreState(&_txn);
 
             // Invalidation of data in the sort stage fetches it but passes it through.
             int count = 0;

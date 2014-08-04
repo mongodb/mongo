@@ -298,11 +298,11 @@ namespace mongo {
         _iterator.reset( NULL );
     }
 
-    void RocksRecordStore::Iterator::prepareToYield() {
+    void RocksRecordStore::Iterator::saveState() {
         // XXX: ???
     }
 
-    bool RocksRecordStore::Iterator::recoverFromYield() {
+    bool RocksRecordStore::Iterator::restoreState() {
         // XXX: ???
         return true;
     }

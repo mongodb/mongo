@@ -93,7 +93,7 @@ namespace mongo {
         return _workingSet.get();
     }
 
-    PlanStage* PlanExecutor::getStages() const {
+    PlanStage* PlanExecutor::getRootStage() const {
         return _root.get();
     }
 
@@ -110,12 +110,12 @@ namespace mongo {
     }
 
     void PlanExecutor::saveState() {
-        if (!_killed) { _root->prepareToYield(); }
+        if (!_killed) { _root->saveState(); }
     }
 
     bool PlanExecutor::restoreState(OperationContext* opCtx) {
         if (!_killed) {
-            _root->recoverFromYield(opCtx);
+            _root->restoreState(opCtx);
         }
         return !_killed;
     }

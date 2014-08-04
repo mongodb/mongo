@@ -34,10 +34,14 @@
 #include <boost/thread.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/repl/master_slave.h"
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
@@ -81,8 +85,8 @@ namespace repl {
     ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
                                             const ReplSettings& settings,
                                             ReplicationCoordinatorExternalState* externalState) :
-            _inShutdown(false),
             _settings(settings),
+            _inShutdown(false),
             _externalState(externalState),
             _thisMembersConfigIndex(-1) {
 
@@ -113,6 +117,9 @@ namespace repl {
         _replExecutor.reset(new ReplicationExecutor(network));
         _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                                  _replExecutor.get())));
+        _syncSourceFeedbackThread.reset(new boost::thread(
+                stdx::bind(&ReplicationCoordinatorExternalState::runSyncSourceFeedback,
+                           _externalState.get())));
     }
 
     void ReplicationCoordinatorImpl::shutdown() {
@@ -138,11 +145,8 @@ namespace repl {
 
         _replExecutor->shutdown();
         _topCoordDriverThread->join(); // must happen outside _mutex
-    }
-
-    bool ReplicationCoordinatorImpl::isShutdownOkay() const {
-        // TODO
-        return false;
+        _externalState->shutdown();
+        _syncSourceFeedbackThread->join();
     }
 
     ReplSettings& ReplicationCoordinatorImpl::getSettings() {
@@ -150,34 +154,43 @@ namespace repl {
     }
 
     ReplicationCoordinator::Mode ReplicationCoordinatorImpl::getReplicationMode() const {
-        if (_settings.usingReplSets()) {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        return _getReplicationMode_inlock();
+    }
+
+    ReplicationCoordinator::Mode ReplicationCoordinatorImpl::_getReplicationMode_inlock() const {
+        if (_rsConfig.isInitialized()) {
             return modeReplSet;
-        } else if (_settings.slave || _settings.master) {
+        }
+        else if (_settings.slave || _settings.master) {
             return modeMasterSlave;
         }
         return modeNone;
     }
 
     void ReplicationCoordinatorImpl::setCurrentMemberState(const MemberState& newState) {
-        invariant(getReplicationMode() == modeReplSet);
+        invariant(_settings.usingReplSets());
         boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(_settings.usingReplSets());
         _currentState = newState;
     }
 
     MemberState ReplicationCoordinatorImpl::getCurrentMemberState() const {
-        invariant(getReplicationMode() == modeReplSet);
         boost::lock_guard<boost::mutex> lk(_mutex);
+        return _getCurrentMemberState_inlock();
+    }
+
+    MemberState ReplicationCoordinatorImpl::_getCurrentMemberState_inlock() const {
+        invariant(_settings.usingReplSets());
         return _currentState;
     }
 
     Status ReplicationCoordinatorImpl::setLastOptime(OperationContext* txn,
                                                      const OID& rid,
                                                      const OpTime& ts) {
-        // TODO(spencer): update slave tracking thread for local.slaves
-        // TODO(spencer): pass info upstream if we're not primary
         boost::lock_guard<boost::mutex> lk(_mutex);
 
-        OpTime& slaveOpTime = _slaveOpTimeMap[rid];
+        OpTime& slaveOpTime = _slaveInfoMap[rid].opTime;
         if (slaveOpTime < ts) {
             slaveOpTime = ts;
             // TODO(spencer): update write concern tags if we're a replSet
@@ -192,6 +205,12 @@ namespace repl {
                 }
             }
         }
+
+        if (_getReplicationMode_inlock() == modeReplSet &&
+                !_getCurrentMemberState_inlock().primary()) {
+            // pass along if we are not primary
+            _externalState->forwardSlaveProgress();
+        }
         return Status::OK();
     }
 
@@ -202,13 +221,14 @@ namespace repl {
         if (!writeConcern.wMode.empty()) {
             fassert(18524, writeConcern.wMode == "majority"); // TODO(spencer): handle tags
             numNodes = _rsConfig.getMajorityNumber();
-        } else {
+        }
+        else {
             numNodes = writeConcern.wNumNodes;
         }
 
-        for (SlaveOpTimeMap::iterator it = _slaveOpTimeMap.begin();
-                it != _slaveOpTimeMap.end(); ++it) {
-            const OpTime& slaveTime = it->second;
+        for (SlaveInfoMap::iterator it = _slaveInfoMap.begin();
+                it != _slaveInfoMap.end(); ++it) {
+            const OpTime& slaveTime = it->second.opTime;
             if (slaveTime >= opId) {
                 --numNodes;
             }
@@ -231,7 +251,10 @@ namespace repl {
             return StatusAndDuration(Status::OK(), Milliseconds(0));
         }
 
-        const Mode replMode = getReplicationMode();
+        Timer timer;
+        boost::unique_lock<boost::mutex> lk(_mutex);
+
+        const Mode replMode = _getReplicationMode_inlock();
         if (replMode == modeNone || serverGlobalParams.configsvr) {
             // no replication check needed (validated above)
             return StatusAndDuration(Status::OK(), Milliseconds(0));
@@ -242,9 +265,7 @@ namespace repl {
             return StatusAndDuration(Status::OK(), Milliseconds(0));
         }
 
-        Timer timer;
         boost::condition_variable condVar;
-        boost::unique_lock<boost::mutex> lk(_mutex);
         // Must hold _mutex before constructing waitInfo as it will modify _replicationWaiterList
         WaiterInfo waitInfo(&_replicationWaiterList, &opId, &writeConcern, &condVar);
 
@@ -266,7 +287,8 @@ namespace repl {
             try {
                 if (writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
                     condVar.wait(lk);
-                } else {
+                }
+                else {
                     condVar.timed_wait(lk, Milliseconds(writeConcern.wTimeout - elapsed));
                 }
             } catch (const boost::thread_interrupted&) {}
@@ -299,18 +321,86 @@ namespace repl {
     }
 
     bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
-        // TODO
+        if (_settings.usingReplSets()) {
+            boost::lock_guard<boost::mutex> lock(_mutex);
+            if (_getReplicationMode_inlock() == modeReplSet &&
+                    _getCurrentMemberState_inlock().primary()) {
+                return true;
+            }
+            return false;
+        }
+
+        if (!_settings.slave)
+            return true;
+
+
+        // TODO(dannenberg) replAllDead is bad and should be removed when master slave is removed
+        if (replAllDead) {
+            return false;
+        }
+
+        if (_settings.master) {
+            // if running with --master --slave, allow.
+            return true;
+        }
+
         return false;
     }
 
-    bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(const StringData& collection) {
-        // TODO
-        return false;
+    bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(const StringData& dbName) {
+        // we must check _settings since getReplicationMode() isn't aware of modeReplSet
+        // until a valid replica set config has been loaded
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        if (_settings.usingReplSets()) {
+            if (_getReplicationMode_inlock() == modeReplSet &&
+                    _getCurrentMemberState_inlock().primary()) {
+                return true;
+            }
+            return dbName == "local";
+        }
+
+        if (!_settings.slave)
+            return true;
+
+        // TODO(dannenberg) replAllDead is bad and should be removed when master slave is removed
+        if (replAllDead) {
+            return dbName == "local";
+        }
+
+        if (_settings.master) {
+            // if running with --master --slave, allow.
+            return true;
+        }
+
+        return dbName == "local";
     }
 
-    Status ReplicationCoordinatorImpl::canServeReadsFor(const NamespaceString& ns, bool slaveOk) {
-        // TODO
-        return Status::OK();
+    Status ReplicationCoordinatorImpl::canServeReadsFor(OperationContext* txn,
+                                                        const NamespaceString& ns,
+                                                        bool slaveOk) {
+        if (_externalState->isGod(txn)) {
+            return Status::OK();
+        }
+        if (canAcceptWritesForDatabase(ns.db())) {
+            return Status::OK();
+        }
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        Mode replMode = _getReplicationMode_inlock();
+        if (replMode == modeMasterSlave && _settings.slave == SimpleSlave) {
+            return Status::OK();
+        }
+        if (slaveOk) {
+            if (replMode == modeMasterSlave || replMode == modeNone) {
+                return Status::OK();
+            }
+            if (_getCurrentMemberState_inlock().secondary()) {
+                return Status::OK();
+            }
+            return Status(ErrorCodes::NotMasterOrSecondaryCode,
+                         "not master or secondary; cannot currently read from this replSet member");
+        }
+        return Status(ErrorCodes::NotMasterNoSlaveOkCode,
+                      "not master and slaveOk=false");
     }
 
     bool ReplicationCoordinatorImpl::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {
@@ -321,11 +411,12 @@ namespace repl {
         if (idx->isIdIndex()) {
             return false;
         }
-        if (getReplicationMode() != modeReplSet) {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        if (_getReplicationMode_inlock() != modeReplSet) {
             return false;
         }
         // see SERVER-6671
-        MemberState ms = getCurrentMemberState();
+        MemberState ms = _getCurrentMemberState_inlock();
         if (! ((ms == MemberState::RS_STARTUP2) ||
                (ms == MemberState::RS_RECOVERING) ||
                (ms == MemberState::RS_ROLLBACK))) {
@@ -355,17 +446,87 @@ namespace repl {
     void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
             OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {
-        // TODO
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        cmdBuilder->append("replSetUpdatePosition", 1);
+        // create an array containing objects each member connected to us and for ourself
+        BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
+        {
+            for (SlaveInfoMap::const_iterator itr = _slaveInfoMap.begin();
+                    itr != _slaveInfoMap.end(); ++itr) {
+                const OID& rid = itr->first;
+                const SlaveInfo& info = itr->second;
+                BSONObjBuilder entry(arrayBuilder.subobjStart());
+                entry.append("_id", rid);
+                entry.append("optime", info.opTime);
+                // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
+                // we need to keep sending it for 2.6 compatibility.
+                // TODO(spencer): Remove this after 2.8 is released.
+                const MemberConfig& memberConfig = _rsConfig.getMemberAt(info.memberID);
+                entry.append("config", memberConfig.toBSON(_rsConfig.getTagConfig()));
+            }
+        }
     }
 
     void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommandHandshakes(
             OperationContext* txn,
             std::vector<BSONObj>* handshakes) {
-        // TODO
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        // handshake obj for us
+        BSONObjBuilder cmd;
+        cmd.append("replSetUpdatePosition", 1);
+        {
+            BSONObjBuilder sub (cmd.subobjStart("handshake"));
+            sub.append("handshake", getMyRID(txn));
+            sub.append("member", _thisMembersConfigIndex);
+            // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
+            // we need to keep sending it for 2.6 compatibility.
+            // TODO(spencer): Remove this after 2.8 is released.
+            sub.append("config", _rsConfig.getMemberAt(_thisMembersConfigIndex).toBSON(
+                    _rsConfig.getTagConfig()));
+        }
+        handshakes->push_back(cmd.obj());
+
+        // handshake objs for all chained members
+        for (SlaveInfoMap::const_iterator itr = _slaveInfoMap.begin();
+             itr != _slaveInfoMap.end(); ++itr) {
+            BSONObjBuilder cmd;
+            cmd.append("replSetUpdatePosition", 1);
+            {
+                BSONObjBuilder subCmd (cmd.subobjStart("handshake"));
+                subCmd.append("handshake", itr->first);
+                int memberID = itr->second.memberID;
+                subCmd.append("member", memberID);
+                // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
+                // we need to keep sending it for 2.6 compatibility.
+                // TODO(spencer): Remove this after 2.8 is released.
+                subCmd.append("config",
+                              _rsConfig.getMemberAt(memberID).toBSON(_rsConfig.getTagConfig()));
+            }
+            handshakes->push_back(cmd.obj());
+        }
     }
 
-    void ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* result) {
-        // TODO
+    Status ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* response) {
+        Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
+        CBHStatus cbh = _replExecutor->scheduleWork(
+            stdx::bind(&TopologyCoordinator::prepareStatusResponse,
+                       _topCoord.get(),
+                       stdx::placeholders::_1,
+                       Date_t(curTimeMillis64()),
+                       time(0) - serverGlobalParams.started,
+                       response,
+                       &result));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+        }
+        fassert(18640, cbh.getStatus());
+        _replExecutor->wait(cbh.getValue());
+        return result;
+    }
+
+    void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result) {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        result->append("config", _rsConfig.toBSON());
     }
 
     bool ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* txn, bool activate) {
@@ -387,20 +548,34 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
-        // TODO
-        return Status::OK();
+        Status result(ErrorCodes::InternalError, "didn't set status in prepareFreezeResponse");
+        CBHStatus cbh = _replExecutor->scheduleWork(
+            stdx::bind(&TopologyCoordinator::prepareFreezeResponse,
+                       _topCoord.get(),
+                       stdx::placeholders::_1,
+                       Date_t(curTimeMillis64()),
+                       secs,
+                       resultObj,
+                       &result));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+        }
+        fassert(18641, cbh.getStatus());
+        _replExecutor->wait(cbh.getValue());
+        return result;
     }
 
-    Status ReplicationCoordinatorImpl::processHeartbeat(const BSONObj& cmdObj, 
-                                                        BSONObjBuilder* resultObj) {
+    Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& args,
+                                                        ReplSetHeartbeatResponse* response) {
         Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");
         CBHStatus cbh = _replExecutor->scheduleWork(
             stdx::bind(&TopologyCoordinator::prepareHeartbeatResponse,
                        _topCoord.get(),
                        stdx::placeholders::_1,
                        Date_t(curTimeMillis64()),
-                       cmdObj,
-                       resultObj,
+                       args,
+                       _settings.ourSetName(),
+                       response,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
@@ -445,7 +620,7 @@ namespace repl {
 
     void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(const ReplicaSetConfig& newConfig,
                                                                 int myIndex) {
-        invariant(getReplicationMode() == modeReplSet);
+        invariant(_settings.usingReplSets());
         boost::lock_guard<boost::mutex> lk(_mutex);
         _rsConfig = newConfig;
         _thisMembersConfigIndex = myIndex;
@@ -468,23 +643,66 @@ namespace repl {
     Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(OperationContext* txn,
                                                                     const BSONArray& updates,
                                                                     BSONObjBuilder* resultObj) {
-        // TODO
+        BSONForEach(elem, updates) {
+            BSONObj entry = elem.Obj();
+            OID id = entry["_id"].OID();
+            OpTime ot = entry["optime"]._opTime();
+            Status status = setLastOptime(txn, id, ot);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
         return Status::OK();
     }
 
     Status ReplicationCoordinatorImpl::processReplSetUpdatePositionHandshake(
             const OperationContext* txn,
-            const BSONObj& handshake,
+            const BSONObj& cmdObj,
             BSONObjBuilder* resultObj) {
-        // TODO
+        OID rid = cmdObj["handshake"].OID();
+        Status status = processHandshake(txn, rid, cmdObj);
+        if (!status.isOK()) {
+            return status;
+        }
+
         return Status::OK();
     }
 
-    bool ReplicationCoordinatorImpl::processHandshake(const OperationContext*,
-                                                      const OID& remoteID,
-                                                      const BSONObj& handshake) {
-        // TODO
-        return false;
+    Status ReplicationCoordinatorImpl::processHandshake(const OperationContext* txn,
+                                                        const OID& remoteID,
+                                                        const BSONObj& handshake) {
+        LOG(2) << "Received handshake " << handshake << " from node with RID " << remoteID;
+
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        SlaveInfo& slaveInfo = _slaveInfoMap[remoteID];
+        if (_getReplicationMode_inlock() == modeReplSet) {
+            if (!handshake.hasField("member")) {
+                return Status(ErrorCodes::ProtocolError,
+                              str::stream() << "Handshake object did not contain \"member\" field. "
+                                      "Handshake: " << handshake);
+            }
+            int memberID = handshake["member"].Int();
+            const MemberConfig* member = _rsConfig.findMemberByID(memberID);
+            if (!member) {
+                return Status(ErrorCodes::NodeNotFound,
+                              str::stream() << "Node with replica set member ID " << memberID <<
+                                      " could not be found in replica set config during handshake");
+            }
+            slaveInfo.memberID = memberID;
+            slaveInfo.hostAndPort = member->getHostAndPort();
+
+            if (!_getCurrentMemberState_inlock().primary()) {
+                // pass along if we are not primary
+                _externalState->forwardSlaveHandshake();
+            }
+        }
+        else {
+            // master/slave
+            slaveInfo.memberID = -1;
+            slaveInfo.hostAndPort = _externalState->getClientHostAndPort(txn);
+        }
+
+        return Status::OK();
     }
 
     void ReplicationCoordinatorImpl::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
@@ -492,8 +710,9 @@ namespace repl {
     }
 
     bool ReplicationCoordinatorImpl::buildsIndexes() {
-        // TODO
-        return false;
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        const MemberConfig& self = _rsConfig.getMemberAt(_thisMembersConfigIndex);
+        return self.shouldBuildIndexes();
     }
 
     std::vector<BSONObj> ReplicationCoordinatorImpl::getHostsWrittenTo(const OpTime& op) {
@@ -536,7 +755,8 @@ namespace repl {
                 if (hap == ignoreHAP) {
                     dontHeartbeatMember = true;
                 }
-            } else {
+            }
+            else {
                 log() << "replset: Bad member for rsHeartbeatRequestNoopByMember failpoint "
                        <<  member.getData() << ". 'member' failed to parse into HostAndPort -- "
                        << status;
@@ -661,6 +881,15 @@ namespace repl {
     BSONObj ReplicationCoordinatorImpl::getGetLastErrorDefault() {
         boost::mutex::scoped_lock lock(_mutex);
         return _rsConfig.getDefaultWriteConcern().toBSON();
+    }
+
+    Status ReplicationCoordinatorImpl::checkReplEnabledForCommand(BSONObjBuilder* result) {
+        //TODO
+        return Status::OK();
+    }
+
+    bool ReplicationCoordinatorImpl::isReplEnabled() const {
+        return _settings.usingReplSets() || _settings.master || _settings.slave;
     }
 
 } // namespace repl

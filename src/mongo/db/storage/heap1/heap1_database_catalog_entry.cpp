@@ -198,7 +198,26 @@ namespace mongo {
                                                         const StringData& fromNS,
                                                         const StringData& toNS,
                                                         bool stayTemp ) {
-        invariant( false );
+        boost::mutex::scoped_lock lk( _entryMapLock );
+        Entry* e = _entryMap[fromNS.toString()];
+        if ( !e ) {
+            _entryMap.erase( fromNS.toString() );
+            return Status( ErrorCodes::NamespaceNotFound,
+                           "cannot renameCollection missng collection" );
+        }
+
+        if ( _entryMap[toNS.toString()] ) {
+            return Status( ErrorCodes::BadValue,
+                           "target namespace exists" );
+        }
+
+        _entryMap[toNS.toString()] = e;
+        _entryMap.erase( fromNS.toString() );
+
+        if ( !stayTemp )
+            e->options.temp = false;
+
+        return Status::OK();
     }
 
     // ------------------
@@ -302,7 +321,21 @@ namespace mongo {
     void Heap1DatabaseCatalogEntry::Entry::updateTTLSetting( OperationContext* txn,
                                                              const StringData& idxName,
                                                              long long newExpireSeconds ) {
-        invariant( false );
+        Indexes::const_iterator i = indexes.find( idxName.toString() );
+        invariant( i != indexes.end() );
+
+        BSONObjBuilder b;
+        for ( BSONObjIterator bi( i->second->spec ); bi.more(); ) {
+            BSONElement e = bi.next();
+            if ( e.fieldNameStringData() == "expireAfterSeconds" ) {
+                continue;
+            }
+            b.append( e );
+        }
+
+        b.append( "expireAfterSeconds", newExpireSeconds );
+
+        i->second->spec = b.obj();
     }
 
 }

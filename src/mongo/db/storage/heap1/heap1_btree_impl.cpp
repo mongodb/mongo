@@ -33,11 +33,14 @@
 #include <set>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/util/mongoutils/str.h"
 
 
 namespace mongo {
 namespace {
-    
+
+    const int TempKeyMaxSize = 1024; // this goes away with SERVER-3372
+
     struct IndexEntry {
         IndexEntry(const BSONObj& key, DiskLoc loc) :key(key), loc(loc) {}
 
@@ -68,7 +71,8 @@ namespace {
         int comparison(const IndexEntry& lhs, const IndexEntry& rhs) const {
             BSONObjIterator lhsIt(lhs.key);
             BSONObjIterator rhsIt(rhs.key);
-            
+
+            // Iterate through both BSONObjects, comparing individual elements one by one
             for (unsigned mask = 1; lhsIt.more(); mask <<= 1) {
                 invariant(rhsIt.more());
 
@@ -98,8 +102,9 @@ namespace {
                     invariant(lEqBehavior == normal);
                     return lEqBehavior == less ? 1 : -1;
                 }
-                
+
             }
+
             invariant(!rhsIt.more());
 
             // This means just look at the key, not the loc.
@@ -108,7 +113,7 @@ namespace {
 
             return lhs.loc.compare(rhs.loc); // is supposed to ignore ordering
         }
-        
+
         /**
          * Preps a query for compare(). Strips fieldNames if there are any.
          */
@@ -119,10 +124,14 @@ namespace {
                                        const vector<bool>& suffixInclusive,
                                        const int cursorDirection) {
 
-            // See comment above for why this is done.
+            // Due to the limitations in the std::set API we need to use the same type (IndexEntry)
+            // for both the stored data and the "query". We cheat and encode extra information in
+            // the first byte of the field names in the query. This works because all stored objects
+            // should have all field names empty, so their first bytes are '\0'.
             const char exclusiveByte = (cursorDirection == 1
                                             ? IndexEntryComparison::greater
                                             : IndexEntryComparison::less);
+
             const StringData exclusiveFieldName(&exclusiveByte, 1);
 
             BSONObjBuilder bb;
@@ -143,11 +152,23 @@ namespace {
                 }
             }
 
+            // have we seen a field in the query object that represents an exclusve bound (i.e., we
+            // inserted an 'l' or a 'g' into a field name already
+            bool seenExclusive = prefixExclusive;
+
             // Handle the suffix. Note that the useful parts of the suffix start at index prefixLen
             // rather than at 0.
             invariant(keySuffix.size() == suffixInclusive.size());
             for (size_t i = prefixLen; i < keySuffix.size(); i++) {
-                if (suffixInclusive[i]) {
+                // if an exclusive field has already been encountered, then nothing after it matters
+                // and the rest of the elements in the vector can be NULL. We want the query object
+                // to have as many elements as the vector, so we append empty elements to the BSON.
+                if (!keySuffix[i]) {
+                    invariant(seenExclusive);
+                    bb.append(StringData(), false);
+                }
+                else if (suffixInclusive[i]) {
+                    seenExclusive = true;
                     bb.appendAs(*keySuffix[i], StringData());
                 }
                 else {
@@ -202,20 +223,28 @@ namespace {
 
     class Heap1BtreeBuilderImpl : public SortedDataBuilderInterface {
     public:
-        Heap1BtreeBuilderImpl(IndexSet* data, bool dupsAllowed)
+        Heap1BtreeBuilderImpl(IndexSet* data, long long* currentKeySize, bool dupsAllowed)
                 : _data(data),
+                  _currentKeySize( currentKeySize ),
                   _dupsAllowed(dupsAllowed),
                   _committed(false) {
             invariant(_data->empty());
         }
 
         ~Heap1BtreeBuilderImpl() {
-            if (!_committed)
+            if (!_committed) {
                 _data->clear();
+                *_currentKeySize = 0;
+            }
         }
 
         Status addKey(const BSONObj& key, const DiskLoc& loc) {
             // inserts should be in ascending order.
+
+            if ( key.objsize() >= TempKeyMaxSize ) {
+                return Status(ErrorCodes::KeyTooLong, "key too big");
+            }
+
 
             invariant(!loc.isNull());
             invariant(loc.isValid());
@@ -227,6 +256,7 @@ namespace {
                 return dupKeyError(key);
 
             _data->insert(_data->end(), IndexEntry(key.getOwned(), loc));
+            *_currentKeySize += key.objsize();
             return Status::OK();
         }
 
@@ -237,34 +267,45 @@ namespace {
 
     private:
         IndexSet* const _data;
+        long long* _currentKeySize;
         const bool _dupsAllowed;
         bool _committed;
     };
 
     class Heap1BtreeImpl : public SortedDataInterface {
     public:
-        Heap1BtreeImpl(const IndexCatalogEntry& info, IndexSet* data) 
+        Heap1BtreeImpl(const IndexCatalogEntry& info, IndexSet* data)
             : _info(info),
-              _data(data)
-        {}
+              _data(data) {
+            _currentKeySize = 0;
+        }
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
-            return new Heap1BtreeBuilderImpl(_data, dupsAllowed);
+            return new Heap1BtreeBuilderImpl(_data, &_currentKeySize, dupsAllowed);
         }
 
         virtual Status insert(OperationContext* txn,
                               const BSONObj& key,
                               const DiskLoc& loc,
                               bool dupsAllowed) {
+
             invariant(!loc.isNull());
             invariant(loc.isValid());
             invariant(!hasFieldNames(key));
+
+            if ( key.objsize() >= TempKeyMaxSize ) {
+                string msg = mongoutils::str::stream()
+                    << "Heap1Btree::insert: key too large to index, failing "
+                    << ' ' << key.objsize() << ' ' << key;
+                return Status(ErrorCodes::KeyTooLong, msg);
+            }
 
             // TODO optimization: save the iterator from the dup-check to speed up insert
             if (!dupsAllowed && isDup(*_data, key, loc))
                 return dupKeyError(key);
 
-            _data->insert(IndexEntry(key.getOwned(), loc));
+            if ( _data->insert(IndexEntry(key.getOwned(), loc)).second )
+                _currentKeySize += key.objsize();
             return Status::OK();
         }
 
@@ -275,13 +316,19 @@ namespace {
 
             const size_t numDeleted = _data->erase(IndexEntry(key, loc));
             invariant(numDeleted <= 1);
+            if ( numDeleted == 1 )
+                _currentKeySize -= key.objsize();
+
             return numDeleted == 1;
-            
         }
 
         virtual void fullValidate(OperationContext* txn, long long *numKeysOut) {
             // TODO check invariants?
             *numKeysOut = _data->size();
+        }
+
+        virtual long long getSpaceUsedBytes( OperationContext* txn ) const {
+            return _currentKeySize + ( sizeof(IndexEntry) * _data->size() );
         }
 
         virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
@@ -325,6 +372,12 @@ namespace {
             }
 
             virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
+                // An empty key means we should seek to the front
+                if (keyRaw.isEmpty()) {
+                    _it = _data.begin();
+                    return false;
+                }
+
                 const BSONObj key = stripFieldNames(keyRaw);
                 _it = _data.lower_bound(IndexEntry(key, loc)); // lower_bound is >= key
                 return _it != _data.end() && (_it->key == key); // intentionally not comparing loc
@@ -374,7 +427,8 @@ namespace {
                     return;
                 }
 
-                _savedKey = _it->key;
+                _savedAtEnd = false;
+                _savedKey = _it->key.getOwned();
                 _savedLoc = _it->loc;
             }
 
@@ -396,6 +450,7 @@ namespace {
             bool _savedAtEnd;
             BSONObj _savedKey;
             DiskLoc _savedLoc;
+
         };
 
         // TODO see if this can share any code with ForwardIterator
@@ -424,6 +479,13 @@ namespace {
             }
 
             virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
+                // An empty key means we should seek to the seek to the end, 
+                // i.e. one past the lowest key in the iterator
+                if (keyRaw.isEmpty()) {
+                    _it = _data.rend();
+                    return false;
+                }
+
                 const BSONObj key = stripFieldNames(keyRaw);
                 _it = lower_bound(IndexEntry(key, loc)); // lower_bound is <= query
                 return _it != _data.rend() && (_it->key == key); // intentionally not comparing loc
@@ -473,7 +535,8 @@ namespace {
                     return;
                 }
 
-                _savedKey = _it->key;
+                _savedAtEnd = false;
+                _savedKey = _it->key.getOwned();
                 _savedLoc = _it->loc;
             }
 
@@ -528,6 +591,7 @@ namespace {
     private:
         const IndexCatalogEntry& _info;
         IndexSet* _data;
+        long long _currentKeySize;
     };
 } // namespace
 

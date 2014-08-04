@@ -111,7 +111,7 @@ namespace mongo {
             }
             else {
                 KeyDataOwnedType key(BSON("" << expectedKey(e.fieldName())));
-                _helper->btree._pushBack(bucket, _helper->dummyDiskLoc, key, child);
+                invariant(_helper->btree.pushBack(bucket, _helper->dummyDiskLoc, key, child));
             }
         }
 
@@ -130,7 +130,7 @@ namespace mongo {
         KeyDataOwnedType k(key);
         BucketType* bucket = _helper->btree.getBucket(bucketLoc);
 
-        _helper->btree._pushBack(bucket, _helper->dummyDiskLoc, k, child);
+        invariant(_helper->btree.pushBack(bucket, _helper->dummyDiskLoc, k, child));
         _helper->btree.fixParentPtrs(_txn, bucket, bucketLoc);
     }
 

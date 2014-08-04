@@ -278,10 +278,10 @@ namespace QueryStageCollectionScan {
             }
 
             // Remove locs[count].
-            scan->prepareToYield();
+            scan->saveState();
             scan->invalidate(locs[count], INVALIDATION_DELETION);
             remove(coll->docFor(locs[count]));
-            scan->recoverFromYield(&_txn);
+            scan->restoreState(&_txn);
 
             // Skip over locs[count].
             ++count;
@@ -340,10 +340,10 @@ namespace QueryStageCollectionScan {
             }
 
             // Remove locs[count].
-            scan->prepareToYield();
+            scan->saveState();
             scan->invalidate(locs[count], INVALIDATION_DELETION);
             remove(coll->docFor(locs[count]));
-            scan->recoverFromYield(&_txn);
+            scan->restoreState(&_txn);
 
             // Skip over locs[count].
             ++count;

@@ -50,11 +50,6 @@ namespace repl {
         // TODO
     }
 
-    bool ReplicationCoordinatorMock::isShutdownOkay() const {
-        // TODO
-        return false;
-    }
-
     ReplSettings& ReplicationCoordinatorMock::getSettings() {
         return _settings;
     }
@@ -112,7 +107,9 @@ namespace repl {
         return true;
     }
 
-    Status ReplicationCoordinatorMock::canServeReadsFor(const NamespaceString& ns, bool slaveOk) {
+    Status ReplicationCoordinatorMock::canServeReadsFor(OperationContext* txn,
+                                                        const NamespaceString& ns,
+                                                        bool slaveOk) {
         // TODO
         return Status::OK();
     }
@@ -146,8 +143,12 @@ namespace repl {
             OperationContext* txn,
             std::vector<BSONObj>* handshakes) {}
 
-    void ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
-        //TODO
+    void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result) {
+        // TODO
+    }
+
+    Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
+        return Status::OK();
     }
 
     bool ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* txn, bool activate) {
@@ -173,8 +174,8 @@ namespace repl {
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorMock::processHeartbeat(const BSONObj& cmdObj, 
-                                                      BSONObjBuilder* resultObj) {
+    Status ReplicationCoordinatorMock::processHeartbeat(const ReplSetHeartbeatArgs& args,
+                                                        ReplSetHeartbeatResponse* response) {
         return Status::OK();
     }
 
@@ -222,11 +223,10 @@ namespace repl {
         return Status::OK();
     }
 
-    bool ReplicationCoordinatorMock::processHandshake(const OperationContext* txn,
-                                                      const OID& remoteID,
-                                                      const BSONObj& handshake) {
-        // TODO
-        return false;
+    Status ReplicationCoordinatorMock::processHandshake(const OperationContext* txn,
+                                                        const OID& remoteID,
+                                                        const BSONObj& handshake) {
+        return Status::OK();
     }
 
     void ReplicationCoordinatorMock::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
@@ -251,6 +251,11 @@ namespace repl {
     BSONObj ReplicationCoordinatorMock::getGetLastErrorDefault() {
         // TODO
         return BSONObj();
+    }
+
+    Status ReplicationCoordinatorMock::checkReplEnabledForCommand(BSONObjBuilder* result) {
+        // TODO
+        return Status::OK();
     }
 
 } // namespace repl

@@ -279,7 +279,8 @@ namespace mongo {
 
         logStartup();
         repl::getGlobalReplicationCoordinator()->startReplication(
-                new repl::TopologyCoordinatorImpl(), new repl::NetworkInterfaceImpl());
+            new repl::TopologyCoordinatorImpl(repl::maxSyncSourceLagSecs), 
+            new repl::NetworkInterfaceImpl());
         if (serverGlobalParams.isHttpInterfaceEnabled)
             boost::thread web(stdx::bind(&webServerThread,
                                          new RestAdminAccess())); // takes ownership

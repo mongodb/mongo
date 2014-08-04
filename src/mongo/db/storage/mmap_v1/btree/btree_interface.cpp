@@ -102,6 +102,10 @@ namespace mongo {
             *numKeysOut = _btree->fullValidate(txn, NULL, false, false, 0);
         }
 
+        virtual long long getSpaceUsedBytes( OperationContext* txn ) const {
+            return _btree->getRecordStore()->dataSize();
+        }
+
         virtual Status dupKeyCheck(OperationContext* txn,
                                    const BSONObj& key,
                                    const DiskLoc& loc) {

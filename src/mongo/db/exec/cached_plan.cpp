@@ -46,9 +46,13 @@ namespace mongo {
     CachedPlanStage::CachedPlanStage(const Collection* collection,
                                      CanonicalQuery* cq,
                                      PlanStage* mainChild,
-                                     PlanStage* backupChild)
+                                     QuerySolution* mainQs,
+                                     PlanStage* backupChild,
+                                     QuerySolution* backupQs)
         : _collection(collection),
           _canonicalQuery(cq),
+          _mainQs(mainQs),
+          _backupQs(backupQs),
           _mainChildPlan(mainChild),
           _backupChildPlan(backupChild),
           _usingBackupChild(false),
@@ -93,24 +97,24 @@ namespace mongo {
         return childStatus;
     }
 
-    void CachedPlanStage::prepareToYield() {
+    void CachedPlanStage::saveState() {
         if (! _usingBackupChild) {
-            _mainChildPlan->prepareToYield();
+            _mainChildPlan->saveState();
         }
 
         if (NULL != _backupChildPlan.get()) {
-            _backupChildPlan->prepareToYield();
+            _backupChildPlan->saveState();
         }
         ++_commonStats.yields;
     }
 
-    void CachedPlanStage::recoverFromYield(OperationContext* opCtx) {
+    void CachedPlanStage::restoreState(OperationContext* opCtx) {
         if (NULL != _backupChildPlan.get()) {
-            _backupChildPlan->recoverFromYield(opCtx);
+            _backupChildPlan->restoreState(opCtx);
         }
 
         if (! _usingBackupChild) {
-            _mainChildPlan->recoverFromYield(opCtx);
+            _mainChildPlan->restoreState(opCtx);
         }
         ++_commonStats.unyields;
     }

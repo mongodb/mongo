@@ -28,6 +28,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
@@ -50,17 +51,32 @@ namespace logger {
                 StringData message) :
             _date(date),
             _severity(severity),
+            _component(LogComponent::kDefault),
+            _contextName(contextName),
+            _message(message) {}
+
+        MessageEventEphemeral(
+                Date_t date,
+                LogSeverity severity,
+                LogComponent component,
+                StringData contextName,
+                StringData message) :
+            _date(date),
+            _severity(severity),
+            _component(component),
             _contextName(contextName),
             _message(message) {}
 
         uint64_t getDate() const { return _date; }
         LogSeverity getSeverity() const { return _severity; }
+        LogComponent getComponent() const { return _component; }
         StringData getContextName() const { return _contextName; }
         StringData getMessage() const { return _message; }
 
     private:
         Date_t _date;
         LogSeverity _severity;
+        LogComponent _component;
         StringData _contextName;
         StringData _message;
     };

@@ -34,11 +34,13 @@
 
 #include <string>
 
+#include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/isself.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sock.h"
 
 namespace mongo {
@@ -46,6 +48,22 @@ namespace repl {
 
     ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl() {}
     ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
+
+    void ReplicationCoordinatorExternalStateImpl::runSyncSourceFeedback() {
+        _syncSourceFeedback.run();
+    }
+
+    void ReplicationCoordinatorExternalStateImpl::shutdown() {
+        _syncSourceFeedback.shutdown();
+    }
+
+    void ReplicationCoordinatorExternalStateImpl::forwardSlaveHandshake() {
+        _syncSourceFeedback.forwardSlaveHandshake();
+    }
+
+    void ReplicationCoordinatorExternalStateImpl::forwardSlaveProgress() {
+        _syncSourceFeedback.forwardSlaveProgress();
+    }
 
     OID ReplicationCoordinatorExternalStateImpl::ensureMe() {
         std::string myname = getHostName();
@@ -80,6 +98,16 @@ namespace repl {
 
     bool ReplicationCoordinatorExternalStateImpl::isSelf(const HostAndPort& host) {
         return repl::isSelf(host);
+
+    }
+
+    HostAndPort ReplicationCoordinatorExternalStateImpl::getClientHostAndPort(
+            const OperationContext* txn) {
+        return HostAndPort(txn->getClient()->clientAddress(true));
+    }
+
+    bool ReplicationCoordinatorExternalStateImpl::isGod(OperationContext* txn) {
+        return txn->getClient()->isGod();
     }
 
 } // namespace repl

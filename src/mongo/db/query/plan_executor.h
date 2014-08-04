@@ -153,7 +153,7 @@ namespace mongo {
         /**
          * Get the stage tree wrapped by this executor, without transferring ownership.
          */
-        PlanStage* getStages() const;
+        PlanStage* getRootStage() const;
 
         /**
          * Get the query that this executor is executing, without transferring ownership.
@@ -220,9 +220,8 @@ namespace mongo {
         void kill();
 
         /**
-         * Execute the plan to completion, throwing out the results.
-         *
-         * Used by explain.
+         * Execute the plan to completion, throwing out the results.  Used when you want to work the
+         * underlying tree without getting results back.
          */
         Status executePlan();
 

@@ -122,11 +122,3 @@ env.CppUnitTest(
         ]
     )
 
-env.CppUnitTest(
-    target='btree_builder_test',
-    source=['btree/btree_builder_test.cpp'
-            ],
-    LIBDEPS=[
-        'btree_test_help'        
-        ]
-    )

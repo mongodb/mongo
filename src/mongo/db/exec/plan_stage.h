@@ -65,8 +65,8 @@ namespace mongo {
      * passed through the WorkingSet interface; see working_set.h for details.
      *
      * All synchronization is the responsibility of the caller.  Queries must be told to yield with
-     * prepareToYield() if any underlying database state changes.  If prepareToYield() is called,
-     * recoverFromYield() must be called again before any work() is done.
+     * saveState() if any underlying database state changes.  If saveState() is called,
+     * restoreState() must be called again before any work() is done.
      *
      * Here is a very simple usage example:
      *
@@ -93,9 +93,9 @@ namespace mongo {
      *
      *     if (shouldYield) {
      *         // Occasionally yield.
-     *         stage->prepareToYield();
+     *         stage->saveState();
      *         // Do work that requires a yield here (execute other plans, insert, delete, etc.).
-     *         stage->recoverFromYield();
+     *         stage->restoreState();
      *     }
      * }
      */
@@ -176,31 +176,27 @@ namespace mongo {
 
         /**
          * Notifies the stage that all locks are about to be released.  The stage must save any
-         * state required to resume where it was before prepareToYield was called.
-         *
-         * XXX: rename to saveState()
+         * state required to resume where it was before saveState was called.
          */
-        virtual void prepareToYield() = 0;
+        virtual void saveState() = 0;
 
         /**
          * Notifies the stage that any required locks have been reacquired.  The stage must restore
          * any saved state and be ready to handle calls to work().
          *
-         * Can only be called after prepareToYield.
-         *
-         * XXX: rename to restoreState()
+         * Can only be called after saveState.
          *
          * XXX: We may not need to pass down 'opCtx' if getMore'd queries use the same
          * OperationContext they were created with.
          */
-        virtual void recoverFromYield(OperationContext* opCtx) = 0;
+        virtual void restoreState(OperationContext* opCtx) = 0;
 
         /**
          * Notifies a stage that a DiskLoc is going to be deleted (or in-place updated) so that the
          * stage can invalidate or modify any state required to continue processing without this
          * DiskLoc.
          *
-         * Can only be called after a prepareToYield but before a recoverFromYield.
+         * Can only be called after a saveState but before a restoreState.
          */
         virtual void invalidate(const DiskLoc& dl, InvalidationType type) = 0;
 

@@ -3051,6 +3051,15 @@ namespace {
         assertSolutionExists("{cscan: {dir: 1}}");
     }
 
+    // Negated $type doesn't use the index
+    TEST_F(QueryPlannerTest, NegationTypeOperator) {
+        addIndex(BSON("i" << 1));
+        runQuery(fromjson("{i: {$not: {$type: 16}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
     // Negated $elemMatch value won't use the index
     TEST_F(QueryPlannerTest, NegationElemMatchValue) {
         addIndex(BSON("i" << 1));

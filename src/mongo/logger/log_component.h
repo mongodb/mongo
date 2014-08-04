@@ -27,7 +27,10 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <string>
+
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 namespace logger {
@@ -66,6 +69,11 @@ namespace logger {
         LogComponent parent() const;
 
         /**
+         * Returns short name as a StringData.
+         */
+        StringData toStringData() const;
+
+        /**
          * Returns short name of log component.
          * Used to generate server parameter names in the format "logLevel_<component short name>".
          */
@@ -78,9 +86,18 @@ namespace logger {
          */
         std::string getDottedName() const;
 
+        /**
+         * Returns name suitable for inclusion in formatted log message.
+         * This is derived from upper-casing the short name with some padding to
+         * fit into a fixed length field.
+         */
+        StringData getNameForLog() const;
+
     private:
         Value _value;
     };
+
+    std::ostream& operator<<(std::ostream& os, LogComponent component);
 
 }  // namespace logger
 }  // namespace mongo

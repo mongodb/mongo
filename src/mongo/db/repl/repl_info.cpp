@@ -62,7 +62,8 @@ namespace repl {
             return;
         }
         
-        if ( replAllDead ) {
+        // TODO(dannenberg) replAllDead is bad and should be removed when master slave is removed
+        if (replAllDead) {
             result.append("ismaster", 0);
             string s = string("dead: ") + replAllDead;
             result.append("info", s);

@@ -207,7 +207,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/query/query_planner',
-        '$BUILD_DIR/mongo/index_set',
+        '$BUILD_DIR/mongo/update_index_data',
         'update',
     ],
 )

@@ -125,10 +125,10 @@ namespace mongo {
         }
     }
 
-    void CappedRecordStoreV1Iterator::prepareToYield() {
+    void CappedRecordStoreV1Iterator::saveState() {
     }
 
-    bool CappedRecordStoreV1Iterator::recoverFromYield() {
+    bool CappedRecordStoreV1Iterator::restoreState() {
         // If invalidate invalidated the DiskLoc we relied on, give up now.
         if (_killedByInvalidate) {
             _recordStore = NULL;

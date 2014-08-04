@@ -201,7 +201,7 @@ namespace QueryStageAnd {
             }
 
             // ...yield
-            ah->prepareToYield();
+            ah->saveState();
             // ...invalidate one of the read objects
             set<DiskLoc> data;
             getLocs(&data, coll);
@@ -214,7 +214,7 @@ namespace QueryStageAnd {
                 }
             }
             size_t memUsageAfter = ah->getMemUsage();
-            ah->recoverFromYield(&_txn);
+            ah->restoreState(&_txn);
 
             // Invalidating a read object should decrease memory usage.
             ASSERT_LESS_THAN(memUsageAfter, memUsageBefore);
@@ -303,7 +303,7 @@ namespace QueryStageAnd {
 
             // "delete" deletedObj (by invalidating the DiskLoc of the obj that matches it).
             BSONObj deletedObj = BSON("_id" << 20 << "foo" << 20 << "bar" << 20 << "baz" << 20);
-            ah->prepareToYield();
+            ah->saveState();
             set<DiskLoc> data;
             getLocs(&data, coll);
 
@@ -319,7 +319,7 @@ namespace QueryStageAnd {
             // Look ahead results do not count towards memory usage.
             ASSERT_EQUALS(memUsageBefore, memUsageAfter);
 
-            ah->recoverFromYield(&_txn);
+            ah->restoreState(&_txn);
 
             // The deleted obj should show up in flagged.
             ASSERT_EQUALS(size_t(1), flagged.size());
@@ -944,10 +944,10 @@ namespace QueryStageAnd {
             // The first thing that the index scan returns (due to increasing DiskLoc trick) is the
             // very first insert, which should be the very first thing in data.  Let's invalidate it
             // and make sure it shows up in the flagged results.
-            ah->prepareToYield();
+            ah->saveState();
             ah->invalidate(*data.begin(), INVALIDATION_DELETION);
             remove(coll->docFor(*data.begin()));
-            ah->recoverFromYield(&_txn);
+            ah->restoreState(&_txn);
 
             // Make sure the nuked obj is actually in the flagged data.
             ASSERT_EQUALS(ws.getFlagged().size(), size_t(1));
@@ -983,10 +983,10 @@ namespace QueryStageAnd {
             for (int i = 0; i < count + 10; ++i) { ++it; }
             // Remove a result that's coming up.  It's not the 'target' result of the AND so it's
             // not flagged.
-            ah->prepareToYield();
+            ah->saveState();
             ah->invalidate(*it, INVALIDATION_DELETION);
             remove(coll->docFor(*it));
-            ah->recoverFromYield(&_txn);
+            ah->restoreState(&_txn);
 
             // Get all results aside from the two we killed.
             while (!ah->isEOF()) {

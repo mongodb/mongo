@@ -84,14 +84,14 @@ namespace mongo {
         }
     }
 
-    void ShardFilterStage::prepareToYield() {
+    void ShardFilterStage::saveState() {
         ++_commonStats.yields;
-        _child->prepareToYield();
+        _child->saveState();
     }
 
-    void ShardFilterStage::recoverFromYield(OperationContext* opCtx) {
+    void ShardFilterStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        _child->recoverFromYield(opCtx);
+        _child->restoreState(opCtx);
     }
 
     void ShardFilterStage::invalidate(const DiskLoc& dl, InvalidationType type) {

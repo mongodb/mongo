@@ -32,10 +32,12 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/isself.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/rs_sync.h" // maxSyncSourceLagSecs
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -43,10 +45,11 @@ namespace mongo {
 
 namespace repl {
 
-    TopologyCoordinatorImpl::TopologyCoordinatorImpl() :
+    TopologyCoordinatorImpl::TopologyCoordinatorImpl(int maxSyncSourceLagSecs) :
         _currentPrimaryIndex(-1),
         _syncSourceIndex(-1),
         _forceSyncSourceIndex(-1),
+        _maxSyncSourceLagSecs(maxSyncSourceLagSecs),
         _busyWithElectSelf(false),
         _selfIndex(0),
         _blockSync(false),
@@ -82,14 +85,14 @@ namespace repl {
             invariant(_forceSyncSourceIndex < _currentConfig.getNumMembers());
             _syncSourceIndex = _forceSyncSourceIndex;
             _forceSyncSourceIndex = -1;
-            sethbmsg( str::stream() << "syncing from: "
-                      << _currentConfig.getMemberAt(_syncSourceIndex).getHostAndPort().toString()
-                      << " by request", 0);
+            _sethbmsg( str::stream() << "syncing from: "
+                       << _currentConfig.getMemberAt(_syncSourceIndex).getHostAndPort().toString()
+                       << " by request", 0);
             return;
         }
 
         // wait for 2N pings before choosing a sync target
-        int needMorePings = _hbdata.size()*2 - HeartbeatInfo::numPings;
+        int needMorePings = _hbdata.size()*2 - _getTotalPings();
 
         if (needMorePings > 0) {
             OCCASIONALLY log() << "waiting for " << needMorePings 
@@ -112,15 +115,15 @@ namespace repl {
             primaryOpTime = _hbdata[_currentPrimaryIndex].getOpTime();
         else
             // choose a time that will exclude no candidates, since we don't see a primary
-            primaryOpTime = OpTime(maxSyncSourceLagSecs, 0);
+            primaryOpTime = OpTime(_maxSyncSourceLagSecs, 0);
 
-        if (primaryOpTime.getSecs() < static_cast<unsigned int>(maxSyncSourceLagSecs)) {
+        if (primaryOpTime.getSecs() < static_cast<unsigned int>(_maxSyncSourceLagSecs)) {
             // erh - I think this means there was just a new election
             // and we don't yet know the new primary's optime
-            primaryOpTime = OpTime(maxSyncSourceLagSecs, 0);
+            primaryOpTime = OpTime(_maxSyncSourceLagSecs, 0);
         }
 
-        OpTime oldestSyncOpTime(primaryOpTime.getSecs() - maxSyncSourceLagSecs, 0);
+        OpTime oldestSyncOpTime(primaryOpTime.getSecs() - _maxSyncSourceLagSecs, 0);
 
         int closestIndex = -1;
 
@@ -163,8 +166,10 @@ namespace repl {
 
                 // omit nodes that are more latent than anything we've already considered
                 if ((closestIndex != -1) &&
-                    (it->getPing() > _hbdata[closestIndex].getPing()))
+                    (_getPing(_currentConfig.getMemberAt(it->getConfigIndex()).getHostAndPort())
+                     > _getPing(_currentConfig.getMemberAt(closestIndex).getHostAndPort()))) {
                     continue;
+                }
 
                 if (attempts == 0 &&
                     (_selfConfig().getSlaveDelay() < 
@@ -185,7 +190,7 @@ namespace repl {
                         if (now % 5 == 0) {
                             log() << "replSet not trying to sync from " << vetoed->first
                                   << ", it is vetoed for " << (vetoed->second - now) 
-                                  << " more seconds" << rsLog;
+                                  << " more seconds";
                         }
                         continue;
                     }
@@ -202,7 +207,7 @@ namespace repl {
             return;
         }
 
-        sethbmsg( str::stream() << "syncing to: " << 
+        _sethbmsg( str::stream() << "syncing to: " << 
                   _currentConfig.getMemberAt(closestIndex).getHostAndPort().toString(), 0);
         _syncSourceIndex = closestIndex;
     }
@@ -226,21 +231,15 @@ namespace repl {
     }
 
     void TopologyCoordinatorImpl::relinquishPrimary(OperationContext* txn) {
-        LOG(2) << "replSet attempting to relinquish" << endl;
-        invariant(txn->lockState()->isWriteLocked());
-        if (_memberState != MemberState::RS_PRIMARY) {
-            // Already relinquished?
-            log() << "replSet warning attempted to relinquish but not primary";
-            return;
-        }
+        invariant(_memberState == MemberState::RS_PRIMARY);
         
-        log() << "replSet relinquishing primary state" << rsLog;
+        log() << "replSet relinquishing primary state";
         _changeMemberState(MemberState::RS_SECONDARY);
 
         // close sockets that were talking to us so they don't blithly send many writes that
         // will fail with "not master" (of course client could check result code, but in
         // case they are not)
-        log() << "replSet closing client sockets after relinquishing primary" << rsLog;
+        log() << "replSet closing client sockets after relinquishing primary";
         //MessagingPort::closeAllSockets(ScopedConn::keepOpen);
         // XXX Eric: what to do here?
     }
@@ -249,6 +248,7 @@ namespace repl {
     void TopologyCoordinatorImpl::_electSelf(Date_t now) {
         verify( !_selfConfig().isArbiter() );
         verify( _selfConfig().getSlaveDelay() == Seconds(0) );
+/*
         try {
             // XXX Eric
             //            _electSelf(now);
@@ -257,16 +257,15 @@ namespace repl {
             throw;
         }
         catch (VoteException& ) { // Eric: XXX
-            log() << "replSet not trying to elect self as responded yea to someone else recently" 
-                  << rsLog;
+            log() << "replSet not trying to elect self as responded yea to someone else recently";
         }
         catch (const DBException& e) {
-            log() << "replSet warning caught unexpected exception in electSelf() " << e.toString() 
-                  << rsLog;
+            log() << "replSet warning caught unexpected exception in electSelf() " << e.toString();
         }
         catch (...) {
-            log() << "replSet warning caught unexpected exception in electSelf()" << rsLog;
+            log() << "replSet warning caught unexpected exception in electSelf()";
         }
+*/
     }
 
     // Produce a reply to a RAFT-style RequestVote RPC; this is MongoDB ReplSetFresh command
@@ -283,7 +282,7 @@ namespace repl {
         bool weAreFresher = false;
         if( _currentConfig.getConfigVersion() > cfgver ) {
             log() << "replSet member " << who << " is not yet aware its cfg version "
-                  << cfgver << " is stale" << rsLog;
+                  << cfgver << " is stale";
             result.append("info", "config version stale");
             weAreFresher = true;
         }
@@ -371,8 +370,8 @@ namespace repl {
                                                           BSONObjBuilder& result) {
 
         //TODO: after eric's checkin, add executer stuff and error if cancelled
-        DEV log() << "replSet received elect msg " << cmdObj.toString() << rsLog;
-        else LOG(2) << "replSet received elect msg " << cmdObj.toString() << rsLog;
+        DEV log() << "replSet received elect msg " << cmdObj.toString();
+        else LOG(2) << "replSet received elect msg " << cmdObj.toString();
 
         std::string setName = cmdObj["setName"].String();
         int whoid = cmdObj["whoid"].Int();
@@ -387,31 +386,31 @@ namespace repl {
         if ( setName != _currentConfig.getReplSetName() ) {
             log() << "replSet error received an elect request for '" << setName
                   << "' but our setName name is '" << 
-                _currentConfig.getReplSetName() << "'" << rsLog;
+                _currentConfig.getReplSetName() << "'";
         }
         else if ( myver < cfgver ) {
             // we are stale.  don't vote
         }
         else if ( myver > cfgver ) {
             // they are stale!
-            log() << "replSet electCmdReceived info got stale version # during election" << rsLog;
+            log() << "replSet electCmdReceived info got stale version # during election";
             vote = -10000;
         }
         else if ( hopefulIndex == -1 ) {
-            log() << "replSet electCmdReceived couldn't find member with id " << whoid << rsLog;
+            log() << "replSet electCmdReceived couldn't find member with id " << whoid;
             vote = -10000;
         }
         else if ( _currentPrimaryIndex != -1 && _memberState == MemberState::RS_PRIMARY ) {
             log() << "I am already primary, " 
                   << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString()
-                  << " can try again once I've stepped down" << rsLog;
+                  << " can try again once I've stepped down";
             vote = -10000;
         }
         else if (_currentPrimaryIndex != -1) {
             log() << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() 
                   << " is trying to elect itself but " <<
                 _currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort().toString() 
-                  << " is already primary" << rsLog;
+                  << " is already primary";
             vote = -10000;
         }
         else if ((highestPriorityIndex != -1) &&
@@ -423,26 +422,20 @@ namespace repl {
             vote = -10000;
         }
         else {
-            try {
-                if (_lastVote.when + LeaseTime >= now && static_cast<int>(_lastVote.who) != whoid) {
-                    LOG(1) << "replSet not voting yea for " << whoid
-                           << " voted for " << _lastVote.who << ' ' << now-_lastVote.when
-                           << " secs ago" << rsLog;
-                    //TODO: remove exception, and change control flow?
-                    throw VoteException();
-                }
+            if (_lastVote.when + LeaseTime >= now && static_cast<int>(_lastVote.who) != whoid) {
+                log() << "replSet voting no for " 
+                      <<  _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() 
+                      << " voted for " << _lastVote.who << ' ' << now-_lastVote.when
+                      << " secs ago";
+            }
+            else {
                 _lastVote.when = now;
                 _lastVote.who = whoid;
                 vote = _selfConfig().getNumVotes();
                 invariant( _currentConfig.getMemberAt(hopefulIndex).getId() == whoid );
                 log() << "replSet info voting yea for " << 
                     _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString()
-                      << " (" << whoid << ')' << rsLog;
-            }
-            catch(VoteException&) {
-                log() << "replSet voting no for " 
-                      <<  _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() 
-                      << " already voted for another" << rsLog;
+                      << " (" << whoid << ')';
             }
         }
 
@@ -454,33 +447,32 @@ namespace repl {
     void TopologyCoordinatorImpl::prepareHeartbeatResponse(
             const ReplicationExecutor::CallbackData& data,
             Date_t now,
-            const BSONObj& cmdObj,
-            BSONObjBuilder* resultObj,
+            const ReplSetHeartbeatArgs& args,
+            const std::string& ourSetName,
+            ReplSetHeartbeatResponse* response,
             Status* result) {
         if (data.status == ErrorCodes::CallbackCanceled) {
             *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
             return;
         }
 
-        if( cmdObj["pv"].Int() != 1 ) {
+        if (args.getProtocolVersion() != 1) {
             *result = Status(ErrorCodes::BadValue, "incompatible replset protocol version");
             return;
         }
 
         // Verify that replica set names match
-        std::string rshb = std::string(cmdObj.getStringField("replSetHeartbeat"));
-        const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
-        if (replSettings.ourSetName() != rshb) {
+        std::string rshb = std::string(args.getSetName());
+        if (ourSetName != rshb) {
             *result = Status(ErrorCodes::BadValue, "repl set names do not match");
-            log() << "replSet set names do not match, our cmdline: " << replSettings.replSet
-                  << rsLog;
-            log() << "replSet rshb: " << rshb << rsLog;
-            resultObj->append("mismatch", true);
+            log() << "replSet set names do not match, ours: " << ourSetName <<
+                "; remote node's: " << rshb;
+            response->noteMismatched();
             return;
         }
 
         // This is a replica set
-        resultObj->append("rs", true);
+        response->noteReplSet();
 
 /*
         if( cmdObj["checkEmpty"].trueValue() ) {
@@ -490,45 +482,41 @@ namespace repl {
 */
 
         // Verify that the config's replset name matches
-        if (_currentConfig.getReplSetName() != cmdObj.getStringField("replSetHeartbeat")) {
+        if (_currentConfig.getReplSetName() != args.getSetName()) {
             *result = Status(ErrorCodes::BadValue, "repl set names do not match (2)");
-            resultObj->append("mismatch", true);
+            response->noteMismatched();
             return; 
         }
-        resultObj->append("set", _currentConfig.getReplSetName());
+        response->setSetName(_currentConfig.getReplSetName());
 
-        resultObj->append("state", _memberState.s);
+        response->setState(_memberState.s);
         if (_memberState == MemberState::RS_PRIMARY) {
-            resultObj->appendDate("electionTime", _electionTime.asDate());
+            response->setElectionTime(_electionTime.asDate());
         }
 
         // Are we electable
-        resultObj->append("e",
-                          _electableSet.find(_selfConfig().getId()) != 
-                          _electableSet.end());
+        response->setElectable(_electableSet.find(_selfConfig().getId()) != _electableSet.end());
         // Heartbeat status message
-        resultObj->append("hbmsg", _getHbmsg());
-        resultObj->append("time", now);
-        resultObj->appendDate("opTime", _lastApplied.asDate());
+        response->setHbMsg(_getHbmsg());
+        response->setTime(now);
+        response->setOpTime(_lastApplied.asDate());
 
         if (_syncSourceIndex != -1) {
-            resultObj->append("syncingTo", 
-                              _currentConfig.getMemberAt(_syncSourceIndex)
-                              .getHostAndPort().toString());
+            response->setSyncingTo(
+                    _currentConfig.getMemberAt(_syncSourceIndex).getHostAndPort().toString());
         }
 
         long long v = _currentConfig.getConfigVersion();
-        resultObj->append("v", v);
+        response->setVersion(v);
         // Deliver new config if caller's version is older than ours
-        if( v > cmdObj["v"].Long() )
-            *resultObj << "config" << _currentConfig.asBson();
+        if (v > args.getConfigVersion()) {
+            response->setConfig(_currentConfig);
+        }
 
         // Resolve the caller's id in our Member list
         int from = -1;
-        if (cmdObj.hasField("fromId")) {
-            if (v == cmdObj["v"].Int()) {
-                from = _getMemberIndex(cmdObj["fromId"].Int());
-            }
+        if (v == args.getConfigVersion() && args.getSenderId() != -1) {
+            from = _getMemberIndex(args.getSenderId());
         }
         if (from == -1) {
             // Can't find the member, so we leave out the stateDisagreement field
@@ -538,7 +526,7 @@ namespace repl {
 
         // if we thought that this node is down, let it know
         if (!_hbdata[from].up()) {
-            resultObj->append("stateDisagreement", true);
+            response->noteStateDisagreement();
         }
 
         // note that we got a heartbeat from this node
@@ -613,7 +601,7 @@ namespace repl {
                       << " and " 
                       << (latestOp - _hbdata[highestPriorityIndex].getOpTime().getSecs()) 
                       << " seconds behind";
-
+/*  logic -- 
                 // Are we primary?
                 if (isSelf(_currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort())) {
                     // replSetStepDown tries to acquire the same lock
@@ -625,24 +613,24 @@ namespace repl {
                 else {
                     // We are not primary.  Step down the remote node.
                     BSONObj cmd = BSON( "replSetStepDown" << 1 );
-/*                ScopedConn conn(primary->fullName());
-                  BSONObj result;
-                  // XXX Eric: schedule stepdown command
+                    ScopedConn conn(primary->fullName());
+                    BSONObj result;
+                    // XXX Eric: schedule stepdown command
 
-                  try {
-                  if (!conn.runCommand("admin", cmd, result, 0)) {
-                  log() << "stepping down " << primary->fullName()
-                  << " failed: " << result << endl;
-                  }
-                  }
-                  catch (DBException &e) {
-                  log() << "stepping down " << primary->fullName() << " threw exception: "
-                  << e.toString() << endl;
-                  }
+                    try {
+                        if (!conn.runCommand("admin", cmd, result, 0)) {
+                            log() << "stepping down " << primary->fullName()
+                                  << " failed: " << result << endl;
+                        }
+                    }
+                    catch (DBException &e) {
+                        log() << "stepping down " << primary->fullName() << " threw exception: "
+                              << e.toString() << endl;
+                    }
                   
 */
                     return StepDown;
-                }
+                
             }
         }
 
@@ -672,7 +660,7 @@ namespace repl {
                 log() << "replset error could not reach/authenticate against any members";
 
                 if (_currentPrimaryIndex == _selfIndex) {
-                    log() << "auth problems, relinquishing primary" << rsLog;
+                    log() << "auth problems, relinquishing primary";
                     // XXX Eric: schedule relinquish
                     //rs->relinquish();
 
@@ -712,7 +700,7 @@ namespace repl {
                     if (remotePrimaryIndex != -1) {
                         // two other nodes think they are primary (asynchronously polled) 
                         // -- wait for things to settle down.
-                        log() << "replSet info two primaries (transiently)" << rsLog;
+                        log() << "replSet info two primaries (transiently)";
                         return None;
                     }
                     remotePrimaryIndex = it->getConfigIndex();
@@ -767,7 +755,7 @@ namespace repl {
             fassert(18505, _currentPrimaryIndex == _selfIndex);
 
             if (_shouldRelinquish()) {
-                log() << "can't see a majority of the set, relinquishing primary" << rsLog;
+                log() << "can't see a majority of the set, relinquishing primary";
                 // XXX Eric: schedule a relinquish
                 //rs->relinquish();
                 return StepDown;
@@ -795,7 +783,7 @@ namespace repl {
             int ll = 0;
             if( ++n > 5 ) ll++;
             if( last + 60 > now ) ll++;
-            LOG(ll) << "replSet can't see a majority, will not try to elect self" << rsLog;
+            LOG(ll) << "replSet can't see a majority, will not try to elect self";
             last = now;
             return None;
         }
@@ -823,7 +811,7 @@ namespace repl {
             requeue();
         }
         catch(...) {
-            log() << "replSet error unexpected assertion in rs manager" << rsLog;
+            log() << "replSet error unexpected assertion in rs manager";
         }
         
     }
@@ -860,7 +848,7 @@ namespace repl {
         }
         if( vTot % 2 == 0 && vTot && complain++ == 0 )
             log() << "replSet warning: even number of voting members in replica set config - "
-                     "add an arbiter or set votes to 0 on one of the existing members" << rsLog;
+                     "add an arbiter or set votes to 0 on one of the existing members";
         return vTot;
     }
 
@@ -910,7 +898,7 @@ namespace repl {
             return;
         }
         _memberState = newMemberState;
-        log() << "replSet " << _memberState.toString() << rsLog;
+        log() << "replSet " << _memberState.toString();
 
         for (std::vector<StateChangeCallbackFn>::const_iterator it = _stateChangeCallbacks.begin();
              it != _stateChangeCallbacks.end(); ++it) {
@@ -918,10 +906,17 @@ namespace repl {
         }
     }
 
-    void TopologyCoordinatorImpl::prepareStatusResponse(Date_t now,
-                                                        const BSONObj& cmdObj,
-                                                        BSONObjBuilder& result,
-                                                        unsigned uptime) {
+    void TopologyCoordinatorImpl::prepareStatusResponse(
+            const ReplicationExecutor::CallbackData& data,
+            Date_t now,
+            unsigned uptime,
+            BSONObjBuilder* response,
+            Status* result) {
+        if (data.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+
         // output for each member
         vector<BSONObj> membersOut;
         MemberState myState = _memberState;
@@ -984,7 +979,9 @@ namespace repl {
                 }
                 bb.appendTimeT("lastHeartbeat", it->getLastHeartbeat());
                 bb.appendTimeT("lastHeartbeatRecv", it->getLastHeartbeatRecv());
-                bb.append("pingMs", static_cast<int>(it->getPing().total_milliseconds()));
+                bb.append("pingMs",
+                          _getPing(_currentConfig.getMemberAt(
+                                  it->getConfigIndex()).getHostAndPort()));
                 std::string s = it->getLastHeartbeatMsg();
                 if( !s.empty() )
                     bb.append("lastHeartbeatMessage", s);
@@ -1009,54 +1006,67 @@ namespace repl {
         // sort members bson
         sort(membersOut.begin(), membersOut.end());
 
-        result.append("set", _currentConfig.getReplSetName());
-        result.appendTimeT("date", now);
-        result.append("myState", myState.s);
+        response->append("set", _currentConfig.getReplSetName());
+        response->appendTimeT("date", now);
+        response->append("myState", myState.s);
 
         // Add sync source info
         if ((_syncSourceIndex != -1) && 
             (myState != MemberState::RS_PRIMARY) &&
             (myState != MemberState::RS_SHUNNED) ) {
-            result.append("syncingTo", _currentConfig.getMemberAt(_syncSourceIndex)
+            response->append("syncingTo", _currentConfig.getMemberAt(_syncSourceIndex)
                           .getHostAndPort().toString());
         }
 
-        result.append("members", membersOut);
+        response->append("members", membersOut);
         /* TODO: decide where this lands
         if( replSetBlind )
             result.append("blind",true); // to avoid confusion if set...
                                          // normally never set except for testing.
         */
+        *result = Status::OK();
     }
-    void TopologyCoordinatorImpl::prepareFreezeResponse(Date_t now,
-                                                        const BSONObj& cmdObj,
-                                                        BSONObjBuilder& result) {
-        int secs = cmdObj.firstElement().numberInt();
+    void TopologyCoordinatorImpl::prepareFreezeResponse(
+            const ReplicationExecutor::CallbackData& data,
+            Date_t now,
+            int secs,
+            BSONObjBuilder* response,
+            Status* result) {
+        if (data.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
 
         if (secs == 0) {
             _stepDownUntil = now;
-            log() << "replSet info 'unfreezing'" << rsLog;
-            result.append("info","unfreezing");
+            log() << "replSet info 'unfreezing'";
+            response->append("info", "unfreezing");
         }
         else {
             if ( secs == 1 )
-                result.append("warning", "you really want to freeze for only 1 second?");
+                response->append("warning", "you really want to freeze for only 1 second?");
 
             if (_memberState != MemberState::RS_PRIMARY) {
                 _stepDownUntil = now + secs;
-                log() << "replSet info 'freezing' for " << secs << " seconds" << rsLog;
+                log() << "replSet info 'freezing' for " << secs << " seconds";
             }
             else {
-                log() << "replSet info received freeze command but we are primary" << rsLog;
+                log() << "replSet info received freeze command but we are primary";
             }
         }
+        *result = Status::OK();
     }
 
     // This function installs a new config object and recreates MemberHeartbeatData objects 
     // that reflect the new config.
-    void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig, 
+    void TopologyCoordinatorImpl::updateConfig(const ReplicationExecutor::CallbackData& cbData,
+                                               const ReplicaSetConfig& newConfig,
                                                int selfIndex,
                                                Date_t now) {
+
+        if (cbData.status == ErrorCodes::CallbackCanceled)
+            return;
+
         invariant(selfIndex < newConfig.getNumMembers());
         _currentConfig = newConfig;        
 
@@ -1106,12 +1116,31 @@ namespace repl {
         }
         if (!s.empty()) {
             lastLogged = _hbmsgTime;
-            LOG(logLevel) << "replSet " << s << rsLog;
+            LOG(logLevel) << "replSet " << s;
         }
     }
     
     const MemberConfig& TopologyCoordinatorImpl::_selfConfig() {
         return _currentConfig.getMemberAt(_selfIndex);
+    }
+
+    void TopologyCoordinatorImpl::recordPing(const HostAndPort& host, const int elapsedMillis) {
+        _pings[host].hit(elapsedMillis);
+    }
+
+    int TopologyCoordinatorImpl::_getPing(const HostAndPort& host) {
+        return _pings[host].getMillis();
+    }
+
+    int TopologyCoordinatorImpl::_getTotalPings() {
+        PingMap::iterator it = _pings.begin();
+        PingMap::iterator end = _pings.end();
+        int totalPings = 0;
+        while (it != end) {
+            totalPings += it->second.getCount();
+            it++;
+        }
+        return totalPings;
     }
 
 } // namespace repl

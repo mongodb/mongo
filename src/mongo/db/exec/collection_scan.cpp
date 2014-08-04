@@ -144,17 +144,17 @@ namespace mongo {
         }
     }
 
-    void CollectionScan::prepareToYield() {
+    void CollectionScan::saveState() {
         ++_commonStats.yields;
         if (NULL != _iter) {
-            _iter->prepareToYield();
+            _iter->saveState();
         }
     }
 
-    void CollectionScan::recoverFromYield(OperationContext* opCtx) {
+    void CollectionScan::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
         if (NULL != _iter) {
-            if (!_iter->recoverFromYield()) {
+            if (!_iter->restoreState()) {
                 warning() << "Collection dropped or state deleted during yield of CollectionScan";
                 _nsDropped = true;
             }

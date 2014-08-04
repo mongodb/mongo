@@ -281,17 +281,17 @@ namespace mongo {
         return SearchState_Finished == _searchState;
     }
 
-    void NearStage::prepareToYield() {
+    void NearStage::saveState() {
         ++_stats->common.yields;
         if (_nextInterval) {
-            _nextInterval->covering->prepareToYield();
+            _nextInterval->covering->saveState();
         }
     }
 
-    void NearStage::recoverFromYield(OperationContext* opCtx) {
+    void NearStage::restoreState(OperationContext* opCtx) {
         ++_stats->common.unyields;
         if (_nextInterval) {
-            _nextInterval->covering->recoverFromYield(opCtx);
+            _nextInterval->covering->restoreState(opCtx);
         }
     }
 

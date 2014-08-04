@@ -30,20 +30,32 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
+#include <set>
+#include <vector>
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/topology_coordinator_mock.h"
+#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-namespace repl {
 
+    // So that you can ASSERT_EQUALS two OpTimes
+    std::ostream& operator<<( std::ostream &s, const OpTime &ot ) {
+        s << ot.toString();
+        return s;
+    }
+    StringBuilder& operator<< (StringBuilder& s, const OpTime& ot) {
+        return (s << ot.toString());
+    }
+
+namespace repl {
 namespace {
 
     TEST(ReplicationCoordinator, StartupShutdown) {
@@ -52,7 +64,13 @@ namespace {
         settings.replSet = "mySet/node1:12345,node2:54321";
         ReplicationCoordinatorImpl coordinator(settings,
                                                new ReplicationCoordinatorExternalStateMock);
-        coordinator.startReplication(new TopologyCoordinatorMock, new NetworkInterfaceMock);
+        ReplicaSetConfig config;
+        config.initialize((BSON("_id" << "mySet" <<
+                                "version" << 2 <<
+                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                             "_id" << 0 )))));
+        coordinator.setCurrentReplicaSetConfig(config, 0);
+        coordinator.startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
         coordinator.shutdown();
     }
 
@@ -98,6 +116,12 @@ namespace {
         settings.replSet = "mySet/node1:12345,node2:54321";
         ReplicationCoordinatorImpl coordinator(settings,
                                                new ReplicationCoordinatorExternalStateMock);
+        ReplicaSetConfig config;
+        config.initialize((BSON("_id" << "mySet" <<
+                                "version" << 2 <<
+                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                             "_id" << 0 )))));
+        coordinator.setCurrentReplicaSetConfig(config, 0);
         OperationContextNoop txn;
 
         OID client1 = OID::gen();
@@ -206,6 +230,12 @@ namespace {
         settings.replSet = "mySet/node1:12345,node2:54321";
         ReplicationCoordinatorImpl coordinator(settings,
                                                new ReplicationCoordinatorExternalStateMock);
+        ReplicaSetConfig config;
+        config.initialize((BSON("_id" << "mySet" <<
+                                "version" << 2 <<
+                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                             "_id" << 0 )))));
+        coordinator.setCurrentReplicaSetConfig(config, 0);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
 
@@ -254,6 +284,12 @@ namespace {
         settings.replSet = "mySet/node1:12345,node2:54321";
         ReplicationCoordinatorImpl coordinator(settings,
                                                new ReplicationCoordinatorExternalStateMock);
+        ReplicaSetConfig config;
+        config.initialize((BSON("_id" << "mySet" <<
+                                "version" << 2 <<
+                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                             "_id" << 0 )))));
+        coordinator.setCurrentReplicaSetConfig(config, 0);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
 
@@ -283,7 +319,13 @@ namespace {
         settings.replSet = "mySet/node1:12345,node2:54321";
         ReplicationCoordinatorImpl coordinator(settings,
                                                new ReplicationCoordinatorExternalStateMock);
-        coordinator.startReplication(new TopologyCoordinatorMock, new NetworkInterfaceMock);
+        ReplicaSetConfig config;
+        config.initialize((BSON("_id" << "mySet" <<
+                                "version" << 2 <<
+                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                             "_id" << 0 )))));
+        coordinator.setCurrentReplicaSetConfig(config, 0);
+        coordinator.startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
 
@@ -308,9 +350,198 @@ namespace {
         awaiter.reset();
     }
 
+    TEST(ReplicationCoordinator, GetReplicationMode) {
+        // should default to modeNone
+        ReplSettings settings;
+        ReplicationCoordinatorImpl coordinator(settings,
+                                               new ReplicationCoordinatorExternalStateMock);
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, coordinator.getReplicationMode());
+
+        // modeMasterSlave if master set
+        ReplSettings settings2;
+        settings2.master = true;
+        ReplicationCoordinatorImpl coordinator2(settings2,
+                                                new ReplicationCoordinatorExternalStateMock);
+        ASSERT_EQUALS(ReplicationCoordinator::modeMasterSlave, coordinator2.getReplicationMode());
+
+        // modeMasterSlave if the slave flag was set
+        ReplSettings settings3;
+        settings3.slave = SimpleSlave;
+        ReplicationCoordinatorImpl coordinator3(settings3,
+                                                new ReplicationCoordinatorExternalStateMock);
+        ASSERT_EQUALS(ReplicationCoordinator::modeMasterSlave, coordinator3.getReplicationMode());
+
+        // modeReplSet only once config isInitialized
+        ReplSettings settings4;
+        settings4.replSet = "mySet/node1:12345";
+        ReplicationCoordinatorImpl coordinator4(settings4,
+                                                new ReplicationCoordinatorExternalStateMock);
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, coordinator4.getReplicationMode());
+        ReplicaSetConfig config;
+        config.initialize((BSON("_id" << "mySet" <<
+                                "version" << 2 <<
+                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                             "_id" << 0 )))));
+        coordinator4.setCurrentReplicaSetConfig(config, 0);
+        ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, coordinator4.getReplicationMode());
+
+        // modeReplSet only once config isInitialized even if the slave flag was set
+        settings4.slave = SimpleSlave;
+        ReplicationCoordinatorImpl coordinator5(settings4,
+                                                new ReplicationCoordinatorExternalStateMock);
+        ASSERT_EQUALS(ReplicationCoordinator::modeMasterSlave, coordinator5.getReplicationMode());
+        coordinator5.setCurrentReplicaSetConfig(config, 0);
+        ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, coordinator5.getReplicationMode());
+    }
+
     TEST(ReplicationCoordinator, AwaitReplicationNamedModes) {
         // TODO(spencer): Test awaitReplication with w:majority and tag groups
     }
+
+    // This test fixture ensures that any tests that call startReplication on their coordinator
+    // will always call shutdown on the coordinator as well.
+    class ReplicationCoordinatorTestWithShutdown : public ::mongo::unittest::Test {
+    public:
+        virtual ~ReplicationCoordinatorTestWithShutdown() {
+            if (coordinator.get()) {
+                coordinator->shutdown();
+            }
+        }
+        boost::scoped_ptr<ReplicationCoordinatorImpl> coordinator;
+    };
+
+    TEST_F(ReplicationCoordinatorTestWithShutdown, TestPrepareReplSetUpdatePositionCommand) {
+
+        ReplSettings settings;
+        settings.replSet = "mySet:/test1:1234,test2:1234,test3:1234";
+        BSONObj configObj =
+                BSON("_id" << "mySet" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test1:1234") <<
+                                             BSON("_id" << 1 << "host" << "test2:1234") <<
+                                             BSON("_id" << 2 << "host" << "test3:1234")));
+        ReplicaSetConfig rsConfig;
+        ASSERT_OK(rsConfig.initialize(configObj));
+        coordinator.reset(new ReplicationCoordinatorImpl(
+                settings, new ReplicationCoordinatorExternalStateMock));
+        coordinator->startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
+        coordinator->setCurrentReplicaSetConfig(rsConfig, 1);
+
+        OID rid1 = OID::gen();
+        OID rid2 = OID::gen();
+        OID rid3 = OID::gen();
+        BSONObj handshake1 = BSON("handshake" << rid1 <<
+                                  "member" << 0 <<
+                                  "config" << BSON("_id" << 0 << "host" << "test1:1234"));
+        BSONObj handshake2 = BSON("handshake" << rid2 <<
+                                  "member" << 1 <<
+                                  "config" << BSON("_id" << 1 << "host" << "test2:1234"));
+        BSONObj handshake3 = BSON("handshake" << rid3 <<
+                                  "member" << 2 <<
+                                  "config" << BSON("_id" << 2 << "host" << "test3:1234"));
+        OperationContextNoop txn;
+        ASSERT_OK(coordinator->processHandshake(&txn, rid1, handshake1));
+        ASSERT_OK(coordinator->processHandshake(&txn, rid2, handshake2));
+        ASSERT_OK(coordinator->processHandshake(&txn, rid3, handshake3));
+        OpTime optime1(1, 1);
+        OpTime optime2(1, 2);
+        OpTime optime3(2, 1);
+        ASSERT_OK(coordinator->setLastOptime(&txn, rid1, optime1));
+        ASSERT_OK(coordinator->setLastOptime(&txn, rid2, optime2));
+        ASSERT_OK(coordinator->setLastOptime(&txn, rid3, optime3));
+
+        // Check that the proper BSON is generated for the replSetUpdatePositionCommand
+        BSONObjBuilder cmdBuilder;
+        coordinator->prepareReplSetUpdatePositionCommand(&txn, &cmdBuilder);
+        BSONObj cmd = cmdBuilder.done();
+
+        ASSERT_EQUALS(2, cmd.nFields());
+        ASSERT_EQUALS("replSetUpdatePosition", cmd.firstElement().fieldNameStringData());
+
+        std::set<OID> rids;
+        BSONForEach(entryElement, cmd["optimes"].Obj()) {
+            BSONObj entry = entryElement.Obj();
+            OID rid = entry["_id"].OID();
+            rids.insert(rid);
+            if (rid == rid1) {
+                ASSERT_EQUALS(optime1, entry["optime"]._opTime());
+            } else if (rid == rid2) {
+                ASSERT_EQUALS(optime2, entry["optime"]._opTime());
+            } else {
+                ASSERT_EQUALS(rid3, rid);
+                ASSERT_EQUALS(optime3, entry["optime"]._opTime());
+            }
+        }
+        ASSERT_EQUALS(3U, rids.size()); // Make sure we saw all 3 nodes
+    }
+
+    TEST_F(ReplicationCoordinatorTestWithShutdown, TestHandshakes) {
+        ReplSettings settings;
+        settings.replSet = "mySet:/test1:1234,test2:1234,test3:1234";
+        BSONObj configObj =
+                BSON("_id" << "mySet" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test1:1234") <<
+                                             BSON("_id" << 1 << "host" << "test2:1234") <<
+                                             BSON("_id" << 2 << "host" << "test3:1234")));
+        ReplicaSetConfig rsConfig;
+        ASSERT_OK(rsConfig.initialize(configObj));
+        coordinator.reset(new ReplicationCoordinatorImpl(
+                settings, new ReplicationCoordinatorExternalStateMock));
+        coordinator->startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
+        coordinator->setCurrentReplicaSetConfig(rsConfig, 1);
+
+        // Test generating basic handshake with no chaining
+        OperationContextNoop txn;
+        std::vector<BSONObj> handshakes;
+        coordinator->prepareReplSetUpdatePositionCommandHandshakes(&txn, &handshakes);
+        ASSERT_EQUALS(1U, handshakes.size());
+        BSONObj handshakeCmd = handshakes[0];
+        ASSERT_EQUALS(2, handshakeCmd.nFields());
+        ASSERT_EQUALS("replSetUpdatePosition", handshakeCmd.firstElement().fieldNameStringData());
+        BSONObj handshake = handshakeCmd["handshake"].Obj();
+        ASSERT_EQUALS(coordinator->getMyRID(&txn), handshake["handshake"].OID());
+        ASSERT_EQUALS(1, handshake["member"].Int());
+        handshakes.clear();
+
+        // Have other nodes handshake us and make sure we process it right.
+        OID slave1RID = OID::gen();
+        OID slave2RID = OID::gen();
+        BSONObj slave1Handshake = BSON("handshake" << slave1RID <<
+                                       "member" << 0 <<
+                                       "config" << BSON("_id" << 0 << "host" << "test1:1234"));
+        BSONObj slave2Handshake = BSON("handshake" << slave2RID <<
+                                       "member" << 2 <<
+                                       "config" << BSON("_id" << 2 << "host" << "test2:1234"));
+        ASSERT_OK(coordinator->processHandshake(&txn, slave1RID, slave1Handshake));
+        ASSERT_OK(coordinator->processHandshake(&txn, slave2RID, slave2Handshake));
+
+        coordinator->prepareReplSetUpdatePositionCommandHandshakes(&txn, &handshakes);
+        ASSERT_EQUALS(3U, handshakes.size());
+        std::set<OID> rids;
+        for (std::vector<BSONObj>::iterator it = handshakes.begin(); it != handshakes.end(); ++it) {
+            BSONObj handshakeCmd = *it;
+            ASSERT_EQUALS(2, handshakeCmd.nFields());
+            ASSERT_EQUALS("replSetUpdatePosition",
+                          handshakeCmd.firstElement().fieldNameStringData());
+
+            BSONObj handshake = handshakeCmd["handshake"].Obj();
+            OID rid = handshake["handshake"].OID();
+            rids.insert(rid);
+            if (rid == coordinator->getMyRID(&txn)) {
+                ASSERT_EQUALS(1, handshake["member"].Int());
+            } else if (rid == slave1RID) {
+                ASSERT_EQUALS(0, handshake["member"].Int());
+            } else {
+                ASSERT_EQUALS(slave2RID, rid);
+                ASSERT_EQUALS(2, handshake["member"].Int());
+            }
+        }
+        ASSERT_EQUALS(3U, rids.size()); // Make sure we saw all 3 nodes
+    }
+
+    // TODO(spencer): Unit test processReplSetGetStatus
+    // TODO(spencer): Unit test replSetFreeze
 
 }  // namespace
 }  // namespace repl

@@ -138,8 +138,8 @@ namespace mongo {
             virtual DiskLoc curr();
             virtual DiskLoc getNext();
             virtual void invalidate(const DiskLoc& dl);
-            virtual void prepareToYield();
-            virtual bool recoverFromYield();
+            virtual void saveState();
+            virtual bool restoreState();
             virtual RecordData dataFor( const DiskLoc& loc ) const;
 
         private:

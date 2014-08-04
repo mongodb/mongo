@@ -173,7 +173,7 @@ namespace mongo {
                 args.IsConstructCall());
         verify(scope->MongoFT()->HasInstance(args.This()));
 
-        DBClientBase* conn = createDirectClient();
+        DBClientBase* conn = createDirectClient(scope->getOpContext());
         v8::Local<v8::External> connHandle =
             scope->dbClientBaseTracker.track(scope->getIsolate(), args.This(), conn);
 

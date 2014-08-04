@@ -59,6 +59,26 @@ namespace {
         return StringData(unknownSeverityString, StringData::LiteralTag());
     }
 
+    char LogSeverity::toChar() const {
+        if (_severity > 0)
+            return 'D';
+        // 'S' might be confused with "Success"
+        // Return 'F' to imply Fatal instead.
+        if (*this == LogSeverity::Severe())
+            return 'F';
+        if (*this == LogSeverity::Error())
+            return 'E';
+        if (*this == LogSeverity::Warning())
+            return 'W';
+        if (*this == LogSeverity::Info())
+            return 'I';
+        if (*this == LogSeverity::Log())
+            return 'I';
+        // Should not reach here - returning 'U' for Unknown severity
+        // to be consistent with toStringData().
+        return 'U';
+    }
+
     std::ostream& operator<<(std::ostream& os, LogSeverity severity) {
         return os << severity.toStringData();
     }

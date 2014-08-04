@@ -51,9 +51,6 @@ namespace repl {
         virtual bool adminOnly() const { return true; }
         virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream &help ) const { help << "internal"; }
-
-        // TODO(spencer): Remove this once all command processing happens in the repl coordinator
-        bool check(string& errmsg, BSONObjBuilder& result);
     };
 
 } // namespace repl
