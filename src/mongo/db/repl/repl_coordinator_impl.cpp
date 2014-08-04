@@ -107,12 +107,12 @@ namespace repl {
 
         _topCoord.reset(topCoord);
         _topCoord->registerConfigChangeCallback(
-                stdx::bind(&ReplicationCoordinatorImpl::setCurrentReplicaSetConfig,
+                stdx::bind(&ReplicationCoordinatorImpl::_onReplicaSetConfigChange,
                            this,
                            stdx::placeholders::_1,
                            stdx::placeholders::_2));
         _topCoord->registerStateChangeCallback(
-                stdx::bind(&ReplicationCoordinatorImpl::setCurrentMemberState,
+                stdx::bind(&ReplicationCoordinatorImpl::_onSelfStateChange,
                            this,
                            stdx::placeholders::_1));
 
@@ -170,7 +170,7 @@ namespace repl {
         return modeNone;
     }
 
-    void ReplicationCoordinatorImpl::setCurrentMemberState(const MemberState& newState) {
+    void ReplicationCoordinatorImpl::_onSelfStateChange(const MemberState& newState) {
         invariant(_settings.usingReplSets());
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_settings.usingReplSets());
@@ -632,7 +632,7 @@ namespace repl {
         return Status::OK();
     }
 
-    void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(const ReplicaSetConfig& newConfig,
+    void ReplicationCoordinatorImpl::_onReplicaSetConfigChange(const ReplicaSetConfig& newConfig,
                                                                 int myIndex) {
         invariant(_settings.usingReplSets());
         boost::lock_guard<boost::mutex> lk(_mutex);

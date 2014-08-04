@@ -173,12 +173,6 @@ namespace repl {
 
         // ================== Members of replication code internal API ===================
 
-        // Called by the TopologyCoordinator whenever this node's replica set state transitions.
-        void setCurrentMemberState(const MemberState& newState);
-
-        // Called by the TopologyCoordinator whenever the replica set configuration is updated
-        void setCurrentReplicaSetConfig(const ReplicaSetConfig& newConfig, int myIndex);
-
         /**
          * Does a heartbeat for a member of the replica set.
          * Should be started during (re)configuration or in the heartbeat callback only.
@@ -196,6 +190,12 @@ namespace repl {
         void cancelHeartbeats();
 
     private:
+
+        // Called by the TopologyCoordinator whenever this node's replica set state transitions.
+        void _onSelfStateChange(const MemberState& newState);
+
+        // Called by the TopologyCoordinator whenever the replica set configuration is updated
+        void _onReplicaSetConfigChange(const ReplicaSetConfig& newConfig, int myIndex);
 
         // Struct that holds information about clients waiting for replication.
         struct WaiterInfo;
