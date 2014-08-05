@@ -347,7 +347,7 @@ worker_async(void *arg)
 retry:		if ((ret = conn->async_new_op(
 		    conn, cfg->uris[next_val % cfg->table_count],
 		    NULL, &cb, &asyncop)) != 0) {
-			if (ret != ENOMEM)
+			if (ret != EBUSY)
 				goto err;
 			(void)usleep(10000);
 			goto retry;
@@ -935,7 +935,7 @@ populate_async(void *arg)
 retry:		if ((ret = conn->async_new_op(
 		    conn, cfg->uris[op % cfg->table_count],
 		    NULL, &cb, &asyncop)) != 0) {
-			if (ret != ENOMEM)
+			if (ret != EBUSY)
 				goto err;
 			(void)usleep(10000);
 			goto retry;
@@ -1311,7 +1311,7 @@ retry:			 if ((ret = cfg->conn->async_new_op(cfg->conn,
 				 * If no ops are available, retry.  Any other
 				 * error, return.
 				 */
-				if (ret == ENOMEM) {
+				if (ret == EBUSY) {
 					(void)usleep(10000);
 					goto retry;
 				}
