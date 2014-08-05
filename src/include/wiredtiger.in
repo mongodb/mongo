@@ -1553,6 +1553,7 @@ struct __wt_connection {
 	 * @param callback the operation callback
 	 * @param[out] asyncopp the new op handle
 	 * @errors
+	 * If there are no available handles, \c EBUSY is returned.
 	 */
 	int __F(async_new_op)(WT_CONNECTION *connection,
 	    const char *uri, const char *config, WT_ASYNC_CALLBACK *callback,
