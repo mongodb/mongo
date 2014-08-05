@@ -1,6 +1,5 @@
-// mongo/unittest/unittest_main.cpp
-
-/*    Copyright 2010 10gen Inc.
+/**
+ *    Copyright (C) 2010 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -27,17 +26,18 @@
  *    then also delete it in the license file.
  */
 
-#include <string>
-#include <vector>
+#pragma once
 
-#include "mongo/base/initializer.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/signal_handlers_synchronous.h"
+namespace mongo {
 
-int main( int argc, char **argv, char **envp ) {
-    ::mongo::setupSynchronousSignalHandlers();
-    ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
-    return ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
-}
+    /**
+     * Sets up handlers for synchronous events, like segv, abort, terminate and malloc-failure.
+     *
+     * Call this very early in main(), before runGlobalInitializers().
+     *
+     * Called by setupSignalHandlers() in signal_handlers.h.  Prefer that method to this one,
+     * in server code and tools that use the storage engine.
+     */
+    void setupSynchronousSignalHandlers();
 
-void mongo::unittest::onCurrentTestNameChange( const std::string &testName ) {}
+}  // namespace mongo
