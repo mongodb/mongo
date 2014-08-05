@@ -453,8 +453,6 @@ namespace mongo {
 
         dbHolder().close( txn, dbName );
 
-        Client::Context ctx(txn, dbName);
-
         if ( backupOriginalFiles ) {
             _renameForBackup( dbName, reservedPath );
         }
