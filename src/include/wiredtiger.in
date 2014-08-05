@@ -549,12 +549,12 @@ struct __wt_cursor {
 
 /*! Asynchronous operation types. */
 typedef enum {
-	WT_AOP_NONE=0,	/*!< No type set */
-	WT_AOP_COMPACT, /*!< Compact the data source */
-	WT_AOP_INSERT,	/*!< Insert if key is not in the data source */
-	WT_AOP_REMOVE,	/*!< Remove a key from the data source */
-	WT_AOP_SEARCH,	/*!< Search and return key/value pair */
-	WT_AOP_UPDATE	/*!< Set the value of an existing key */
+	WT_AOP_NONE=0,	/*!< No operation type set */
+	WT_AOP_COMPACT, /*!< WT_ASYNC_OP::compact */
+	WT_AOP_INSERT,	/*!< WT_ASYNC_OP::insert */
+	WT_AOP_REMOVE,	/*!< WT_ASYNC_OP::remove */
+	WT_AOP_SEARCH,	/*!< WT_ASYNC_OP::search */
+	WT_AOP_UPDATE	/*!< WT_ASYNC_OP::update */
 } WT_ASYNC_OPTYPE;
 
 /*!
@@ -566,16 +566,17 @@ typedef enum {
  * is a self-contained work unit.  The operation will be performed in the
  * context of the worker thread's session.  Each operation is performed
  * within the context of a transaction.  The application is notified of its
- * completion with a callback.  The transaction is resolved once the
- * callback returns.
+ * completion with a callback.  The transaction is resolved once the callback
+ * returns.
  *
  * The table referenced in an operation must already exist.
  *
  * Raw data is represented by key/value pairs of WT_ITEM structures, but
- * operations can also provide access to fields within the key and value if the
- * formats are described in the WT_SESSION::create method.
+ * operations can also provide access to fields within the key and value if
+ * the formats are described in the WT_SESSION::create method.
  *
- * <b>Thread safety:</b> A WT_ASYNC_OP handle is not shared between threads.
+ * <b>Thread safety:</b> A WT_ASYNC_OP handle may not be shared between
+ * threads, see @ref threads for more information.
  */
 struct __wt_async_op {
 	/*! The connection for this operation. */
@@ -614,201 +615,119 @@ struct __wt_async_op {
 	 * @{
 	 */
 	/*!
-	 * Get the key for the current record.
-	 *
-	 * @snippet ex_async.c Get the operation's string key
+	 * Invoke the underlying WT_CURSOR::get_key method; see that method
+	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @param ... pointers to hold key fields corresponding to
-	 * WT_ASYNC_OP::key_format.
-	 * @errors
+	 * @returns as described for WT_CURSOR::get_key
 	 */
 	int __F(get_key)(WT_ASYNC_OP *op, ...);
 
 	/*!
-	 * Get the value for the current record.
-	 *
-	 * @snippet ex_async.c Get the operation's string value
+	 * Invoke the underlying WT_CURSOR::get_value method; see that method
+	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @param ... pointers to hold value fields corresponding to
-	 * WT_ASYNC_OP::value_format.
-	 * @errors
+	 * @returns as described for WT_CURSOR::get_value
 	 */
 	int __F(get_value)(WT_ASYNC_OP *op, ...);
 
 	/*!
-	 * Set the key for the next operation.
-	 *
-	 * @snippet ex_async.c Set the operation's string key
+	 * Invoke the underlying WT_CURSOR::set_key method; see that method
+	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @param ... key fields corresponding to WT_ASYNC_OP::key_format.
-	 *
-	 * If an error occurs during this operation, a flag will be set in the
-	 * operation, and the next operation to access the key will fail.  This
-	 * simplifies error handling in applications.
 	 */
 	void __F(set_key)(WT_ASYNC_OP *op, ...);
 
 	/*!
-	 * Set the value for the next operation.
-	 *
-	 * @snippet ex_async.c Set the operation's string value
+	 * Invoke the underlying WT_CURSOR::set_value method; see that method
+	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @param ... value fields corresponding to WT_ASYNC_OP::value_format.
-	 *
-	 * If an error occurs during this operation, a flag will be set in the
-	 * operation, and the next operation to access the value will fail
-	 * This simplifies error handling in applications.
 	 */
 	void __F(set_value)(WT_ASYNC_OP *op, ...);
 	/*! @} */
 
 	/*!
-	 * Return the record matching the key. The key must first be set.
-	 *
-	 * @snippet ex_async.c search
-	 *
-	 * On success, the operation contains the returned record.
+	 * @name Positioning
+	 * @{
+	 */
+	/*!
+	 * Invoke the underlying WT_CURSOR::search method; see that method
+	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @errors
+	 * @returns via the callback as described for WT_CURSOR::search
 	 */
 	int __F(search)(WT_ASYNC_OP *op);
+	/*! @} */
 
 	/*!
 	 * @name Data modification
 	 * @{
 	 */
 	/*!
-	 * Insert a record and optionally update an existing record.
-	 *
-	 * If the operation was configured with "overwrite=true" (the default),
-	 * both the key and value must be set; if the record already exists,
-	 * the key's value will be updated, otherwise, the record will be
-	 * inserted.
-	 *
-	 * @snippet ex_all.c Insert a new record or overwrite an existing record
-	 *
-	 * If the operation was not configured with "overwrite=true", both the
-	 * key and value must be set and the record must not already exist; the
-	 * record will be inserted.
-	 *
-	 * @snippet ex_all.c Insert a new record and fail if the record exists
-	 *
-	 * If an operation with record number keys was configured with
-	 * "append=true" (not the default), the value must be set; a new record
-	 * will be appended and the record number set as the operation's
-	 * key value.
-	 *
-	 * @snippet ex_all.c Insert a new record and assign a record number
-	 *
-	 * Inserting a new record after the current maximum record in a
-	 * fixed-length bit field column-store (that is, a store with an
-	 * 'r' type key and 't' type value) may implicitly create the missing
-	 * records as records with a value of 0.
-	 *
-	 * When loading a large amount of data into a new object, using
-	 * normal cursor operations with the \c bulk configuration string
-	 * enabled will be much faster than asynchronous operations.
-	 *
-	 * The maximum length of a single column stored in a table is not fixed
-	 * (as it partially depends on the underlying file configuration), but
-	 * is always a small number of bytes less than 4GB.
+	 * Invoke the underlying WT_CURSOR::insert method; see that method
+	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @errors
-	 * In particular, if \c overwrite is not configured and a record with
-	 * the specified key already exists, ::WT_DUPLICATE_KEY is returned.
+	 * @returns via the callback as described for WT_CURSOR::insert
 	 */
 	int __F(insert)(WT_ASYNC_OP *op);
 
 	/*!
-	 * Update a record and optionally insert an existing record.
-	 *
-	 * If the operation was configured with "overwrite=true" (the default),
-	 * both the key and value must be set; if the record already exists, the
-	 * key's value will be updated, otherwise, the record will be inserted.
-	 *
-	 * @snippet ex_all.c Update an existing record or insert a new record
-	 *
-	 * If the operation was not configured with "overwrite=true", both the
-	 * key and value must be set and the record must already exist; the
-	 * record will be updated.
-	 *
-	 * @snippet ex_all.c Update an existing record and fail if DNE
-	 *
-	 * The maximum length of a single column stored in a table is not fixed
-	 * (as it partially depends on the underlying file configuration), but
-	 * is always a small number of bytes less than 4GB.
+	 * Invoke the underlying WT_CURSOR::update method; see that method
+	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @errors
-	 * In particular, if \c overwrite is not configured and no record with
-	 * the specified key exists, ::WT_NOTFOUND is returned.
+	 * @returns via the callback as described for WT_CURSOR::update
 	 */
 	int __F(update)(WT_ASYNC_OP *op);
 
 	/*!
-	 * Remove a record.
-	 *
-	 * If the operation was configured with "overwrite=true" (the default),
-	 * the key must be set; the key's record will be removed if it exists,
-	 * no error will be returned if the record does not exist.
-	 *
-	 * @snippet ex_all.c Remove a record
-	 *
-	 * If the operation was not configured with "overwrite=true", the key
-	 * must be set and the key's record must exist; the record will be
-	 * removed.
-	 *
-	 * @snippet ex_all.c Remove a record and fail if DNE
-	 *
-	 * Removing a record in a fixed-length bit field column-store
-	 * (that is, a store with an 'r' type key and 't' type value) is
-	 * identical to setting the record's value to 0.
+	 * Invoke the underlying WT_CURSOR::remove method; see that method
+	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @errors
-	 * In particular, if \c overwrite is not configured and no record with
-	 * the specified key exists, ::WT_NOTFOUND is returned.
+	 * @returns via the callback as described for WT_CURSOR::remove
 	 */
 	int __F(remove)(WT_ASYNC_OP *op);
+	/*! @} */
 
 	/*!
-	 * Compact a live row- or column-store btree or LSM tree.
-	 *
-	 * @snippet ex_async.c Compact a table
+	 * @name Table operations
+	 * @{
+	 */
+	/*!
+	 * Invoke the underlying WT_SESSION::compact method; see that method
+	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @errors
+	 * @returns via the callback as described for WT_SESSION::compact
 	 */
 	int __F(compact)(WT_ASYNC_OP *op);
+	/*! @} */
 
 	/*!
 	 * Get the unique identifier for this operation.
 	 *
-	 * @snippet ex_async.c Get identifier
+	 * @snippet ex_async.c async get identifier
 	 *
 	 * @param op the operation handle
-	 * @errors
+	 * @returns the id of the operation
 	 */
 	uint64_t __F(get_id)(WT_ASYNC_OP *op);
 
 	/*!
 	 * Get the type for this operation.
 	 *
-	 * @snippet ex_async.c Get type
+	 * @snippet ex_async.c async get type
 	 *
 	 * @param op the operation handle
-	 * @returns the WT_ASYNC_OPTYPE of this operation
-	 * @errors
+	 * @returns the ::WT_ASYNC_OPTYPE of the operation
 	 */
 	WT_ASYNC_OPTYPE __F(get_type)(WT_ASYNC_OP *op);
-
-	/*! @} */
 
 	/*
 	 * Protected fields, only to be used by internal implementation.
@@ -1509,7 +1428,7 @@ struct __wt_connection {
 	/*!
 	 * Wait for all outstanding operations to complete.
 	 *
-	 * @snippet ex_async.c flush
+	 * @snippet ex_async.c async flush
 	 *
 	 * @param connection the connection handle
 	 * @errors
@@ -1519,7 +1438,7 @@ struct __wt_connection {
 	/*!
 	 * Return an async operation handle
 	 *
-	 * @snippet ex_async.c Allocate a handle
+	 * @snippet ex_async.c async handle allocation
 	 *
 	 * @param connection the connection handle
 	 * @param uri the connection handle
@@ -1544,6 +1463,7 @@ struct __wt_connection {
 	 * @param callback the operation callback
 	 * @param[out] asyncopp the new op handle
 	 * @errors
+	 * If there are no available handles, \c EBUSY is returned.
 	 */
 	int __F(async_new_op)(WT_CONNECTION *connection,
 	    const char *uri, const char *config, WT_ASYNC_CALLBACK *callback,
@@ -2064,7 +1984,7 @@ const char *wiredtiger_strerror(int err);
  * Applications register their implementation with WiredTiger by calling
  * WT_CONNECTION::async_new_op.
  *
- * @snippet ex_async.c Allocate a handle
+ * @snippet ex_async.c async handle allocation
  */
 struct __wt_async_callback {
 	/*!
@@ -2075,7 +1995,7 @@ struct __wt_async_callback {
 	 * @param[in] flags currently unused
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
-	 * @snippet ex_async.c example callback implementation
+	 * @snippet ex_async.c async example callback implementation
 	 */
 	int (*notify)(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op,
 	    int op_ret, uint32_t flags);

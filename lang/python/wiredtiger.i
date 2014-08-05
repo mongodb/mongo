@@ -330,14 +330,14 @@ do {
 		SWIG_ERROR_IF_NOT_SET(result);
 }
 
-/* Async operations can return ENOMEM when no ops are available. */
-%define ENOMEM_OK(m)
+/* Async operations can return EBUSY when no ops are available. */
+%define EBUSY_OK(m)
 %exception m {
 retry:
 	$action
-	if (result != 0 && result != ENOMEM)
+	if (result != 0 && result != EBUSY)
 		SWIG_ERROR_IF_NOT_SET(result);
-        else if (result == ENOMEM) {
+        else if (result == EBUSY) {
                 __wt_sleep(0, 10000);
                 goto retry;
         }
@@ -369,7 +369,7 @@ retry:
 }
 %enddef
 
-ENOMEM_OK(__wt_connection::async_new_op)
+EBUSY_OK(__wt_connection::async_new_op)
 ENUM_OK(__wt_async_op::get_type)
 NOTFOUND_OK(__wt_cursor::next)
 NOTFOUND_OK(__wt_cursor::prev)

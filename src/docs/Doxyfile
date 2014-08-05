@@ -1549,6 +1549,8 @@ INCLUDE_FILE_PATTERNS  =
 # instead of the = operator.
 
 PREDEFINED             = DOXYGEN \
+                         __wt_async_callback:=WT_ASYNC_CALLBACK \
+                         __wt_async_op:=WT_ASYNC_OP \
                          __wt_collator:=WT_COLLATOR \
                          __wt_compressor:=WT_COMPRESSOR \
                          __wt_config_arg:=WT_CONFIG_ARG \
@@ -1563,6 +1565,7 @@ PREDEFINED             = DOXYGEN \
                          __wt_extractor:=WT_EXTRACTOR \
                          __wt_item:=WT_ITEM \
                          __wt_session:=WT_SESSION \
+                         __wt_txn_notify:=WT_TXN_NOTIFY \
                          WT_HANDLE_CLOSED(x):=x \
                          WT_HANDLE_NULLABLE(x):=x
 

@@ -87,6 +87,10 @@ valid_build()
 		echo 'Unreferenced page: see docs/pages.html for the list.'
 		e=1
 	}
+	classf=`ls ../docs/struct___* 2>/dev/null`
+	for c in $classf; do
+		echo "$c: Need to add class to PREDEFINE in src/docs/Doxyfile"
+	done
 }
 
 build()

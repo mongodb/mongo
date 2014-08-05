@@ -143,7 +143,7 @@ retry:
 	 */
 	if (op == NULL || op->state != WT_ASYNCOP_FREE) {
 		WT_STAT_FAST_CONN_INCR(session, async_full);
-		WT_RET(ENOMEM);
+		WT_RET(EBUSY);
 	}
 	/*
 	 * Set the state of this op handle as READY for the user to use.
