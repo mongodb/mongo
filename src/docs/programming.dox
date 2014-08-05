@@ -14,7 +14,6 @@ each of which is ordered by one or more columns.
 - @subpage config_strings
 - @subpage cursors
 - @subpage transactions
-- @subpage async
 - @subpage error_handling
 
 <h2>Storage options</h2>
@@ -28,11 +27,12 @@ each of which is ordered by one or more columns.
 - @subpage name_space
 - @subpage signals
 
-<h2>Application notes</h2>
+<h2>Advanced features</h2>
 - @subpage checkpoints
 - @subpage compaction
 - @subpage hot_backup
 - @subpage statistics
+- @subpage async
 - @subpage shared_cache
 
 <h2>Performance tuning</h2>

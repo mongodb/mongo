@@ -41,152 +41,168 @@
 #endif
 
 const char *home = NULL;
-const char *uri = "table:async";
 int global_error = 0;
 
-/*! [example callback implementation] */
+/*! [async example callback implementation] */
 typedef struct {
 	WT_ASYNC_CALLBACK iface;
 	uint32_t num_keys;
 } ASYNC_KEYS;
 
 static int
-cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
+async_callback(WT_ASYNC_CALLBACK *cb,
+    WT_ASYNC_OP *op, int wiredtiger_error, uint32_t flags)
 {
 	ASYNC_KEYS *asynckey = (ASYNC_KEYS *)cb;
 	WT_ASYNC_OPTYPE type;
 	WT_ITEM k, v;
 	const char *key, *value;
 	uint64_t id;
-	int t_ret;
+	int ret;
 
-	(void)flags;
-	/*! [Get type] */
+	(void)flags;				/* Unused */
+
+	/*! [async get type] */
+	/* Retrieve the operation's WT_ASYNC_OPTYPE type. */
 	type = op->get_type(op);
-	/*! [Get type] */
-	/*! [Get identifier] */
+	/*! [async get type] */
+
+	/*! [async get identifier] */
+	/* Retrieve the operation's 64-bit identifier. */
 	id = op->get_id(op);
-	/*! [Get identifier] */
-	t_ret = 0;
-	if (ret != 0) {
-		printf("ID %" PRIu64 " error %d\n", id, ret);
-		global_error = ret;
+	/*! [async get identifier] */
+
+	/* Check for a WiredTiger error. */
+	if (wiredtiger_error != 0) {
+		fprintf(stderr,
+		    "ID %" PRIu64 " error %d: %s\n",
+		    id, wiredtiger_error,
+		    wiredtiger_strerror(wiredtiger_error));
+		global_error = wiredtiger_error;
 		return (1);
 	}
+
+	/* If doing a search, retrieve the key/value pair. */
 	if (type == WT_AOP_SEARCH) {
-		/*! [Get the operation's string key] */
-		t_ret = op->get_key(op, &k);
+		/*! [async get the operation's string key] */
+		ret = op->get_key(op, &k);
 		key = k.data;
-		/*! [Get the operation's string key] */
-		/*! [Get the operation's string value] */
-		t_ret = op->get_value(op, &v);
+		/*! [async get the operation's string key] */
+		/*! [async get the operation's string value] */
+		ret = op->get_value(op, &v);
 		value = v.data;
-		/*! [Get the operation's string value] */
+		/*! [async get the operation's string value] */
 		ATOMIC_ADD(asynckey->num_keys, 1);
 		printf("Id %" PRIu64 " got record: %s : %s\n", id, key, value);
 	}
-	return (t_ret);
+	return (ret);
 }
+/*! [async example callback implementation] */
 
-static ASYNC_KEYS ex_asynckeys = { {cb_asyncop}, 0 };
+static ASYNC_KEYS ex_asynckeys = { {async_callback}, 0 };
 
-/*! [example callback implementation] */
 #define	MAX_KEYS	15
 
-int main(void)
+int
+main(void)
 {
 	WT_ASYNC_OP *op;
-	WT_CONNECTION *wt_conn;
+	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int i, ret;
 	char k[MAX_KEYS][16], v[MAX_KEYS][16];
 
-	/*! [example connection] */
-#define	CONN_CONFIG "create,cache_size=100MB," \
-    "async=(enabled=true,ops_max=10,threads=2)"
-	if ((ret = wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn)) != 0) {
-		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
-		return (ret);
-	}
-	/*! [example connection] */
+	/*! [async example connection] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,cache_size=100MB,"
+	    "async=(enabled=true,ops_max=20,threads=2)", &conn);
+	/*! [async example connection] */
 
-	/*! [example table create] */
-	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
-	ret = session->create(session, uri,
-	    "key_format=S,value_format=S");
-	/*! [example table create] */
+	/*! [async example table create] */
+	ret = conn->open_session(conn, NULL, NULL, &session);
+	ret = session->create(
+	    session, "table:async", "key_format=S,value_format=S");
+	/*! [async example table create] */
 
+	/* Insert a set of keys asynchronously. */
 	for (i = 0; i < MAX_KEYS; i++) {
-		/*! [Allocate a handle] */
-		op = NULL;
-retry:
-		ret = wt_conn->async_new_op(wt_conn, uri, NULL,
-		    &ex_asynckeys.iface, &op);
-		if (ret != 0) {
+		/*! [async handle allocation] */
+		while ((ret = conn->async_new_op(conn,
+		    "table:async", NULL, &ex_asynckeys.iface, &op)) != 0) {
 			/*
-			 * If we used up all the ops, pause and retry to
-			 * give the workers a chance to process them.
+			 * If we used up all the handles, pause and retry to
+			 * give the workers a chance to catch up.
 			 */
 			fprintf(stderr,
-			    "Iteration %d: async_new_op ret %d\n",i,ret);
+			    "asynchronous operation handle not available\n");
 			sleep(1);
-			goto retry;
 		}
-		/*! [Allocate a handle] */
-		/*! [Set the operation's string key] */
+		/*! [async handle allocation] */
+
+		/*! [async insert] */
+		/*
+		 * Set the operation's string key and value, and then do
+		 * an asynchronous insert.
+		 */
+		/*! [async set the operation's string key] */
 		snprintf(k[i], sizeof(k), "key%d", i);
 		op->set_key(op, k[i]);
-		/*! [Set the operation's string key] */
-		/*! [Set the operation's string value] */
+		/*! [async set the operation's string key] */
+
+		/*! [async set the operation's string value] */
 		snprintf(v[i], sizeof(v), "value%d", i);
 		op->set_value(op, v[i]);
-		/*! [Set the operation's string value] */
-		/*! [example insert] */
+		/*! [async set the operation's string value] */
+
 		ret = op->insert(op);
-		/*! [example insert] */
+		/*! [async insert] */
 	}
 
-	/*! [flush] */
-	wt_conn->async_flush(wt_conn);
-	/*! [flush] */
-	/*! [Compact a table] */
-	ret = wt_conn->async_new_op(wt_conn, uri, "timeout=10",
-	    &ex_asynckeys.iface, &op);
-	op->compact(op);
-	/*! [Compact a table] */
+	/*! [async flush] */
+	/* Wait for all outstanding operations to complete. */
+	ret = conn->async_flush(conn);
+	/*! [async flush] */
 
+	/*! [async compaction] */
+	/*
+	 * Compact a table asynchronously, limiting the run-time to 5 minutes.
+	 */
+	ret = conn->async_new_op(
+	    conn, "table:async", "timeout=300", &ex_asynckeys.iface, &op);
+	ret = op->compact(op);
+	/*! [async compaction] */
+
+	/* Search for the keys we just inserted, asynchronously. */
 	for (i = 0; i < MAX_KEYS; i++) {
-		op = NULL;
-retry2:
-		ret = wt_conn->async_new_op(wt_conn, uri, NULL,
-		    &ex_asynckeys.iface, &op);
-		if (ret != 0) {
+		while ((ret = conn->async_new_op(conn,
+		    "table:async", NULL, &ex_asynckeys.iface, &op)) != 0) {
 			/*
-			 * If we used up all the ops, pause and retry to
-			 * give the workers a chance to process them.
+			 * If we used up all the handles, pause and retry to
+			 * give the workers a chance to catch up.
 			 */
 			fprintf(stderr,
-			    "Iteration %d: async_new_op ret %d\n",i,ret);
+			    "asynchronous operation handle not available\n");
 			sleep(1);
-			goto retry2;
 		}
+
+		/*! [async search] */
+		/*
+		 * Set the operation's string key and value, and then do
+		 * an asynchronous search.
+		 */
 		snprintf(k[i], sizeof(k), "key%d", i);
 		op->set_key(op, k[i]);
-		/*! [search] */
 		op->search(op);
-		/*! [search] */
+		/*! [async search] */
 	}
 
-	wt_conn->async_flush(wt_conn);
-	printf("Searched for %d keys\n", ex_asynckeys.num_keys);
-	/*! [example close] */
 	/*
-	 * Connection close automatically does an async_flush so it will
-	 * allow all queued search operations to complete.
+	 * Connection close automatically does an async_flush so it will wait
+	 * for all queued search operations to complete.
 	 */
-	ret = wt_conn->close(wt_conn, NULL);
-	/*! [example close] */
+	ret = conn->close(conn, NULL);
+
+	printf("Searched for %d keys\n", ex_asynckeys.num_keys);
 
 	return (ret);
 }

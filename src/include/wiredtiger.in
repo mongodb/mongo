@@ -616,7 +616,7 @@ struct __wt_async_op {
 	/*!
 	 * Get the key for the current record.
 	 *
-	 * @snippet ex_async.c Get the operation's string key
+	 * @snippet ex_async.c async get the operation's string key
 	 *
 	 * @param op the operation handle
 	 * @param ... pointers to hold key fields corresponding to
@@ -628,7 +628,7 @@ struct __wt_async_op {
 	/*!
 	 * Get the value for the current record.
 	 *
-	 * @snippet ex_async.c Get the operation's string value
+	 * @snippet ex_async.c async get the operation's string value
 	 *
 	 * @param op the operation handle
 	 * @param ... pointers to hold value fields corresponding to
@@ -640,7 +640,7 @@ struct __wt_async_op {
 	/*!
 	 * Set the key for the next operation.
 	 *
-	 * @snippet ex_async.c Set the operation's string key
+	 * @snippet ex_async.c async set the operation's string key
 	 *
 	 * @param op the operation handle
 	 * @param ... key fields corresponding to WT_ASYNC_OP::key_format.
@@ -654,7 +654,7 @@ struct __wt_async_op {
 	/*!
 	 * Set the value for the next operation.
 	 *
-	 * @snippet ex_async.c Set the operation's string value
+	 * @snippet ex_async.c async set the operation's string value
 	 *
 	 * @param op the operation handle
 	 * @param ... value fields corresponding to WT_ASYNC_OP::value_format.
@@ -669,7 +669,7 @@ struct __wt_async_op {
 	/*!
 	 * Return the record matching the key. The key must first be set.
 	 *
-	 * @snippet ex_async.c search
+	 * @snippet ex_async.c async search
 	 *
 	 * On success, the operation contains the returned record.
 	 *
@@ -780,7 +780,7 @@ struct __wt_async_op {
 	/*!
 	 * Compact a live row- or column-store btree or LSM tree.
 	 *
-	 * @snippet ex_async.c Compact a table
+	 * @snippet ex_async.c async compaction
 	 *
 	 * @param op the operation handle
 	 * @errors
@@ -790,7 +790,7 @@ struct __wt_async_op {
 	/*!
 	 * Get the unique identifier for this operation.
 	 *
-	 * @snippet ex_async.c Get identifier
+	 * @snippet ex_async.c async get identifier
 	 *
 	 * @param op the operation handle
 	 * @errors
@@ -800,7 +800,7 @@ struct __wt_async_op {
 	/*!
 	 * Get the type for this operation.
 	 *
-	 * @snippet ex_async.c Get type
+	 * @snippet ex_async.c async get type
 	 *
 	 * @param op the operation handle
 	 * @returns the WT_ASYNC_OPTYPE of this operation
@@ -1509,7 +1509,7 @@ struct __wt_connection {
 	/*!
 	 * Wait for all outstanding operations to complete.
 	 *
-	 * @snippet ex_async.c flush
+	 * @snippet ex_async.c async flush
 	 *
 	 * @param connection the connection handle
 	 * @errors
@@ -1519,7 +1519,7 @@ struct __wt_connection {
 	/*!
 	 * Return an async operation handle
 	 *
-	 * @snippet ex_async.c Allocate a handle
+	 * @snippet ex_async.c async handle allocation
 	 *
 	 * @param connection the connection handle
 	 * @param uri the connection handle
@@ -2064,7 +2064,7 @@ const char *wiredtiger_strerror(int err);
  * Applications register their implementation with WiredTiger by calling
  * WT_CONNECTION::async_new_op.
  *
- * @snippet ex_async.c Allocate a handle
+ * @snippet ex_async.c async handle allocation
  */
 struct __wt_async_callback {
 	/*!
@@ -2075,7 +2075,7 @@ struct __wt_async_callback {
 	 * @param[in] flags currently unused
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
-	 * @snippet ex_async.c example callback implementation
+	 * @snippet ex_async.c async example callback implementation
 	 */
 	int (*notify)(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op,
 	    int op_ret, uint32_t flags);
