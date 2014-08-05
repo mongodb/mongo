@@ -650,7 +650,7 @@ struct __wt_async_op {
 	/*! @} */
 
 	/*!
-	 * @name Cursor positioning
+	 * @name Positioning
 	 * @{
 	 */
 	/*!
@@ -658,7 +658,7 @@ struct __wt_async_op {
 	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @returns as described for WT_CURSOR::search
+	 * @returns via the callback as described for WT_CURSOR::search
 	 */
 	int __F(search)(WT_ASYNC_OP *op);
 	/*! @} */
@@ -672,7 +672,7 @@ struct __wt_async_op {
 	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @returns as described for WT_CURSOR::insert
+	 * @returns via the callback as described for WT_CURSOR::insert
 	 */
 	int __F(insert)(WT_ASYNC_OP *op);
 
@@ -681,7 +681,7 @@ struct __wt_async_op {
 	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @returns as described for WT_CURSOR::update
+	 * @returns via the callback as described for WT_CURSOR::update
 	 */
 	int __F(update)(WT_ASYNC_OP *op);
 
@@ -690,7 +690,7 @@ struct __wt_async_op {
 	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @returns as described for WT_CURSOR::remove
+	 * @returns via the callback as described for WT_CURSOR::remove
 	 */
 	int __F(remove)(WT_ASYNC_OP *op);
 	/*! @} */
@@ -704,7 +704,7 @@ struct __wt_async_op {
 	 * for configuration, return and error values.
 	 *
 	 * @param op the operation handle
-	 * @returns as described for WT_SESSION::compact
+	 * @returns via the callback as described for WT_SESSION::compact
 	 */
 	int __F(compact)(WT_ASYNC_OP *op);
 	/*! @} */
