@@ -43,6 +43,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
 #include "mongo/s/shard.h"
+#include "mongo/s/type_actionlog.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
 #include "mongo/s/type_mongos.h"
@@ -50,6 +51,7 @@
 #include "mongo/s/type_tags.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/timer.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -155,6 +157,95 @@ namespace mongo {
                        false, // multi
                        WriteConcernOptions::Unacknowledged,
                        NULL );
+    }
+
+     /* 
+     * Builds the details object for the actionlog.
+     * Current formats for detail are:
+     * Success: {
+     *           "candidateChunks" : ,
+     *           "chunksMoved" : ,
+     *           "executionTimeMillis" : ,
+     *           "errorOccured" : false
+     *          }
+     * Failure: {
+     *           "executionTimeMillis" : ,
+     *           "errmsg" : ,
+     *           "errorOccured" : true
+     *          }
+     * @param didError, did this round end in an error?
+     * @param executionTime, the time this round took to run
+     * @param candidateChunks, the number of chunks identified to be moved
+     * @param chunksMoved, the number of chunks moved
+     * @param errmsg, the error message for this round
+     */
+
+    static BSONObj _buildDetails( bool didError, int executionTime,
+            int candidateChunks, int chunksMoved, const std::string& errmsg ) {
+
+        BSONObjBuilder builder;
+        builder.append("executionTimeMillis", executionTime);
+        builder.append("errorOccured", didError);
+
+        if ( didError ) {
+            builder.append("errmsg", errmsg);
+        } else {
+            builder.append("candidateChunks", candidateChunks);
+            builder.append("chunksMoved", chunksMoved);
+        }
+        return builder.obj();
+    }
+
+    /**
+     * Reports the result of the balancer round into config.actionlog
+     *
+     * @param actionLog, which contains the balancer round information to be logged
+     *
+     */
+
+    static void _reportRound( ActionLogType& actionLog) {
+        try {
+            ScopedDbConnection conn( configServer.getConnectionString(), 30 );
+
+            // send a copy of the message to the log in case it doesn't reach config.actionlog
+            actionLog.setTime(jsTime());
+
+            LOG(1) << "about to log balancer result: " << actionLog;
+
+            // The following method is not thread safe. However, there is only one balancer
+            // thread per mongos process. The create collection is a a no-op when the collection
+            // already exists
+            static bool createActionlog = false;
+            if ( ! createActionlog ) {
+                try {
+                    static const int actionLogSizeBytes = 1024 * 1024 * 2;
+                    conn->createCollection( ActionLogType::ConfigNS , actionLogSizeBytes , true );
+                }
+                catch ( const DBException& ex ) {
+                    LOG(1) << "config.actionlog could not be created, another mongos process "
+                           << "may have done so" << causedBy(ex);
+
+                }
+                createActionlog = true;
+            }
+
+            Status result = clusterInsert( ActionLogType::ConfigNS,
+                                           actionLog.toBSON(),
+                                           WriteConcernOptions::AllConfigs,
+                                           NULL );
+
+            if ( !result.isOK() ) {
+                log() << "Error encountered while logging action from balancer "
+                      << result.reason();
+            }
+
+            conn.done();
+        }
+        catch ( const DBException& ex ) {
+            // if we got here, it means the config change is only in the log;
+            // the change didn't make it to config.actionlog
+            warning() << "could not log balancer result" << causedBy(ex);
+        }
     }
 
     bool Balancer::_checkOIDs() {
@@ -458,12 +549,20 @@ namespace mongo {
 
         while ( ! inShutdown() ) {
 
+            Timer balanceRoundTimer;
+            ActionLogType actionLog;
+
+            actionLog.setServer(getHostNameCached());
+            actionLog.setWhat("balancer.round");
+
             try {
 
                 ScopedDbConnection conn(config.toString(), 30);
 
                 // ping has to be first so we keep things in the config server in sync
                 _ping();
+
+                BSONObj balancerResult;
 
                 // use fresh shard state
                 Shard::reloadShardInfo();
@@ -552,6 +651,11 @@ namespace mongo {
                                                         waitForDelete );
                     }
 
+                    actionLog.setDetails( _buildDetails( false, balanceRoundTimer.millis(),
+                        static_cast<int>(candidateChunks.size()), _balancedLastTime, "") );
+
+                    _reportRound( actionLog );
+
                     LOG(1) << "*** end of balancing round" << endl;
                 }
 
@@ -567,6 +671,12 @@ namespace mongo {
 
                 // Just to match the opening statement if in log level 1
                 LOG(1) << "*** End of balancing round" << endl;
+
+                // This round failed, tell the world!
+                actionLog.setDetails( _buildDetails( true, balanceRoundTimer.millis(),
+                    0, 0, e.what()) );
+
+                _reportRound( actionLog );
 
                 sleepsecs( sleepTime ); // sleep a fair amount b/c of error
                 continue;
