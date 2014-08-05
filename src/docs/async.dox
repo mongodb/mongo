@@ -59,14 +59,14 @@ example:
 
 To aid the application in matching up an asynchronous operation with a
 subsequent call to the callback function, every handle contains a unique
-\c uint64_t identifier and WT_ASYNC_OPTYPE type.  Both are assigned when
+\c uint64_t identifier and ::WT_ASYNC_OPTYPE type.  Both are assigned when
 the asynchronous operation is performed.
 
 To retrieve the id, use the WT_ASYNC_OP::id method:
 
 @snippet ex_async.c async get identifier
 
-To retrieve the type, use the WT_ASYNC_OP::type method:
+To retrieve the ::WT_ASYNC_OPTYPE type, use the WT_ASYNC_OP::type method:
 
 @snippet ex_async.c async get type
 
