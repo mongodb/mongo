@@ -668,6 +668,10 @@ struct __wt_async_op {
 	/*! @} */
 
 	/*!
+	 * @name Cursor positioning
+	 * @{
+	 */
+	/*!
 	 * Return the record matching the key. The key must first be set.
 	 *
 	 * @snippet ex_async.c async search
@@ -678,6 +682,7 @@ struct __wt_async_op {
 	 * @errors
 	 */
 	int __F(search)(WT_ASYNC_OP *op);
+	/*! @} */
 
 	/*!
 	 * @name Data modification
@@ -777,7 +782,12 @@ struct __wt_async_op {
 	 * the specified key exists, ::WT_NOTFOUND is returned.
 	 */
 	int __F(remove)(WT_ASYNC_OP *op);
+	/*! @} */
 
+	/*!
+	 * @name Table operations
+	 * @{
+	 */
 	/*!
 	 * Compact a live row- or column-store btree or LSM tree.
 	 *
@@ -787,7 +797,6 @@ struct __wt_async_op {
 	 * @errors
 	 */
 	int __F(compact)(WT_ASYNC_OP *op);
-
 	/*! @} */
 
 	/*!
