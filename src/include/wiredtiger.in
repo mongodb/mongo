@@ -805,7 +805,7 @@ struct __wt_async_op {
 	 * @snippet ex_async.c async get identifier
 	 *
 	 * @param op the operation handle
-	 * @errors
+	 * @returns the id of the operation
 	 */
 	uint64_t __F(get_id)(WT_ASYNC_OP *op);
 
@@ -815,8 +815,7 @@ struct __wt_async_op {
 	 * @snippet ex_async.c async get type
 	 *
 	 * @param op the operation handle
-	 * @returns the WT_ASYNC_OPTYPE of this operation
-	 * @errors
+	 * @returns the WT_ASYNC_OPTYPE of the operation
 	 */
 	WT_ASYNC_OPTYPE __F(get_type)(WT_ASYNC_OP *op);
 
