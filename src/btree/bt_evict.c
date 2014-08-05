@@ -336,9 +336,6 @@ err:		__wt_err(session, ret, "cache eviction helper error");
 
 	WT_TRET(__wt_verbose(session, WT_VERB_EVICTSERVER, "helper exiting"));
 
-	if (session != conn->default_session)
-		(void)session->iface.close(&session->iface, NULL);
-
 	return (NULL);
 }
 
