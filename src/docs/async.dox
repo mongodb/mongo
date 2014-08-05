@@ -59,8 +59,9 @@ example:
 
 To aid the application in matching up an asynchronous operation with a
 subsequent call to the callback function, every handle contains a unique
-\c uint64_t identifier and ::WT_ASYNC_OPTYPE type.  Both are assigned when
-the asynchronous operation is performed.
+\c uint64_t identifier and ::WT_ASYNC_OPTYPE type.  The \c identifier is
+assigned when the handle is allocated and the \c type is assigned when
+the asynchronous operation is queued.
 
 To retrieve the id, use the WT_ASYNC_OP::get_id method:
 
@@ -72,7 +73,7 @@ To retrieve the ::WT_ASYNC_OPTYPE type, use the WT_ASYNC_OP::get_type method:
 
 WiredTiger only allows a limited number of method calls back into the
 library using the WT_ASYNC_OP handle, while in the callback function.
-The application is allowed to retrieve than handle's key value,
+The application is allowed to retrieve than handle's key, value,
 identifier and the operation type from the WT_ASYNC_OP handle.
 
 Here is a complete example callback function implementation, from
