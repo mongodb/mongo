@@ -35,7 +35,6 @@ env.Library('topology_coordinator_impl',
 
 env.Library('repl_coordinator_impl',
             [
-                'check_quorum_for_config_change.cpp',
                 'repl_coordinator_impl.cpp',
                 'replica_set_config_checks.cpp',
             ],
@@ -59,14 +58,6 @@ env.CppUnitTest('replica_set_config_checks_test',
                 LIBDEPS=[
                     'repl_coordinator_impl',
                     'replmocks'
-                ])
-
-env.CppUnitTest('check_quorum_for_config_change_test',
-                'check_quorum_for_config_change_test.cpp',
-                LIBDEPS=[
-                    'repl_coordinator_impl',
-                    'replication_executor',
-                    'replmocks',
                 ])
 
 env.Library('repl_coordinator_interface',
