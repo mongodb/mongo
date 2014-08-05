@@ -787,6 +787,8 @@ struct __wt_async_op {
 	 */
 	int __F(compact)(WT_ASYNC_OP *op);
 
+	/*! @} */
+
 	/*!
 	 * Get the unique identifier for this operation.
 	 *
@@ -807,8 +809,6 @@ struct __wt_async_op {
 	 * @errors
 	 */
 	WT_ASYNC_OPTYPE __F(get_type)(WT_ASYNC_OP *op);
-
-	/*! @} */
 
 	/*
 	 * Protected fields, only to be used by internal implementation.
