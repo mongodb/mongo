@@ -994,6 +994,7 @@ writelock
 wrlock
 ws
 wti
+wtperf
 wts
 xF
 xff

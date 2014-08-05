@@ -1,7 +1,13 @@
 /*! @page programming Writing WiredTiger applications
 
 This section covers topics of interest for programmers writing
-WiredTiger applications:
+WiredTiger applications.
+
+We follow SQL terminology: a database is set of tables managed together.
+Tables consist of rows, where each row is a key and its associated
+value.  Tables may optionally have an associated schema, splitting the
+value into a set of columns.  Tables may also have associated indices,
+each of which is ordered by one or more columns.
 
 <h2>Using the API</h2>
 - @subpage basic_api
@@ -14,7 +20,6 @@ WiredTiger applications:
 - @subpage schema
 - @subpage lsm
 - @subpage file_formats
-- @subpage bulk_load
 - @subpage compression
 
 <h2>Programming notes</h2>
@@ -22,18 +27,19 @@ WiredTiger applications:
 - @subpage name_space
 - @subpage signals
 
-<h2>Application notes</h2>
+<h2>Advanced features</h2>
 - @subpage checkpoints
 - @subpage compaction
 - @subpage hot_backup
 - @subpage statistics
+- @subpage async
 - @subpage shared_cache
 
 <h2>Performance tuning</h2>
 - @subpage tune_memory_allocator
 - @subpage tune_page_sizes
 - @subpage tune_cache
-- @subpage bulk_load
+- @subpage tune_bulk_load
 - @subpage tune_cursor_persist
 - @subpage tune_read_only_objects
 - @subpage tune_checksum
@@ -45,13 +51,18 @@ WiredTiger applications:
 - @subpage tune_statistics
 - @subpage tune_close
 
+<h2>Simulating workloads in Wiredtiger</h2>
+- @subpage wtperf
+
 <h2>Extending WiredTiger</h2>
 - @subpage custom_data_sources
 - @subpage helium
 
-<h2>Administering a WiredTiger database</h2>
+<h2>Managing WiredTiger databases</h2>
 - @subpage home
 - @subpage database_config
+- @subpage hot_backup
+- @subpage filesystems
 - @subpage security
 
  */

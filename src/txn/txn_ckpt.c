@@ -896,7 +896,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 /*
  * __wt_checkpoint_sync --
- *	Sync a file that has been checkpointed.
+ *	Sync a file that has been checkpointed, and wait for the result.
  */
 int
 __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
@@ -913,7 +913,7 @@ __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Should have an underlying block manager reference. */
 	WT_ASSERT(session, bm != NULL);
 
-	return (bm->sync(bm, session));
+	return (bm->sync(bm, session, 0));
 }
 
 /*

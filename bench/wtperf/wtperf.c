@@ -343,15 +343,13 @@ worker_async(void *arg)
 		 * Sleep to allow workers a chance to run and process async ops.
 		 * Then retry to get an async op.
 		 */
-		asyncop = NULL;
-retry:		if ((ret = conn->async_new_op(
+		while ((ret = conn->async_new_op(
 		    conn, cfg->uris[next_val % cfg->table_count],
-		    NULL, &cb, &asyncop)) != 0) {
-			if (ret != ENOMEM)
-				goto err;
+		    NULL, &cb, &asyncop)) == EBUSY)
 			(void)usleep(10000);
-			goto retry;
-		}
+		if (ret != 0)
+			goto err;
+
 		asyncop->app_private = thread;
 		asyncop->set_key(asyncop, key_buf);
 		switch (*op) {
@@ -931,17 +929,14 @@ populate_async(void *arg)
 		/*
 		 * Allocate an async op for whichever table.
 		 */
-		asyncop = NULL;
-retry:		if ((ret = conn->async_new_op(
+		while ((ret = conn->async_new_op(
 		    conn, cfg->uris[op % cfg->table_count],
-		    NULL, &cb, &asyncop)) != 0) {
-			if (ret != ENOMEM)
-				goto err;
+		    NULL, &cb, &asyncop)) == EBUSY)
 			(void)usleep(10000);
-			goto retry;
-		}
-		asyncop->app_private = thread;
+		if (ret != 0)
+			goto err;
 
+		asyncop->app_private = thread;
 		generate_key(cfg, key_buf, op);
 		asyncop->set_key(asyncop, key_buf);
 		if (cfg->random_value)
@@ -1304,19 +1299,16 @@ execute_populate(CONFIG *cfg)
 		}
 		tables = cfg->table_count;
 		for (i = 0; i < cfg->table_count; i++) {
-retry:			 if ((ret = cfg->conn->async_new_op(cfg->conn,
-			    cfg->uris[i], "timeout=0", &cb,
-			    &asyncop)) != 0) {
-				/*
-				 * If no ops are available, retry.  Any other
-				 * error, return.
-				 */
-				if (ret == ENOMEM) {
-					(void)usleep(10000);
-					goto retry;
-				}
+			/*
+			 * If no ops are available, retry.  Any other error,
+			 * return.
+			 */
+			 while ((ret = cfg->conn->async_new_op(cfg->conn,
+			    cfg->uris[i], "timeout=0", &cb, &asyncop)) == EBUSY)
+				(void)usleep(10000);
+			if (ret != 0)
 				return (ret);
-			}
+
 			asyncop->app_private = &tables;
 			if ((ret = asyncop->compact(asyncop)) != 0) {
 				lprintf(cfg, ret, 0, "Async compact failed.");

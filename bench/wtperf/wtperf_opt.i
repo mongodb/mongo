@@ -31,7 +31,6 @@
 #ifdef OPT_DECLARE_STRUCT
 #define	DEF_OPT_AS_BOOL(name, initval, desc)		int name;
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	const char *name;
-#define	DEF_OPT_AS_INT(name, initval, desc)		int name;
 #define	DEF_OPT_AS_STRING(name, initval, desc)		const char *name;
 #define	DEF_OPT_AS_UINT32(name, initval, desc)		uint32_t name;
 #endif
@@ -42,8 +41,6 @@
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
 	{ #name, desc, initval, CONFIG_STRING_TYPE,                    \
 	offsetof(CONFIG, name) },
-#define	DEF_OPT_AS_INT(name, initval, desc)				\
-	{ #name, desc, #initval, INT_TYPE, offsetof(CONFIG, name) },
 #define	DEF_OPT_AS_STRING(name, initval, desc)				\
 	{ #name, desc, initval, STRING_TYPE, offsetof(CONFIG, name) },
 #define	DEF_OPT_AS_UINT32(name, initval, desc)				\
@@ -53,9 +50,19 @@
 #ifdef OPT_DEFINE_DEFAULT
 #define	DEF_OPT_AS_BOOL(name, initval, desc)		initval,
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	initval,
-#define	DEF_OPT_AS_INT(name, initval, desc)		initval,
 #define	DEF_OPT_AS_STRING(name, initval, desc)		initval,
 #define	DEF_OPT_AS_UINT32(name, initval, desc)		initval,
+#endif
+
+#ifdef OPT_DEFINE_DOXYGEN
+#define	DEF_OPT_AS_BOOL(name, initval, desc)				\
+	{ #name, desc, #initval, BOOL_TYPE, 0 },
+#define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
+	{ #name, desc, initval, CONFIG_STRING_TYPE, 0 },
+#define	DEF_OPT_AS_STRING(name, initval, desc)				\
+	{ #name, desc, initval, STRING_TYPE, 0 },
+#define	DEF_OPT_AS_UINT32(name, initval, desc)				\
+	{ #name, desc, #initval, UINT32_TYPE, 0 },
 #endif
 
 /*
@@ -158,6 +165,5 @@ DEF_OPT_AS_UINT32(warmup, 0,
 
 #undef DEF_OPT_AS_BOOL
 #undef DEF_OPT_AS_CONFIG_STRING
-#undef DEF_OPT_AS_INT
 #undef DEF_OPT_AS_STRING
 #undef DEF_OPT_AS_UINT32

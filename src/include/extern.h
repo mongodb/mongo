@@ -1120,6 +1120,7 @@ extern int __wt_filesize_name(WT_SESSION_IMPL *session,
     off_t *sizep);
 extern int __wt_bytelock(WT_FH *fhp, off_t byte, int lock);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
+extern int __wt_fsync_async(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len);
 extern int __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, FILE *fp);
 extern int __wt_mmap(WT_SESSION_IMPL *session,
