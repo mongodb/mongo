@@ -575,7 +575,8 @@ typedef enum {
  * operations can also provide access to fields within the key and value if the
  * formats are described in the WT_SESSION::create method.
  *
- * <b>Thread safety:</b> A WT_ASYNC_OP handle is not shared between threads.
+ * <b>Thread safety:</b> A WT_ASYNC_OP handle may not be shared between
+ * threads, see @ref threads for more information.
  */
 struct __wt_async_op {
 	/*! The connection for this operation. */
