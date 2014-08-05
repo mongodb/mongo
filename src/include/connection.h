@@ -203,7 +203,7 @@ struct __wt_connection_impl {
 	pthread_t	 evict_tid;	/* Eviction server thread ID */
 	int		 evict_tid_set;	/* Eviction server thread ID set */
 
-	u_int32_t	 evict_workers_max;/* Max eviction workers */
+	uint32_t	 evict_workers_max;/* Max eviction workers */
 	uint32_t	 evict_workers;	/* Number of eviction workers */
 	WT_EVICT_WORKER	*evict_workctx;	/* Eviction worker context */
 
