@@ -27,6 +27,7 @@
  * ex_async.c
  * 	demonstrates how to use the asynchronous API.
  */
+#include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
@@ -137,7 +138,10 @@ main(void)
 			 */
 			fprintf(stderr,
 			    "asynchronous operation handle not available\n");
-			sleep(1);
+			if (ret == EBUSY)
+				sleep(1);
+			else
+				return (ret);
 		}
 		/*! [async handle allocation] */
 
@@ -184,7 +188,10 @@ main(void)
 			 */
 			fprintf(stderr,
 			    "asynchronous operation handle not available\n");
-			sleep(1);
+			if (ret == EBUSY)
+				sleep(1);
+			else
+				return (ret);
 		}
 
 		/*! [async search] */
