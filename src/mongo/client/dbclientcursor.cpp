@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -265,6 +266,16 @@ namespace mongo {
         BSONObj o(batch.data);
         batch.data += o.objsize();
         /* todo would be good to make data null at end of batch for safety */
+        return o;
+    }
+
+    BSONObj DBClientCursor::nextSafe() {
+        BSONObj o = next();
+        if( strcmp(o.firstElementFieldName(), "$err") == 0 ) {
+            std::string s = "nextSafe(): " + o.toString();
+            LOG(5) << s;
+            uasserted(13106, s);
+        }
         return o;
     }
 

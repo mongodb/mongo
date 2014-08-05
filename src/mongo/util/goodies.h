@@ -88,8 +88,6 @@ namespace mongo {
 // PRINTFL; prints file:line
 #define MONGO_PRINTFL std::cout << __FILE__ ":" << __LINE__ << std::endl
 #define PRINTFL MONGO_PRINTFL
-#define MONGO_FLOG log() << __FILE__ ":" << __LINE__ << std::endl
-#define FLOG MONGO_FLOG
 
     inline bool startsWith(const char *str, const char *prefix) {
         size_t l = strlen(prefix);

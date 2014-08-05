@@ -31,9 +31,13 @@
 #pragma once
 
 #include "mongo/s/chunk_diff.h"
+
+#include "mongo/logger/log_severity.h"
+#include "mongo/logger/logger.h"
+#include "mongo/logger/logstream_builder.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/type_chunk.h"
-#include "mongo/util/log.h"
+#include "mongo/util/concurrency/thread_name.h"
 
 namespace mongo {
 
@@ -122,8 +126,6 @@ namespace mongo {
     int ConfigDiffTracker<ValType,ShardType>::
         calculateConfigDiff( DBClientCursorInterface& diffCursor )
     {
-        MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kSharding);
-
         verifyAttached();
 
         // Apply the chunk changes to the ranges and versions
@@ -151,14 +153,20 @@ namespace mongo {
                 diffChunkDoc[ChunkType::max()].type() != Object ||
                 diffChunkDoc[ChunkType::shard()].type() != String )
             {
-                warning() << "got invalid chunk document " << diffChunkDoc
+                using namespace logger;
+                LogstreamBuilder(globalLogDomain(), getThreadName(), LogSeverity::Warning(),
+                                 LogComponent::kSharding)
+                          << "got invalid chunk document " << diffChunkDoc
                           << " when trying to load differing chunks" << endl;
                 continue;
             }
 
             if( ! chunkVersion.isSet() || ! chunkVersion.hasEqualEpoch( currEpoch ) ){
 
-                warning() << "got invalid chunk version " << chunkVersion << " in document " << diffChunkDoc
+                using namespace logger;
+                LogstreamBuilder(globalLogDomain(), getThreadName(), LogSeverity::Warning(),
+                                 LogComponent::kSharding)
+                          << "got invalid chunk version " << chunkVersion << " in document " << diffChunkDoc
                           << " when trying to load differing chunks at version "
                           << ChunkVersion( _maxVersion->majorVersion(),
                                            _maxVersion->minorVersion(),
@@ -189,11 +197,16 @@ namespace mongo {
             if( isTracked( diffChunkDoc ) ) newTracked.push_back( diffChunkDoc.getOwned() );
         }
 
-        LOG(3) << "found " << _validDiffs
-               << " new chunks for collection " << _ns
-               << " (tracking " << newTracked.size()
-               << "), new version is " << *_maxVersion
-               << endl;
+        using namespace logger;
+        if (globalLogDomain()->shouldLog(LogComponent::kSharding, LogSeverity::Debug(3))) {
+            LogstreamBuilder(globalLogDomain(), getThreadName(), LogSeverity::Debug(3),
+                             LogComponent::kSharding)
+                << "found " << _validDiffs
+                << " new chunks for collection " << _ns
+                << " (tracking " << newTracked.size()
+                << "), new version is " << *_maxVersion
+                << endl;
+        }
 
         for( vector<BSONObj>::iterator it = newTracked.begin(); it != newTracked.end(); it++ ){
 
@@ -245,8 +258,13 @@ namespace mongo {
         Query queryObj(query);
         queryObj.sort(BSON( "lastmod" << 1 ));
 
-        LOG(2) << "major version query from " << *_maxVersion << " and over "
-               << _maxShardVersions->size() << " shards is " << queryObj << endl;
+        using namespace logger;
+        if (globalLogDomain()->shouldLog(LogComponent::kSharding, LogSeverity::Debug(2))) {
+            LogstreamBuilder(globalLogDomain(), getThreadName(), LogSeverity::Debug(2),
+                             LogComponent::kSharding)
+                << "major version query from " << *_maxVersion << " and over "
+                << _maxShardVersions->size() << " shards is " << queryObj << endl;
+        }
 
         return queryObj;
     }

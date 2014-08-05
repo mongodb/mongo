@@ -34,6 +34,7 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/util/log.h"
 #include "mongo/util/concurrency/mvar.h"
 
 namespace mongo {

@@ -155,6 +155,13 @@ namespace repl {
         return false;
     }
 
+    void OplogReader::tailCheck() {
+        if( cursor.get() && cursor->isDead() ) {
+            log() << "repl: old cursor isDead, will initiate a new one" << std::endl;
+            resetCursor();
+        }
+    }
+
     bool OplogReader::passthroughHandshake(const mongo::OID& rid, const int nextOnChainId) {
         BSONObjBuilder cmd;
         cmd.append("handshake", rid);

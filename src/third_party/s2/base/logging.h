@@ -16,7 +16,10 @@
 
 #include <iosfwd>
 
-#include "mongo/util/log.h"
+#include "mongo/logger/log_severity.h"
+#include "mongo/logger/logger.h"
+#include "mongo/logger/logstream_builder.h"
+#include "mongo/util/concurrency/thread_name.h"
 
 #include "macros.h"
 
@@ -50,13 +53,26 @@
 #endif
 
 #include "base/port.h"
-#define INFO mongo::log().stream()
+#define INFO LogMessageInfo().stream()
 #define FATAL LogMessageFatal(__FILE__, __LINE__).stream()
 #define DFATAL LogMessageFatal(__FILE__, __LINE__).stream()
 
 // VLOG messages will be logged at debug level 5 with the S2 log component.
 #define S2LOG(x) x
-#define VLOG(x) MONGO_LOG_COMPONENT(::mongo::logger::LogSeverity::Debug(5), ::mongo::logger::LogComponent::kS2)
+// Expansion of MONGO_LOG_COMPONENT defined in mongo/util/log.h
+#define VLOG(x) \
+    if (!(::mongo::logger::globalLogDomain())->shouldLog(::mongo::logger::LogComponent::kS2, ::mongo::logger::LogSeverity::Debug(5))) {} \
+    else ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), ::mongo::getThreadName(), ::mongo::logger::LogSeverity::Debug(5), ::mongo::logger::LogComponent::kS2)
+
+class LogMessageInfo {
+ public:
+  LogMessageInfo();
+  std::ostream& stream() { return _lsb.stream(); }
+
+ private:
+    mongo::logger::LogstreamBuilder _lsb;
+  DISALLOW_COPY_AND_ASSIGN(LogMessageInfo);
+};
 
 class LogMessageFatal {
  public:

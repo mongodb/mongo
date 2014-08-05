@@ -33,6 +33,7 @@
 #include "mongo/db/stats/counters.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
     OpCounters::OpCounters() {}

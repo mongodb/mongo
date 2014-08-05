@@ -32,6 +32,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/geo/geometry_container.h"
+#include "mongo/util/log.h"
 
 namespace {
 

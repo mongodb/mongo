@@ -31,6 +31,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {  
@@ -700,6 +701,20 @@ namespace mongo {
             s << "?type=" << type();
             break;
         }
+    }
+
+    std::string BSONElement::_asCode() const {
+        switch( type() ) {
+        case mongo::String:
+        case Code:
+            return std::string(valuestr(), valuestrsize()-1);
+        case CodeWScope:
+            return std::string(codeWScopeCode(), *(int*)(valuestr())-1);
+        default:
+            log() << "can't convert type: " << (int)(type()) << " to code" << std::endl;
+        }
+        uassert( 10062 ,  "not code" , 0 );
+        return "";
     }
 
     std::ostream& operator<<( std::ostream &s, const BSONElement &e ) {

@@ -33,6 +33,7 @@
 #include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

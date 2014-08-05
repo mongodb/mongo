@@ -46,10 +46,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/export_macros.h"
 
-#if defined(_DEBUG) && defined(MONGO_EXPOSE_MACROS)
-#include "mongo/util/log.h"
-#endif
-
 namespace mongo {
 
 #if defined(_WIN32)
@@ -328,20 +324,7 @@ namespace mongo {
             @param dt a Java-style 64 bit date value, that is
             the number of milliseconds since January 1, 1970, 00:00:00 GMT
         */
-        BSONObjBuilder& appendDate(const StringData& fieldName, Date_t dt) {
-            /* easy to pass a time_t to this and get a bad result.  thus this warning. */
-#if defined(_DEBUG) && defined(MONGO_EXPOSE_MACROS)
-            if( dt > 0 && dt <= 0xffffffff ) {
-                static int n;
-                if( n++ == 0 )
-                    log() << "DEV WARNING appendDate() called with a tiny (but nonzero) date" << std::endl;
-            }
-#endif
-            _b.appendNum((char) Date);
-            _b.appendStr(fieldName);
-            _b.appendNum(dt);
-            return *this;
-        }
+        BSONObjBuilder& appendDate(const StringData& fieldName, Date_t dt);
         BSONObjBuilder& append(const StringData& fieldName, Date_t dt) {
             return appendDate(fieldName, dt);
         }

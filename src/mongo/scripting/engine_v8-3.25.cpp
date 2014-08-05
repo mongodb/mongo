@@ -1865,6 +1865,51 @@ namespace mongo {
                 *v8::String::Utf8Value(args[0]->ToString())));
     }
 
+    /**
+     * Check for an error condition (e.g. empty handle, JS exception, OOM) after executing
+     * a v8 operation.
+     * @resultHandle         handle storing the result of the preceding v8 operation
+     * @try_catch            the active v8::TryCatch exception handler
+     * @param reportError    if true, log an error message
+     * @param assertOnError  if true, throw an exception if an error is detected
+     *                       if false, return value indicates error state
+     * @return true if an error was detected and assertOnError is set to false
+     *         false if no error was detected
+     */
+    template <typename _HandleType>
+    bool V8Scope::checkV8ErrorState(const _HandleType& resultHandle,
+                                    const v8::TryCatch& try_catch,
+                                    bool reportError,
+                                    bool assertOnError) {
+        bool haveError = false;
+
+        if (try_catch.HasCaught() && try_catch.CanContinue()) {
+            // normal JS exception
+            _error = v8ExceptionToSTLString(&try_catch);
+            haveError = true;
+        }
+        else if (hasOutOfMemoryException()) {
+            // out of memory exception (treated as terminal)
+            _error = "JavaScript execution failed -- v8 is out of memory";
+            haveError = true;
+        }
+        else if (resultHandle.IsEmpty() || try_catch.HasCaught()) {
+            // terminal exception (due to empty handle, termination, etc.)
+            _error = "JavaScript execution failed";
+            haveError = true;
+        }
+
+        if (haveError) {
+            if (reportError)
+                log() << _error << endl;
+            if (assertOnError)
+                uasserted(16722, _error);
+            return true;
+        }
+
+        return false;
+    }
+
     MONGO_INITIALIZER(JavascriptPrintDomain)(InitializerContext*) {
         jsPrintLogDomain = logger::globalLogManager()->getNamedDomain("javascriptOutput");
         return Status::OK();

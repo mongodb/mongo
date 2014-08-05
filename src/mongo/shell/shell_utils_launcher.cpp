@@ -52,6 +52,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_win32.h"
 

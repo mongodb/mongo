@@ -34,6 +34,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

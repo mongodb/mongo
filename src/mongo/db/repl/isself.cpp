@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetworking
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/isself.h"
@@ -33,6 +35,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include "mongo/base/init.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/auth/action_set.h"
@@ -131,14 +134,12 @@ namespace {
         }
 
         if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
-            LogstreamBuilder builder(logger::globalLogDomain(),
-                                     getThreadName(),
-                                     logger::LogSeverity::Debug(2));
+            StringBuilder builder;
             builder << "getAddrsForHost(\"" << iporhost << ":" << port << "\"):";
             for (std::vector<std::string>::const_iterator o = out.begin(); o != out.end(); ++o) {
                 builder << " [ " << *o << "]";
             }
-            builder << std::endl;
+            LOG(2) << builder.str();
         }
 
         return out;
@@ -338,14 +339,12 @@ namespace {
 
 #endif  // defined(_WIN32)
         if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
-            LogstreamBuilder builder(logger::globalLogDomain(),
-                                     getThreadName(),
-                                     logger::LogSeverity::Debug(2));
+            StringBuilder builder;
             builder << "getBoundAddrs():";
             for (std::vector<std::string>::const_iterator o = out.begin(); o != out.end(); ++o) {
                 builder << " [ " << *o << "]";
             }
-            builder << std::endl;
+            LOG(2) << builder.str();
         }
         return out;
 #else  // ifdef FASTPATH

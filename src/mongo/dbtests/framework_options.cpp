@@ -36,6 +36,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/password.h"
 

@@ -47,6 +47,7 @@
 #include "mongo/util/concurrency/qlock.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/concurrency/threadlocal.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
 

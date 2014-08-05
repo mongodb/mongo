@@ -50,6 +50,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/file_allocator.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 
 namespace mongo {

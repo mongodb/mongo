@@ -38,6 +38,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/util/file_allocator.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"

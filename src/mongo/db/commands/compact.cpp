@@ -44,6 +44,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

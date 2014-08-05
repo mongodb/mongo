@@ -54,6 +54,7 @@
 #include "mongo/util/compress.h"
 #include "mongo/util/concurrency/qlock.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"

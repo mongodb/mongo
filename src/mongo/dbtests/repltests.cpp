@@ -44,6 +44,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 
 #include "mongo/dbtests/dbtests.h"
 

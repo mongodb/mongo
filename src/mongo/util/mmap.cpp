@@ -35,6 +35,7 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/util/concurrency/rwlock.h"
+#include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"

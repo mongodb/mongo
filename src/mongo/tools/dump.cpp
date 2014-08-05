@@ -46,6 +46,7 @@
 #include "mongo/tools/mongodump_options.h"
 #include "mongo/tools/tool.h"
 #include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace mongo;

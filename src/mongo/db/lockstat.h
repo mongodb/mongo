@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "mongo/bson/util/builder.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/timer.h"
 

@@ -197,7 +197,7 @@ namespace mongo {
 
 
         verify( len <= 0x7fffffff );
-        _ht.reset(new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index"));
+        _ht.reset(new NamespaceHashTable(p, (int) len, "namespace index"));
     }
 
 

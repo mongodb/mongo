@@ -34,6 +34,7 @@
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/util/log.h"
 
 namespace {
 

@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/instance.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/text.h"
 #include "mongo/util/winutil.h"

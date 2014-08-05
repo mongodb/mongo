@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/log.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {

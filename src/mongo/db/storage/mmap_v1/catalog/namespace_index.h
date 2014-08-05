@@ -37,6 +37,7 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/storage/mmap_v1/catalog/hashtab.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 
 namespace mongo {
 
@@ -86,7 +87,7 @@ namespace mongo {
         void maybeMkdir() const;
 
         DurableMappedFile _f;
-        scoped_ptr<HashTable<Namespace,NamespaceDetails> > _ht;
+        scoped_ptr<NamespaceHashTable> _ht;
         std::string _dir;
         std::string _database;
     };

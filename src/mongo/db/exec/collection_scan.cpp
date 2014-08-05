@@ -34,6 +34,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 
 #include "mongo/db/client.h" // XXX-ERH
 

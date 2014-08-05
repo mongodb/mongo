@@ -325,7 +325,6 @@ static void startupConfigActions(const std::vector<std::string>& argv) {
 }
 
 static int _main() {
-
     if (!initializeServerGlobalState())
         return EXIT_FAILURE;
 

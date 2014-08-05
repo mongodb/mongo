@@ -33,6 +33,7 @@
 #include "mongo/s/cluster_client_internal.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/type_config_version.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

@@ -40,6 +40,7 @@
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/write_concern.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

@@ -40,6 +40,7 @@
 #include <vm/vm_param.h>
 
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/log.h"
 #include "processinfo.h"
 
 namespace mongo {

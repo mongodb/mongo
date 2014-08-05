@@ -36,6 +36,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

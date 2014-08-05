@@ -42,6 +42,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 
 using namespace mongo;
 

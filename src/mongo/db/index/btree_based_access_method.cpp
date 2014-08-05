@@ -40,6 +40,7 @@
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
 
 

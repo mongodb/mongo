@@ -40,6 +40,7 @@
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/util/log.h"
 
 namespace {
 

@@ -57,7 +57,7 @@ namespace mongo {
 
         class DurableInterface : boost::noncopyable {
         public:
-            virtual ~DurableInterface() { log() << "ERROR warning ~DurableInterface not intended to be called" << std::endl; }
+            virtual ~DurableInterface();
 
             /** Declare that a file has been created
                 Normally writes are applied only after journaling, for safety.  But here the file

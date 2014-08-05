@@ -33,6 +33,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/export_macros.h"
 #include "mongo/client/syncclusterconnection.h"
+#include "mongo/logger/labeled_level.h"
 
 #define LOCK_TIMEOUT (15 * 60 * 1000)
 #define LOCK_SKEW_FACTOR (30)
@@ -100,7 +101,7 @@ namespace mongo {
     class MONGO_CLIENT_API DistributedLock {
     public:
 
-    	static LabeledLevel logLvl;
+        static logger::LabeledLevel logLvl;
 
         struct PingData {
 

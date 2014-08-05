@@ -29,6 +29,7 @@
 #include "mongo/util/fail_point.h"
 
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
 using mongoutils::str::stream;

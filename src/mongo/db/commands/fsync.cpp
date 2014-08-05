@@ -46,6 +46,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/background.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
     

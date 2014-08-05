@@ -36,6 +36,7 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/file.h"
+#include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"

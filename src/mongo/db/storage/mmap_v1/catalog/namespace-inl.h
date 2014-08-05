@@ -30,6 +30,10 @@
 
 #pragma once
 
+#include <boost/filesystem/path.hpp>
+
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
     inline Namespace& Namespace::operator=(const StringData& ns) {

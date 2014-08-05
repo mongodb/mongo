@@ -178,12 +178,7 @@ namespace mongo {
 
     private:
 
-        void _checkOk() const {
-            if ( _magic == 123987 )
-                return;
-            log() << "uh oh: " << (void*)(this) << " " << _magic;
-            verify(0);
-        }
+        void _checkOk() const;
 
         int _magic;
 

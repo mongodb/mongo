@@ -337,6 +337,7 @@ namespace mongo {
                            Message& m,
                            DbResponse& dbresponse,
                            const HostAndPort& remote ) {
+        MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kQuery);
 
         // before we lock...
         int op = m.operation();

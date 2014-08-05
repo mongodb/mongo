@@ -28,9 +28,11 @@
 
 #pragma once
 
-#include <ostream>
-
-#include "mongo/util/log.h"
+#include "mongo/logger/log_component.h"
+#include "mongo/logger/log_severity.h"
+#include "mongo/logger/logger.h"
+#include "mongo/logger/logstream_builder.h"
+#include "mongo/util/concurrency/thread_name.h"
 
 namespace mongo {
 
@@ -57,7 +59,9 @@ namespace mongo {
     const logger::LogSeverity verboseQueryLogSeverity = logger::LogSeverity::Debug(5);
 
 // With a #define like this, we don't evaluate the costly toString()s that are QLOG'd
-#define QLOG() MONGO_LOG_COMPONENT(verboseQueryLogSeverity, verboseQueryLogComponent) << "[QLOG] "
+#define QLOG() \
+    if (!(::mongo::logger::globalLogDomain())->shouldLog(::mongo::verboseQueryLogComponent, ::mongo::verboseQueryLogSeverity)) {} \
+    else ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), ::mongo::getThreadName(), ::mongo::verboseQueryLogSeverity, ::mongo::verboseQueryLogComponent) << "[QLOG] "
 
     bool qlogOff();
     bool qlogOn();

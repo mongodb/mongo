@@ -65,20 +65,6 @@ namespace mongo {
         return OpTime();
     }
 
-    inline std::string BSONElement::_asCode() const {
-        switch( type() ) {
-        case mongo::String:
-        case Code:
-            return std::string(valuestr(), valuestrsize()-1);
-        case CodeWScope:
-            return std::string(codeWScopeCode(), *(int*)(valuestr())-1);
-        default:
-            log() << "can't convert type: " << (int)(type()) << " to code" << std::endl;
-        }
-        uassert( 10062 ,  "not code" , 0 );
-        return "";
-    }
-
     inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const DateNowLabeler& id) {
         _builder->appendDate(_fieldName, jsTime());
         _fieldName = StringData();

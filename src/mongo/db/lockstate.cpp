@@ -31,6 +31,7 @@
 #include "mongo/db/lockstate.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 

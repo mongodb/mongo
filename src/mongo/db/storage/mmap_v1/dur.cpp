@@ -94,7 +94,7 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kJournaling);
 
     namespace dur {
 
@@ -887,6 +887,10 @@ namespace mongo {
             preallocateFiles();
 
             boost::thread t(durThread);
+        }
+
+        DurableInterface::~DurableInterface() {
+            log() << "ERROR warning ~DurableInterface not intended to be called" << std::endl;
         }
 
         void DurableImpl::syncDataAndTruncateJournal(OperationContext* txn) {

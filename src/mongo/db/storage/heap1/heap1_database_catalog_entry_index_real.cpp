@@ -37,6 +37,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/storage/heap1/heap1_btree_impl.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
     IndexAccessMethod* Heap1DatabaseCatalogEntry::getIndex( OperationContext* txn,

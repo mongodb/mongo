@@ -39,6 +39,7 @@
 #include "mongo/db/lockstate.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/file_allocator.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

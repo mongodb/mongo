@@ -37,6 +37,7 @@
 #include "mongo/db/json.h"
 #include "mongo/tools/mongoimport_options.h"
 #include "mongo/tools/tool.h"
+#include "mongo/util/log.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/text.h"
 

@@ -38,6 +38,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/float_utils.h"
 #include "mongo/util/embedded_builder.h"
+#include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {

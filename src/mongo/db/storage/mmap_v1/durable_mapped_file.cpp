@@ -38,6 +38,7 @@
 
 
 #include "mongo/db/d_concurrency.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/util/mongoutils/str.h"
@@ -139,7 +140,7 @@ namespace mongo {
         else
             _fileSuffixNo = (int) str::toUnsigned(suffix);
 
-        _p = RelativePath::fromFullPath(prefix);
+        _p = RelativePath::fromFullPath(storageGlobalParams.dbpath, prefix);
     }
 
     bool DurableMappedFile::open(const std::string& fname, bool sequentialHint) {

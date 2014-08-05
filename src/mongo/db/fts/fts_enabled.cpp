@@ -30,6 +30,8 @@
 
 #include "mongo/db/server_parameters.h"
 
+#include "mongo/util/log.h"
+
 namespace mongo {
     namespace fts {
         namespace {

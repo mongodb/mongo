@@ -130,25 +130,8 @@ namespace repl {
         const std::string _hostport;
 
         // we should already be locked...
-        bool connect() {
-          std::string err;
-          if (!connInfo->cc->connect(HostAndPort(_hostport), err)) {
-            log() << "couldn't connect to " << _hostport << ": " << err << rsLog;
-            return false;
-          }
-          connInfo->connected = true;
-          connInfo->tagPort();
+        bool connect();
 
-          // if we cannot authenticate against a member, then either its key file
-          // or our key file has to change.  if our key file has to change, we'll
-          // be rebooting. if their file has to change, they'll be rebooted so the
-          // connection created above will go dead, reconnect, and reauth.
-          if (getGlobalAuthorizationManager()->isAuthEnabled()) {
-                return authenticateInternalUser(connInfo->cc.get()); 
-          }
-
-          return true;
-        }
     };
 
     inline ScopedConn::ScopedConn(const std::string& hostport) : _hostport(hostport) {

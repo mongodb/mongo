@@ -41,6 +41,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/log.h"
 #include "mongo/util/md5.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"

@@ -30,6 +30,7 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/float_utils.h"
+#include "mongo/util/log.h"
 #include "mongo/util/startup_test.h"
 
 

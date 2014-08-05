@@ -36,6 +36,8 @@
 #include <termios.h>
 #endif
 
+#include "mongo/util/log.h"
+
 using namespace std;
 
 namespace mongo {

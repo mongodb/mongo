@@ -590,4 +590,30 @@ namespace mongo {
 
     TicketHolder Listener::globalTicketHolder(DEFAULT_MAX_CONN);
     AtomicInt64 Listener::globalConnectionNumber;
+
+    void ListeningSockets::closeAll() {
+        std::set<int>* sockets;
+        std::set<std::string>* paths;
+
+        {
+            scoped_lock lk( _mutex );
+            sockets = _sockets;
+            _sockets = new std::set<int>();
+            paths = _socketPaths;
+            _socketPaths = new std::set<std::string>();
+        }
+
+        for ( std::set<int>::iterator i=sockets->begin(); i!=sockets->end(); i++ ) {
+            int sock = *i;
+            log() << "closing listening socket: " << sock << std::endl;
+            closesocket( sock );
+        }
+
+        for ( std::set<std::string>::iterator i=paths->begin(); i!=paths->end(); i++ ) {
+            std::string path = *i;
+            log() << "removing socket file: " << path << std::endl;
+            ::remove( path.c_str() );
+        }
+    }
+
 }

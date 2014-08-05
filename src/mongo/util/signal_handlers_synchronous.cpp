@@ -45,6 +45,7 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/text.h"
 

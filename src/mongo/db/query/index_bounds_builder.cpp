@@ -37,6 +37,7 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_knobs.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/db/geo/s2.h"
 #include "third_party/s2/s2cell.h"

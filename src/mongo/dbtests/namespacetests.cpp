@@ -51,6 +51,7 @@
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/util/log.h"
 
 namespace NamespaceTests {
 

@@ -38,6 +38,8 @@
 #include <rocksdb/options.h>
 #include <rocksdb/slice.h>
 
+#include "mongo/util/log.h"
+
 namespace mongo {
 
     RocksRecordStore::RocksRecordStore( const StringData& ns,

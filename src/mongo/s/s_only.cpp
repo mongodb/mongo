@@ -40,6 +40,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
 #include "mongo/s/shard.h"
+#include "mongo/util/log.h"
 #include "mongo/util/concurrency/thread_name.h"
 
 /*

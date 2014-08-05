@@ -34,6 +34,7 @@
 #include "mongo/s/distlock.h"
 #include "mongo/s/chunk.h"  // needed for genID
 #include "mongo/s/config.h" // needed for changelog write
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

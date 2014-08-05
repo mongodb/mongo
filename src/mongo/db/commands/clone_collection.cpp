@@ -51,6 +51,7 @@
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

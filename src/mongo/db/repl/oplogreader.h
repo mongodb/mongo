@@ -80,12 +80,7 @@ namespace repl {
 
         bool connect(const mongo::OID& rid, const int from, const std::string& to);
 
-        void tailCheck() {
-            if( cursor.get() && cursor->isDead() ) {
-                log() << "repl: old cursor isDead, will initiate a new one" << std::endl;
-                resetCursor();
-            }
-        }
+        void tailCheck();
 
         bool haveCursor() { return cursor.get() != 0; }
 

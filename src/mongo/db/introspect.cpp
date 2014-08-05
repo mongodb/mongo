@@ -41,6 +41,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/util/goodies.h"
+#include "mongo/util/log.h"
 
 namespace {
     const size_t MAX_PROFILE_DOC_SIZE_BYTES = 100*1024;

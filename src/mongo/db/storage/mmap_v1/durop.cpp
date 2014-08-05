@@ -98,7 +98,7 @@ namespace mongo {
 
         FileCreatedOp::FileCreatedOp(const std::string& f, unsigned long long l) :
             DurOp(JEntry::OpCode_FileCreated) {
-            _p = RelativePath::fromFullPath(f);
+            _p = RelativePath::fromFullPath(storageGlobalParams.dbpath, f);
             _len = l;
         }
 

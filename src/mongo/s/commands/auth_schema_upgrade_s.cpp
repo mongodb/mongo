@@ -44,6 +44,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_shard.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {

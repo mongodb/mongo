@@ -36,6 +36,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/type_explain.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

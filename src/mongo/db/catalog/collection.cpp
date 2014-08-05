@@ -45,6 +45,7 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
+#include "mongo/util/log.h"
 
 namespace mongo {
 

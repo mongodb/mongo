@@ -58,6 +58,11 @@ namespace repl {
                                                _shutdownSignaled(false) {}
     SyncSourceFeedback::~SyncSourceFeedback() {}
 
+    void SyncSourceFeedback::_resetConnection() {
+        LOG(1) << "resetting connection in sync source feedback";
+        _connection.reset();
+    }
+
     bool SyncSourceFeedback::replAuthenticate() {
         if (!getGlobalAuthorizationManager()->isAuthEnabled())
             return true;

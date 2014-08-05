@@ -33,6 +33,7 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/util/log.h"
 
 namespace {
 

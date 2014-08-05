@@ -51,6 +51,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/text.h"

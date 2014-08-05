@@ -34,7 +34,6 @@
 #include "mongo/util/concurrency/rwlockimpl.h"
 #include "mongo/util/concurrency/simplerwlock.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -233,7 +232,6 @@ namespace mongo {
                 i += ( sleep - 1 );
             }
             if ( ! got ) {
-                log() << "couldn't lazily get rwlock";
                 RWLockBase::lock();
             }
         }

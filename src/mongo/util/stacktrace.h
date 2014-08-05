@@ -33,7 +33,10 @@
 
 #include <iostream>
 
-#include "mongo/util/log.h"
+#include "mongo/logger/log_severity.h"
+#include "mongo/logger/logger.h"
+#include "mongo/logger/logstream_builder.h"
+#include "mongo/util/concurrency/thread_name.h"
 
 #if defined(_WIN32)
 // We need to pick up a decl for CONTEXT. Forward declaring would be preferable, but it is
@@ -43,12 +46,21 @@
 
 namespace mongo {
 
+    /**
+      * Returns a log stream builder suitable for printStackTrace() default argument
+      * Do not use in any other context.
+      */
+    inline logger::LogstreamBuilder getStackTraceLogger() {
+        using namespace logger;
+        return LogstreamBuilder(globalLogDomain(), getThreadName(), LogSeverity::Log());
+    }
+
     // Print stack trace information to "os", default to the log stream.
-    void printStackTrace(std::ostream &os=log().stream());
+    void printStackTrace(std::ostream &os=getStackTraceLogger().stream());
 
 #if defined(_WIN32)
     // Print stack trace (using a specified stack context) to "os", default to the log stream.
-    void printWindowsStackTrace(CONTEXT &context, std::ostream &os=log().stream());
+    void printWindowsStackTrace(CONTEXT &context, std::ostream &os=getStackTraceLogger().stream());
 
     // Print error message from C runtime followed by stack trace
     int crtDebugCallback(int, char* originalMessage, int*);

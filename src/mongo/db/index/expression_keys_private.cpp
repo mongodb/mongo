@@ -39,6 +39,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2regioncoverer.h"

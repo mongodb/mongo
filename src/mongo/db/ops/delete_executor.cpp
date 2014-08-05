@@ -38,6 +38,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

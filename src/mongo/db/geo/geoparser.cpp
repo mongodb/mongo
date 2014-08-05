@@ -33,6 +33,7 @@
 
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "third_party/s2/s2polygonbuilder.h"
 

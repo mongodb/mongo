@@ -39,6 +39,7 @@
 #include "mongo/s/type_database.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_shard.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

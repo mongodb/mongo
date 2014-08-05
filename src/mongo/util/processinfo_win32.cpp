@@ -33,6 +33,7 @@
 #include <psapi.h>
 
 #include "mongo/util/processinfo.h"
+#include "mongo/util/log.h"
 
 using namespace std;
 

@@ -66,6 +66,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/log.h"
 
 
 namespace mongo {

@@ -29,6 +29,7 @@
 #include "mongo/db/geo/geo_query.h"
 
 #include "mongo/db/geo/geoparser.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

@@ -30,6 +30,7 @@
 
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

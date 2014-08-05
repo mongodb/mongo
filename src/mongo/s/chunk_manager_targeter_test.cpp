@@ -31,6 +31,7 @@
 #include "mongo/db/query/interval.h"
 #include "mongo/s/chunk.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 
 namespace {
 

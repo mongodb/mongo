@@ -35,6 +35,8 @@
 #include <iostream>
 #include <fstream>
 
+#include "mongo/util/log.h"
+
 using namespace std;
 
 namespace mongo {
