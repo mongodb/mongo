@@ -56,7 +56,7 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	if ((ret =
 	    __wt_config_gets(session, cfg, "eviction_worker_max", &cval)) == 0)
-		cache->eviction_workers_max = (u_int)cval.val;
+		conn->evict_workers_max = (u_int)cval.val;
 	WT_RET_NOTFOUND_OK(ret);
 
 	return (0);

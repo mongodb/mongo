@@ -13,6 +13,7 @@ noinst_PROGRAMS = \
 	ex_extending \
 	ex_file \
 	ex_hello \
+	ex_log \
 	ex_pack \
 	ex_process \
 	ex_schema \

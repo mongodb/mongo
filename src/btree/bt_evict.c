@@ -150,33 +150,12 @@ __evict_server(void *arg)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_EVICTION_WORKER *workers, *worker;
+	WT_EVICT_WORKER *worker;
 	WT_SESSION_IMPL *session;
-	u_int i;
 
 	session = arg;
 	conn = S2C(session);
 	cache = conn->cache;
-	workers = NULL;
-
-	if (cache->eviction_workers_max > 0)
-		WT_ERR(__wt_calloc_def(
-		    session, cache->eviction_workers_max, &workers));
-
-	/*
-	 * If eviction workers are configured, start with at most two - we'll
-	 * launch new threads if there is work for them to do.
-	 */
-	for (i = 0; i < cache->eviction_workers_max && i < 2; i++) {
-		worker = &workers[cache->eviction_workers++];
-		worker->conn = conn;
-		worker->id = i;
-		F_SET(worker, WT_EVICT_WORKER_RUN);
-		WT_ERR(__wt_thread_create(session,
-		    &worker->tid, __evict_worker, worker));
-	}
-
-	cache->workers = workers;
 
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
 		/* Evict pages from the cache as needed. */
@@ -189,8 +168,8 @@ __evict_server(void *arg)
 		 * If we have caught up and there are more than the minimum
 		 * number of eviction workers running, shut one down.
 		 */
-		if (cache->eviction_workers > 2) {
-			worker = &workers[--cache->eviction_workers];
+		if (conn->evict_workers > 2) {
+			worker = &conn->evict_workctx[--conn->evict_workers];
 			F_CLR(worker, WT_EVICT_WORKER_RUN);
 			WT_TRET(__wt_cond_signal(
 			    session, cache->evict_waiter_cond));
@@ -206,14 +185,7 @@ __evict_server(void *arg)
 
 	WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "exiting"));
 
-err:	WT_TRET(__wt_verbose(
-	    session, WT_VERB_EVICTSERVER, "waiting for helper threads"));
-	for (i = 0; i < cache->eviction_workers; i++) {
-		WT_TRET(__wt_cond_signal(session, cache->evict_waiter_cond));
-		WT_TRET(__wt_thread_join(session, workers[i].tid));
-	}
-	__wt_free(session, workers);
-
+err:	
 	if (ret != 0) {
 		WT_PANIC_MSG(session, ret, "eviction server error");
 		return (NULL);
@@ -246,13 +218,36 @@ int
 __wt_evict_create(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
+	WT_EVICT_WORKER *workers;
+	u_int i;
 
 	/* Set first, the thread might run before we finish up. */
 	F_SET(conn, WT_CONN_EVICTION_RUN);
 
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
+	/* We need a session handle because we're reading/writing pages. */
+	WT_RET(__wt_open_internal_session(
+	    conn, "eviction-server", 0, 0, &session));
 	conn->evict_session = session;
-	conn->evict_session->name = "eviction-server";
+
+	if (conn->evict_workers_max > 0) {
+		WT_RET(__wt_calloc_def(
+		    session, conn->evict_workers_max, &workers));
+		conn->evict_workctx = workers;
+
+		for (i = 0; i < conn->evict_workers_max; i++) {
+			WT_RET(__wt_open_internal_session(conn,
+			    "eviction-worker", 0, 0, &workers[i].session));
+			workers[i].id = i;
+			/* Start at most two worker threads initially. */
+			if (i < 2) {
+				++conn->evict_workers;
+				F_SET(&workers[i], WT_EVICT_WORKER_RUN);
+				WT_RET(__wt_thread_create(
+				    session, &workers[i].tid,
+				    __evict_worker, &workers[i]));
+			}
+		}
+	}
 
 	WT_RET(__wt_thread_create(
 	    session, &conn->evict_tid, __evict_server, conn->evict_session));
@@ -268,13 +263,27 @@ __wt_evict_create(WT_CONNECTION_IMPL *conn)
 int
 __wt_evict_destroy(WT_CONNECTION_IMPL *conn)
 {
+	WT_CACHE *cache;
 	WT_DECL_RET;
+	WT_EVICT_WORKER *workers;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
+	u_int i;
 
+	cache = conn->cache;
 	session = conn->default_session;
+	workers = conn->evict_workctx;
 
 	F_CLR(conn, WT_CONN_EVICTION_RUN);
+
+	WT_TRET(__wt_verbose(
+	    session, WT_VERB_EVICTSERVER, "waiting for helper threads"));
+	for (i = 0; i < conn->evict_workers; i++) {
+		WT_TRET(__wt_cond_signal(session, cache->evict_waiter_cond));
+		WT_TRET(__wt_thread_join(session, workers[i].tid));
+	}
+	__wt_free(session, conn->evict_workctx);
+
 	if (conn->evict_tid_set) {
 		WT_TRET(__wt_evict_server_wake(session));
 		WT_TRET(__wt_thread_join(session, conn->evict_tid));
@@ -287,6 +296,7 @@ __wt_evict_destroy(WT_CONNECTION_IMPL *conn)
 
 		conn->evict_session = NULL;
 	}
+
 	return (ret);
 }
 
@@ -300,20 +310,14 @@ __evict_worker(void *arg)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_EVICTION_WORKER *worker;
+	WT_EVICT_WORKER *worker;
 	WT_SESSION_IMPL *session;
 	uint32_t flags;
 
 	worker = arg;
-	conn = worker->conn;
+	session = worker->session;
+	conn = S2C(session);
 	cache = conn->cache;
-
-	/*
-	 * We need a session handle because we're reading/writing pages.
-	 * Start with the default session to keep error handling simple.
-	 */
-	session = conn->default_session;
-	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &session));
 
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN) &&
 	    F_ISSET(worker, WT_EVICT_WORKER_RUN)) {
@@ -390,7 +394,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	WT_EVICTION_WORKER *worker;
+	WT_EVICT_WORKER *worker;
 	int loop;
 	uint32_t flags;
 	uint64_t bytes_inuse;
@@ -431,10 +435,8 @@ __evict_pass(WT_SESSION_IMPL *session)
 
 		/* Start a worker if we have capacity and the cache is full. */
 		if (bytes_inuse > conn->cache_size &&
-		    cache->eviction_workers < cache->eviction_workers_max) {
-			worker = &cache->workers[cache->eviction_workers++];
-			worker->conn = conn;
-			worker->id = cache->eviction_workers - 1;
+		    conn->evict_workers < conn->evict_workers_max) {
+			worker = &conn->evict_workctx[conn->evict_workers++];
 			F_SET(worker, WT_EVICT_WORKER_RUN);
 			WT_RET(__wt_thread_create(session,
 			    &worker->tid, __evict_worker, worker));
@@ -745,7 +747,7 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 	 */
 	WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
 
-	if (cache->eviction_workers > 0) {
+	if (S2C(session)->evict_workers > 0) {
 		WT_STAT_FAST_CONN_INCR(
 		    session, cache_eviction_server_not_evicting);
 		/*

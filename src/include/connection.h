@@ -55,9 +55,9 @@ struct __wt_named_data_source {
 
 /*
  * Allocate some additional slots for internal sessions.  There is a default
- * session for each connection, plus a session for the eviction thread.
+ * session for each connection, plus a session for each server thread.
  */
-#define	WT_NUM_INTERNAL_SESSIONS	2
+#define	WT_NUM_INTERNAL_SESSIONS	10
 
 /*
  * WT_CONNECTION_IMPL --
@@ -199,9 +199,13 @@ struct __wt_connection_impl {
 	uint32_t	 async_size;	/* Async op array size */
 	uint32_t	 async_workers;	/* Number of async workers */
 
-	WT_SESSION_IMPL *evict_session;	/* Eviction server session */
+	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
 	pthread_t	 evict_tid;	/* Eviction server thread ID */
 	int		 evict_tid_set;	/* Eviction server thread ID set */
+
+	u_int32_t	 evict_workers_max;/* Max eviction workers */
+	uint32_t	 evict_workers;	/* Number of eviction workers */
+	WT_EVICT_WORKER	*evict_workctx;	/* Eviction worker context */
 
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	pthread_t	 stat_tid;	/* Statistics log thread */

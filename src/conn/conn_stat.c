@@ -407,8 +407,8 @@ __statlog_start(WT_CONNECTION_IMPL *conn)
 
 	F_SET(conn, WT_CONN_SERVER_STATISTICS);
 	/* The statistics log server gets its own session. */
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &conn->stat_session));
-	conn->stat_session->name = "statlog-server";
+	WT_RET(__wt_open_internal_session(
+	    conn, "statlog-server", 1, 1, &conn->stat_session));
 
 	session = conn->stat_session;
 

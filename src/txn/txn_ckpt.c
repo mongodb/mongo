@@ -178,11 +178,15 @@ __checkpoint_data_source(WT_SESSION_IMPL *session, const char *cfg[])
 
 /*
  * __wt_checkpoint_list --
- *	Get a list of URIs we want to flush.
+ *	Get a list of handles to flush.
  */
 int
 __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_DATA_HANDLE *saved_dhandle;
+	WT_DECL_RET;
+	const char *name;
+
 	WT_UNUSED(cfg);
 
 	/* Should not be called with anything other than a file object. */
@@ -190,62 +194,77 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session,
 	    memcmp(session->dhandle->name, "file:", strlen("file:")) == 0);
 
-	return (__wt_buf_catfmt(
-	    session, session->checkpoint, "%s,", session->dhandle->name));
+	/* Make sure there is space for the next entry. */
+	WT_RET(__wt_realloc_def(session, &session->ckpt_handle_allocated,
+	    session->ckpt_handle_next + 1, &session->ckpt_handle));
+
+	/* Not strictly necessary, but cleaner to clear the current handle. */
+	name = session->dhandle->name;
+	saved_dhandle = session->dhandle;
+	session->dhandle = NULL;
+
+	/* Ignore busy files, we'll deal with them in the checkpoint. */
+	switch (ret = __wt_session_get_btree(session, name, NULL, NULL, 0)) {
+	case 0:
+		session->ckpt_handle[
+		    session->ckpt_handle_next++] = session->dhandle;
+		break;
+	case EBUSY:
+		ret = 0;
+		break;
+	default:
+		break;
+	}
+
+	session->dhandle = saved_dhandle;
+	return (ret);
 }
 
 /*
  * __checkpoint_write_leaves --
- *	Write the dirty leaf pages for all open handles.
+ *	Write any dirty leaf pages for all checkpoint handles.
  */
 static int
 __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	char *p, *t;
+	u_int i;
+
+	i = 0;
 
 	/* Should not be called with any handle reference. */
 	WT_ASSERT(session, session->dhandle == NULL);
 
-	WT_RET(__wt_scr_alloc(session, 512, &session->checkpoint));
-	p = (char *)session->checkpoint->data;
-	*p = '\0';
-
 	/*
-	 * Get a list of URIs we want to flush; this pulls closed objects into
-	 * the session cache, but we're going to do that anyway.  There's a
-	 * race where an object might be closed between the time we decide to
-	 * flush it and do the flush, but that's pretty unlikely and only means
-	 * we waste a little work.
+	 * Get a list of handles we want to flush; this may pull closed objects
+	 * into the session cache, but we're going to do that eventually anyway.
 	 */
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __checkpoint_apply(session, cfg, __wt_checkpoint_list, NULL));
 	WT_ERR(ret);
 
 	/*
-	 * Walk the list, flushing the leaf pages from each file.  If the file
-	 * is busy that's fine, we'll deal with it once we get the schema lock.
+	 * Walk the list, flushing the leaf pages from each file, then releasing
+	 * the file.  Note that we increment inside the loop to simplify error
+	 * handling.
 	 */
-	for (p = t = (char *)session->checkpoint->data; *p != '\0'; p = t + 1)
-		if ((t = strchr(p, ',')) != NULL) {
-			*t = '\0';
+	while (i < session->ckpt_handle_next) {
+		dhandle = session->ckpt_handle[i++];
+		WT_WITH_DHANDLE(session, dhandle,
+		    ret = __wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES));
+		WT_WITH_DHANDLE(session, dhandle,
+		    WT_TRET(__wt_session_release_btree(session)));
+		WT_ERR(ret);
+	}
 
-			ret = __wt_session_get_btree(session, p, NULL, NULL, 0);
-			if (ret == EBUSY || ret == ENOENT) {
-				ret = 0;
-				continue;
-			}
-			WT_ERR(ret);
-
-			if ((ret = __wt_cache_op(
-			    session, NULL, WT_SYNC_WRITE_LEAVES)) == EBUSY)
-				ret = 0;
-
-			WT_TRET(__wt_session_release_btree(session));
-			WT_ERR(ret);
-		}
-
-err:	__wt_scr_free(&session->checkpoint);
+err:	while (i < session->ckpt_handle_next) {
+		dhandle = session->ckpt_handle[i++];
+		WT_WITH_DHANDLE(session, dhandle,
+		    WT_TRET(__wt_session_release_btree(session)));
+	}
+	__wt_free(session, session->ckpt_handle);
+	session->ckpt_handle_allocated = session->ckpt_handle_next = 0;
 	return (ret);
 }
 

@@ -724,7 +724,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	off_t log_size;
 	uint32_t allocsize, cksum, firstlog, lastlog, lognum, rdup_len, reclen;
 	u_int i, logcount;
-	int done;
+	int eol;
 	char **logfiles;
 
 	conn = S2C(session);
@@ -732,6 +732,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	log_fh = NULL;
 	logcount = 0;
 	logfiles = NULL;
+	eol = 0;
 	WT_CLEAR(buf);
 
 	/*
@@ -766,9 +767,15 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			    lsnp->file > log->fileid)
 				return (WT_NOTFOUND);
 
+			/*
+			 * Log cursors may not know the starting LSN.  If an
+			 * LSN pointer is passed in, but it is the INIT_LSN,
+			 * start from the first_lsn.
+			 */
 			start_lsn = *lsnp;
+			if (IS_INIT_LSN(&start_lsn))
+				start_lsn = log->first_lsn;
 		}
-
 		end_lsn = log->alloc_lsn;
 	} else {
 		/*
@@ -804,13 +811,9 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	}
 	WT_ERR(__log_openfile(session, 0, &log_fh, start_lsn.file));
 	WT_ERR(__log_filesize(session, log_fh, &log_size));
-	if (LF_ISSET(WT_LOGSCAN_ONE))
-		done = 1;
-	else
-		done = 0;
 	rd_lsn = start_lsn;
 	WT_ERR(__wt_buf_initsize(session, &buf, LOG_ALIGN));
-	do {
+	for (;;) {
 		if (rd_lsn.offset + allocsize > log_size) {
 advance:
 			/*
@@ -818,6 +821,7 @@ advance:
 			 */
 			WT_ERR(__wt_close(session, log_fh));
 			log_fh = NULL;
+			eol = 1;
 			/*
 			 * Truncate this log file before we move to the next.
 			 */
@@ -902,12 +906,14 @@ advance:
 		 * We have a valid log record.  If it is not the log file
 		 * header, invoke the callback.
 		 */
-		if (rd_lsn.offset != 0)
-			WT_ERR((*func)(session, &buf, &rd_lsn, cookie));
-
 		WT_STAT_FAST_CONN_INCR(session, log_scan_records);
+		if (rd_lsn.offset != 0) {
+			WT_ERR((*func)(session, &buf, &rd_lsn, cookie));
+			if (LF_ISSET(WT_LOGSCAN_ONE))
+				break;
+		}
 		rd_lsn.offset += (off_t)rdup_len;
-	} while (!done);
+	}
 
 	/* Truncate if we're in recovery. */
 	if (LF_ISSET(WT_LOGSCAN_RECOVER) &&
@@ -918,6 +924,12 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 	__wt_buf_free(session, &buf);
+	/*
+	 * If the caller wants one record and it is at the end of log,
+	 * return WT_NOTFOUND.
+	 */
+	if (LF_ISSET(WT_LOGSCAN_ONE) && eol && ret == 0)
+		ret = WT_NOTFOUND;
 	if (ret == ENOENT)
 		ret = 0;
 	if (log_fh != NULL)

@@ -51,10 +51,6 @@ __sweep(WT_SESSION_IMPL *session)
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __wt_cache_op(
 			    session, NULL, WT_SYNC_WRITE_LEAVES));
-			if (ret == EBUSY) {
-				ret = 0;
-				continue;
-			}
 			WT_RET(ret);
 
 			/*
@@ -138,9 +134,9 @@ __wt_sweep_create(WT_CONNECTION_IMPL *conn)
 	/* Set first, the thread might run before we finish up. */
 	F_SET(conn, WT_CONN_SERVER_SWEEP);
 
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
+	WT_RET(
+	    __wt_open_internal_session(conn, "sweep-server", 1, 1, &session));
 	conn->sweep_session = session;
-	conn->sweep_session->name = "sweep-server";
 
 	WT_RET(__wt_cond_alloc(
 	    session, "handle sweep server", 0, &conn->sweep_cond));

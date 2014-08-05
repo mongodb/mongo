@@ -430,11 +430,11 @@ err:	API_END_RET(session, ret);
 }
 
 /*
- * __wt_curds_create --
+ * __wt_curds_open --
  *	Initialize a data-source cursor.
  */
 int
-__wt_curds_create(
+__wt_curds_open(
     WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner,
     const char *cfg[], WT_DATA_SOURCE *dsrc, WT_CURSOR **cursorp)
 {

@@ -99,8 +99,8 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 
 	F_SET(conn, WT_CONN_SERVER_CHECKPOINT);
 	/* The checkpoint server gets its own session. */
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &conn->ckpt_session));
-	conn->ckpt_session->name = "checkpoint-server";
+	WT_RET(__wt_open_internal_session(
+	    conn, "checkpoint-server", 1, 1, &conn->ckpt_session));
 
 	WT_RET(
 	    __wt_cond_alloc(session, "checkpoint server", 0, &conn->ckpt_cond));

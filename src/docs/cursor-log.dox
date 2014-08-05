@@ -1,0 +1,49 @@
+/*! @page cursor_log Log cursors
+
+WiredTiger cursors provide access to data from a variety of sources.
+One of these sources is the set of records in the transaction log files.
+WiredTiger log records can be made up of multiple operations from a
+single transaction.  One can use a log cursor to access the operations
+comprising the transaction log record.
+
+When using a log cursor the key is the LSN and also an operation counter
+within that log record.  When a log record is a single entity (i.e. any
+record that is not a transaction commit made up of operations), the
+operation counter returned in the key will be zero.
+
+The value returned contains the following:
+
+- transaction id (commit records only, otherwise 0)
+- record type
+- operation type (commit records only, otherwise 0)
+- file id (if applicable, otherwise 0)
+- operation key (commit records only, otherwise empty)
+- operation value
+
+The following example opens a log cursor on the database:
+
+@snippet ex_log.c log cursor open
+
+and using the key:
+
+@snippet ex_log.c log cursor get_key
+
+and using the value:
+
+@snippet ex_log.c log cursor get_value
+
+Notes:
+
+- Although the key format includes an operation counter, that
+field is ignored when setting the key for a WT_CURSOR::search.
+The following is an example of setting the key:
+
+@snippet ex_log.c log cursor set_key
+
+- Performing a WT_CURSOR::next call on a log cursor moves to the
+next operation within a commit record or the first operation in
+the next log record (which may be the entire log record).
+
+- Log cursors are always read-only.
+
+*/
