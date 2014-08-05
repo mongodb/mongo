@@ -57,7 +57,7 @@ namespace {
                                              BSON("_id" << 20 << "host" << "h2") <<
                                              BSON("_id" << 30 << "host" << "h3")))));
 
-        TopologyCoordinatorImpl topocoord(std::numeric_limits<int>::max());
+        TopologyCoordinatorImpl topocoord((Seconds(std::numeric_limits<long>::max())));
         Date_t now = 0;
         topocoord.updateConfig(cbData, config, 0, now++);
 
@@ -110,7 +110,7 @@ namespace {
                                              BSON("_id" << 20 << "host" << "h2") <<
                                              BSON("_id" << 30 << "host" << "h3")))));
 
-        TopologyCoordinatorImpl topocoord(std::numeric_limits<int>::max());
+        TopologyCoordinatorImpl topocoord((Seconds(std::numeric_limits<long>::max())));
         Date_t now = 0;
         topocoord.updateConfig(cbData, config, 0, now++);
 
@@ -155,7 +155,7 @@ namespace {
                                              BSON("_id" << 20 << "host" << "h2") <<
                                              BSON("_id" << 30 << "host" << "h3")))));
 
-        TopologyCoordinatorImpl topocoord(std::numeric_limits<int>::max());
+        TopologyCoordinatorImpl topocoord((Seconds(std::numeric_limits<long>::max())));
         Date_t now = 0;
         topocoord.updateConfig(cbData, config, 0, now++);
 

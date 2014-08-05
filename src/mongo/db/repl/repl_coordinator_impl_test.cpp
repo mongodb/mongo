@@ -57,6 +57,8 @@ namespace mongo {
 
 namespace repl {
 namespace {
+    
+    const Seconds zeroSecs(0);
 
     TEST(ReplicationCoordinator, StartupShutdown) {
         ReplSettings settings;
@@ -70,7 +72,8 @@ namespace {
                                 "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
                                                              "_id" << 0 )))));
         coordinator.setCurrentReplicaSetConfig(config, 0);
-        coordinator.startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
+        coordinator.startReplication(new TopologyCoordinatorImpl(zeroSecs), 
+                                     new NetworkInterfaceMock);
         coordinator.shutdown();
     }
 
@@ -325,7 +328,8 @@ namespace {
                                 "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
                                                              "_id" << 0 )))));
         coordinator.setCurrentReplicaSetConfig(config, 0);
-        coordinator.startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
+        coordinator.startReplication(new TopologyCoordinatorImpl(zeroSecs), 
+                                     new NetworkInterfaceMock);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
 
@@ -424,7 +428,8 @@ namespace {
         ASSERT_OK(rsConfig.initialize(configObj));
         coordinator.reset(new ReplicationCoordinatorImpl(
                 settings, new ReplicationCoordinatorExternalStateMock));
-        coordinator->startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
+        coordinator->startReplication(new TopologyCoordinatorImpl(zeroSecs), 
+                                      new NetworkInterfaceMock);
         coordinator->setCurrentReplicaSetConfig(rsConfig, 1);
 
         OID rid1 = OID::gen();
@@ -491,7 +496,8 @@ namespace {
         ASSERT_OK(rsConfig.initialize(configObj));
         coordinator.reset(new ReplicationCoordinatorImpl(
                 settings, new ReplicationCoordinatorExternalStateMock));
-        coordinator->startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
+        coordinator->startReplication(new TopologyCoordinatorImpl(zeroSecs), 
+                                      new NetworkInterfaceMock);
         coordinator->setCurrentReplicaSetConfig(rsConfig, 1);
 
         // Test generating basic handshake with no chaining

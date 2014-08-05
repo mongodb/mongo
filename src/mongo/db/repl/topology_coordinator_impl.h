@@ -76,7 +76,7 @@ namespace repl {
 
     class TopologyCoordinatorImpl : public TopologyCoordinator {
     public:
-        explicit TopologyCoordinatorImpl(int maxSyncSourceLagSecs);
+        explicit TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs);
 
         virtual void setLastApplied(const OpTime& optime);
         virtual void setCommitOkayThrough(const OpTime& optime);
@@ -216,7 +216,7 @@ namespace repl {
         // The next sync source to be chosen, requested via a replSetSyncFrom command
         int _forceSyncSourceIndex;
         // How far this node must fall behind before considering switching sync sources
-        int _maxSyncSourceLagSecs;
+        Seconds _maxSyncSourceLagSecs;
 
         // insanity follows
 

@@ -45,7 +45,7 @@ namespace mongo {
 
 namespace repl {
 
-    TopologyCoordinatorImpl::TopologyCoordinatorImpl(int maxSyncSourceLagSecs) :
+    TopologyCoordinatorImpl::TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs) :
         _currentPrimaryIndex(-1),
         _syncSourceIndex(-1),
         _forceSyncSourceIndex(-1),
@@ -118,15 +118,16 @@ namespace repl {
             primaryOpTime = _hbdata[_currentPrimaryIndex].getOpTime();
         else
             // choose a time that will exclude no candidates, since we don't see a primary
-            primaryOpTime = OpTime(_maxSyncSourceLagSecs, 0);
+            primaryOpTime = OpTime(_maxSyncSourceLagSecs.total_seconds(), 0);
 
-        if (primaryOpTime.getSecs() < static_cast<unsigned int>(_maxSyncSourceLagSecs)) {
+        if (primaryOpTime.getSecs() < 
+            static_cast<unsigned int>(_maxSyncSourceLagSecs.total_seconds())) {
             // erh - I think this means there was just a new election
             // and we don't yet know the new primary's optime
-            primaryOpTime = OpTime(_maxSyncSourceLagSecs, 0);
+            primaryOpTime = OpTime(_maxSyncSourceLagSecs.total_seconds(), 0);
         }
 
-        OpTime oldestSyncOpTime(primaryOpTime.getSecs() - _maxSyncSourceLagSecs, 0);
+        OpTime oldestSyncOpTime(primaryOpTime.getSecs() - _maxSyncSourceLagSecs.total_seconds(), 0);
 
         int closestIndex = -1;
 

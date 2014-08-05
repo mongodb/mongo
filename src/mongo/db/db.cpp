@@ -279,7 +279,7 @@ namespace mongo {
 
         logStartup();
         repl::getGlobalReplicationCoordinator()->startReplication(
-            new repl::TopologyCoordinatorImpl(repl::maxSyncSourceLagSecs), 
+            new repl::TopologyCoordinatorImpl(Seconds(repl::maxSyncSourceLagSecs)), 
             new repl::NetworkInterfaceImpl());
         if (serverGlobalParams.isHttpInterfaceEnabled)
             boost::thread web(stdx::bind(&webServerThread,
