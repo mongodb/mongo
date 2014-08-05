@@ -62,6 +62,8 @@ async_callback(WT_ASYNC_CALLBACK *cb,
 
 	(void)flags;				/* Unused */
 
+	ret = 0;
+
 	/*! [async get type] */
 	/* Retrieve the operation's WT_ASYNC_OPTYPE type. */
 	type = op->get_type(op);
