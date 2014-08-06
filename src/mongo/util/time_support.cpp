@@ -750,8 +750,8 @@ namespace {
     
     void sleepmillis(long long s) {
         fassert(16228, s <= 0xffffffff );
-        // When our waiting period falls bellow Windows min resolution, let's set resolution
-        // to 1 ms. Note that this change may affect all kernel scheduler thread operations.
+        // When our waiting period falls below Windows min resolution, let's set resolution
+        // to s ms. Note that this change may affect all kernel scheduler thread operations.
         // Apparently this changes the Windows kernel "quantum" length
         // see http://msdn.microsoft.com/en-us/library/windows/desktop/dd757624(v=vs.85).aspx
         if(isBelowWindowsMinResolution(s)) timeBeginPeriod(s);
