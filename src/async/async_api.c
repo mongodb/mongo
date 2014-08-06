@@ -51,8 +51,8 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	 * Insert it at the head expecting LRU usage.  We need a real session
 	 * for the cursor.
 	 */
-	session = NULL;
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
+	WT_RET(
+	    __wt_open_internal_session(conn, "async-cursor", 1, 1, &session));
 	__wt_spin_lock(session, &async->ops_lock);
 	WT_ERR(__wt_calloc_def(session, 1, &af));
 	WT_ERR(__wt_strdup(session, uri, &af->uri));
@@ -143,7 +143,7 @@ retry:
 	 */
 	if (op == NULL || op->state != WT_ASYNCOP_FREE) {
 		WT_STAT_FAST_CONN_INCR(session, async_full);
-		WT_RET(ENOMEM);
+		WT_RET(EBUSY);
 	}
 	/*
 	 * Set the state of this op handle as READY for the user to use.
@@ -268,9 +268,8 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 		 * workers and we may want to selectively stop some workers
 		 * while leaving the rest running.
 		 */
-		WT_RET(__wt_open_session(
-		    conn, 1, NULL, NULL, &async->worker_sessions[i]));
-		async->worker_sessions[i]->name = "async-worker";
+		WT_RET(__wt_open_internal_session(
+		    conn, "async-worker", 1, 1, &async->worker_sessions[i]));
 		F_SET(async->worker_sessions[i], WT_SESSION_SERVER_ASYNC);
 	}
 	for (i = 0; i < conn->async_workers; i++) {
@@ -363,9 +362,8 @@ __wt_async_reconfig(WT_CONNECTION_IMPL *conn, const char *cfg[])
 			/*
 			 * Each worker has its own session.
 			 */
-			WT_RET(__wt_open_session(
-			    conn, 1, NULL, NULL, &async->worker_sessions[i]));
-			async->worker_sessions[i]->name = "async-worker";
+			WT_RET(__wt_open_internal_session(conn,
+			    "async-worker", 1, 1, &async->worker_sessions[i]));
 			F_SET(async->worker_sessions[i],
 			    WT_SESSION_SERVER_ASYNC);
 		}

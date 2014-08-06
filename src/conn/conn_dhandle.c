@@ -173,6 +173,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	int no_schema_lock;
 
 	dhandle = session->dhandle;
 	btree = S2BT(session);
@@ -181,9 +182,22 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 		return (0);
 
 	/*
-	 * We're not holding the schema lock, and threads may be walking the
-	 * list of open handles, operating on them (for example, checkpoint).
-	 * Acquire the handle's close lock.
+	 * If we don't already have the schema lock, make it an error to try
+	 * to acquire it.  The problem is that we are holding an exclusive
+	 * lock on the handle, and if we attempt to acquire the schema lock
+	 * we might deadlock with a thread that has the schema lock and wants
+	 * a handle lock (specifically, checkpoint).
+	 */
+	no_schema_lock = 0;
+	if (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED)) {
+		no_schema_lock = 1;
+		F_SET(session, WT_SESSION_NO_SCHEMA_LOCK);
+	}
+
+	/*
+	 * We may not be holding the schema lock, and threads may be walking
+	 * the list of open handles (for example, checkpoint).  Acquire the
+	 * handle's close lock.
 	 */
 	__wt_spin_lock(session, &dhandle->close_lock);
 
@@ -203,6 +217,9 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
 err:	__wt_spin_unlock(session, &dhandle->close_lock);
+
+	if (no_schema_lock)
+		F_CLR(session, WT_SESSION_NO_SCHEMA_LOCK);
 
 	return (ret);
 }
@@ -626,7 +643,6 @@ int
 __wt_conn_dhandle_discard(WT_CONNECTION_IMPL *conn)
 {
 	WT_DATA_HANDLE *dhandle;
-	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
@@ -649,13 +665,13 @@ restart:
 	}
 
 	/*
-	 * Closing the files may have resulted in entries on our session's list
-	 * of open data handles, specifically, we added the metadata file if
-	 * any of the files were dirty.  Clean up that list before we shut down
-	 * the metadata entry, for good.
+	 * Closing the files may have resulted in entries on our default
+	 * session's list of open data handles, specifically, we added the
+	 * metadata file if any of the files were dirty.  Clean up that list
+	 * before we shut down the metadata entry, for good.
 	 */
-	while ((dhandle_cache = SLIST_FIRST(&session->dhandles)) != NULL)
-		__wt_session_discard_btree(session, dhandle_cache);
+	__wt_session_close_cache(session);
+	F_SET(session, WT_SESSION_NO_DATA_HANDLES);
 
 	/* Close the metadata file handle. */
 	while ((dhandle = SLIST_FIRST(&conn->dhlh)) != NULL)

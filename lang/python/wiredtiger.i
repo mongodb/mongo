@@ -330,14 +330,14 @@ do {
 		SWIG_ERROR_IF_NOT_SET(result);
 }
 
-/* Async operations can return ENOMEM when no ops are available. */
-%define ENOMEM_OK(m)
+/* Async operations can return EBUSY when no ops are available. */
+%define EBUSY_OK(m)
 %exception m {
 retry:
 	$action
-	if (result != 0 && result != ENOMEM)
+	if (result != 0 && result != EBUSY)
 		SWIG_ERROR_IF_NOT_SET(result);
-        else if (result == ENOMEM) {
+        else if (result == EBUSY) {
                 __wt_sleep(0, 10000);
                 goto retry;
         }
@@ -369,7 +369,7 @@ retry:
 }
 %enddef
 
-ENOMEM_OK(__wt_connection::async_new_op)
+EBUSY_OK(__wt_connection::async_new_op)
 ENUM_OK(__wt_async_op::get_type)
 NOTFOUND_OK(__wt_cursor::next)
 NOTFOUND_OK(__wt_cursor::prev)
@@ -381,9 +381,10 @@ COMPARE_OK(__wt_cursor::compare)
 COMPARE_OK(__wt_cursor::search_near)
 
 /* Lastly, some methods need no (additional) error checking. */
-%exception __wt_connection::search_near;
+%exception __wt_connection::diagnostic_build;
 %exception __wt_connection::get_home;
 %exception __wt_connection::is_new;
+%exception __wt_connection::search_near;
 %exception __wt_async_op::_set_key;
 %exception __wt_async_op::_set_value;
 %exception __wt_cursor::_set_key;
@@ -783,6 +784,14 @@ typedef int int_void;
 	int _freecb() {
 		return (0);
 	}
+
+        int diagnostic_build() {
+%#ifdef HAVE_DIAGNOSTIC
+                return 1;
+%#else
+                return 0;
+%#endif
+        }
 };
 
 /* Remove / rename parts of the C API that we don't want in Python. */
@@ -805,6 +814,7 @@ typedef int int_void;
 %ignore __wt_event_handler;
 %ignore __wt_extractor;
 %ignore __wt_item;
+%ignore __wt_lsn;
 
 %ignore __wt_connection::add_collator;
 %ignore __wt_connection::add_compressor;

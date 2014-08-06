@@ -221,10 +221,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	if (block->os_cache_dirty_max != 0 &&
 	    (block->os_cache_dirty += align_size) > block->os_cache_dirty_max) {
 		block->os_cache_dirty = 0;
-		if ((ret = sync_file_range(fh->fd,
-		    (off64_t)0, (off64_t)0, SYNC_FILE_RANGE_WRITE)) != 0)
-			WT_RET_MSG(
-			    session, ret, "%s: sync_file_range", block->name);
+		WT_RET(__wt_fsync_async(session, fh));
 	}
 #endif
 #ifdef HAVE_POSIX_FADVISE

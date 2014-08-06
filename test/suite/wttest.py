@@ -254,6 +254,10 @@ class WiredTigerTestCase(unittest.TestCase):
     def tearDown(self):
         excinfo = sys.exc_info()
         passed = (excinfo == (None, None, None))
+        if passed:
+            skipped = False
+        else:
+            skipped = (excinfo[0] == unittest.SkipTest)
         self.pr('finishing')
 
         try:
@@ -272,12 +276,12 @@ class WiredTigerTestCase(unittest.TestCase):
             os.chdir(self.origcwd)
 
         # Clean up unless there's a failure
-        if passed and not WiredTigerTestCase._preserveFiles:
+        if (passed or skipped) and not WiredTigerTestCase._preserveFiles:
             shutil.rmtree(self.testdir, ignore_errors=True)
         else:
             self.pr('preserving directory ' + self.testdir)
 
-        if not passed:
+        if not passed and not skipped:
             print "ERROR in " + self.testsubdir
             self.pr('FAIL')
             self.prexception(excinfo)

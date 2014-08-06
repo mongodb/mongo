@@ -44,9 +44,9 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	 * files. Use read-uncommitted isolation to avoid keeping
 	 * updates in cache unnecessarily.
 	 */
-	WT_ERR(__wt_open_session(S2C(session), 1, NULL,
-	    "isolation=read-uncommitted", &worker_session));
-	worker_session->name = "lsm-worker-manager";
+	WT_RET(__wt_open_internal_session(
+	    S2C(session), "lsm-worker-manager", 1, 0, &worker_session));
+	worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
 	manager->lsm_worker_sessions[0] = worker_session;
 	WT_ERR(__wt_thread_create(session, &manager->lsm_worker_tids[0],
 	    __lsm_worker_manager, worker_session));
@@ -206,9 +206,9 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	 * Use read-uncommitted isolation to avoid keeping updates in cache
 	 * unnecessarily.
 	 */
-	WT_RET(__wt_open_session(
-	    conn, 1, NULL, "isolation=read-uncommitted", &worker_session));
-	worker_session->name = "lsm-worker-switch";
+	WT_RET(__wt_open_internal_session(
+	    conn, "lsm-worker-switch", 1, 0, &worker_session));
+	worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
 	manager->lsm_worker_sessions[1] = worker_session;
 	/* Freed by the worker thread when it shuts down */
 	WT_RET(__wt_calloc_def(session, 1, &worker_args));
@@ -227,9 +227,9 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	 */
 	for (; manager->lsm_workers < manager->lsm_workers_max;
 	    manager->lsm_workers++) {
-		WT_RET(__wt_open_session(conn, 1, NULL,
-		    "isolation=read-uncommitted", &worker_session));
-		worker_session->name = "lsm-worker-1";
+		WT_RET(__wt_open_internal_session(
+		    conn, "lsm-worker-1", 1, 0, &worker_session));
+		worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
 		manager->lsm_worker_sessions[manager->lsm_workers] =
 		    worker_session;
 		/* Freed by the worker thread when it shuts down */

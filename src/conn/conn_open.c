@@ -41,7 +41,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 * threads because those may allocate and use session resources that
 	 * need to get cleaned up on close.
 	 */
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
+	WT_RET(__wt_open_internal_session(conn, "connection", 1, 0, &session));
 	conn->default_session = session;
 
 	return (0);
@@ -113,8 +113,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_conn_remove_data_source(conn, ndsrc));
 
 	/*
-	 * Complain if files weren't closed, ignoring the lock and logging
-	 * files, we'll close them in a minute.
+	 * Complain if files weren't closed, ignoring the lock file, we'll
+	 * close it in a minute.
 	 */
 	TAILQ_FOREACH(fh, &conn->fhqh, q) {
 		if (fh == conn->lock_fh)
@@ -127,12 +127,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/* Shut down the eviction server thread. */
-	F_CLR(conn, WT_CONN_EVICTION_RUN);
-	if (conn->cache_evict_tid_set) {
-		WT_TRET(__wt_evict_server_wake(session));
-		WT_TRET(__wt_thread_join(session, conn->cache_evict_tid));
-		conn->cache_evict_tid_set = 0;
-	}
+	WT_TRET(__wt_evict_destroy(conn));
 
 	/* Disconnect from shared cache - must be before cache destroy. */
 	WT_TRET(__wt_conn_cache_pool_destroy(conn));
@@ -194,24 +189,15 @@ int
 __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *evict_session;
 
 	conn = S2C(session);
 
-	F_SET(conn, WT_CONN_EVICTION_RUN | WT_CONN_SERVER_RUN);
+	F_SET(conn, WT_CONN_SERVER_RUN);
 
 	/*
 	 * Start the eviction thread.
-	 *
-	 * It needs a session handle because it is reading/writing pages.
-	 * Allocate a session here so the eviction thread never needs
-	 * to acquire the connection spinlock, which can lead to deadlock.
 	 */
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &evict_session));
-	evict_session->name = "eviction-server";
-	WT_RET(__wt_thread_create(session,
-	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
-	conn->cache_evict_tid_set = 1;
+	WT_RET(__wt_evict_create(conn));
 
 	/*
 	 * Start the handle sweep thread.

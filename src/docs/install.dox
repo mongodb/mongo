@@ -1,4 +1,4 @@
-/*! @page install How to build and install WiredTiger
+/*! @page install Building and installing WiredTiger
 
 This section explains how to build and install the WiredTiger software.
 
@@ -132,7 +132,8 @@ Build the WiredTiger Java API.
 
 @par \c --enable-leveldb[=rocksdb]
 Build the Google, Inc. LevelDB API.  Optionally, if \c rocksdb is
-specified, build the Facebook, Inc. RocksDB API.
+specified, build the Facebook, Inc. RocksDB API.  See @ref leveldb for
+more information.
 
 @par \c --enable-python
 Build the WiredTiger <a href="http://www.python.org">Python</a> API.

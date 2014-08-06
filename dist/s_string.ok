@@ -88,6 +88,7 @@ ERET
 ESET
 ETIME
 ETIMEDOUT
+EXLOG
 EXTLIST
 Enqueue
 Env
@@ -128,6 +129,7 @@ INUSE
 ISSET
 ITEMs
 Inline
+Intra
 Ippokratis
 JPEG
 JSON
@@ -408,6 +410,7 @@ curconfig
 curdump
 curfile
 curindex
+curlog
 curmetadata
 cursoring
 cursorp
@@ -621,6 +624,7 @@ lognum
 logput
 logread
 logrec
+logtest
 lookup
 lookups
 lr
@@ -840,6 +844,10 @@ stdarg
 stderr
 stdin
 stdout
+stepinit
+stepkv
+stepnext
+steprec
 str
 strcmp
 strdup
@@ -986,6 +994,7 @@ writelock
 wrlock
 ws
 wti
+wtperf
 wts
 xF
 xff

@@ -351,7 +351,8 @@ __cache_pool_balance(void)
 	 * has closed. If it's NULL create a new one.
 	 */
 	if (cp->session == NULL &&
-	    (ret = __wt_open_session(entry, 1, NULL, NULL, &cp->session)) != 0)
+	    (ret = __wt_open_internal_session(
+		entry, "cache-pool", 0, 0, &cp->session)) != 0)
 		WT_ERR_MSG(NULL, ret,
 		    "Failed to create session for cache pool");
 

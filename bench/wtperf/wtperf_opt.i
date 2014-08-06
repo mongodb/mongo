@@ -31,7 +31,6 @@
 #ifdef OPT_DECLARE_STRUCT
 #define	DEF_OPT_AS_BOOL(name, initval, desc)		int name;
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	const char *name;
-#define	DEF_OPT_AS_INT(name, initval, desc)		int name;
 #define	DEF_OPT_AS_STRING(name, initval, desc)		const char *name;
 #define	DEF_OPT_AS_UINT32(name, initval, desc)		uint32_t name;
 #endif
@@ -40,12 +39,10 @@
 #define	DEF_OPT_AS_BOOL(name, initval, desc)				\
 	{ #name, desc, #initval, BOOL_TYPE, offsetof(CONFIG, name) },
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
-	{ #name, desc, #initval, CONFIG_STRING_TYPE,                    \
+	{ #name, desc, initval, CONFIG_STRING_TYPE,                    \
 	offsetof(CONFIG, name) },
-#define	DEF_OPT_AS_INT(name, initval, desc)				\
-	{ #name, desc, #initval, INT_TYPE, offsetof(CONFIG, name) },
 #define	DEF_OPT_AS_STRING(name, initval, desc)				\
-	{ #name, desc, #initval, STRING_TYPE, offsetof(CONFIG, name) },
+	{ #name, desc, initval, STRING_TYPE, offsetof(CONFIG, name) },
 #define	DEF_OPT_AS_UINT32(name, initval, desc)				\
 	{ #name, desc, #initval, UINT32_TYPE, offsetof(CONFIG, name) },
 #endif
@@ -53,9 +50,19 @@
 #ifdef OPT_DEFINE_DEFAULT
 #define	DEF_OPT_AS_BOOL(name, initval, desc)		initval,
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	initval,
-#define	DEF_OPT_AS_INT(name, initval, desc)		initval,
 #define	DEF_OPT_AS_STRING(name, initval, desc)		initval,
 #define	DEF_OPT_AS_UINT32(name, initval, desc)		initval,
+#endif
+
+#ifdef OPT_DEFINE_DOXYGEN
+#define	DEF_OPT_AS_BOOL(name, initval, desc)				\
+	{ #name, desc, #initval, BOOL_TYPE, 0 },
+#define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
+	{ #name, desc, initval, CONFIG_STRING_TYPE, 0 },
+#define	DEF_OPT_AS_STRING(name, initval, desc)				\
+	{ #name, desc, initval, STRING_TYPE, 0 },
+#define	DEF_OPT_AS_UINT32(name, initval, desc)				\
+	{ #name, desc, #initval, UINT32_TYPE, 0 },
 #endif
 
 /*
@@ -89,7 +96,7 @@ DEF_OPT_AS_CONFIG_STRING(conn_config, "create",
 DEF_OPT_AS_BOOL(compact, 0, "post-populate compact for LSM merging activity")
 DEF_OPT_AS_STRING(compression, "none",
     "compression extension.  Allowed configuration values are: "
-    "'none' (default), 'bzip', 'snappy', 'zlib'")
+    "'none', 'bzip', 'snappy', 'zlib'")
 DEF_OPT_AS_BOOL(create, 1,
     "do population phase; false to use existing database")
 DEF_OPT_AS_UINT32(database_count, 1,
@@ -103,7 +110,7 @@ DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
 DEF_OPT_AS_UINT32(min_throughput, 0,
-    "abort if any throughput measured is less than this amount.  Requires"
+    "abort if any throughput measured is less than this amount.  Requires "
     "sample_interval to be configured")
 DEF_OPT_AS_UINT32(max_latency, 0,
     "abort if any latency measured exceeds this number of milliseconds."
@@ -145,8 +152,8 @@ DEF_OPT_AS_STRING(threads, "", "workload configuration: each 'count' "
     "specified; for example, a more complex threads configuration might be "
     "'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))' "
     "which would create 2 threads doing nothing but reads and 8 threads "
-    "each doing 50% inserts and 25% reads and updates.  Allowed"
-    "configuration values are 'count', 'reads', 'inserts', 'updates'")
+    "each doing 50% inserts and 25% reads and updates.  Allowed configuration "
+    "values are 'count', 'reads', 'inserts', 'updates'")
 DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
     "transaction configuration string, relevant when populate_opts_per_txn "
     "is nonzero")
@@ -158,6 +165,5 @@ DEF_OPT_AS_UINT32(warmup, 0,
 
 #undef DEF_OPT_AS_BOOL
 #undef DEF_OPT_AS_CONFIG_STRING
-#undef DEF_OPT_AS_INT
 #undef DEF_OPT_AS_STRING
 #undef DEF_OPT_AS_UINT32

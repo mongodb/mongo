@@ -36,11 +36,10 @@ __sweep(WT_SESSION_IMPL *session)
 			continue;
 
 		/*
-		 * We have a candidate for closing; if it's open, acquire an
-		 * exclusive lock on the handle and close it (the lock blocks
-		 * threads from opening the handle).  We might be blocking an
-		 * open for a fairly long time (over disk I/O), but the handle
-		 * has been quiescent for awhile.
+		 * We have a candidate for closing; if it's open, flush dirty
+		 * leaf pages, then acquire an exclusive lock on the handle
+		 * and close it. We might be blocking opens for a long time
+		 * (over disk I/O), but the handle was quiescent for awhile.
 		 *
 		 * The close can fail if an update cannot be written (updates in
 		 * a no-longer-referenced file might not yet be globally visible
@@ -49,6 +48,11 @@ __sweep(WT_SESSION_IMPL *session)
 		 * the transaction state has progressed.
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
+			WT_WITH_DHANDLE(session, dhandle,
+			    ret = __wt_cache_op(
+			    session, NULL, WT_SYNC_WRITE_LEAVES));
+			WT_RET(ret);
+
 			/*
 			 * We don't set WT_DHANDLE_EXCLUSIVE deliberately, we
 			 * want opens to block on us rather than returning an
@@ -127,11 +131,12 @@ __wt_sweep_create(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
 
+	/* Set first, the thread might run before we finish up. */
 	F_SET(conn, WT_CONN_SERVER_SWEEP);
 
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
+	WT_RET(
+	    __wt_open_internal_session(conn, "sweep-server", 1, 1, &session));
 	conn->sweep_session = session;
-	conn->sweep_session->name = "sweep-server";
 
 	WT_RET(__wt_cond_alloc(
 	    session, "handle sweep server", 0, &conn->sweep_cond));

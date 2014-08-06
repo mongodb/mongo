@@ -275,7 +275,7 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
   else if (ret != 0)
     return WiredTigerErrorToStatus(ret, NULL);
 
-  if (options.create_if_missing) 
+  if (options.create_if_missing)
     ret = wtleveldb_create(conn, options, WT_URI);
 
   if (ret != 0) {

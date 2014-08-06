@@ -32,9 +32,11 @@ Gimpel
 GitHub
 Google
 Google's
+HyperDex
 HyperLevelDB
 IEC
 JavaScript
+LD
 LDFLAGS
 LIBS
 LLVM
@@ -51,6 +53,8 @@ Multithreaded
 NOTFOUND
 NUMA
 NoSQL
+OPTYPE
+PRELOAD
 README
 RedHat
 RepMgr
@@ -78,6 +82,7 @@ apiflags
 ar
 archiver
 arg
+async
 autoconf
 automake
 basecfg
@@ -193,6 +198,7 @@ html
 huffman
 hugepage
 hyperleveldb
+icount
 iflag
 indices
 init
@@ -205,6 +211,7 @@ jemalloc
 jni
 jrx
 json
+kb
 keyexist
 keyfmt
 keyname
@@ -289,6 +296,7 @@ oltp
 oob
 os
 ovfl
+pareto
 pcoll
 pdf
 perf
@@ -323,10 +331,12 @@ recs
 rerequests
 ret
 rf
+rmw
 ro
 rocksdb
 rpc
 runnable
+runtime
 rwlock
 sHQ
 sHq
@@ -336,6 +346,7 @@ schemas
 selectable
 seqname
 serializable
+sess
 skiplist
 spinlock
 spinlocks
@@ -351,9 +362,11 @@ strget
 struct
 structs
 subdatabases
+subdirectory
 subpage
 superset
 sys
+sz
 tablename
 tcl
 tcmalloc
@@ -392,6 +405,7 @@ valuefmt
 vec
 versa
 vm
+warmup
 whitespace
 wiredtiger
 workQ

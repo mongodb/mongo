@@ -1,4 +1,4 @@
-/*! @page bulk_load Bulk-load
+/*! @page tune_bulk_load Bulk-load
 
 When loading a large amount of data into a new object, using a cursor
 with the \c bulk configuration string enabled and loading the data in

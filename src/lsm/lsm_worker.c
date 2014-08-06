@@ -143,8 +143,6 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_TXN_ISOLATION saved_isolation;
-	int locked;
-	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	*flushed = 0;
 
@@ -176,7 +174,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 
 	/*
 	 * Flush the file before checkpointing: this is the expensive part in
-	 * terms of I/O: do it without holding the schema lock.
+	 * terms of I/O.
 	 *
 	 * Use the special eviction isolation level to avoid interfering with
 	 * an application checkpoint: we have already checked that all of the
@@ -184,28 +182,15 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 *
 	 * !!! We can wait here for checkpoints and fsyncs to complete, which
 	 * can be a long time.
-	 *
-	 * Don't skip flushing the leaves either: that just means we'll hold
-	 * the schema lock for (much) longer, which blocks the world.
 	 */
-	WT_RET(__wt_session_get_btree(session, chunk->uri, NULL, NULL, 0));
-	for (locked = 0; !locked && ret == 0;) {
-		if ((ret = __wt_spin_trylock(session,
-		    &S2C(session)->checkpoint_lock, &id)) == 0)
-			locked = 1;
-		else if (ret == EBUSY) {
-			ret = 0;
-			__wt_yield();
-		}
-	}
-	if (locked) {
+	if ((ret = __wt_session_get_btree(
+	    session, chunk->uri, NULL, NULL, 0)) == 0) {
 		saved_isolation = session->txn.isolation;
 		session->txn.isolation = TXN_ISO_EVICTION;
 		ret = __wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES);
 		session->txn.isolation = saved_isolation;
-		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
+		WT_TRET(__wt_session_release_btree(session));
 	}
-	WT_TRET(__wt_session_release_btree(session));
 	WT_RET(ret);
 
 	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointing"));
@@ -358,39 +343,12 @@ static int
 __lsm_discard_handle(
     WT_SESSION_IMPL *session, const char *uri, const char *checkpoint)
 {
-	WT_DECL_RET;
-	int locked;
-	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
-
 	/* This will fail with EBUSY if the file is still in use. */
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 
-	/*
-	 * We need the checkpoint lock to discard in-memory handles: otherwise,
-	 * an application checkpoint could see this file locked and fail with
-	 * EBUSY.
-	 *
-	 * We can't get the checkpoint lock earlier or it will deadlock with
-	 * the schema lock.
-	 */
-	locked = 0;
-	if (checkpoint == NULL && (ret = __wt_spin_trylock(
-	    session, &S2C(session)->checkpoint_lock, &id)) == 0)
-		locked = 1;
-	if (ret == 0)
-		F_SET(session->dhandle, WT_DHANDLE_DISCARD);
-
-	/*
-	 * This check must come after taking the checkpoint lock - since
-	 * otherwise an in progress checkpoint may have set the modified
-	 * flag in the file we're discarding.
-	 */
-	WT_TRET(__wt_session_release_btree(session));
-	if (locked)
-		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
-
-	return (ret);
+	F_SET(session->dhandle, WT_DHANDLE_DISCARD);
+	return (__wt_session_release_btree(session));
 }
 
 /*

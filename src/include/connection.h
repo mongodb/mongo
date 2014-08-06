@@ -55,9 +55,9 @@ struct __wt_named_data_source {
 
 /*
  * Allocate some additional slots for internal sessions.  There is a default
- * session for each connection, plus a session for the eviction thread.
+ * session for each connection, plus a session for each server thread.
  */
-#define	WT_NUM_INTERNAL_SESSIONS	2
+#define	WT_NUM_INTERNAL_SESSIONS	10
 
 /*
  * WT_CONNECTION_IMPL --
@@ -105,9 +105,6 @@ struct __wt_connection_impl {
 	size_t  foc_size;		/* Array size */
 
 	WT_FH *lock_fh;			/* Lock file handle */
-
-	pthread_t cache_evict_tid;	/* Eviction server thread ID */
-	int	  cache_evict_tid_set;	/* Eviction server thread ID set */
 
 	uint64_t  split_gen;		/* Generation number for splits */
 
@@ -203,6 +200,13 @@ struct __wt_connection_impl {
 	uint32_t	 async_workers;	/* Number of async workers */
 
 	WT_LSM_MANAGER	lsm_manager;	/* LSM worker thread information */
+
+	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
+	pthread_t	 evict_tid;	/* Eviction server thread ID */
+	int		 evict_tid_set;	/* Eviction server thread ID set */
+
+	uint32_t	 evict_workers;	/* Number of eviction workers */
+	void		*evict_workctx; /* Eviction worker context */
 
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	pthread_t	 stat_tid;	/* Statistics log thread */

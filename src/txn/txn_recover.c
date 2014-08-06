@@ -415,7 +415,7 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP) ? 1 : 0;
 
 	/* We need a real session for recovery. */
-	WT_RET(__wt_open_session(conn, 0, NULL, NULL, &session));
+	WT_RET(__wt_open_session(conn, NULL, NULL, &session));
 	F_SET(session, WT_SESSION_NO_LOGGING);
 	r.session = session;
 
@@ -463,14 +463,14 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 
 	conn->next_file_id = r.max_fileid;
 
-err:	if (ret == 0)
-		/*
-		 * If recovery ran successfully forcibly log a checkpoint
-		 * so that the next open is fast and keep the metadata
-		 * up to date with the checkpoint LSN and archiving.
-		 */
-		session->iface.checkpoint(&session->iface, "force=1");
-	WT_TRET(__recovery_free(&r));
+	/*
+	 * If recovery ran successfully forcibly log a checkpoint so the next
+	 * open is fast and keep the metadata up to date with the checkpoint
+	 * LSN and archiving.
+	 */
+	WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
+
+err:	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);
 	WT_TRET(session->iface.close(&session->iface, NULL));
 

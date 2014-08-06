@@ -17,7 +17,6 @@ src/block/block_slvg.c
 src/block/block_vrfy.c
 src/block/block_write.c
 src/bloom/bloom.c
-src/btree/bt_bulk.c
 src/btree/bt_compact.c
 src/btree/bt_curnext.c
 src/btree/bt_curprev.c
@@ -77,6 +76,7 @@ src/cursor/cur_dump.c
 src/cursor/cur_file.c
 src/cursor/cur_index.c
 src/cursor/cur_json.c
+src/cursor/cur_log.c
 src/cursor/cur_metadata.c
 src/cursor/cur_stat.c
 src/cursor/cur_std.c

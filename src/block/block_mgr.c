@@ -71,9 +71,11 @@ __bm_checkpoint(WT_BM *bm,
  *	Flush a file to disk.
  */
 static int
-__bm_sync(WT_BM *bm, WT_SESSION_IMPL *session)
+__bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, int async)
 {
-	return (__wt_fsync(session, bm->block->fh));
+	return (async ?
+	    __wt_fsync_async(session, bm->block->fh) :
+	    __wt_fsync(session, bm->block->fh));
 }
 
 /*
@@ -362,7 +364,8 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->salvage_valid = (int (*)(WT_BM *,
 		    WT_SESSION_IMPL *, uint8_t *, size_t))__bm_readonly;
 		bm->stat = __bm_stat;
-		bm->sync = (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
+		bm->sync =
+		    (int (*)(WT_BM *, WT_SESSION_IMPL *, int))__bm_readonly;
 		bm->verify_addr = __bm_verify_addr;
 		bm->verify_end = __bm_verify_end;
 		bm->verify_start = __bm_verify_start;
