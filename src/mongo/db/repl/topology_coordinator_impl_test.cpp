@@ -28,8 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <limits>
-
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/unittest/unittest.h"
@@ -57,7 +55,7 @@ namespace {
                                              BSON("_id" << 20 << "host" << "h2") <<
                                              BSON("_id" << 30 << "host" << "h3")))));
 
-        TopologyCoordinatorImpl topocoord((Seconds(std::numeric_limits<long>::max())));
+        TopologyCoordinatorImpl topocoord((Seconds(999)));
         Date_t now = 0;
         topocoord.updateConfig(cbData, config, 0, now++);
 
@@ -110,7 +108,7 @@ namespace {
                                              BSON("_id" << 20 << "host" << "h2") <<
                                              BSON("_id" << 30 << "host" << "h3")))));
 
-        TopologyCoordinatorImpl topocoord((Seconds(std::numeric_limits<long>::max())));
+        TopologyCoordinatorImpl topocoord((Seconds(999)));
         Date_t now = 0;
         topocoord.updateConfig(cbData, config, 0, now++);
 
@@ -155,7 +153,7 @@ namespace {
                                              BSON("_id" << 20 << "host" << "h2") <<
                                              BSON("_id" << 30 << "host" << "h3")))));
 
-        TopologyCoordinatorImpl topocoord((Seconds(std::numeric_limits<long>::max())));
+        TopologyCoordinatorImpl topocoord((Seconds(999)));
         Date_t now = 0;
         topocoord.updateConfig(cbData, config, 0, now++);
 
