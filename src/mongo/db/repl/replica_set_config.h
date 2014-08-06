@@ -130,6 +130,15 @@ namespace repl {
         Seconds getHeartbeatTimeoutPeriod() const { return _heartbeatTimeoutPeriod; }
 
         /**
+         * Gets the amount of time to wait for a response to hearbeats sent to other
+         * nodes in the replica set, as above, but returns a Milliseconds instead of
+         * Seconds object.
+         */
+        Milliseconds getHeartbeatTimeoutPeriodMillis() const {
+            return Milliseconds(_heartbeatTimeoutPeriod.total_milliseconds());
+        }
+
+        /**
          * Gets the number of nodes that constitutes a "majority" in this replica set,
          * for purposes of replicating data.
          */
