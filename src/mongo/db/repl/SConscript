@@ -33,11 +33,6 @@ env.Library('topology_coordinator_impl',
             LIBDEPS=['replication_executor',
                      'repl_settings'])
 
-env.CppUnitTest('topology_coordinator_impl_test',
-                'topology_coordinator_impl_test.cpp',
-                LIBDEPS=['topology_coordinator_impl',
-                         'replica_set_messages'])
-
 env.Library('repl_coordinator_impl',
             [
                 'repl_coordinator_impl.cpp',
