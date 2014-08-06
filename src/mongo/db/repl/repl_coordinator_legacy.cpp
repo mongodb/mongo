@@ -80,7 +80,6 @@ namespace repl {
                 log() << "ERROR: can't use --slave or --master replication options with --replSet";
                 log() << "***" << endl;
             }
-            newRepl();
 
             ReplSetSeedList *replSetSeedList = new ReplSetSeedList(_settings.replSet);
             boost::thread t(stdx::bind(&startReplSets, replSetSeedList));

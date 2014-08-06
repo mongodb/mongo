@@ -55,7 +55,7 @@ namespace repl {
     }
 
     bool ReplicationCoordinatorMock::isReplEnabled() const {
-        return false;
+        return _settings.usingReplSets() || _settings.master || _settings.slave;
     }
 
     ReplicationCoordinator::Mode ReplicationCoordinatorMock::getReplicationMode() const {

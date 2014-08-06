@@ -1241,7 +1241,7 @@ namespace repl {
 
         oldRepl();
 
-        ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
+        const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         if( !replSettings.slave && !replSettings.master )
             return;
 
@@ -1262,7 +1262,6 @@ namespace repl {
 
         if ( replSettings.master ) {
             LOG(1) << "master=true" << endl;
-            replSettings.master = true;
             createOplog(&txn);
             boost::thread t(replMasterThread);
         }
