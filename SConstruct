@@ -735,8 +735,6 @@ elif linux:
 
     if static:
         env.Append( LINKFLAGS=" -static " )
-    if has_option( "static-libstdc++" ):
-        env.Append( LINKFLAGS=["-static-libstdc++", "-static-libgcc"] )
 
 elif solaris:
      env.Append( CPPDEFINES=[ "__sunos__" ] )
@@ -890,6 +888,9 @@ elif windows:
 
 env['STATIC_AND_SHARED_OBJECTS_ARE_THE_SAME'] = 1
 if nix:
+
+    if has_option( "static-libstdc++" ):
+        env.Append( LINKFLAGS=["-static-libstdc++", "-static-libgcc"] )
 
     if has_option( "distcc" ):
         env["CXX"] = "distcc " + env["CXX"]
