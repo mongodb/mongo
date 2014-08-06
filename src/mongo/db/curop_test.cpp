@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include <boost/thread/thread.hpp>
 
 #include "mongo/base/init.h"
