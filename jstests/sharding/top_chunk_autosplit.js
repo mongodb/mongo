@@ -16,6 +16,7 @@ st.startBalancer();
 var configDB = st.s.getDB('config');
 var topChunkBefore = configDB.chunks.find({}).sort({ min: -1 }).next();
 
+// This bulk insert should only trigger a single chunk move.
 var largeStr = new Array(1024).join('x');
 var bulk = testDB.user.initializeUnorderedBulkOp();
 for (var x = 100; x < 1000; x++) {
