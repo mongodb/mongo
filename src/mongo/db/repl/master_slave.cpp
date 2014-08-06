@@ -1032,6 +1032,8 @@ namespace repl {
 
     /* --------------------------------------------------------------*/
 
+    static bool _replMainStarted = false;
+
     /*
     TODO:
     _ source has autoptr to the cursor
@@ -1049,7 +1051,7 @@ namespace repl {
             ReplSource::loadAll(txn, sources);
 
             // only need this param for initial reset
-            getGlobalReplicationCoordinator()->getSettings().fastsync = false;
+            _replMainStarted = true;
         }
 
         if ( sources.empty() ) {
@@ -1266,8 +1268,10 @@ namespace repl {
             boost::thread t(replMasterThread);
         }
 
-        while( replSettings.fastsync ) // don't allow writes until we've set up from log
-            sleepmillis( 50 );
+        if (replSettings.fastsync) {
+            while(!_replMainStarted) // don't allow writes until we've set up from log
+                sleepmillis( 50 );
+        }
     }
     int _dummy_z;
 
