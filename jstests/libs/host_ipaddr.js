@@ -28,7 +28,7 @@ function get_ipaddr() {
             ipAddr = cat(ipFile).match(/IPv4.*: (.*)/)[1];
         } else {
             runProgram('bash', '-c',  unixCmd);
-            ipAddr = cat(ipFile).replace("addr:", "").match(/inet (.[^ ]*) /)[1];
+            ipAddr = cat(ipFile).replace(/addr:/g, "").match(/inet (.[^ ]*) /)[1];
         }
     }
     finally {
