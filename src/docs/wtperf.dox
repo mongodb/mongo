@@ -21,6 +21,11 @@ populate_threads=1
 threads=((count=8,reads=1))
 @endcode
 
+In most cases, where the workload is the only interesting phase, the
+populate phase can be performed once and the workload phase run
+repeatedly (for more information, see the wtperf \c create configuration
+variable).
+
 The \c conn_config configuration supports setting any WiredTiger
 connection configuration value.  This is commonly used to configure
 statistics with regular reports, to obtain more information from the
@@ -31,13 +36,13 @@ conn_config="cache_size=20G,statistics=(fast,clear),statistics_log=(wait=600)"
 report_interval=5
 @endcode
 
-Note that quoting must be used when passing values to Wiredtiger
-configuration as opposed to configuring the \c wtperf utility.
+Note quoting must be used when passing values to Wiredtiger
+configuration, as opposed to configuring the \c wtperf utility itself.
 
 The \c table_config configuration supports setting any WiredTiger object
 creation configuration value, for example, the above test can be
 converted to using an LSM store instead of a B+tree store, with
-additional LSM configuration by changing \c conn_config to:
+additional LSM configuration, by changing \c conn_config to:
 
 @code
 table_config="lsm=(chunk_size=5MB),type=lsm,os_cache_dirty_max=16MB"
@@ -52,32 +57,33 @@ updates:
 threads=((count=2,inserts=1),(count=2,inserts=1,reads=1,updates=1))
 @endcode
 
-Some example \c wtperf configuration files can be found in the
+Example \c wtperf configuration files can be found in the
 \c bench/wtperf/runners/ directory.
 
-@section monitor Monitoring performance
+@section monitor Monitoring wtperf performance
 
 In addition to testing a particular configuration, \c wtperf can monitor
-performance and operation latency times.  Monitoring can be enabled using
-the \c sample_interval configuration setting.  For example to record
-every 10 seconds, add the following to the \c wtperf configuration file:
+performance and operation latency times.  Monitoring can be enabled
+using the \c sample_interval configuration setting.  For example to
+record information every 10 seconds, add the following to the \c wtperf
+configuration file:
 
 @code
 sample_interval=10
 @endcode
 
-Enabling monitoring causes \c wtperf to create a file \c monitor in
-the database home directory, or another directory as specified in
-the \c -m option to \c wtperf.
+Enabling monitoring causes \c wtperf to create a file \c monitor in the
+database home directory, or another directory as specified in the \c -m
+option to \c wtperf.
 
 A visualization tool to see the performance over the course of the
 \c wtperf run can be found in \c tools/wtperf_stats.py.
 
 The following example shows how to run the \c large-lsm.wtperf
-stock configuration to a subdirectory of \c build_posix called
-\c WT_TEST with monitoring enabled and then generate a graph.
-This example assumes you have all the necessary tools
-already installed to build WiredTiger, Python and python-nvd3.
+configuration to a subdirectory of \c build_posix called \c WT_TEST with
+monitoring enabled, and then generate a graph.  This example assumes you
+have all the necessary tools already installed to build WiredTiger,
+Python and python-nvd3.
 
 @code
 cd $WIREDTIGER_SOURCE
@@ -86,12 +92,12 @@ mkdir WTPERF_RUN && ./bench/wtperf/wtperf -h WTPERF_SAMPLE -O ./bench/wtperf/run
 cd WTPERF_RUN; python ../tools/wtperf_stats.py monitor
 @endcode
 
-Once the python tool completes, you will find a file \c wtperf_stats.html
-in the current working directory. The file will have content like:
+The python tool creates a file named \c wtperf_stats.html in the current
+working directory.  For example, the file will have content like this:
 
 \htmlinclude wtperf-sample.html
 
-@section config Configuration options
+@section config Wtperf configuration options
 
 The following is a list of the currently available \c wtperf
 configuration options:

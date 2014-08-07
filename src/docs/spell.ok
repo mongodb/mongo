@@ -195,6 +195,7 @@ href
 hrow
 hsearch
 html
+htmlinclude
 huffman
 hugepage
 hyperleveldb
@@ -290,6 +291,7 @@ nowait
 nul
 num
 numa
+nvd
 objectsin
 ol
 oltp
