@@ -37,6 +37,7 @@
 #include "mongo/util/stacktrace.h"
 
 #ifdef _WIN32
+#include <mmsystem.h>
 
 namespace mongo {
 
@@ -51,6 +52,11 @@ namespace mongo {
         if (_setmaxstdio(2048) == -1) {
             warning() << "Failed to increase max open files limit from default of 512 to 2048";
         }
+		
+        // Let's set minimum Windows Kernel quantum lenght to 1ms in order to allow sleepmillis()
+		// to support waiting periods below Windows default quantum lenght (which can vary per Windows version)
+        // see http://msdn.microsoft.com/en-us/library/windows/desktop/dd757624(v=vs.85).aspx
+		timeBeginPeriod(1);
 
         return Status::OK();
     }
