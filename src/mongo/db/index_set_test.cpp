@@ -31,11 +31,36 @@ namespace mongo {
 
         ASSERT_FALSE( a.mightBeIndexed( "b" ) );
         ASSERT_FALSE( a.mightBeIndexed( "a.c" ) );
+
+        a.clear();
+        ASSERT_FALSE( a.mightBeIndexed( "a.b" ) );
     }
 
     TEST( IndexPathSetTest, Simple2 ) {
         IndexPathSet a;
         a.addPath( "ab" );
+        ASSERT_FALSE( a.mightBeIndexed( "a" ) );
+        a.clear();
+        ASSERT_FALSE( a.mightBeIndexed( "ab" ) );
+    }
+
+    TEST( IndexPathSetTest, AllPathsIndexed1 ) {
+        IndexPathSet a;
+        a.allPathsIndexed();
+        ASSERT_TRUE( a.mightBeIndexed( "a" ) );
+        a.clear();
+        ASSERT_FALSE( a.mightBeIndexed( "a" ) );
+    }
+
+    TEST( IndexPathSetTest, AllPathsIndexed2 ) {
+        IndexPathSet a;
+        a.allPathsIndexed();
+        ASSERT_TRUE( a.mightBeIndexed( "a" ) );
+        ASSERT_TRUE( a.mightBeIndexed( "" ) );
+        a.addPath( "a" );
+        ASSERT_TRUE( a.mightBeIndexed( "a" ) );
+        ASSERT_TRUE( a.mightBeIndexed( "b" ) );
+        a.clear();
         ASSERT_FALSE( a.mightBeIndexed( "a" ) );
     }
 

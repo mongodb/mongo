@@ -24,6 +24,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/db.h"
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/json.h"
 #include "mongo/db/mongommf.h"
 #include "mongo/db/ops/delete.h"
@@ -764,6 +765,17 @@ namespace mongo {
         get_cmap_inlock(ns).erase(ns);
     }
 
+    namespace {
+        bool indexIsText(const BSONObj& keyPattern) {
+            BSONObjIterator it( keyPattern );
+            while ( it.more() ) {
+                if ( str::equals( it.next().valuestrsafe(), "text" ) ) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
 
     void NamespaceDetailsTransient::computeIndexKeys() {
         _indexedPaths.clear();
@@ -772,13 +784,44 @@ namespace mongo {
         if ( ! d )
             return;
 
+        bool indexesAreLegacy = (cc().database()->getFile(0)->getHeader()->versionMinor
+                                 == PDFILE_VERSION_MINOR_22_AND_OLDER);
+
         NamespaceDetails::IndexIterator i = d->ii( true );
         while( i.more() ) {
-            BSONObj key = i.next().keyPattern();
-            BSONObjIterator j( key );
-            while ( j.more() ) {
-                BSONElement e = j.next();
-                _indexedPaths.addPath( e.fieldName() );
+            const IndexSpec& indexSpec = getIndexSpec( &(i.next()) );
+            BSONObj key = indexSpec.keyPattern;
+
+            if ( indexesAreLegacy || !indexIsText( key ) ) {
+                BSONObjIterator j( key );
+                while ( j.more() ) {
+                    BSONElement e = j.next();
+                    _indexedPaths.addPath( e.fieldName() );
+                }
+            }
+            else {
+                // This is a text index.  Get the paths for the indexed fields out of the FTSSpec.
+                fts::FTSSpec ftsSpec( indexSpec.info );
+                if ( ftsSpec.wildcard() ) {
+                    _indexedPaths.allPathsIndexed();
+                }
+                else {
+                    for ( size_t i = 0; i < ftsSpec.numExtraBefore(); ++i ) {
+                        _indexedPaths.addPath( ftsSpec.extraBefore(i) );
+                    }
+                    for ( fts::Weights::const_iterator it = ftsSpec.weights().begin();
+                          it != ftsSpec.weights().end();
+                          ++it ) {
+                        _indexedPaths.addPath( it->first );
+                    }
+                    for ( size_t i = 0; i < ftsSpec.numExtraAfter(); ++i ) {
+                        _indexedPaths.addPath( ftsSpec.extraAfter(i) );
+                    }
+                    // Note that 2.4.x supports {textIndexVersion: 1} only. {textIndexVersion: 1}
+                    // can only have one language per document, and the "language override" field
+                    // specifies the exact path to the language.
+                    _indexedPaths.addPath( ftsSpec.languageOverrideField() );
+                }
             }
         }
 

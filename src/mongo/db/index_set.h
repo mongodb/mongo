@@ -32,7 +32,11 @@ namespace mongo {
 
     class IndexPathSet {
     public:
+        IndexPathSet();
+
         void addPath( const StringData& path );
+
+        void allPathsIndexed();
 
         void clear();
 
@@ -43,6 +47,8 @@ namespace mongo {
         bool _startsWith( const StringData& a, const StringData& b ) const;
 
         std::set<std::string> _canonical;
+
+        bool _allPathsIndexed;
     };
 
 }

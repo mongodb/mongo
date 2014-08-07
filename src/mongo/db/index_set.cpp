@@ -21,6 +21,8 @@
 
 namespace mongo {
 
+    IndexPathSet::IndexPathSet() : _allPathsIndexed( false ) { }
+
     void IndexPathSet::addPath( const StringData& path ) {
         string s;
         if ( getCanonicalIndexField( path, &s ) ) {
@@ -31,11 +33,20 @@ namespace mongo {
         }
     }
 
+    void IndexPathSet::allPathsIndexed() {
+        _allPathsIndexed = true;
+    }
+
     void IndexPathSet::clear() {
         _canonical.clear();
+        _allPathsIndexed = false;
     }
 
     bool IndexPathSet::mightBeIndexed( const StringData& path ) const {
+        if ( _allPathsIndexed ) {
+            return true;
+        }
+
         StringData use = path;
         string x;
         if ( getCanonicalIndexField( path, &x ) )
