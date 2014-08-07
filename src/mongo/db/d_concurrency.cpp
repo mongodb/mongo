@@ -94,10 +94,7 @@ namespace mongo {
         LockStat stats;
 
         void lock_R(LockState* lockState) {
-            massert(16103,
-                    str::stream() << "can't lock_R, threadState=" 
-                                  << (int)lockState->threadState(),
-                    lockState->threadState() == 0);
+            invariant(lockState->threadState() == 0);
             lockState->lockedStart('R');
             q.lock_R(); 
         }
@@ -414,18 +411,12 @@ namespace mongo {
         if( _lockState->otherCount() ) { 
             // nested. prev could be read or write. if/when we do temprelease with DBRead/DBWrite we will need to increment/decrement here
             // (so we can not release or assert if nested).  temprelease we should avoid if we can though, it's a bit of an anti-pattern.
-            massert(18513,
-                    str::stream() << "internal error tried to lock two databases at the same time. old:" 
-                                  << _lockState->otherName() << " new:" << db,
-                    db == _lockState->otherName());
+            invariant(db == _lockState->otherName());
             return;
         }
 
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
-        massert(18514,
-                str::stream() << "can't dblock:" << db 
-                              << " when local or admin is already locked",
-                _lockState->nestableCount() == 0);
+        invariant(_lockState->nestableCount() == 0);
 
         if (db != _lockState->otherName()) {
             DBLocksMap::ref r(dblocks);
@@ -453,18 +444,12 @@ namespace mongo {
         if (_lockState->otherCount()) {
             // nested. if/when we do temprelease with DBWrite we will need to increment here
             // (so we can not release or assert if nested).
-            massert(16106,
-                    str::stream() << "internal error tried to lock two databases at the same "
-                                  << "time. old:" << _lockState->otherName() << " new:" << db,
-                    db == _lockState->otherName());
+            invariant(db == _lockState->otherName());
             return;
         }
 
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
-        massert(16098,
-                str::stream() << "can't dblock:" << db 
-                              << " when local or admin is already locked",
-                _lockState->nestableCount() == 0);
+        invariant(_lockState->nestableCount() == 0);
 
         if (db != _lockState->otherName()) {
             DBLocksMap::ref r(dblocks);
@@ -502,7 +487,8 @@ namespace mongo {
         _locked_w=false; 
         _weLocked=0;
 
-        massert(16186, "can't get a DBWrite while having a read lock", !_lockState->hasAnyReadLock());
+        invariant(!_lockState->hasAnyReadLock());
+
         if (_lockState->isW())
             return;
 
@@ -649,18 +635,12 @@ namespace mongo {
         if( _lockState->otherCount() ) { 
             // nested. prev could be read or write. if/when we do temprelease with DBRead/DBWrite we will need to increment/decrement here
             // (so we can not release or assert if nested).  temprelease we should avoid if we can though, it's a bit of an anti-pattern.
-            massert(16099,
-                    str::stream() << "internal error tried to lock two databases at the same time. old:" 
-                                  << _lockState->otherName() << " new:" << db,
-                    db == _lockState->otherName());
+            invariant(db == _lockState->otherName());
             return;
         }
 
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
-        massert(16100, 
-                str::stream() << "can't dblock:" << db 
-                              << " when local or admin is already locked",
-                _lockState->nestableCount() == 0);
+        invariant(_lockState->nestableCount() == 0);
 
         if (db != _lockState->otherName()) {
             DBLocksMap::ref r(dblocks);
