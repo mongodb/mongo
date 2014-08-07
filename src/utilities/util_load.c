@@ -49,7 +49,7 @@ typedef struct {
 static int config_list_add(CONFIG_LIST *, char *);
 static int config_read(char ***, int *);
 static int config_rename(char **, const char *);
-static void config_remove(char *, char *);
+static void config_remove(char *, const char *);
 static int config_reorder(char **list);
 static int config_update(WT_SESSION *, char **);
 static int format(void);
@@ -854,8 +854,9 @@ config_update(WT_SESSION *session, char **list)
 {
 	int found;
 	const char *cfg[] = { NULL, NULL, NULL };
-	char **configp, **listp, **rm;
-	static char *rmnames[] = {
+	char **configp, **listp;
+	const char **rm;
+	static const char *rmnames[] = {
 		"filename", "id", "checkpoint",	"checkpoint_lsn",
 		"version", "source", NULL };
 
@@ -993,7 +994,7 @@ config_rename(char **urip, const char *name)
  *	Remove a single config key and its value.
  */
 static void
-config_remove(char *config, char *ckey)
+config_remove(char *config, const char *ckey)
 {
 	int parens, quoted;
 	char *begin, match[100], *next, *p;
