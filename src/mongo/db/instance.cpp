@@ -728,7 +728,7 @@ namespace mongo {
                     sleepmillis(20);
                 else if( lastWaitTime == 0 ) {
                     scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(txn, ns));
-                    collection = ctx->ctx().db()->getCollection( txn, ns);
+                    collection = ctx->ctx().db()->getCollection( txn, ns );
                     /* TODO: Replace this number when changes (if ever) changes are merged into upstream */
                     uassert( 77383, "collection dropped between newGetMore calls", collection );
                     lastWaitTime = collection->documentInsertedNotificationNow();
