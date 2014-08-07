@@ -51,6 +51,7 @@
 // Note: LSM doesn't split, build full pages from the start
 #define WT_TABLE_CONFIG "type=lsm,split_pct=100,leaf_item_max=1KB," \
     "lsm=(chunk_size=100MB,bloom_config=(leaf_page_max=8MB)),"
+#define	WT_TIMESTAMP_FORMAT "%d.%llu"
 
 using leveldb::Cache;
 using leveldb::FilterPolicy;
