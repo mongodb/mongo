@@ -155,48 +155,24 @@ namespace mongo {
             return ShardPtr();
         }
 
-        ShardPtr find(const string& ident) {
-            string errmsg;
-            ConnectionString connStr = ConnectionString::parse(ident, errmsg);
+        ShardPtr find( const string& ident ) {
+            string mykey = ident;
 
-            uassert(18642, str::stream() << "Error parsing connection string: " << ident,
-                    errmsg.empty());
+            {
+                scoped_lock lk( _mutex );
+                ShardMap::iterator i = _lookup.find( mykey );
 
-            if (connStr.type() == ConnectionString::SET) {
-                scoped_lock lk(_rsMutex);
-                ShardMap::iterator iter = _rsLookup.find(connStr.getSetName());
-
-                if (iter == _rsLookup.end()) {
-                    return ShardPtr();
-                }
-
-                return iter->second;
-            }
-            else {
-                scoped_lock lk(_mutex);
-                ShardMap::iterator iter = _lookup.find(ident);
-
-                if (iter == _rsLookup.end()) {
-                    return ShardPtr();
-                }
-
-                return iter->second;
-            }
-        }
-
-        ShardPtr findWithRetry(const string& ident) {
-            ShardPtr shard(find(ident));
-
-            if (shard != NULL) {
-                return shard;
+                if ( i != _lookup.end() )
+                    return i->second;
             }
 
             // not in our maps, re-load all
             reload();
 
-            shard = find(ident);
-            massert(13129 , str::stream() << "can't find shard for: " << ident, shard != NULL);
-            return shard;
+            scoped_lock lk( _mutex );
+            ShardMap::iterator i = _lookup.find( mykey );
+            massert( 13129 , (string)"can't find shard for: " + mykey , i != _lookup.end() );
+            return i->second;
         }
 
         // Lookup shard by replica set name. Returns Shard::EMTPY if the name can't be found.
@@ -206,12 +182,12 @@ namespace mongo {
             scoped_lock lk( _rsMutex );
             ShardMap::iterator i = _rsLookup.find( name );
 
-            return (i == _rsLookup.end()) ? Shard::EMPTY : *(i->second.get());
+            return (i == _rsLookup.end()) ? Shard::EMPTY : i->second.get();
         }
 
         // Useful for ensuring our shard data will not be modified while we use it
         Shard findCopy( const string& ident ){
-            ShardPtr found = findWithRetry(ident);
+            ShardPtr found = find( ident );
             scoped_lock lk( _mutex );
             massert( 13128 , (string)"can't find shard for: " + ident , found.get() );
             return *found.get();
