@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+// THIS FILE IS DEPRECATED -- the old explain implementation is being replaced
+
 #pragma once
 
 #include "mongo/base/status.h"
@@ -50,21 +52,9 @@ namespace mongo {
      *
      * All these fields are documented in type_explain.h
      *
-     * TODO: Currently, only working for single-leaf plans.
+     * TODO: This is temporarily in place to support the legacy explain format. Once legacy
+     * explain is removed, this function should be deleted.
      */
     Status explainPlan(const PlanStageStats& stats, TypeExplain** explainOut, bool fullDetails);
-
-    /**
-     * If the out-parameter 'info' is non-null, fills in '*infoOut' with information
-     * from the query solution tree 'soln' that can be determined before the query is done
-     * running. Whereas 'explainPlan(...)' above is for collecting runtime debug information,
-     * this function is for collecting static debug information that is known prior
-     * to query runtime.
-     *
-     * The caller is responsible for deleting '*infoOut'.
-     */
-    void getPlanInfo(const QuerySolution& soln, PlanInfo** infoOut);
-
-    void statsToBSON(const PlanStageStats& stats, BSONObjBuilder* bob);
 
 } // namespace mongo

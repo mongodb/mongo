@@ -1,32 +1,51 @@
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/net/ssl_manager.h"
 
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/tss.hpp>
+#include <ostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include "mongo/base/init.h"
-#include "mongo/bson/util/atomic_int.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/exit.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/net/ssl_expiration.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/scopeguard.h"
 
@@ -35,7 +54,12 @@
 #include <openssl/x509v3.h>
 #endif
 
+using std::endl;
+
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
+
     SSLGlobalParams sslGlobalParams;
 
 #ifndef MONGO_SSL   
@@ -67,7 +91,7 @@ namespace mongo {
         public:
 
             SSLThreadInfo() {
-                _id = ++_next;
+                _id = _next.fetchAndAdd(1);
             }
 
             ~SSLThreadInfo() {
@@ -101,7 +125,7 @@ namespace mongo {
         private:
             unsigned _id;
 
-            static AtomicUInt _next;
+            static AtomicUInt32 _next;
             // Note: see SERVER-8734 for why we are using a recursive mutex here.
             // Once the deadlock fix in OpenSSL is incorporated into most distros of
             // Linux, this can be changed back to a nonrecursive mutex.
@@ -117,7 +141,7 @@ namespace mongo {
             SSLThreadInfo::get()->lock_callback( mode , type , file , line );
         }
 
-        AtomicUInt SSLThreadInfo::_next;
+        AtomicUInt32 SSLThreadInfo::_next;
         std::vector<boost::recursive_mutex*> SSLThreadInfo::_mutex;
         boost::thread_specific_ptr<SSLThreadInfo> SSLThreadInfo::_thread;
 
@@ -126,6 +150,7 @@ namespace mongo {
         SimpleMutex sslManagerMtx("SSL Manager");
         SSLManagerInterface* theSSLManager = NULL;
         static const int BUFFER_SIZE = 8*1024;
+        static const int DATE_LEN = 128;
 
         struct Params {
             Params(const std::string& pemfile,
@@ -136,6 +161,7 @@ namespace mongo {
                    const std::string& crlfile = "",
                    bool weakCertificateValidation = false,
                    bool allowInvalidCertificates = false,
+                   bool allowInvalidHostnames = false,
                    bool fipsMode = false) :
                 pemfile(pemfile),
                 pempwd(pempwd),
@@ -145,6 +171,7 @@ namespace mongo {
                 crlfile(crlfile),
                 weakCertificateValidation(weakCertificateValidation),
                 allowInvalidCertificates(allowInvalidCertificates),
+                allowInvalidHostnames(allowInvalidHostnames),
                 fipsMode(fipsMode) {};
 
             std::string pemfile;
@@ -155,6 +182,7 @@ namespace mongo {
             std::string crlfile;
             bool weakCertificateValidation;
             bool allowInvalidCertificates;
+            bool allowInvalidHostnames;
             bool fipsMode;
         };
 
@@ -204,6 +232,7 @@ namespace mongo {
             bool _validateCertificates;
             bool _weakValidation;
             bool _allowInvalidCertificates;
+            bool _allowInvalidHostnames;
             std::string _serverSubjectName;
             std::string _clientSubjectName;
 
@@ -225,9 +254,19 @@ namespace mongo {
             bool _initSSLContext(SSL_CTX** context, const Params& params);
 
             /*
-             * Parse the x509 subject name from the PEM keyfile and store it 
+             * Converts time from OpenSSL return value to unsigned long long
+             * representing the milliseconds since the epoch.
              */
-            bool _setSubjectName(const std::string& keyFile, std::string& subjectName);
+            unsigned long long _convertASN1ToMillis(ASN1_TIME* t);
+
+            /*
+             * Parse and store x509 subject name from the PEM keyfile.
+             * For server instances check that PEM certificate is not expired
+             * and extract server certificate notAfter date.
+             */
+            bool _parseAndValidateCertificate(const std::string& keyFile,
+                                              std::string* subjectName,
+                                              Date_t* serverNotAfter);
 
             /** @return true if was successful, otherwise false */
             bool _setupPEM(SSL_CTX* context,
@@ -291,6 +330,7 @@ namespace mongo {
                 sslGlobalParams.sslCRLFile,
                 sslGlobalParams.sslWeakCertificateValidation,
                 sslGlobalParams.sslAllowInvalidCertificates,
+                sslGlobalParams.sslAllowInvalidHostnames,
                 sslGlobalParams.sslFIPSMode);
             theSSLManager = new SSLManager(params, isSSLServer);
         }
@@ -367,7 +407,8 @@ namespace mongo {
     SSLManager::SSLManager(const Params& params, bool isServer) :
         _validateCertificates(false),
         _weakValidation(params.weakCertificateValidation),
-        _allowInvalidCertificates(params.allowInvalidCertificates) {
+        _allowInvalidCertificates(params.allowInvalidCertificates),
+        _allowInvalidHostnames(params.allowInvalidHostnames) {
 
         SSL_library_init();
         SSL_load_error_strings();
@@ -397,7 +438,7 @@ namespace mongo {
             _serverContext = NULL;
 
             if (!params.pemfile.empty()) {
-                if (!_setSubjectName(params.pemfile, _clientSubjectName)) {
+                if (!_parseAndValidateCertificate(params.pemfile, &_clientSubjectName, NULL)) {
                     uasserted(16941, "ssl initialization problem"); 
                 }
             }
@@ -408,17 +449,20 @@ namespace mongo {
                 uasserted(16562, "ssl initialization problem"); 
             }
 
-            if (!_setSubjectName(params.pemfile, _serverSubjectName)) {
+            Date_t notAfter = Date_t();
+            if (!_parseAndValidateCertificate(params.pemfile, &_serverSubjectName, &notAfter)) {
                 uasserted(16942, "ssl initialization problem"); 
             }
+
+            static CertificateExpirationMonitor task = CertificateExpirationMonitor(notAfter);
             // use the cluster certificate for outgoing connections if specified
             if (!params.clusterfile.empty()) {
-                if (!_setSubjectName(params.clusterfile, _clientSubjectName)) {
+                if (!_parseAndValidateCertificate(params.clusterfile, &_clientSubjectName, NULL)) {
                     uasserted(16943, "ssl initialization problem"); 
                 }
             }
             else { 
-                if (!_setSubjectName(params.pemfile, _clientSubjectName)) {
+                if (!_parseAndValidateCertificate(params.pemfile, &_clientSubjectName, NULL)) {
                     uasserted(16944, "ssl initialization problem"); 
                 }
             }
@@ -502,17 +546,19 @@ namespace mongo {
 
     void SSLManager::_setupFIPS() {
         // Turn on FIPS mode if requested.
-#ifdef OPENSSL_FIPS
+        // OPENSSL_FIPS must be defined by the OpenSSL headers, plus MONGO_SSL_FIPS
+        // must be defined via a MongoDB build flag.
+#if defined(OPENSSL_FIPS) && defined(MONGO_SSL_FIPS)
         int status = FIPS_mode_set(1);
         if (!status) {
-            error() << "can't activate FIPS mode: " << 
+            severe() << "can't activate FIPS mode: " << 
                 getSSLErrorMessage(ERR_get_error()) << endl;
-            fassertFailed(16703);
+            fassertFailedNoTrace(16703);
         }
         log() << "FIPS 140-2 mode activated" << endl;
 #else
-        error() << "this version of mongodb was not compiled with FIPS support";
-        fassertFailed(17089);
+        severe() << "this version of mongodb was not compiled with FIPS support";
+        fassertFailedNoTrace(17089);
 #endif
     }
 
@@ -571,30 +617,91 @@ namespace mongo {
         return true;
     }
 
-    bool SSLManager::_setSubjectName(const std::string& keyFile, std::string& subjectName) {
-        // Read the certificate subject name and store it 
-        BIO *in = BIO_new(BIO_s_file_internal());
-        if (NULL == in){
-            error() << "failed to allocate BIO object: " << 
-                getSSLErrorMessage(ERR_get_error()) << endl;
-            return false;
-        }
-        ON_BLOCK_EXIT(BIO_free, in);
+    unsigned long long SSLManager::_convertASN1ToMillis(ASN1_TIME* asn1time) {
+        BIO *outBIO = BIO_new(BIO_s_mem());
+        int timeError = ASN1_TIME_print(outBIO, asn1time);
+        ON_BLOCK_EXIT(BIO_free, outBIO);
 
-        if (BIO_read_filename(in, keyFile.c_str()) <= 0){
-            error() << "cannot read key file when setting subject name: " << keyFile << ' ' <<
-                getSSLErrorMessage(ERR_get_error()) << endl;
-            return false;
+        if (timeError <= 0) {
+            error() << "ASN1_TIME_print failed or wrote no data.";
+            return 0;
         }
 
-        X509* x509 = PEM_read_bio_X509(in, NULL, &SSLManager::password_cb, this);
-        if (NULL == x509) {
-            error() << "cannot retreive certificate from keyfile: " << keyFile << ' ' <<
-                getSSLErrorMessage(ERR_get_error()) << endl; 
+        char dateChar[DATE_LEN];
+        timeError = BIO_gets(outBIO, dateChar, DATE_LEN);
+        if (timeError <= 0) {
+            error() << "BIO_gets call failed to transfer contents to buf";
+            return 0;
+        }
+
+        //Ensure that day format is two digits for parsing.
+        //Jun  8 17:00:03 2014 becomes Jun 08 17:00:03 2014.
+        if (dateChar[4] == ' ') {
+            dateChar[4] = '0';
+        }
+
+        std::istringstream inStringStream((std::string(dateChar,20)));
+        boost::posix_time::time_input_facet *inputFacet = 
+            new boost::posix_time::time_input_facet("%b %d %H:%M:%S %Y");
+
+        inStringStream.imbue(std::locale(std::cout.getloc(), inputFacet));
+        boost::posix_time::ptime posixTime;
+        inStringStream >> posixTime;
+
+        const boost::gregorian::date epoch =
+            boost::gregorian::date(1970, boost::gregorian::Jan, 1);
+
+        return (posixTime - boost::posix_time::ptime(epoch)).total_milliseconds();
+    }
+
+    bool SSLManager::_parseAndValidateCertificate(const std::string& keyFile, 
+                                                  std::string* subjectName,
+                                                  Date_t* serverNotAfter) {
+        BIO *inBIO = BIO_new(BIO_s_file_internal());
+        if (inBIO == NULL) {
+            error() << "failed to allocate BIO object: "
+                    << getSSLErrorMessage(ERR_get_error());
+            return false;
+        }
+
+        ON_BLOCK_EXIT(BIO_free, inBIO);
+        if (BIO_read_filename(inBIO, keyFile.c_str()) <= 0) {
+            error() << "cannot read key file when setting subject name: "
+                    << keyFile << ' ' << getSSLErrorMessage(ERR_get_error());
+            return false;
+        }
+
+        X509* x509 = PEM_read_bio_X509(inBIO, NULL, &SSLManager::password_cb, this);
+        if (x509 == NULL) {
+            error() << "cannot retrieve certificate from keyfile: "
+                    << keyFile << ' ' << getSSLErrorMessage(ERR_get_error()); 
             return false;
         }
         ON_BLOCK_EXIT(X509_free, x509);
-        subjectName = getCertificateSubjectName(x509);
+
+        *subjectName = getCertificateSubjectName(x509);
+        if (serverNotAfter != NULL) {
+
+            unsigned long long notBeforeMillis = _convertASN1ToMillis(X509_get_notBefore(x509));
+            if (notBeforeMillis == 0) {
+                error() << "date conversion failed";
+                return false;
+            }
+
+            unsigned long long notAfterMillis = _convertASN1ToMillis(X509_get_notAfter(x509));
+            if (notAfterMillis == 0) {
+                error() << "date conversion failed";
+                return false;
+            }
+
+            if ((notBeforeMillis > curTimeMillis64()) ||
+                (curTimeMillis64() > notAfterMillis)) {
+                dbexit(EXIT_BADOPTIONS,
+                       "The provided SSL certificate is expired or not yet valid.");
+            }
+
+            *serverNotAfter = Date_t(notAfterMillis);
+        }
 
         return true;
     }
@@ -603,7 +710,7 @@ namespace mongo {
                                const std::string& keyFile, 
                                const std::string& password) {
         _password = password;
- 
+
         if ( SSL_CTX_use_certificate_chain_file( context , keyFile.c_str() ) != 1 ) {
             error() << "cannot read certificate file: " << keyFile << ' ' <<
                 getSSLErrorMessage(ERR_get_error()) << endl;
@@ -634,6 +741,15 @@ namespace mongo {
     }
 
     bool SSLManager::_setupCA(SSL_CTX* context, const std::string& caFile) {
+        // Set the list of CAs sent to clients
+        STACK_OF (X509_NAME) * certNames = SSL_load_client_CA_file(caFile.c_str());
+        if (certNames == NULL) {
+            error() << "cannot read certificate authority file: " << caFile << " " <<
+                getSSLErrorMessage(ERR_get_error()) << endl;
+            return false;
+        }
+        SSL_CTX_set_client_CA_list(context, certNames);
+
         // Load trusted CA
         if (SSL_CTX_load_verify_locations(context, caFile.c_str(), NULL) != 1) {
             error() << "cannot read certificate authority file: " << caFile << " " <<
@@ -859,7 +975,7 @@ namespace mongo {
         sk_GENERAL_NAME_pop_free(sanNames, GENERAL_NAME_free);
 
         if (!sanMatch) {
-            if (_allowInvalidCertificates) {
+            if (_allowInvalidCertificates || _allowInvalidHostnames) {
                 warning() << "The server certificate does not match the host name " << 
                     remoteHost;
             }

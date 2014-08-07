@@ -1,16 +1,28 @@
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/platform/basic.h"
@@ -38,7 +50,6 @@ using namespace std;
 // TODO: Extra log context appending, and re-enable log_user_*.js
 // TODO: Eliminate cout/cerr.
 // TODO: LogIndent (for mongodump).
-// TODO: Eliminate rawOut.
 
 namespace mongo {
 
@@ -55,16 +66,16 @@ namespace mongo {
         return Status::OK();
     }
 
-    int tlogLevel = 0; // test log level. so we avoid overchattiness (somewhat) in the c++ unit tests
-
-    const char *default_getcurns() { return ""; }
-    const char * (*getcurns)() = default_getcurns;
-
-    bool rotateLogs() {
+    bool rotateLogs(bool renameFiles) {
         using logger::RotatableFileManager;
         RotatableFileManager* manager = logger::globalRotatableFileManager();
         RotatableFileManager::FileNameStatusPairVector result(
-                manager->rotateAll("." + terseCurrentTime(false)));
+                manager->rotateAll(renameFiles, "." + terseCurrentTime(false)));
+        for (RotatableFileManager::FileNameStatusPairVector::iterator it = result.begin();
+                it != result.end(); it++) {
+            warning() << "Rotating log file " << it->first << " failed: " << it->second.toString()
+                    << endl;
+        }
         return result.empty();
     }
 
@@ -116,46 +127,11 @@ namespace mongo {
         return s.str();
     }
 
-    namespace {
-        bool rawOutToStderr = false;
-    } // namespace
-
-    void setRawOutToStderr() {
-        rawOutToStderr = true;
-    }
-
-    /*
-     * NOTE(schwerin): Called from signal handlers; should not be taking locks or allocating
-     * memory.
-     */
-    void rawOut(const StringData &s) {
-        // Can't use STDxxx_FILENO macros since they don't exist on windows.
-        const int fd = rawOutToStderr
-                        ? 2 // STDERR_FILENO
-                        : 1 // STDOUT_FILENO
-                        ;
-
-        const char* ptr = s.rawData();
-        size_t bytesRemaining = s.size();
-        while (bytesRemaining) {
-#ifdef _WIN32
-            int ret = _write(fd, ptr, bytesRemaining);
-#else
-            ssize_t ret = write(fd, ptr, bytesRemaining);
-#endif
-            if (ret < 0)
-                return; // Nothing to do. Can't even log since that is what is failing.
-
-            ptr += ret;
-            bytesRemaining -= ret;
-        }
-    }
-
     void logContext(const char *errmsg) {
         if ( errmsg ) {
-            problem() << errmsg << endl;
+            log() << errmsg << endl;
         }
-        printStackTrace(problem().stream());
+        printStackTrace(log().stream());
     }
 
     LogIndentLevel::LogIndentLevel() {

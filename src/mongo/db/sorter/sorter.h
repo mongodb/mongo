@@ -62,7 +62,7 @@
  * // Return *this if your type doesn't have an unowned state
  * Type getOwned() const;
  *
- * Comparators are functors that that compare pair<Key, Value> and return an
+ * Comparators are functors that that compare std::pair<Key, Value> and return an
  * int less than, equal to, or greater than 0 depending on how the two pairs
  * compare with the same semantics as memcmp.
  * Example for Key=BSONObj, Value=int:

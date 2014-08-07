@@ -126,11 +126,11 @@ namespace mongo {
 
     bool doUpgradeV0ToV5(const ConnectionString& configLoc,
                          const VersionType& lastVersionInfo,
-                         string* errMsg);
+                         std::string* errMsg);
 
     bool doUpgradeV4ToV5(const ConnectionString& configLoc,
                          const VersionType& lastVersionInfo,
-                         string* errMsg);
+                         std::string* errMsg);
 
     //
     // Utilities for upgrading a config database to a new config version and checking the status of
@@ -156,7 +156,7 @@ namespace mongo {
      *
      * @return a VersionStatus enum indicating compatibility
      */
-    VersionStatus isConfigVersionCompatible(const VersionType& versionInfo, string* whyNot);
+    VersionStatus isConfigVersionCompatible(const VersionType& versionInfo, std::string* whyNot);
 
     /**
      * Returns the config version of the cluster pointed at by the connection string.
@@ -176,6 +176,6 @@ namespace mongo {
                                       bool upgrade,
                                       VersionType* initialVersionInfo,
                                       VersionType* finalVersionInfo,
-                                      string* errMsg);
+                                      std::string* errMsg);
 
 } // end namespace

@@ -37,6 +37,6 @@ explain = t.find( { a:{ $gte:5 } }, { _id:0, a:1 } ).explain();
 assert.eq( explain.cursor, 'BtreeCursor a_1' );
 assert.eq( explain.n, 5 );
 assert.eq( explain.nscanned, 5 );
-assert.eq( explain.nscannedObjects, 5 ); // Covered indexes do not work with sharding.
+assert.eq( explain.nscannedObjects, 5 ); // Queries against sharded collections are never covered.
 
 s.stop();

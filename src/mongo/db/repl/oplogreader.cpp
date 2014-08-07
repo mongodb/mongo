@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/repl/oplogreader.h"
 
 #include <boost/shared_ptr.hpp>
@@ -36,7 +38,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
@@ -45,6 +47,10 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
+namespace repl {
 
     //number of readers created;
     //  this happens when the source source changes, a reconfig/network-error or the cursor dies
@@ -65,11 +71,11 @@ namespace mongo {
         return authenticateInternalUser(conn);
     }
 
-    bool replHandshake(DBClientConnection *conn, const BSONObj& me) {
+    bool replHandshake(DBClientConnection *conn, const OID& myRID) {
         string myname = getHostName();
 
         BSONObjBuilder cmd;
-        cmd.appendAs( me["_id"] , "handshake" );
+        cmd.append("handshake", myRID);
         if (theReplSet) {
             cmd.append("member", theReplSet->selfId());
             cmd.append("config", theReplSet->myConfig().asBson());
@@ -122,7 +128,7 @@ namespace mongo {
         return true;
     }
 
-    bool OplogReader::connect(const std::string& hostName, const BSONObj& me) {
+    bool OplogReader::connect(const std::string& hostName, const OID& myRID) {
         if (conn()) {
             return true;
         }
@@ -131,7 +137,7 @@ namespace mongo {
             return false;
         }
 
-        if (!replHandshake(_conn.get(), me)) {
+        if (!replHandshake(_conn.get(), myRID)) {
             return false;
         }
 
@@ -188,4 +194,5 @@ namespace mongo {
         tailingQuery(ns, query.done(), fields);
     }
 
-}
+} // namespace repl
+} // namespace mongo

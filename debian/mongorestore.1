@@ -1,8 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGORESTORE" "1" "October 03, 2013" "2.4" "mongodb-manual"
+.TH "MONGORESTORE" "1" "March 18, 2014" "2.6" "mongodb-manual"
 .SH NAME
-mongorestore \- MongoDB
+mongorestore \- MongoDB Data Restoration Tool
 .
 .nr rst2man-indent-level 0
 .
@@ -40,6 +40,7 @@ data to an existing database.
 \fBmongorestore\fP can write data to either \fImongod\fP or \fBmongos\fP
 instances, in addition to writing directly to MongoDB data files
 without an active \fBmongod\fP\&.
+.SH BEHAVIOR
 .sp
 If you restore to an existing database, \fBmongorestore\fP will
 only insert into the existing database, and does not perform updates
@@ -64,14 +65,29 @@ during a restore operation, but \fBmongorestore\fP will not
 receive errors.
 .UNINDENT
 .sp
-\fBNOTE:\fP
-.INDENT 0.0
-.INDENT 3.5
-The format of data created by \fBmongodump\fP tool from the
-2.2 distribution or later is different and incompatible with
-earlier versions of \fBmongod\fP\&.
-.UNINDENT
-.UNINDENT
+The data format used by \fBmongodump\fP from version 2.2 or
+later is \fIincompatible\fP with earlier versions of \fBmongod\fP\&.
+Do not use recent versions of \fBmongodump\fP to back up older
+data stores.
+.SH REQUIRED ACCESS TO RESTORE USER DATA
+.sp
+Changed in version 2.6.
+
+.sp
+To restore users and \fIuser\-defined roles\fP on a
+given database, you must have access to the \fBadmin\fP database. MongoDB
+stores the user data and role definitions for all databases in the
+\fBadmin\fP database.
+.sp
+Specifically, to restore users to a given database, you must have the
+\fBinsert\fP \fIaction\fP on the \fBadmin\fP
+database\(aqs \fBadmin.system.users\fP collection. The \fBrestore\fP
+role provides this privilege.
+.sp
+To restore user\-defined roles to a database, you must have the
+\fBinsert\fP action on the \fBadmin\fP database\(aqs
+\fBadmin.system.roles\fP collection. The \fBrestore\fP role
+provides this privilege.
 .SH OPTIONS
 .INDENT 0.0
 .TP
@@ -83,35 +99,46 @@ earlier versions of \fBmongod\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-help
-Returns a basic help and usage text.
+.B \-\-help, \-h
+Returns information on \fBmongorestore\fP options and usage.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-verbose, \-v
-Increases the amount of internal reporting returned on the command
-line. Increase the verbosity with the \fB\-v\fP form by including
-the option multiple times (e.g. \fB\-vvvvv\fP).
+Increases the amount of internal reporting returned on standard output
+or in log files. Increase the verbosity with the \fB\-v\fP form by
+including the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-quiet
+Runs \fBmongorestore\fP in a quiet mode that attempts to limit the amount of
+output. This option suppresses:
+.INDENT 7.0
+.IP \(bu 2
+output from \fIdatabase commands\fP
+.IP \(bu 2
+replication activity
+.IP \(bu 2
+connection accepted events
+.IP \(bu 2
+connection closed events
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-version
-Returns the version of the \fBmongorestore\fP tool.
+Returns the \fBmongorestore\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-host <hostname><:port>
-Specifies a resolvable hostname for the \fBmongod\fP to which
-you want to restore the database. By default
-\fBmongorestore\fP will attempt to connect to a MongoDB
-process running on the localhost port number \fB27017\fP\&. For an
-example of \fI\-\-host\fP, see \fIbackup\-restore\-dump\fP\&.
+.B \-\-host <hostname><:port>, \-h
+Specifies a resolvable hostname for the \fBmongod\fP to which to
+connect. By default \fBmongorestore\fP attempts to connect to a MongoDB instance
+running on the localhost on port number \fB27017\fP\&.
 .sp
-Optionally, specify a port number to connect a MongoDB instance
-running on a port other than \fB27017\fP\&.
-.sp
-To connect to a replica set, you can specify the replica set seed
-name, and a seed list of set members, in the following format:
+To connect to a replica set, specify the replica set seed name and the
+seed list of set members. Use the following format:
 .INDENT 7.0
 .INDENT 3.5
 .sp
@@ -122,69 +149,138 @@ name, and a seed list of set members, in the following format:
 .fi
 .UNINDENT
 .UNINDENT
+.sp
+You can always connect directly to a single MongoDB instance by
+specifying the host and port number directly.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-port <port>
-Specifies the port number, if the MongoDB instance is not running
-on the standard port (i.e. \fB27017\fP). You may also specify a port
-number using the \fI\-\-host\fP command. For
-an example of \fI\-\-port\fP, see \fIbackup\-restore\-dump\fP\&.
+Specifies the port number when the MongoDB instance is not running on the
+standard port of \fB27017\fP\&. You may also specify the port number
+using the \fB\-\-host\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-ipv6
-Enables IPv6 support that allows \fBmongorestore\fP to connect
-to the MongoDB instance using an IPv6 network. All MongoDB programs
-and processes, including \fBmongorestore\fP, disable IPv6
-support by default.
+Enables IPv6 support, which allows \fBmongorestore\fP to connect to the MongoDB
+instance using an IPv6 network. All MongoDB programs and processes,
+including \fBmongorestore\fP, disable IPv6 support by default.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-ssl
-New in version 2.4: MongoDB added support for SSL connections to \fBmongod\fP
-instances in mongorestore\&.
+New in version 2.6.
 
 .sp
-\fBNOTE:\fP
-.INDENT 7.0
-.INDENT 3.5
-SSL support in mongorestore is not compiled into the default
-distribution of MongoDB. See
-http://docs.mongodb.org/manual/tutorial/configure\-ssl for more information on SSL
-and MongoDB.
+Enables connection to a \fBmongod\fP or \fBmongos\fP that has
+SSL support enabled.
 .sp
-Additionally, mongorestore does not support connections to
-\fBmongod\fP instances that require client certificate
-validation.
-.UNINDENT
-.UNINDENT
-.sp
-Allows \fBmongorestore\fP to connect to \fBmongod\fP
-instance over an SSL connection.
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-username <username>, \-u <username>
-Specifies a username to authenticate to the MongoDB instance, if
-your database requires authentication. Use in conjunction with the
-\fI\-\-password\fP option to supply a
-password. For an example of \fI\-\-username\fP, see
-\fIbackup\-restore\-dump\fP\&.
+.B \-\-sslCAFile <filename>
+New in version 2.6.
+
+.sp
+Specifies the \fB\&.pem\fP file that contains the root certificate chain
+from the Certificate Authority. Specify the file name of the
+\fB\&.pem\fP file using relative or absolute paths.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-password <password>, \-p <password>
-Specifies a password to authenticate to the MongoDB instance. Use
-in conjunction with the \fI\-\-username\fP option to
-supply a username. For an example of \fI\-\-password\fP, see
-\fIbackup\-restore\-dump\fP\&.
+.B \-\-sslPEMKeyFile <filename>
+New in version 2.6.
+
 .sp
-If you specify a \fI\-\-username\fP and do not pass an argument
-to \fI\-\-password\fP, \fBmongorestore\fP will prompt for a
-password interactively. If you do not specify a password on the
-command line, \fI\-\-password\fP must be the last argument
-specified.
+Specifies the \fB\&.pem\fP file that contains both the SSL certificate
+and key. Specify the file name of the \fB\&.pem\fP file using relative
+or absolute paths.
+.sp
+This option is required when using the \fI\-\-ssl\fP option to connect
+to a \fBmongod\fP or \fBmongos\fP that has
+\fBsslCAFile\fP enabled \fIwithout\fP
+\fBsslWeakCertificateValidation\fP\&.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslPEMKeyPassword <value>
+New in version 2.6.
+
+.sp
+Specifies the password to de\-crypt the certificate\-key file (i.e.
+\fI\-\-sslPEMKeyFile\fP). Use \fI\-\-sslPEMKeyPassword\fP only if
+the certificate\-key file is encrypted. In all cases, \fBmongorestore\fP will
+redact the password from all logging and reporting output.
+.sp
+If the private key in the PEM file is encrypted and you do not specify
+\fI\-\-sslPEMKeyPassword\fP, \fBmongorestore\fP will prompt for a passphrase.
+See \fIssl\-certificate\-password\fP\&.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslCRLFile <filename>
+New in version 2.6.
+
+.sp
+Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
+List. Specify the file name of the \fB\&.pem\fP file using relative or
+absolute paths.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslAllowInvalidCertificates
+New in version 2.6.
+
+.sp
+Bypasses the validation checks for server certificates and allows
+the use of invalid certificates. When using the
+\fBsslAllowInvalidCertificates\fP setting, MongoDB logs as a
+warning the use of the invalid certificate.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslFIPSMode
+New in version 2.6.
+
+.sp
+Directs \fBmongorestore\fP to use the FIPS mode of the installed OpenSSL
+library. Your system must
+have a FIPS compliant OpenSSL library to use \fI\-\-sslFIPSMode\fP\&.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-username <username>, \-u
+Specifies a username with which to authenticate to a MongoDB database
+that uses authentication. Use in conjunction with the \fB\-\-password\fP and
+\fB\-\-authenticationDatabase\fP options.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-password <password>, \-p
+Specifies a password with which to authenticate to a MongoDB database
+that uses authentication. Use in conjunction with the \fB\-\-username\fP and
+\fB\-\-authenticationDatabase\fP options.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -192,17 +288,10 @@ specified.
 New in version 2.4.
 
 .sp
-Specifies the database that holds the user\(aqs (e.g
-\fI\-\-username\fP) credentials.
-.sp
-By default, \fBmongorestore\fP assumes that the database specified to the
-\fI\-\-db\fP argument holds the user\(aqs credentials, unless you
-specify \fI\-\-authenticationDatabase\fP\&.
-.sp
-See \fBuserSource\fP,
-http://docs.mongodb.org/manual/reference/privilege\-documents and
-http://docs.mongodb.org/manual/reference/user\-privileges for more information about
-delegated authentication in MongoDB.
+Specifies the database that holds the user\(aqs credentials.
+If you do not specify an authentication database, \fBmongorestore\fP assumes
+that the database specified as the argument to the \fI\%\-\-db\fP option
+holds the user\(aqs credentials.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -210,81 +299,70 @@ delegated authentication in MongoDB.
 New in version 2.4.
 
 .sp
-Specifies the authentication mechanism. By default, the
-authentication mechanism is \fBMONGODB\-CR\fP, which is the MongoDB
-challenge/response authentication mechanism. In MongoDB Enterprise,
-\fBmongorestore\fP also includes support for \fBGSSAPI\fP to handle
-Kerberos authentication.
-.sp
-See http://docs.mongodb.org/manual/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication
+Specifies the authentication mechanism. By default, the authentication
+mechanism is \fBMONGODB\-CR\fP, which is the MongoDB challenge/response
+authentication mechanism. In MongoDB Enterprise, \fBmongorestore\fP also includes
+support for \fBGSSAPI\fP to handle Kerberos authentication. See
+http://docs.mongodb.org/manual/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication
 for more information about Kerberos authentication.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-dbpath <path>
 Specifies the directory of the MongoDB data files. If used, the
-\fI\-\-dbpath\fP option enables \fBmongorestore\fP to attach
-directly to local data files and insert the data without the
-\fBmongod\fP\&. To run with \fI\-\-dbpath\fP,
-\fBmongorestore\fP needs to lock access to the data directory:
-as a result, no \fBmongod\fP can access the same path while the
-process runs. For an example of \fI\-\-dbpath\fP, see
-\fIbackup\-restore\-dbpath\fP\&.
+\fI\%\-\-dbpath\fP option enables \fBmongorestore\fP to attach directly to local data
+files without a running \fBmongod\fP\&. When run with \fI\%\-\-dbpath\fP,
+\fBmongorestore\fP locks access to the data directory. No \fBmongod\fP can
+access the same path while the process runs.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-directoryperdb
-Use the \fI\-\-directoryperdb\fP in conjunction with the
-corresponding option to \fBmongod\fP, which allows
-\fBmongorestore\fP to import data into MongoDB instances that
-have every database\(aqs files saved in discrete directories on the
-disk. This option is only relevant when specifying the
-\fI\-\-dbpath\fP option.
+When used in conjunction with the corresponding option in
+\fBmongod\fP, allows \fBmongorestore\fP to access data from MongoDB
+instances that use an on\-disk format where every database has a distinct
+directory. This option is only relevant when specifying the
+\fI\%\-\-dbpath\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-journal
-Allows \fBmongorestore\fP write to the durability
-\fIjournal\fP to ensure that the data files will remain in a
-consistent state during the write process. This option is only
-relevant when specifying the \fI\-\-dbpath\fP option. For an
-example of \fI\-\-journal\fP, see \fIbackup\-restore\-dbpath\fP\&.
+Allows \fBmongorestore\fP operations to use the durability \fIjournal\fP to
+ensure data files remain valid and recoverable. This option is only
+relevant when specifying the \fI\%\-\-dbpath\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-db <db>, \-d <db>
-Use the \fI\-\-db\fP option to specify a database for
-\fBmongorestore\fP to restore data \fIinto\fP\&. If the database
-doesn\(aqt exist, \fBmongorestore\fP will create the specified
-database.  If you do not specify a \fB<db>\fP,
-\fBmongorestore\fP creates new databases that correspond to
-the databases where data originated and data may be
-overwritten. Use this option to restore data into a MongoDB
-instance that already has data.
+.B \-\-db <database>, \-d
+Specifies a database for \fBmongorestore\fP to restore data \fIinto\fP\&.
+If the database does not exist, \fBmongorestore\fP creates the
+database. If you do not specify a \fB<db>\fP, \fBmongorestore\fP
+creates new databases that correspond to the databases where data
+originated and data may be overwritten. Use this option to restore data
+into a MongoDB instance that already has data.
 .sp
-\fI\-\-db\fP does \fInot\fP control which \fIBSON\fP files
+\fI\%\-\-db\fP does \fInot\fP control which \fIBSON\fP files
 \fBmongorestore\fP restores. You must use the
-\fBmongorestore\fP \fI\%path option\fP to limit that restored data.
+\fBmongorestore\fP \fI\%path option\fP to
+limit that restored data.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-collection <collection>, \-c <collection>
-Use the \fI\-\-collection\fP option to specify a collection for
-\fBmongorestore\fP to restore. If you do not specify a
-\fB<collection>\fP, \fBmongorestore\fP imports all collections
-created. Existing data may be overwritten. Use this option to
-restore data into a MongoDB instance that already has data, or to
-restore only some data in the specified imported data set.
+.B \-\-collection <collection>, \-c
+Specifies a single collection for \fBmongorestore\fP to restore. If
+you do not specify \fI\%\-\-collection\fP, \fBmongorestore\fP takes
+the collection name from the input filename. If the input file has an
+extension, MongoDB omits the extension of the file from the collection
+name.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-objcheck
-Forces the \fBmongorestore\fP to validate all requests from
-clients upon receipt to ensure that clients never insert invalid
-documents into the database. For objects with a high degree of
-sub\-document nesting, \fI\-\-objcheck\fP can have a small impact
-on performance. You can set \fI\%--noobjcheck\fP to disable
-object checking at run\-time.
+Forces \fBmongorestore\fP to validate all requests from clients
+upon receipt to ensure that clients never insert invalid documents into
+the database. For objects with a high degree of sub\-document nesting,
+\fI\-\-objcheck\fP can have a small impact on performance. You can set
+\fI\%\-\-noobjcheck\fP to disable object checking at run\-time.
 .sp
 Changed in version 2.4: MongoDB enables \fI\-\-objcheck\fP by default, to prevent any
 client from inserting malformed or invalid BSON into a MongoDB
@@ -302,27 +380,41 @@ incoming BSON documents.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-filter \(aq<JSON>\(aq
-Limits the documents that \fBmongorestore\fP imports to only
-those documents that match the JSON document specified as
-\fB\(aq<JSON>\(aq\fP\&. Be sure to include the document in single quotes to
-avoid interaction with your system\(aqs shell environment. For an
-example of \fI\%--filter\fP, see \fIbackup\-restore\-filter\fP\&.
+.B \-\-filter <JSON>
+Limits the documents that \fBmongorestore\fP imports to only those
+documents that match the JSON document specified as \fB\(aq<JSON>\(aq\fP\&. Be
+sure to include the document in single quotes to avoid interaction with
+your system\(aqs shell environment. For an example of \fI\%\-\-filter\fP,
+see \fIbackup\-restore\-filter\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-drop
-Modifies the restoration procedure to drop every collection from
-the target database before restoring the collection from the dumped
-backup.
+Modifies the restoration procedure to drop every collection from the
+target database before restoring the collection from the dumped backup.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-oplogReplay
-Replays the \fIoplog\fP after restoring the dump to ensure that the current
-state of the database reflects the point\-in\-time backup captured with
-the "\fImongodump \-\-oplog\fP" command. For an example of
-\fI\%--oplogReplay\fP, see \fIbackup\-restore\-oplogreplay\fP\&.
+Replays the \fIoplog\fP after restoring the dump to ensure that the
+current state of the database reflects the point\-in\-time backup captured
+with the "\fImongodump \-\-oplog\fP" command. For an example of
+\fI\%\-\-oplogReplay\fP, see \fIbackup\-restore\-oplogreplay\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-oplogLimit <timestamp>
+New in version 2.2.
+
+.sp
+Prevents \fBmongorestore\fP from applying \fIoplog\fP entries
+newer than the \fB<timestamp>\fP\&. Specify \fB<timestamp>\fP values in the
+form of \fB<time_t>:<ordinal>\fP, where \fB<time_t>\fP is the seconds since
+the UNIX epoch, and \fB<ordinal>\fP represents a counter of operations in
+the oplog that occurred in the specified second.
+.sp
+You must use \fI\%\-\-oplogLimit\fP in conjunction with the
+\fI\%\-\-oplogReplay\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -332,14 +424,12 @@ version during the restoration process.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-w <number of replicas per write>
+.B \-\-noIndexRestore
 New in version 2.2.
 
 .sp
-Specifies the \fIwrite concern\fP for each write operation that
-\fBmongorestore\fP writes to the target database. By default,
-\fBmongorestore\fP does not wait for a response for
-\fIwrite acknowledgment\fP\&.
+Prevents \fBmongorestore\fP from restoring and building indexes as
+specified in the corresponding \fBmongodump\fP output.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -347,34 +437,20 @@ Specifies the \fIwrite concern\fP for each write operation that
 New in version 2.2.
 
 .sp
-Prevents \fBmongorestore\fP from setting the collection
-options, such as those specified by the \fBcollMod\fP
-\fIdatabase command\fP, on restored collections.
+Prevents \fBmongorestore\fP from setting the collection options,
+such as those specified by the \fBcollMod\fP \fIdatabase
+command\fP, on restored collections.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-noIndexRestore
+.B \-\-w <number of replicas per write>
 New in version 2.2.
 
 .sp
-Prevents \fBmongorestore\fP from restoring and building
-indexes as specified in the corresponding \fBmongodump\fP
-output.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-oplogLimit <timestamp>
-New in version 2.2.
-
-.sp
-Prevents \fBmongorestore\fP from applying \fIoplog\fP entries newer
-than the \fB<timestamp>\fP\&. Specify \fB<timestamp>\fP values in the
-form of \fB<time_t>:<ordinal>\fP, where \fB<time_t>\fP is the seconds
-since the UNIX epoch, and \fB<ordinal>\fP represents a counter of
-operations in the oplog that occurred in the specified second.
-.sp
-You must use \fI\%--oplogLimit\fP in conjunction with the
-\fI\%--oplogReplay\fP option.
+Specifies the \fIwrite concern\fP for each write operation that
+\fBmongorestore\fP writes to the target database. By default,
+\fBmongorestore\fP does not wait for a response for \fIwrite
+acknowledgment\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -383,9 +459,9 @@ The final argument of the \fBmongorestore\fP command is a
 directory path. This argument specifies the location of the
 database dump from which to restore.
 .UNINDENT
-.SH USAGE
+.SH USE
 .sp
-See http://docs.mongodb.org/manual/tutorial/backup\-databases\-with\-binary\-database\-dumps
+See http://docs.mongodb.org/manual/tutorial/backup\-with\-mongodump
 for a larger overview of \fBmongorestore\fP
 usage. Also see the \fBmongodump\fP document for an overview of the
 \fBmongodump\fP, which provides the related inverse
@@ -444,6 +520,6 @@ mongorestore \-\-host mongodb1.example.net \-\-port 37017 \-\-username user \-\-
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2011-2013, MongoDB, Inc.
+2011-2014, MongoDB, Inc.
 .\" Generated by docutils manpage writer.
 .

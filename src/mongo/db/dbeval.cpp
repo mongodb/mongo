@@ -1,4 +1,4 @@
-// commands.cpp
+// dbeval.cpp
 
 /**
 *    Copyright (C) 2012 10gen Inc.
@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <time.h>
 
@@ -40,15 +40,18 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/util/lruishmap.h"
 
 namespace mongo {
 
     const int edebug=0;
 
-    bool dbEval(const string& dbName, BSONObj& cmd, BSONObjBuilder& result, string& errmsg) {
+    static bool dbEval(OperationContext* txn,
+                       const string& dbName,
+                       const BSONObj& cmd,
+                       BSONObjBuilder& result,
+                       string& errmsg) {
+
         BSONElement e = cmd.firstElement();
         uassert( 10046 ,  "eval needs Code" , e.type() == Code || e.type() == CodeWScope || e.type() == String );
 
@@ -71,18 +74,18 @@ namespace mongo {
             return false;
         }
 
-        const string userToken = ClientBasic::getCurrent()->getAuthorizationSession()
-                                                          ->getAuthenticatedUserNamesToken();
-        auto_ptr<Scope> s = globalScriptEngine->getPooledScope( dbName, "dbeval" + userToken );
+        scoped_ptr<Scope> s(globalScriptEngine->newScope());
+
         ScriptingFunction f = s->createFunction(code);
         if ( f == 0 ) {
             errmsg = (string)"compile failed: " + s->getError();
             return false;
         }
 
+        s->localConnectForDbEval(txn, dbName.c_str());
+
         if ( e.type() == CodeWScope )
             s->init( e.codeWScopeScopeDataUnsafe() );
-        s->localConnect( dbName.c_str() );
 
         BSONObj args;
         {
@@ -90,8 +93,8 @@ namespace mongo {
             if ( argsElement.type() == Array ) {
                 args = argsElement.embeddedObject();
                 if ( edebug ) {
-                    out() << "args:" << args.toString() << endl;
-                    out() << "code:\n" << code << endl;
+                    log() << "args:" << args.toString() << endl;
+                    log() << "code:\n" << code << endl;
                 }
             }
         }
@@ -102,7 +105,7 @@ namespace mongo {
             res = s->invoke(f, &args, 0, storageGlobalParams.quota ? 10 * 60 * 1000 : 0);
             int m = t.millis();
             if (m > serverGlobalParams.slowMS) {
-                out() << "dbeval slow, time: " << dec << m << "ms " << dbName << endl;
+                log() << "dbeval slow, time: " << dec << m << "ms " << dbName << endl;
                 if ( m >= 1000 ) log() << code << endl;
                 else OCCASIONALLY log() << code << endl;
             }
@@ -131,7 +134,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "Evaluate javascript at the server.\n" "http://dochub.mongodb.org/core/serversidecodeexecution";
         }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -139,15 +142,16 @@ namespace mongo {
             RoleGraph::generateUniversalPrivileges(out);
         }
         CmdEval() : Command("eval", false, "$eval") { }
-        bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( cmdObj["nolock"].trueValue() ) {
-                return dbEval(dbname, cmdObj, result, errmsg);
+                return dbEval(txn, dbname, cmdObj, result, errmsg);
             }
 
-            Lock::GlobalWrite lk;
-            Client::Context ctx( dbname );
+            Lock::GlobalWrite lk(txn->lockState());
+            // No WriteUnitOfWork necessary, as dbEval will create its own, see "nolock" case above
+            Client::Context ctx(txn,  dbname );
 
-            return dbEval(dbname, cmdObj, result, errmsg);
+            return dbEval(txn, dbname, cmdObj, result, errmsg);
         }
     } cmdeval;
 

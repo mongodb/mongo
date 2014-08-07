@@ -92,20 +92,13 @@ namespace mongo {
          * Returns a ShardEndpoint for the doc from the mock ranges
          */
         Status targetInsert( const BSONObj& doc, ShardEndpoint** endpoint ) const {
-
-            const std::vector<MockRange*>& ranges = getRanges();
-            for ( std::vector<MockRange*>::const_iterator it = ranges.begin(); it != ranges.end();
-                ++it ) {
-
-                const MockRange* range = *it;
-
-                if ( rangeContains( range->range.minKey, range->range.maxKey, doc ) ) {
-                    *endpoint = new ShardEndpoint( range->endpoint );
-                    return Status::OK();
-                }
-            }
-
-            return Status( ErrorCodes::UnknownError, "no mock range found for document" );
+            std::vector<ShardEndpoint*> endpoints;
+            Status status = targetQuery( doc, &endpoints );
+            if ( !status.isOK() )
+                return status;
+            if ( !endpoints.empty() )
+                *endpoint = endpoints.front();
+            return Status::OK();
         }
 
         /**
@@ -126,9 +119,21 @@ namespace mongo {
             return targetQuery( deleteDoc.getQuery(), endpoints );
         }
 
-        Status targetAll( std::vector<ShardEndpoint*>* endpoints ) const {
+        Status targetCollection( std::vector<ShardEndpoint*>* endpoints ) const {
             // TODO: XXX
             // No-op
+            return Status::OK();
+        }
+
+        Status targetAllShards( std::vector<ShardEndpoint*>* endpoints ) const {
+            const std::vector<MockRange*>& ranges = getRanges();
+            for ( std::vector<MockRange*>::const_iterator it = ranges.begin(); it != ranges.end();
+                ++it ) {
+
+                const MockRange* range = *it;
+                endpoints->push_back( new ShardEndpoint( range->endpoint ) );
+            }
+
             return Status::OK();
         }
 
@@ -155,21 +160,32 @@ namespace mongo {
 
         KeyRange parseRange( const BSONObj& query ) const {
 
-            ASSERT_EQUALS( query.nFields(), 1 );
-            ASSERT_EQUALS( query.firstElement().type(), Object );
+            std::string fieldName = query.firstElement().fieldName();
 
-            string fieldName = query.firstElement().fieldName();
-            BSONObj queryRange = query.firstElement().Obj();
+            if ( query.firstElement().isNumber() ) {
 
-            ASSERT( !queryRange[GTE.l_].eoo() );
-            ASSERT( !queryRange[LT.l_].eoo() );
+                return KeyRange( "",
+                                 BSON( fieldName << query.firstElement().numberInt() ),
+                                 BSON( fieldName << query.firstElement().numberInt() + 1 ),
+                                 BSON( fieldName << 1 ) );
+            }
+            else if ( query.firstElement().type() == Object ) {
 
-            BSONObjBuilder minKeyB;
-            minKeyB.appendAs( queryRange[GTE.l_], fieldName );
-            BSONObjBuilder maxKeyB;
-            maxKeyB.appendAs( queryRange[LT.l_], fieldName );
+                BSONObj queryRange = query.firstElement().Obj();
 
-            return KeyRange( "", minKeyB.obj(), maxKeyB.obj(), BSON( fieldName << 1 ) );
+                ASSERT( !queryRange[GTE.l_].eoo() );
+                ASSERT( !queryRange[LT.l_].eoo() );
+
+                BSONObjBuilder minKeyB;
+                minKeyB.appendAs( queryRange[GTE.l_], fieldName );
+                BSONObjBuilder maxKeyB;
+                maxKeyB.appendAs( queryRange[LT.l_], fieldName );
+
+                return KeyRange( "", minKeyB.obj(), maxKeyB.obj(), BSON( fieldName << 1 ) );
+            }
+
+            ASSERT( false );
+            return KeyRange( "", BSONObj(), BSONObj(), BSONObj() );
         }
 
         /**

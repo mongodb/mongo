@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -35,8 +35,8 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -47,7 +47,9 @@ namespace QueryStageSortTests {
 
     class QueryStageSortTestBase {
     public:
-        QueryStageSortTestBase() { }
+        QueryStageSortTestBase() : _client(&_txn) {
+        
+        }
 
         void fillData() {
             for (int i = 0; i < numObj(); ++i) {
@@ -64,8 +66,8 @@ namespace QueryStageSortTests {
         }
 
         void getLocs(set<DiskLoc>* out, Collection* coll) {
-            CollectionIterator* it = coll->getIterator(DiskLoc(), false,
-                                                       CollectionScanParams::FORWARD);
+            RecordIterator* it = coll->getIterator(&_txn, DiskLoc(), false,
+                                                   CollectionScanParams::FORWARD);
             while (!it->isEOF()) {
                 DiskLoc nextLoc = it->getNext();
                 out->insert(nextLoc);
@@ -89,7 +91,7 @@ namespace QueryStageSortTests {
                 WorkingSetMember member;
                 member.loc = *it;
                 member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-                member.obj = it->obj();
+                member.obj = coll->docFor(*it);
                 ASSERT_FALSE(member.obj.isOwned());
                 ms->pushBack(member);
             }
@@ -117,22 +119,24 @@ namespace QueryStageSortTests {
             insertVarietyOfObjects(ms, coll);
 
             SortStageParams params;
+            params.collection = coll;
             params.pattern = BSON("foo" << direction);
             params.limit = limit();
 
             // Must fetch so we can look at the doc as a BSONObj.
-            PlanExecutor runner(ws, new FetchStage(ws, new SortStage(params, ws, ms), NULL));
+            PlanExecutor runner(
+                    ws, new FetchStage(ws, new SortStage(params, ws, ms), NULL, coll), coll);
 
             // Look at pairs of objects to make sure that the sort order is pairwise (and therefore
             // totally) correct.
             BSONObj last;
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&last, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&last, NULL));
 
             // Count 'last'.
             int count = 1;
 
             BSONObj current;
-            while (Runner::RUNNER_ADVANCED == runner.getNext(&current, NULL)) {
+            while (PlanExecutor::ADVANCED == runner.getNext(&current, NULL)) {
                 int cmp = sgn(current.woSortOrder(last, params.pattern));
                 // The next object should be equal to the previous or oriented according to the sort
                 // pattern.
@@ -166,11 +170,12 @@ namespace QueryStageSortTests {
 
 
         static const char* ns() { return "unittests.QueryStageSort"; }
-    private:
-        static DBDirectClient _client;
+
+    protected:
+        OperationContextImpl _txn;
+        DBDirectClient _client;
     };
 
-    DBDirectClient QueryStageSortTestBase::_client;
 
     // Sort some small # of results in increasing order.
     class QueryStageSortInc: public QueryStageSortTestBase {
@@ -178,15 +183,17 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
+
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(ns());
+            Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&_txn, ns());
             }
 
             fillData();
             sortAndCheck(1, coll);
+            ctx.commit();
         }
     };
 
@@ -196,15 +203,17 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
+
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(ns());
+            Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&_txn, ns());
             }
 
             fillData();
             sortAndCheck(-1, coll);
+            ctx.commit();
         }
     };
 
@@ -223,15 +232,17 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 10000; }
 
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
+
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(ns());
+            Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&_txn, ns());
             }
 
             fillData();
             sortAndCheck(-1, coll);
+            ctx.commit();
         }
     };
 
@@ -241,11 +252,12 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 2000; }
 
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
+            
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(ns());
+            Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&_txn, ns());
             }
             fillData();
 
@@ -259,6 +271,7 @@ namespace QueryStageSortTests {
             insertVarietyOfObjects(ms.get(), coll);
 
             SortStageParams params;
+            params.collection = coll;
             params.pattern = BSON("foo" << 1);
             params.limit = limit();
             auto_ptr<SortStage> ss(new SortStage(params, &ws, ms.get()));
@@ -267,20 +280,20 @@ namespace QueryStageSortTests {
 
             // Have sort read in data from the mock stage.
             for (int i = 0; i < firstRead; ++i) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ss->work(&id);
                 ASSERT_NOT_EQUALS(PlanStage::ADVANCED, status);
             }
 
             // We should have read in the first 'firstRead' locs.  Invalidate the first.
-            ss->prepareToYield();
+            ss->saveState();
             set<DiskLoc>::iterator it = locs.begin();
             ss->invalidate(*it++, INVALIDATION_DELETION);
-            ss->recoverFromYield();
+            ss->restoreState(&_txn);
 
             // Read the rest of the data from the mock stage.
             while (!ms->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 ss->work(&id);
             }
 
@@ -288,16 +301,16 @@ namespace QueryStageSortTests {
             ms.release();
 
             // Let's just invalidate everything now.
-            ss->prepareToYield();
+            ss->saveState();
             while (it != locs.end()) {
                 ss->invalidate(*it++, INVALIDATION_DELETION);
             }
-            ss->recoverFromYield();
+            ss->restoreState(&_txn);
 
             // Invalidation of data in the sort stage fetches it but passes it through.
             int count = 0;
             while (!ss->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ss->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
                 WorkingSetMember* member = ws.get(id);
@@ -305,6 +318,7 @@ namespace QueryStageSortTests {
                 ASSERT(!member->hasLoc());
                 ++count;
             }
+            ctx.commit();
 
             // Returns all docs.
             ASSERT_EQUALS(limit() ? limit() : numObj(), count);
@@ -323,6 +337,48 @@ namespace QueryStageSortTests {
         }
     };
 
+    // Should error out if we sort with parallel arrays.
+    class QueryStageSortParallelArrays : public QueryStageSortTestBase {
+    public:
+        virtual int numObj() { return 100; }
+
+        void run() {
+            Client::WriteContext ctx(&_txn, ns());
+            
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(&_txn, ns());
+            if (!coll) {
+                coll = db->createCollection(&_txn, ns());
+            }
+
+            WorkingSet* ws = new WorkingSet();
+            MockStage* ms = new MockStage(ws);
+
+            for (int i = 0; i < numObj(); ++i) {
+                WorkingSetMember member;
+                member.state = WorkingSetMember::OWNED_OBJ;
+
+                member.obj = fromjson("{a: [1,2,3], b:[1,2,3], c:[1,2,3], d:[1,2,3,4]}");
+                ms->pushBack(member);
+
+                member.obj = fromjson("{a:1, b:1, c:1}");
+                ms->pushBack(member);
+            }
+
+            SortStageParams params;
+            params.collection = coll;
+            params.pattern = BSON("b" << -1 << "c" << 1 << "a" << 1);
+            params.limit = 0;
+
+            // We don't get results back since we're sorting some parallel arrays.
+            PlanExecutor runner(
+                    ws, new FetchStage(ws, new SortStage(params, ws, ms), NULL, coll), coll);
+            PlanExecutor::ExecState runnerState = runner.getNext(NULL, NULL);
+            ASSERT_EQUALS(PlanExecutor::EXEC_ERROR, runnerState);
+            ctx.commit();
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "query_stage_sort_test" ) { }
@@ -338,6 +394,7 @@ namespace QueryStageSortTests {
             add<QueryStageSortInvalidation>();
             add<QueryStageSortInvalidationWithLimit<10> >();
             add<QueryStageSortInvalidationWithLimit<1> >();
+            add<QueryStageSortParallelArrays>();
         }
     }  queryStageSortTest;
 

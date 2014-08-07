@@ -54,7 +54,7 @@ namespace {
         ASSERT_FALSE(sort.isEOF());
 
         // First call to work() initializes sort key generator.
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = sort.work(&id);
         ASSERT_EQUALS(state, PlanStage::NEED_TIME);
 
@@ -111,7 +111,7 @@ namespace {
 
         SortStage sort(params, &ws, ms);
 
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = PlanStage::NEED_TIME;
 
         // Keep working sort stage until data is available.

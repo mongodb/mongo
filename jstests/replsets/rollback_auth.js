@@ -93,7 +93,7 @@ reconnect(a);
 reconnect(b);
 
 // Wait for B to be master
-replTest.waitForState(b_conn, replTest.PRIMARY);
+replTest.waitForState(b_conn, replTest.PRIMARY, 60000);
 printjson(b.adminCommand('replSetGetStatus'));
 
 
@@ -138,6 +138,7 @@ replTest.waitForState(a_conn, replTest.PRIMARY, 60000);
 jsTestLog("Doing writes that should persist after the rollback");
 
 // Modify the user and role in a way that will persist.
+A.auth('userAdmin', 'pwd');
 a.grantPrivilegesToRole('myRole',
                         [{resource: {db: 'test', collection: 'baz'}, actions: ['collStats']}],
                         {}); // Default write concern will wait for majority, which will time out.
@@ -148,6 +149,8 @@ a.createRole({role: 'persistentRole',
 a.grantRolesToUser('spencer',
                    ['persistentRole'],
                    {}); // Default write concern will wait for majority, which will time out.
+A.logout();
+a.auth('spencer', 'pwd');
 
 // A has the data we just wrote, but not what B wrote before
 assert.commandWorked(a.runCommand({dbStats: 1}));
@@ -171,9 +174,11 @@ jsTestLog("Triggering rollback");
 B.runCommand({ replSetTest: 1, blind: false });
 reconnect(a);
 reconnect(b);
-replTest.awaitReplication();
-replTest.waitForState(a_conn, replTest.PRIMARY);
-replTest.waitForState(b_conn, replTest.SECONDARY);
+authutil.asCluster(replTest.nodes,
+                   'jstests/libs/key1',
+                   function() { replTest.awaitReplication(); });
+replTest.waitForState(a_conn, replTest.PRIMARY, 60000);
+replTest.waitForState(b_conn, replTest.SECONDARY, 60000);
 
 // Now both A and B should agree
 assert.commandWorked(a.runCommand({dbStats: 1}));

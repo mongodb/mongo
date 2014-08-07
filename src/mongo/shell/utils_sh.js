@@ -3,11 +3,11 @@ sh = function() { return "try sh.help();" }
 sh._checkMongos = function() {
     var x = db.runCommand( "ismaster" );
     if ( x.msg != "isdbgrid" )
-        throw "not connected to a mongos"
+        throw Error("not connected to a mongos");
 }
 
 sh._checkFullName = function( fullName ) {
-    assert( fullName , "neeed a full name" )
+    assert( fullName , "need a full name" )
     assert( fullName.indexOf( "." ) > 0 , "name needs to be fully qualified <db>.<collection>'" )
 }
 
@@ -47,6 +47,7 @@ sh.help = function() {
     print( "\tsh.addShardTag(shard,tag)                 adds the tag to the shard" );
     print( "\tsh.removeShardTag(shard,tag)              removes the tag from the shard" );
     print( "\tsh.addTagRange(fullName,min,max,tag)      tags the specified range of the given collection" );
+    print( "\tsh.removeTagRange(fullName,min,max,tag)   removes the tagged range of the given collection" );
 
     print( "\tsh.status()                               prints a general overview of the cluster" )
 }
@@ -225,7 +226,7 @@ sh.waitForBalancerOff = function( timeout, interval ){
     }
     catch( e ){
         print( "Balancer still may be active, you must manually verify this is not the case using the config.changelog collection." )
-        throw e
+        throw Error(e);
     }
         
     print( "Waiting again for active hosts after balancer is off..." )
@@ -319,13 +320,13 @@ sh._lastMigration = function( ns ){
 sh._checkLastError = function( mydb ) {
     var err = mydb.getLastError();
     if ( err )
-        throw "error: " + err;
+        throw Error( "error: " + err );
 }
 
 sh.addShardTag = function( shard, tag ) {
     var config = db.getSisterDB( "config" );
     if ( config.shards.findOne( { _id : shard } ) == null ) {
-        throw "can't find a shard with name: " + shard;
+        throw Error( "can't find a shard with name: " + shard );
     }
     config.shards.update( { _id : shard } , { $addToSet : { tags : tag } } );
     sh._checkLastError( config );
@@ -334,7 +335,7 @@ sh.addShardTag = function( shard, tag ) {
 sh.removeShardTag = function( shard, tag ) {
     var config = db.getSisterDB( "config" );
     if ( config.shards.findOne( { _id : shard } ) == null ) {
-        throw "can't find a shard with name: " + shard;
+        throw Error( "can't find a shard with name: " + shard );
     }
     config.shards.update( { _id : shard } , { $pull : { tags : tag } } );
     sh._checkLastError( config );
@@ -350,4 +351,20 @@ sh.addTagRange = function( ns, min, max, tag ) {
             {_id: { ns : ns , min : min }, ns : ns , min : min , max : max , tag : tag } , 
             true );
     sh._checkLastError( config );    
+}
+
+sh.removeTagRange = function( ns, min, max, tag ) {
+    var config = db.getSisterDB( "config" );
+    // warn if the namespace does not exist, even dropped
+    if ( config.collections.findOne( { _id : ns } ) == null ) {
+        print( "Warning: can't find the namespace: " + ns + " - collection likely never sharded" );
+    }
+    // warn if the tag being removed is still in use
+    if ( config.shards.findOne( { tags : tag } ) ) {
+        print( "Warning: tag still in use by at least one shard" );
+    }
+    // max and tag criteria not really needed, but including them avoids potentially unexpected
+    // behavior.
+    config.tags.remove( { _id : { ns : ns , min : min } , max : max , tag : tag } );
+    sh._checkLastError( config );
 }

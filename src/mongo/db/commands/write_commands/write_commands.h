@@ -57,12 +57,13 @@ namespace mongo {
          */
         WriteCmd( const StringData& name, BatchedCommandRequest::BatchType writeType );
 
-    private:
-        virtual bool logTheOp();
+        // Full log of write command can be quite large.
+        static void redactTooLongLog( mutablebson::Document* cmdObj, const StringData& fieldName );
 
+    private:
         virtual bool slaveOk() const;
 
-        virtual LockType locktype() const;
+        virtual bool isWriteCommandForConfigServer() const;
 
         virtual Status checkAuthForCommand( ClientBasic* client,
                                             const std::string& dbname,
@@ -71,10 +72,12 @@ namespace mongo {
         virtual bool shouldAffectCommandCounter() const;
 
         // Write command entry point.
-        virtual bool run(const string& dbname,
+        virtual bool run(
+                 OperationContext* txn,
+                 const std::string& dbname,
                  BSONObj& cmdObj,
                  int options,
-                 string& errmsg,
+                 std::string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl);
 
@@ -86,27 +89,30 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(CmdInsert);
     public:
         CmdInsert();
+        void redactForLogging(mutablebson::Document* cmdObj);
 
     private:
-        virtual void help(stringstream& help) const;
+        virtual void help(std::stringstream& help) const;
     };
 
     class CmdUpdate : public WriteCmd {
         MONGO_DISALLOW_COPYING(CmdUpdate);
     public:
         CmdUpdate();
+        void redactForLogging(mutablebson::Document* cmdObj);
 
     private:
-        virtual void help(stringstream& help) const;
+        virtual void help(std::stringstream& help) const;
     };
 
     class CmdDelete : public WriteCmd {
         MONGO_DISALLOW_COPYING(CmdDelete);
     public:
         CmdDelete();
+        void redactForLogging(mutablebson::Document* cmdObj);
 
     private:
-        virtual void help(stringstream& help) const;
+        virtual void help(std::stringstream& help) const;
     };
 
 } // namespace mongo

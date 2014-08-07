@@ -49,8 +49,11 @@ namespace mongo {
          * Returns Status::OK() if it's a valid spec.
          * Returns a Status indicating how it's invalid otherwise.
          */
-        static Status make(const BSONObj& spec, const MatchExpression* const query,
-                           ParsedProjection** out);
+        static Status make(const BSONObj& spec,
+                           const MatchExpression* const query,
+                           ParsedProjection** out,
+                           const MatchExpressionParser::WhereCallback& whereCallback =
+                                        MatchExpressionParser::WhereCallback());
 
         /**
          * Is the full document required to compute this projection?
@@ -61,7 +64,7 @@ namespace mongo {
          * If requiresDocument() == false, what fields are required to compute
          * the projection?
          */
-        const vector<string>& getRequiredFields() const {
+        const std::vector<std::string>& getRequiredFields() const {
             return _requiredFields;
         }
 
@@ -83,11 +86,20 @@ namespace mongo {
             return _wantGeoNearPoint;
         }
 
+        bool wantIndexKey() const {
+            return _returnKey;
+        }
+
     private:
         /**
          * Must go through ::make
          */
         ParsedProjection() : _requiresDocument(true) { }
+
+        /**
+         * Returns true if field name refers to a positional projection.
+         */
+        static bool _isPositionalOperator(const char* fieldName);
 
         /**
          * Returns true if the MatchExpression 'query' queries against
@@ -101,8 +113,8 @@ namespace mongo {
         static bool _hasPositionalOperatorMatch(const MatchExpression* const query,
                                                 const std::string& matchfield);
 
-        // XXX stringdata?
-        vector<string> _requiredFields;
+        // TODO: stringdata?
+        std::vector<std::string> _requiredFields;
 
         bool _requiresDocument;
 
@@ -111,6 +123,8 @@ namespace mongo {
         bool _wantGeoNearDistance;
 
         bool _wantGeoNearPoint;
+
+        bool _returnKey;
     };
 
 }  // namespace mongo

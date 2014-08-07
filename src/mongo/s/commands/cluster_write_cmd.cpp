@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+ 
 #include "mongo/base/init.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client_basic.h"
@@ -33,10 +35,12 @@
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
@@ -54,30 +58,32 @@ namespace mongo {
         virtual ~ClusterWriteCmd() {
         }
 
-        bool logTheOp() {
-            return false;
-        }
-
         bool slaveOk() const {
             return false;
         }
 
-        LockType locktype() const {
-            return Command::NONE;
-        }
+        bool isWriteCommandForConfigServer() const { return false; }
 
         Status checkAuthForCommand( ClientBasic* client,
                                     const std::string& dbname,
                                     const BSONObj& cmdObj ) {
 
-            return auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
-                                                   _writeType,
-                                                   NamespaceString( parseNs( dbname, cmdObj ) ),
-                                                   cmdObj );
+            Status status = auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
+                                                            _writeType,
+                                                            NamespaceString( parseNs( dbname,
+                                                                                      cmdObj ) ),
+                                                            cmdObj );
+
+            // TODO: Remove this when we standardize GLE reporting from commands
+            if ( !status.isOK() ) {
+                setLastError( status.code(), status.reason().c_str() );
+            }
+
+            return status;
         }
 
         // Cluster write command entry point.
-        bool run( const string& dbname,
+        bool run(OperationContext* txn, const string& dbname,
                   BSONObj& cmdObj,
                   int options,
                   string& errmsg,
@@ -140,7 +146,7 @@ namespace mongo {
     // Cluster write command implementation(s) below
     //
 
-    bool ClusterWriteCmd::run( const string& dbName,
+    bool ClusterWriteCmd::run(OperationContext* txn, const string& dbName,
                                BSONObj& cmdObj,
                                int options,
                                string& errMsg,
@@ -151,23 +157,62 @@ namespace mongo {
         BatchedCommandResponse response;
         ClusterWriter writer( true /* autosplit */, 0 /* timeout */ );
 
-        // TODO: if we do namespace parsing, push this to the type
-        if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
+        // NOTE: Sometimes this command is invoked with LE disabled for legacy writes
+        LastError* cmdLastError = lastError.get( false );
 
-            // Batch parse failure
-            response.setOk( false );
-            response.setErrCode( ErrorCodes::FailedToParse );
-            response.setErrMessage( errMsg );
+        {
+            // Disable the last error object for the duration of the write
+            LastError::Disabled disableLastError( cmdLastError );
+
+            // TODO: if we do namespace parsing, push this to the type
+            if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
+
+                // Batch parse failure
+                response.setOk( false );
+                response.setErrCode( ErrorCodes::FailedToParse );
+                response.setErrMessage( errMsg );
+            }
+            else {
+
+                // Fixup the namespace to be a full ns internally
+                NamespaceString nss( dbName, request.getNS() );
+                request.setNS( nss.ns() );
+
+                writer.write( request, &response );
+            }
+
+            dassert( response.isValid( NULL ) );
         }
-        else {
 
-            // Fixup the namespace to be a full ns internally
-            NamespaceString nss( dbName, request.getNS() );
-            request.setNS( nss.ns() );
-            writer.write( request, &response );
+        if ( cmdLastError ) {
+            // Populate the lastError object based on the write response
+            cmdLastError->reset();
+            batchErrorToLastError( request, response, cmdLastError );
         }
 
-        dassert( response.isValid( NULL ) );
+        size_t numAttempts;
+        if ( !response.getOk() ) {
+            numAttempts = 0;
+        } else if ( request.getOrdered() && response.isErrDetailsSet() ) {
+            numAttempts = response.getErrDetailsAt(0)->getIndex() + 1; // Add one failed attempt
+        } else {
+            numAttempts = request.sizeWriteOps();
+        }
+
+        // TODO: increase opcounters by more than one
+        if ( _writeType == BatchedCommandRequest::BatchType_Insert ) {
+            for( size_t i = 0; i < numAttempts; ++i ) {
+                globalOpCounters.gotInsert();
+            }
+        } else if ( _writeType == BatchedCommandRequest::BatchType_Update ) {
+            for( size_t i = 0; i < numAttempts; ++i ) {
+                globalOpCounters.gotUpdate();
+            }
+        } else if ( _writeType == BatchedCommandRequest::BatchType_Delete ) {
+            for( size_t i = 0; i < numAttempts; ++i ) {
+                globalOpCounters.gotDelete();
+            }
+        }
 
         // Save the last opTimes written on each shard for this client, to allow GLE to work
         if ( ClientInfo::exists() && writer.getStats().hasShardStats() ) {

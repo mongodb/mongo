@@ -26,9 +26,8 @@
  *    it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/db/field_parser.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/geo/core.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/util/mongoutils/str.h"
@@ -38,9 +37,8 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    inline std::ostream& operator<<(std::ostream &s, const GeoHash &h) {
-        s << h.toString();
-        return s;
+    std::ostream& operator<<(std::ostream &s, const GeoHash &h) {
+        return s << h.toString();
     }
 
     /* 
@@ -60,9 +58,13 @@ namespace mongo {
                 hashedToNormal[fixed] = i;
             }
 
+            // Generate all 32 + 1 all-on bit patterns by repeatedly shifting the next bit to the
+            // correct position
+
             long long currAllX = 0, currAllY = 0;
-            for (int i = 0; i < 64; i++){
-                long long thisBit = 1LL << (63 - i);
+            for (int i = 0; i < 64 + 2; i++){
+
+                long long thisBit = 1LL << (63 >= i ? 63 - i : 0);
 
                 if (i % 2 == 0) {
                     allX[i / 2] = currAllX;
@@ -80,12 +82,13 @@ namespace mongo {
         // allX[1] = 8000000000000000
         // allX[2] = a000000000000000
         // allX[3] = a800000000000000
-        long long allX[32];
+        // Note that 32 + 1 entries are needed, since 0 and 32 are both valid numbers of bits.
+        long long allX[33];
         // Same alternating bits but starting with one from the MSB:
         // allY[1] = 4000000000000000
         // allY[2] = 5000000000000000
         // allY[3] = 5400000000000000
-        long long allY[32];
+        long long allY[33];
 
         unsigned hashedToNormal[256];
     };
@@ -105,6 +108,16 @@ namespace mongo {
     inline static long long mask64For(const int i) {
         return 1LL << (63 - i);
     }
+
+    // Binary data is stored in some particular byte ordering that requires this.
+    static void copyAndReverse(char *dst, const char *src) {
+        for (unsigned a = 0; a < 8; a++) {
+            dst[a] = src[7 - a];
+        }
+    }
+
+    // Definition
+    unsigned int const GeoHash::kMaxBits = 32;
 
     /* This class maps an x,y coordinate pair to a hash value.
      * This should probably be renamed/generalized so that it's more of a planar hash,
@@ -137,7 +150,7 @@ namespace mongo {
         _bits = bits;
         if (e.type() == BinData) {
             int len = 0;
-            _copyAndReverse((char*)&_hash, e.binData(len));
+            copyAndReverse((char*)&_hash, e.binData(len));
             verify(len == 8);
         } else {
             cout << "GeoHash bad element: " << e << endl;
@@ -256,7 +269,7 @@ namespace mongo {
     // TODO(hk): Comment this.
     BSONObj GeoHash::wrap(const char* name) const {
         BSONObjBuilder b(20);
-        appendToBuilder(&b, name);
+        appendHashMin(&b, name);
         BSONObj o = b.obj();
         if ('\0' == name[0]) verify(o.objsize() == 20);
         return o;
@@ -363,7 +376,12 @@ namespace mongo {
     }
 
     bool GeoHash::operator<(const GeoHash& h) const {
-        if (_hash != h._hash) return _hash < h._hash;
+
+        if (_hash != h._hash) {
+            return static_cast<unsigned long long>(_hash) <
+                   static_cast<unsigned long long>(h._hash);
+        }
+
         return _bits < h._bits;
     }
 
@@ -397,16 +415,36 @@ namespace mongo {
      * Maybe there's junk in there?  Not sure why this is done.
      */
     void GeoHash::clearUnusedBits() {
+        // Left shift count should be less than 64
+        if (_bits == 0) {
+            _hash = 0;
+            return;
+        }
+
         static long long FULL = 0xFFFFFFFFFFFFFFFFLL;
         long long mask = FULL << (64 - (_bits * 2));
         _hash &= mask;
     }
 
-    // Append the hash to the builder provided.
-    void GeoHash::appendToBuilder(BSONObjBuilder* b, const char * name) const {
+    static void appendHashToBuilder(long long hash,
+                                    BSONObjBuilder* builder,
+                                    const char* fieldName) {
         char buf[8];
-        _copyAndReverse(buf, (char*)&_hash);
-        b->appendBinData(name, 8, bdtCustom, buf);
+        copyAndReverse(buf, (char*) &hash);
+        builder->appendBinData(fieldName, 8, bdtCustom, buf);
+    }
+
+    void GeoHash::appendHashMin(BSONObjBuilder* builder, const char* fieldName) const {
+        // The min bound of a GeoHash region has all the unused suffix bits set to 0
+        appendHashToBuilder(_hash, builder, fieldName);
+    }
+
+    void GeoHash::appendHashMax(BSONObjBuilder* builder, const char* fieldName) const {
+        // The max bound of a GeoHash region has all the unused suffix bits set to 1
+        long long suffixMax = ~(geoBitSets.allX[_bits] | geoBitSets.allY[_bits]);
+        long long hashMax = _hash | suffixMax;
+
+        appendHashToBuilder(hashMax, builder, fieldName);
     }
 
     long long GeoHash::getHash() const {
@@ -428,14 +466,82 @@ namespace mongo {
         return GeoHash(_hash, i);
     }
 
-    // Binary data is stored in some particular byte ordering that requires this.
-    void GeoHash::_copyAndReverse(char *dst, const char *src) {
-        for (unsigned a = 0; a < 8; a++) {
-            dst[a] = src[7 - a];
+
+    bool GeoHash::subdivide( GeoHash children[4] ) const {
+        if ( _bits == 32 ) {
+            return false;
         }
+
+        children[0] = GeoHash( _hash, _bits + 1 ); // (0, 0)
+        children[1] = children[0];
+        children[1].setBit( _bits * 2 + 1, 1 ); // (0, 1)
+        children[2] = children[0];
+        children[2].setBit( _bits * 2, 1 ); // (1, 0)
+        children[3] = GeoHash(children[1]._hash | children[2]._hash, _bits + 1); // (1, 1)
+        return true;
     }
 
-    GeoHashConverter::GeoHashConverter(const Parameters &params) : _params(params) {
+    bool GeoHash::contains(const GeoHash& other) const {
+        return _bits <= other._bits && other.hasPrefix(*this);
+    }
+
+    GeoHash GeoHash::parent(unsigned int level) const {
+        return GeoHash(_hash, level);
+    }
+
+    GeoHash GeoHash::parent() const {
+        verify(_bits > 0);
+        return GeoHash(_hash, _bits - 1);
+    }
+
+    static BSONField<int> bitsField("bits", 26);
+    static BSONField<double> maxField("max", 180.0);
+    static BSONField<double> minField("min", -180.0);
+
+    Status GeoHashConverter::parseParameters(const BSONObj& paramDoc,
+                                             GeoHashConverter::Parameters* params) {
+
+        string errMsg;
+
+        if (FieldParser::FIELD_INVALID
+            == FieldParser::extractNumber(paramDoc, bitsField, &params->bits, &errMsg)) {
+            return Status(ErrorCodes::InvalidOptions, errMsg);
+        }
+
+        if (FieldParser::FIELD_INVALID
+            == FieldParser::extractNumber(paramDoc, maxField, &params->max, &errMsg)) {
+            return Status(ErrorCodes::InvalidOptions, errMsg);
+        }
+
+        if (FieldParser::FIELD_INVALID
+            == FieldParser::extractNumber(paramDoc, minField, &params->min, &errMsg)) {
+            return Status(ErrorCodes::InvalidOptions, errMsg);
+        }
+
+        if (params->bits < 1 || params->bits > 32) {
+            return Status(ErrorCodes::InvalidOptions,
+                          str::stream() << "bits for hash must be > 0 and <= 32, "
+                                        << "but " << params->bits << " bits were specified");
+        }
+
+        if (params->min >= params->max) {
+            return Status(ErrorCodes::InvalidOptions,
+                          str::stream() << "region for hash must be valid and have positive area, "
+                                        << "but [" << params->min << ", " << params->max << "] "
+                                        << "was specified");
+        }
+
+        double numBuckets = (1024 * 1024 * 1024 * 4.0);
+        params->scaling = numBuckets / (params->max - params->min);
+
+        return Status::OK();
+    }
+
+    GeoHashConverter::GeoHashConverter(const Parameters& params) : _params(params) {
+        init();
+    }
+
+    void GeoHashConverter::init() {
         // TODO(hk): What do we require of the values in params?
 
         // Compute how much error there is so it can be used as a fudge factor.
@@ -564,6 +670,18 @@ namespace mongo {
         h.unhash(&a, &b);
         *x = convertFromHashScale(a);
         *y = convertFromHashScale(b);
+    }
+
+    Box GeoHashConverter::unhashToBox(const GeoHash &h) const {
+        double sizeEdgeBox = sizeEdge(h);
+        Point min(unhashToPoint(h));
+        Point max(min.x + sizeEdgeBox, min.y + sizeEdgeBox);
+        Box box(min, max);
+        return box;
+    }
+
+    Box GeoHashConverter::unhashToBox(const BSONElement &e) const {
+        return unhashToBox(hash(e));
     }
 
     double GeoHashConverter::sizeOfDiag(const GeoHash& a) const {

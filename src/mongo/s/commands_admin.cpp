@@ -26,7 +26,7 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
 
@@ -48,6 +48,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_write.h"
@@ -63,6 +64,7 @@
 #include "mongo/s/write_ops/batch_downconvert.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/processinfo.h"
@@ -72,6 +74,8 @@
 #include "mongo/util/version.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     namespace dbgrid_cmds {
 
@@ -87,7 +91,7 @@ namespace mongo {
             }
 
             // all grid commands are designed not to lock
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
 
             bool okForConfigChanges( string& errmsg ) {
                 string e;
@@ -114,7 +118,7 @@ namespace mongo {
                 actions.addAction(ActionType::netstat);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("configserver", configServer.getPrimary().getConnString() );
                 result.append("isdbgrid", 1);
                 return true;
@@ -134,7 +138,7 @@ namespace mongo {
                 actions.addAction(ActionType::flushRouterConfig);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 grid.flushConfig();
                 result.appendBool( "flushed" , true );
                 return true;
@@ -151,7 +155,7 @@ namespace mongo {
                 actions.addAction(ActionType::fsync);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 if ( cmdObj["lock"].trueValue() ) {
                     errmsg = "can't do lock through mongos";
                     return false;
@@ -205,7 +209,7 @@ namespace mongo {
             virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
                 return cmdObj.firstElement().valuestrsafe();
             }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string dbname = parseNs("admin", cmdObj);
 
                 if ( dbname.size() == 0 ) {
@@ -400,7 +404,7 @@ namespace mongo {
             virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
                 return cmdObj.firstElement().valuestrsafe();
             }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string dbname = parseNs("admin", cmdObj);
                 if ( dbname.size() == 0 ) {
                     errmsg = "no db";
@@ -459,7 +463,7 @@ namespace mongo {
             virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
                 return parseNsFullyQualified(dbname, cmdObj);
             }
-            bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 const string ns = parseNs(dbname, cmdObj);
                 if ( ns.size() == 0 ) {
                     errmsg = "no ns";
@@ -744,7 +748,7 @@ namespace mongo {
                     }
                 }
 
-                MONGO_TLOG(0) << "CMD: shardcollection: " << cmdObj << endl;
+                LOG(0) << "CMD: shardcollection: " << cmdObj << endl;
 
                 audit::logShardCollection(ClientBasic::getCurrent(), ns, proposedKey, careAboutUnique);
                 config->shardCollection( ns , proposedKey , careAboutUnique , &initSplits );
@@ -769,8 +773,9 @@ namespace mongo {
                             continue;
 
                         BSONObj moveResult;
+                        WriteConcernOptions noThrottle;
                         if (!chunk->moveAndCommit(to, Chunk::MaxChunkSize,
-                                false, true, 0, moveResult)) {
+                                                  &noThrottle, true, 0, moveResult)) {
                             warning().stream()
                                       << "Couldn't move chunk " << chunk << " to shard "  << to
                                       << " while sharding collection " << ns << ". Reason: "
@@ -790,21 +795,28 @@ namespace mongo {
                     ChunkPtr currentChunk = chunkManager->findIntersectingChunk( allSplits[0] );
                     vector<BSONObj> subSplits;
                     for ( unsigned i = 0 ; i <= allSplits.size(); i++){
-                        if ( i == allSplits.size() || ! currentChunk->containsPoint( allSplits[i] ) ) {
+                        if ( i == allSplits.size() ||
+                                ! currentChunk->containsPoint( allSplits[i] ) ) {
                             if ( ! subSplits.empty() ){
-                                BSONObj splitResult;
-                                if ( ! currentChunk->multiSplit( subSplits , splitResult ) ){
+                                Status status = currentChunk->multiSplit( subSplits );
+                                if ( !status.isOK() ){
                                     warning().stream()
                                         << "Couldn't split chunk " << currentChunk
                                         << " while sharding collection " << ns << ". Reason: "
-                                        << splitResult << endl;
+                                        << status << endl;
                                 }
                                 subSplits.clear();
                             }
                             if ( i < allSplits.size() )
                                 currentChunk = chunkManager->findIntersectingChunk( allSplits[i] );
                         } else {
-                            subSplits.push_back( allSplits[i] );
+                            BSONObj splitPoint(allSplits[i]);
+                            if ( currentChunk->getMin().woCompare( splitPoint ) == 0 ) {
+                                // Do not split on the boundaries.
+                                continue;
+                            }
+
+                            subSplits.push_back( splitPoint );
                         }
                     }
 
@@ -837,7 +849,7 @@ namespace mongo {
             virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
                 return parseNsFullyQualified(dbname, cmdObj);
             }
-            bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string ns = parseNs(dbname, cmdObj);
                 if ( ns.size() == 0 ) {
                     errmsg = "need to specify fully namespace";
@@ -888,7 +900,7 @@ namespace mongo {
             virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
                 return parseNsFullyQualified(dbname, cmdObj);
             }
-            bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
@@ -990,10 +1002,14 @@ namespace mongo {
                       << " on shard " << chunk->getShard().getName() << endl;
 
                 BSONObj res;
-                bool worked;
                 if ( middle.isEmpty() ) {
-                    BSONObj ret = chunk->singleSplit( true /* force a split even if not enough data */ , res );
-                    worked = !ret.isEmpty();
+                    Status status = chunk->split( true /* force a split even if not enough data */,
+                                                  NULL );
+                    if ( !status.isOK() ) {
+                        errmsg = "split failed";
+                        result.append( "cause", status.toString() );
+                        return false;
+                    }
                 }
                 else {
                     // sanity check if the key provided is a valid split point
@@ -1009,13 +1025,13 @@ namespace mongo {
 
                     vector<BSONObj> splitPoints;
                     splitPoints.push_back( middle );
-                    worked = chunk->multiSplit( splitPoints , res );
-                }
+                    Status status = chunk->multiSplit( splitPoints );
 
-                if ( !worked ) {
-                    errmsg = "split failed";
-                    result.append( "cause" , res );
-                    return false;
+                    if ( !status.isOK() ) {
+                        errmsg = "split failed";
+                        result.append( "cause", status.toString() );
+                        return false;
+                    }
                 }
 
                 return true;
@@ -1046,7 +1062,7 @@ namespace mongo {
             virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
                 return parseNsFullyQualified(dbname, cmdObj);
             }
-            bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
@@ -1110,7 +1126,7 @@ namespace mongo {
                     return false;
                 }
 
-                MONGO_TLOG(0) << "CMD: movechunk: " << cmdObj << endl;
+                LOG(0) << "CMD: movechunk: " << cmdObj << endl;
 
                 StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMSCommand(cmdObj);
 
@@ -1119,10 +1135,23 @@ namespace mongo {
                     return false;
                 }
 
+                scoped_ptr<WriteConcernOptions> writeConcern(new WriteConcernOptions());
+                Status status = writeConcern->parseSecondaryThrottle(cmdObj, NULL);
+
+                if (!status.isOK()){
+                    if (status.code() != ErrorCodes::WriteConcernNotDefined) {
+                        errmsg = status.toString();
+                        return false;
+                    }
+
+                    // Let the shard decide what write concern to use.
+                    writeConcern.reset();
+                }
+
                 BSONObj res;
                 if (!c->moveAndCommit(to,
                                       maxChunkSizeBytes,
-                                      cmdObj["_secondaryThrottle"].trueValue(),
+                                      writeConcern.get(),
                                       cmdObj["_waitForDelete"].trueValue(),
                                       maxTimeMS.getValue(),
                                       res)) {
@@ -1154,7 +1183,7 @@ namespace mongo {
                 actions.addAction(ActionType::listShards);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
 
                 vector<BSONObj> all;
@@ -1185,7 +1214,7 @@ namespace mongo {
                 actions.addAction(ActionType::addShard);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg.clear();
 
                 // get replica set component hosts
@@ -1210,7 +1239,8 @@ namespace mongo {
 
                     // it's fine if mongods of a set all use default port
                     if ( ! serverAddrs[i].hasPort() ) {
-                        serverAddrs[i].setPort(ServerGlobalParams::ShardServerPort);
+                        serverAddrs[i] = HostAndPort(serverAddrs[i].host(),
+                                                     ServerGlobalParams::ShardServerPort);
                     }
                 }
 
@@ -1254,7 +1284,7 @@ namespace mongo {
                 actions.addAction(ActionType::removeShard);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string target = cmdObj.firstElement().valuestrsafe();
                 Shard s = Shard::make( target );
                 if ( ! grid.knowAboutShard( s.getConnString() ) ) {
@@ -1424,7 +1454,7 @@ namespace mongo {
 
         class IsDbGridCmd : public Command {
         public:
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1432,7 +1462,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
             IsDbGridCmd() : Command("isdbgrid") { }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("isdbgrid", 1);
                 result.append("hostname", getHostNameCached());
                 return true;
@@ -1441,7 +1471,7 @@ namespace mongo {
 
         class CmdIsMaster : public Command {
         public:
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1452,7 +1482,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
             CmdIsMaster() : Command("isMaster" , false , "ismaster") { }
-            virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 result.appendBool("ismaster", true );
                 result.append("msg", "isdbgrid");
                 result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
@@ -1473,21 +1503,18 @@ namespace mongo {
         class CmdWhatsMyUri : public Command {
         public:
             CmdWhatsMyUri() : Command("whatsmyuri") { }
-            virtual bool logTheOp() {
-                return false; // the modification will be logged directly
-            }
             virtual bool slaveOk() const {
                 return true;
             }
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
             virtual void help( stringstream &help ) const {
                 help << "{whatsmyuri:1}";
             }
-            virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                result << "you" << ClientInfo::get()->getRemote();
+            virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+                result << "you" << ClientInfo::get()->getRemote().toString();
                 return true;
             }
         } cmdWhatsMyUri;
@@ -1495,7 +1522,7 @@ namespace mongo {
 
         class CmdShardingGetPrevError : public Command {
         public:
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1506,7 +1533,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
             CmdShardingGetPrevError() : Command( "getPrevError" , false , "getpreverror") { }
-            virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg += "getpreverror not supported for sharded environments";
                 return false;
             }
@@ -1514,7 +1541,7 @@ namespace mongo {
 
         class CmdShardingGetLastError : public Command {
         public:
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1526,7 +1553,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {} // No auth required
             CmdShardingGetLastError() : Command("getLastError" , false , "getlasterror") { }
 
-            virtual bool run( const string& dbName,
+            virtual bool run(OperationContext* txn, const string& dbName,
                               BSONObj& cmdObj,
                               int,
                               string& errmsg,
@@ -1672,14 +1699,14 @@ namespace mongo {
     public:
         CmdShardingResetError() : Command( "resetError" , false , "reseterror" ) {}
 
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const {
             return true;
         }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
-        bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             LastError *le = lastError.get();
             if ( le )
                 le->reset();
@@ -1704,11 +1731,10 @@ namespace mongo {
     public:
         CmdListDatabases() : Command("listDatabases", true , "listdatabases" ) {}
 
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream& help ) const { help << "list databases on cluster"; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -1718,7 +1744,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
-        bool run(const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        bool run(OperationContext* txn, const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             vector<Shard> shards;
             Shard::getAllShards( shards );
 
@@ -1832,11 +1858,10 @@ namespace mongo {
     class CmdCloseAllDatabases : public Command {
     public:
         CmdCloseAllDatabases() : Command("closeAllDatabases", false , "closeAllDatabases" ) {}
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream& help ) const { help << "Not supported sharded"; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -1846,7 +1871,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
-        bool run(const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& /*result*/, bool /*fromRepl*/) {
+        bool run(OperationContext* txn, const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& /*result*/, bool /*fromRepl*/) {
             errmsg = "closeAllDatabases isn't supported through mongos";
             return false;
         }
@@ -1856,17 +1881,16 @@ namespace mongo {
     class CmdReplSetGetStatus : public Command {
     public:
         CmdReplSetGetStatus() : Command("replSetGetStatus"){}
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream& help ) const { help << "Not supported through mongos"; }
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             return Status::OK(); // Require no auth since this command isn't supported in mongos
         }
-        bool run(const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        bool run(OperationContext* txn, const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             if ( jsobj["forShell"].trueValue() ) {
                 lastError.disableForCommand();
                 ClientInfo::get()->disableForCommand();
@@ -1885,7 +1909,7 @@ namespace mongo {
              << "either (1) ran from localhost or (2) authenticated.";
     }
 
-    bool CmdShutdown::run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+    bool CmdShutdown::run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         return shutdownHelper();
     }
 

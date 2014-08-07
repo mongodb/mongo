@@ -28,9 +28,9 @@
 
 #pragma once
 
-namespace mongo {
+#include "mongo/db/exec/working_set.h"
 
-    class WorkingSetMember;
+namespace mongo {
 
     class WorkingSetCommon {
     public:
@@ -39,12 +39,60 @@ namespace mongo {
          * Requires either a valid BSONObj or valid DiskLoc.
          * Returns true if the fetch and invalidate succeeded, false otherwise.
          */
-        static bool fetchAndInvalidateLoc(WorkingSetMember* member);
+        static bool fetchAndInvalidateLoc(WorkingSetMember* member, const Collection* collection);
 
         /**
          * Initialize the fields in 'dest' from 'src', creating copies of owned objects as needed.
          */
         static void initFrom(WorkingSetMember* dest, const WorkingSetMember& src);
+
+        /**
+         * Build a BSONObj which represents a Status to return in a WorkingSet.
+         */
+        static BSONObj buildMemberStatusObject(const Status& status);
+
+        /**
+         * Allocate a new WSM and initialize it with
+         * the code and reason from the status.
+         * Owned BSON object will have the following layout:
+         * {
+         *     ok: <ok>, // 1 for OK; 0 otherwise.
+         *     code: <code>, // Status::code()
+         *     errmsg: <errmsg> // Status::reason()
+         * }
+         */
+        static WorkingSetID allocateStatusMember(WorkingSet* ws, const Status& status);
+
+        /**
+         * Returns true if object was created by allocateStatusMember().
+         */
+        static bool isValidStatusMemberObject(const BSONObj& obj);
+
+        /**
+         * Returns object in working set member created with allocateStatusMember().
+         * Does not assume isValidStatusMemberObject.
+         * If the WSID is invalid or the working set member is created by
+         * allocateStatusMember, objOut will not be updated.
+         */
+        static void getStatusMemberObject(const WorkingSet& ws, WorkingSetID wsid,
+                                          BSONObj* objOut);
+
+        /**
+         * Returns status from working set member object.
+         * Assumes isValidStatusMemberObject().
+         */
+        static Status getMemberObjectStatus(const BSONObj& memberObj);
+
+        /**
+         * Returns status from working set member created with allocateStatusMember().
+         * Assumes isValidStatusMemberObject().
+         */
+        static Status getMemberStatus(const WorkingSetMember& member);
+
+        /**
+         * Formats working set member object created with allocateStatusMember().
+         */
+        static std::string toStatusString(const BSONObj& obj);
     };
 
 }  // namespace mongo

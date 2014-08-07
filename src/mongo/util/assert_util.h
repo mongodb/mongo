@@ -2,17 +2,29 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
@@ -31,13 +43,12 @@ namespace mongo {
     enum CommonErrorCodes {
         OkCode = 0,
         DatabaseDifferCaseCode = 13297 ,  // uassert( 13297 )
-        InterruptedAtShutdown = 11600 ,   // uassert( 11600 )
         SendStaleConfigCode = 13388 ,     // uassert( 13388 )
         RecvStaleConfigCode = 9996,       // uassert( 9996 )
         PrepareConfigsFailedCode = 13104, // uassert( 13104 )
         NotMasterOrSecondaryCode = 13436, // uassert( 13436 )
         NotMasterNoSlaveOkCode = 13435,   // uassert( 13435 )
-        NotMaster = 10107                 // uassert( 10107 )
+        NotMaster = 10107,                // uassert( 10107 )
     };
 
     class MONGO_CLIENT_API AssertionCount {
@@ -144,12 +155,6 @@ namespace mongo {
 
         virtual bool severe() const { return true; }
         virtual bool isUserAssertion() const { return false; }
-
-        /* true if an interrupted exception - see KillCurrentOp */
-        bool interrupted() {
-            return _ei.code == InterruptedAtShutdown || _ei.code == 11601 ||
-                   _ei.code == ErrorCodes::ExceededTimeLimit;
-        }
     };
 
     /* UserExceptions are valid errors that a user can cause, like out of disk space or duplicate key */
@@ -229,6 +234,15 @@ namespace mongo {
        display happening.
     */
 #define MONGO_massert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (::mongo::msgasserted(msgid, msg), 0) )
+
+    MONGO_CLIENT_API inline void massertStatusOK(const Status& status) {
+        if (MONGO_unlikely(!status.isOK())) {
+            msgasserted((status.location() != 0 ? status.location() : status.code()),
+                        status.reason());
+        }
+    }
+
+
     /* same as massert except no msgid */
 #define MONGO_verify(_Expression) (void)( MONGO_likely(!!(_Expression)) || (::mongo::verifyFailed(#_Expression, __FILE__, __LINE__), 0) )
 
@@ -274,7 +288,7 @@ namespace mongo {
     try { \
         expression; \
     } catch ( const std::exception &e ) { \
-        stringstream ss; \
+        std::stringstream ss; \
         ss << "caught exception: " << e.what() << ' ' << __FILE__ << ' ' << __LINE__; \
         msgasserted( 13294 , ss.str() ); \
     } catch ( ... ) { \
@@ -285,7 +299,7 @@ namespace mongo {
     try { \
         expression; \
     } catch ( const std::exception &e ) { \
-        stringstream ss; \
+        std::stringstream ss; \
         ss << msg << " caught exception exception: " << e.what();   \
         msgasserted( 14043 , ss.str() );        \
     } catch ( ... ) { \
@@ -297,10 +311,10 @@ namespace mongo {
     try { \
         expression; \
     } catch ( const std::exception &e ) { \
-        problem() << "caught exception (" << e.what() << ") in destructor (" << __FUNCTION__ \
-                  << ")" << std::endl; \
+        ::mongo::log() << "caught exception (" << e.what() << ") in destructor (" << __FUNCTION__ \
+              << ")" << std::endl; \
     } catch ( ... ) { \
-        problem() << "caught unknown exception in destructor (" << __FUNCTION__ << ")" \
-                  << std::endl; \
+        ::mongo::log() << "caught unknown exception in destructor (" << __FUNCTION__ << ")" \
+              << std::endl; \
     }
 

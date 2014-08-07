@@ -6,10 +6,6 @@ var rt = new ReplTest( "mod_move" );
 
 m = rt.start( true , { oplogSize : 50 } );
 
-function block(){
-    am.runCommand( { getlasterror : 1 , w : 2 , wtimeout : 3000 } )
-}
-
 am = m.getDB( "foo" );
 
 function check( note ){
@@ -31,39 +27,30 @@ function check( note ){
 BIG = 100000;
 N = BIG * 2;
 
-s : "asdasdasdasdasdasdasdadasdadasdadasdasdas"
-
-for ( i=0; i<BIG; i++ ) {
-    am.a.insert( { _id : i , s : 1 , x : 1 } )
+var bulk = am.a.initializeUnorderedBulkOp();
+for (var i = 0; i < BIG; i++) {
+    bulk.insert({ _id: i, s: 1, x: 1 });
 }
-for ( ; i<N; i++ ) {
-    am.a.insert( { _id : i , s : 1 } )
+for (; i < N; i++) {
+    bulk.insert({ _id: i, s: 1 });
 }
-for ( i=0; i<BIG; i++ ) {
-    am.a.remove( { _id : i } )
+for (i = 0; i < BIG; i++) {
+    bulk.find({ _id: i }).remove();
 }
-am.getLastError();
+assert.writeOK(bulk.execute());
 assert.eq( BIG , am.a.count() )
 
 assert.eq( 1 , am.a.stats().paddingFactor , "A2"  )
 
-
 // start slave
 s = rt.start( false );
 as = s.getDB( "foo" );
-for ( i=N-1; i>=BIG; i-- ) {
-    am.a.update( { _id : i } , { $set : { x : 1 } } )
-    if ( i == N ) {
-        am.getLastError()
-        assert.lt( as.a.count() , BIG , "B1" )
-        print( "NOW : " + as.a.count() )
-    }
+bulk = am.a.initializeUnorderedBulkOp();
+for (i = N - 1; i >= BIG; i--) {
+    bulk.find({ _id: i }).update({ $set: { x: 1 }});
 }
+assert.writeOK(bulk.execute());
 
 check( "B" )
 
 rt.stop();
-
-
-
-

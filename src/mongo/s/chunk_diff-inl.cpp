@@ -33,6 +33,7 @@
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -95,7 +96,7 @@ namespace mongo {
         // Get the diff query required
         Query diffQuery = configDiffQuery( extraMinorVersions );
 
-        ScopedDbConnection conn(config);
+        ScopedDbConnection conn(config, 30.0);
 
         try {
 
@@ -121,6 +122,8 @@ namespace mongo {
     int ConfigDiffTracker<ValType,ShardType>::
         calculateConfigDiff( DBClientCursorInterface& diffCursor )
     {
+        MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kSharding);
+
         verifyAttached();
 
         // Apply the chunk changes to the ranges and versions
@@ -153,11 +156,13 @@ namespace mongo {
                 continue;
             }
 
-            if( ! chunkVersion.isSet() || ! chunkVersion.hasCompatibleEpoch( currEpoch ) ){
+            if( ! chunkVersion.isSet() || ! chunkVersion.hasEqualEpoch( currEpoch ) ){
 
                 warning() << "got invalid chunk version " << chunkVersion << " in document " << diffChunkDoc
                           << " when trying to load differing chunks at version "
-                          << ChunkVersion( _maxVersion->toLong(), currEpoch ) << endl;
+                          << ChunkVersion( _maxVersion->majorVersion(),
+                                           _maxVersion->minorVersion(),
+                                           currEpoch ) << endl;
 
                 // Don't keep loading, since we know we'll be broken here
                 return -1;

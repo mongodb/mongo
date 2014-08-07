@@ -28,8 +28,6 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
-
 #include "mongo/db/commands/fsync.h"
 
 #include <string>
@@ -41,9 +39,12 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/dur.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/background.h"
 
 namespace mongo {
@@ -81,7 +82,7 @@ namespace mongo {
         boost::condition _unlockSync;
 
         FSyncCommand() : Command( "fsync" ), m("lockfsync") { locked=false; pendingUnlock=false; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual void help(stringstream& h) const { h << url(); }
@@ -92,9 +93,9 @@ namespace mongo {
             actions.addAction(ActionType::fsync);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
 
-            if (Lock::isLocked()) {
+            if (txn->lockState()->isLocked()) {
                 errmsg = "fsync: Cannot execute fsync command from contexts that hold a data lock";
                 return false;
             }
@@ -130,12 +131,13 @@ namespace mongo {
             else {
                 // the simple fsync command case
                 if (sync) {
-                    Lock::GlobalWrite w; // can this be GlobalRead? and if it can, it should be nongreedy.
-                    getDur().commitNow();
+                    // can this be GlobalRead? and if it can, it should be nongreedy.
+                    Lock::GlobalWrite w(txn->lockState());
+                    getDur().commitNow(txn);
+                    //  No WriteUnitOfWork needed, as this does no writes of its own.
                 }
-                // question : is it ok this is not in the dblock? i think so but this is a change from past behavior, 
-                // please advise.
-                result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );
+                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+                result.append( "numFiles" , storageEngine->flushAllFiles( sync ) );
             }
             return 1;
         }
@@ -145,12 +147,15 @@ namespace mongo {
 
     void FSyncLockThread::doRealWork() {
         SimpleMutex::scoped_lock lkf(filesLockedFsync);
-        Lock::GlobalWrite global(true/*stopGreed*/);
+
+        OperationContextImpl txn;   // XXX?
+        Lock::GlobalWrite global(txn.lockState()); // No WriteUnitOfWork needed
+
         SimpleMutex::scoped_lock lk(fsyncCmd.m);
         
         verify( ! fsyncCmd.locked ); // impossible to get here if locked is true
         try { 
-            getDur().syncDataAndTruncateJournal();
+            getDur().syncDataAndTruncateJournal(&txn);
         } 
         catch( std::exception& e ) { 
             error() << "error doing syncDataAndTruncateJournal: " << e.what() << endl;
@@ -163,7 +168,8 @@ namespace mongo {
         global.downgrade();
         
         try {
-            MemoryMappedFile::flushAll(true);
+            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            storageEngine->flushAllFiles(true);
         }
         catch( std::exception& e ) { 
             error() << "error doing flushAll: " << e.what() << endl;
@@ -195,7 +201,6 @@ namespace mongo {
     
     // @return true if unlocked
     bool _unlockFsync() {
-        verify(!Lock::isLocked());
         SimpleMutex::scoped_lock lk( fsyncCmd.m );
         if( !fsyncCmd.locked ) { 
             return false;

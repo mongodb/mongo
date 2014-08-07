@@ -16,28 +16,21 @@ adminUser = { db : "admin", username : "foo", password : "bar" };
 //set up a 2 shard cluster with keyfile
 var st = new ShardingTest( { name : "auth_add_shard1", shards : 1,
                             mongos : 1, verbose : 1, keyFile : "jstests/libs/key1" } )
-st.stopBalancer();
 
 var mongos = st.s0
 var admin = mongos.getDB("admin")
 
-assert.eq( 1, st.config.shards.count() , "initial server count wrong" );
-
 print("1 shard system setup");
 
 //add the admin user
-var user = admin.system.users.findOne();
-if (user) {
-    print("user already exists");
-    printjson(user);
-}
-else {
-    print("adding user");
-    mongos.getDB(adminUser.db).createUser({user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles});
-}
+print("adding user");
+mongos.getDB(adminUser.db).createUser({user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles});
 
 //login as admin user
 login(adminUser);
+
+st.stopBalancer();
+assert.eq( 1, st.config.shards.count() , "initial server count wrong" );
 
 //start a mongod with NO keyfile
 var conn = MongoRunner.runMongod({});

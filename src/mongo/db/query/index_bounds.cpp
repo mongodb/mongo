@@ -28,7 +28,12 @@
 
 #include "mongo/db/query/index_bounds.h"
 
+#include <algorithm>
+#include <utility>
+
 namespace mongo {
+
+    using std::vector;
 
     namespace {
 
@@ -37,6 +42,26 @@ namespace mongo {
             if (i == 0)
                 return 0;
             return i > 0 ? 1 : -1;
+        }
+
+        /**
+         * Returns BEHIND if the key is behind the interval.
+         * Returns WITHIN if the key is within the interval.
+         * Returns AHEAD if the key is ahead the interval.
+         *
+         * All directions are oriented along 'direction'.
+         */
+        IndexBoundsChecker::Location intervalCmp(const Interval& interval, const BSONElement& key,
+                                                 const int expectedDirection) {
+            int cmp = sgn(key.woCompare(interval.start, false));
+            bool startOK = (cmp == expectedDirection) || (cmp == 0 && interval.startInclusive);
+            if (!startOK) { return IndexBoundsChecker::BEHIND; }
+
+            cmp = sgn(key.woCompare(interval.end, false));
+            bool endOK = (cmp == -expectedDirection) || (cmp == 0 && interval.endInclusive);
+            if (!endOK) { return IndexBoundsChecker::AHEAD; }
+
+            return IndexBoundsChecker::WITHIN;
         }
 
     }  // namespace
@@ -75,6 +100,62 @@ namespace mongo {
         return ss;
     }
 
+    // static
+    void OrderedIntervalList::complement() {
+        BSONObjBuilder minBob;
+        minBob.appendMinKey("");
+        BSONObj minObj = minBob.obj();
+
+        // We complement by scanning the entire range of BSON values
+        // from MinKey to MaxKey. The value from which we must begin
+        // the next complemented interval is kept in 'curBoundary'.
+        BSONElement curBoundary = minObj.firstElement();
+
+        // If 'curInclusive' is true, then 'curBoundary' is
+        // included in one of the original intervals, and hence
+        // should not be included in the complement (and vice-versa
+        // if 'curInclusive' is false).
+        bool curInclusive = false;
+
+        // We will build up a list of intervals that represents
+        // the inversion of those in the OIL.
+        vector<Interval> newIntervals;
+        for (size_t j = 0; j < intervals.size(); ++j) {
+            Interval curInt = intervals[j];
+            if (0 != curInt.start.woCompare(curBoundary) ||
+                (!curInclusive && !curInt.startInclusive)) {
+                // Make a new interval from 'curBoundary' to
+                // the start of 'curInterval'.
+                BSONObjBuilder intBob;
+                intBob.append(curBoundary);
+                intBob.append(curInt.start);
+                Interval newInt(intBob.obj(), !curInclusive, !curInt.startInclusive);
+                newIntervals.push_back(newInt);
+            }
+
+            // Reset the boundary for the next iteration.
+            curBoundary = curInt.end;
+            curInclusive = curInt.endInclusive;
+        }
+
+        // We may have to add a final interval which ends in MaxKey.
+        BSONObjBuilder maxBob;
+        maxBob.appendMaxKey("");
+        BSONObj maxObj = maxBob.obj();
+        BSONElement maxKey = maxObj.firstElement();
+        if (0 != maxKey.woCompare(curBoundary) || !curInclusive) {
+            BSONObjBuilder intBob;
+            intBob.append(curBoundary);
+            intBob.append(maxKey);
+            Interval newInt(intBob.obj(), !curInclusive, true);
+            newIntervals.push_back(newInt);
+        }
+
+        // Replace the old list of intervals with the new one.
+        intervals.clear();
+        intervals.insert(intervals.end(), newIntervals.begin(), newIntervals.end());
+    }
+
     string IndexBounds::toString() const {
         mongoutils::str::stream ss;
         if (isSimpleRange) {
@@ -103,7 +184,7 @@ namespace mongo {
         return ss;
     }
 
-    BSONObj IndexBounds::toBSON() const {
+    BSONObj IndexBounds::toLegacyBSON() const {
         BSONObjBuilder builder;
         if (isSimpleRange) {
             // TODO
@@ -141,10 +222,39 @@ namespace mongo {
 
                     fieldBuilder.append(
                         static_cast<BSONArray>(intervalBuilder.arr().clientReadable()));
+
+                    // If the bounds object gets too large, truncate it.
+                    static const int kMaxBoundsSize = 1024 * 1024;
+                    if (builder.len() > kMaxBoundsSize) {
+                        intervalBuilder.doneFast();
+                        fieldBuilder.append(BSON("warning" << "bounds obj exceeds 1 MB"));
+                        fieldBuilder.doneFast();
+                        return builder.obj();
+                    }
                 }
             }
         }
+
         return builder.obj();
+    }
+
+    BSONObj IndexBounds::toBSON() const {
+        BSONObjBuilder bob;
+        vector<OrderedIntervalList>::const_iterator itField;
+        for (itField = fields.begin(); itField != fields.end(); ++itField) {
+            BSONArrayBuilder fieldBuilder(bob.subarrayStart(itField->name));
+
+            vector<Interval>::const_iterator itInterval;
+            for (itInterval = itField->intervals.begin()
+                    ; itInterval != itField->intervals.end()
+                    ; ++itInterval) {
+                fieldBuilder.append(itInterval->toString());
+            }
+
+            fieldBuilder.doneFast();
+        }
+
+        return bob.obj();
     }
 
     //
@@ -437,38 +547,50 @@ namespace mongo {
         return VALID;
     }
 
-    // static
-    IndexBoundsChecker::Location IndexBoundsChecker::intervalCmp(const Interval& interval,
-                                                                   const BSONElement& key,
-                                                                   const int expectedDirection) {
-        int cmp = sgn(key.woCompare(interval.start, false));
-        bool startOK = (cmp == expectedDirection) || (cmp == 0 && interval.startInclusive);
-        if (!startOK) { return BEHIND; }
+    namespace {
 
-        cmp = sgn(key.woCompare(interval.end, false));
-        bool endOK = (cmp == -expectedDirection) || (cmp == 0 && interval.endInclusive);
-        if (!endOK) { return AHEAD; }
+        /**
+         * Returns true if key (first member of pair) is AHEAD of interval
+         * along 'direction' (second member of pair).
+         */
+        bool isKeyAheadOfInterval(const Interval& interval,
+                                  const std::pair<BSONElement, int>& keyAndDirection) {
+            const BSONElement& elt = keyAndDirection.first;
+            int expectedDirection = keyAndDirection.second;
+            IndexBoundsChecker::Location where = intervalCmp(interval, elt, expectedDirection);
+            return IndexBoundsChecker::AHEAD == where;
+        }
 
-        return WITHIN;
-    }
+    } // namespace
 
     // static
     IndexBoundsChecker::Location IndexBoundsChecker::findIntervalForField(const BSONElement& elt,
             const OrderedIntervalList& oil, const int expectedDirection, size_t* newIntervalIndex) {
+        // Binary search for interval.
+        // Intervals are ordered in the same direction as our keys.
+        // Key behind all intervals: [BEHIND, ..., BEHIND]
+        // Key ahead of all intervals: [AHEAD, ..., AHEAD]
+        // Key within one interval: [AHEAD, ..., WITHIN, BEHIND, ...]
+        // Key not in any inteval: [AHEAD, ..., AHEAD, BEHIND, ...]
 
-        for (size_t i = 0; i < oil.intervals.size(); ++i) {
-            Location where = intervalCmp(oil.intervals[i], elt, expectedDirection);
+        // Find left-most BEHIND/WITHIN interval.
+        vector<Interval>::const_iterator i =
+            std::lower_bound(oil.intervals.begin(), oil.intervals.end(),
+                             std::make_pair(elt, expectedDirection), isKeyAheadOfInterval);
 
-            // Intervals are ordered in the same direction as our keys.  The first interval we
-            // aren't ahead of is the one we're looking for.
-            if (AHEAD != where) {
-                *newIntervalIndex = i;
-                return where;
-            }
+        // Key ahead of all intervals.
+        if (i == oil.intervals.end()) {
+            return AHEAD;
         }
 
-        // If we're here, we're ahead of all intervals.
-        return AHEAD;
+        // Found either interval containing key or left-most BEHIND interval.
+        *newIntervalIndex = std::distance(oil.intervals.begin(), i);
+
+        // Additional check to determine if interval contains key.
+        Location where = intervalCmp(*i, elt, expectedDirection);
+        invariant(BEHIND == where || WITHIN == where);
+
+        return where;
     }
 
 }  // namespace mongo

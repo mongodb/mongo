@@ -28,7 +28,7 @@
 
 // strategy_sharded.cpp
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/owned_pointer_vector.h"
@@ -41,7 +41,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/max_time.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/stats/counters.h"
@@ -54,14 +53,72 @@
 #include "mongo/s/request.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 // error codes 8010-8040
 
 namespace mongo {
 
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+
     static bool _isSystemIndexes( const char* ns ) {
         return nsToCollectionSubstring(ns) == "system.indexes";
+    }
+
+    /**
+     * Returns true if request is a query for sharded indexes.
+     */
+    static bool doShardedIndexQuery( Request& r, const QuerySpec& qSpec ) {
+
+        // Extract the ns field from the query, which may be embedded within the "query" or
+        // "$query" field.
+        string indexNSQuery(qSpec.filter()["ns"].str());
+        DBConfigPtr config = grid.getDBConfig( r.getns() );
+
+        if ( !config->isSharded( indexNSQuery )) {
+            return false;
+        }
+
+        // if you are querying on system.indexes, we need to make sure we go to a shard
+        // that actually has chunks. This is not a perfect solution (what if you just
+        // look at all indexes), but better than doing nothing.
+
+        ShardPtr shard;
+        ChunkManagerPtr cm;
+        config->getChunkManagerOrPrimary( indexNSQuery, cm, shard );
+        if ( cm ) {
+            set<Shard> shards;
+            cm->getAllShards( shards );
+            verify( shards.size() > 0 );
+            shard.reset( new Shard( *shards.begin() ) );
+        }
+
+        ShardConnection dbcon( *shard , r.getns() );
+        DBClientBase &c = dbcon.conn();
+
+        string actualServer;
+
+        Message response;
+        bool ok = c.call( r.m(), response, true , &actualServer );
+        uassert( 10200 , "mongos: error calling db", ok );
+
+        {
+            QueryResult *qr = (QueryResult *) response.singleData();
+            if ( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
+                dbcon.done();
+                // Version is zero b/c this is deprecated codepath
+                throw RecvStaleConfigException( r.getns(),
+                                                "Strategy::doQuery",
+                                                ChunkVersion( 0, 0, OID() ),
+                                                ChunkVersion( 0, 0, OID() ));
+            }
+        }
+
+        r.reply( response , actualServer.size() ? actualServer : c.getServerAddress() );
+        dbcon.done();
+
+        return true;
     }
 
     void Strategy::queryOp( Request& r ) {
@@ -79,10 +136,17 @@ namespace mongo {
         audit::logQueryAuthzCheck(client, ns, q.query, status.code());
         uassertStatusOK(status);
 
-        LOG(3) << "shard query: " << q.ns << "  " << q.query << endl;
+        LOG(3) << "query: " << q.ns << " " << q.query << " ntoreturn: " << q.ntoreturn
+               << " options: " << q.queryOptions << endl;
 
         if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
             throw UserException( 8010 , "something is wrong, shouldn't see a command here" );
+
+        if (q.queryOptions & QueryOption_Exhaust) {
+            uasserted(18526,
+                      string("the 'exhaust' query option is invalid for mongos queries: ") + q.ns
+                      + " " + q.query.toString());
+        }
 
         QuerySpec qSpec( (string)q.ns, q.query, q.fields, q.ntoskip, q.ntoreturn, q.queryOptions );
 
@@ -92,22 +156,7 @@ namespace mongo {
                  maxTimeMS.getStatus().reason(),
                  maxTimeMS.isOK() );
 
-        if ( _isSystemIndexes( q.ns ) && q.query["ns"].type() == String && r.getConfig()->isSharded( q.query["ns"].String() ) ) {
-            // if you are querying on system.indexes, we need to make sure we go to a shard that actually has chunks
-            // this is not a perfect solution (what if you just look at all indexes)
-            // but better than doing nothing
-
-            ShardPtr myShard;
-            ChunkManagerPtr cm;
-            r.getConfig()->getChunkManagerOrPrimary( q.query["ns"].String(), cm, myShard );
-            if ( cm ) {
-                set<Shard> shards;
-                cm->getAllShards( shards );
-                verify( shards.size() > 0 );
-                myShard.reset( new Shard( *shards.begin() ) );
-            }
-            
-            doIndexQuery( r, *myShard );
+        if ( _isSystemIndexes( q.ns ) && doShardedIndexQuery( r, qSpec )) {
             return;
         }
 
@@ -135,7 +184,14 @@ namespace mongo {
             throw;
         }
 
-        if( cursor->isSharded() ){
+        // TODO: Revisit all of this when we revisit the sharded cursor cache
+
+        if (cursor->getNumQueryShards() != 1) {
+
+            // More than one shard (or zero), manage with a ShardedClientCursor
+            // NOTE: We may also have *zero* shards here when the returnPartial flag is set.
+            // Currently the code in ShardedClientCursor handles this.
+
             ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
 
             BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
@@ -161,14 +217,15 @@ namespace mongo {
                     startFrom, hasMore ? cc->getId() : 0 );
         }
         else{
+
+            // Only one shard is used
+
             // Remote cursors are stored remotely, we shouldn't need this around.
-            // TODO: we should probably just make cursor an auto_ptr
             scoped_ptr<ParallelSortClusteredCursor> cursorDeleter( cursor );
 
-            // TODO:  Better merge this logic.  We potentially can now use the same cursor logic for everything.
-            ShardPtr primary = cursor->getPrimary();
-            verify( primary.get() );
-            DBClientCursorPtr shardCursor = cursor->getShardCursor( *primary );
+            ShardPtr shard = cursor->getQueryShard();
+            verify( shard.get() );
+            DBClientCursorPtr shardCursor = cursor->getShardCursor(*shard);
 
             // Implicitly stores the cursor in the cache
             r.reply( *(shardCursor->getMessage()) , shardCursor->originalHost() );
@@ -178,34 +235,17 @@ namespace mongo {
         }
     }
 
-    void Strategy::doIndexQuery( Request& r , const Shard& shard ) {
-
-        ShardConnection dbcon( shard , r.getns() );
-        DBClientBase &c = dbcon.conn();
-
-        string actualServer;
-
-        Message response;
-        bool ok = c.call( r.m(), response, true , &actualServer );
-        uassert( 10200 , "mongos: error calling db", ok );
-
-        {
-            QueryResult *qr = (QueryResult *) response.singleData();
-            if ( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
-                dbcon.done();
-                // Version is zero b/c this is deprecated codepath
-                throw RecvStaleConfigException( r.getns() , "Strategy::doQuery", ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ) );
-            }
-        }
-
-        r.reply( response , actualServer.size() ? actualServer : c.getServerAddress() );
-        dbcon.done();
-    }
-
     void Strategy::clientCommandOp( Request& r ) {
         QueryMessage q( r.d() );
 
-        LOG(3) << "single query: " << q.ns << "  " << q.query << "  ntoreturn: " << q.ntoreturn << " options : " << q.queryOptions << endl;
+        LOG(3) << "command: " << q.ns << " " << q.query << " ntoreturn: " << q.ntoreturn
+               << " options: " << q.queryOptions << endl;
+
+        if (q.queryOptions & QueryOption_Exhaust) {
+            uasserted(18527,
+                      string("the 'exhaust' query option is invalid for mongos commands: ") + q.ns
+                      + " " + q.query.toString());
+        }
 
         NamespaceString nss( r.getns() );
         // Regular queries are handled in strategy_shard.cpp
@@ -416,7 +456,10 @@ namespace mongo {
 
         // TODO:  Handle stale config exceptions here from coll being dropped or sharded during op
         // for now has same semantics as legacy request
-        ChunkManagerPtr info = r.getChunkManager();
+        DBConfigPtr config = grid.getDBConfig( ns );
+        ShardPtr primary;
+        ChunkManagerPtr info;
+        config->getChunkManagerOrPrimary( ns, info, primary );
 
         //
         // TODO: Cleanup cursor cache, consolidate into single codepath
@@ -547,20 +590,11 @@ namespace mongo {
             (void) parsed; // for compile
             dassert( parsed && response.isValid( NULL ) );
 
-            // Populate the lastError object based on the write
+            // Populate the lastError object based on the write response
             lastError.get( false )->reset();
-            bool hadError = batchErrorToLastError( *request,
-                                                   response,
-                                                   lastError.get( false ) );
+            bool hadError = batchErrorToLastError( *request, response, lastError.get( false ) );
 
-            // Need to specially count inserts
-            if ( op == dbInsert ) {
-                for( int i = 0; i < response.getN(); ++i )
-                    r.gotInsert();
-            }
-
-            // If this is an ordered batch and we had a non-write-concern error, we should
-            // stop sending.
+            // Check if this is an ordered batch and we had an error which should stop processing
             if ( request->getOrdered() && hadError )
                 break;
         }

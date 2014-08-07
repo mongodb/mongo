@@ -13,20 +13,24 @@ t = new ToolTest( "dumprestoreWithNoOptions" );
 t.startDB( "foo" );
 db = t.db;
 
+// We turn this off to prevent the server from touching the 'options' field in system.namespaces.
+// This is important because we check exact values of the 'options' field in this test.
+db.adminCommand({setParameter:1, newCollectionsUsePowerOf2Sizes: false});
+
 dbname = db.getName();
 dbname2 = "NOT_"+dbname;
 
 db.dropDatabase();
 
-var options = { capped: true, size: 1000, autoIndexId: true };
+var options = { capped: true, size: 4096, autoIndexId: true };
 db.createCollection('capped', options);
 assert.eq( 1, db.system.indexes.count(), "auto index not created" );
 var cappedOptions = db.capped.exists().options;
 for ( var opt in options ) {
-  assert.eq(options[opt], cappedOptions[opt], 'invalid option')
+    assert.eq(options[opt], cappedOptions[opt],
+              'invalid option:' + tojson(options) + " " + tojson(cappedOptions));
 }
-db.capped.insert({ x: 1 });
-db.getLastError()
+assert.writeOK(db.capped.insert({ x: 1 }));
 
 // Full dump/restore
 
@@ -40,20 +44,20 @@ t.runTool( "restore" , "--dir" , t.ext , "--noOptionsRestore");
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert(true !== db.capped.stats().capped, "restore options were not ignored");
-assert(undefined === db.capped.exists().options, "restore options not ignored");
+assert.eq(undefined, db.capped.exists().options,
+       "restore options not ignored: " + tojson( db.capped.exists() ) );
 
 // Dump/restore single DB
 
 db.dropDatabase();
-var options = { capped: true, size: 1000, autoIndexId: true };
+var options = { capped: true, size: 4096, autoIndexId: true };
 db.createCollection('capped', options);
 assert.eq( 1, db.system.indexes.count(), "auto index not created" );
 var cappedOptions = db.capped.exists().options;
 for ( var opt in options ) {
   assert.eq(options[opt], cappedOptions[opt], 'invalid option')
 }
-db.capped.insert({ x: 1 });
-db.getLastError()
+assert.writeOK(db.capped.insert({ x: 1 }));
 
 dumppath = t.ext + "noOptionsSingleDump/";
 mkdir(dumppath);
@@ -74,15 +78,15 @@ assert(undefined === db.capped.exists().options, "restore options not ignored");
 // Dump/restore single collection
 
 db.dropDatabase();
-var options = { capped: true, size: 1000, autoIndexId: true };
+var options = { capped: true, size: 4096, autoIndexId: true };
 db.createCollection('capped', options);
 assert.eq( 1, db.system.indexes.count(), "auto index not created" );
 var cappedOptions = db.capped.exists().options;
 for ( var opt in options ) {
   assert.eq(options[opt], cappedOptions[opt], 'invalid option')
 }
-db.capped.insert({ x: 1 });
-db.getLastError()
+
+assert.writeOK(db.capped.insert({ x: 1 }));
 
 dumppath = t.ext + "noOptionsSingleColDump/";
 mkdir(dumppath);

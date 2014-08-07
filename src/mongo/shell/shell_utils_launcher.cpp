@@ -2,17 +2,29 @@
 /*
  *    Copyright 2010 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/pch.h"
@@ -319,10 +331,17 @@ namespace mongo {
         
         boost::filesystem::path ProgramRunner::findProgram( const string &prog ) {
             boost::filesystem::path p = prog;
+
 #ifdef _WIN32
-            p = change_extension(p, ".exe");
+            // The system programs either come versioned in the form of <utility>-<major.minor> 
+            // (e.g., mongorestore-2.4) or just <utility>. For windows, the appropriate extension 
+            // needs to be appended.
+            //
+            if (p.extension() != ".exe") {
+                p = prog + ".exe";
+            }
 #endif
-            
+
             if( boost::filesystem::exists(p) ) {
 #ifndef _WIN32
                 p = boost::filesystem::initial_path() / p;
@@ -334,10 +353,12 @@ namespace mongo {
                 boost::filesystem::path t = boost::filesystem::current_path() / p;
                 if( boost::filesystem::exists(t)  ) return t;
             }
+
             {
                 boost::filesystem::path t = boost::filesystem::initial_path() / p;
                 if( boost::filesystem::exists(t)  ) return t;
             }
+
             return p; // not found; might find via system path
         }
 
@@ -467,12 +488,17 @@ namespace mongo {
             verify(registry._handles.count(pid));
             HANDLE h = registry._handles[pid];
 
-            if (block)
-                WaitForSingleObject(h, INFINITE);
+            if (block) {
+                if (WaitForSingleObject(h, INFINITE)) {
+                    log() << "WaitForSingleObject failed: " << errnoWithDescription();
+                }
+            }
 
             DWORD tmp;
             if(GetExitCodeProcess(h, &tmp)) {
                 if ( tmp == STILL_ACTIVE ) {
+                    if (block)
+                        log() << "Process is STILL_ACTIVE even after blocking";
                     return false;
                 }
                 CloseHandle(h);
@@ -482,6 +508,7 @@ namespace mongo {
                 return true;
             }
             else {
+                log() << "GetExitCodeProcess failed: " << errnoWithDescription();
                 return false;
             }
 #else
@@ -529,7 +556,7 @@ namespace mongo {
             ProgramRunner r( a );
             r.start();
             boost::thread t( r );
-            int exit_code;
+            int exit_code = -123456; // sentinel value
             wait_for_pid( r.pid(), true, &exit_code );
             if ( r.port() > 0 ) {
                 registry.deletePort( r.port() );
@@ -544,7 +571,7 @@ namespace mongo {
             ProgramRunner r( a );
             r.start();
             boost::thread t( r );
-            int exit_code;
+            int exit_code = -123456; // sentinel value
             wait_for_pid(r.pid(), true,  &exit_code);
             registry.deletePid( r.pid() );
             return BSON( string( "" ) << exit_code );
@@ -620,7 +647,41 @@ namespace mongo {
                 }
                 else {
                     log() << "kill_wrapper OpenEvent failed to open event to the process "
-                        << pid.asUInt32() << ". It has likely died already";
+                        << pid.asUInt32()
+                        << ". It has likely died already or server is running an older version."
+                        << " Attempting to shutdown through admin command.";
+
+                    // Back-off to the old way of shutting down the server on Windows, in case we
+                    // are managing a pre-2.6.0rc0 service, which did not have the event.
+                    //
+                    try {
+                        DBClientConnection conn;
+                        conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
+
+                        BSONElement authObj = opt["auth"];
+
+                        if (!authObj.eoo()){
+                            string errMsg;
+                            conn.auth("admin", authObj["user"].String(),
+                                authObj["pwd"].String(), errMsg);
+
+                            if (!errMsg.empty()) {
+                                cout << "Failed to authenticate before shutdown: "
+                                    << errMsg << endl;
+                            }
+                        }
+
+                        BSONObj info;
+                        BSONObjBuilder b;
+                        b.append("shutdown", 1);
+                        b.append("force", 1);
+                        conn.runCommand("admin", b.done(), info);
+                    }
+                    catch (...) {
+                        // Do nothing. This command never returns data to the client and the driver
+                        // doesn't like that.
+                        //
+                    }
                 }
                 return;
             }

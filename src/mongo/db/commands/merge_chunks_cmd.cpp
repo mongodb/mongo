@@ -69,7 +69,7 @@ namespace mongo {
 
         virtual bool adminOnly() const { return true; }
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         // Required
         static BSONField<string> nsField;
@@ -80,7 +80,7 @@ namespace mongo {
         static BSONField<string> shardNameField;
         static BSONField<string> configField;
 
-        bool run( const string& dbname,
+        bool run(OperationContext* txn, const string& dbname,
                   BSONObj& cmdObj,
                   int,
                   string& errmsg,
@@ -160,7 +160,7 @@ namespace mongo {
                 return false;
             }
 
-            return mergeChunks( NamespaceString( ns ), minKey, maxKey, epoch, true, &errmsg );
+            return mergeChunks( txn, NamespaceString( ns ), minKey, maxKey, epoch, &errmsg );
         }
     };
 

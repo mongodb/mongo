@@ -9,7 +9,7 @@
  * infinitely looping operation, we ensure that killall interrupts the drop command (drop is
  * normally a short lived operation and is otherwise difficult to kill deterministically).  The
  * subsequent drop() on restart would historically assert if the data integrity issue caused by
- * SERVER-1818 occured.
+ * SERVER-1818 occurred.
  */
 
 port = allocatePorts( 1 )[ 0 ]
@@ -21,8 +21,7 @@ var mongod = startMongod( "--port", port, "--dbpath", dbpath, "--nohttpinterface
 var db = mongod.getDB( "test" );
 var collection = db.getCollection( baseName );
 
-collection.save( {} );
-assert( ! db.getLastError() );
+assert.writeOK(collection.insert({}));
 
 s1 = startParallelShell( "db." + baseName + ".count( { $where: function() { while( 1 ) { ; } } } )", port );
 // HACK(schwerin): startParallelShell's return value should allow you to block until the command has

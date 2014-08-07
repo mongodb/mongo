@@ -53,6 +53,23 @@ namespace mongo {
             response.addToErrDetails( errorCopy );
         }
 
+        MockWriteResult( const ConnectionString& endpoint,
+                         const WriteErrorDetail& error,
+                         int copies ) :
+            endpoint( endpoint ) {
+
+            response.setOk( true );
+            response.setN( 0 );
+
+            for ( int i = 0; i < copies; ++i ) {
+                WriteErrorDetail* errorCopy = new WriteErrorDetail;
+                error.cloneTo( errorCopy );
+                errorCopy->setIndex( i );
+                response.addToErrDetails( errorCopy );
+            }
+        }
+
+
         MockWriteResult( const ConnectionString& endpoint, const BatchedCommandResponse& response ) :
                 endpoint( endpoint ) {
             response.cloneTo( &this->response );

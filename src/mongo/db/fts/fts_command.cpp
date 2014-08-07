@@ -57,7 +57,7 @@ namespace mongo {
         }
 
 
-        bool FTSCommand::run(const string& dbname,
+        bool FTSCommand::run(OperationContext* txn, const string& dbname,
                              BSONObj& cmdObj,
                              int options,
                              string& errmsg,
@@ -92,7 +92,7 @@ namespace mongo {
                 projection = cmdObj["project"].Obj();
             }
 
-            return _run( dbname, cmdObj, options,
+            return _run( txn, dbname, cmdObj, options,
                          ns, search, language, limit, filter, projection, errmsg, result );
         }
 

@@ -31,10 +31,12 @@
 #include <limits>
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/s2common.h"
-#include "mongo/db/index/expression_index.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/query/expression_index.h"
+#include "mongo/db/query/expression_index_knobs.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/db/geo/s2.h"
 #include "third_party/s2/s2cell.h"
@@ -197,7 +199,14 @@ namespace mongo {
                                                const IndexEntry& index,
                                                OrderedIntervalList* oilOut,
                                                BoundsTightness* tightnessOut) {
-        translate(expr, elt, index, oilOut, tightnessOut);
+        OrderedIntervalList arg;
+        translate(expr, elt, index, &arg, tightnessOut);
+
+        // Append the new intervals to oilOut.
+        oilOut->intervals.insert(oilOut->intervals.end(), arg.intervals.begin(),
+                                 arg.intervals.end());
+
+        // Union the appended intervals with the existing ones.
         unionize(oilOut);
     }
 
@@ -216,6 +225,9 @@ namespace mongo {
                                        const IndexEntry& index,
                                        OrderedIntervalList* oilOut,
                                        BoundsTightness* tightnessOut) {
+        // We expect that the OIL we are constructing starts out empty.
+        invariant(oilOut->intervals.empty());
+
         oilOut->name = elt.fieldName();
 
         bool isHashed = false;
@@ -253,6 +265,84 @@ namespace mongo {
             // Therefore, a fetch is required.
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
+        else if (MatchExpression::NOT == expr->matchType()) {
+            MatchExpression* child = expr->getChild(0);
+
+            // If we have a NOT -> EXISTS, we must handle separately.
+            if (MatchExpression::EXISTS == child->matchType()) {
+                // We should never try to use a sparse index for $exists:false.
+                invariant(!index.sparse);
+                BSONObjBuilder bob;
+                bob.appendNull("");
+                bob.appendNull("");
+                BSONObj dataObj = bob.obj();
+                oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
+                
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+                return;
+            }
+            else if (Indexability::nodeCanUseIndexOnOwnField(child)) {
+                // We have a NOT of a bounds-generating expression. Get the
+                // bounds of the NOT's child and then complement them.
+                translate(expr->getChild(0), elt, index, oilOut, tightnessOut);
+                oilOut->complement();
+
+                // If the index is multikey, it doesn't matter what the tightness
+                // of the child is, we must return INEXACT_FETCH. Consider a multikey
+                // index on 'a' with document {a: [1, 2, 3]} and query {a: {$ne: 3}}.
+                // If we treated the bounds [MinKey, 3), (3, MaxKey] as exact, then
+                // we would erroneously return the document!
+                if (index.multikey) {
+                    *tightnessOut = INEXACT_FETCH;
+                }
+            }
+            else {
+                // TODO: In the future we shouldn't need this. We handle this case for the time
+                // being because we have some deficiencies in tree normalization (see SERVER-12735).
+                //
+                // For example, we will get here if there is an index {a: 1}
+                // and the query is {a: {$elemMatch: {$not: {$gte: 6}}}}.
+                oilOut->intervals.push_back(allValues());
+                *tightnessOut = INEXACT_FETCH;
+            }
+        }
+        else if (MatchExpression::EXISTS == expr->matchType()) {
+            // We only handle the {$exists:true} case, as {$exists:false}
+            // will have been translated to {$not:{ $exists:true }}.
+            //
+            // Documents with a missing value are stored *as if* they were
+            // explicitly given the value 'null'.  Given:
+            //    X = { b : 1 }
+            //    Y = { a : null, b : 1 }
+            // X and Y look identical from within a standard index on { a : 1 }.
+            // HOWEVER a sparse index on { a : 1 } will treat X and Y differently,
+            // storing Y and not storing X.
+            //
+            // We can safely use an index in the following cases:
+            // {a:{ $exists:true }} - normal index helps, but we must still fetch
+            // {a:{ $exists:true }} - sparse index is exact
+            // {a:{ $exists:false }} - normal index requires a fetch
+            // {a:{ $exists:false }} - sparse indexes cannot be used at all.
+            //
+            // Noted in SERVER-12869, in case this ever changes some day.
+            if (index.sparse) {
+                oilOut->intervals.push_back(allValues());
+                // A sparse, compound index on { a:1, b:1 } will include entries
+                // for all of the following documents:
+                //    { a:1 }, { b:1 }, { a:1, b:1 }
+                // So we must use INEXACT bounds in this case.
+                if ( 1 < index.keyPattern.nFields() ) {
+                    *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+                }
+                else {
+                    *tightnessOut = IndexBoundsBuilder::EXACT;
+                }
+            }
+            else {
+                oilOut->intervals.push_back(allValues());
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
+        }
         else if (MatchExpression::EQ == expr->matchType()) {
             const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);
             translateEquality(node->getData(), isHashed, oilOut, tightnessOut);
@@ -264,6 +354,14 @@ namespace mongo {
             // Everything is <= MaxKey.
             if (MaxKey == dataElt.type()) {
                 oilOut->intervals.push_back(allValues());
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+                return;
+            }
+
+            // Only NaN is <= NaN.
+            if (isNaN(dataElt.numberDouble())) {
+                double nan = dataElt.numberDouble();
+                oilOut->intervals.push_back(makePointInterval(nan));
                 *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
@@ -280,8 +378,13 @@ namespace mongo {
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
             oilOut->intervals.push_back(makeRangeInterval(dataObj, typeMatch(dataObj), true));
-            // XXX: only exact if not (null or array)
-            *tightnessOut = IndexBoundsBuilder::EXACT;
+
+            if (dataElt.isSimpleType()) {
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+            }
+            else {
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
         }
         else if (MatchExpression::LT == expr->matchType()) {
             const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
@@ -290,6 +393,12 @@ namespace mongo {
             // Everything is <= MaxKey.
             if (MaxKey == dataElt.type()) {
                 oilOut->intervals.push_back(allValues());
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+                return;
+            }
+
+            // Nothing is < NaN.
+            if (isNaN(dataElt.numberDouble())) {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
@@ -313,8 +422,12 @@ namespace mongo {
                 oilOut->intervals.push_back(interval);
             }
 
-            // XXX: only exact if not (null or array)
-            *tightnessOut = IndexBoundsBuilder::EXACT;
+            if (dataElt.isSimpleType()) {
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+            }
+            else {
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
         }
         else if (MatchExpression::GT == expr->matchType()) {
             const GTMatchExpression* node = static_cast<const GTMatchExpression*>(expr);
@@ -323,6 +436,12 @@ namespace mongo {
             // Everything is > MinKey.
             if (MinKey == dataElt.type()) {
                 oilOut->intervals.push_back(allValues());
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+                return;
+            }
+
+            // Nothing is > NaN.
+            if (isNaN(dataElt.numberDouble())) {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
@@ -345,8 +464,12 @@ namespace mongo {
                 oilOut->intervals.push_back(interval);
             }
 
-            // XXX: only exact if not (null or array)
-            *tightnessOut = IndexBoundsBuilder::EXACT;
+            if (dataElt.isSimpleType()) {
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+            }
+            else {
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
         }
         else if (MatchExpression::GTE == expr->matchType()) {
             const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(expr);
@@ -355,6 +478,14 @@ namespace mongo {
             // Everything is >= MinKey.
             if (MinKey == dataElt.type()) {
                 oilOut->intervals.push_back(allValues());
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+                return;
+            }
+
+            // Only NaN is >= NaN.
+            if (isNaN(dataElt.numberDouble())) {
+                double nan = dataElt.numberDouble();
+                oilOut->intervals.push_back(makePointInterval(nan));
                 *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
@@ -371,8 +502,12 @@ namespace mongo {
             verify(dataObj.isOwned());
 
             oilOut->intervals.push_back(makeRangeInterval(dataObj, true, typeMatch(dataObj)));
-            // XXX: only exact if not (null or array)
-            *tightnessOut = IndexBoundsBuilder::EXACT;
+            if (dataElt.isSimpleType()) {
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+            }
+            else {
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
         }
         else if (MatchExpression::REGEX == expr->matchType()) {
             const RegexMatchExpression* rme = static_cast<const RegexMatchExpression*>(expr);
@@ -421,28 +556,52 @@ namespace mongo {
                 }
             }
 
-            // XXX: what happens here?
-            if (afr.hasNull()) { }
-            // XXX: what happens here as well?
-            if (afr.hasEmptyArray()) { }
+            if (afr.hasNull()) {
+                // A null index key does not always match a null query value so we must fetch the
+                // doc and run a full comparison.  See SERVER-4529.
+                // TODO: Do we already set the tightnessOut by calling translateEquality?
+                *tightnessOut = INEXACT_FETCH;
+            }
+
+            if (afr.hasEmptyArray()) {
+                // Empty arrays are indexed as undefined.
+                BSONObjBuilder undefinedBob;
+                undefinedBob.appendUndefined("");
+                oilOut->intervals.push_back(makePointInterval(undefinedBob.obj()));
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
 
             unionize(oilOut);
         }
         else if (MatchExpression::GEO == expr->matchType()) {
+
             const GeoMatchExpression* gme = static_cast<const GeoMatchExpression*>(expr);
-            // Can only do this for 2dsphere.
-            if (!mongoutils::str::equals("2dsphere", elt.valuestrsafe())) {
+
+            if (mongoutils::str::equals("2dsphere", elt.valuestrsafe())) {
+                verify(gme->getGeoQuery().getGeometry().hasS2Region());
+                const S2Region& region = gme->getGeoQuery().getGeometry().getS2Region();
+                ExpressionMapping::cover2dsphere(region, index.infoObj, oilOut);
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
+            else if (mongoutils::str::equals("2d", elt.valuestrsafe())) {
+                verify(gme->getGeoQuery().getGeometry().hasR2Region());
+                const R2Region& region = gme->getGeoQuery().getGeometry().getR2Region();
+
+                ExpressionMapping::cover2d(region,
+                                           index.infoObj,
+                                           internalGeoPredicateQuery2DMaxCoveringCells,
+                                           oilOut);
+
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+            }
+            else {
                 warning() << "Planner error trying to build geo bounds for " << elt.toString()
                           << " index element.";
                 verify(0);
             }
-
-            const S2Region& region = gme->getGeoQuery().getRegion();
-            ExpressionMapping::cover2dsphere(region, index.infoObj, oilOut);
-            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
         else {
-            warning() << "Planner error, trying to build bounds for expr "
+            warning() << "Planner error, trying to build bounds for expression: "
                       << expr->toString() << endl;
             verify(0);
         }
@@ -478,11 +637,6 @@ namespace mongo {
 
         while (argidx < argiv.size() && ividx < iv.size()) {
             Interval::IntervalComparison cmp = argiv[argidx].compare(iv[ividx]);
-            /*
-            QLOG() << "comparing " << argiv[argidx].toString()
-                 << " with " << iv[ividx].toString()
-                 << " cmp is " << Interval::cmpstr(cmp) << endl;
-                 */
 
             verify(Interval::INTERVAL_UNKNOWN != cmp);
 
@@ -522,8 +676,8 @@ namespace mongo {
                 }
             }
         }
-        // XXX swap
-        oilOut->intervals = result;
+
+        oilOut->intervals.swap(result);
     }
 
     // static
@@ -541,8 +695,6 @@ namespace mongo {
         while (i < iv.size() - 1) {
             // Compare i with i + 1.
             Interval::IntervalComparison cmp = iv[i].compare(iv[i + 1]);
-            // QLOG() << "comparing " << iv[i].toString() << " with " << iv[i+1].toString()
-                 // << " cmp is " << Interval::cmpstr(cmp) << endl;
 
             // This means our sort didn't work.
             verify(Interval::INTERVAL_SUCCEEDS != cmp);
@@ -605,6 +757,13 @@ namespace mongo {
     }
 
     // static
+    Interval IndexBoundsBuilder::makePointInterval(double d) {
+        BSONObjBuilder bob;
+        bob.append("", d);
+        return makePointInterval(bob.obj());
+    }
+
+    // static
     BSONObj IndexBoundsBuilder::objFromElement(const BSONElement& elt) {
         BSONObjBuilder bob;
         bob.appendAs(elt, "");
@@ -628,7 +787,6 @@ namespace mongo {
 
         const string start = simpleRegex(rme->getString().c_str(), rme->getFlags().c_str(), tightnessOut);
 
-        // QLOG() << "regex bounds start is " << start << endl;
         // Note that 'tightnessOut' is set by simpleRegex above.
         if (!start.empty()) {
             string end = start;
@@ -666,41 +824,52 @@ namespace mongo {
 
             verify(dataObj.isOwned());
             oil->intervals.push_back(makePointInterval(dataObj));
-            // XXX: it's exact if the index isn't sparse?
+
             if (dataObj.firstElement().isNull() || isHashed) {
                 *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             }
             else {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
             }
+            return;
         }
-        // In the following cases, 'data' is an array. Using
-        // arrays with hashed indices is currently not supported,
-        // so we don't have to worry about that case.
-        else if (data.Obj().isEmpty()) { // Array == data.type()
-            // XXX: tighten bounds in empty case
-            oil->intervals.push_back(allValues());
-            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+
+        // If we're here, Array == data.type().
+        //
+        // Using arrays with hashed indices is currently not supported, so we don't have to worry
+        // about that case.
+        //
+        // Arrays are indexed by either:
+        //
+        // 1. the first element if there is one.  Note that using the first is arbitrary; we could
+        // just as well use any array element.). If the query is {a: [1, 2, 3]}, for example, then
+        // using the bounds [1, 1] for the multikey index will pick up every document containing the
+        // array [1, 2, 3].
+        //
+        // 2. undefined if the array is empty.
+        //
+        // Also, arrays are indexed by:
+        //
+        // 3. the full array if it's inside of another array.  We check for this so that the query
+        // {a: [1, 2, 3]} will match documents like {a: [[1, 2, 3], 4, 5]}.
+
+        // Case 3.
+        oil->intervals.push_back(makePointInterval(objFromElement(data)));
+
+        if (data.Obj().isEmpty()) {
+            // Case 2.
+            BSONObjBuilder undefinedBob;
+            undefinedBob.appendUndefined("");
+            oil->intervals.push_back(makePointInterval(undefinedBob.obj()));
         }
-        else { // Array == data.type() && !data.Obj().isEmpty()
-            BSONObj dataObj = objFromElement(data);
+        else {
+            // Case 1.
             BSONElement firstEl = data.Obj().firstElement();
-
-            // Use the first element in the array to construct the
-            // first interval. (Using the first is arbitrary; we could
-            // just as well use any array element.). If the query is
-            // {a: [1, 2, 3]}, for example, then using the bounds [1, 1]
-            // for the multikey index will pick up every document containing
-            // the array [1, 2, 3].
             oil->intervals.push_back(makePointInterval(objFromElement(firstEl)));
-
-            // The second point interval uses the entire array. This is
-            // necessary so that the query {a: [1, 2, 3]} will match
-            // documents like {a: [[1, 2, 3], 4, 5]}.
-            oil->intervals.push_back(makePointInterval(dataObj));
-
-            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
+
+        std::sort(oil->intervals.begin(), oil->intervals.end(), IntervalComparison);
+        *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
     }
 
     // static
@@ -731,7 +900,6 @@ namespace mongo {
                 std::reverse(iv.begin(), iv.end());
                 // Step 2: reverse each interval.
                 for (size_t i = 0; i < iv.size(); ++i) {
-                    QLOG() << "reversing " << iv[i].toString() << endl;
                     iv[i].reverse();
                 }
             }
@@ -739,10 +907,135 @@ namespace mongo {
         }
 
         if (!bounds->isValidFor(kp, scanDir)) {
-            QLOG() << "INVALID BOUNDS: " << bounds->toString() << endl;
-            QLOG() << "kp = " << kp.toString() << endl;
-            QLOG() << "scanDir = " << scanDir << endl;
+            log() << "INVALID BOUNDS: " << bounds->toString() << endl
+                   << "kp = " << kp.toString() << endl
+                   << "scanDir = " << scanDir << endl;
             verify(0);
+        }
+    }
+
+    // static
+    bool IndexBoundsBuilder::isSingleInterval(const IndexBounds& bounds,
+                                              BSONObj* startKey,
+                                              bool* startKeyInclusive,
+                                              BSONObj* endKey,
+                                              bool* endKeyInclusive) {
+        // We build our start/end keys as we go.
+        BSONObjBuilder startBob;
+        BSONObjBuilder endBob;
+
+        // The start and end keys are inclusive unless we have a non-point interval, in which case
+        // we take the inclusivity from there.
+        *startKeyInclusive = true;
+        *endKeyInclusive = true;
+
+        size_t fieldNo = 0;
+
+        // First, we skip over point intervals.
+        for (; fieldNo < bounds.fields.size(); ++fieldNo) {
+            const OrderedIntervalList& oil = bounds.fields[fieldNo];
+            // A point interval requires just one interval...
+            if (1 != oil.intervals.size()) {
+                break;
+            }
+            if (!oil.intervals[0].isPoint()) {
+                break;
+            }
+            // Since it's a point, start == end.
+            startBob.append(oil.intervals[0].start);
+            endBob.append(oil.intervals[0].end);
+        }
+
+        if (fieldNo >= bounds.fields.size()) {
+            // All our intervals are points.  We count for all values of one field.
+            *startKey = startBob.obj();
+            *endKey = endBob.obj();
+            return true;
+        }
+
+        // After point intervals we can have exactly one non-point interval.
+        const OrderedIntervalList& nonPoint = bounds.fields[fieldNo];
+        if (1 != nonPoint.intervals.size()) {
+            return false;
+        }
+
+        // Add the non-point interval to our builder and set the inclusivity from it.
+        startBob.append(nonPoint.intervals[0].start);
+        *startKeyInclusive = nonPoint.intervals[0].startInclusive;
+        endBob.append(nonPoint.intervals[0].end);
+        *endKeyInclusive = nonPoint.intervals[0].endInclusive;
+
+        ++fieldNo;
+
+        // Get some "all values" intervals for comparison's sake.
+        // TODO: make static?
+        Interval minMax = IndexBoundsBuilder::allValues();
+        Interval maxMin = minMax;
+        maxMin.reverse();
+
+        // And after the non-point interval we can have any number of "all values" intervals.
+        for (; fieldNo < bounds.fields.size(); ++fieldNo) {
+            const OrderedIntervalList& oil = bounds.fields[fieldNo];
+            // "All Values" is just one point.
+            if (1 != oil.intervals.size()) {
+                break;
+            }
+
+            // Must be min->max or max->min.
+            if (oil.intervals[0].equals(minMax)) {
+                // As an example for the logic below, consider the index {a:1, b:1} and a count for
+                // {a: {$gt: 2}}.  Our start key isn't inclusive (as it's $gt: 2) and looks like
+                // {"":2} so far.  If we move to the key greater than {"":2, "": MaxKey} we will get
+                // the first value of 'a' that is greater than 2.
+                if (!*startKeyInclusive) {
+                    startBob.appendMaxKey("");
+                }
+                else {
+                    // In this case, consider the index {a:1, b:1} and a count for {a:{$gte: 2}}.
+                    // We want to look at all values where a is 2, so our start key is {"":2,
+                    // "":MinKey}.
+                    startBob.appendMinKey("");
+                }
+
+                // Same deal as above.  Consider the index {a:1, b:1} and a count for {a: {$lt: 2}}.
+                // Our end key isn't inclusive as ($lt: 2) and looks like {"":2} so far.  We can't
+                // look at any values where a is 2 so we have to stop at {"":2, "": MinKey} as
+                // that's the smallest key where a is still 2.
+                if (!*endKeyInclusive) {
+                    endBob.appendMinKey("");
+                }
+                else {
+                    endBob.appendMaxKey("");
+                }
+            }
+            else if (oil.intervals[0].equals(maxMin)) {
+                // The reasoning here is the same as above but with the directions reversed.
+                if (!*startKeyInclusive) {
+                    startBob.appendMinKey("");
+                }
+                else {
+                    startBob.appendMaxKey("");
+                }
+                if (!*endKeyInclusive) {
+                    endBob.appendMaxKey("");
+                }
+                else {
+                    endBob.appendMinKey("");
+                }
+            }
+            else {
+                // No dice.
+                break;
+            }
+        }
+
+        if (fieldNo >= bounds.fields.size()) {
+            *startKey = startBob.obj();
+            *endKey = endBob.obj();
+            return true;
+        }
+        else {
+            return false;
         }
     }
 

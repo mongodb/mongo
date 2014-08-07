@@ -13,12 +13,13 @@ md = m.getDB("d");
 mc = m.getDB("d")["c"];
 
 print("2. Insert some data");
-N = 50000;
-mc.ensureIndex({x:1})
+N = 5000;
+mc.ensureIndex({x:1});
+var bulk = mc.initializeUnorderedBulkOp();
 for( i = 0; i < N; ++i ) {
-    mc.save( {_id:i,x:i,a:{}} );
+    bulk.insert({ _id: i, x: i, a: {} });
 }
-md.getLastError();
+assert.writeOK(bulk.execute());
 
 print("3. Make sure synced");
 replTest.awaitReplication();

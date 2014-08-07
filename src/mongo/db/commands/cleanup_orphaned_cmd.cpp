@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include <string>
 #include <vector>
 
@@ -39,11 +41,25 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/range_deleter_service.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/range_arithmetic.h"
+#include "mongo/s/type_settings.h"
+#include "mongo/util/log.h"
+
+namespace {
+    using mongo::WriteConcernOptions;
+
+    const int kDefaultWTimeoutMs = 60 * 1000;
+    const WriteConcernOptions DefaultWriteConcern("majority",
+                                                  WriteConcernOptions::NONE,
+                                                  kDefaultWTimeoutMs);
+}
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     using mongoutils::str::stream;
 
@@ -61,9 +77,10 @@ namespace mongo {
      *
      * If the collection is not sharded, returns CleanupResult_Done.
      */
-    CleanupResult cleanupOrphanedData( const NamespaceString& ns,
+    CleanupResult cleanupOrphanedData( OperationContext* txn,
+                                       const NamespaceString& ns,
                                        const BSONObj& startingFromKeyConst,
-                                       bool secondaryThrottle,
+                                       const WriteConcernOptions& secondaryThrottle,
                                        BSONObj* stoppedAtKey,
                                        string* errMsg ) {
 
@@ -116,7 +133,8 @@ namespace mongo {
 
         // Metadata snapshot may be stale now, but deleter checks metadata again in write lock
         // before delete.
-        if ( !getDeleter()->deleteNow( ns.toString(),
+        if ( !getDeleter()->deleteNow( txn,
+                                       ns.toString(),
                                        orphanRange.minKey,
                                        orphanRange.maxKey,
                                        keyPattern,
@@ -146,6 +164,17 @@ namespace mongo {
      * the balancer is off.
      *
      * Safe to call with the balancer on.
+     *
+     * Format:
+     *
+     * {
+     *      cleanupOrphaned: <ns>,
+     *      // optional parameters:
+     *      startingAtKey: { <shardKeyValue> }, // defaults to lowest value
+     *      secondaryThrottle: <bool>, // defaults to true
+     *      // defaults to { w: "majority", wtimeout: 60000 }. Applies to individual writes.
+     *      writeConcern: { <writeConcern options> }
+     * }
      */
     class CleanupOrphanedCommand : public Command {
     public:
@@ -167,17 +196,17 @@ namespace mongo {
             return Status::OK();
         }
 
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         // Input
         static BSONField<string> nsField;
         static BSONField<BSONObj> startingFromKeyField;
-        static BSONField<bool> secondaryThrottleField;
 
         // Output
         static BSONField<BSONObj> stoppedAtKeyField;
 
-        bool run( string const &db,
+        bool run( OperationContext* txn,
+                  string const &db,
                   BSONObj &cmdObj,
                   int,
                   string &errmsg,
@@ -202,35 +231,56 @@ namespace mongo {
                 return false;
             }
 
-            bool secondaryThrottle = true;
-            if ( !FieldParser::extract( cmdObj,
-                                        secondaryThrottleField,
-                                        &secondaryThrottle,
-                                        &errmsg ) ) {
+            WriteConcernOptions writeConcern;
+            Status status = writeConcern.parseSecondaryThrottle(cmdObj, NULL);
+
+            if (!status.isOK()){
+                if (status.code() != ErrorCodes::WriteConcernNotDefined) {
+                    return appendCommandStatus(result, status);
+                }
+
+                writeConcern = DefaultWriteConcern;
+            }
+            else {
+                repl::ReplicationCoordinator* replCoordinator =
+                        repl::getGlobalReplicationCoordinator();
+                Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status);
+                }
+            }
+
+            if (writeConcern.shouldWaitForOtherNodes() &&
+                    writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
+                // Don't allow no timeout.
+                writeConcern.wTimeout = kDefaultWTimeoutMs;
+            }
+
+            if (!shardingState.enabled()) {
+                errmsg = str::stream() << "server is not part of a sharded cluster or "
+                                       << "the sharding metadata is not yet initialized.";
                 return false;
             }
 
             ChunkVersion shardVersion;
-            Status status = shardingState.refreshMetadataNow( ns, &shardVersion );
+            status = shardingState.refreshMetadataNow(txn, ns, &shardVersion);
             if ( !status.isOK() ) {
                 if ( status.code() == ErrorCodes::RemoteChangeDetected ) {
-                    warning() << "orphaned cleanup needs to be retried, "
-                              << "collection metadata at shard version " << shardVersion
-                              << " changed during reload" << endl;
-                    // Version changed and is not yet in steady state, return the same starting
-                    // key so the client can retry again.
-                    result.append( stoppedAtKeyField(), startingFromKey );
-                    return true;
+                    warning() << "Shard version in transition detected while refreshing "
+                              << "metadata for " << ns << " at version " << shardVersion << endl;
                 }
-
-                errmsg = str::stream() << "failed to refresh shard metadata: " << status.reason();
-                return false;
+                else {
+                    errmsg = str::stream() << "failed to refresh shard metadata: "
+                                           << status.reason();
+                    return false;
+                }
             }
 
             BSONObj stoppedAtKey;
-            CleanupResult cleanupResult = cleanupOrphanedData( NamespaceString( ns ),
+            CleanupResult cleanupResult = cleanupOrphanedData( txn,
+                                                               NamespaceString( ns ),
                                                                startingFromKey,
-                                                               secondaryThrottle,
+                                                               writeConcern,
                                                                &stoppedAtKey,
                                                                &errmsg );
 
@@ -251,7 +301,6 @@ namespace mongo {
 
     BSONField<string> CleanupOrphanedCommand::nsField( "cleanupOrphaned" );
     BSONField<BSONObj> CleanupOrphanedCommand::startingFromKeyField( "startingFromKey" );
-    BSONField<bool> CleanupOrphanedCommand::secondaryThrottleField( "secondaryThrottle" );
     BSONField<BSONObj> CleanupOrphanedCommand::stoppedAtKeyField( "stoppedAtKey" );
 
     MONGO_INITIALIZER(RegisterCleanupOrphanedCommand)(InitializerContext* context) {

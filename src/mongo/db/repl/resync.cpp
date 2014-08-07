@@ -28,10 +28,12 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/master_slave.h"  // replSettings
-#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h" // replLocalAuth()
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
+namespace repl {
 
     // operator requested resynchronization of replication (on a slave or secondary). {resync: 1}
     class CmdResync : public Command {
@@ -42,9 +44,7 @@ namespace mongo {
         virtual bool adminOnly() const {
             return true;
         }
-        virtual bool logTheOp() { return false; }
-        virtual bool lockGlobally() const { return true; }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -58,38 +58,51 @@ namespace mongo {
         }
 
         CmdResync() : Command("resync") { }
-        virtual bool run(const string&,
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
-            if (replSettings.usingReplSets()) {
+
+            const std::string ns = parseNs(dbname, cmdObj);
+            Lock::GlobalWrite globalWriteLock(txn->lockState());
+            WriteUnitOfWork wunit(txn->recoveryUnit());
+            Client::Context ctx(txn, ns);
+            if (getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
+                if (!theReplSet) {
+                    errmsg = "no replication yet active";
+                    return false;
+                }
                 if (theReplSet->isPrimary()) {
                     errmsg = "primaries cannot resync";
                     return false;
                 }
-                return theReplSet->resync(errmsg);
+                return theReplSet->resync(txn, errmsg);
             }
 
             // below this comment pertains only to master/slave replication
             if ( cmdObj.getBoolField( "force" ) ) {
-                if ( !waitForSyncToFinish( errmsg ) )
+                if ( !waitForSyncToFinish(txn, errmsg ) )
                     return false;
                 replAllDead = "resync forced";
             }
-            if ( !replAllDead ) {
+            // TODO(dannenberg) replAllDead is bad and should be removed when masterslave is removed
+            if (!replAllDead) {
                 errmsg = "not dead, no need to resync";
                 return false;
             }
-            if ( !waitForSyncToFinish( errmsg ) )
+            if ( !waitForSyncToFinish(txn, errmsg ) )
                 return false;
 
-            ReplSource::forceResyncDead( "client" );
+            ReplSource::forceResyncDead( txn, "client" );
             result.append( "info", "triggered resync for all sources" );
+            wunit.commit();
             return true;
         }
-        bool waitForSyncToFinish( string &errmsg ) const {
+
+        bool waitForSyncToFinish(OperationContext* txn, string &errmsg) const {
             // Wait for slave thread to finish syncing, so sources will be be
             // reloaded with new saved state on next pass.
             Timer t;
@@ -97,7 +110,7 @@ namespace mongo {
                 if ( syncing == 0 || t.millis() > 30000 )
                     break;
                 {
-                    Lock::TempRelease t;
+                    Lock::TempRelease t(txn->lockState());
                     relinquishSyncingSome = 1;
                     sleepmillis(1);
                 }
@@ -109,4 +122,5 @@ namespace mongo {
             return true;
         }
     } cmdResync;
-}
+} // namespace repl
+} // namespace mongo

@@ -2,17 +2,29 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
@@ -32,15 +44,10 @@ namespace mongo {
     class BSONObj;
     class BSONElement;
     class BSONObjBuilder;
-}
 
-namespace bson {
-    typedef mongo::BSONElement be;
-    typedef mongo::BSONObj bo;
-    typedef mongo::BSONObjBuilder bob;
-}
-
-namespace mongo {
+    typedef BSONElement be;
+    typedef BSONObj bo;
+    typedef BSONObjBuilder bob;
 
     /* l and r MUST have same type when called: check that first. */
     int compareElementValues(const BSONElement& l, const BSONElement& r);
@@ -67,6 +74,9 @@ namespace mongo {
             std::string foo = obj["foo"].String(); // std::exception if not a std::string type or DNE
         */
         std::string String()        const { return chk(mongo::String).str(); }
+        const StringData checkAndGetStringData() const {
+            return chk(mongo::String).valueStringData();
+        }
         Date_t Date()               const { return chk(mongo::Date).date(); }
         double Number()             const { return chk(isNumber()).number(); }
         double Double()             const { return chk(NumberDouble)._numberDouble(); }
@@ -236,9 +246,9 @@ namespace mongo {
             return type() == jstNULL;
         }
 
-        /** Size (length) of a string element.
-            You must assure of type String first.
-            @return string size including terminating null
+        /** Size (length) of a std::string element.
+            You must assure of type std::string first.
+            @return std::string size including terminating null
         */
         int valuestrsize() const {
             return *reinterpret_cast< const int* >( value() );
@@ -256,13 +266,21 @@ namespace mongo {
             return value() + 4;
         }
 
-        /** Get the string value of the element.  If not a string returns "". */
+        /** Get the std::string value of the element.  If not a std::string returns "". */
         const char *valuestrsafe() const {
             return type() == mongo::String ? valuestr() : "";
         }
-        /** Get the string value of the element.  If not a string returns "". */
+        /** Get the std::string value of the element.  If not a std::string returns "". */
         std::string str() const {
             return type() == mongo::String ? std::string(valuestr(), valuestrsize()-1) : std::string();
+        }
+
+        /**
+         * Returns a StringData pointing into this element's data.  Does not validate that the
+         * element is actually of type String.
+         */
+        const StringData valueStringData() const {
+            return StringData(valuestr(), valuestrsize() - 1);
         }
 
         /** Get javascript code of a CodeWScope data element. */
@@ -335,7 +353,7 @@ namespace mongo {
             return (BinDataType)c;
         }
 
-        /** Retrieve the regex string for a Regex element */
+        /** Retrieve the regex std::string for a Regex element */
         const char *regex() const {
             verify(type() == RegEx);
             return value();
@@ -620,5 +638,8 @@ namespace mongo {
         fieldNameSize_ = 0;
         totalSize = 1;
     }
+
+    // TODO(SERVER-14596): move to a better place; take a StringData.
+    std::string escape( const std::string& s , bool escape_slash=false);
 
 }

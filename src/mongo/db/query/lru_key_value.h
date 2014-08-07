@@ -54,8 +54,8 @@ namespace mongo {
      * The keys of generic type K map to values of type V*. The V*
      * pointers are owned by the kv-store.
      *
-     * XXX: Move this into the util/ directory and do any cleanup necessary
-     * to make if fully general.
+     * TODO: We could move this into the util/ directory and do any cleanup necessary to make it
+     * fully general.
      */
     template<class K, class V>
     class LRUKeyValue {
@@ -160,7 +160,7 @@ namespace mongo {
         Status remove(const K& key) {
             KVMapConstIt i = _kvMap.find(key);
             if (i == _kvMap.end()) {
-                return Status(ErrorCodes::BadValue, "no such key in LRU key-value store");
+                return Status(ErrorCodes::NoSuchKey, "no such key in LRU key-value store");
             }
             KVListIt found = i->second;
             delete found->second;
@@ -183,12 +183,19 @@ namespace mongo {
         }
 
         /**
+         * Returns true if entry is found in the kv-store.
+         */
+        bool hasKey(const K& key) const {
+            return _kvMap.find(key) != _kvMap.end();
+        }
+
+        /**
          * Returns the number of entries currently in the kv-store.
          */
         size_t size() const { return _currentSize; }
 
         /**
-         * XXX: The kv-store should implement its own iterator. Calling through to the underlying
+         * TODO: The kv-store should implement its own iterator. Calling through to the underlying
          * iterator exposes the internals, and forces the caller to make a horrible type
          * declaration.
          */

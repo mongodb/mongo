@@ -41,7 +41,7 @@ namespace mongo {
     /**
      * PlanCacheCommand
      * Defines common attributes for all plan cache related commands
-     * such as slaveOk and locktype.
+     * such as slaveOk.
      */
     class PlanCacheCommand : public Command {
     public:
@@ -58,15 +58,10 @@ namespace mongo {
          * implement plan cache command functionality.
          */
 
-        bool run(const std::string& dbname, BSONObj& cmdObj, int options,
+        bool run(OperationContext* txn, const std::string& dbname, BSONObj& cmdObj, int options,
                  std::string& errmsg, BSONObjBuilder& result, bool fromRepl);
 
-        /**
-         * It's fine to return NONE here because plan cache commands
-         * create explicit read context to access collection info cache.
-         * Refer to dbcommands.cpp on how locktype() is handled.
-         */
-        virtual LockType locktype() const;
+        virtual bool isWriteCommandForConfigServer() const;
 
         virtual bool slaveOk() const;
 
@@ -77,7 +72,8 @@ namespace mongo {
          * - planCacheRead
          * - planCacheWrite
          */
-        virtual Status checkAuthForCommand(ClientBasic* client, const std::string& dbname,
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
                                            const BSONObj& cmdObj);
         /**
          * Subset of command arguments used by plan cache commands
@@ -85,13 +81,17 @@ namespace mongo {
          * Should contain just enough logic to invoke run*Command() function
          * in plan_cache.h
          */
-        virtual Status runPlanCacheCommand(const std::string& ns, BSONObj& cmdObj,
+        virtual Status runPlanCacheCommand(OperationContext* txn,
+                                           const std::string& ns,
+                                           BSONObj& cmdObj,
                                            BSONObjBuilder* bob) = 0;
 
         /**
          * Validatess query shape from command object and returns canonical query.
          */
-        static Status canonicalize(const std::string& ns, const BSONObj& cmdObj,
+        static Status canonicalize(OperationContext* txn,
+                                   const std::string& ns,
+                                   const BSONObj& cmdObj,
                                    CanonicalQuery** canonicalQueryOut);
 
     private:
@@ -108,7 +108,10 @@ namespace mongo {
     class PlanCacheListQueryShapes : public PlanCacheCommand {
     public:
         PlanCacheListQueryShapes();
-        virtual Status runPlanCacheCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
+        virtual Status runPlanCacheCommand(OperationContext* txn,
+                                           const std::string& ns,
+                                           BSONObj& cmdObj,
+                                           BSONObjBuilder* bob);
 
         /**
          * Looks up cache keys for collection's plan cache.
@@ -120,55 +123,59 @@ namespace mongo {
     /**
      * planCacheClear
      *
-     * { planCacheClear: <collection> }
+     * {
+     *     planCacheClear: <collection>,
+     *     query: <query>,
+     *     sort: <sort>,
+     *     projection: <projection>
+     * }
      *
      */
     class PlanCacheClear : public PlanCacheCommand {
     public:
         PlanCacheClear();
-        virtual Status runPlanCacheCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
-
-        /**
-         * Clears collection's plan cache.
-         */
-        static Status clear(const std::string& ns, PlanCache* planCache);
-    };
-
-    /**
-     * planCacheDrop
-     *
-     * { planCacheDrop: <collection>, key: <key> } }
-     *
-     */
-    class PlanCacheDrop : public PlanCacheCommand {
-    public:
-        PlanCacheDrop();
-        virtual Status runPlanCacheCommand(const std::string& ns, BSONObj& cmdObj,
+        virtual Status runPlanCacheCommand(OperationContext* txn,
+                                           const std::string& ns,
+                                           BSONObj& cmdObj,
                                            BSONObjBuilder* bob);
 
         /**
-         * Drops using a cache key.
+         * Clears collection's plan cache.
+         * If query shape is provided, clears plans for that single query shape only.
          */
-        static Status drop(PlanCache* planCache,const std::string& ns,  const BSONObj& cmdObj);
+        static Status clear(OperationContext* txn,
+                            PlanCache* planCache,
+                            const std::string& ns,
+                            const BSONObj& cmdObj);
     };
 
     /**
      * planCacheListPlans
      *
-     * { planCacheListPlans: <collection>, key: <key> } }
+     * {
+     *     planCacheListPlans: <collection>,
+     *     query: <query>,
+     *     sort: <sort>,
+     *     projection: <projection>
+     * }
      *
      */
     class PlanCacheListPlans : public PlanCacheCommand {
     public:
         PlanCacheListPlans();
-        virtual Status runPlanCacheCommand(const std::string& ns, BSONObj& cmdObj,
+        virtual Status runPlanCacheCommand(OperationContext* txn,
+                                           const std::string& ns,
+                                           BSONObj& cmdObj,
                                            BSONObjBuilder* bob);
 
         /**
          * Displays the cached plans for a query shape.
          */
-        static Status list(const PlanCache& planCache, const std::string& ns,
-                           const BSONObj& cmdObj, BSONObjBuilder* bob);
+        static Status list(OperationContext* txn,
+                           const PlanCache& planCache,
+                           const std::string& ns,
+                           const BSONObj& cmdObj,
+                           BSONObjBuilder* bob);
     };
 
 }  // namespace mongo

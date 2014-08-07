@@ -41,6 +41,7 @@ namespace {
 
     void assertInKVStore(LRUKeyValue<int, int>& cache, int key, int value) {
         int* cachedValue = NULL;
+        ASSERT_TRUE(cache.hasKey(key));
         Status s = cache.get(key, &cachedValue);
         ASSERT_OK(s);
         ASSERT_EQUALS(*cachedValue, value);
@@ -48,6 +49,7 @@ namespace {
 
     void assertNotInKVStore(LRUKeyValue<int, int>& cache, int key) {
         int* cachedValue = NULL;
+        ASSERT_FALSE(cache.hasKey(key));
         Status s = cache.get(key, &cachedValue);
         ASSERT_NOT_OK(s);
     }

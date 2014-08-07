@@ -84,12 +84,11 @@ catch (e) {
 }
 
 print("\nget new master (31001)");
-replTest.getMaster();
 
 assert.soon(function() {
-        var secondMaster = replTest.getMaster();
+        var secondMaster = replTest.getMaster(2 * 60 * 1000);
         return firstMaster+"" != secondMaster+"";
-    }, 'making sure '+firstMaster+' isn\'t still master', 60000);
+    }, 'making sure '+firstMaster+' isn\'t still master', 2 * 60 * 1000);
 
 
 print("\ncheck shutdown command on 31000");

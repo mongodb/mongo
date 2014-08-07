@@ -45,7 +45,7 @@ var reconnect = function(a) {
 
 
 var name = "toostale"
-var replTest = new ReplSetTest( {name: name, nodes: 3});
+var replTest = new ReplSetTest({ name: name, nodes: 3, oplogSize: 5 });
 var host = getHostName();
 
 var nodes = replTest.startSet();
@@ -76,10 +76,13 @@ reconnect(master.getDB("local"));
 var count = master.getDB("local").oplog.rs.count();
 var prevCount = -1;
 while (count != prevCount) {
-  print("inserting 10000");
-  for (var i = 0; i < 10000; i++) {
-    mdb.bar.insert({x:i, date : new Date(), str : "safkaldmfaksndfkjansfdjanfjkafa"});
+  print("inserting 1000");
+  var bulk = mdb.bar.initializeUnorderedBulkOp();
+  for (var i = 0; i < 1000; i++) {
+    bulk.insert({ x: i, date: new Date(), str: "safkaldmfaksndfkjansfdjanfjkafa" });
   }
+  assert.writeOK(bulk.execute());
+
   prevCount = count;
   replTest.awaitReplication();
   count = master.getDB("local").oplog.rs.count();

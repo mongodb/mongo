@@ -54,17 +54,6 @@ namespace mongo {
     public:
         virtual ~IndexCursor() { }
 
-        // XXX SHORT TERM HACKS THAT MUST DIE: 2d index
-        virtual DiskLoc getBucket() const { return DiskLoc(); }
-
-        // XXX SHORT TERM HACKS THAT MUST DIE: 2d index
-        virtual int getKeyOfs() const { return 0; }
-
-        /**
-         * Set options on the cursor (direction).  See CursorOptions below.
-         */
-        virtual Status setOptions(const CursorOptions& options) = 0;
-
         /**
          * A cursor doesn't point anywhere by default.  You must seek to the start position.
          * The provided position must be a predicate that the index understands.  The
@@ -114,9 +103,7 @@ namespace mongo {
          */
 
         /**
-         * Save our current position in the index.  Assumes that we are currently pointing to a
-         * valid position in the index.
-         * If not, we error.  Otherwise, succeed.
+         * Save our current position in the index.
          */
         virtual Status savePosition() = 0;
 
@@ -126,12 +113,12 @@ namespace mongo {
          */
         virtual Status restorePosition() = 0;
 
-        // Return a string describing the cursor.
-        virtual string toString() = 0;
+        // Return a std::string describing the cursor.
+        virtual std::string toString() = 0;
 
         /**
          *  Add debugging info to the provided builder.
-         * TODO(hk/alerner): We can do this better, perhaps with a more structured format.
+         * TODO(hk): We can do this better, perhaps with a more structured format.
          */
         virtual void explainDetails(BSONObjBuilder* b) { }
     };

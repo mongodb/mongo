@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -31,260 +31,24 @@
  */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/mmap_v1/extent.h"
+#include "mongo/db/storage/mmap_v1/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
+// #include "mongo/db/structure/catalog/namespace_details.h"  // XXX SERVER-13640
+#include "mongo/db/storage/record_store.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace QueryStageCollectionScan {
-
-    //
-    // Test some nitty-gritty capped collection details.  Ported and polished from pdfiletests.cpp.
-    //
-    class QueryStageCollectionScanCappedBase {
-    public:
-        QueryStageCollectionScanCappedBase() : _context(ns()) { }
-
-        virtual ~QueryStageCollectionScanCappedBase() {
-            _context.db()->dropCollection( ns() );
-        }
-
-        void run() {
-            // Create the capped collection.
-            stringstream spec;
-            spec << "{\"capped\":true,\"size\":2000,\"$nExtents\":" << nExtents() << "}";
-
-            string err;
-            ASSERT( userCreateNS( ns(), fromjson( spec.str() ), err, false ) );
-
-            // Tell the test to add data/extents/etc.
-            insertTestData();
-
-            CollectionScanParams params;
-            params.ns = ns();
-            params.direction = CollectionScanParams::FORWARD;
-            params.tailable = false;
-            params.start = DiskLoc();
-
-            // Walk the collection going forward.
-            {
-                // Create an executor to handle the scan.
-                WorkingSet* ws = new WorkingSet();
-                PlanStage* ps = new CollectionScan(params, ws, NULL);
-                PlanExecutor runner(ws, ps);
-
-                int resultCount = 0;
-                BSONObj obj;
-                while (Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL)) {
-                    ASSERT_EQUALS(resultCount, obj.firstElement().number());
-                    ++resultCount;
-                }
-
-                ASSERT_EQUALS(expectedCount(), resultCount);
-            }
-
-            // Walk the collection going backwards.
-            {
-                params.direction = CollectionScanParams::BACKWARD;
-
-                WorkingSet* ws = new WorkingSet();
-                PlanStage* ps = new CollectionScan(params, ws, NULL);
-                PlanExecutor runner(ws, ps);
-
-                // Going backwards.
-                int resultCount = expectedCount() - 1;
-                BSONObj obj;
-                while (Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL)) {
-                    ASSERT_EQUALS(resultCount, obj.firstElement().number());
-                    --resultCount;
-                }
-
-                ASSERT_EQUALS(-1, resultCount);
-            }
-        }
-
-    protected:
-        // Insert records into the collection.
-        virtual void insertTestData() = 0;
-
-        // How many records do we expect to find in our scan?
-        virtual int expectedCount() const = 0;
-
-        // How many extents do we create when we make the collection?
-        virtual int nExtents() const = 0;
-
-        // Quote: bypass standard alloc/insert routines to use the extent we want.
-        static DiskLoc insert( const DiskLoc& ext, int i ) {
-            // Copied verbatim.
-            BSONObjBuilder b;
-            b.append( "a", i );
-            BSONObj o = b.done();
-            int len = o.objsize();
-            Extent *e = ext.ext();
-            e = getDur().writing(e);
-            int ofs;
-            if ( e->lastRecord.isNull() )
-                ofs = ext.getOfs() + ( e->_extentData - (char *)e );
-            else
-                ofs = e->lastRecord.getOfs() + e->lastRecord.rec()->lengthWithHeaders();
-            DiskLoc dl( ext.a(), ofs );
-            Record *r = dl.rec();
-            r = (Record*) getDur().writingPtr(r, Record::HeaderSize + len);
-            r->lengthWithHeaders() = Record::HeaderSize + len;
-            r->extentOfs() = e->myLoc.getOfs();
-            r->nextOfs() = DiskLoc::NullOfs;
-            r->prevOfs() = e->lastRecord.isNull() ? DiskLoc::NullOfs : e->lastRecord.getOfs();
-            memcpy( r->data(), o.objdata(), len );
-            if ( e->firstRecord.isNull() )
-                e->firstRecord = dl;
-            else
-                getDur().writingInt(e->lastRecord.rec()->nextOfs()) = ofs;
-            e->lastRecord = dl;
-            return dl;
-        }
-
-        static const char *ns() { return "unittests.QueryStageCollectionScanCapped"; }
-
-        static NamespaceDetails *nsd() { return nsdetails(ns()); }
-
-    private:
-        Lock::GlobalWrite lk_;
-        Client::Context _context;
-    };
-
-    class QueryStageCollscanEmpty : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {}
-        virtual int expectedCount() const { return 0; }
-        virtual int nExtents() const { return 0; }
-    };
-
-    class QueryStageCollscanEmptyLooped : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {
-            nsd()->writingWithExtra()->capFirstNewRecord() = DiskLoc();
-        }
-        virtual int expectedCount() const { return 0; }
-        virtual int nExtents() const { return 0; }
-    };
-
-    class QueryStageCollscanEmptyMultiExtentLooped : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {
-            nsd()->writingWithExtra()->capFirstNewRecord() = DiskLoc();
-        }
-        virtual int expectedCount() const { return 0; }
-        virtual int nExtents() const { return 3; }
-    };
-
-    class QueryStageCollscanSingle : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {
-            nsd()->writingWithExtra()->capFirstNewRecord() = insert( nsd()->capExtent(), 0 );
-        }
-        virtual int expectedCount() const { return 1; }
-        virtual int nExtents() const { return 0; }
-    };
-
-    class QueryStageCollscanNewCapFirst : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {
-            DiskLoc x = insert( nsd()->capExtent(), 0 );
-            nsd()->writingWithExtra()->capFirstNewRecord() = x;
-            insert( nsd()->capExtent(), 1 );
-        }
-        virtual int expectedCount() const { return 2; }
-        virtual int nExtents() const { return 0; }
-    };
-
-    class QueryStageCollscanNewCapLast : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {
-            insert( nsd()->capExtent(), 0 );
-            nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 1 );
-        }
-        virtual int expectedCount() const { return 2; }
-        virtual int nExtents() const { return 0; }
-    };
-
-    class QueryStageCollscanNewCapMiddle : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {
-            insert( nsd()->capExtent(), 0 );
-            nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 1 );
-            insert( nsd()->capExtent(), 2 );
-        }
-        virtual int expectedCount() const { return 3; }
-        virtual int nExtents() const { return 0; }
-    };
-
-    class QueryStageCollscanFirstExtent : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {
-            insert( nsd()->capExtent(), 0 );
-            insert( nsd()->lastExtent(), 1 );
-            nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 2 );
-            insert( nsd()->capExtent(), 3 );
-        }
-        virtual int expectedCount() const { return 4; }
-        virtual int nExtents() const { return 2; }
-    };
-
-    class QueryStageCollscanLastExtent : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {
-            nsd()->capExtent().writing() = nsd()->lastExtent();
-            insert( nsd()->capExtent(), 0 );
-            insert( nsd()->firstExtent(), 1 );
-            nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 2 );
-            insert( nsd()->capExtent(), 3 );
-        }
-        virtual int expectedCount() const { return 4; }
-        virtual int nExtents() const { return 2; }
-    };
-
-    class QueryStageCollscanMidExtent : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {
-            nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
-            insert( nsd()->capExtent(), 0 );
-            insert( nsd()->lastExtent(), 1 );
-            insert( nsd()->firstExtent(), 2 );
-            nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 3 );
-            insert( nsd()->capExtent(), 4 );
-        }
-        virtual int expectedCount() const { return 5; }
-        virtual int nExtents() const { return 3; }
-    };
-
-    class QueryStageCollscanAloneInExtent : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {
-            nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
-            insert( nsd()->lastExtent(), 0 );
-            insert( nsd()->firstExtent(), 1 );
-            nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 2 );
-        }
-        virtual int expectedCount() const { return 3; }
-        virtual int nExtents() const { return 3; }
-    };
-
-    class QueryStageCollscanFirstInExtent : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {
-            nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
-            insert( nsd()->lastExtent(), 0 );
-            insert( nsd()->firstExtent(), 1 );
-            nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 2 );
-            insert( nsd()->capExtent(), 3 );
-        }
-        virtual int expectedCount() const { return 4; }
-        virtual int nExtents() const { return 3; }
-    };
-
-    class QueryStageCollscanLastInExtent : public QueryStageCollectionScanCappedBase {
-        virtual void insertTestData() {
-            nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
-            insert( nsd()->capExtent(), 0 );
-            insert( nsd()->lastExtent(), 1 );
-            insert( nsd()->firstExtent(), 2 );
-            nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 3 );
-        }
-        virtual int expectedCount() const { return 4; }
-        virtual int nExtents() const { return 3; }
-    };
 
     //
     // Stage-specific tests.
@@ -292,19 +56,21 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollectionScanBase {
     public:
-        QueryStageCollectionScanBase() {
-            Client::WriteContext ctx(ns());
+        QueryStageCollectionScanBase() : _client(&_txn) {
+            Client::WriteContext ctx(&_txn, ns());
 
             for (int i = 0; i < numObj(); ++i) {
                 BSONObjBuilder bob;
                 bob.append("foo", i);
                 _client.insert(ns(), bob.obj());
             }
+            ctx.commit();
         }
 
         virtual ~QueryStageCollectionScanBase() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
+            ctx.commit();
         }
 
         void remove(const BSONObj& obj) {
@@ -312,11 +78,11 @@ namespace QueryStageCollectionScan {
         }
 
         int countResults(CollectionScanParams::Direction direction, const BSONObj& filterObj) {
-            Client::ReadContext ctx(ns());
+            Client::ReadContext ctx(&_txn, ns());
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
             params.direction = direction;
             params.tailable = false;
 
@@ -327,26 +93,28 @@ namespace QueryStageCollectionScan {
 
             // Make a scan and have the runner own it.
             WorkingSet* ws = new WorkingSet();
-            PlanStage* ps = new CollectionScan(params, ws, filterExpr.get());
-            PlanExecutor runner(ws, ps);
+            PlanStage* ps = new CollectionScan(&_txn, params, ws, filterExpr.get());
+            PlanExecutor runner(ws, ps, params.collection);
 
             // Use the runner to count the number of objects scanned.
             int count = 0;
-            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL); ) { ++count; }
+            for (BSONObj obj; PlanExecutor::ADVANCED == runner.getNext(&obj, NULL); ) { ++count; }
             return count;
         }
 
-        void getLocs(CollectionScanParams::Direction direction, vector<DiskLoc>* out) {
+        void getLocs(Collection* collection,
+                     CollectionScanParams::Direction direction,
+                     vector<DiskLoc>* out) {
             WorkingSet ws;
 
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = collection;
             params.direction = direction;
             params.tailable = false;
 
-            scoped_ptr<CollectionScan> scan(new CollectionScan(params, &ws, NULL));
+            scoped_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
             while (!scan->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
@@ -360,11 +128,13 @@ namespace QueryStageCollectionScan {
 
         static const char* ns() { return "unittests.QueryStageCollectionScan"; }
 
+    protected:
+        OperationContextImpl _txn;
+
     private:
-        static DBDirectClient _client;
+        DBDirectClient _client;
     };
 
-    DBDirectClient QueryStageCollectionScanBase::_client;
 
     //
     // Go forwards, get everything.
@@ -418,21 +188,21 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanObjectsInOrderForward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::ReadContext ctx(ns());
+            Client::ReadContext ctx(&_txn, ns());
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
 
             // Make a scan and have the runner own it.
             WorkingSet* ws = new WorkingSet();
-            PlanStage* ps = new CollectionScan(params, ws, NULL);
-            PlanExecutor runner(ws, ps);
+            PlanStage* ps = new CollectionScan(&_txn, params, ws, NULL);
+            PlanExecutor runner(ws, ps, params.collection);
 
             int count = 0;
-            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL); ) {
+            for (BSONObj obj; PlanExecutor::ADVANCED == runner.getNext(&obj, NULL); ) {
                 // Make sure we get the objects in the order we want
                 ASSERT_EQUALS(count, obj["foo"].numberInt());
                 ++count;
@@ -449,19 +219,19 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanObjectsInOrderBackward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::ReadContext ctx(ns());
+            Client::ReadContext ctx(&_txn, ns());
 
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
             params.direction = CollectionScanParams::BACKWARD;
             params.tailable = false;
 
             WorkingSet* ws = new WorkingSet();
-            PlanStage* ps = new CollectionScan(params, ws, NULL);
-            PlanExecutor runner(ws, ps);
+            PlanStage* ps = new CollectionScan(&_txn, params, ws, NULL);
+            PlanExecutor runner(ws, ps, params.collection);
 
             int count = 0;
-            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL); ) {
+            for (BSONObj obj; PlanExecutor::ADVANCED == runner.getNext(&obj, NULL); ) {
                 ++count;
                 ASSERT_EQUALS(numObj() - count, obj["foo"].numberInt());
             }
@@ -478,53 +248,56 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanInvalidateUpcomingObject : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
+
+            Collection* coll = ctx.ctx().db()->getCollection( &_txn, ns() );
 
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;
-            getLocs(CollectionScanParams::FORWARD, &locs);
+            getLocs(coll, CollectionScanParams::FORWARD, &locs);
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = coll;
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
 
             WorkingSet ws;
-            scoped_ptr<CollectionScan> scan(new CollectionScan(params, &ws, NULL));
+            scoped_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
 
             int count = 0;
             while (count < 10) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(locs[count].obj()["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }
             }
 
             // Remove locs[count].
-            scan->prepareToYield();
+            scan->saveState();
             scan->invalidate(locs[count], INVALIDATION_DELETION);
-            remove(locs[count].obj());
-            scan->recoverFromYield();
+            remove(coll->docFor(locs[count]));
+            scan->restoreState(&_txn);
 
             // Skip over locs[count].
             ++count;
 
             // Expect the rest.
             while (!scan->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(locs[count].obj()["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }
             }
+            ctx.commit();
 
             ASSERT_EQUALS(numObj(), count);
         }
@@ -538,53 +311,55 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanInvalidateUpcomingObjectBackward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
+            Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
 
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;
-            getLocs(CollectionScanParams::BACKWARD, &locs);
+            getLocs(coll, CollectionScanParams::BACKWARD, &locs);
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = coll;
             params.direction = CollectionScanParams::BACKWARD;
             params.tailable = false;
 
             WorkingSet ws;
-            scoped_ptr<CollectionScan> scan(new CollectionScan(params, &ws, NULL));
+            scoped_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
 
             int count = 0;
             while (count < 10) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(locs[count].obj()["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }
             }
 
             // Remove locs[count].
-            scan->prepareToYield();
+            scan->saveState();
             scan->invalidate(locs[count], INVALIDATION_DELETION);
-            remove(locs[count].obj());
-            scan->recoverFromYield();
+            remove(coll->docFor(locs[count]));
+            scan->restoreState(&_txn);
 
             // Skip over locs[count].
             ++count;
 
             // Expect the rest.
             while (!scan->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(locs[count].obj()["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }
             }
+            ctx.commit();
 
             ASSERT_EQUALS(numObj(), count);
         }
@@ -595,21 +370,7 @@ namespace QueryStageCollectionScan {
         All() : Suite( "QueryStageCollectionScan" ) {}
 
         void setupTests() {
-            // These tests are ported from pdfile.cpp
-            add<QueryStageCollscanEmpty>();
-            add<QueryStageCollscanEmptyLooped>();
-            add<QueryStageCollscanEmptyMultiExtentLooped>();
-            add<QueryStageCollscanSingle>();
-            add<QueryStageCollscanNewCapFirst>();
-            add<QueryStageCollscanNewCapLast>();
-            add<QueryStageCollscanNewCapMiddle>();
-            add<QueryStageCollscanFirstExtent>();
-            add<QueryStageCollscanLastExtent>();
-            add<QueryStageCollscanMidExtent>();
-            add<QueryStageCollscanAloneInExtent>();
-            add<QueryStageCollscanFirstInExtent>();
-            add<QueryStageCollscanLastInExtent>();
-            // These are not.  Stage-specific tests below.
+            // Stage-specific tests below.
             add<QueryStageCollscanBasicForward>();
             add<QueryStageCollscanBasicBackward>();
             add<QueryStageCollscanBasicForwardWithMatch>();

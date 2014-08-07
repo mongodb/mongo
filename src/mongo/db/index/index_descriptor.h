@@ -1,3 +1,5 @@
+// index_descriptor.cpp
+
 /**
 *    Copyright (C) 2013 10gen Inc.
 *
@@ -30,9 +32,7 @@
 
 #include <string>
 
-#include "mongo/db/structure/catalog/index_details.h"  // For IndexDetails.
 #include "mongo/db/jsobj.h"
-#include "mongo/db/structure/catalog/namespace_details.h"  // For NamespaceDetails.
 #include "mongo/db/catalog/collection.h"
 
 #include "mongo/util/stacktrace.h"
@@ -56,21 +56,22 @@ namespace mongo {
          * OnDiskIndexData is a pointer to the memory mapped per-index data.
          * infoObj is a copy of the index-describing BSONObj contained in the OnDiskIndexData.
          */
-        IndexDescriptor(Collection* collection, BSONObj infoObj)
+        IndexDescriptor(Collection* collection, const std::string& accessMethodName, BSONObj infoObj)
             : _magic(123987),
               _collection(collection),
+              _accessMethodName(accessMethodName),
               _infoObj(infoObj.getOwned()),
               _numFields(infoObj.getObjectField("key").nFields()),
               _keyPattern(infoObj.getObjectField("key").getOwned()),
               _indexName(infoObj.getStringField("name")),
               _parentNS(infoObj.getStringField("ns")),
-              _isIdIndex(IndexDetails::isIdIndexPattern( _keyPattern )),
+              _isIdIndex(isIdIndexPattern( _keyPattern )),
               _sparse(infoObj["sparse"].trueValue()),
               _dropDups(infoObj["dropDups"].trueValue()),
               _unique( _isIdIndex || infoObj["unique"].trueValue() ),
               _cachedEntry( NULL )
         {
-            _indexNamespace = _parentNS + ".$" + _indexName;
+            _indexNamespace = makeIndexNamespace( _parentNS, _indexName );
 
             _version = 0;
             BSONElement e = _infoObj["v"];
@@ -102,13 +103,16 @@ namespace mongo {
         //
 
         // Return the name of the index.
-        const string& indexName() const { _checkOk(); return _indexName; }
+        const std::string& indexName() const { _checkOk(); return _indexName; }
 
         // Return the name of the indexed collection.
-        const string& parentNS() const { return _parentNS; }
+        const std::string& parentNS() const { return _parentNS; }
 
         // Return the name of this index's storage area (database.table.$index)
-        const string& indexNamespace() const { return _indexNamespace; }
+        const std::string& indexNamespace() const { return _indexNamespace; }
+
+        // Return the name of the access method we must use to access this index's data.
+        const std::string& getAccessMethodName() const { return _accessMethodName; }
 
         //
         // Properties every index has
@@ -137,20 +141,40 @@ namespace mongo {
 
         // Allow access to arbitrary fields in the per-index info object.  Some indices stash
         // index-specific data there.
-        BSONElement getInfoElement(const string& name) const { return _infoObj[name]; }
+        BSONElement getInfoElement(const std::string& name) const { return _infoObj[name]; }
 
         //
         // "Internals" of accessing the index, used by IndexAccessMethod(s).
         //
 
-        // Return a (rather compact) string representation.
-        string toString() const { _checkOk(); return _infoObj.toString(); }
+        // Return a (rather compact) std::string representation.
+        std::string toString() const { _checkOk(); return _infoObj.toString(); }
 
         // Return the info object.
         const BSONObj& infoObj() const { _checkOk(); return _infoObj; }
 
-        // this is the owner of this IndexDescriptor
-        IndexCatalog* getIndexCatalog() const { return _collection->getIndexCatalog(); }
+        // Both the collection and the catalog must outlive the IndexDescriptor
+        const Collection* getCollection() const { return _collection; }
+        const IndexCatalog* getIndexCatalog() const { return _collection->getIndexCatalog(); }
+
+        bool areIndexOptionsEquivalent( const IndexDescriptor* other ) const;
+
+        static bool isIdIndexPattern( const BSONObj &pattern ) {
+            BSONObjIterator i(pattern);
+            BSONElement e = i.next();
+            //_id index must have form exactly {_id : 1} or {_id : -1}.
+            //Allows an index of form {_id : "hashed"} to exist but
+            //do not consider it to be the primary _id index
+            if(! ( strcmp(e.fieldName(), "_id") == 0
+                   && (e.numberInt() == 1 || e.numberInt() == -1)))
+                return false;
+             return i.next().eoo();
+        }
+
+        static std::string makeIndexNamespace( const StringData& ns,
+                                          const StringData& name ) {
+            return ns.toString() + ".$" + name.toString();
+        }
 
     private:
 
@@ -166,6 +190,9 @@ namespace mongo {
         // Related catalog information of the parent collection
         Collection* _collection;
 
+        // What access method should we use for this index?
+        std::string _accessMethodName;
+
         // The BSONObj describing the index.  Accessed through the various members above.
         const BSONObj _infoObj;
 
@@ -173,9 +200,9 @@ namespace mongo {
 
         int64_t _numFields; // How many fields are indexed?
         BSONObj _keyPattern;
-        string _indexName;
-        string _parentNS;
-        string _indexNamespace;
+        std::string _indexName;
+        std::string _parentNS;
+        std::string _indexNamespace;
         bool _isIdIndex;
         bool _sparse;
         bool _dropDups;

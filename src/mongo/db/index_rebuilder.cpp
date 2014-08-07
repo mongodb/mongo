@@ -26,18 +26,26 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/index_rebuilder.h"
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/client.h"
-#include "mongo/db/instance.h"
-#include "mongo/db/pdfile.h"
-#include "mongo/db/repl/rs.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/client.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     IndexRebuilder indexRebuilder;
 
@@ -50,32 +58,35 @@ namespace mongo {
     void IndexRebuilder::run() {
         Client::initThread(name().c_str()); 
         ON_BLOCK_EXIT_OBJ(cc(), &Client::shutdown);
+
+        OperationContextImpl txn;
+
         cc().getAuthorizationSession()->grantInternalAuthorization();
 
         std::vector<std::string> dbNames;
-        getDatabaseNames(dbNames);
+
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases( &dbNames );
 
         try {
             std::list<std::string> collNames;
             for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
                  dbName < dbNames.end();
                  dbName++) {
-                Client::ReadContext ctx(*dbName);
-                Database* db = cc().database();
-                db->namespaceIndex().getNamespaces(collNames, /* onlyCollections */ true);
+                Client::ReadContext ctx(&txn, *dbName);
+
+                Database* db = ctx.ctx().db();
+                db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collNames);
             }
-            checkNS(collNames);
+            checkNS(&txn, collNames);
         }
-        catch (const DBException&) {
-            warning() << "index rebuilding did not complete" << endl;
+        catch (const DBException& e) {
+            warning() << "Index rebuilding did not complete: " << e.what() << endl;
         }
-        boost::unique_lock<boost::mutex> lk(ReplSet::rss.mtx);
-        ReplSet::rss.indexRebuildDone = true;
-        ReplSet::rss.cond.notify_all();
         LOG(1) << "checking complete" << endl;
     }
 
-    void IndexRebuilder::checkNS(const std::list<std::string>& nsToCheck) {
+    void IndexRebuilder::checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
         bool firstTime = true;
         for (std::list<std::string>::const_iterator it = nsToCheck.begin();
                 it != nsToCheck.end();
@@ -87,20 +98,21 @@ namespace mongo {
 
             // This write lock is held throughout the index building process
             // for this namespace.
-            Client::WriteContext ctx(ns);
-            Collection* collection = ctx.ctx().db()->getCollection( ns );
+            Client::WriteContext ctx(txn, ns);
+
+            Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
             if ( collection == NULL )
                 continue;
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
             if ( collection->ns().isOplog() && indexCatalog->numIndexesTotal() > 0 ) {
-                warning() << ns << " had ilegal indexes, removing";
-                indexCatalog->dropAllIndexes( true );
+                warning() << ns << " had illegal indexes, removing";
+                indexCatalog->dropAllIndexes(txn, true);
                 continue;
             }
 
-            vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes();
+            vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(txn);
 
             // The indexes have now been removed from system.indexes, so the only record is
             // in-memory. If there is a journal commit between now and when insert() rewrites
@@ -131,12 +143,13 @@ namespace mongo {
 
                 log() << "going to rebuild: " << indexObj;
 
-                Status status = indexCatalog->createIndex( indexObj, false );
+                Status status = indexCatalog->createIndex(txn, indexObj, false);
                 if ( !status.isOK() ) {
                     log() << "building index failed: " << status.toString() << " index: " << indexObj;
                 }
 
             }
+            ctx.commit();
         }
     }
 

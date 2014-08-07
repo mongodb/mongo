@@ -36,7 +36,7 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     // This interface exists to facilitate easier testing;
     // the test infrastructure implements these functions with stubs.
@@ -91,15 +91,6 @@ namespace replset {
 
         const Member* _currentSyncTarget;
 
-        // Notifier thread
-
-        // used to wait until another op has been replicated
-        boost::condition_variable _lastOpCond;
-        boost::mutex _lastOpMutex;
-
-        const Member* _oplogMarkerTarget;
-        OpTime _consumedOpTime; // not locked, only used by notifier thread
-
         BackgroundSync();
         BackgroundSync(const BackgroundSync& s);
         BackgroundSync operator=(const BackgroundSync& s);
@@ -107,10 +98,10 @@ namespace replset {
         // Production thread
         void _producerThread();
         // Adds elements to the list, up to maxSize.
-        void produce();
+        void produce(OperationContext* txn);
         // Check if rollback is necessary
-        bool isRollbackRequired(OplogReader& r);
-        void getOplogReader(OplogReader& r);
+        bool isRollbackRequired(OperationContext* txn, OplogReader& r);
+        void getOplogReader(OperationContext* txn, OplogReader& r);
         // Evaluate if the current sync target is still good
         bool shouldChangeSyncTarget();
         // check lastOpTimeWritten against the remote's earliest op, filling in remoteOldestOp.
@@ -120,18 +111,9 @@ namespace replset {
         // restart syncing
         void start();
 
-        // Tracker thread
-        // tells the sync target where this member is synced to
-        void markOplog();
-        bool hasCursor();
-
-        // Sets _oplogMarkerTarget and calls connect();
-        // used for both the notifier command and the older OplogReader style notifier
-        bool connectOplogNotifier();
-
+    public:
         bool isAssumingPrimary();
 
-    public:
         static BackgroundSync* get();
         static void shutdown();
         static void notify();
@@ -159,5 +141,5 @@ namespace replset {
     };
 
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

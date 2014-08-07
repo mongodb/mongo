@@ -27,11 +27,16 @@
 */
 
 #include "mongo/db/exec/skip.h"
+#include "mongo/db/exec/working_set_common.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
+    // static
+    const char* SkipStage::kStageType = "SKIP";
+
     SkipStage::SkipStage(int toSkip, WorkingSet* ws, PlanStage* child)
-        : _ws(ws), _child(child), _toSkip(toSkip) { }
+        : _ws(ws), _child(child), _toSkip(toSkip), _commonStats(kStageType) { }
 
     SkipStage::~SkipStage() { }
 
@@ -40,9 +45,10 @@ namespace mongo {
     PlanStage::StageState SkipStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
-        if (isEOF()) { return PlanStage::IS_EOF; }
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         StageState status = _child->work(&id);
 
         if (PlanStage::ADVANCED == status) {
@@ -59,12 +65,21 @@ namespace mongo {
             ++_commonStats.advanced;
             return PlanStage::ADVANCED;
         }
-        else {
-            if (PlanStage::NEED_FETCH == status) {
-                *out = id;
-                ++_commonStats.needFetch;
+        else if (PlanStage::FAILURE == status) {
+            *out = id;
+            // If a stage fails, it may create a status WSM to indicate why it
+            // failed, in which case 'id' is valid.  If ID is invalid, we
+            // create our own error message.
+            if (WorkingSet::INVALID_ID == id) {
+                mongoutils::str::stream ss;
+                ss << "skip stage failed to read in results from child";
+                Status status(ErrorCodes::InternalError, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
             }
-            else if (PlanStage::NEED_TIME == status) {
+            return status;
+        }
+        else {
+            if (PlanStage::NEED_TIME == status) {
                 ++_commonStats.needTime;
             }
             // NEED_TIME/YIELD, ERROR, IS_EOF
@@ -72,14 +87,14 @@ namespace mongo {
         }
     }
 
-    void SkipStage::prepareToYield() {
+    void SkipStage::saveState() {
         ++_commonStats.yields;
-        _child->prepareToYield();
+        _child->saveState();
     }
 
-    void SkipStage::recoverFromYield() {
+    void SkipStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        _child->recoverFromYield();
+        _child->restoreState(opCtx);
     }
 
     void SkipStage::invalidate(const DiskLoc& dl, InvalidationType type) {
@@ -87,11 +102,27 @@ namespace mongo {
         _child->invalidate(dl, type);
     }
 
+    vector<PlanStage*> SkipStage::getChildren() const {
+        vector<PlanStage*> children;
+        children.push_back(_child.get());
+        return children;
+    }
+
     PlanStageStats* SkipStage::getStats() {
         _commonStats.isEOF = isEOF();
+        _specificStats.skip = _toSkip;
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SKIP));
+        ret->specific.reset(new SkipStats(_specificStats));
         ret->children.push_back(_child->getStats());
         return ret.release();
+    }
+
+    const CommonStats* SkipStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* SkipStage::getSpecificStats() {
+        return &_specificStats;
     }
 
 }  // namespace mongo

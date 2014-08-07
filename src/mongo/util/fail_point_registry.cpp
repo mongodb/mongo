@@ -28,7 +28,6 @@
 
 #include "mongo/util/fail_point_registry.h"
 
-#include "mongo/db/commands.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -54,7 +53,7 @@ namespace mongo {
     }
 
     FailPoint* FailPointRegistry::getFailPoint(const string& name) const {
-        return mapFindWithDefault(_fpMap, name, reinterpret_cast<FailPoint *>(NULL));
+        return mapFindWithDefault(_fpMap, name, static_cast<FailPoint*>(NULL));
     }
 
     void FailPointRegistry::freeze() {

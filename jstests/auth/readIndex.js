@@ -4,11 +4,11 @@ var conn = MongoRunner.runMongod({auth : ""});
 var adminDB = conn.getDB("admin");
 var testDB = conn.getDB("testdb");
 
+adminDB.createUser({user:'root', pwd:'password', roles:['root']});
+adminDB.auth('root', 'password');
 testDB.foo.insert({a:1});
-
-testDB.createUser({user:'dbAdmin',
-                   pwd:'password',
-                   roles:['dbAdmin']});
+testDB.createUser({user:'dbAdmin', pwd:'password', roles:['dbAdmin']});
+adminDB.logout();
 
 testDB.auth('dbAdmin', 'password');
 testDB.foo.ensureIndex({a:1});

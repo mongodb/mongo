@@ -28,25 +28,61 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/background.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/file_allocator.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
-    Database* DatabaseHolder::getOrCreate( const string& ns, const string& path, bool& justCreated ) {
-        string dbname = _todb( ns );
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
+
+    static DatabaseHolder _dbHolder;
+
+    DatabaseHolder& dbHolder() {
+        return _dbHolder;
+    }
+
+    Database* DatabaseHolder::get(OperationContext* txn,
+                                  const StringData& ns) const {
+
+        txn->lockState()->assertAtLeastReadLocked(ns);
+
+        SimpleMutex::scoped_lock lk(_m);
+        const StringData db = _todb( ns );
+        DBs::const_iterator it = _dbs.find(db);
+        if ( it != _dbs.end() )
+            return it->second;
+        return NULL;
+    }
+
+    Database* DatabaseHolder::getOrCreate(OperationContext* txn,
+                                          const StringData& ns,
+                                          bool& justCreated) {
+
+        const StringData dbname = _todb( ns );
+        invariant(txn->lockState()->isAtLeastReadLocked(dbname));
+
+        if (txn->lockState()->isWriteLocked() && FileAllocator::get()->hasFailed()) {
+            uassert(17507, "Can't take a write lock while out of disk space", false);
+        }
+
         {
             SimpleMutex::scoped_lock lk(_m);
-            Lock::assertAtLeastReadLocked(ns);
-            DBs& m = _paths[path];
             {
-                DBs::iterator i = m.find(dbname);
-                if( i != m.end() ) {
+                DBs::const_iterator i = _dbs.find(dbname);
+                if( i != _dbs.end() ) {
                     justCreated = false;
                     return i->second;
                 }
@@ -55,14 +91,23 @@ namespace mongo {
             // todo: protect against getting sprayed with requests for different db names that DNE -
             //       that would make the DBs map very large.  not clear what to do to handle though,
             //       perhaps just log it, which is what we do here with the "> 40" :
-            bool cant = !Lock::isWriteLocked(ns);
+            bool cant = !txn->lockState()->isWriteLocked(ns);
             if( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) ||
-                m.size() > 40 || cant || DEBUG_BUILD ) {
-                log() << "opening db: "
-                      << (path == storageGlobalParams.dbpath ? "" : path) << ' ' << dbname
-                      << endl;
+                _dbs.size() > 40 || cant || DEBUG_BUILD ) {
+                log() << "opening db: " << dbname;
             }
             massert(15927, "can't open database in a read lock. if db was just closed, consider retrying the query. might otherwise indicate an internal error", !cant);
+        }
+
+        // we know we have a db exclusive lock here
+        { // check casing
+            string duplicate = Database::duplicateUncasedName(dbname.toString());
+            if ( !duplicate.empty() ) {
+                stringstream ss;
+                ss << "db already exists with different case already have: [" << duplicate
+                   << "] trying to create [" << dbname.toString() << "]";
+                uasserted( DatabaseDifferCaseCode , ss.str() );
+            }
         }
 
         // we mark our thread as having done writes now as we do not want any exceptions
@@ -70,51 +115,82 @@ namespace mongo {
         cc().writeHappened();
 
         // this locks _m for defensive checks, so we don't want to be locked right here :
-        Database *db = new Database( dbname.c_str() , justCreated , path );
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        invariant(storageEngine);
+        DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry( txn, dbname );
+        invariant( entry );
+        justCreated = !entry->exists();
+        Database *db = new Database(txn,
+                                    dbname,
+                                    entry );
 
         {
             SimpleMutex::scoped_lock lk(_m);
-            DBs& m = _paths[path];
-            verify( m[dbname] == 0 );
-            m[dbname] = db;
-            _size++;
+            _dbs[dbname] = db;
         }
 
         return db;
     }
 
-    bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result , bool force ) {
-        log() << "DatabaseHolder::closeAll path:" << path << endl;
-        verify( Lock::isW() );
-        getDur().commitNow(); // bad things happen if we close a DB with outstanding writes
+    void DatabaseHolder::close(OperationContext* txn,
+                               const StringData& ns) {
+        invariant(txn->lockState()->isW());
 
-        map<string,Database*>& m = _paths[path];
-        _size -= m.size();
+        StringData db = _todb(ns);
+
+        SimpleMutex::scoped_lock lk(_m);
+        DBs::const_iterator it = _dbs.find(db);
+        if ( it == _dbs.end() )
+            return;
+
+        it->second->close( txn );
+        delete it->second;
+        _dbs.erase( db );
+
+        getGlobalEnvironment()->getGlobalStorageEngine()->closeDatabase( txn, db.toString() );
+    }
+
+    bool DatabaseHolder::closeAll(OperationContext* txn,
+                                  BSONObjBuilder& result,
+                                  bool force) {
+        invariant(txn->lockState()->isW());
+
+        getDur().commitNow(txn); // bad things happen if we close a DB with outstanding writes
+
+        SimpleMutex::scoped_lock lk(_m);
 
         set< string > dbs;
-        for ( map<string,Database*>::iterator i = m.begin(); i != m.end(); i++ ) {
-            wassert( i->second->path() == path );
+        for ( DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i ) {
             dbs.insert( i->first );
         }
 
-        currentClient.get()->getContext()->_clear();
-
-        BSONObjBuilder bb( result.subarrayStart( "dbs" ) );
-        int n = 0;
+        BSONArrayBuilder bb( result.subarrayStart( "dbs" ) );
         int nNotClosed = 0;
         for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
             string name = *i;
-            LOG(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
-            Client::Context ctx( name , path );
+
+            LOG(2) << "DatabaseHolder::closeAll name:" << name;
+
             if( !force && BackgroundOperation::inProgForDb(name) ) {
-                log() << "WARNING: can't close database " << name << " because a bg job is in progress - try killOp command" << endl;
+                log() << "WARNING: can't close database "
+                      << name
+                      << " because a bg job is in progress - try killOp command"
+                      << endl;
                 nNotClosed++;
+                continue;
             }
-            else {
-                Database::closeDatabase( name.c_str() , path );
-                bb.append( bb.numStr( n++ ) , name );
-            }
+
+            Database* db = _dbs[name];
+            db->close( txn );
+            delete db;
+
+            _dbs.erase( name );
+
+            getGlobalEnvironment()->getGlobalStorageEngine()->closeDatabase( txn, name );
+
+            bb.append( name );
         }
+
         bb.done();
         if( nNotClosed ) {
             result.append("nNotClosed", nNotClosed);
@@ -122,6 +198,4 @@ namespace mongo {
 
         return true;
     }
-
-
 }

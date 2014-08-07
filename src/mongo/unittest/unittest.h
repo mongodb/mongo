@@ -39,13 +39,13 @@
 #include <string>
 #include <vector>
 
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include "mongo/base/status_with.h"
 #include "mongo/logger/logstream_builder.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -57,8 +57,7 @@
 /**
  * Fails unless "EXPRESSION" is true.
  */
-#define ASSERT_TRUE(EXPRESSION) ::mongo::unittest::TestAssertion( __FILE__, __LINE__ ).failIf( \
-            !(EXPRESSION), "Expected: " #EXPRESSION )
+#define ASSERT_TRUE(EXPRESSION) if (!(EXPRESSION)) ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, "Expected: " #EXPRESSION).stream()
 #define ASSERT(EXPRESSION) ASSERT_TRUE(EXPRESSION)
 
 /**
@@ -74,8 +73,8 @@
 /**
  * Fails if "EXPRESSION" is true.
  */
-#define ASSERT_FALSE(EXPRESSION) ::mongo::unittest::TestAssertion( __FILE__, __LINE__ ).failIf( \
-            (EXPRESSION), "Expected: !(" #EXPRESSION ")" )
+#define ASSERT_FALSE(EXPRESSION) if (EXPRESSION) \
+::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, "Expected: !(" #EXPRESSION ")").stream()
 
 /*
  * Binary comparison assertions.
@@ -110,17 +109,42 @@
  * halts.
  */
 #define ASSERT_THROWS(EXPRESSION, EXCEPTION_TYPE)                       \
-    do {                                                                \
-        bool threw = false;                                             \
-        ::mongo::unittest::TestAssertion _testAssertion( __FILE__, __LINE__ ); \
-        try {                                                            \
-            EXPRESSION;                                               \
-        } catch ( const EXCEPTION_TYPE& ) { threw = true; }            \
-        if (!threw)                                                     \
-            _testAssertion.fail("Expected expression " #EXPRESSION      \
-                                " to throw " #EXCEPTION_TYPE " but it threw nothing."); \
-    } while( false )
+    ASSERT_THROWS_PRED(EXPRESSION,                                      \
+                       EXCEPTION_TYPE,                                  \
+                       ::mongo::stdx::bind(::mongo::unittest::alwaysTrue))
 
+/**
+ * Behaves like ASSERT_THROWS, above, but also fails if calling what() on the thrown exception
+ * does not return a string equal to EXPECTED_WHAT.
+ */
+#define ASSERT_THROWS_WHAT(EXPRESSION, EXCEPTION_TYPE, EXPECTED_WHAT) \
+    ASSERT_THROWS_PRED(EXPRESSION, \
+                       EXCEPTION_TYPE, \
+                       ::mongo::stdx::bind(std::equal_to<std::string>(), (EXPECTED_WHAT), \
+                                           ::mongo::stdx::bind(&EXCEPTION_TYPE::what, \
+                                                               ::mongo::stdx::placeholders::_1)))
+
+/**
+ * Behaves like ASSERT_THROWS, above, but also fails if PREDICATE(ex) for the throw exception, ex,
+ * is false.
+ */
+#define ASSERT_THROWS_PRED(EXPRESSION, EXCEPTION_TYPE, PREDICATE) do {  \
+        ::mongo::unittest::TestAssertion _testAssertion( __FILE__, __LINE__ ); \
+        try {                                                           \
+            EXPRESSION;                                                 \
+            _testAssertion.fail("Expected expression " #EXPRESSION      \
+                                " to throw " #EXCEPTION_TYPE            \
+                                " but it threw nothing.");              \
+        } catch (const EXCEPTION_TYPE& ex) {                            \
+            if (!(PREDICATE(ex))) {                                     \
+                _testAssertion.fail("Expected " #EXPRESSION             \
+                                    " to throw an exception of type "   \
+                                    #EXCEPTION_TYPE                     \
+                                    " where " #PREDICATE                \
+                                    "(ex) was true, but it was false."); \
+            }                                                           \
+        }                                                               \
+    } while (false)
 
 /**
  * Construct a single test, named "TEST_NAME" within the test case "CASE_NAME".
@@ -191,7 +215,7 @@ namespace mongo {
         /**
          * Type representing the function composing a test.
          */
-        typedef boost::function<void (void)> TestFunction;
+        typedef stdx::function<void (void)> TestFunction;
 
         /**
          * Container holding a test function and its name.  Suites
@@ -266,7 +290,7 @@ namespace mongo {
          */
         class Suite : private boost::noncopyable {
         public:
-            Suite( const string& name );
+            Suite( const std::string& name );
             virtual ~Suite();
 
             template<class T>
@@ -274,7 +298,7 @@ namespace mongo {
 
             template<class T , typename A >
             void add( const A& a ) {
-                add(demangleName(typeid(T)), boost::bind(&Suite::runTestObjectWithArg<T, A>, a));
+                add(demangleName(typeid(T)), stdx::bind(&Suite::runTestObjectWithArg<T, A>, a));
             }
 
             template<class T>
@@ -294,7 +318,7 @@ namespace mongo {
              * The implementation of this function must be safe to call during the global static
              * initialization block before main() executes.
              */
-            static Suite *getSuite(const string& name);
+            static Suite *getSuite(const std::string& name);
 
         protected:
             virtual void setupTests();
@@ -322,21 +346,6 @@ namespace mongo {
         };
 
         /**
-         * Collection of information about failed tests.  Used in reporting
-         * failures.
-         */
-        class TestAssertionFailureDetails : private boost::noncopyable {
-        public:
-            TestAssertionFailureDetails( const std::string& theFile,
-                                         unsigned theLine,
-                                         const std::string& theMessage );
-
-            const std::string file;
-            const unsigned line;
-            const std::string message;
-        };
-
-        /**
          * Exception thrown when a test assertion fails.
          *
          * Typically thrown by helpers in the TestAssertion class and its ilk, below.
@@ -347,18 +356,37 @@ namespace mongo {
          */
         class TestAssertionFailureException {
         public:
-            TestAssertionFailureException( const std::string& theFile,
-                                           unsigned theLine,
-                                           const std::string& theMessage );
+            TestAssertionFailureException(const std::string& theFile,
+                                          unsigned theLine,
+                                          const std::string& theMessage);
 
-            const std::string& getFile() const { return _details->file; }
-            unsigned getLine() const { return _details->line; }
-            const std::string& getMessage() const { return _details->message; }
+            const std::string& getFile() const { return _file; }
+            unsigned getLine() const { return _line; }
+            const std::string& getMessage() const { return _message; }
+            void setMessage(const std::string& message) { _message = message; }
 
             std::string toString() const;
 
         private:
-            boost::shared_ptr<TestAssertionFailureDetails> _details;
+            std::string _file;
+            unsigned _line;
+            std::string _message;
+        };
+
+        class TestAssertionFailure {
+            MONGO_DISALLOW_COPYING(TestAssertionFailure);
+        public:
+            TestAssertionFailure(
+                    const std::string& file, unsigned line, const std::string& message);
+#if __cplusplus < 201103
+            ~TestAssertionFailure();
+#else
+            ~TestAssertionFailure() noexcept(false);
+#endif
+            std::ostream& stream();
+        private:
+            TestAssertionFailureException _exception;
+            std::ostringstream _stream;
         };
 
         /**
@@ -368,7 +396,7 @@ namespace mongo {
 
         public:
             /**
-             * file string must stay in scope and remain unchanged for the lifetime
+             * file std::string must stay in scope and remain unchanged for the lifetime
              * of the TestAssertion object.
              */
             TestAssertion( const char* file, unsigned line );
@@ -462,6 +490,15 @@ namespace mongo {
         }
 
         /**
+         * Get the value out of a StatusWith<T>, or throw an exception if it is not OK.
+         */
+        template <typename T>
+        const T& assertGet(const StatusWith<T>& swt) {
+            ASSERT_OK(swt.getStatus());
+            return swt.getValue();
+        }
+
+        /**
          * Hack to support the runaway test observer in dbtests.  This is a hook that
          * unit test running harnesses (unittest_main and dbtests) must implement.
          */
@@ -471,6 +508,9 @@ namespace mongo {
          * Return a list of suite names.
          */
         std::vector<std::string> getAllSuiteNames();
+
+
+        inline bool alwaysTrue() { return true; }
 
     }  // namespace unittest
 }  // namespace mongo

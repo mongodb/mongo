@@ -121,6 +121,7 @@ namespace {
 
     class CmdAuthSchemaUpgradeS : public CmdAuthSchemaUpgrade {
         virtual bool run(
+                OperationContext* txn,
                 const string& dbname,
                 BSONObj& cmdObj,
                 int options,
@@ -151,10 +152,12 @@ namespace {
             }
 
             status = checkClusterMongoVersions(configServer.getConnectionString(), "2.5.4");
-            if (!status.isOK())
+            if (!status.isOK()) {
+                log() << "Auth schema upgrade failed: " << status << endl;
                 return appendCommandStatus(result, status);
+            }
 
-            status = authzManager->upgradeSchema(maxSteps, writeConcern);
+            status = authzManager->upgradeSchema(txn, maxSteps, writeConcern);
             if (!status.isOK())
                 return appendCommandStatus(result, status);
 

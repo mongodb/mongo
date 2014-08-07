@@ -30,12 +30,22 @@
 
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    MergeSortStage::MergeSortStage(const MergeSortStageParams& params, WorkingSet* ws)
-        : _ws(ws), _pattern(params.pattern), _dedup(params.dedup),
-          _merging(StageWithValueComparison(ws, params.pattern)) { }
+    // static
+    const char* MergeSortStage::kStageType = "SORT_MERGE";
+
+    MergeSortStage::MergeSortStage(const MergeSortStageParams& params,
+                                   WorkingSet* ws,
+                                   const Collection* collection)
+        : _collection(collection),
+          _ws(ws),
+          _pattern(params.pattern),
+          _dedup(params.dedup),
+          _merging(StageWithValueComparison(ws, params.pattern)),
+          _commonStats(kStageType) { }
 
     MergeSortStage::~MergeSortStage() {
         for (size_t i = 0; i < _children.size(); ++i) { delete _children[i]; }
@@ -57,13 +67,16 @@ namespace mongo {
     PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         if (!_noResultToMerge.empty()) {
             // We have some child that we don't have a result from.  Each child must have a result
             // in order to pick the minimum result among all our children.  Work a child.
             PlanStage* child = _noResultToMerge.front();
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             StageState code = child->work(&id);
 
             if (PlanStage::ADVANCED == code) {
@@ -120,12 +133,21 @@ namespace mongo {
                 ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
-            else {
-                if (PlanStage::NEED_FETCH == code) {
-                    *out = id;
-                    ++_commonStats.needFetch;
+            else if (PlanStage::FAILURE == code) {
+                *out = id;
+                // If a stage fails, it may create a status WSM to indicate why it
+                // failed, in which case 'id' is valid.  If ID is invalid, we
+                // create our own error message.
+                if (WorkingSet::INVALID_ID == id) {
+                    mongoutils::str::stream ss;
+                    ss << "merge sort stage failed to read in results from child";
+                    Status status(ErrorCodes::InternalError, ss);
+                    *out = WorkingSetCommon::allocateStatusMember( _ws, status);
                 }
-                else if (PlanStage::NEED_TIME == code) {
+                return code;
+            }
+            else {
+                if (PlanStage::NEED_TIME == code) {
                     ++_commonStats.needTime;
                 }
                 return code;
@@ -160,17 +182,17 @@ namespace mongo {
         return PlanStage::ADVANCED;
     }
 
-    void MergeSortStage::prepareToYield() {
+    void MergeSortStage::saveState() {
         ++_commonStats.yields;
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->prepareToYield();
+            _children[i]->saveState();
         }
     }
 
-    void MergeSortStage::recoverFromYield() {
+    void MergeSortStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->recoverFromYield();
+            _children[i]->restoreState(opCtx);
         }
     }
 
@@ -185,7 +207,7 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(valueIt->id);
             if (member->hasLoc() && (dl == member->loc)) {
                 // Force a fetch and flag.  We could possibly merge this result back in later.
-                WorkingSetCommon::fetchAndInvalidateLoc(member);
+                WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
                 _ws->flagForReview(valueIt->id);
                 ++_specificStats.forcedFetches;
             }
@@ -227,8 +249,14 @@ namespace mongo {
         return false;
     }
 
+    vector<PlanStage*> MergeSortStage::getChildren() const {
+        return _children;
+    }
+
     PlanStageStats* MergeSortStage::getStats() {
         _commonStats.isEOF = isEOF();
+
+        _specificStats.sortPattern = _pattern;
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SORT_MERGE));
         ret->specific.reset(new MergeSortStats(_specificStats));
@@ -236,6 +264,14 @@ namespace mongo {
             ret->children.push_back(_children[i]->getStats());
         }
         return ret.release();
+    }
+
+    const CommonStats* MergeSortStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* MergeSortStage::getSpecificStats() {
+        return &_specificStats;
     }
 
 }  // namespace mongo

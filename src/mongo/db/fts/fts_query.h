@@ -36,7 +36,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/fts/stemmer.h"
 #include "mongo/db/fts/stop_words.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
@@ -50,13 +49,13 @@ namespace mongo {
         class FTSQuery {
 
         public:
-            Status parse(const string& query, const StringData& language);
+            Status parse(const std::string& query, const StringData& language);
 
-            const vector<string>& getTerms() const { return _terms; }
-            const unordered_set<string>& getNegatedTerms() const { return _negatedTerms; }
+            const std::vector<std::string>& getTerms() const { return _terms; }
+            const std::set<std::string>& getNegatedTerms() const { return _negatedTerms; }
 
-            const vector<string>& getPhr() const { return _phrases; }
-            const vector<string>& getNegatedPhr() const { return _negatedPhrases; }
+            const std::vector<std::string>& getPhr() const { return _phrases; }
+            const std::vector<std::string>& getNegatedPhr() const { return _negatedPhrases; }
 
             /**
              * @return true if any negations or phrase + or -
@@ -68,23 +67,25 @@ namespace mongo {
                     _negatedPhrases.size() > 0;
             }
 
-            string getSearch() const { return _search; }
+            std::string getSearch() const { return _search; }
             const FTSLanguage& getLanguage() const { return *_language; }
 
-            string toString() const;
+            std::string toString() const;
 
-            string debugString() const;
+            std::string debugString() const;
+
+            BSONObj toBSON() const;
 
         protected:
-            string _search;
+            std::string _search;
             const FTSLanguage* _language;
-            vector<string> _terms;
-            unordered_set<string> _negatedTerms;
-            vector<string> _phrases;
-            vector<string> _negatedPhrases;
+            std::vector<std::string> _terms;
+            std::set<std::string> _negatedTerms;
+            std::vector<std::string> _phrases;
+            std::vector<std::string> _negatedPhrases;
 
         private:
-            void _addTerm( const StopWords* sw, Stemmer& stemmer, const string& term, bool negated );
+            void _addTerm( const StopWords* sw, Stemmer& stemmer, const std::string& term, bool negated );
         };
 
     }

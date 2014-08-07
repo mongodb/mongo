@@ -55,7 +55,7 @@ namespace mongo {
 
         static const BSONField<int> ok;
         static const BSONField<int> errCode;
-        static const BSONField<string> errMessage;
+        static const BSONField<std::string> errMessage;
         static const BSONField<long long> n;
         static const BSONField<long long> nModified;
         static const BSONField<std::vector<BatchedUpsertDetail*> > upsertDetails;
@@ -157,7 +157,7 @@ namespace mongo {
         bool _isErrCodeSet;
 
         // (O)  whether all items in the batch applied correctly
-        string _errMessage;
+        std::string _errMessage;
         bool _isErrMessageSet;
 
         // (M)  number of documents affected

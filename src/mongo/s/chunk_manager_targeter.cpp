@@ -48,7 +48,7 @@ namespace mongo {
             *errMsg = ex.toString();
         }
 
-        return config;
+        return config.get();
     }
 
     ChunkManagerTargeter::ChunkManagerTargeter() :
@@ -179,7 +179,6 @@ namespace mongo {
         }
     }
 
-
     Status ChunkManagerTargeter::targetUpdate( const BatchedUpdateDocument& updateDoc,
                                                vector<ShardEndpoint*>* endpoints ) const {
 
@@ -208,8 +207,8 @@ namespace mongo {
         }
 
         BSONObj targetedDoc = updateType == UpdateType_OpStyle ? query : updateExpr;
-        Status result = targetQuery( targetedDoc, endpoints );
-        if ( !result.isOK() ) return result;
+
+        bool exactShardKeyQuery = false;
 
         if ( _manager ) {
 
@@ -220,7 +219,7 @@ namespace mongo {
             // Non-multi updates must be targeted exactly by shard key *or* exact _id.
             //
 
-            bool exactShardKeyQuery = _manager->hasShardKey( targetedDoc );
+            exactShardKeyQuery = _manager->hasTargetableShardKey(targetedDoc);
 
             if ( updateDoc.getUpsert() && !exactShardKeyQuery ) {
                 return Status( ErrorCodes::ShardKeyNotFound,
@@ -239,12 +238,26 @@ namespace mongo {
             }
 
             // Track autosplit stats for sharded collections
+            // Note: this is only best effort accounting and is not accurate.
             if ( exactShardKeyQuery ) {
-                // Note: this is only best effort accounting and is not accurate.
-                ChunkPtr chunk = _manager->findChunkForDoc( targetedDoc );
+                ChunkPtr chunk = _manager->findChunkForDoc(targetedDoc);
                 _stats->chunkSizeDelta[chunk->getMin()] +=
                     ( query.objsize() + updateExpr.objsize() );
             }
+        }
+
+        Status result = Status::OK();
+        if (exactShardKeyQuery) {
+            // We can't rely on our query targeting to be exact
+            ShardEndpoint* endpoint = NULL;
+            result = targetShardKey(targetedDoc, &endpoint);
+            endpoints->push_back(endpoint);
+
+            invariant(result.isOK());
+            invariant(NULL != endpoint);
+        }
+        else {
+            result = targetQuery(targetedDoc, endpoints);
         }
 
         return result;
@@ -253,8 +266,7 @@ namespace mongo {
     Status ChunkManagerTargeter::targetDelete( const BatchedDeleteDocument& deleteDoc,
                                                vector<ShardEndpoint*>* endpoints ) const {
 
-        Status result = targetQuery( deleteDoc.getQuery(), endpoints );
-        if ( !result.isOK() ) return result;
+        bool exactShardKeyQuery = false;
 
         if ( _manager ) {
 
@@ -264,7 +276,7 @@ namespace mongo {
             // Limit-1 deletes must be targeted exactly by shard key *or* exact _id
             //
 
-            bool exactShardKeyQuery = _manager->hasShardKey( deleteDoc.getQuery() );
+            exactShardKeyQuery = _manager->hasTargetableShardKey(deleteDoc.getQuery());
             bool exactIdQuery = isExactIdQuery( deleteDoc.getQuery() );
 
             if ( deleteDoc.getLimit() == 1 && !exactShardKeyQuery && !exactIdQuery ) {
@@ -275,9 +287,22 @@ namespace mongo {
             }
         }
 
+        Status result = Status::OK();
+        if (exactShardKeyQuery) {
+            // We can't rely on our query targeting to be exact
+            ShardEndpoint* endpoint = NULL;
+            result = targetShardKey(deleteDoc.getQuery(), &endpoint);
+            endpoints->push_back(endpoint);
+
+            invariant(result.isOK());
+            invariant(NULL != endpoint);
+        }
+        else {
+            result = targetQuery(deleteDoc.getQuery(), endpoints);
+        }
+
         return result;
     }
-
 
     Status ChunkManagerTargeter::targetQuery( const BSONObj& query,
                                               vector<ShardEndpoint*>* endpoints ) const {
@@ -291,7 +316,11 @@ namespace mongo {
 
         set<Shard> shards;
         if ( _manager ) {
-            _manager->getShardsForQuery( shards, query );
+            try {
+                _manager->getShardsForQuery( shards, query );
+            } catch ( const DBException& ex ) {
+                return ex.toStatus();
+            }
         }
         else {
             shards.insert( *_primary );
@@ -307,7 +336,22 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status ChunkManagerTargeter::targetAll( vector<ShardEndpoint*>* endpoints ) const {
+    Status ChunkManagerTargeter::targetShardKey(const BSONObj& doc,
+                                                ShardEndpoint** endpoint) const {
+
+        invariant(NULL != _manager);
+        dassert(_manager->hasShardKey(doc));
+
+        ChunkPtr chunk = _manager->findChunkForDoc(doc);
+
+        Shard shard = chunk->getShard();
+        *endpoint = new ShardEndpoint(shard.getName(),
+                                      _manager->getVersion(StringData(shard.getName())));
+
+        return Status::OK();
+    }
+
+    Status ChunkManagerTargeter::targetCollection( vector<ShardEndpoint*>* endpoints ) const {
 
         if ( !_primary && !_manager ) {
             return Status( ErrorCodes::NamespaceNotFound,
@@ -325,6 +369,28 @@ namespace mongo {
         }
 
         for ( set<Shard>::iterator it = shards.begin(); it != shards.end(); ++it ) {
+            endpoints->push_back( new ShardEndpoint( it->getName(),
+                                                     _manager ?
+                                                         _manager->getVersion( *it ) :
+                                                         ChunkVersion::UNSHARDED() ) );
+        }
+
+        return Status::OK();
+    }
+
+    Status ChunkManagerTargeter::targetAllShards( vector<ShardEndpoint*>* endpoints ) const {
+
+        if ( !_primary && !_manager ) {
+            return Status( ErrorCodes::NamespaceNotFound,
+                           str::stream() << "could not target every shard with versions for "
+                                         << getNS().ns()
+                                         << "; metadata not found" );
+        }
+
+        vector<Shard> shards;
+        Shard::getAllShards( shards );
+
+        for ( vector<Shard>::iterator it = shards.begin(); it != shards.end(); ++it ) {
             endpoints->push_back( new ShardEndpoint( it->getName(),
                                                      _manager ?
                                                          _manager->getVersion( *it ) :
@@ -353,7 +419,7 @@ namespace mongo {
                                             const ChunkVersion& shardVersionB ) {
 
             // Collection may have been dropped
-            if ( !shardVersionA.hasCompatibleEpoch( shardVersionB ) ) return CompareResult_Unknown;
+            if ( !shardVersionA.hasEqualEpoch( shardVersionB ) ) return CompareResult_Unknown;
 
             // Zero shard versions are only comparable to themselves
             if ( !shardVersionA.isSet() || !shardVersionB.isSet() ) {
@@ -496,10 +562,24 @@ namespace mongo {
             remoteShardVersion = ChunkVersion::fromBSON( staleInfo, "vWanted" );
         }
 
-        // We assume here that we can't have more than one stale config per-shard
-        dassert( _remoteShardVersions.find( endpoint.shardName ) == _remoteShardVersions.end() );
-
-        _remoteShardVersions.insert( make_pair( endpoint.shardName, remoteShardVersion ) );
+        ShardVersionMap::iterator it = _remoteShardVersions.find( endpoint.shardName );
+        if ( it == _remoteShardVersions.end() ) {
+            _remoteShardVersions.insert( make_pair( endpoint.shardName, remoteShardVersion ) );
+        }
+        else {
+            ChunkVersion& previouslyNotedVersion = it->second;
+            if ( previouslyNotedVersion.hasEqualEpoch( remoteShardVersion )) {
+                if ( previouslyNotedVersion.isOlderThan( remoteShardVersion )) {
+                    remoteShardVersion.cloneTo( &previouslyNotedVersion );
+                }
+            }
+            else {
+                // Epoch changed midway while applying the batch so set the version to
+                // something unique and non-existent to force a reload when
+                // refreshIsNeeded is called.
+                ChunkVersion::IGNORED().cloneTo( &previouslyNotedVersion );
+            }
+        }
     }
 
     void ChunkManagerTargeter::noteCouldNotTarget() {

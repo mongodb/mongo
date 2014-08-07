@@ -38,7 +38,7 @@ namespace mongo {
 
         TEST( FTSMatcher, NegWild1 ) {
             FTSQuery q;
-            q.parse( "foo -bar", "english" );
+            ASSERT_OK( q.parse( "foo -bar", "english" ) );
             FTSMatcher m( q,
                           FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
 
@@ -49,7 +49,7 @@ namespace mongo {
         // Regression test for SERVER-11994.
         TEST( FTSMatcher, NegWild2 ) {
             FTSQuery q;
-            q.parse( "pizza -restaurant", "english" );
+            ASSERT_OK( q.parse( "pizza -restaurant", "english" ) );
             FTSMatcher m( q,
                           FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
 
@@ -59,7 +59,7 @@ namespace mongo {
 
         TEST( FTSMatcher, Phrase1 ) {
             FTSQuery q;
-            q.parse( "foo \"table top\"", "english" );
+            ASSERT_OK( q.parse( "foo \"table top\"", "english" ) );
             FTSMatcher m( q,
                           FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
             
@@ -75,11 +75,24 @@ namespace mongo {
 
         TEST( FTSMatcher, Phrase2 ) {
             FTSQuery q;
-            q.parse( "foo \"table top\"", "english" );
+            ASSERT_OK( q.parse( "foo \"table top\"", "english" ) );
             FTSMatcher m( q,
                           FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
             ASSERT( m.phraseMatch( "table top",
                                    BSON( "x" << BSON_ARRAY( "table top" ) ) ) );
+        }
+
+        // Test that the matcher parses the document with the document language, not the search
+        // language.
+        TEST( FTSMatcher, ParsesUsingDocLanguage ) {
+            FTSQuery q;
+            ASSERT_OK( q.parse( "-glad", "none" ) );
+            FTSMatcher m( q,
+                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
+
+            // Even though the search language is "none", the document {x: "gladly"} should be
+            // parsed using the English stemmer, and as such should match the negated term "glad".
+            ASSERT( m.hasNegativeTerm( BSON( "x" << "gladly" ) ) );
         }
 
     }

@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     namespace fts {
 
         class FTSCommand : public Command {
@@ -49,31 +51,32 @@ namespace mongo {
             bool slaveOk() const { return true; }
             bool slaveOverrideOk() const { return true; }
 
-            LockType locktype() const;
+            virtual bool isWriteCommandForConfigServer() const { return false; }
 
             void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out);
 
 
-            bool run(const string& dbname,
+            bool run(OperationContext* txn, const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
-                     string& errmsg,
+                     std::string& errmsg,
                      BSONObjBuilder& result,
                      bool fromRepl);
 
         protected:
-            bool _run( const string& dbName,
+            bool _run( OperationContext* txn,
+                       const std::string& dbName,
                        BSONObj& cmdObj,
                        int cmdOptions,
-                       const string& ns,
-                       const string& searchString,
-                       string language, // "" for not-set
+                       const std::string& ns,
+                       const std::string& searchString,
+                       std::string language, // "" for not-set
                        int limit,
                        BSONObj& filter,
                        BSONObj& projection,
-                       string& errmsg,
+                       std::string& errmsg,
                        BSONObjBuilder& result );
         };
 

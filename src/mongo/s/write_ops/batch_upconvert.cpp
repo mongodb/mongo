@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/multi_command_dispatch.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -88,7 +89,8 @@ namespace mongo {
                     break;
                 }
             }
-            while ( dbMsg.moreJSObjs() );
+            while ( docs.size() < BatchedCommandRequest::kMaxWriteBatchSize
+                    && dbMsg.moreJSObjs() );
 
             dassert( !docs.empty() );
 
@@ -100,6 +102,7 @@ namespace mongo {
                 request->getInsertRequest()->addToDocuments( *it );
             }
             request->setOrdered( ordered );
+            request->setWriteConcern( WriteConcernOptions::Acknowledged );
 
             insertRequests->push_back( request );
         }
@@ -127,6 +130,7 @@ namespace mongo {
             new BatchedCommandRequest( BatchedCommandRequest::BatchType_Update );
         request->setNS( nss.ns() );
         request->getUpdateRequest()->addToUpdates( updateDoc );
+        request->setWriteConcern( WriteConcernOptions::Acknowledged );
 
         return request;
     }
@@ -149,6 +153,7 @@ namespace mongo {
             new BatchedCommandRequest( BatchedCommandRequest::BatchType_Delete );
         request->setNS( nss.ns() );
         request->getDeleteRequest()->addToDeletes( deleteDoc );
+        request->setWriteConcern( WriteConcernOptions::Acknowledged );
 
         return request;
     }
@@ -174,8 +179,15 @@ namespace mongo {
         }
         else if ( response.isErrDetailsSet() ) {
             // The last error in the batch is always reported - this matches expected COE
-            // semantics for insert batches and works for single writes
-            lastBatchError = response.getErrDetails().back();
+            // semantics for insert batches. For updates and deletes, error is only reported
+            // if the error was on the last item.
+
+            const bool lastOpErrored = response.getErrDetails().back()->getIndex() ==
+                    static_cast<int>(request.sizeWriteOps() - 1);
+            if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert ||
+                    lastOpErrored ) {
+                lastBatchError = response.getErrDetails().back();
+            }
         }
         else {
             // We don't care about write concern errors, these happen in legacy mode in GLE.
@@ -207,15 +219,15 @@ namespace mongo {
             if ( response.isUpsertDetailsSet() )
                 numUpserted = response.sizeUpsertDetails();
 
-            int numUpdated = response.getN() - numUpserted;
-            dassert( numUpdated >= 0 );
+            int numMatched = response.getN() - numUpserted;
+            dassert( numMatched >= 0 );
 
             // Wrap upserted id in "upserted" field
             BSONObj leUpsertedId;
             if ( !upsertedId.isEmpty() )
                 leUpsertedId = upsertedId.firstElement().wrap( kUpsertedFieldName );
 
-            error->recordUpdate( numUpdated > 0, response.getN(), leUpsertedId );
+            error->recordUpdate( numMatched > 0, response.getN(), leUpsertedId );
         }
         else if ( request.getBatchType() == BatchedCommandRequest::BatchType_Delete ) {
             error->recordDelete( response.getN() );

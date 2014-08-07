@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,118 +26,43 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/index/haystack_access_method.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/geo/hash.h"
+#include "mongo/db/index/expression_keys_private.h"
+#include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/haystack_access_method_internal.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
-    static const string GEOSEARCHNAME = "geoHaystack";
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
-    HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState)
-        : BtreeBasedAccessMethod(btreeState) {
+    HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
+        : BtreeBasedAccessMethod(btreeState, btree) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();
 
-        BSONElement e = descriptor->getInfoElement("bucketSize");
-        uassert(16777, "need bucketSize", e.isNumber());
-        _bucketSize = e.numberDouble();
-        uassert(16769, "bucketSize cannot be zero", _bucketSize != 0.0);
-
-        // Example:
-        // db.foo.ensureIndex({ pos : "geoHaystack", type : 1 }, { bucketSize : 1 })
-        BSONObjIterator i(descriptor->keyPattern());
-        while (i.more()) {
-            BSONElement e = i.next();
-            if (e.type() == String && GEOSEARCHNAME == e.valuestr()) {
-                uassert(16770, "can't have more than one geo field", _geoField.size() == 0);
-                uassert(16771, "the geo field has to be first in index",
-                        _otherFields.size() == 0);
-                _geoField = e.fieldName();
-            } else {
-                uassert(16772, "geoSearch can only have 1 non-geo field for now",
-                        _otherFields.size() == 0);
-                _otherFields.push_back(e.fieldName());
-            }
-        }
+        ExpressionParams::parseHaystackParams(descriptor->infoObj(),
+                                              &_geoField,
+                                              &_otherFields,
+                                              &_bucketSize);
 
         uassert(16773, "no geo field specified", _geoField.size());
         uassert(16774, "no non-geo fields specified", _otherFields.size());
     }
 
     void HaystackAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        BSONElement loc = obj.getFieldDotted(_geoField);
-
-        if (loc.eoo()) { return; }
-
-        uassert(16775, "latlng not an array", loc.isABSONObj());
-        string root;
-        {
-            BSONObjIterator i(loc.Obj());
-            BSONElement x = i.next();
-            BSONElement y = i.next();
-            root = makeString(hash(x), hash(y));
-        }
-
-        verify(_otherFields.size() == 1);
-
-        BSONElementSet all;
-
-        // This is getFieldsDotted (plural not singular) since the object we're indexing
-        // may be an array.
-        obj.getFieldsDotted(_otherFields[0], all);
-
-        if (all.size() == 0) {
-            // We're indexing a document that doesn't have the secondary non-geo field present.
-            // XXX: do we want to add this even if all.size() > 0?  result:empty search terms
-            // match everything instead of only things w/empty search terms)
-            addKey(root, BSONElement(), keys);
-        } else {
-            // Ex:If our secondary field is type: "foo" or type: {a:"foo", b:"bar"},
-            // all.size()==1.  We can query on the complete field.
-            // Ex: If our secondary field is type: ["A", "B"] all.size()==2 and all has values
-            // "A" and "B".  The query looks for any of the fields in the array.
-            for (BSONElementSet::iterator i = all.begin(); i != all.end(); ++i) {
-                addKey(root, *i, keys);
-            }
-        }
+        ExpressionKeysPrivate::getHaystackKeys(obj, _geoField, _otherFields, _bucketSize, keys);
     }
 
-    int HaystackAccessMethod::hash(const BSONElement& e) const {
-        uassert(16776, "geo field is not a number", e.isNumber());
-        double d = e.numberDouble();
-        d += 180;
-        d /= _bucketSize;
-        return static_cast<int>(d);
-    }
-
-    string HaystackAccessMethod::makeString(int hashedX, int hashedY) const {
-        stringstream ss;
-        ss << hashedX << "_" << hashedY;
-        return ss.str();
-    }
-
-    // Build a new BSONObj with root in it.  If e is non-empty, append that to the key.  Insert
-    // the BSONObj into keys.
-    void HaystackAccessMethod::addKey(const string& root, const BSONElement& e,
-                                      BSONObjSet* keys) const {
-        BSONObjBuilder buf;
-        buf.append("", root);
-
-        if (e.eoo())
-            buf.appendNull("");
-        else
-            buf.appendAs(e, "");
-
-        keys->insert(buf.obj());
-    }
-
-    void HaystackAccessMethod::searchCommand(const BSONObj& nearObj, double maxDistance,
+    void HaystackAccessMethod::searchCommand(OperationContext* txn, Collection* collection,
+                                             const BSONObj& nearObj, double maxDistance,
                                              const BSONObj& search, BSONObjBuilder* result,
                                              unsigned limit) {
         Timer t;
@@ -147,19 +72,19 @@ namespace mongo {
         int x, y;
         {
             BSONObjIterator i(nearObj);
-            x = hash(i.next());
-            y = hash(i.next());
+            x = ExpressionKeysPrivate::hashHaystackElement(i.next(), _bucketSize);
+            y = ExpressionKeysPrivate::hashHaystackElement(i.next(), _bucketSize);
         }
         int scale = static_cast<int>(ceil(maxDistance / _bucketSize));
 
-        GeoHaystackSearchHopper hopper(nearObj, maxDistance, limit, _geoField);
+        GeoHaystackSearchHopper hopper(nearObj, maxDistance, limit, _geoField, collection);
 
         long long btreeMatches = 0;
 
         for (int a = -scale; a <= scale && !hopper.limitReached(); ++a) {
             for (int b = -scale; b <= scale && !hopper.limitReached(); ++b) {
                 BSONObjBuilder bb;
-                bb.append("", makeString(x + a, y + b));
+                bb.append("", ExpressionKeysPrivate::makeHaystackString(x + a, y + b));
 
                 for (unsigned i = 0; i < _otherFields.size(); i++) {
                     // See if the non-geo field we're indexing on is in the provided search term.
@@ -172,17 +97,14 @@ namespace mongo {
 
                 BSONObj key = bb.obj();
 
-                // TODO(hk): this keeps a set of all DiskLoc seen in this pass so that we don't
-                // consider the element twice.  Do we want to instead store a hash of the set?
-                // Is this often big?
                 unordered_set<DiskLoc, DiskLoc::Hasher> thisPass;
 
 
-                scoped_ptr<Runner> runner(InternalPlanner::indexScan(_btreeState->collection(),
+                scoped_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,  collection,
                                                                      _descriptor, key, key, true));
-                Runner::RunnerState state;
+                PlanExecutor::ExecState state;
                 DiskLoc loc;
-                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &loc))) {
+                while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
                     if (hopper.limitReached()) { break; }
                     pair<unordered_set<DiskLoc, DiskLoc::Hasher>::iterator, bool> p
                         = thisPass.insert(loc);

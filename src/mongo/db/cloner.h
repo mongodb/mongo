@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 
@@ -38,66 +39,69 @@ namespace mongo {
     struct CloneOptions;
     class DBClientBase;
     class DBClientCursor;
+    class OperationContext;
     class Query;
 
     class Cloner: boost::noncopyable {
     public:
         Cloner();
-        /**
-         *  slaveOk     - if true it is ok if the source of the data is !ismaster.
-         *  useReplAuth - use the credentials we normally use as a replication slave for the cloning
-         *  snapshot    - use $snapshot mode for copying collections.  note this should not be used
-         *                when it isn't required, as it will be slower.  for example,
-         *                repairDatabase need not use it.
-         */
-        void setConnection( DBClientBase *c ) { _conn.reset( c ); }
+
+        void setConnection(DBClientBase* c) {
+            _conn.reset(c);
+        }
 
         /** copy the entire database */
-        bool go(Client::Context& ctx,
-                const string& masterHost, const CloneOptions& opts,
-                set<string>* clonedColls,
-                string& errmsg, int *errCode = 0);
+        bool go(OperationContext* txn,
+                const std::string& toDBName,
+                const std::string& masterHost,
+                const CloneOptions& opts,
+                std::set<std::string>* clonedColls,
+                std::string& errmsg,
+                int *errCode = 0);
 
-        bool copyCollection(const string& ns, const BSONObj& query, string& errmsg,
-                            bool mayYield, bool mayBeInterrupted, bool copyIndexes = true,
+        bool copyCollection(OperationContext* txn,
+                            const std::string& ns,
+                            const BSONObj& query,
+                            std::string& errmsg,
+                            bool mayYield,
+                            bool mayBeInterrupted,
+                            bool copyIndexes = true,
                             bool logForRepl = true );
-        /**
-         * validate the cloner query was successful
-         * @param cur   Cursor the query was executed on
-         * @param errCode out  Error code encountered during the query
-         * @param errmsg out  Error message encountered during the query
-         */
-        static bool validateQueryResults(const auto_ptr<DBClientCursor>& cur, int32_t* errCode,
-                                         string& errmsg);
-
-        /**
-         * @param errmsg out  - Error message (if encountered).
-         * @param errCode out - If provided, this will be set on error to the server's error code.
-         *                      Currently this will only be set if there is an error in the initial
-         *                      system.namespaces query.
-         */
-        static bool cloneFrom(Client::Context& context,
-                              const string& masterHost, const CloneOptions& options,
-                              string& errmsg, int* errCode = 0,
-                              set<string>* clonedCollections = 0);
-
-        /**
-         * Copy a collection (and indexes) from a remote host
-         */
-        static bool copyCollectionFromRemote(const string& host, const string& ns, string& errmsg);
 
     private:
-        void copy(Client::Context& ctx,
-                  const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
-                  bool masterSameProcess, bool slaveOk, bool mayYield, bool mayBeInterrupted,
+        void copy(OperationContext* txn,
+                  const std::string& toDBName,
+                  const NamespaceString& from_ns,
+                  const NamespaceString& to_ns,
+                  bool logForRepl,
+                  bool masterSameProcess,
+                  bool slaveOk,
+                  bool mayYield,
+                  bool mayBeInterrupted,
                   Query q);
 
+        void copyIndexes(OperationContext* txn,
+                         const string& toDBName,
+                         const NamespaceString& from_ns,
+                         const NamespaceString& to_ns,
+                         bool logForRepl,
+                         bool masterSameProcess,
+                         bool slaveOk,
+                         bool mayYield,
+                         bool mayBeInterrupted);
+
         struct Fun;
-        auto_ptr<DBClientBase> _conn;
+        std::auto_ptr<DBClientBase> _conn;
     };
 
+    /**
+     *  slaveOk     - if true it is ok if the source of the data is !ismaster.
+     *  useReplAuth - use the credentials we normally use as a replication slave for the cloning
+     *  snapshot    - use $snapshot mode for copying collections.  note this should not be used
+     *                when it isn't required, as it will be slower.  for example,
+     *                repairDatabase need not use it.
+     */
     struct CloneOptions {
-
         CloneOptions() {
             logForRepl = true;
             slaveOk = false;
@@ -110,8 +114,8 @@ namespace mongo {
             syncIndexes = true;
         }
 
-        string fromDB;
-        set<string> collsToIgnore;
+        std::string fromDB;
+        std::set<std::string> collsToIgnore;
 
         bool logForRepl;
         bool slaveOk;

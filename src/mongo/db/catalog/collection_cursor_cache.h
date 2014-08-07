@@ -33,20 +33,22 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/invalidation_type.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
+    class OperationContext;
     class PseudoRandom;
-    class Runner;
+    class PlanExecutor;
 
     class CollectionCursorCache {
     public:
         CollectionCursorCache( const StringData& ns );
 
         /**
-         * will kill() all Runner instances it has
+         * will kill() all PlanExecutor instances it has
          */
         ~CollectionCursorCache();
 
@@ -60,8 +62,8 @@ namespace mongo {
         void invalidateAll( bool collectionGoingAway );
 
         /**
-         * Broadcast a document invalidation to all relevant Runner(s).  invalidateDocument must
-         * called *before* the provided DiskLoc is about to be deleted or mutated.
+         * Broadcast a document invalidation to all relevant PlanExecutor(s).  invalidateDocument
+         * must called *before* the provided DiskLoc is about to be deleted or mutated.
          */
         void invalidateDocument( const DiskLoc& dl,
                                  InvalidationType type );
@@ -71,56 +73,66 @@ namespace mongo {
          * note: must have a readlock on the collection
          * @return number timed out
          */
-        std::size_t timeoutCursors( unsigned millisSinceLastCall );
+        std::size_t timeoutCursors( int millisSinceLastCall );
 
         // -----------------
 
         /**
-         * Register a runner so that it can be notified of deletion/invalidation during yields.
-         * Must be called before a runner yields.  If a runner is cached (inside a ClientCursor) it
-         * MUST NOT be registered; the two are mutually exclusive.
+         * Register an executor so that it can be notified of deletion/invalidation during yields.
+         * Must be called before an executor yields.  If an executor is cached (inside a
+         * ClientCursor) it MUST NOT be registered; the two are mutually exclusive.
          */
-        void registerRunner(Runner* runner);
+        void registerExecutor(PlanExecutor* exec);
 
         /**
-         * Remove a runner from the runner registry.
+         * Remove an executor from the registry.
          */
-        void deregisterRunner(Runner* runner);
+        void deregisterExecutor(PlanExecutor* exec);
 
         // -----------------
 
         CursorId registerCursor( ClientCursor* cc );
         void deregisterCursor( ClientCursor* cc );
 
+        bool eraseCursor( CursorId id, bool checkAuth );
+
         void getCursorIds( std::set<CursorId>* openCursors );
         std::size_t numCursors();
 
-        ClientCursor* find( CursorId id );
+        /**
+         * @param pin - if true, will try to pin cursor
+         *                  if pinned already, will assert
+         *                  otherwise will pin
+         */
+        ClientCursor* find( CursorId id, bool pin );
+
+        void unpin( ClientCursor* cursor );
 
         // ----------------------
 
-        static int eraseCursorGlobalIfAuthorized( int n, long long* ids );
-        static bool eraseCursorGlobalIfAuthorized( CursorId id );
+        static int eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, 
+            const long long* ids);
+        static bool eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id);
 
-        static bool eraseCursorGlobal( CursorId id );
+        static bool eraseCursorGlobal(OperationContext* txn, CursorId id);
 
         /**
          * @return number timed out
          */
-        static std::size_t timeoutCursorsGlobal( unsigned millisSinceLastCall );
+        static std::size_t timeoutCursorsGlobal(OperationContext* txn, int millisSinceLastCall);
 
     private:
         CursorId _allocateCursorId_inlock();
         void _deregisterCursor_inlock( ClientCursor* cc );
 
-        string _ns;
+        NamespaceString _nss;
         unsigned _collectionCacheRuntimeId;
         scoped_ptr<PseudoRandom> _random;
 
         SimpleMutex _mutex;
 
-        typedef unordered_set<Runner*> RunnerSet;
-        RunnerSet _nonCachedRunners;
+        typedef unordered_set<PlanExecutor*> ExecSet;
+        ExecSet _nonCachedExecutors;
 
         typedef std::map<CursorId,ClientCursor*> CursorMap;
         CursorMap _cursors;

@@ -1,19 +1,31 @@
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclient_rs.h"
 
@@ -26,8 +38,12 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
+
 namespace {
 
     /*
@@ -144,6 +160,7 @@ namespace {
     // --------------------------------
 
     const size_t DBClientReplicaSet::MAX_RETRY = 3;
+    bool DBClientReplicaSet::_authPooledSecondaryConn = true;
 
     DBClientReplicaSet::DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout )
         : _setName( name ), _so_timeout( so_timeout ) {
@@ -151,6 +168,9 @@ namespace {
     }
 
     DBClientReplicaSet::~DBClientReplicaSet() {
+        if (_lastSlaveOkConn.get() == _master.get()) {
+            _lastSlaveOkConn.release();
+        }
     }
 
     ReplicaSetMonitorPtr DBClientReplicaSet::_getMonitor() const {
@@ -177,7 +197,7 @@ namespace {
         if (_master) {
             _master->setRunCommandHook(func);
         }
-        if (_lastSlaveOkConn) {
+        if (_lastSlaveOkConn.get()) {
            _lastSlaveOkConn->setRunCommandHook(func);
         }
         _runCommandHook = func;
@@ -189,7 +209,7 @@ namespace {
         if (_master) {
             _master->setPostRunCommandHook(func);
         }
-        if (_lastSlaveOkConn) {
+        if (_lastSlaveOkConn.get()) {
            _lastSlaveOkConn->setPostRunCommandHook(func);
         }
         _postRunCommandHook = func;
@@ -203,16 +223,12 @@ namespace {
     bool DBClientReplicaSet::isStillConnected() {
 
         if ( _master && !_master->isStillConnected() ) {
-            _master.reset();
-            _masterHost = HostAndPort();
+            resetMaster();
             // Don't notify monitor of bg failure, since it's not clear how long ago it happened
         }
 
-        if ( _lastSlaveOkConn && !_lastSlaveOkConn->isStillConnected() ) {
-            _lastSlaveOkConn.reset();
-            _lastSlaveOkHost = HostAndPort();
-            // Reset read pref too, since we're re-selecting the slaveOk host anyway
-            _lastReadPref.reset();
+        if ( _lastSlaveOkConn.get() && !_lastSlaveOkConn->isStillConnected() ) {
+            resetSlaveOkConn();
             // Don't notify monitor of bg failure, since it's not clear how long ago it happened
         }
 
@@ -306,6 +322,9 @@ namespace {
                       << (errmsg.empty()? "" : ", err: ") << errmsg);
         }
 
+        resetMaster();
+
+        _masterHost = h;
         _master.reset(newConn);
         _master->setReplSetClientCallback(this);
         _master->setRunCommandHook(_runCommandHook);
@@ -316,18 +335,23 @@ namespace {
     }
 
     bool DBClientReplicaSet::checkLastHost(const ReadPreferenceSetting* readPref) {
-        if (_lastSlaveOkHost.empty()) {
+        // Can't use a cached host if we don't have one.
+        if (!_lastSlaveOkConn.get() || _lastSlaveOkHost.empty()) {
             return false;
         }
 
-        ReplicaSetMonitorPtr monitor = _getMonitor();
+        // Don't pin if the readPrefs differ.
+        if (!_lastReadPref || !_lastReadPref->equals(*readPref)) {
+            return false;
+        }
 
-        if (_lastSlaveOkConn && _lastSlaveOkConn->isFailed()) {
+        // Make sure we don't think the host is down.
+        if (_lastSlaveOkConn->isFailed() || !_getMonitor()->isHostUp(_lastSlaveOkHost)) {
             invalidateLastSlaveOkCache();
             return false;
         }
 
-        return _lastSlaveOkConn && _lastReadPref && _lastReadPref->equals(*readPref);
+        return true;
     }
 
     void DBClientReplicaSet::_auth( DBClientConnection * conn ) {
@@ -339,6 +363,19 @@ namespace {
                 warning() << "cached auth failed for set: " << _setName <<
                     " db: " << i->second[saslCommandUserDBFieldName].str() <<
                     " user: " << i->second[saslCommandUserFieldName].str() << endl;
+            }
+        }
+    }
+
+    void DBClientReplicaSet::logoutAll(DBClientConnection* conn) {
+        for (map<string, BSONObj>::const_iterator i = _auths.begin(); i != _auths.end(); ++i) {
+            BSONObj response;
+            try {
+                conn->logout(i->first, response);
+            }
+            catch (const UserException& ex) {
+                warning() << "Failed to logout: " << conn->getServerAddress() <<
+                    " on db: " << i->first << endl;
             }
         }
     }
@@ -398,12 +435,10 @@ namespace {
                 // NOTE: _lastSlaveOkConn may or may not be the same as _master
                 dassert(_lastSlaveOkConn.get() == conn || _master.get() == conn);
                 if ( conn != _lastSlaveOkConn.get() ) {
-                    _lastSlaveOkHost = HostAndPort();
-                    _lastSlaveOkConn.reset();
+                    resetSlaveOkConn();
                 }
                 if ( conn != _master.get() ) {
-                    _masterHost = HostAndPort();
-                    _master.reset();
+                    resetMaster();
                 }
 
                 return;
@@ -609,7 +644,8 @@ namespace {
         if ( monitor ) {
             monitor->failedHost( _masterHost );
         }
-        _master.reset(); 
+
+        resetMaster();
     }
 
     auto_ptr<DBClientCursor> DBClientReplicaSet::checkSlaveQueryResult( auto_ptr<DBClientCursor> result ){
@@ -637,7 +673,8 @@ namespace {
         log() << "slave no longer has secondary status: " << _lastSlaveOkHost << endl;
         // Failover to next slave
         _getMonitor()->failedHost( _lastSlaveOkHost );
-        _lastSlaveOkConn.reset();
+
+        resetSlaveOkConn();
     }
 
     DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
@@ -651,38 +688,41 @@ namespace {
         }
 
         ReplicaSetMonitorPtr monitor = _getMonitor();
-        _lastSlaveOkHost = monitor->getHostOrRefresh(*readPref);
+        HostAndPort selectedNode = monitor->getHostOrRefresh(*readPref);
 
-        if ( _lastSlaveOkHost.empty() ){
+        if ( selectedNode.empty() ){
 
             LOG( 3 ) << "dbclient_rs no compatible node found" << endl;
 
             return NULL;
         }
 
+        // We are now about to get a new connection from the pool, so cleanup
+        // the current one and release it back to the pool.
+        resetSlaveOkConn();
+
         _lastReadPref = readPref;
+        _lastSlaveOkHost = selectedNode;
 
         // Primary connection is special because it is the only connection that is
         // versioned in mongos. Therefore, we have to make sure that this object
         // maintains only one connection to the primary and use that connection
         // every time we need to talk to the primary.
-        if (monitor->isPrimary(_lastSlaveOkHost)) {
+        if (monitor->isPrimary(selectedNode)) {
             checkMaster();
-            _lastSlaveOkConn = _master;
-            _lastSlaveOkHost = _masterHost; // implied, but still assign just to be safe
 
-            LOG( 3 ) << "dbclient_rs selecting primary node " << _lastSlaveOkHost << endl;
+            LOG( 3 ) << "dbclient_rs selecting primary node " << selectedNode << endl;
+
+            _lastSlaveOkConn.reset(_master.get());
 
             return _master.get();
         }
 
-        string errmsg;
-        ConnectionString connStr(_lastSlaveOkHost);
         // Needs to perform a dynamic_cast because we need to set the replSet
         // callback. We should eventually not need this after we remove the
         // callback.
         DBClientConnection* newConn = dynamic_cast<DBClientConnection*>(
-                connStr.connect(errmsg, _so_timeout));
+                pool.get(_lastSlaveOkHost.toString(), _so_timeout));
 
         // Assert here instead of returning NULL since the contract of this method is such
         // that returning NULL means none of the nodes were good, which is not the case here.
@@ -694,7 +734,13 @@ namespace {
         _lastSlaveOkConn->setRunCommandHook(_runCommandHook);
         _lastSlaveOkConn->setPostRunCommandHook(_postRunCommandHook);
 
-        _auth(_lastSlaveOkConn.get());
+        if (_authPooledSecondaryConn) {
+            _auth(_lastSlaveOkConn.get());
+        }
+        else {
+            // Mongos pooled connections are authenticated through
+            // ShardingConnectionHook::onCreate().
+        }
 
         LOG( 3 ) << "dbclient_rs selecting node " << _lastSlaveOkHost << endl;
 
@@ -964,8 +1010,47 @@ namespace {
          * as failed. For example, asserts 13079, 13080, 16386
          */
         _getMonitor()->failedHost(_lastSlaveOkHost);
+        resetSlaveOkConn();
+    }
+
+    void DBClientReplicaSet::reset() {
+        resetSlaveOkConn();
+        _lazyState._lastClient = NULL;
+        _lastReadPref.reset();
+    }
+
+    void DBClientReplicaSet::setAuthPooledSecondaryConn(bool setting) {
+        _authPooledSecondaryConn = setting;
+    }
+
+    void DBClientReplicaSet::resetMaster() {
+        if (_master.get() == _lastSlaveOkConn.get()) {
+            _lastSlaveOkConn.release();
+            _lastSlaveOkHost = HostAndPort();
+        }
+
+        _master.reset();
+        _masterHost = HostAndPort();
+    }
+
+    void DBClientReplicaSet::resetSlaveOkConn() {
+        if (_lastSlaveOkConn.get() == _master.get()) {
+            _lastSlaveOkConn.release();
+        }
+        else if (_lastSlaveOkConn.get() != NULL) {
+            if (_authPooledSecondaryConn) {
+                logoutAll(_lastSlaveOkConn.get());
+            }
+            else {
+                // Mongos pooled connections are all authenticated with the same credentials;
+                // so no need to logout.
+            }
+
+            // If the connection was bad, the pool will clean it up.
+            pool.release(_lastSlaveOkHost.toString(), _lastSlaveOkConn.release());
+        }
+
         _lastSlaveOkHost = HostAndPort();
-        _lastSlaveOkConn.reset();
     }
 
     // trying to optimize for the common dont-care-about-tags case.

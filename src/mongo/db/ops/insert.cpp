@@ -29,6 +29,7 @@
  */
 
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/global_optime.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -40,7 +41,8 @@ namespace mongo {
             return StatusWith<BSONObj>( ErrorCodes::BadValue,
                                         str::stream()
                                         << "object to insert too large"
-                                        << doc.objsize() );
+                                        << ". size in bytes: " << doc.objsize()
+                                        << ", max size: " << BSONObjMaxUserSize );
 
         bool firstElementIsId = doc.firstElement().fieldNameStringData() == "_id";
         bool hasTimestampToFix = false;
@@ -53,7 +55,6 @@ namespace mongo {
                     // we replace Timestamp(0,0) at the top level with a correct value
                     // in the fast pass, we just mark that we want to swap
                     hasTimestampToFix = true;
-                    break;
                 }
 
                 const char* fieldName = e.fieldName();
@@ -79,6 +80,12 @@ namespace mongo {
                     if ( e.type() == Array ) {
                         return StatusWith<BSONObj>( ErrorCodes::BadValue,
                                                     "can't use an array for _id" );
+                    }
+                    if ( e.type() == Object ) {
+                        BSONObj o = e.Obj();
+                        Status s = o.storageValidEmbedded();
+                        if ( !s.isOK() )
+                            return StatusWith<BSONObj>( s );
                     }
                 }
 
@@ -114,8 +121,7 @@ namespace mongo {
                 // no-op
             }
             else if ( e.type() == Timestamp && e.timestampValue() == 0 ) {
-                mutex::scoped_lock lk(OpTime::m);
-                b.append( e.fieldName(), OpTime::now(lk) );
+                b.append( e.fieldName(), getNextGlobalOptime() );
             }
             else {
                 b.append( e );
@@ -146,6 +152,12 @@ namespace mongo {
 
         if ( !NamespaceString::validCollectionName( coll ) )
             return Status( ErrorCodes::BadValue, "invalid collection name" );
+
+        if ( db.size() + 1 /* dot */ + coll.size() > NamespaceString::MaxNsCollectionLen )
+            return Status( ErrorCodes::BadValue,
+                           str::stream()
+                             << "fully qualified namespace " << db << '.' << coll << " is too long "
+                             << "(max is " << NamespaceString::MaxNsCollectionLen << " bytes)" );
 
         // check spceial areas
 

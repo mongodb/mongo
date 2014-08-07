@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2013-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -32,6 +32,7 @@
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -64,7 +65,8 @@ namespace mongo {
          * 
          * The behavior of the insertion can be specified through 'options'.  
          */
-        virtual Status insert(const BSONObj& obj,
+        virtual Status insert(OperationContext* txn,
+                              const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numInserted) = 0;
@@ -73,7 +75,8 @@ namespace mongo {
          * Analogous to above, but remove the records instead of inserting them.  If not NULL,
          * numDeleted will be set to the number of keys removed from the index for the document.
          */
-        virtual Status remove(const BSONObj& obj,
+        virtual Status remove(OperationContext* txn,
+                              const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numDeleted) = 0;
@@ -88,7 +91,8 @@ namespace mongo {
          *
          * There is no obligation to perform the update after performing validation.
          */
-        virtual Status validateUpdate(const BSONObj& from,
+        virtual Status validateUpdate(OperationContext* txn,
+                                      const BSONObj& from,
                                       const BSONObj& to,
                                       const DiskLoc& loc,
                                       const InsertDeleteOptions& options,
@@ -102,13 +106,15 @@ namespace mongo {
          * called.  If the index was changed, we may return an error, as our ticket may have been
          * invalidated.
          */
-        virtual Status update(const UpdateTicket& ticket, int64_t* numUpdated) = 0;
+        virtual Status update(OperationContext* txn,
+                              const UpdateTicket& ticket,
+                              int64_t* numUpdated) = 0;
 
         /**
          * Fills in '*out' with an IndexCursor.  Return a status indicating success or reason of
          * failure. If the latter, '*out' contains NULL.  See index_cursor.h for IndexCursor usage.
          */
-        virtual Status newCursor(IndexCursor **out) const = 0;
+        virtual Status newCursor(OperationContext* txn, const CursorOptions& opts, IndexCursor** out) const = 0;
 
         // ------ index level operations ------
 
@@ -118,7 +124,7 @@ namespace mongo {
          * only called once for the lifetime of the index
          * if called multiple times, is an error
          */
-        virtual Status initializeAsEmpty() = 0;
+        virtual Status initializeAsEmpty(OperationContext* txn) = 0;
 
         /**
          * Try to page-in the pages that contain the keys generated from 'obj'.
@@ -126,7 +132,12 @@ namespace mongo {
          * appropriate pages are not swapped out.
          * See prefetch.cpp.
          */
-        virtual Status touch(const BSONObj& obj) = 0;
+        virtual Status touch(OperationContext* txn, const BSONObj& obj) = 0;
+
+        /**
+         * this pages in the entire index
+         */
+        virtual Status touch(OperationContext* txn) const = 0;
 
         /**
          * Walk the entire index, checking the internal structure for consistency.
@@ -137,7 +148,13 @@ namespace mongo {
          * Currently wasserts that the index is invalid.  This could/should be changed in
          * the future to return a Status.
          */
-        virtual Status validate(int64_t* numKeys) = 0;
+        virtual Status validate(OperationContext* txn, int64_t* numKeys) = 0;
+
+        /**
+         * @return The number of bytes consumed by this index.
+         *         Exactly what is counted is not defined based on padding, re-use, etc...
+         */
+        virtual long long getSpaceUsedBytes( OperationContext* txn ) const = 0;
 
         //
         // Bulk operations support
@@ -151,10 +168,14 @@ namespace mongo {
          * Long term, you'll eventually be able to mix/match bulk, not bulk,
          * have as many as you want, etc..
          *
+         * Caller owns the returned IndexAccessMethod.
+         *
+         * The provided OperationContext must outlive the IndexAccessMethod returned.
+         *
          * For now (1/8/14) you can only do bulk when the index is empty
          * it will fail if you try other times.
          */
-        virtual IndexAccessMethod* initiateBulk() = 0;
+        virtual IndexAccessMethod* initiateBulk(OperationContext* txn) = 0;
 
         /**
          * Call this when you are ready to finish your bulk work.

@@ -33,19 +33,20 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/client.h"
-#include "mongo/db/curop-inl.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
 
-    extern string dbExecCommand;
+    extern std::string dbExecCommand;
 
     /** a high level recording of operations to the database - sometimes used for diagnostics 
         and debugging.
         */
     class DiagLog {
-        ofstream *f; // note this is never freed
+        std::ofstream *f; // note this is never freed
         /* 0 = off; 1 = writes, 2 = reads, 3 = both
            7 = log a few reads, and all writes.
         */
@@ -67,24 +68,32 @@ namespace mongo {
 
     extern DiagLog _diaglog;
 
-    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort &client );
+    void assembleResponse( OperationContext* txn,
+                           Message& m,
+                           DbResponse& dbresponse,
+                           const HostAndPort &client );
 
-    void getDatabaseNames(vector<std::string> &names,
-                          const std::string& usePath = storageGlobalParams.dbpath);
-
-    /* returns true if there is no data on this server.  useful when starting replication.
-       local database does NOT count.
-    */
-    bool replHasDatabases();
-
-    /** "embedded" calls to the local server directly. 
-        Caller does not need to lock, that is handled within.
+    /**
+     * Embedded calls to the local server using the DBClientBase API without going over the network.
+     *
+     * Caller does not need to lock, that is handled within.
+     *
+     * All operations are performed within the scope of a passed-in OperationContext (except when
+     * using the deprecated constructor). You must ensure that the OperationContext is valid when
+     * calling into any function. If you ever need to change the OperationContext, that can be done
+     * without the overhead of creating a new DBDirectClient by calling setOpCtx(), after which all
+     * operations will use the new OperationContext.
      */
     class DBDirectClient : public DBClientBase {
     public:
+        DBDirectClient(); // DEPRECATED
+        DBDirectClient(OperationContext* txn);
+
+        void setOpCtx(OperationContext* txn) { _txn = txn; };
+
         using DBClientBase::query;
 
-        virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
+        virtual std::auto_ptr<DBClientCursor> query(const std::string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0, int batchSize = 0);
 
         virtual bool isFailed() const {
@@ -95,14 +104,14 @@ namespace mongo {
             return true;
         }
 
-        virtual string toString() const {
+        virtual std::string toString() const {
             return "DBDirectClient";
         }
-        virtual string getServerAddress() const {
+        virtual std::string getServerAddress() const {
             return "localhost"; // TODO: should this have the port?
         }
-        virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
-        virtual void say( Message &toSend, bool isRetry = false , string * actualServer = 0 );
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true , std::string * actualServer = 0 );
+        virtual void say( Message &toSend, bool isRetry = false , std::string * actualServer = 0 );
         virtual void sayPiggyBack( Message &toSend ) {
             // don't need to piggy back when connected locally
             return say( toSend );
@@ -114,7 +123,7 @@ namespace mongo {
             return call( toSend , response );
         }
         
-        virtual unsigned long long count(const string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
+        virtual unsigned long long count(const std::string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
         
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
 
@@ -126,13 +135,10 @@ namespace mongo {
 
     private:
         static HostAndPort _clientHost;
+        boost::scoped_ptr<OperationContext> _txnOwned;
+        OperationContext* _txn; // Points either to _txnOwned or a passed-in transaction.
     };
 
-    extern int lockFile;
-#ifdef _WIN32
-    extern HANDLE lockFileHandle;
-#endif
-    void acquirePathLock(bool doingRepair=false); // if doingRepair=true don't consider unclean shutdown an error
     void maybeCreatePidFile();
 
     void exitCleanly( ExitCode code );

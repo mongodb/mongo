@@ -32,7 +32,7 @@
    to an open socket (or logical connection if pooling on sockets) from a client.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
 
@@ -49,13 +49,14 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/db.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/curop-inl.h"
-#include "mongo/db/kill_current_op.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pagefault.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/handshake_args.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
@@ -64,17 +65,8 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/file_allocator.h"
-#include "mongo/util/mongoutils/checksum.h"
 #include "mongo/util/mongoutils/str.h"
 
-#ifndef __has_feature
-#define __has_feature(x) 0
-#endif
-
-#define ASAN_ENABLED __has_feature(address_sanitizer)
-#define MSAN_ENABLED __has_feature(memory_sanitizer)
-#define TSAN_ENABLED __has_feature(thread_sanitizer)
-#define XSAN_ENABLED (ASAN_ENABLED || MSAN_ENABLED || TSAN_ENABLED)
 
 namespace mongo {
 
@@ -83,67 +75,10 @@ namespace mongo {
 
     TSP_DEFINE(Client, currentClient)
 
-#if defined(_DEBUG) && !defined(MONGO_OPTIMIZED_BUILD) && !XSAN_ENABLED
-    struct StackChecker;
-    ThreadLocalValue<StackChecker *> checker;
-
-    struct StackChecker { 
-#if defined(_WIN32)
-        enum { SZ = 330 * 1024 };
-#elif defined(__APPLE__) && defined(__MACH__)
-        enum { SZ = 374 * 1024 };
-#elif defined(__linux__)
-        enum { SZ = 235 * 1024 };
-#else
-        enum { SZ = 235 * 1024 };   // default size, same as Linux to match old behavior
-#endif
-        char buf[SZ];
-        StackChecker() { 
-            checker.set(this);
-        }
-        void init() { 
-            memset(buf, 42, sizeof(buf)); 
-        }
-        static void check(StringData tname) {
-            static int max;
-            StackChecker *sc = checker.get();
-            const char *p = sc->buf;
-
-            int lastStackByteModifed = 0;
-            for( ; lastStackByteModifed < SZ; lastStackByteModifed++ ) { 
-                if( p[lastStackByteModifed] != 42 )
-                    break;
-            }
-            int numberBytesUsed = SZ-lastStackByteModifed;
-            
-            if( numberBytesUsed > max ) {
-                max = numberBytesUsed;
-                log() << "thread " << tname << " stack usage was " << numberBytesUsed << " bytes, " 
-                      << " which is the most so far" << endl;
-            }
-            
-            if ( numberBytesUsed > ( SZ - 16000 ) ) {
-                // we are within 16000 bytes of SZ
-                log() << "used " << numberBytesUsed << " bytes, max is " << (int)SZ << " exiting" << endl;
-                fassertFailed( 16151 );
-            }
-
-        }
-    };
-#endif
-
     /* each thread which does db operations has a Client object in TLS.
        call this when your thread starts.
     */
-    Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
-#if defined(_DEBUG) && !defined(MONGO_OPTIMIZED_BUILD) && !XSAN_ENABLED
-        {
-            if( sizeof(void*) == 8 ) {
-                StackChecker sc;
-                sc.init();
-            }
-        }
-#endif
+    void Client::initThread(const char *desc, AbstractMessagingPort *mp) {
         verify( currentClient.get() == 0 );
 
         string fullDesc = desc;
@@ -158,32 +93,16 @@ namespace mongo {
         mongo::lastError.initThread();
         c->setAuthorizationSession(new AuthorizationSession(new AuthzSessionExternalStateMongod(
                 getGlobalAuthorizationManager())));
-        return *c;
     }
-
-    /* resets the client for the current thread */
-    void Client::resetThread( const StringData& origThreadName ) {
-        verify( currentClient.get() != 0 );
-
-        // Detach all client info from thread
-        mongo::lastError.reset(NULL);
-        currentClient.get()->shutdown();
-        currentClient.reset(NULL);
-
-        setThreadName( origThreadName.rawData() );
-    }
-
 
     Client::Client(const string& desc, AbstractMessagingPort *p) :
         ClientBasic(p),
-        _context(0),
         _shutdown(false),
         _desc(desc),
         _god(0),
         _lastOp(0)
     {
-        _hasWrittenThisPass = false;
-        _pageFaultRetryableSection = 0;
+        _hasWrittenSinceCheckpoint = false;
         _connectionId = p ? p->connectionId() : 0;
         _curOp = new CurOp( this );
 #ifndef _WIN32
@@ -232,13 +151,6 @@ namespace mongo {
     }
 
     bool Client::shutdown() {
-#if defined(_DEBUG) && !defined(MONGO_OPTIMIZED_BUILD) && !XSAN_ENABLED
-        {
-            if( sizeof(void*) == 8 ) {
-                StackChecker::check( desc() );
-            }
-        }
-#endif
         _shutdown = true;
         if ( inShutdown() )
             return false;
@@ -250,42 +162,41 @@ namespace mongo {
         return false;
     }
 
-    BSONObj CachedBSONObj::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
-    Client::Context::Context(const std::string& ns , Database * db) :
-        _client( currentClient.get() ), 
-        _oldContext( _client->_context ),
-        _path(storageGlobalParams.dbpath), // is this right? could be a different db?
-                                               // may need a dassert for this
-        _justCreated(false),
-        _doVersion( true ),
-        _ns( ns ), 
-        _db(db)
-    {
-        verify( db == 0 || db->isOk() );
-        _client->_context = this;
+    BSONObj CachedBSONObjBase::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
+
+    Client::Context::Context(OperationContext* txn, const std::string& ns, Database * db)
+        : _client( currentClient.get() ), 
+          _justCreated(false),
+          _doVersion( true ),
+          _ns( ns ), 
+          _db(db),
+          _txn(txn) {
+
     }
 
-    Client::Context::Context(const string& ns, const std::string& path, bool doVersion) :
-        _client( currentClient.get() ), 
-        _oldContext( _client->_context ),
-        _path( path ), 
-        _justCreated(false), // set for real in finishInit
-        _doVersion(doVersion),
-        _ns( ns ), 
-        _db(0) 
-    {
+    Client::Context::Context(OperationContext* txn,
+                             const string& ns,
+                             bool doVersion)
+        : _client( currentClient.get() ), 
+          _justCreated(false), // set for real in finishInit
+          _doVersion(doVersion),
+          _ns( ns ), 
+          _db(NULL),
+          _txn(txn) {
+
         _finishInit();
     }
        
     /** "read lock, and set my context, all in one operation" 
      *  This handles (if not recursively locked) opening an unopened database.
      */
-    Client::ReadContext::ReadContext(const string& ns, const std::string& path) {
+    Client::ReadContext::ReadContext(
+                OperationContext* txn, const string& ns, bool doVersion) {
         {
-            lk.reset( new Lock::DBRead(ns) );
-            Database *db = dbHolder().get(ns, path);
+            _lk.reset(new Lock::DBRead(txn->lockState(), ns));
+            Database *db = dbHolder().get(txn, ns);
             if( db ) {
-                c.reset( new Context(path, ns, db) );
+                _c.reset(new Context(txn, ns, db, doVersion));
                 return;
             }
         }
@@ -293,20 +204,25 @@ namespace mongo {
         // we usually don't get here, so doesn't matter how fast this part is
         {
             DEV log() << "_DEBUG ReadContext db wasn't open, will try to open " << ns << endl;
-            if( Lock::isW() ) { 
+            if (txn->lockState()->isW()) {
                 // write locked already
+                WriteUnitOfWork wunit(txn->recoveryUnit());
                 DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
-                c.reset(new Context(ns, path));
+                _c.reset(new Context(txn, ns, doVersion));
+                wunit.commit();
             }
-            else if( !Lock::nested() ) { 
-                lk.reset(0);
+            else if (!txn->lockState()->isRecursive()) {
+                _lk.reset(0);
                 {
-                    Lock::GlobalWrite w;
-                    Context c(ns, path);
+                    Lock::GlobalWrite w(txn->lockState());
+                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    Context c(txn, ns, doVersion);
+                    wunit.commit();
                 }
+
                 // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
-                lk.reset( new Lock::DBRead(ns) );
-                c.reset(new Context(ns, path));
+                _lk.reset(new Lock::DBRead(txn->lockState(), ns));
+                _c.reset(new Context(txn, ns, doVersion));
             }
             else { 
                 uasserted(15928, str::stream() << "can't open a database from a nested read lock " << ns);
@@ -318,11 +234,16 @@ namespace mongo {
         //       it would be easy to first check that there is at least a .ns file, or something similar.
     }
 
-    Client::WriteContext::WriteContext(const string& ns, const std::string& path)
-        : _lk( ns ) ,
-          _c(ns, path) {
+    Client::WriteContext::WriteContext(
+                OperationContext* opCtx, const std::string& ns, bool doVersion)
+        : _lk(opCtx->lockState(), ns),
+          _wunit(opCtx->recoveryUnit()),
+          _c(opCtx, ns, doVersion) {
     }
 
+    void Client::WriteContext::commit() {
+        _wunit.commit();
+    }
 
     void Client::Context::checkNotStale() const { 
         switch ( _client->_curOp->getOp() ) {
@@ -344,60 +265,44 @@ namespace mongo {
     }
 
     // invoked from ReadContext
-    Client::Context::Context(const string& path, const string& ns, Database *db) :
-        _client( currentClient.get() ), 
-        _oldContext( _client->_context ),
-        _path( path ), 
-        _justCreated(false),
-        _doVersion( true ),
-        _ns( ns ), 
-        _db(db)
-    {
+    Client::Context::Context(OperationContext* txn,
+                             const string& ns,
+                             Database *db,
+                             bool doVersion)
+        : _client( currentClient.get() ), 
+          _justCreated(false),
+          _doVersion( doVersion ),
+          _ns( ns ), 
+          _db(db),
+          _txn(txn) {
+
         verify(_db);
-        checkNotStale();
-        _client->_context = this;
+        if (_doVersion) checkNotStale();
         _client->_curOp->enter( this );
     }
        
     void Client::Context::_finishInit() {
-        dassert( Lock::isLocked() );
-        int writeLocked = Lock::somethingWriteLocked();
-        if ( writeLocked && FileAllocator::get()->hasFailed() ) {
-            uassert(14031, "Can't take a write lock while out of disk space", false);
-        }
-        
-        _db = dbHolderUnchecked().getOrCreate( _ns , _path , _justCreated );
-        verify(_db);
+        _db = dbHolder().getOrCreate(_txn, _ns, _justCreated);
+        invariant(_db);
+
         if( _doVersion ) checkNotStale();
-        massert( 16107 , str::stream() << "Don't have a lock on: " << _ns , Lock::atLeastReadLocked( _ns ) );
-        _client->_context = this;
+
         _client->_curOp->enter( this );
     }
     
     Client::Context::~Context() {
         DEV verify( _client == currentClient.get() );
-        _client->_curOp->recordGlobalTime( _timer.micros() );
-        _client->_curOp->leave( this );
-        _client->_context = _oldContext; // note: _oldContext may be null
-    }
 
-    bool Client::Context::inDB( const string& db , const string& path ) const {
-        if ( _path != path )
-            return false;
+        // Lock must still be held
+        invariant(_txn->lockState()->isLocked());
 
-        if ( db == _ns )
-            return true;
-
-        string::size_type idx = _ns.find( db );
-        if ( idx != 0 )
-            return false;
-
-        return  _ns[db.size()] == '.';
+        _client->_curOp->recordGlobalTime(_txn->lockState()->isWriteLocked(), _timer.micros());
     }
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {
         // _lastOp is never set if replication is off
-        if( theReplSet || ! _lastOp.isNull() ) {
+        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                repl::ReplicationCoordinator::modeReplSet || !_lastOp.isNull()) {
             b.appendTimestamp( "lastOp" , _lastOp.asDate() );
         }
     }
@@ -408,46 +313,6 @@ namespace mongo {
         return "";
     }
 
-    string Client::toString() const {
-        stringstream ss;
-        if ( _curOp )
-            ss << _curOp->info().jsonString();
-        return ss.str();
-    }
-
-    string sayClientState() {
-        Client* c = currentClient.get();
-        if ( !c )
-            return "no client";
-        return c->toString();
-    }
-
-    void Client::gotHandshake( const BSONObj& o ) {
-        BSONObjIterator i(o);
-
-        {
-            BSONElement id = i.next();
-            verify( id.type() );
-            _remoteId = id.wrap( "_id" );
-        }
-
-        BSONObjBuilder b;
-        while ( i.more() )
-            b.append( i.next() );
-        
-        b.appendElementsUnique( _handshake );
-
-        _handshake = b.obj();
-
-        if (theReplSet && o.hasField("member")) {
-            theReplSet->registerSlave(_remoteId, o["member"].Int());
-        }
-    }
-
-    bool ClientBasic::hasCurrent() {
-        return currentClient.get();
-    }
-
     ClientBasic* ClientBasic::getCurrent() {
         return currentClient.get();
     }
@@ -456,7 +321,7 @@ namespace mongo {
     public:
         void help(stringstream& h) const { h << "internal"; }
         HandshakeCmd() : Command( "handshake" ) {}
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
@@ -466,89 +331,24 @@ namespace mongo {
             actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            Client& c = cc();
-            c.gotHandshake( cmdObj );
-            return 1;
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            repl::HandshakeArgs handshake;
+            Status status = handshake.initialize(cmdObj);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+
+            // TODO(dannenberg) move this into actual processing for both version
+            txn->getClient()->setRemoteID(handshake.getRid());
+
+            status = repl::getGlobalReplicationCoordinator()->processHandshake(txn,
+                                                                               handshake);
+            return appendCommandStatus(result, status);
         }
 
     } handshakeCmd;
 
-    int Client::recommendedYieldMicros( int * writers , int * readers, bool needExact ) {
-        int num = 0;
-        int w = 0;
-        int r = 0;
-        {
-            scoped_lock bl(clientsMutex);
-            for ( set<Client*>::iterator i=clients.begin(); i!=clients.end(); ++i ) {
-                Client* c = *i;
-                if ( c->lockState().hasLockPending() ) {
-                    num++;
-                    if ( c->lockState().hasAnyWriteLock() )
-                        w++;
-                    else
-                        r++;
-                }
-                if (num > 100 && !needExact)
-                    break;
-            }
-        }
 
-        if ( writers )
-            *writers = w;
-        if ( readers )
-            *readers = r;
-
-        int time = r * 10; // we have to be nice to readers since they don't have priority
-        time += w; // writers are greedy, so we can be mean tot hem
-
-        time = min( time , 1000000 );
-
-        // if there has been a kill request for this op - we should yield to allow the op to stop
-        // This function returns empty string if we aren't interrupted
-        if ( *killCurrentOp.checkForInterruptNoAssert() ) {
-            return 100;
-        }
-
-        return time;
-    }
-
-    int Client::getActiveClientCount( int& writers, int& readers ) {
-        writers = 0;
-        readers = 0;
-
-        scoped_lock bl(clientsMutex);
-        for ( set<Client*>::iterator i=clients.begin(); i!=clients.end(); ++i ) {
-            Client* c = *i;
-            if ( ! c->curop()->active() )
-                continue;
-
-            if ( c->lockState().hasAnyWriteLock() )
-                writers++;
-            if ( c->lockState().hasAnyReadLock() )
-                readers++;
-        }
-
-        return writers + readers;
-    }
-
-    bool Client::allowedToThrowPageFaultException() const {
-        if ( _hasWrittenThisPass )
-            return false;
-        
-        if ( ! _pageFaultRetryableSection )
-            return false;
-
-        if ( _pageFaultRetryableSection->laps() >= 100 )
-            return false;
-        
-        // if we've done a normal yield, it means we're in a ClientCursor or something similar
-        // in that case, that code should be handling yielding, not us
-        if ( _curOp && _curOp->numYields() > 0 ) 
-            return false;
-
-        return true;
-    }
 
     void OpDebug::reset() {
         extra.reset();
@@ -565,9 +365,10 @@ namespace mongo {
         exhaust = false;
 
         nscanned = -1;
+        nscannedObjects = -1;
         idhack = false;
         scanAndOrder = false;
-        nupdated = -1;
+        nMatched = -1;
         nModified = -1;
         ninserted = -1;
         ndeleted = -1;
@@ -577,6 +378,7 @@ namespace mongo {
         upsert = false;
         keyUpdates = 0;  // unsigned, so -1 not possible
         planSummary = "";
+        execStats.reset();
         
         exceptionInfo.reset();
         
@@ -605,6 +407,7 @@ namespace mongo {
                     mutablebson::Document cmdToLog(curop.query(), 
                             mutablebson::Document::kInPlaceDisabled);
                     curCommand->redactForLogging(&cmdToLog);
+                    s << curCommand->name << " ";
                     s << cmdToLog.toString();
                 } 
                 else { // Should not happen but we need to handle curCommand == NULL gracefully
@@ -618,7 +421,7 @@ namespace mongo {
         }
 
         if (!planSummary.empty()) {
-            s << " planSummary: " << planSummary;
+            s << " planSummary: " << planSummary.toString();
         }
         
         if ( ! updateobj.isEmpty() ) {
@@ -632,10 +435,11 @@ namespace mongo {
         OPDEBUG_TOSTRING_HELP_BOOL( exhaust );
 
         OPDEBUG_TOSTRING_HELP( nscanned );
+        OPDEBUG_TOSTRING_HELP( nscannedObjects );
         OPDEBUG_TOSTRING_HELP_BOOL( idhack );
         OPDEBUG_TOSTRING_HELP_BOOL( scanAndOrder );
         OPDEBUG_TOSTRING_HELP( nmoved );
-        OPDEBUG_TOSTRING_HELP( nupdated );
+        OPDEBUG_TOSTRING_HELP( nMatched );
         OPDEBUG_TOSTRING_HELP( nModified );
         OPDEBUG_TOSTRING_HELP( ninserted );
         OPDEBUG_TOSTRING_HELP( ndeleted );
@@ -724,11 +528,12 @@ namespace mongo {
         OPDEBUG_APPEND_BOOL( exhaust );
 
         OPDEBUG_APPEND_NUMBER( nscanned );
+        OPDEBUG_APPEND_NUMBER( nscannedObjects );
         OPDEBUG_APPEND_BOOL( idhack );
         OPDEBUG_APPEND_BOOL( scanAndOrder );
         OPDEBUG_APPEND_BOOL( moved );
         OPDEBUG_APPEND_NUMBER( nmoved );
-        OPDEBUG_APPEND_NUMBER( nupdated );
+        OPDEBUG_APPEND_NUMBER( nMatched );
         OPDEBUG_APPEND_NUMBER( nModified );
         OPDEBUG_APPEND_NUMBER( ninserted );
         OPDEBUG_APPEND_NUMBER( ndeleted );
@@ -747,9 +552,7 @@ namespace mongo {
         OPDEBUG_APPEND_NUMBER( responseLength );
         b.append( "millis" , executionTime );
 
-        if (!execStats.isEmpty()) {
-            b.append("execStats", execStats);
-        }
+        execStats.append(b, "execStats");
 
         return true;
     }

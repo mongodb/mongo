@@ -31,7 +31,6 @@
 #include "mongo/db/keypattern.h"
 
 #include "mongo/db/hasher.h"
-#include "mongo/db/queryutil.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace mongoutils;
@@ -136,10 +135,17 @@ namespace mongo {
         return newBound.obj();
     }
 
-    typedef vector<pair<BSONObj,BSONObj> >::const_iterator BoundListIter;
+    BoundList KeyPattern::keyBounds( const BSONObj& keyPattern, const IndexBounds& indexBounds ) {
+        invariant(indexBounds.fields.size() == (size_t)keyPattern.nFields());
 
-    BoundList KeyPattern::keyBounds( const FieldRangeSet& queryConstraints ) const {
-        // To construct our bounds we will generate intervals based on constraints for
+        // If any field is unsatisfied, return empty bound list.
+        for (vector<OrderedIntervalList>::const_iterator it = indexBounds.fields.begin();
+                it != indexBounds.fields.end(); it++) {
+            if (it->intervals.size() == 0) {
+                return BoundList();
+            }
+        }
+        // To construct our bounds we will generate intervals based on bounds for
         // the first field, then compound intervals based on constraints for the first
         // 2 fields, then compound intervals for the first 3 fields, etc.
         // As we loop through the fields, we start generating new intervals that will later
@@ -151,26 +157,27 @@ namespace mongo {
         BoundBuilders builders;
         builders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ),
                                        shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
-        BSONObjIterator i( _pattern );
+        BSONObjIterator keyIter( keyPattern );
         // until equalityOnly is false, we are just dealing with equality (no range or $in queries).
         bool equalityOnly = true;
-        while( i.more() ) {
-            BSONElement e = i.next();
+
+        for (size_t i = 0; i < indexBounds.fields.size(); i++) {
+            BSONElement e = keyIter.next();
+
+            StringData fieldName = e.fieldNameStringData();
 
             // get the relevant intervals for this field, but we may have to transform the
             // list of what's relevant according to the expression for this field
-            const FieldRange &fr = queryConstraints.range( e.fieldName() );
-            const vector<FieldInterval> &oldIntervals = fr.intervals();
-            BoundList fieldBounds = _transformFieldBounds( oldIntervals , e );
+            const OrderedIntervalList& oil = indexBounds.fields[i];
+            const vector<Interval>& intervals = oil.intervals;
 
             if ( equalityOnly ) {
-                if ( fieldBounds.size() == 1 &&
-                     ( fieldBounds.front().first == fieldBounds.front().second ) ){
+                if ( intervals.size() == 1 && intervals.front().isPoint() ){
                     // this field is only a single point-interval
                     BoundBuilders::const_iterator j;
                     for( j = builders.begin(); j != builders.end(); ++j ) {
-                        j->first->appendElements( fieldBounds.front().first );
-                        j->second->appendElements( fieldBounds.front().first );
+                        j->first->appendAs( intervals.front().start, fieldName );
+                        j->second->appendAs( intervals.front().end, fieldName );
                     }
                 }
                 else {
@@ -180,13 +187,15 @@ namespace mongo {
                     equalityOnly = false;
 
                     BoundBuilders newBuilders;
-                    BoundBuilders::const_iterator i;
-                    for( i = builders.begin(); i != builders.end(); ++i ) {
-                        BSONObj first = i->first->obj();
-                        BSONObj second = i->second->obj();
 
-                        for(BoundListIter j = fieldBounds.begin(); j != fieldBounds.end(); ++j ) {
-                            uassert( 16452,
+                    for(BoundBuilders::const_iterator it = builders.begin(); it != builders.end(); ++it ) {
+                        BSONObj first = it->first->obj();
+                        BSONObj second = it->second->obj();
+
+                        for ( vector<Interval>::const_iterator interval = intervals.begin();
+                                interval != intervals.end(); ++interval )
+                        {
+                            uassert( 17439,
                                      "combinatorial limit of $in partitioning of results exceeded" ,
                                      newBuilders.size() < MAX_IN_COMBINATIONS );
                             newBuilders.push_back(
@@ -194,8 +203,8 @@ namespace mongo {
                                                 shared_ptr<BSONObjBuilder>( new BSONObjBuilder())));
                             newBuilders.back().first->appendElements( first );
                             newBuilders.back().second->appendElements( second );
-                            newBuilders.back().first->appendElements( j->first );
-                            newBuilders.back().second->appendElements( j->second );
+                            newBuilders.back().first->appendAs( interval->start, fieldName );
+                            newBuilders.back().second->appendAs( interval->end, fieldName );
                         }
                     }
                     builders = newBuilders;
@@ -206,57 +215,14 @@ namespace mongo {
                 // just extend what we've generated with min/max bounds for this field
                 BoundBuilders::const_iterator j;
                 for( j = builders.begin(); j != builders.end(); ++j ) {
-                    j->first->appendElements( fieldBounds.front().first );
-                    j->second->appendElements( fieldBounds.back().second );
+                    j->first->appendAs( intervals.front().start, fieldName );
+                    j->second->appendAs( intervals.back().end, fieldName );
                 }
             }
         }
         BoundList ret;
         for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i )
             ret.push_back( make_pair( i->first->obj(), i->second->obj() ) );
-        return ret;
-    }
-
-    BoundList KeyPattern::_transformFieldBounds( const vector<FieldInterval>& oldIntervals ,
-                                                 const BSONElement& field  ) const {
-
-        BoundList ret;
-        vector<FieldInterval>::const_iterator i;
-        for( i = oldIntervals.begin(); i != oldIntervals.end(); ++i ) {
-            if ( isAscending( field ) ){
-                // straightforward map [a,b] --> [a,b]
-                ret.push_back( make_pair( BSON( field.fieldName() << i->_lower._bound ) ,
-                                          BSON( field.fieldName() << i->_upper._bound ) ) );
-            } else if ( isDescending( field ) ) {
-                // reverse [a,b] --> [b,a]
-                ret.push_back( make_pair( BSON( field.fieldName() << i->_upper._bound ) ,
-                                          BSON( field.fieldName() << i->_lower._bound ) ) );
-            } else if ( isHashed( field ) ){
-                if ( i->equality() ) {
-                    // hash [a,a] --> [hash(a),hash(a)]
-                    long long int h = BSONElementHasher::hash64( i->_lower._bound ,
-                                                             BSONElementHasher::DEFAULT_HASH_SEED );
-                    ret.push_back( make_pair( BSON( field.fieldName() << h ) ,
-                                              BSON( field.fieldName() << h ) ) );
-                } else {
-                    // if it's a range interval and this field is hashed, just generate one
-                    // big interval from MinKey to MaxKey, since these vals could lie anywhere
-                    ret.clear();
-                    ret.push_back( make_pair( BSON( field.fieldName() << MINKEY ) ,
-                                              BSON( field.fieldName() << MAXKEY ) ) );
-                    break;
-                }
-            }
-        }
-
-        if ( isDescending( field ) ) {
-            // now order is [ [2,1], [4,3] , [6,5]....[n,n-1] ].  Reverse to get decreasing order.
-            reverse( ret.begin() , ret.end() );
-        } else if ( isHashed( field ) ){
-            // [ hash(a) , hash(b) , hash(c) ...] no longer in order, so sort before returning
-            sort( ret.begin() , ret.end() );
-        }
-
         return ret;
     }
 

@@ -2,29 +2,46 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/pch.h"
 
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/storage/durable_mapped_file.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mmap.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/text.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    namespace {
+        mongo::AtomicUInt64 mmfNextId(0);
+    }
 
     static size_t fetchMinOSPageSizeBytes() {
         SYSTEM_INFO si;
@@ -42,24 +59,72 @@ namespace mongo {
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
 
-    static unsigned long long _nextMemoryMappedFileLocation = 256LL * 1024LL * 1024LL * 1024LL;
-    static SimpleMutex _nextMemoryMappedFileLocationMutex( "nextMemoryMappedFileLocationMutex" );
+    const unsigned long long memoryMappedFileLocationFloor = 256LL * 1024LL * 1024LL * 1024LL;
+    static unsigned long long _nextMemoryMappedFileLocation = memoryMappedFileLocationFloor;
 
-    static void* getNextMemoryMappedFileLocation( unsigned long long mmfSize ) {
-        if ( 4 == sizeof(void*) ) {
+    static SimpleMutex _nextMemoryMappedFileLocationMutex("nextMemoryMappedFileLocationMutex");
+
+    unsigned long long AlignNumber(unsigned long long number, unsigned long long granularity)
+    {
+        return (number + granularity - 1) & ~(granularity - 1);
+    }
+
+    static void* getNextMemoryMappedFileLocation(unsigned long long mmfSize) {
+        if (4 == sizeof(void*)) {
             return 0;
         }
-        SimpleMutex::scoped_lock lk( _nextMemoryMappedFileLocationMutex );
+        SimpleMutex::scoped_lock lk(_nextMemoryMappedFileLocationMutex);
+
         static unsigned long long granularity = 0;
-        if ( 0 == granularity ) {
+
+        if (0 == granularity) {
             SYSTEM_INFO systemInfo;
-            GetSystemInfo( &systemInfo );
-            granularity = static_cast<unsigned long long>( systemInfo.dwAllocationGranularity );
+            GetSystemInfo(&systemInfo);
+            granularity = static_cast<unsigned long long>(systemInfo.dwAllocationGranularity);
         }
+
         unsigned long long thisMemoryMappedFileLocation = _nextMemoryMappedFileLocation;
-        mmfSize = ( mmfSize + granularity - 1) & ~( granularity - 1 );
-        _nextMemoryMappedFileLocation += mmfSize;
-        return reinterpret_cast<void*>( static_cast<uintptr_t>( thisMemoryMappedFileLocation ) );
+
+        int current_retry = 1;
+
+        while (true) {
+            MEMORY_BASIC_INFORMATION memInfo;
+
+            if (VirtualQuery(reinterpret_cast<LPCVOID>(thisMemoryMappedFileLocation),
+                &memInfo, sizeof(memInfo)) == 0) {
+                DWORD gle = GetLastError();
+
+                // If we exceed the limits of Virtual Memory 
+                // - 8TB before Windows 8.1/2012 R2, 128 TB after
+                // restart scanning from our memory mapped floor once more
+                // This is a linear scan of regions, not of every VM page
+                if (gle == ERROR_INVALID_PARAMETER && current_retry == 1) {
+                    thisMemoryMappedFileLocation = memoryMappedFileLocationFloor;
+                    ++current_retry;
+                    continue;
+                }
+
+                log() << "VirtualQuery of " << thisMemoryMappedFileLocation
+                    << " failed with error " << errnoWithDescription(gle);
+                fassertFailed(17484);
+            }
+
+            // Free memory regions that we can use for memory map files
+            // 1. Marked MEM_FREE, not MEM_RESERVE
+            // 2. Marked as PAGE_NOACCESS, not anything else
+            if (memInfo.Protect == PAGE_NOACCESS &&
+                memInfo.State == MEM_FREE &&
+                memInfo.RegionSize > mmfSize)
+                break;
+
+            thisMemoryMappedFileLocation = reinterpret_cast<unsigned long long>(memInfo.BaseAddress)
+                + memInfo.RegionSize;
+        }
+
+        _nextMemoryMappedFileLocation = thisMemoryMappedFileLocation
+            + AlignNumber(mmfSize, granularity);
+
+        return reinterpret_cast<void*>(static_cast<uintptr_t>(thisMemoryMappedFileLocation));
     }
 
     /** notification on unmapping so we can clear writable bits */
@@ -71,7 +136,7 @@ namespace mongo {
     }
 
     MemoryMappedFile::MemoryMappedFile()
-        : _flushMutex(new mutex("flushMutex")), _uniqueId(0) {
+        : _uniqueId(mmfNextId.fetchAndAdd(1)) {
         fd = 0;
         maphandle = 0;
         len = 0;
@@ -80,6 +145,10 @@ namespace mongo {
 
     void MemoryMappedFile::close() {
         LockMongoFilesShared::assertExclusivelyLocked();
+
+        // Prevent flush and close from concurrently running
+        boost::lock_guard<boost::mutex> lk(_flushMutex);
+
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
             clearWritableBits(*i);
             UnmapViewOfFile(*i);
@@ -98,24 +167,47 @@ namespace mongo {
 
     void* MemoryMappedFile::createReadOnlyMap() {
         verify( maphandle );
+
         scoped_lock lk(mapViewMutex);
-        LPVOID thisAddress = getNextMemoryMappedFileLocation( len );
-        void* readOnlyMapAddress = MapViewOfFileEx(
+
+        void* readOnlyMapAddress = NULL;
+        int current_retry = 0;
+
+        while (true) {
+
+            LPVOID thisAddress = getNextMemoryMappedFileLocation(len);
+
+            readOnlyMapAddress = MapViewOfFileEx(
                 maphandle,          // file mapping handle
                 FILE_MAP_READ,      // access
                 0, 0,               // file offset, high and low
                 0,                  // bytes to map, 0 == all
-                thisAddress );      // address to place file
-        if ( 0 == readOnlyMapAddress ) {
-            DWORD dosError = GetLastError();
-            log() << "MapViewOfFileEx for " << filename()
+                thisAddress);       // address to place file
+
+            if (0 == readOnlyMapAddress) {
+                DWORD dosError = GetLastError();
+
+                ++current_retry;
+
+                // If we failed to allocate a memory mapped file, try again in case we picked
+                // an address that Windows is also trying to use for some other VM allocations
+                if (dosError == ERROR_INVALID_ADDRESS && current_retry < 5) {
+                    continue;
+                }
+
+                log() << "MapViewOfFileEx for " << filename()
                     << " at address " << thisAddress
-                    << " failed with error " << errnoWithDescription( dosError )
+                    << " failed with error " << errnoWithDescription(dosError)
                     << " (file size is " << len << ")"
                     << " in MemoryMappedFile::createReadOnlyMap"
                     << endl;
-            fassertFailed( 16165 );
+
+                fassertFailed(16165);
+            }
+
+            break;
         }
+
         views.push_back( readOnlyMapAddress );
         return readOnlyMapAddress;
     }
@@ -190,25 +282,59 @@ namespace mongo {
         {
             scoped_lock lk(mapViewMutex);
             DWORD access = ( options & READONLY ) ? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
-            LPVOID thisAddress = getNextMemoryMappedFileLocation( length );
-            view = MapViewOfFileEx(
+
+            int current_retry = 0;
+            while (true) {
+
+                LPVOID thisAddress = getNextMemoryMappedFileLocation(length);
+
+                view = MapViewOfFileEx(
                     maphandle,      // file mapping handle
                     access,         // access
                     0, 0,           // file offset, high and low
                     0,              // bytes to map, 0 == all
-                    thisAddress );  // address to place file
-            if ( view == 0 ) {
-                DWORD dosError = GetLastError();
-                log() << "MapViewOfFileEx for " << filename
+                    thisAddress);  // address to place file
+
+                if (view == 0) {
+                    DWORD dosError = GetLastError();
+
+                    ++current_retry;
+
+                    // If we failed to allocate a memory mapped file, try again in case we picked
+                    // an address that Windows is also trying to use for some other VM allocations
+                    if (dosError == ERROR_INVALID_ADDRESS && current_retry < 5) {
+                        continue;
+                    }
+
+#ifndef _WIN64
+                    // Warn user that if they are running a 32-bit app on 64-bit Windows
+                    if (dosError == ERROR_NOT_ENOUGH_MEMORY) {
+                        BOOL wow64Process;
+                        BOOL retWow64 = IsWow64Process(GetCurrentProcess(), &wow64Process);
+                        if (retWow64 && wow64Process) {
+                            log() << "This is a 32-bit MongoDB binary running on a 64-bit"
+                                " operating system that has run out of virtual memory for"
+                                " databases. Switch to a 64-bit build of MongoDB to open"
+                                " the databases.";
+                        }
+                    }
+#endif
+
+                    log() << "MapViewOfFileEx for " << filename
                         << " at address " << thisAddress
-                        << " failed with " << errnoWithDescription( dosError )
+                        << " failed with " << errnoWithDescription(dosError)
                         << " (file size is " << length << ")"
                         << " in MemoryMappedFile::map"
                         << endl;
-                close();
-                fassertFailed( 16166 );
+
+                    close();
+                    fassertFailed(16166);
+                }
+
+                break;
             }
         }
+
         views.push_back(view);
         len = length;
         return view;
@@ -253,6 +379,18 @@ namespace mongo {
                                       &oldProtection );
             if ( !ok ) {
                 DWORD dosError = GetLastError();
+
+                if (dosError == ERROR_COMMITMENT_LIMIT) {
+                    // System has run out of memory between physical RAM & page file, tell the user
+                    BSONObjBuilder bb;
+
+                    ProcessInfo p;
+                    p.getExtraInfo(bb);
+
+                    log() << "MongoDB has exhausted the system memory capacity.";
+                    log() << "Current Memory Status: " << bb.obj().toString();
+                }
+
                 log() << "VirtualProtect for " << mmf->filename()
                         << " chunk " << chunkno
                         << " failed with " << errnoWithDescription( dosError )
@@ -269,31 +407,52 @@ namespace mongo {
 
     void* MemoryMappedFile::createPrivateMap() {
         verify( maphandle );
+
         scoped_lock lk(mapViewMutex);
+
         LPVOID thisAddress = getNextMemoryMappedFileLocation( len );
-        void* privateMapAddress = MapViewOfFileEx(
+
+        void* privateMapAddress = NULL;
+        int current_retry = 0;
+
+        while (true) {
+
+            privateMapAddress = MapViewOfFileEx(
                 maphandle,          // file mapping handle
                 FILE_MAP_READ,      // access
                 0, 0,               // file offset, high and low
                 0,                  // bytes to map, 0 == all
-                thisAddress );      // address to place file
-        if ( privateMapAddress == 0 ) {
-            DWORD dosError = GetLastError();
-            log() << "MapViewOfFileEx for " << filename()
-                    << " failed with error " << errnoWithDescription( dosError )
+                thisAddress);      // address to place file
+
+            if (privateMapAddress == 0) {
+                DWORD dosError = GetLastError();
+
+                ++current_retry;
+
+                // If we failed to allocate a memory mapped file, try again in case we picked
+                // an address that Windows is also trying to use for some other VM allocations
+                if (dosError == ERROR_INVALID_ADDRESS && current_retry < 5) {
+                    continue;
+                }
+
+                log() << "MapViewOfFileEx for " << filename()
+                    << " failed with error " << errnoWithDescription(dosError)
                     << " (file size is " << len << ")"
                     << " in MemoryMappedFile::createPrivateMap"
                     << endl;
-            fassertFailed( 16167 );
+
+                fassertFailed(16167);
+            }
+
+            break;
         }
+
         clearWritableBits( privateMapAddress );
         views.push_back( privateMapAddress );
         return privateMapAddress;
     }
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-        verify( Lock::isW() );
-
         LockMongoFilesExclusive lockMongoFiles;
 
         clearWritableBits(oldPrivateAddr);
@@ -324,31 +483,37 @@ namespace mongo {
         return newPrivateView;
     }
 
-    // prevent WRITETODATAFILES() from running at the same time as FlushViewOfFile()
-    SimpleMutex globalFlushMutex("globalFlushMutex");
-
     class WindowsFlushable : public MemoryMappedFile::Flushable {
     public:
         WindowsFlushable( MemoryMappedFile* theFile,
                           void * view,
                           HANDLE fd,
+                          const uint64_t id,
                           const std::string& filename,
-                          boost::shared_ptr<mutex> flushMutex )
-            : _theFile(theFile), _view(view), _fd(fd), _filename(filename), _flushMutex(flushMutex)
+                          boost::mutex& flushMutex )
+            : _theFile(theFile), _view(view), _fd(fd), _id(id), _filename(filename),
+              _flushMutex(flushMutex)
         {}
 
         void flush() {
             if (!_view || !_fd)
                 return;
 
-            LockMongoFilesShared mmfilesLock;
-            if ( MongoFile::getAllFiles().count( _theFile ) == 0 ) {
-                // this was deleted while we were unlocked
-                return;
+            {
+                LockMongoFilesShared mmfilesLock;
+
+                std::set<MongoFile*> mmfs = MongoFile::getAllFiles();
+                std::set<MongoFile*>::const_iterator it = mmfs.find(_theFile);
+                if ( it == mmfs.end() || (*it)->getUniqueId() != _id ) {
+                    // this was deleted while we were unlocked
+                    return;
+                }
+
+                // Hold the flush mutex to ensure the file is not closed during flush
+                _flushMutex.lock();
             }
 
-            SimpleMutex::scoped_lock _globalFlushMutex(globalFlushMutex);
-            scoped_lock lk(*_flushMutex);
+            boost::lock_guard<boost::mutex> lk(_flushMutex, boost::adopt_lock_t());
 
             int loopCount = 0;
             bool success = false;
@@ -386,7 +551,7 @@ namespace mongo {
             success = FALSE != FlushFileBuffers(_fd);
             if (!success) {
                 int err = GetLastError();
-                out() << "FlushFileBuffers failed: " << errnoWithDescription( err )
+                log() << "FlushFileBuffers failed: " << errnoWithDescription( err )
                       << " file: " << _filename << endl;
                 dataSyncFailedHandler();
             }
@@ -395,20 +560,22 @@ namespace mongo {
         MemoryMappedFile* _theFile; // this may be deleted while we are running
         void * _view;
         HANDLE _fd;
+        const uint64_t _id;
         string _filename;
-        boost::shared_ptr<mutex> _flushMutex;
+        boost::mutex& _flushMutex;
     };
 
     void MemoryMappedFile::flush(bool sync) {
         uassert(13056, "Async flushing not supported on windows", sync);
         if( !views.empty() ) {
-            WindowsFlushable f( this, viewForFlushing() , fd , filename() , _flushMutex);
+            WindowsFlushable f(this, viewForFlushing(), fd, _uniqueId, filename(), _flushMutex);
             f.flush();
         }
     }
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
-        return new WindowsFlushable( this, viewForFlushing() , fd , filename() , _flushMutex );
+        return new WindowsFlushable(this, viewForFlushing(), fd, _uniqueId,
+                                    filename(), _flushMutex);
     }
 
 }

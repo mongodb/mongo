@@ -34,7 +34,6 @@
 
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/util/unordered_fast_key_table.h"
 
 namespace mongo {
@@ -58,35 +57,6 @@ namespace mongo {
             for ( std::string::size_type i = 0; i < sz; i++ )
                 (*s)[i] = (char)tolower( (int)(*s)[i] );
         }
-
-        /*
-         * ScoredLocation stores the total score for a document (record *) wrt a search
-         *
-         */
-        struct ScoredLocation {
-            ScoredLocation( Record* r, double sc )
-                : rec(r), score(sc) {
-            }
-
-            Record* rec;
-            double score;
-
-            bool operator<( const ScoredLocation& other ) const {
-                if ( other.score < score )
-                    return true;
-                if ( other.score > score )
-                    return false;
-                return rec < other.rec;
-            }
-        };
-
-        // scored location comparison is done based on score
-        class ScoredLocationComp {
-        public:
-            bool operator() (const ScoredLocation& lhs, const ScoredLocation& rhs) const {
-                return (lhs.score > rhs.score);
-            }
-        };
 
         struct _be_hash {
             size_t operator()( const BSONElement& e ) const {

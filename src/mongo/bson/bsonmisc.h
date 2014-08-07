@@ -2,17 +2,29 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
@@ -20,7 +32,6 @@
 #include <memory>
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/client/export_macros.h"
 
 namespace mongo {
 
@@ -53,10 +64,6 @@ namespace mongo {
         RIGHT_SUBFIELD = 2
     };
 
-    class LexNumCmp;
-    FieldCompareResult compareDottedFieldNames( const std::string& l , const std::string& r ,
-                                               const LexNumCmp& cmp );
-
     /** Use BSON macro to build a BSONObj from a stream
 
         e.g.,
@@ -83,38 +90,38 @@ namespace mongo {
        Example:
          std::cout << BSON( GENOID << "z" << 3 ); // { _id : ..., z : 3 }
     */
-    struct MONGO_CLIENT_API GENOIDLabeler { };
-    extern MONGO_CLIENT_API GENOIDLabeler GENOID;
+    struct GENOIDLabeler { };
+    extern GENOIDLabeler GENOID;
 
     /* Utility class to add a Date element with the current time
        Example:
          std::cout << BSON( "created" << DATENOW ); // { created : "2009-10-09 11:41:42" }
     */
-    struct MONGO_CLIENT_API DateNowLabeler { };
-    extern MONGO_CLIENT_API DateNowLabeler DATENOW;
+    struct DateNowLabeler { };
+    extern DateNowLabeler DATENOW;
 
     /* Utility class to assign a NULL value to a given attribute
        Example:
          std::cout << BSON( "a" << BSONNULL ); // { a : null }
     */
-    struct MONGO_CLIENT_API NullLabeler { };
-    extern MONGO_CLIENT_API NullLabeler BSONNULL;
+    struct NullLabeler { };
+    extern NullLabeler BSONNULL;
 
     /* Utility class to assign an Undefined value to a given attribute
        Example:
          std::cout << BSON( "a" << BSONUndefined ); // { a : undefined }
     */
-    struct MONGO_CLIENT_API UndefinedLabeler { };
-    extern MONGO_CLIENT_API UndefinedLabeler BSONUndefined;
+    struct UndefinedLabeler { };
+    extern UndefinedLabeler BSONUndefined;
 
     /* Utility class to add the minKey (minus infinity) to a given attribute
        Example:
          std::cout << BSON( "a" << MINKEY ); // { "a" : { "$minKey" : 1 } }
     */
-    struct MONGO_CLIENT_API MinKeyLabeler { };
-    extern MONGO_CLIENT_API MinKeyLabeler MINKEY;
-    struct MONGO_CLIENT_API MaxKeyLabeler { };
-    extern MONGO_CLIENT_API MaxKeyLabeler MAXKEY;
+    struct MinKeyLabeler { };
+    extern MinKeyLabeler MINKEY;
+    struct MaxKeyLabeler { };
+    extern MaxKeyLabeler MAXKEY;
 
     // Utility class to implement GT, GTE, etc as described above.
     class Labeler {
@@ -138,13 +145,13 @@ namespace mongo {
         BSONObjBuilderValueStream *s_;
     };
 
-    // Utility class to allow adding a string to BSON as a Symbol
+    // Utility class to allow adding a std::string to BSON as a Symbol
     struct BSONSymbol {
         explicit BSONSymbol(const StringData& sym) :symbol(sym) {}
         StringData symbol;
     };
 
-    // Utility class to allow adding a string to BSON as Code
+    // Utility class to allow adding a std::string to BSON as Code
     struct BSONCode {
         explicit BSONCode(const StringData& str) :code(str) {}
         StringData code;
@@ -179,13 +186,13 @@ namespace mongo {
         OID oid;
     };
 
-    extern MONGO_CLIENT_API Labeler::Label GT;
-    extern MONGO_CLIENT_API Labeler::Label GTE;
-    extern MONGO_CLIENT_API Labeler::Label LT;
-    extern MONGO_CLIENT_API Labeler::Label LTE;
-    extern MONGO_CLIENT_API Labeler::Label NE;
-    extern MONGO_CLIENT_API Labeler::Label NIN;
-    extern MONGO_CLIENT_API Labeler::Label BSIZE;
+    extern Labeler::Label GT;
+    extern Labeler::Label GTE;
+    extern Labeler::Label LT;
+    extern Labeler::Label LTE;
+    extern Labeler::Label NE;
+    extern Labeler::Label NIN;
+    extern Labeler::Label BSIZE;
 
 
     // $or helper: OR(BSON("x" << GT << 7), BSON("y" << LT << 6));
@@ -198,7 +205,7 @@ namespace mongo {
     // definitions in bsonobjbuilder.h b/c of incomplete types
 
     // Utility class to implement BSON( key << val ) as described above.
-    class MONGO_CLIENT_API BSONObjBuilderValueStream : public boost::noncopyable {
+    class BSONObjBuilderValueStream : public boost::noncopyable {
     public:
         friend class Labeler;
         BSONObjBuilderValueStream( BSONObjBuilder * builder );

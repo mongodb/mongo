@@ -1,16 +1,28 @@
 /* Copyright 2013 10gen Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/platform/basic.h"
@@ -399,8 +411,14 @@ namespace mutablebson {
         // The designated field name for the root element.
         const char kRootFieldName[] = "";
 
-        // How many reps do we cache before we spill to heap. Use a power of two.
+        // How many reps do we cache before we spill to heap. Use a power of two. For debug
+        // builds we make this very small so it is less likely to mask vector invalidation
+        // logic errors. We don't make it zero so that we do execute the fastRep code paths.
+#if defined(_DEBUG)
+        const size_t kFastReps = 2;
+#else
         const size_t kFastReps = 128;
+#endif
 
         // An ElementRep contains the information necessary to locate the data for an Element,
         // and the topology information for how the Element is related to other Elements in the
@@ -1002,24 +1020,45 @@ namespace mutablebson {
             }
         }
 
-        // Not all types are currently permitted to be updated in-place.
-        bool canUpdateInPlace(const ElementRep& rep) {
-            const BSONType type = getType(rep);
-            switch(type) {
-            case mongo::NumberDouble:
-            case mongo::String:
-            case mongo::BinData:
-            case mongo::jstOID:
-            case mongo::Bool:
-            case mongo::Date:
-            case mongo::NumberInt:
-            case mongo::Timestamp:
-            case mongo::NumberLong:
-                return true;
-            default:
+        // Check all preconditions on doing an in-place update, except for size match.
+        bool canUpdateInPlace(const ElementRep& sourceRep, const ElementRep& targetRep) {
+
+            // NOTE: CodeWScope might arguably be excluded since it has substructure, but
+            // mutable doesn't permit navigation into its document, so we can handle it.
+
+            // We can only do an in-place update to an element that is serialized and is not in
+            // the leaf heap.
+            //
+            // TODO: In the future, we can replace values in the leaf heap if they are of the
+            // same size as the origin was. For now, we don't support that.
+            if (!hasValue(targetRep) || (targetRep.objIdx == kLeafObjIdx))
                 return false;
+
+            // sourceRep should be newly created, so it must have a value representation.
+            dassert(hasValue(sourceRep));
+
+            // For a target that has substructure, we only permit in-place updates if there
+            // cannot be ElementReps that reference data within the target. We don't need to
+            // worry about ElementReps for source, since it is newly created. The only way
+            // there can be ElementReps referring into substructure is if the Element has
+            // non-empty non-opaque child references.
+            if (!isLeaf(targetRep)) {
+                if (((targetRep.child.left != Element::kOpaqueRepIdx) &&
+                     (targetRep.child.left != Element::kInvalidRepIdx)) ||
+                    ((targetRep.child.right != Element::kOpaqueRepIdx) &&
+                     (targetRep.child.right != Element::kInvalidRepIdx)))
+                    return false;
             }
+
+            return true;
         }
+
+        template<typename Builder>
+        void writeElement(Element::RepIdx repIdx, Builder* builder,
+                          const StringData* fieldName = NULL) const;
+
+        template<typename Builder>
+        void writeChildren(Element::RepIdx repIdx, Builder* builder) const;
 
     private:
 
@@ -1633,9 +1672,9 @@ namespace mutablebson {
         if (thisRep.parent == kInvalidRepIdx && _repIdx == kRootRepIdx) {
             // If this is the root element, then we need to handle it differently, since it
             // doesn't have a field name and should embed directly, rather than as an object.
-            writeChildren(builder);
+            impl.writeChildren(_repIdx, builder);
         } else {
-            writeElement(builder);
+            impl.writeElement(_repIdx, builder);
         }
     }
 
@@ -1644,7 +1683,7 @@ namespace mutablebson {
         const Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
         verify(impl.getType(thisRep) == mongo::Array);
-        return writeChildren(builder);
+        return impl.writeChildren(_repIdx, builder);
     }
 
     Status Element::setValueDouble(const double value) {
@@ -1976,60 +2015,46 @@ namespace mutablebson {
         ElementRep& thisRep = impl.getElementRep(_repIdx);
         ElementRep& valueRep = impl.getElementRep(newValueIdx);
 
-        bool inPlace = false;
-        if (impl.canUpdateInPlace(valueRep) && impl.isInPlaceModeEnabled()) {
+        if (impl.isInPlaceModeEnabled() && impl.canUpdateInPlace(valueRep, thisRep)) {
 
-            // In place updates are currently enabled. We can do an in-place update to an
-            // element that is serialized and is not in the leaf heap.
-            const bool inLeafHeap = (thisRep.objIdx == kLeafObjIdx);
-            const bool hasValue = impl.hasValue(thisRep);
+            // Get the BSONElement representations of the existing and new value, so we can
+            // check if they are size compatible.
+            BSONElement thisElt = impl.getSerializedElement(thisRep);
+            BSONElement valueElt = impl.getSerializedElement(valueRep);
 
-            // TODO: In the future, we can replace values in the leaf heap if they are of the
-            // same size as the origin was. For now, we don't support that.
-            if (hasValue && !inLeafHeap) {
+            if (thisElt.size() == valueElt.size()) {
 
-                // See if the new Element can be recorded as an in-place update.
-                dassert(impl.hasValue(valueRep));
+                // The old and new elements are size compatible. Compute the base offsets
+                // of each BSONElement in the object in which it resides. We use these to
+                // calculate the source and target offsets in the damage entries we are
+                // going to write.
 
-                // Get the BSONElement representations of the existing and new value, so we can
-                // check if they are size compatible.
-                BSONElement thisElt = impl.getSerializedElement(thisRep);
-                BSONElement valueElt = impl.getSerializedElement(valueRep);
+                const DamageEvent::OffsetSizeType targetBaseOffset =
+                    getElementOffset(impl.getObject(thisRep.objIdx), thisElt);
 
-                if (thisElt.size() == valueElt.size()) {
+                const DamageEvent::OffsetSizeType sourceBaseOffset =
+                    getElementOffset(impl.getObject(valueRep.objIdx), valueElt);
 
-                    // The old and new elements are size compatible. Compute the base offsets
-                    // of each BSONElement in the object in which it resides. We use these to
-                    // calculate the source and target offsets in the damage entries we are
-                    // going to write.
-
-                    const DamageEvent::OffsetSizeType targetBaseOffset =
-                        getElementOffset(impl.getObject(thisRep.objIdx), thisElt);
-
-                    const DamageEvent::OffsetSizeType sourceBaseOffset =
-                        getElementOffset(impl.getObject(valueRep.objIdx), valueElt);
-
-                    // If this is a type change, record a damage event for the new type.
-                    if (thisElt.type() != valueElt.type()) {
-                        impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
-                    }
-
-                    dassert(thisElt.fieldNameSize() == valueElt.fieldNameSize());
-                    dassert(thisElt.valuesize() == valueElt.valuesize());
-
-                    // Record a damage event for the new value data.
-                    impl.recordDamageEvent(
-                        targetBaseOffset + thisElt.fieldNameSize() + 1,
-                        sourceBaseOffset + thisElt.fieldNameSize() + 1,
-                        thisElt.valuesize());
-
-                    inPlace = true;
+                // If this is a type change, record a damage event for the new type.
+                if (thisElt.type() != valueElt.type()) {
+                    impl.recordDamageEvent(targetBaseOffset, sourceBaseOffset, 1);
                 }
+
+                dassert(thisElt.fieldNameSize() == valueElt.fieldNameSize());
+                dassert(thisElt.valuesize() == valueElt.valuesize());
+
+                // Record a damage event for the new value data.
+                impl.recordDamageEvent(
+                    targetBaseOffset + thisElt.fieldNameSize() + 1,
+                    sourceBaseOffset + thisElt.fieldNameSize() + 1,
+                    thisElt.valuesize());
+            } else {
+
+                // We couldn't do it in place, so disable future in-place updates.
+                impl.disableInPlaceUpdates();
+
             }
         }
-
-        if (!inPlace)
-            getDocument().disableInPlaceUpdates();
 
         // If we are not rootish, then wire in the new value among our relations.
         if (thisRep.parent != kInvalidRepIdx) {
@@ -2077,25 +2102,36 @@ namespace mutablebson {
             BufBuilder& buffer;
         };
 
-    } // namespace
-
-    template<typename Builder>
-    void Element::writeElement(Builder* builder, const StringData* fieldName) const {
-        // No need to verify(ok()) since we are only called from methods that have done so.
-        dassert(ok());
-
-        const Document::Impl& impl = getDocument().getImpl();
-        const ElementRep& thisRep = impl.getElementRep(_repIdx);
-
-        if (impl.hasValue(thisRep)) {
-            BSONElement element = impl.getSerializedElement(thisRep);
+        static void appendElement(BSONObjBuilder* builder,
+                                  const BSONElement& element,
+                                  const StringData* fieldName) {
             if (fieldName)
                 builder->appendAs(element, *fieldName);
             else
                 builder->append(element);
+        }
+
+        // BSONArrayBuilder should not be appending elements with a fieldName
+        static void appendElement(BSONArrayBuilder* builder,
+                                  const BSONElement& element,
+                                  const StringData* fieldName) {
+            invariant(!fieldName);
+            builder->append(element);
+        }
+
+    } // namespace
+
+    template<typename Builder>
+    void Document::Impl::writeElement(Element::RepIdx repIdx, Builder* builder,
+                                      const StringData* fieldName) const {
+
+        const ElementRep& rep = getElementRep(repIdx);
+
+        if (hasValue(rep)) {
+            appendElement(builder, getSerializedElement(rep), fieldName);
         } else {
-            const BSONType type = impl.getType(thisRep);
-            const StringData subName = fieldName ? *fieldName : impl.getFieldName(thisRep);
+            const BSONType type = getType(rep);
+            const StringData subName = fieldName ? *fieldName : getFieldName(rep);
             SubBuilder<Builder> subBuilder(builder, type, subName);
 
             // Otherwise, this is a 'dirty leaf', which is impossible.
@@ -2103,37 +2139,85 @@ namespace mutablebson {
 
             if (type == mongo::Array) {
                 BSONArrayBuilder child_builder(subBuilder.buffer);
-                writeChildren(&child_builder);
+                writeChildren(repIdx, &child_builder);
                 child_builder.doneFast();
             } else {
                 BSONObjBuilder child_builder(subBuilder.buffer);
-                writeChildren(&child_builder);
+                writeChildren(repIdx, &child_builder);
                 child_builder.doneFast();
             }
         }
     }
 
     template<typename Builder>
-    void Element::writeChildren(Builder* builder) const {
-        // No need to verify(ok()) since we are only called from methods that have done so.
-        dassert(ok());
+    void Document::Impl::writeChildren(Element::RepIdx repIdx, Builder* builder) const {
 
         // TODO: In theory, I think we can walk rightwards building a write region from all
         // serialized embedded children that share an obj id and form a contiguous memory
         // region. For arrays we would need to know something about how many elements we wrote
         // that way so that the indexes would come out right.
         //
-        // Also in theory instead of walking all the way right, we can walk right until we hit
-        // an opaque node. Then we can bulk copy the opaque region, maybe? Probably that
-        // doesn't work for arrays.
-        //
-        // However, both of the above ideas involve walking the memory twice: once two build
-        // the copy region, and another time to actually copy it. It is unclear if this is
-        // better than just walking it once with the recursive solution.
-        Element current = leftChild();
-        while (current.ok()) {
-            current.writeElement(builder);
-            current = current.rightSibling();
+        // However, that involves walking the memory twice: once to build the copy region, and
+        // another time to actually copy it. It is unclear if this is better than just walking
+        // it once with the recursive solution.
+
+        const ElementRep& rep = getElementRep(repIdx);
+
+        // OK, need to resolve left if we haven't done that yet.
+        Element::RepIdx current = rep.child.left;
+        if (current == Element::kOpaqueRepIdx)
+            current = const_cast<Impl*>(this)->resolveLeftChild(repIdx);
+
+        // We need to write the element, and then walk rightwards.
+        while (current != Element::kInvalidRepIdx) {
+            writeElement(current, builder);
+
+            // If we have an opaque region to the right, and we are not in an array, then we
+            // can bulk copy from the end of the element we just wrote to the end of our
+            // parent.
+            const ElementRep& currentRep = getElementRep(current);
+
+            if (currentRep.sibling.right == Element::kOpaqueRepIdx) {
+
+                // Obtain the current parent, so we can see if we can bulk copy the right
+                // siblings.
+                const ElementRep& parentRep = getElementRep(currentRep.parent);
+
+                // Bulk copying right only works on objects
+                if ((getType(parentRep) == mongo::Object) &&
+                    (currentRep.objIdx != kInvalidObjIdx) &&
+                    (currentRep.objIdx == parentRep.objIdx)) {
+
+                    BSONElement currentElt = getSerializedElement(currentRep);
+                    const uint32_t currentSize = currentElt.size();
+
+                    const BSONObj parentObj = (currentRep.parent == kRootRepIdx) ?
+                        getObject(parentRep.objIdx) :
+                        getSerializedElement(parentRep).Obj();
+                    const uint32_t parentSize = parentObj.objsize();
+
+                    const uint32_t currentEltOffset = getElementOffset(parentObj, currentElt);
+                    const uint32_t nextEltOffset = currentEltOffset + currentSize;
+
+                    const char* copyBegin = parentObj.objdata() + nextEltOffset;
+                    const uint32_t copyBytes = parentSize - nextEltOffset;
+
+                    // The -1 is because we don't want to copy in the terminal EOO.
+                    builder->bb().appendBuf(copyBegin, copyBytes - 1);
+
+                    // We are done with all children.
+                    break;
+                }
+
+                // We couldn't bulk copy, and our right sibling is opaque. We need to
+                // resolve. Note that the call to resolve may invalidate 'currentRep', so
+                // rather than falling through and acquiring the index by examining currentRep,
+                // update it with the return value of resolveRightSibling and restart the loop.
+                current = const_cast<Impl*>(this)->resolveRightSibling(current);
+                continue;
+            }
+
+            current = currentRep.sibling.right;
         }
     }
 
@@ -2538,27 +2622,34 @@ namespace mutablebson {
     }
 
     Element Document::makeElement(ConstElement element, const StringData* fieldName) {
+
+        Impl& impl = getImpl();
+
         if (this == &element.getDocument()) {
+
             // If the Element that we want to build from belongs to this Document, then we have
             // to first copy it to the side, and then back in, since otherwise we might be
             // attempting both read to and write from the underlying BufBuilder simultaneously,
             // which will not work.
             BSONObjBuilder builder;
-            element.writeElement(&builder, fieldName);
-            BSONObj built = builder.obj();
+            impl.writeElement(element.getIdx(), &builder, fieldName);
+            BSONObj built = builder.done();
             BSONElement newElement = built.firstElement();
             return makeElement(newElement);
+
         } else {
+
             // If the Element belongs to another document, then we can just stream it into our
             // builder. We still do need to dassert that the field name doesn't alias us
             // somehow.
-            Impl& impl = getImpl();
             if (fieldName) {
                 dassert(impl.doesNotAlias(*fieldName));
             }
             BSONObjBuilder& builder = impl.leafBuilder();
             const int leafRef = builder.len();
-            element.writeElement(&builder, fieldName);
+
+            const Impl& oImpl = element.getDocument().getImpl();
+            oImpl.writeElement(element.getIdx(), &builder, fieldName);
             return Element(this, impl.insertLeafElement(leafRef));
         }
     }

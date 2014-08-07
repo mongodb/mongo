@@ -33,8 +33,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/repl/write_concern.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/d_logic.h"
 
 namespace mongo {
@@ -54,24 +55,29 @@ namespace mongo {
      * 5. Delete range.
      * 6. Wait until the majority of the secondaries catch up.
      */
-    bool RangeDeleterDBEnv::deleteRange(const StringData& ns,
-                                        const BSONObj& inclusiveLower,
-                                        const BSONObj& exclusiveUpper,
-                                        const BSONObj& keyPattern,
-                                        bool secondaryThrottle,
+    bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
+                                        const RangeDeleteEntry& taskDetails,
+                                        long long int* deletedDocs,
                                         std::string* errMsg) {
+        const string ns(taskDetails.ns);
+        const BSONObj inclusiveLower(taskDetails.min);
+        const BSONObj exclusiveUpper(taskDetails.max);
+        const BSONObj keyPattern(taskDetails.shardKeyPattern);
+        const WriteConcernOptions writeConcern(taskDetails.writeConcern);
+
         const bool initiallyHaveClient = haveClient();
 
         if (!initiallyHaveClient) {
             Client::initThread("RangeDeleter");
         }
 
+        *deletedDocs = 0;
         ShardForceVersionOkModeBlock forceVersion;
         {
-            Helpers::RemoveSaver removeSaver("moveChunk", ns.toString(), "post-cleanup");
+            Helpers::RemoveSaver removeSaver("moveChunk", ns, "post-cleanup");
 
             // log the opId so the user can use it to cancel the delete using killOp.
-            unsigned int opId = cc().curop()->opNum();
+            unsigned int opId = txn->getCurOp()->opNum();
             log() << "Deleter starting delete for: " << ns
                   << " from " << inclusiveLower
                   << " -> " << exclusiveUpper
@@ -79,20 +85,21 @@ namespace mongo {
                   << endl;
 
             try {
-                long long numDeleted =
-                        Helpers::removeRange(KeyRange(ns.toString(),
+                *deletedDocs =
+                        Helpers::removeRange(txn,
+                                             KeyRange(ns,
                                                       inclusiveLower,
                                                       exclusiveUpper,
                                                       keyPattern),
                                              false, /*maxInclusive*/
-                                             replSet? secondaryThrottle : false,
+                                             writeConcern,
                                              serverGlobalParams.moveParanoia ? &removeSaver : NULL,
                                              true, /*fromMigrate*/
                                              true); /*onlyRemoveOrphans*/
 
-                if (numDeleted < 0) {
-                    warning() << "collection or index dropped "
-                              << "before data could be cleaned" << endl;
+                if (*deletedDocs < 0) {
+                    *errMsg = "collection or index dropped before data could be cleaned";
+                    warning() << *errMsg << endl;
 
                     if (!initiallyHaveClient) {
                         cc().shutdown();
@@ -101,7 +108,7 @@ namespace mongo {
                     return false;
                 }
 
-                log() << "rangeDeleter deleted " << numDeleted
+                log() << "rangeDeleter deleted " << *deletedDocs
                       << " documents for " << ns
                       << " from " << inclusiveLower
                       << " -> " << exclusiveUpper
@@ -122,31 +129,6 @@ namespace mongo {
             }
         }
 
-        if (replSet) {
-            Timer elapsedTime;
-            ReplTime lastOpApplied = cc().getLastOp().asDate();
-            while (!opReplicatedEnough(lastOpApplied,
-                                       BSON("w" << "majority").firstElement())) {
-                if (elapsedTime.seconds() >= 3600) {
-                    *errMsg = str::stream() << "rangeDeleter timed out after "
-                                            << elapsedTime.seconds() << " seconds while waiting"
-                                            << " for deletions to be replicated to majority nodes";
-
-                    if (!initiallyHaveClient) {
-                        cc().shutdown();
-                    }
-
-                    return false;
-                }
-
-                sleepsecs(1);
-            }
-
-            LOG(elapsedTime.seconds() < 30 ? 1 : 0)
-                << "rangeDeleter took " << elapsedTime.seconds() << " seconds "
-                << " waiting for deletes to be replicated to majority nodes" << endl;
-        }
-
         if (!initiallyHaveClient) {
             cc().shutdown();
         }
@@ -154,10 +136,11 @@ namespace mongo {
         return true;
     }
 
-    void RangeDeleterDBEnv::getCursorIds(const StringData& ns,
+    void RangeDeleterDBEnv::getCursorIds(OperationContext* txn,
+                                         const StringData& ns,
                                          std::set<CursorId>* openCursors) {
-        Client::ReadContext ctx(ns.toString());
-        Collection* collection = ctx.ctx().db()->getCollection( ns );
+        Client::ReadContext ctx(txn, ns.toString());
+        Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
         if ( !collection )
             return;
 

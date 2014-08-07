@@ -2,25 +2,39 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/net/listen.h"
 
+#include "mongo/db/server_options.h"
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/message_port.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/scopeguard.h"
@@ -55,6 +69,7 @@
 
 namespace mongo {
 
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
 
     // ----- Listener -------
 
@@ -121,7 +136,10 @@ namespace mongo {
         _mine = ipToAddrs(_ip.c_str(), _port, false);
 #endif
 
-        for (vector<SockAddr>::const_iterator it=_mine.begin(), end=_mine.end(); it != end; ++it) {
+        for (std::vector<SockAddr>::const_iterator it=_mine.begin(), end=_mine.end();
+             it != end;
+             ++it) {
+
             const SockAddr& me = *it;
 
             SOCKET sock = ::socket(me.getType(), SOCK_STREAM, 0);
@@ -150,7 +168,7 @@ namespace mongo {
             {
                 const int one = 1;
                 if ( setsockopt( sock , SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0 )
-                    out() << "Failed to set socket opt, SO_REUSEADDR" << endl;
+                    log() << "Failed to set socket opt, SO_REUSEADDR" << endl;
             }
 #endif
 
@@ -164,7 +182,7 @@ namespace mongo {
 
 #if !defined(_WIN32)
             if (me.getType() == AF_UNIX) {
-                if (chmod(me.getAddr().c_str(), 0777) == -1) {
+                if (chmod(me.getAddr().c_str(), serverGlobalParams.unixSocketPermissions) == -1) {
                     error() << "couldn't chmod socket file " << me << errnoWithDescription() << endl;
                 }
                 ListeningSockets::get()->addPath( me.getAddr() );
@@ -386,7 +404,14 @@ namespace mongo {
                 int status = WSAEventSelect(_socks[count], events[count], FD_ACCEPT | FD_CLOSE);
                 if (status == SOCKET_ERROR) {
                     const int mongo_errno = WSAGetLastError();
-                    error() << "Windows WSAEventSelect returned " 
+
+                    // During shutdown, we may fail to listen on the socket if it has already
+                    // been closed
+                    if (inShutdown()) {
+                        return;
+                    }
+
+                    error() << "Windows WSAEventSelect returned "
                         << errnoWithDescription(mongo_errno) << endl;
                     fassertFailed(16727);
                 }

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -33,6 +33,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
@@ -45,8 +46,8 @@ namespace QueryStageTests {
 
     class IndexScanBase {
     public:
-        IndexScanBase() {
-            Client::WriteContext ctx(ns());
+        IndexScanBase() : _client(&_txn) {
+            Client::WriteContext ctx(&_txn, ns());
 
             for (int i = 0; i < numObj(); ++i) {
                 BSONObjBuilder bob;
@@ -58,30 +59,35 @@ namespace QueryStageTests {
 
             addIndex(BSON("foo" << 1));
             addIndex(BSON("foo" << 1 << "baz" << 1));
+            ctx.commit();
         }
 
         virtual ~IndexScanBase() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
+            ctx.commit();
         }
 
         void addIndex(const BSONObj& obj) {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             _client.ensureIndex(ns(), obj);
+            ctx.commit();
         }
 
         int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
-            Client::ReadContext ctx(ns());
+            Client::ReadContext ctx(&_txn, ns());
 
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
             verify(swme.isOK());
             auto_ptr<MatchExpression> filterExpr(swme.getValue());
 
             WorkingSet* ws = new WorkingSet();
-            PlanExecutor runner(ws, new IndexScan(params, ws, filterExpr.get()));
+            PlanExecutor runner(ws, 
+                                new IndexScan(&_txn, params, ws, filterExpr.get()), 
+                                ctx.ctx().db()->getCollection(&_txn, ns()));
 
             int count = 0;
-            for (DiskLoc dl; Runner::RUNNER_ADVANCED == runner.getNext(NULL, &dl); ) {
+            for (DiskLoc dl; PlanExecutor::ADVANCED == runner.getNext(NULL, &dl); ) {
                 ++count;
             }
 
@@ -89,29 +95,31 @@ namespace QueryStageTests {
         }
 
         void makeGeoData() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             for (int i = 0; i < numObj(); ++i) {
                 double lat = double(rand()) / RAND_MAX;
                 double lng = double(rand()) / RAND_MAX;
                 _client.insert(ns(), BSON("geo" << BSON_ARRAY(lng << lat)));
             }
+            ctx.commit();
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj) {
-            Client::ReadContext ctx(ns());
-            Collection* collection = ctx.ctx().db()->getCollection( ns() );
+            Client::ReadContext ctx(&_txn, ns());
+            Collection* collection = ctx.ctx().db()->getCollection( &_txn, ns() );
             return collection->getIndexCatalog()->findIndexByKeyPattern( obj );
         }
 
         static int numObj() { return 50; }
         static const char* ns() { return "unittests.IndexScan"; }
 
-    private:
-        static DBDirectClient _client;
-    };
+    protected:
+        OperationContextImpl _txn;
 
-    DBDirectClient IndexScanBase::_client;
+    private:
+        DBDirectClient _client;
+    };
 
     class QueryStageIXScanBasic : public IndexScanBase {
     public:

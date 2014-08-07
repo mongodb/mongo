@@ -3,11 +3,16 @@
 var t = db.server9444;
 t.drop();
 
-var memoryLimitMB = 100;
+var sharded = (typeof(RUNNING_IN_SHARDED_AGG_TEST) != 'undefined'); // see end of testshard1.js
+if (sharded) {
+    db.adminCommand( { shardcollection : t.getFullName(), key : { "_id" : 'hashed' } } );
+}
+
+var memoryLimitMB = sharded ? 200 : 100;
 
 function loadData() {
     var bigStr = Array(1024*1024 + 1).toString(); // 1MB of ','
-    for (var i = 0; i < 101; i++)
+    for (var i = 0; i < memoryLimitMB + 1; i++)
         t.insert({_id: i, bigStr: i + bigStr, random: Math.random()});
 
     assert.gt(t.stats().size, memoryLimitMB * 1024*1024);
@@ -54,5 +59,19 @@ test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {_id:-1}}], 
 test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {random:1}}], groupCode);
 test([{$sort: {random:1}}, {$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}], sortCode);
 
+var origDB = db;
+if (sharded) {
+    // Stop balancer first before dropping so there will be no contention on the ns lock.
+    // It's alright to modify the global db variable since sharding tests never run in parallel.
+    db = db.getSiblingDB('config');
+    sh.stopBalancer();
+}
+
 // don't leave large collection laying around
 t.drop();
+
+if (sharded) {
+    sh.startBalancer();
+    db = origDB;
+}
+

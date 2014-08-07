@@ -1,7 +1,7 @@
 // fts_command_mongod.h
 
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2012-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,23 +28,22 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include <string>
 
+#include "mongo/db/client.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/fts/fts_command.h"
 #include "mongo/db/fts/fts_util.h"
-#include "mongo/db/pdfile.h"
-#include "mongo/db/query/get_runner.h"
-#include "mongo/db/query/type_explain.h"
+#include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
 
     namespace fts {
-
-        Command::LockType FTSCommand::locktype() const {
-            return READ;
-        }
 
         /*
          * Runs the command object cmdobj on the db with name dbname and puts result in result.
@@ -56,7 +55,8 @@ namespace mongo {
          * @param fromRepl
          * @return true if successful, false otherwise
          */
-        bool FTSCommand::_run(const string& dbname,
+        bool FTSCommand::_run(OperationContext* txn,
+                              const string& dbname,
                               BSONObj& cmdObj,
                               int cmdOptions,
                               const string& ns,
@@ -94,19 +94,33 @@ namespace mongo {
             projBob.appendElements(sortSpec);
             BSONObj projObj = projBob.obj();
 
+            Client::ReadContext ctx(txn, ns);
+
             CanonicalQuery* cq;
-            if (!CanonicalQuery::canonicalize(ns, queryObj, sortSpec, projObj, 0, limit, BSONObj(), &cq).isOK()) {
-                errmsg = "Can't parse filter / create query";
+            Status canonicalizeStatus = 
+                    CanonicalQuery::canonicalize(ns, 
+                                                 queryObj,
+                                                 sortSpec,
+                                                 projObj, 
+                                                 0,
+                                                 limit,
+                                                 BSONObj(),
+                                                 &cq,
+                                                 WhereCallbackReal(txn, StringData(dbname)));
+            if (!canonicalizeStatus.isOK()) {
+                errmsg = canonicalizeStatus.reason();
                 return false;
             }
 
-            Runner* rawRunner;
-            if (!getRunner(cq, &rawRunner, 0).isOK()) {
-                errmsg = "can't get query runner";
+            PlanExecutor* rawExec;
+            Status getExecStatus = getExecutor(
+                txn, ctx.ctx().db()->getCollection(txn, ns), cq, &rawExec);
+            if (!getExecStatus.isOK()) {
+                errmsg = getExecStatus.reason();
                 return false;
             }
 
-            auto_ptr<Runner> runner(rawRunner);
+            auto_ptr<PlanExecutor> exec(rawExec);
 
             BSONArrayBuilder resultBuilder(result.subarrayStart("results"));
 
@@ -116,7 +130,7 @@ namespace mongo {
             int numReturned = 0;
 
             BSONObj obj;
-            while (Runner::RUNNER_ADVANCED == runner->getNext(&obj, NULL)) {
+            while (PlanExecutor::ADVANCED == exec->getNext(&obj, NULL)) {
                 if ((resultSize + obj.objsize()) >= BSONObjMaxUserSize) {
                     break;
                 }
@@ -145,13 +159,10 @@ namespace mongo {
             BSONObjBuilder stats(result.subobjStart("stats"));
 
             // Fill in nscanned from the explain.
-            TypeExplain* bareExplain;
-            Status res = runner->getInfo(&bareExplain, NULL);
-            if (res.isOK()) {
-                auto_ptr<TypeExplain> explain(bareExplain);
-                stats.append("nscanned", explain->getNScanned());
-                stats.append("nscannedObjects", explain->getNScannedObjects());
-            }
+            PlanSummaryStats summary;
+            Explain::getSummaryStats(exec.get(), &summary);
+            stats.appendNumber("nscanned", summary.totalKeysExamined);
+            stats.appendNumber("nscannedObjects", summary.totalDocsExamined);
 
             stats.appendNumber( "n" , numReturned );
             stats.append( "timeMicros", (int)comm.micros() );

@@ -1,5 +1,5 @@
 /**
- * Integration test for read prefrence and tagging. The more comprehensive unit test
+ * Integration test for read preference and tagging. The more comprehensive unit test
  * can be found in dbtests/replica_set_monitor_test.cpp.
  */
 
@@ -80,11 +80,12 @@ var doTest = function(useDollarQuerySyntax) {
     var coll = conn.getDB( 'test' ).user;
 
     assert.soon(function() {
-        coll.insert({ x: 1 });
-        var err = coll.getDB().getLastError(NODES);
-        if (err == null) {
+        var res = coll.insert({ x: 1 }, { writeConcern: { w: NODES }});
+        if (!res.hasWriteError()) {
             return true;
         }
+
+        var err = res.getWriteError().errmsg;
         // Transient transport errors may be expected b/c of the replSetReconfig
         if (err.indexOf("transport error") == -1) {
             throw err;

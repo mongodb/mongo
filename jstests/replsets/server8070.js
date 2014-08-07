@@ -30,7 +30,10 @@ replSet.initiate(
             {_id: 0, host: getHostName()+":"+replSet.ports[0]},
             {_id: 1, host: getHostName()+":"+replSet.ports[1], priority: 0},
             {_id: 2, host: getHostName()+":"+replSet.ports[2], priority: 0}
-        ]
+        ],
+        settings: {
+            chainingAllowed: false
+        }
     }
 );
 

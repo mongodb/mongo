@@ -20,10 +20,7 @@ var checkValidState = function(i) {
 var safeInsert = function() {
     master = rs.getMaster();
     master.getDB("admin").auth("foo", "bar");
-    master.getDB("foo").bar.insert({x:1});
-    var insertWorked = master.getDB("foo").runCommand({getlasterror:1});
-    printjson(insertWorked);
-    assert.eq(insertWorked.ok, 1);
+    assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 }
 
 print("authing");
@@ -44,12 +41,13 @@ assert.soon(function() {
 print("make common point");
 
 safeInsert();
-rs.awaitReplication();
+authutil.asCluster(rs.nodes, 'jstests/libs/key1', function() { rs.awaitReplication(); });
 
 print("write stuff to 0&2")
 rs.stop(1);
 
 master = rs.getMaster();
+master.getDB("admin").auth("foo", "bar");
 master.getDB("foo").bar.drop();
 print("last op: "+tojson(master.getDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next()));
 

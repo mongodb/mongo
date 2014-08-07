@@ -42,8 +42,10 @@ namespace mongo {
      * Returns a Status indicating how it's invalid otherwise.
      */
     // static
-    Status ParsedProjection::make(const BSONObj& spec, const MatchExpression* const query,
-                                  ParsedProjection** out) {
+    Status ParsedProjection::make(const BSONObj& spec, 
+                                  const MatchExpression* const query,
+                                  ParsedProjection** out,
+                                  const MatchExpressionParser::WhereCallback& whereCallback) {
         // Are we including or excluding fields?  Values:
         // -1 when we haven't initialized it.
         // 1 when we're including
@@ -126,8 +128,9 @@ namespace mongo {
                     BSONObj elemMatchObj = e.wrap();
                     verify(elemMatchObj.isOwned());
 
-                    // XXX this is wasteful and slow.
-                    StatusWithMatchExpression swme = MatchExpressionParser::parse(elemMatchObj);
+                    // TODO: Is there a faster way of validating the elemMatchObj?
+                    StatusWithMatchExpression swme = MatchExpressionParser::parse(elemMatchObj,
+                                                                                  whereCallback);
                     if (!swme.isOK()) {
                         return swme.getStatus();
                     }
@@ -193,7 +196,8 @@ namespace mongo {
                 }
             }
 
-            if (mongoutils::str::contains(e.fieldName(), ".$")) {
+
+            if (_isPositionalOperator(e.fieldName())) {
                 // Validate the positional op.
                 if (!e.trueValue()) {
                     return Status(ErrorCodes::BadValue,
@@ -236,13 +240,7 @@ namespace mongo {
         // Save the raw spec.  It should be owned by the LiteParsedQuery.
         verify(spec.isOwned());
         pp->_source = spec;
-
-        // returnKey clobbers everything.
-        if (hasIndexKeyProjection) {
-            pp->_requiresDocument = false;
-            *out = pp.release();
-            return Status::OK();
-        }
+        pp->_returnKey = hasIndexKeyProjection;
 
         // Dotted fields aren't covered, non-simple require match details, and as for include, "if
         // we default to including then we can't use an index because we don't know what we're
@@ -265,14 +263,32 @@ namespace mongo {
             BSONObjIterator srcIt(spec);
             while (srcIt.more()) {
                 BSONElement elt = srcIt.next();
+                // We've already handled the _id field before entering this loop.
+                if (includeID && mongoutils::str::equals(elt.fieldName(), "_id")) {
+                    continue;
+                }
                 if (elt.trueValue()) {
                     pp->_requiredFields.push_back(elt.fieldName());
                 }
             }
         }
 
+        // returnKey clobbers everything.
+        if (hasIndexKeyProjection) {
+            pp->_requiresDocument = false;
+        }
+
         *out = pp.release();
         return Status::OK();
+    }
+
+    // static
+    bool ParsedProjection::_isPositionalOperator(const char* fieldName) {
+        return mongoutils::str::contains(fieldName, ".$") &&
+               !mongoutils::str::contains(fieldName, ".$ref") &&
+               !mongoutils::str::contains(fieldName, ".$id") &&
+               !mongoutils::str::contains(fieldName, ".$db");
+
     }
 
     // static

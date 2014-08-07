@@ -4,20 +4,32 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/db/commands.h"
 
@@ -90,7 +102,6 @@ namespace mongo {
         return ResourcePattern::forExactNamespace(NamespaceString(ns));
     }
 
-
     void Command::htmlHelp(stringstream& ss) const {
         string helpStr;
         {
@@ -105,16 +116,16 @@ namespace mongo {
         if( web ) ss << "</a>";
         ss << "</td>\n";
         ss << "<td>";
-        int l = locktype();
-        //if( l == NONE ) ss << "N ";
-        if( l == READ ) ss << "R ";
-        else if( l == WRITE ) ss << "W ";
+        if (isWriteCommandForConfigServer()) { 
+            ss << "W "; 
+        }
+        else { 
+            ss << "R "; 
+        }
         if( slaveOk() )
             ss << "S ";
         if( adminOnly() )
             ss << "A";
-        if( lockGlobally() ) 
-            ss << " lockGlobally ";
         ss << "</td>";
         ss << "<td>";
         if( helpStr != "no help defined" ) {
@@ -185,7 +196,8 @@ namespace mongo {
         help << "no help defined";
     }
 
-    std::vector<BSONObj> Command::stopIndexBuilds(const std::string& dbname, 
+    std::vector<BSONObj> Command::stopIndexBuilds(OperationContext* opCtx,
+                                                  Database* db,
                                                   const BSONObj& cmdObj) {
         return std::vector<BSONObj>();
     }
@@ -195,13 +207,6 @@ namespace mongo {
         if ( i == _commands->end() )
             return 0;
         return i->second;
-    }
-
-    Command::LockType Command::locktype( const string& name ) {
-        Command * c = findCommand( name );
-        if ( ! c )
-            return WRITE;
-        return c->locktype();
     }
 
     bool Command::appendCommandStatus(BSONObjBuilder& result, const Status& status) {
@@ -266,7 +271,7 @@ namespace mongo {
     void Command::logIfSlow( const Timer& timer, const string& msg ) {
         int ms = timer.millis();
         if (ms > serverGlobalParams.slowMS) {
-            out() << msg << " took " << ms << " ms." << endl;
+            log() << msg << " took " << ms << " ms." << endl;
         }
     }
 
@@ -328,12 +333,14 @@ namespace mongo {
 namespace mongo {
 
     extern DBConnectionPool pool;
+    // This is mainly used by the internal writes using write commands.
+    extern DBConnectionPool shardConnectionPool;
 
     class PoolFlushCmd : public Command {
     public:
         PoolFlushCmd() : Command( "connPoolSync" , false , "connpoolsync" ) {}
         virtual void help( stringstream &help ) const { help<<"internal"; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -342,7 +349,8 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
-        virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
+        virtual bool run(OperationContext* txn, const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
+            shardConnectionPool.flush();
             pool.flush();
             return true;
         }
@@ -356,7 +364,7 @@ namespace mongo {
     public:
         PoolStats() : Command( "connPoolStats" ) {}
         virtual void help( stringstream &help ) const { help<<"stats about connection pool"; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -364,7 +372,7 @@ namespace mongo {
             actions.addAction(ActionType::connPoolStats);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
+        virtual bool run(OperationContext* txn, const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
             pool.appendInfo( result );
             result.append( "numDBClientConnection" , DBClientConnection::getNumConnections() );
             result.append( "numAScopedConnection" , AScopedConnection::getNumConnections() );

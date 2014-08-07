@@ -39,6 +39,18 @@
 
 namespace mongo {
 
+    // An enum describing the version of an S2 index.
+    enum S2IndexVersion {
+        // The first version of the S2 index, introduced in MongoDB 2.4.0.  Compatible with MongoDB
+        // 2.4.0 and later.  Supports the following GeoJSON objects: Point, LineString, Polygon.
+        S2_INDEX_VERSION_1 = 1,
+
+        // The current version of the S2 index, introduced in MongoDB 2.6.0.  Compatible with
+        // MongoDB 2.6.0 and later.  Introduced support for the following GeoJSON objects:
+        // MultiPoint, MultiLineString, MultiPolygon, GeometryCollection.
+        S2_INDEX_VERSION_2 = 2
+    };
+
     struct S2IndexingParams {
         // Since we take the cartesian product when we generate keys for an insert,
         // we need a cap.
@@ -52,15 +64,18 @@ namespace mongo {
         // And, what's the coarsest?  When we search in larger coverings we know we
         // can stop here -- we index nothing coarser than this.
         int coarsestIndexedLevel;
+        // Version of this index (specific to the index type).
+        S2IndexVersion indexVersion;
 
         double radius;
 
-        string toString() const {
-            stringstream ss;
-            ss << "maxKeysPerInsert: " << maxKeysPerInsert << endl;
-            ss << "maxCellsInCovering: " << maxCellsInCovering << endl;
-            ss << "finestIndexedLevel: " << finestIndexedLevel << endl;
-            ss << "coarsestIndexedLevel: " << coarsestIndexedLevel << endl;
+        std::string toString() const {
+            std::stringstream ss;
+            ss << "maxKeysPerInsert: " << maxKeysPerInsert << std::endl;
+            ss << "maxCellsInCovering: " << maxCellsInCovering << std::endl;
+            ss << "finestIndexedLevel: " << finestIndexedLevel << std::endl;
+            ss << "coarsestIndexedLevel: " << coarsestIndexedLevel << std::endl;
+            ss << "indexVersion: " << indexVersion << std::endl;
             return ss.str();
         }
 
@@ -76,12 +91,9 @@ namespace mongo {
     public:
         // Given a coverer, region, and field name, generate a BSONObj that we can pass to a
         // FieldRangeSet so that we only examine the keys that the provided region may intersect.
-        static BSONObj coverAsBSON(const vector<S2CellId> &cover, const string& field,
+        static BSONObj coverAsBSON(const std::vector<S2CellId> &cover, const std::string& field,
                                    const int coarsestIndexedLevel);
         static void setCoverLimitsBasedOnArea(double area, S2RegionCoverer *coverer, int coarsestIndexedLevel);
-        static bool getKeysForObject(const BSONObj& obj, const S2IndexingParams& params,
-                                     vector<string>* out);
-        static bool distanceBetween(const S2Point& us, const BSONObj& them, double *out);
     };
 
 }  // namespace mongo

@@ -1,45 +1,38 @@
 /*    Copyright 2013 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/client/auth_helpers.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/util/md5.hpp"
 
 namespace mongo {
 namespace auth {
 
     const std::string schemaVersionServerParameter = "authSchemaVersion";
-
-    std::string createPasswordDigest(const StringData& username,
-                                     const StringData& clearTextPassword) {
-        md5digest d;
-        {
-            md5_state_t st;
-            md5_init(&st);
-            md5_append(&st, (const md5_byte_t *) username.rawData(), username.size());
-            md5_append(&st, (const md5_byte_t *) ":mongo:", 7 );
-            md5_append(&st,
-                       (const md5_byte_t *) clearTextPassword.rawData(),
-                       clearTextPassword.size());
-            md5_finish(&st, d);
-        }
-        return digestToString( d );
-    }
 
     Status getRemoteStoredAuthorizationVersion(DBClientBase* conn, int* outVersion) {
         try {
@@ -70,105 +63,6 @@ namespace auth {
         } catch (const DBException& e) {
             return e.toStatus();
         }
-    }
-
-    void getUpdateToUpgradeUser(const StringData& sourceDB,
-                                const BSONObj& oldUserDoc,
-                                BSONObj* query,
-                                BSONObj* update) {
-        std::string oldUserSource;
-        uassertStatusOK(bsonExtractStringFieldWithDefault(
-                                oldUserDoc,
-                                "userSource",
-                                sourceDB,
-                                &oldUserSource));
-
-        const std::string oldUserName = oldUserDoc["user"].String();
-        *query = BSON("_id" << oldUserSource + "." + oldUserName);
-
-        BSONObjBuilder updateBuilder;
-
-        {
-            BSONObjBuilder toSetBuilder(updateBuilder.subobjStart("$set"));
-            toSetBuilder << "user" << oldUserName << "db" << oldUserSource;
-            BSONElement pwdElement = oldUserDoc["pwd"];
-            if (!pwdElement.eoo()) {
-                toSetBuilder << "credentials" << BSON("MONGODB-CR" << pwdElement.String());
-            }
-            else if (oldUserSource == "$external") {
-                toSetBuilder << "credentials" << BSON("external" << true);
-            }
-        }
-        {
-            BSONObjBuilder pushAllBuilder(updateBuilder.subobjStart("$pushAll"));
-            BSONArrayBuilder rolesBuilder(pushAllBuilder.subarrayStart("roles"));
-
-            const bool readOnly = oldUserDoc["readOnly"].trueValue();
-            const BSONElement rolesElement = oldUserDoc["roles"];
-            if (readOnly) {
-                // Handles the cases where there is a truthy readOnly field, which is a 2.2-style
-                // read-only user.
-                if (sourceDB == "admin") {
-                    rolesBuilder << BSON("role" << "readAnyDatabase" << "db" << "admin");
-                }
-                else {
-                    rolesBuilder << BSON("role" << "read" << "db" << sourceDB);
-                }
-            }
-            else if (rolesElement.eoo()) {
-                // Handles the cases where the readOnly field is absent or falsey, but the
-                // user is known to be 2.2-style because it lacks a roles array.
-                if (sourceDB == "admin") {
-                    rolesBuilder << BSON("role" << "root" << "db" << "admin");
-                }
-                else {
-                    rolesBuilder << BSON("role" << "dbOwner" << "db" << sourceDB);
-                }
-            }
-            else {
-                // Handles 2.4-style user documents, with roles arrays and (optionally, in admin db)
-                // otherDBRoles objects.
-                uassert(17252,
-                        "roles field in v2.4 user documents must be an array",
-                        rolesElement.type() == Array);
-                for (BSONObjIterator oldRoles(rolesElement.Obj());
-                     oldRoles.more();
-                     oldRoles.next()) {
-
-                    BSONElement roleElement = *oldRoles;
-                    rolesBuilder << BSON("role" << roleElement.String() << "db" << sourceDB);
-                }
-
-                BSONElement otherDBRolesElement = oldUserDoc["otherDBRoles"];
-                if (sourceDB == "admin" && !otherDBRolesElement.eoo()) {
-                    uassert(17253,
-                            "otherDBRoles field in v2.4 user documents must be an object.",
-                            otherDBRolesElement.type() == Object);
-
-                    for (BSONObjIterator otherDBs(otherDBRolesElement.Obj());
-                         otherDBs.more();
-                         otherDBs.next()) {
-
-                        BSONElement otherDBRoles = *otherDBs;
-                        if (otherDBRoles.fieldNameStringData() == "local")
-                            continue;
-                        uassert(17254,
-                                "Member fields of otherDBRoles objects must be arrays.",
-                                otherDBRoles.type() == Array);
-                        for (BSONObjIterator oldRoles(otherDBRoles.Obj());
-                             oldRoles.more();
-                             oldRoles.next()) {
-
-                            BSONElement roleElement = *oldRoles;
-                            rolesBuilder << BSON("role" << roleElement.String() <<
-                                                 "db" << otherDBRoles.fieldNameStringData());
-                        }
-                    }
-                }
-            }
-        }
-
-        *update = updateBuilder.obj();
     }
 }  // namespace auth
 }  // namespace mongo

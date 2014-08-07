@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -30,8 +30,8 @@
 
 #include <vector>
 
-#include "mongo/db/geo/core.h"
 #include "mongo/db/geo/hash.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -52,15 +52,12 @@ namespace mongo {
      * 2d indices don't handle wrapping so we can't use them for queries that wrap.
      */
     static bool twoDWontWrap(const Circle& circle, const IndexEntry& index) {
-        // XXX: where does this really belong
-        GeoHashConverter::Parameters params;
-        params.bits = static_cast<unsigned>(fieldWithDefault(index.infoObj, "bits", 26));
-        params.max = fieldWithDefault(index.infoObj, "max", 180.0);
-        params.min = fieldWithDefault(index.infoObj, "min", -180.0);
-        double numBuckets = (1024 * 1024 * 1024 * 4.0);
-        params.scaling = numBuckets / (params.max - params.min);
 
-        GeoHashConverter conv(params);
+        GeoHashConverter::Parameters hashParams;
+        Status paramStatus = GeoHashConverter::parseParameters(index.infoObj, &hashParams);
+        verify(paramStatus.isOK()); // we validated the params on index creation
+
+        GeoHashConverter conv(hashParams);
 
         // FYI: old code used flat not spherical error.
         double yscandist = rad2deg(circle.radius) + conv.getErrorSphere();
@@ -76,9 +73,9 @@ namespace mongo {
     void QueryPlannerIXSelect::getFields(MatchExpression* node,
                                          string prefix,
                                          unordered_set<string>* out) {
-        // Do not traverse tree beyond negation node
+        // Do not traverse tree beyond a NOR negation node
         MatchExpression::MatchType exprtype = node->matchType();
-        if (exprtype == MatchExpression::NOT || exprtype == MatchExpression::NOR) {
+        if (exprtype == MatchExpression::NOR) {
             return;
         }
 
@@ -126,32 +123,118 @@ namespace mongo {
     bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
                                           const IndexEntry& index,
                                           MatchExpression* node) {
-        // XXX: CatalogHack::getAccessMethodName: do we have to worry about this?  when?
-        string ixtype;
-        if (String != elt.type()) {
-            ixtype = "";
+        // Historically one could create indices with any particular value for the index spec,
+        // including values that now indicate a special index.  As such we have to make sure the
+        // index type wasn't overridden before we pay attention to the string in the index key
+        // pattern element.
+        //
+        // e.g. long ago we could have created an index {a: "2dsphere"} and it would
+        // be treated as a btree index by an ancient version of MongoDB.  To try to run
+        // 2dsphere queries over it would be folly.
+        string indexedFieldType;
+        if (String != elt.type() || (INDEX_BTREE == index.type)) {
+            indexedFieldType = "";
         }
         else {
-            ixtype = elt.String();
+            indexedFieldType = elt.String();
         }
 
         // We know elt.fieldname() == node->path().
         MatchExpression::MatchType exprtype = node->matchType();
 
-        // TODO: use indexnames
-        if ("" == ixtype) {
-            if (index.sparse && exprtype == MatchExpression::EQ) {
-                // Can't check for null w/a sparse index.
+        if (indexedFieldType.empty()) {
+            // Can't check for null w/a sparse index.
+            if (exprtype == MatchExpression::EQ && index.sparse) {
                 const EqualityMatchExpression* expr
                     = static_cast<const EqualityMatchExpression*>(node);
-                return !expr->getData().isNull();
+                if (expr->getData().isNull()) {
+                    return false;
+                }
             }
-            return exprtype != MatchExpression::GEO && exprtype != MatchExpression::GEO_NEAR;
+
+            // We can't use a btree-indexed field for geo expressions.
+            if (exprtype == MatchExpression::GEO || exprtype == MatchExpression::GEO_NEAR) {
+                return false;
+            }
+
+            // There are restrictions on when we can use the index if
+            // the expression is a NOT.
+            if (exprtype == MatchExpression::NOT) {
+                // Don't allow indexed NOT on special index types such as geo or text indices.
+                if (INDEX_BTREE != index.type) {
+                    return false;
+                }
+
+                // Prevent negated preds from using sparse indices. Doing so would cause us to
+                // miss documents which do not contain the indexed fields.
+                if (index.sparse) {
+                    return false;
+                }
+
+                // Can't index negations of MOD, REGEX, TYPE_OPERATOR, or ELEM_MATCH_VALUE.
+                MatchExpression::MatchType childtype = node->getChild(0)->matchType();
+                if (MatchExpression::REGEX == childtype ||
+                    MatchExpression::MOD == childtype ||
+                    MatchExpression::TYPE_OPERATOR == childtype ||
+                    MatchExpression::ELEM_MATCH_VALUE == childtype) {
+                    return false;
+                }
+
+                // If it's a negated $in, it can't have any REGEX's inside.
+                if (MatchExpression::MATCH_IN == childtype) {
+                    InMatchExpression* ime = static_cast<InMatchExpression*>(node->getChild(0));
+                    if (ime->getData().numRegexes() != 0) {
+                        return false;
+                    }
+                }
+            }
+
+            // We can only index EQ using text indices.  This is an artificial limitation imposed by
+            // FTSSpec::getIndexPrefix() which will fail if there is not an EQ predicate on each
+            // index prefix field of the text index.
+            //
+            // Example for key pattern {a: 1, b: "text"}:
+            // - Allowed: node = {a: 7}
+            // - Not allowed: node = {a: {$gt: 7}}
+
+            if (INDEX_TEXT != index.type) {
+                return true;
+            }
+
+            // If we're here we know it's a text index.  Equalities are OK anywhere in a text index.
+            if (MatchExpression::EQ == exprtype) {
+                return true;
+            }
+
+            // Not-equalities can only go in a suffix field of an index kp.  We look through the key
+            // pattern to see if the field we're looking at now appears as a prefix.  If so, we
+            // can't use this index for it.
+            BSONObjIterator specIt(index.keyPattern);
+            while (specIt.more()) {
+                BSONElement elt = specIt.next();
+                // We hit the dividing mark between prefix and suffix, so whatever field we're
+                // looking at is a suffix, since it appears *after* the dividing mark between the
+                // two.  As such, we can use the index.
+                if (String == elt.type()) {
+                    return true;
+                }
+
+                // If we're here, we're still looking at prefix elements.  We know that exprtype
+                // isn't EQ so we can't use this index.
+                if (node->path() == elt.fieldNameStringData()) {
+                    return false;
+                }
+            }
+
+            // NOTE: This shouldn't be reached.  Text index implies there is a separator implies we
+            // will always hit the 'return true' above.
+            invariant(0);
+            return true;
         }
-        else if ("hashed" == ixtype) {
+        else if (IndexNames::HASHED == indexedFieldType) {
             return exprtype == MatchExpression::MATCH_IN || exprtype == MatchExpression::EQ;
         }
-        else if ("2dsphere" == ixtype) {
+        else if (IndexNames::GEO_2DSPHERE == indexedFieldType) {
             if (exprtype == MatchExpression::GEO) {
                 // within or intersect.
                 GeoMatchExpression* gme = static_cast<GeoMatchExpression*>(node);
@@ -162,16 +245,15 @@ namespace mongo {
             else if (exprtype == MatchExpression::GEO_NEAR) {
                 GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(node);
                 // Make sure the near query is compatible with 2dsphere.
-                if (gnme->getData().centroid.crs == SPHERE || gnme->getData().isNearSphere) {
-                    return true;
-                }
+                return gnme->getData().centroid.crs == SPHERE;
             }
             return false;
         }
-        else if ("2d" == ixtype) {
+        else if (IndexNames::GEO_2D == indexedFieldType) {
             if (exprtype == MatchExpression::GEO_NEAR) {
                 GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(node);
-                return gnme->getData().centroid.crs == FLAT;
+                // Make sure the near query is compatible with 2d index
+                return gnme->getData().centroid.crs == FLAT || !gnme->getData().isWrappingQuery;
             }
             else if (exprtype == MatchExpression::GEO) {
                 // 2d only supports within.
@@ -183,28 +265,30 @@ namespace mongo {
 
                 const GeometryContainer& gc = gq.getGeometry();
 
-                // 2d indices answer flat queries.
-                if (gc.hasFlatRegion()) {
+                // 2d indices require an R2 covering
+                if (gc.hasR2Region()) {
                     return true;
                 }
 
+                const CapWithCRS* cap = gc.getCapGeometryHack();
+
                 // 2d indices can answer centerSphere queries.
-                if (NULL == gc._cap.get()) {
+                if (NULL == cap) {
                     return false;
                 }
 
-                verify(SPHERE == gc._cap->crs);
-                const Circle& circle = gc._cap->circle;
+                verify(SPHERE == cap->crs);
+                const Circle& circle = cap->circle;
 
                 // No wrapping around the edge of the world is allowed in 2d centerSphere.
                 return twoDWontWrap(circle, index);
             }
             return false;
         }
-        else if ("text" == ixtype) {
+        else if (IndexNames::TEXT == indexedFieldType) {
             return (exprtype == MatchExpression::TEXT);
         }
-        else if ("geoHaystack" == ixtype) {
+        else if (IndexNames::GEO_HAYSTACK == indexedFieldType) {
             return false;
         }
         else {
@@ -218,16 +302,23 @@ namespace mongo {
     void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
                                            string prefix,
                                            const vector<IndexEntry>& indices) {
-        // Do not traverse tree beyond negation node
+        // Do not traverse tree beyond logical NOR node
         MatchExpression::MatchType exprtype = node->matchType();
-        if (exprtype == MatchExpression::NOT || exprtype == MatchExpression::NOR) {
+        if (exprtype == MatchExpression::NOR) {
             return;
         }
 
         // Every indexable node is tagged even when no compatible index is
         // available.
-        if (Indexability::nodeCanUseIndexOnOwnField(node)) {
-            string fullPath = prefix + node->path().toString();
+        if (Indexability::isBoundsGenerating(node)) {
+            string fullPath;
+            if (MatchExpression::NOT == node->matchType()) {
+                fullPath = prefix + node->getChild(0)->path().toString();
+            }
+            else {
+                fullPath = prefix + node->path().toString();
+            }
+
             verify(NULL == node->getTag());
             RelevantTag* rt = new RelevantTag();
             node->setTag(rt);
@@ -247,6 +338,14 @@ namespace mongo {
                     }
                 }
             }
+
+            // If this is a NOT, we have to clone the tag and attach
+            // it to the NOT's child.
+            if (MatchExpression::NOT == node->matchType()) {
+                RelevantTag* childRt = static_cast<RelevantTag*>(rt->clone());
+                childRt->path = rt->path;
+                node->getChild(0)->setTag(childRt);
+            }
         }
         else if (Indexability::arrayUsesIndexOnChildren(node)) {
             // See comment in getFields about all/elemMatch and paths.
@@ -261,6 +360,291 @@ namespace mongo {
             for (size_t i = 0; i < node->numChildren(); ++i) {
                 rateIndices(node->getChild(i), prefix, indices);
             }
+        }
+    }
+
+    // static
+    void QueryPlannerIXSelect::stripInvalidAssignments(MatchExpression* node,
+                                                       const vector<IndexEntry>& indices) {
+
+        stripInvalidAssignmentsToTextIndexes(node, indices);
+
+        if (MatchExpression::GEO != node->matchType() &&
+            MatchExpression::GEO_NEAR != node->matchType()) {
+
+            stripInvalidAssignmentsTo2dsphereIndices(node, indices);
+        }
+    }
+
+    //
+    // Helpers used by stripInvalidAssignments
+    //
+
+    /**
+     * Remove 'idx' from the RelevantTag lists for 'node'.  'node' must be a leaf.
+     */
+    static void removeIndexRelevantTag(MatchExpression* node, size_t idx) {
+        RelevantTag* tag = static_cast<RelevantTag*>(node->getTag());
+        verify(tag);
+        vector<size_t>::iterator firstIt = std::find(tag->first.begin(),
+                                                     tag->first.end(),
+                                                     idx);
+        if (firstIt != tag->first.end()) {
+            tag->first.erase(firstIt);
+        }
+
+        vector<size_t>::iterator notFirstIt = std::find(tag->notFirst.begin(),
+                                                        tag->notFirst.end(),
+                                                        idx);
+        if (notFirstIt != tag->notFirst.end()) {
+            tag->notFirst.erase(notFirstIt);
+        }
+    }
+
+    //
+    // Text index quirks
+    //
+
+    /**
+     * Traverse the subtree rooted at 'node' to remove invalid RelevantTag assignments to text index
+     * 'idx', which has prefix paths 'prefixPaths'.
+     */
+    static void stripInvalidAssignmentsToTextIndex(MatchExpression* node,
+                                                   size_t idx,
+            const unordered_set<StringData, StringData::Hasher>& prefixPaths) {
+
+        // If we're here, there are prefixPaths and node is either:
+        // 1. a text pred which we can't use as we have nothing over its prefix, or
+        // 2. a non-text pred which we can't use as we don't have a text pred AND-related.
+        if (Indexability::nodeCanUseIndexOnOwnField(node)) {
+            removeIndexRelevantTag(node, idx);
+            return;
+        }
+
+        // Do not traverse tree beyond negation node.
+        if (node->matchType() == MatchExpression::NOT
+            || node->matchType() == MatchExpression::NOR) {
+
+            return;
+        }
+
+        // For anything to use a text index with prefixes, we require that:
+        // 1. The text pred exists in an AND,
+        // 2. The non-text preds that use the text index's prefixes are also in that AND.
+
+        if (node->matchType() != MatchExpression::AND) {
+            // It's an OR or some kind of array operator.
+            for (size_t i = 0; i < node->numChildren(); ++i) {
+                stripInvalidAssignmentsToTextIndex(node->getChild(i), idx, prefixPaths);
+            }
+            return;
+        }
+
+        // If we're here, we're an AND.  Determine whether the children satisfy the index prefix for
+        // the text index.
+        invariant(node->matchType() == MatchExpression::AND);
+
+        bool hasText = false;
+
+        // The AND must have an EQ predicate for each prefix path.  When we encounter a child with a
+        // tag we remove it from childrenPrefixPaths.  All children exist if this set is empty at
+        // the end.
+        unordered_set<StringData, StringData::Hasher> childrenPrefixPaths = prefixPaths;
+
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            MatchExpression* child = node->getChild(i);
+            RelevantTag* tag = static_cast<RelevantTag*>(child->getTag());
+
+            if (NULL == tag) {
+                // 'child' could be a logical operator.  Maybe there are some assignments hiding
+                // inside.
+                stripInvalidAssignmentsToTextIndex(child, idx, prefixPaths);
+                continue;
+            }
+
+            bool inFirst = tag->first.end() != std::find(tag->first.begin(),
+                                                         tag->first.end(),
+                                                         idx);
+
+            bool inNotFirst = tag->notFirst.end() != std::find(tag->notFirst.begin(),
+                                                               tag->notFirst.end(),
+                                                               idx);
+
+            if (inFirst || inNotFirst) {
+                // Great!  'child' was assigned to our index.
+                if (child->matchType() == MatchExpression::TEXT) {
+                    hasText = true;
+                }
+                else {
+                    childrenPrefixPaths.erase(child->path());
+                    // One fewer prefix we're looking for, possibly.  Note that we could have a
+                    // suffix assignment on the index and wind up here.  In this case the erase
+                    // above won't do anything since a suffix isn't a prefix.
+                }
+            }
+            else {
+                // Recurse on the children to ensure that they're not hiding any assignments
+                // to idx.
+                stripInvalidAssignmentsToTextIndex(child, idx, prefixPaths);
+            }
+        }
+
+        // Our prereqs for using the text index were not satisfied so we remove the assignments from
+        // all children of the AND.
+        if (!hasText || !childrenPrefixPaths.empty()) {
+            for (size_t i = 0; i < node->numChildren(); ++i) {
+                stripInvalidAssignmentsToTextIndex(node->getChild(i), idx, prefixPaths);
+            }
+        }
+    }
+
+    // static
+    void QueryPlannerIXSelect::stripInvalidAssignmentsToTextIndexes(
+        MatchExpression* node,
+        const vector<IndexEntry>& indices) {
+
+        for (size_t i = 0; i < indices.size(); ++i) {
+            const IndexEntry& index = indices[i];
+
+            // We only care about text indices.
+            if (INDEX_TEXT != index.type) {
+                continue;
+            }
+
+            // Gather the set of paths that comprise the index prefix for this text index.
+            // Each of those paths must have an equality assignment, otherwise we can't assign
+            // *anything* to this index.
+            unordered_set<StringData, StringData::Hasher> textIndexPrefixPaths;
+            BSONObjIterator it(index.keyPattern);
+
+            // We stop when we see the first string in the key pattern.  We know that
+            // the prefix precedes "text".
+            for (BSONElement elt = it.next(); elt.type() != String; elt = it.next()) {
+                textIndexPrefixPaths.insert(elt.fieldName());
+                verify(it.more());
+            }
+
+            // If the index prefix is non-empty, remove invalid assignments to it.
+            if (!textIndexPrefixPaths.empty()) {
+                stripInvalidAssignmentsToTextIndex(node, i, textIndexPrefixPaths);
+            }
+        }
+    }
+
+    //
+    // 2dsphere V2 sparse quirks
+    //
+
+    static void stripInvalidAssignmentsTo2dsphereIndex(MatchExpression* node, size_t idx) {
+
+        if (Indexability::nodeCanUseIndexOnOwnField(node)) {
+            removeIndexRelevantTag(node, idx);
+            return;
+        }
+
+        const MatchExpression::MatchType nodeType = node->matchType();
+
+        // Don't bother peeking inside of negations.
+        if (MatchExpression::NOT == nodeType || MatchExpression::NOR == nodeType) {
+            return;
+        }
+
+        if (MatchExpression::AND != nodeType) {
+            // It's an OR or some kind of array operator.
+            for (size_t i = 0; i < node->numChildren(); ++i) {
+                stripInvalidAssignmentsTo2dsphereIndex(node->getChild(i), idx);
+            }
+            return;
+        }
+
+        bool hasGeoField = false;
+
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            MatchExpression* child = node->getChild(i);
+            RelevantTag* tag = static_cast<RelevantTag*>(child->getTag());
+
+            if (NULL == tag) {
+                // 'child' could be a logical operator.  Maybe there are some assignments hiding
+                // inside.
+                stripInvalidAssignmentsTo2dsphereIndex(child, idx);
+                continue;
+            }
+
+            bool inFirst = tag->first.end() != std::find(tag->first.begin(),
+                                                         tag->first.end(),
+                                                         idx);
+
+            bool inNotFirst = tag->notFirst.end() != std::find(tag->notFirst.begin(),
+                                                               tag->notFirst.end(),
+                                                               idx);
+
+            // If there is an index assignment...
+            if (inFirst || inNotFirst) {
+                // And it's a geo predicate...
+                if (MatchExpression::GEO == child->matchType() ||
+                    MatchExpression::GEO_NEAR == child->matchType()) {
+
+                    hasGeoField = true;
+                }
+            }
+            else {
+                // Recurse on the children to ensure that they're not hiding any assignments
+                // to idx.
+                stripInvalidAssignmentsTo2dsphereIndex(child, idx);
+            }
+        }
+
+        // If there isn't a geo predicate our results aren't a subset of what's in the geo index, so
+        // if we use the index we'll miss results.
+        if (!hasGeoField) {
+            for (size_t i = 0; i < node->numChildren(); ++i) {
+                stripInvalidAssignmentsTo2dsphereIndex(node->getChild(i), idx);
+            }
+        }
+    }
+
+    // static
+    void QueryPlannerIXSelect::stripInvalidAssignmentsTo2dsphereIndices(
+        MatchExpression* node,
+        const vector<IndexEntry>& indices) {
+
+        for (size_t i = 0; i < indices.size(); ++i) {
+            const IndexEntry& index = indices[i];
+
+            // We only worry about 2dsphere indices.
+            if (INDEX_2DSPHERE != index.type) {
+                continue;
+            }
+
+            // They also have to be V2.  Both ignore the sparse flag but V1 is
+            // never-sparse, V2 geo-sparse.
+            BSONElement elt = index.infoObj["2dsphereIndexVersion"];
+            if (elt.eoo()) {
+                continue;
+            }
+            if (!elt.isNumber()) {
+                continue;
+            }
+            if (2 != elt.numberInt()) {
+                continue;
+            }
+
+            // If every field is geo don't bother doing anything.
+            bool allFieldsGeo = true;
+            BSONObjIterator it(index.keyPattern);
+            while (it.more()) {
+                BSONElement elt = it.next();
+                if (String != elt.type()) {
+                    allFieldsGeo = false;
+                    break;
+                }
+            }
+            if (allFieldsGeo) {
+                continue;
+            }
+
+            // Remove bad assignments from this index.
+            stripInvalidAssignmentsTo2dsphereIndex(node, i);
         }
     }
 

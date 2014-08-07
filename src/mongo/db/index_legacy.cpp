@@ -30,10 +30,10 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/index/expression_keys_private.h"
+#include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 
@@ -45,15 +45,21 @@ namespace mongo {
             return fts::FTSSpec::fixSpec(obj);
         }
 
+        if (IndexNames::GEO_2DSPHERE == pluginName) {
+            return S2AccessMethod::fixSpec(obj);
+        }
+
         return obj;
     }
 
     // static
-    BSONObj IndexLegacy::getMissingField(Collection* collection, const BSONObj& infoObj) {
+    BSONObj IndexLegacy::getMissingField(OperationContext* txn,
+                                         Collection* collection,
+                                         const BSONObj& infoObj) {
         BSONObj keyPattern = infoObj.getObjectField( "key" );
         string accessMethodName;
         if ( collection )
-            accessMethodName = collection->getIndexCatalog()->getAccessMethodName(keyPattern);
+            accessMethodName = collection->getIndexCatalog()->getAccessMethodName(txn, keyPattern);
         else
             accessMethodName = IndexNames::findPluginName(keyPattern);
 
@@ -67,25 +73,12 @@ namespace mongo {
             // alter the data format).  Additionally, in certain places the hashed index code and
             // the index bound calculation code assume null and missing are indexed identically.
             BSONObj nullObj = BSON("" << BSONNULL);
-            return BSON("" << HashAccessMethod::makeSingleKey(nullObj.firstElement(), seed,
-                                                              hashVersion));
+            return BSON("" << ExpressionKeysPrivate::makeSingleHashKey(nullObj.firstElement(), seed, hashVersion));
         }
         else {
             BSONObjBuilder b;
             b.appendNull("");
             return b.obj();
-        }
-    }
-
-    // static
-    void IndexLegacy::postBuildHook(Collection* collection, const BSONObj& keyPattern) {
-        // If it's an FTS index, we want to set the power of 2 flag.
-        string pluginName = collection->getIndexCatalog()->getAccessMethodName(keyPattern);
-        if (IndexNames::TEXT == pluginName) {
-            NamespaceDetails* nsd = collection->details();
-            if (nsd->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes)) {
-                nsd->syncUserFlags(collection->ns().ns());
-            }
         }
     }
 

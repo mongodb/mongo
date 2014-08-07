@@ -40,7 +40,7 @@ namespace mongo {
      */
     class BtreeKeyGenerator {
     public:
-        BtreeKeyGenerator(vector<const char*> fieldNames, vector<BSONElement> fixed, bool isSparse);
+        BtreeKeyGenerator(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed, bool isSparse);
         virtual ~BtreeKeyGenerator() { }
 
         void getKeys(const BSONObj &obj, BSONObjSet *keys) const;
@@ -49,7 +49,7 @@ namespace mongo {
 
     protected:
         // These are used by the getKeysImpl(s) below.
-        vector<const char*> _fieldNames;
+        std::vector<const char*> _fieldNames;
         bool _isSparse;
         BSONObj _nullKey; // a full key with all fields null
         BSONObj _nullObj;     // only used for _nullElt
@@ -64,10 +64,10 @@ namespace mongo {
 
     class BtreeKeyGeneratorV0 : public BtreeKeyGenerator {
     public:
-        BtreeKeyGeneratorV0(vector<const char*> fieldNames, vector<BSONElement> fixed,
+        BtreeKeyGeneratorV0(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
                             bool isSparse);
         virtual ~BtreeKeyGeneratorV0() { }
-        
+
     private:
         virtual void getKeysImpl(vector<const char*> fieldNames, vector<BSONElement> fixed,
                                  const BSONObj &obj, BSONObjSet *keys) const;
@@ -75,7 +75,7 @@ namespace mongo {
 
     class BtreeKeyGeneratorV1 : public BtreeKeyGenerator {
     public:
-        BtreeKeyGeneratorV1(vector<const char*> fieldNames, vector<BSONElement> fixed,
+        BtreeKeyGeneratorV1(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
                             bool isSparse);
         virtual ~BtreeKeyGeneratorV1() { }
 
@@ -106,7 +106,7 @@ namespace mongo {
                                  const BSONElement &arrEntry, BSONObjSet *keys,
                                  unsigned numNotFound, const BSONElement &arrObjElt,
                                  const set<unsigned> &arrIdxs, bool mayExpandArrayUnembedded) const;
-        
+
         BSONObj _undefinedObj;
         BSONElement _undefinedElt;
     };

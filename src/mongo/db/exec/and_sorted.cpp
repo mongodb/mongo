@@ -31,12 +31,22 @@
 #include "mongo/db/exec/and_common-inl.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    AndSortedStage::AndSortedStage(WorkingSet* ws, const MatchExpression* filter)
-        : _ws(ws), _filter(filter), _targetNode(numeric_limits<size_t>::max()),
-          _targetId(WorkingSet::INVALID_ID), _isEOF(false) { }
+    // static
+    const char* AndSortedStage::kStageType = "AND_SORTED";
+
+    AndSortedStage::AndSortedStage(WorkingSet* ws, 
+                                   const MatchExpression* filter,
+                                   const Collection* collection)
+        : _collection(collection), 
+          _ws(ws),
+          _filter(filter),
+          _targetNode(numeric_limits<size_t>::max()),
+          _targetId(WorkingSet::INVALID_ID), _isEOF(false),
+          _commonStats(kStageType) { }
 
     AndSortedStage::~AndSortedStage() {
         for (size_t i = 0; i < _children.size(); ++i) { delete _children[i]; }
@@ -50,6 +60,9 @@ namespace mongo {
 
     PlanStage::StageState AndSortedStage::work(WorkingSetID* out) {
         ++_commonStats.works;
+
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
 
         if (isEOF()) { return PlanStage::IS_EOF; }
 
@@ -75,7 +88,7 @@ namespace mongo {
         verify(DiskLoc() == _targetLoc);
 
         // Pick one, and get a loc to work toward.
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         StageState state = _children[0]->work(&id);
 
         if (PlanStage::ADVANCED == state) {
@@ -103,16 +116,26 @@ namespace mongo {
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
-        else if (PlanStage::IS_EOF == state || PlanStage::FAILURE == state) {
+        else if (PlanStage::IS_EOF == state) {
+            _isEOF = true;
+            return state;
+        }
+        else if (PlanStage::FAILURE == state) {
+            *out = id;
+            // If a stage fails, it may create a status WSM to indicate why it
+            // failed, in which case 'id' is valid.  If ID is invalid, we
+            // create our own error message.
+            if (WorkingSet::INVALID_ID == id) {
+                mongoutils::str::stream ss;
+                ss << "sorted AND stage failed to read in results from first child";
+                Status status(ErrorCodes::InternalError, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+            }
             _isEOF = true;
             return state;
         }
         else {
-            if (PlanStage::NEED_FETCH == state) {
-                *out = id;
-                ++_commonStats.needFetch;
-            }
-            else if (PlanStage::NEED_TIME == state) {
+            if (PlanStage::NEED_TIME == state) {
                 ++_commonStats.needTime;
             }
 
@@ -128,7 +151,7 @@ namespace mongo {
         // We have nodes that haven't hit _targetLoc yet.
         size_t workingChildNumber = _workingTowardRep.front();
         PlanStage* next = _children[workingChildNumber];
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         StageState state = next->work(&id);
 
         if (PlanStage::ADVANCED == state) {
@@ -206,36 +229,47 @@ namespace mongo {
                 return PlanStage::NEED_TIME;
             }
         }
-        else if (PlanStage::IS_EOF == state || PlanStage::FAILURE == state) {
+        else if (PlanStage::IS_EOF == state) {
+            _isEOF = true;
+            _ws->free(_targetId);
+            return state;
+        }
+        else if (PlanStage::FAILURE == state) {
+            *out = id;
+            // If a stage fails, it may create a status WSM to indicate why it
+            // failed, in which case 'id' is valid.  If ID is invalid, we
+            // create our own error message.
+            if (WorkingSet::INVALID_ID == id) {
+                mongoutils::str::stream ss;
+                ss << "sorted AND stage failed to read in results from child " << workingChildNumber;
+                Status status(ErrorCodes::InternalError, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+            }
             _isEOF = true;
             _ws->free(_targetId);
             return state;
         }
         else {
-            if (PlanStage::NEED_FETCH == state) {
-                *out = id;
-                ++_commonStats.needFetch;
-            }
-            else if (PlanStage::NEED_TIME == state) {
+            if (PlanStage::NEED_TIME == state) {
                 ++_commonStats.needTime;
             }
             return state;
         }
     }
 
-    void AndSortedStage::prepareToYield() {
+    void AndSortedStage::saveState() {
         ++_commonStats.yields;
 
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->prepareToYield();
+            _children[i]->saveState();
         }
     }
 
-    void AndSortedStage::recoverFromYield() {
+    void AndSortedStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
 
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->recoverFromYield();
+            _children[i]->restoreState(opCtx);
         }
     }
 
@@ -256,7 +290,7 @@ namespace mongo {
             ++_specificStats.flagged;
 
             // The DiskLoc could still be a valid result so flag it and save it for later.
-            WorkingSetCommon::fetchAndInvalidateLoc(_ws->get(_targetId));
+            WorkingSetCommon::fetchAndInvalidateLoc(_ws->get(_targetId), _collection);
             _ws->flagForReview(_targetId);
 
             _targetId = WorkingSet::INVALID_ID;
@@ -266,8 +300,19 @@ namespace mongo {
         }
     }
 
+    vector<PlanStage*> AndSortedStage::getChildren() const {
+        return _children;
+    }
+
     PlanStageStats* AndSortedStage::getStats() {
         _commonStats.isEOF = isEOF();
+
+        // Add a BSON representation of the filter to the stats tree, if there is one.
+        if (NULL != _filter) {
+            BSONObjBuilder bob;
+            _filter->toBSON(&bob);
+            _commonStats.filter = bob.obj();
+        }
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_SORTED));
         ret->specific.reset(new AndSortedStats(_specificStats));
@@ -276,6 +321,14 @@ namespace mongo {
         }
 
         return ret.release();
+    }
+
+    const CommonStats* AndSortedStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* AndSortedStage::getSpecificStats() {
+        return &_specificStats;
     }
 
 }  // namespace mongo

@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2013-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -35,6 +35,9 @@
 
 namespace mongo {
 
+    class Collection;
+    class OperationContext;
+
     /**
      * Maps (lat, lng) to the bucketSize-sided square bucket that contains it.
      * Examines all documents in a given radius of a given point.
@@ -55,24 +58,20 @@ namespace mongo {
     public:
         using BtreeBasedAccessMethod::_descriptor;
 
-        HaystackAccessMethod(IndexCatalogEntry* btreeState);
+        HaystackAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
         virtual ~HaystackAccessMethod() { }
 
     protected:
         friend class GeoHaystackSearchCommand;
-        void searchCommand(const BSONObj& nearObj, double maxDistance, const BSONObj& search,
+        void searchCommand(OperationContext* txn, Collection* collection,
+                           const BSONObj& nearObj, double maxDistance, const BSONObj& search,
                            BSONObjBuilder* result, unsigned limit);
 
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
-        // Helper methods called by getKeys:
-        int hash(const BSONElement& e) const;
-        string makeString(int hashedX, int hashedY) const;
-        void addKey(const string& root, const BSONElement& e, BSONObjSet* keys) const;
-
-        string _geoField;
-        vector<string> _otherFields;
+        std::string _geoField;
+        std::vector<std::string> _otherFields;
         double _bucketSize;
     };
 

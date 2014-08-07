@@ -30,6 +30,7 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/server_parameters.h"
 
 namespace mongo {
@@ -68,7 +69,10 @@ namespace mongo {
         ASSERT_EQUALS( "c", v[2] );
 
         BSONObjBuilder b;
-        vv.append( b, vv.name() );
+
+        OperationContextNoop txn;
+        vv.append(&txn, b, vv.name());
+
         BSONObj y = b.obj();
         ASSERT( x.firstElement().woCompare( y.firstElement(), false ) == 0 );
 

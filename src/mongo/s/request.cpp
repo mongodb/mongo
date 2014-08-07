@@ -28,7 +28,7 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/request.h"
 
@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
@@ -43,14 +44,18 @@
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     Request::Request( Message& m, AbstractMessagingPort* p ) :
         _m(m) , _d( m ) , _p(p) , _didInit(false) {
 
-        verify( _d.getns() );
         _id = _m.header()->id;
+
+        _txn.reset(new OperationContextNoop());
 
         _clientInfo = ClientInfo::get();
         if ( p ) {
@@ -66,46 +71,21 @@ namespace mongo {
             return;
         _didInit = true;
         reset();
-        _clientInfo->getAuthorizationSession()->startRequest();
+        _clientInfo->getAuthorizationSession()->startRequest(_txn.get());
     }
 
     // Deprecated, will move to the strategy itself
     void Request::reset() {
-        if ( _m.operation() == dbKillCursors ) {
+        _m.header()->id = _id;
+        _clientInfo->clearRequestInfo();
+
+        if ( !_d.messageShouldHaveNs()) {
             return;
         }
 
         uassert( 13644 , "can't use 'local' database through mongos" , ! str::startsWith( getns() , "local." ) );
 
-        // TODO: Deprecated, keeping to preserve codepath for now
-        const string nsStr (getns()); // use in functions taking string rather than char*
-
-        _config = grid.getDBConfig( nsStr );
-
-        // TODO:  In general, throwing an exception when the cm doesn't exist is really annoying
-        if ( _config->isSharded( nsStr ) ) {
-            _chunkManager = _config->getChunkManagerIfExists( nsStr );
-        }
-        else {
-            _chunkManager.reset();
-        }
-
-        _m.header()->id = _id;
-        _clientInfo->clearRequestInfo();
-    }
-
-    // Deprecated, will move to the strategy itself
-    Shard Request::primaryShard() const {
-        verify( _didInit );
-
-        if ( _chunkManager ) {
-            if ( _chunkManager->numChunks() > 1 )
-                throw UserException( 8060 , "can't call primaryShard on a sharded collection" );
-            return _chunkManager->findIntersectingChunk( _chunkManager->getShardKey().globalMin() )->getShard();
-        }
-        Shard s = _config->getShard( getns() );
-        uassert( 10194 ,  "can't call primaryShard on a sharded collection!" , s.ok() );
-        return s;
+        grid.getDBConfig( getns() );
     }
 
     void Request::process( int attempt ) {
@@ -127,6 +107,7 @@ namespace mongo {
         bool iscmd = false;
         if ( op == dbKillCursors ) {
             cursorCache.gotKillCursors( _m );
+            globalOpCounters.gotOp( op , iscmd );
         }
         else if ( op == dbQuery ) {
             NamespaceString nss(getns());
@@ -143,12 +124,16 @@ namespace mongo {
             else {
                 STRATEGY->queryOp( *this );
             }
+
+            globalOpCounters.gotOp( op , iscmd );
         }
         else if ( op == dbGetMore ) {
             STRATEGY->getMore( *this );
+            globalOpCounters.gotOp( op , iscmd );
         }
         else {
             STRATEGY->writeOp( op, *this );
+            // globalOpCounters are handled by write commands.
         }
 
         LOG(3) << "Request::process end ns: " << getns()
@@ -157,12 +142,6 @@ namespace mongo {
                << " attempt: " << attempt
                << " " << t.millis() << "ms"
                << endl;
-
-        globalOpCounters.gotOp( op , iscmd );
-    }
-
-    void Request::gotInsert() {
-        globalOpCounters.gotInsert();
     }
 
     void Request::reply( Message & response , const string& fromServer ) {

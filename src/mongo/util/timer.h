@@ -2,17 +2,29 @@
 
 /*    Copyright 2010 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
@@ -34,9 +46,9 @@ namespace mongo {
      */
     class MONGO_CLIENT_API Timer /*copyable*/ {
     public:
-        static const unsigned long long millisPerSecond = 1000;
-        static const unsigned long long microsPerSecond = 1000 * millisPerSecond;
-        static const unsigned long long nanosPerSecond = 1000 * microsPerSecond;
+        static const long long millisPerSecond = 1000;
+        static const long long microsPerSecond = 1000 * millisPerSecond;
+        static const long long nanosPerSecond = 1000 * microsPerSecond;
 
         Timer() { reset(); }
         int seconds() const { return (int)(micros() / 1000000); }
@@ -48,15 +60,15 @@ namespace mongo {
          *  @return time in milliseconds.
          */
         inline int millisReset() {
-            unsigned long long nextNow = now();
-            unsigned long long deltaMicros =
+            const long long nextNow = now();
+            const long long deltaMicros =
                 ((nextNow - _old) * microsPerSecond) / _countsPerSecond;
 
             _old = nextNow;
             return static_cast<int>(deltaMicros / 1000);
         }
 
-        inline unsigned long long micros() const {
+        inline long long micros() const {
             return ((now() - _old) * microsPerSecond) / _countsPerSecond;
         }
 
@@ -70,13 +82,11 @@ namespace mongo {
          * This value is initialized at program startup, and never changed after.
          * It should be treated as private.
          */
-        static unsigned long long _countsPerSecond;
+        static long long _countsPerSecond;
 
     private:
-        inline unsigned long long now() const;
+        long long now() const;
 
-        unsigned long long _old;
+        long long _old;
     };
 }  // namespace mongo
-
-#include "mongo/util/timer-inl.h"

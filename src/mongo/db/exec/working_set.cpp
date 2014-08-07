@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -88,6 +88,19 @@ namespace mongo {
         return _flagged.end() != _flagged.find(id);
     }
 
+    void WorkingSet::clear() {
+        for (size_t i = 0; i < _data.size(); i++) {
+            delete _data[i].member;
+        }
+        _data.clear();
+
+        // Since working set is now empty, the free list pointer should
+        // point to nothing.
+        _freeList = INVALID_ID;
+
+        _flagged.clear();
+    }
+
     WorkingSetMember::WorkingSetMember() : state(WorkingSetMember::INVALID) { }
 
     WorkingSetMember::~WorkingSetMember() { }
@@ -119,7 +132,7 @@ namespace mongo {
     }
 
     bool WorkingSetMember::hasComputed(const WorkingSetComputedDataType type) const {
-        return _computed[type];
+        return _computed[type].get();
     }
 
     const WorkingSetComputedData* WorkingSetMember::getComputed(const WorkingSetComputedDataType type) const {
@@ -157,6 +170,27 @@ namespace mongo {
         }
 
         return false;
+    }
+
+    size_t WorkingSetMember::getMemUsage() const {
+        size_t memUsage = 0;
+
+        if (hasLoc()) {
+            memUsage += sizeof(DiskLoc);
+        }
+
+        // XXX: Unowned objects count towards current size.
+        //      See SERVER-12579
+        if (hasObj()) {
+            memUsage += obj.objsize();
+        }
+
+        for (size_t i = 0; i < keyData.size(); ++i) {
+            const IndexKeyDatum& keyDatum = keyData[i];
+            memUsage += keyDatum.keyData.objsize();
+        }
+
+        return memUsage;
     }
 
 }  // namespace mongo

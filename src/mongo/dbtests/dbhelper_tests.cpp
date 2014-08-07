@@ -26,9 +26,12 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/db/dbhelpers.h"
-#include "mongo/dbtests/dbtests.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -38,7 +41,6 @@ namespace mongo {
      */
 
     static const char * const ns = "unittests.removetests";
-    static DBDirectClient client;
 
     // TODO: Normalize with test framework
     /** Simple test for Helpers::RemoveRange. */
@@ -48,24 +50,32 @@ namespace mongo {
                 _min( 4 ), _max( 8 )
         {
         }
+
         void run() {
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
             for ( int i = 0; i < 10; ++i ) {
                 client.insert( ns, BSON( "_id" << i ) );
             }
 
             {
                 // Remove _id range [_min, _max).
-                Lock::DBWrite lk( ns );
-                Client::Context ctx( ns );
+                Lock::DBWrite lk(txn.lockState(), ns);
+                WriteUnitOfWork wunit(txn.recoveryUnit());
+                Client::Context ctx(&txn,  ns );
+
                 KeyRange range( ns,
                                 BSON( "_id" << _min ),
                                 BSON( "_id" << _max ),
                                 BSON( "_id" << 1 ) );
-                Helpers::removeRange( range );
+                mongo::WriteConcernOptions dummyWriteConcern;
+                Helpers::removeRange(&txn, range, false, dummyWriteConcern);
+                wunit.commit();
             }
 
             // Check that the expected documents remain.
-            ASSERT_EQUALS( expected(), docs() );
+            ASSERT_EQUALS( expected(), docs(&txn) );
         }
     private:
         BSONArray expected() const {
@@ -78,7 +88,9 @@ namespace mongo {
             }
             return bab.arr();
         }
-        BSONArray docs() const {
+
+        BSONArray docs(OperationContext* txn) const {
+            DBDirectClient client(txn);
             auto_ptr<DBClientCursor> cursor = client.query( ns,
                                                             Query().hint( BSON( "_id" << 1 ) ) );
             BSONArrayBuilder bab;
@@ -107,8 +119,9 @@ namespace mongo {
     //
 
     TEST(DBHelperTests, FindDiskLocs) {
+        OperationContextImpl txn;
+        DBDirectClient client(&txn);
 
-        DBDirectClient client;
         // Some unique tag we can use to make sure we're pulling back the right data
         OID tag = OID::gen();
         client.remove( ns, BSONObj() );
@@ -125,14 +138,15 @@ namespace mongo {
         long long estSizeBytes;
         {
             // search _id range (0, 10)
-            Lock::DBRead lk( ns );
-            Client::Context ctx( ns );
+            Lock::DBRead lk(txn.lockState(), ns);
+
             KeyRange range( ns,
                             BSON( "_id" << 0 ),
                             BSON( "_id" << numDocsInserted ),
                             BSON( "_id" << 1 ) );
 
-            Status result = Helpers::getLocsInRange( range,
+            Status result = Helpers::getLocsInRange( &txn,
+                                                     range,
                                                      maxSizeBytes,
                                                      &locs,
                                                      &numDocsFound,
@@ -143,9 +157,13 @@ namespace mongo {
             ASSERT_NOT_EQUALS( estSizeBytes, 0 );
             ASSERT_LESS_THAN( estSizeBytes, maxSizeBytes );
 
+            Database* db = dbHolder().get( &txn, nsToDatabase(range.ns) );
+            const Collection* collection = db->getCollection(&txn, ns);
+
             // Make sure all the disklocs actually correspond to the right info
-            for ( set<DiskLoc>::iterator it = locs.begin(); it != locs.end(); ++it ) {
-                ASSERT_EQUALS( it->obj()["tag"].OID(), tag );
+            for ( set<DiskLoc>::const_iterator it = locs.begin(); it != locs.end(); ++it ) {
+                const BSONObj obj = collection->docFor(*it);
+                ASSERT_EQUALS(obj["tag"].OID(), tag);
             }
         }
     }
@@ -155,8 +173,9 @@ namespace mongo {
     //
 
     TEST(DBHelperTests, FindDiskLocsNoIndex) {
+        OperationContextImpl txn;
+        DBDirectClient client(&txn);
 
-        DBDirectClient client;
         client.remove( ns, BSONObj() );
         client.insert( ns, BSON( "_id" << OID::gen() ) );
 
@@ -166,8 +185,8 @@ namespace mongo {
         long long numDocsFound;
         long long estSizeBytes;
         {
-            Lock::DBRead lk( ns );
-            Client::Context ctx( ns );
+            Lock::DBRead lk(txn.lockState(), ns);
+            Client::Context ctx(&txn,  ns );
 
             // search invalid index range
             KeyRange range( ns,
@@ -175,7 +194,8 @@ namespace mongo {
                             BSON( "badIndex" << 10 ),
                             BSON( "badIndex" << 1 ) );
 
-            Status result = Helpers::getLocsInRange( range,
+            Status result = Helpers::getLocsInRange( &txn,
+                                                     range,
                                                      maxSizeBytes,
                                                      &locs,
                                                      &numDocsFound,
@@ -194,8 +214,9 @@ namespace mongo {
     //
 
     TEST(DBHelperTests, FindDiskLocsTooBig) {
+        OperationContextImpl txn;
+        DBDirectClient client(&txn);
 
-        DBDirectClient client;
         client.remove( ns, BSONObj() );
 
         int numDocsInserted = 10;
@@ -210,14 +231,15 @@ namespace mongo {
         long long numDocsFound;
         long long estSizeBytes;
         {
-            Lock::DBRead lk( ns );
-            Client::Context ctx( ns );
+            Lock::DBRead lk(txn.lockState(), ns);
+            Client::Context ctx(&txn,  ns );
             KeyRange range( ns,
                             BSON( "_id" << 0 ),
                             BSON( "_id" << numDocsInserted ),
                             BSON( "_id" << 1 ) );
 
-            Status result = Helpers::getLocsInRange( range,
+            Status result = Helpers::getLocsInRange( &txn,
+                                                     range,
                                                      maxSizeBytes,
                                                      &locs,
                                                      &numDocsFound,

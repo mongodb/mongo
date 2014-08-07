@@ -3,11 +3,11 @@
 s = new ShardingTest( "moveDistLock", 3, 0, undefined, { sync : true } );
 
 s._connections[0].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew : 15000 } )
-s._connections[1].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew : -16000 } )
+s._connections[1].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew : -32000 } )
 
 // We need to start another mongos after skewing the clock, since the first mongos will have already
 // tested the config servers (via the balancer) before we manually skewed them
-otherMongos = startMongos( { port : 30020, v : 0, configdb : s._configDB } );
+otherMongos = startMongos( { port : 30020, v : 2, configdb : s._configDB } );
 
 // Initialize DB data
 initDB = function(name) {

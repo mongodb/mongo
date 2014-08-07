@@ -52,20 +52,30 @@ var forceSync = function() {
             var config = nodes[2].getDB("local").system.replset.findOne();
             var targetHost = config.members[1].host;
             printjson(nodes[2].getDB("admin").runCommand({replSetSyncFrom : targetHost}));
+            assert.soon(
+                function() {
+                    return nodes[2].getDB("test").foo.findOne() != null;
+                },
+                'Check for data after force sync', 5000
+            );
             return nodes[2].getDB("test").foo.findOne() != null;
         },
         'Check force sync still works'
     );
 };
 
-print("break the network so that node 2 cannot replicate");
-breakNetwork();
+// SERVER-12922
+//
+if (!_isWindows()) {
+    print("break the network so that node 2 cannot replicate");
+    breakNetwork();
 
-print("make sure chaining is not happening");
-checkNoChaining();
+    print("make sure chaining is not happening");
+    checkNoChaining();
 
-print("check that forcing sync target still works");
-forceSync();
+    print("check that forcing sync target still works");
+    forceSync();
 
-var config = master.getDB("local").system.replset.findOne();
-assert.eq(false, config.settings.chainingAllowed, tojson(config));
+    var config = master.getDB("local").system.replset.findOne();
+    assert.eq(false, config.settings.chainingAllowed, tojson(config));
+}

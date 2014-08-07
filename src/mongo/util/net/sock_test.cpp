@@ -147,12 +147,12 @@ namespace {
         Notification accepted;
         SOCKET acceptSock = INVALID_SOCKET;
         boost::thread acceptor(
-            boost::bind(&detail::awaitAccept, &acceptSock, listenSock, boost::ref(accepted)));
+            stdx::bind(&detail::awaitAccept, &acceptSock, listenSock, boost::ref(accepted)));
 
         Notification connected;
         SOCKET connectSock = INVALID_SOCKET;
         boost::thread connector(
-            boost::bind(&detail::awaitConnect, &connectSock, *connectRes, boost::ref(connected)));
+            stdx::bind(&detail::awaitConnect, &connectSock, *connectRes, boost::ref(connected)));
 
         connected.waitToBeNotified();
         if (connectSock == INVALID_SOCKET) {

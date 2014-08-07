@@ -37,7 +37,7 @@
     <?if $(var.Edition) = Enterprise ?>
       <WixVariable Id="WixUILicenseRtf" Value="$(var.EnterpriseBase)\distsrc\LICENSE.rtf" />
     <?else ?>
-      <WixVariable Id="WixUILicenseRtf" Value=".\GNU-AGPL-3.0.rtf" />
+      <WixVariable Id="WixUILicenseRtf" Value="$(var.ProjectDir)GNU-AGPL-3.0.rtf" />
     <?endif ?>
 
   </Fragment>

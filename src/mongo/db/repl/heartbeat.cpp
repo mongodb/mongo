@@ -26,59 +26,62 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
-
 #include <boost/thread/thread.hpp>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
-#include "mongo/db/repl/health.h"
-#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/repl/heartbeat_info.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_set_health_poll_task.h"
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/server.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/background.h"
-#include "mongo/util/concurrency/msg.h"
 #include "mongo/util/concurrency/task.h"
-#include "mongo/util/concurrency/value.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/goodies.h"
-#include "mongo/util/mongoutils/html.h"
 #include "mongo/util/ramlog.h"
 
 namespace mongo {
-
-    using namespace bson;
+namespace repl {
 
     MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
-    MONGO_FP_DECLARE(rsStopHeartbeatRequest);
 
-    extern bool replSetBlind;
+namespace {
+    /**
+     * Returns true if there is no data on this server. Useful when starting replication.
+     * The "local" database does NOT count except for "rs.oplog" collection.
+     * Used to set the hasData field on replset heartbeat command response.
+     */
+    bool replHasDatabases(OperationContext* txn) {
+        vector<string> names;
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases(&names);
 
-    unsigned int HeartbeatInfo::numPings;
-
-    long long HeartbeatInfo::timeDown() const {
-        if( up() ) return 0;
-        if( downSince == 0 )
-            return 0; // still waiting on first heartbeat
-        return jsTime() - downSince;
+        if( names.size() >= 2 ) return true;
+        if( names.size() == 1 ) {
+            if( names[0] != "local" )
+                return true;
+            // we have a local database.  return true if oplog isn't empty
+            {
+                Lock::DBRead lk(txn->lockState(), repl::rsoplog);
+                BSONObj o;
+                if( Helpers::getFirst(txn, repl::rsoplog, o) )
+                    return true;
+            }
+        }
+        return false;
     }
-
-    void HeartbeatInfo::updateFromLastPoll(const HeartbeatInfo& newInfo) {
-        hbstate = newInfo.hbstate;
-        health = newInfo.health;
-        upSince = newInfo.upSince;
-        downSince = newInfo.downSince;
-        lastHeartbeat = newInfo.lastHeartbeat;
-        lastHeartbeatMsg = newInfo.lastHeartbeatMsg;
-        // Note: lastHeartbeatRecv is updated through CmdReplSetHeartbeat::run().
-
-        syncingTo = newInfo.syncingTo;
-        opTime = newInfo.opTime;
-        skew = newInfo.skew;
-        authIssue = newInfo.authIssue;
-        ping = newInfo.ping;
-    }
+    
+} // namespace
 
     /* { replSetHeartbeat : <setname> } */
     class CmdReplSetHeartbeat : public ReplSetCommand {
@@ -92,13 +95,7 @@ namespace mongo {
             actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( replSetBlind ) {
-                if (theReplSet) {
-                    errmsg = str::stream() << theReplSet->selfFullName() << " is blind";
-                }
-                return false;
-            }
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
 
             MONGO_FAIL_POINT_BLOCK(rsDelayHeartbeatResponse, delay) {
                 const BSONObj& data = delay.getData();
@@ -107,95 +104,44 @@ namespace mongo {
 
             /* we don't call ReplSetCommand::check() here because heartbeat
                checks many things that are pre-initialization. */
-            if( !replSet ) {
+            if (!getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
                 errmsg = "not running with --replSet";
                 return false;
             }
 
-            /* we want to keep heartbeat connections open when relinquishing primary.  tag them here. */
+            if ( replSetBlind ) {
+                errmsg = str::stream() << "node is blind";
+                return false;
+            }
+
+            /* we want to keep heartbeat connections open when relinquishing primary.  
+               tag them here. */
             {
                 AbstractMessagingPort *mp = cc().port();
                 if( mp )
                     mp->tag |= ScopedConn::keepOpen;
             }
 
-            if( cmdObj["pv"].Int() != 1 ) {
-                errmsg = "incompatible replset protocol version";
-                return false;
-            }
-            {
-                string s = string(cmdObj.getStringField("replSetHeartbeat"));
-                if (replSettings.ourSetName() != s) {
-                    errmsg = "repl set names do not match";
-                    log() << "replSet set names do not match, our cmdline: " << replSettings.replSet
-                          << rsLog;
-                    log() << "replSet s: " << s << rsLog;
-                    result.append("mismatch", true);
-                    return false;
-                }
+            ReplSetHeartbeatArgs args;
+            Status status = args.initialize(cmdObj);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
             }
 
-            result.append("rs", true);
-            if( cmdObj["checkEmpty"].trueValue() ) {
-                result.append("hasData", replHasDatabases());
-            }
-            if( (theReplSet == 0) || (theReplSet->startupStatus == ReplSetImpl::LOADINGCONFIG) ) {
-                string from( cmdObj.getStringField("from") );
-                if( !from.empty() ) {
-                    scoped_lock lck( replSettings.discoveredSeeds_mx );
-                    replSettings.discoveredSeeds.insert(from);
-                }
-                result.append("hbmsg", "still initializing");
-                return true;
+            // ugh.
+            if (args.getCheckEmpty()) {
+                result.append("hasData", replHasDatabases(txn));
             }
 
-            if( theReplSet->name() != cmdObj.getStringField("replSetHeartbeat") ) {
-                errmsg = "repl set names do not match (2)";
-                result.append("mismatch", true);
-                return false;
-            }
-            result.append("set", theReplSet->name());
-            result.append("state", theReplSet->state().s);
-            result.append("e", theReplSet->iAmElectable());
-            result.append("hbmsg", theReplSet->hbmsg());
-            result.append("time", (long long) time(0));
-            result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
-            const Member *syncTarget = replset::BackgroundSync::get()->getSyncTarget();
-            if (syncTarget) {
-                result.append("syncingTo", syncTarget->fullName());
-            }
-
-            int v = theReplSet->config().version;
-            result.append("v", v);
-            if( v > cmdObj["v"].Int() )
-                result << "config" << theReplSet->config().asBson();
-
-            Member* from = NULL;
-            if (cmdObj.hasField("fromId")) {
-                if (v == cmdObj["v"].Int()) {
-                    from = theReplSet->getMutableMember(cmdObj["fromId"].Int());
-                }
-            }
-            if (!from) {
-                from = theReplSet->findByName(cmdObj.getStringField("from"));
-                if (!from) {
-                    return true;
-                }
-            }
-
-            // if we thought that this node is down, let it know
-            if (!from->hbinfo().up()) {
-                result.append("stateDisagreement", true);
-            }
-
-            // note that we got a heartbeat from this node
-            theReplSet->mgr->send(boost::bind(&ReplSet::msgUpdateHBRecv,
-                                              theReplSet, from->hbinfo().id(), time(0)));
-
-
-            return true;
+            ReplSetHeartbeatResponse response;
+            status = getGlobalReplicationCoordinator()->processHeartbeat(args, &response);
+            if (status.isOK())
+                response.addToBSON(&result);
+            return appendCommandStatus(result, status);
         }
     } cmdReplSetHeartbeat;
+
+    MONGO_FP_DECLARE(rsStopHeartbeatRequest);
 
     bool requestHeartbeat(const std::string& setName,
                           const std::string& from,
@@ -235,292 +181,6 @@ namespace mongo {
         return conn.runCommand("admin", cmdBuilder.done(), result, 0);
     }
 
-    /**
-     * Poll every other set member to check its status.
-     *
-     * A detail about local machines and authentication: suppose we have 2
-     * members, A and B, on the same machine using different keyFiles. A is
-     * primary. If we're just starting the set, there are no admin users, so A
-     * and B can access each other because it's local access.
-     *
-     * Then we add a user to A. B cannot sync this user from A, because as soon
-     * as we add a an admin user, A requires auth. However, A can still
-     * heartbeat B, because B *doesn't* have an admin user.  So A can reach B
-     * but B cannot reach A.
-     *
-     * Once B is restarted with the correct keyFile, everything should work as
-     * expected.
-     */
-    class ReplSetHealthPollTask : public task::Task {
-    private:
-        /**
-         * Each healthpoll task reconnects periodically.  By starting each task at a different
-         * number for "tries", the tasks will reconnect at different times, minimizing the impact
-         * of network blips.
-         */
-        static int s_try_offset;
-
-        HostAndPort h;
-        HeartbeatInfo m;
-        int tries;
-        const int threshold;
-    public:
-        ReplSetHealthPollTask(const HostAndPort& hh, const HeartbeatInfo& mm)
-            : h(hh), m(mm), tries(s_try_offset), threshold(15),
-              _timeout(ReplSetConfig::DEFAULT_HB_TIMEOUT) {
-
-            if (theReplSet) {
-                _timeout = theReplSet->config().getHeartbeatTimeout();
-            }
-
-            // doesn't need protection, all health tasks are created in a single thread
-            s_try_offset += 7;
-        }
-
-        string name() const { return "rsHealthPoll"; }
-
-        void setUp() { }
-
-        void doWork() {
-            if ( !theReplSet ) {
-                LOG(2) << "replSet not initialized yet, skipping health poll this round" << rsLog;
-                return;
-            }
-
-            HeartbeatInfo mem = m;
-            HeartbeatInfo old = mem;
-            try {
-                BSONObj info;
-                int theirConfigVersion = -10000;
-
-                bool ok = _requestHeartbeat(mem, info, theirConfigVersion);
-
-                // weight new ping with old pings
-                // on the first ping, just use the ping value
-                if (old.ping != 0) {
-                    mem.ping = (unsigned int)((old.ping * .8) + (mem.ping * .2));
-                }
-
-                if( ok ) {
-                    up(info, mem);
-                }
-                else if (info["code"].numberInt() == ErrorCodes::Unauthorized ||
-                         info["errmsg"].str() == "unauthorized") {
-
-                    authIssue(mem);
-                }
-                else {
-                    down(mem, info.getStringField("errmsg"));
-                }
-            }
-            catch (const DBException& e) {
-                log() << "replSet health poll task caught a DBException: " << e.what();
-                down(mem, e.what());
-            }
-            catch (const std::exception& e) {
-                log() << "replSet health poll task caught an exception: " << e.what();
-                down(mem, e.what());
-            }
-            m = mem;
-
-            theReplSet->mgr->send( boost::bind(&ReplSet::msgUpdateHBInfo, theReplSet, mem) );
-
-            static time_t last = 0;
-            time_t now = time(0);
-            bool changed = mem.changed(old);
-            if( changed ) {
-                if( old.hbstate != mem.hbstate )
-                    log() << "replSet member " << h.toString() << " is now in state " << mem.hbstate.toString() << rsLog;
-            }
-            if( changed || now-last>4 ) {
-                last = now;
-                theReplSet->mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
-            }
-        }
-
-    private:
-        bool tryHeartbeat(BSONObj* info, int* theirConfigVersion) {
-            bool ok = false;
-
-            try {
-                ok = requestHeartbeat(theReplSet->name(), theReplSet->selfFullName(),
-                                      h.toString(), *info, theReplSet->config().version,
-                                      *theirConfigVersion);
-            }
-            catch (DBException&) {
-                // don't do anything, ok is already false
-            }
-
-            return ok;
-        }
-
-        bool _requestHeartbeat(HeartbeatInfo& mem, BSONObj& info, int& theirConfigVersion) {
-            {
-                ScopedConn conn(h.toString());
-                conn.setTimeout(_timeout);
-                if (tries++ % threshold == (threshold - 1)) {
-                    conn.reconnect();
-                }
-            }
-
-            Timer timer;
-            time_t before = curTimeMicros64() / 1000000;
-
-            bool ok = tryHeartbeat(&info, &theirConfigVersion);
-
-            mem.ping = static_cast<unsigned int>(timer.millis());
-            time_t totalSecs = mem.ping / 1000;
-
-            // if that didn't work and we have more time, lower timeout and try again
-            if (!ok && totalSecs < _timeout) {
-                log() << "replset info " << h.toString() << " heartbeat failed, retrying" << rsLog;
-
-                // lower timeout to remaining ping time
-                {
-                    ScopedConn conn(h.toString());
-                    conn.setTimeout(_timeout - totalSecs);
-                }
-
-                int checkpoint = timer.millis();
-                timer.reset();
-                ok = tryHeartbeat(&info, &theirConfigVersion);
-                mem.ping = static_cast<unsigned int>(timer.millis());
-                totalSecs = (checkpoint + mem.ping)/1000;
-
-                // set timeout back to default
-                {
-                    ScopedConn conn(h.toString());
-                    conn.setTimeout(_timeout);
-                }
-            }
-
-            // we set this on any response - we don't get this far if
-            // couldn't connect because exception is thrown
-            time_t after = mem.lastHeartbeat = before + totalSecs;
-
-            if ( info["time"].isNumber() ) {
-                long long t = info["time"].numberLong();
-                if( t > after )
-                    mem.skew = (int) (t - after);
-                else if( t < before )
-                    mem.skew = (int) (t - before); // negative
-            }
-            else {
-                // it won't be there if remote hasn't initialized yet
-                if( info.hasElement("time") )
-                    warning() << "heatbeat.time isn't a number: " << info << endl;
-                mem.skew = INT_MIN;
-            }
-
-            {
-                be state = info["state"];
-                if( state.ok() )
-                    mem.hbstate = MemberState(state.Int());
-            }
-
-            if (info.hasField("stateDisagreement") && info["stateDisagreement"].trueValue()) {
-                log() << "replset info " << h.toString() << " thinks that we are down" << endl;
-            }
-
-            return ok;
-        }
-
-        void authIssue(HeartbeatInfo& mem) {
-            mem.authIssue = true;
-            mem.hbstate = MemberState::RS_UNKNOWN;
-
-            // set health to 0 so that this doesn't count towards majority
-            mem.health = 0.0;
-            theReplSet->rmFromElectable(mem.id());
-        }
-
-        void down(HeartbeatInfo& mem, string msg) {
-            // if we've received a heartbeat from this member within the last two seconds, don't
-            // change its state to down (if it's already down, leave it down since we don't have
-            // any info about it other than it's heartbeating us)
-            const Member* oldMemInfo = theReplSet->findById(mem.id());
-            if (oldMemInfo && oldMemInfo->hbinfo().lastHeartbeatRecv+2 >= time(0)) {
-                log() << "replset info " << h.toString()
-                      << " just heartbeated us, but our heartbeat failed: " << msg
-                      << ", not changing state" << rsLog;
-                // we don't update any of the heartbeat info, though, since we didn't get any info
-                // other than "not down" from having it heartbeat us
-                return;
-            }
-
-            mem.authIssue = false;
-            mem.health = 0.0;
-            mem.ping = 0;
-            if( mem.upSince || mem.downSince == 0 ) {
-                mem.upSince = 0;
-                mem.downSince = jsTime();
-                mem.hbstate = MemberState::RS_DOWN;
-                log() << "replSet info " << h.toString() << " is down (or slow to respond): " << msg << rsLog;
-            }
-            mem.lastHeartbeatMsg = msg;
-            theReplSet->rmFromElectable(mem.id());
-        }
-
-        void up(const BSONObj& info, HeartbeatInfo& mem) {
-            HeartbeatInfo::numPings++;
-            mem.authIssue = false;
-
-            if( mem.upSince == 0 ) {
-                log() << "replSet member " << h.toString() << " is up" << rsLog;
-                mem.upSince = mem.lastHeartbeat;
-            }
-            mem.health = 1.0;
-            mem.lastHeartbeatMsg = info["hbmsg"].String();
-            if (info.hasElement("syncingTo")) {
-                mem.syncingTo = info["syncingTo"].String();
-            }
-            else {
-                // empty out syncingTo since they are no longer syncing to anyone
-                mem.syncingTo = "";
-            }
-
-            if( info.hasElement("opTime") )
-                mem.opTime = info["opTime"].Date();
-
-            // see if this member is in the electable set
-            if( info["e"].eoo() ) {
-                // for backwards compatibility
-                const Member *member = theReplSet->findById(mem.id());
-                if (member && member->config().potentiallyHot()) {
-                    theReplSet->addToElectable(mem.id());
-                }
-                else {
-                    theReplSet->rmFromElectable(mem.id());
-                }
-            }
-            // add this server to the electable set if it is within 10
-            // seconds of the latest optime we know of
-            else if( info["e"].trueValue() &&
-                     mem.opTime >= theReplSet->lastOpTimeWritten.getSecs() - 10) {
-                unsigned lastOp = theReplSet->lastOtherOpTime().getSecs();
-                if (lastOp > 0 && mem.opTime >= lastOp - 10) {
-                    theReplSet->addToElectable(mem.id());
-                }
-            }
-            else {
-                theReplSet->rmFromElectable(mem.id());
-            }
-
-            be cfg = info["config"];
-            if( cfg.ok() ) {
-                // received a new config
-                boost::function<void()> f =
-                    boost::bind(&Manager::msgReceivedNewConfig, theReplSet->mgr, cfg.Obj().copy());
-                theReplSet->mgr->send(f);
-            }
-        }
-
-        // Heartbeat timeout
-        time_t _timeout;
-    };
-
-    int ReplSetHealthPollTask::s_try_offset = 0;
-
     void ReplSetImpl::endOldHealthTasks() {
         unsigned sz = healthTasks.size();
         for( set<ReplSetHealthPollTask*>::iterator i = healthTasks.begin(); i != healthTasks.end(); i++ )
@@ -545,24 +205,27 @@ namespace mongo {
     */
     void ReplSetImpl::startThreads() {
         task::fork(mgr);
-        mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
+        mgr->send( stdx::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
 
         if (myConfig().arbiterOnly) {
             return;
         }
 
+        // this ensures that will have bgsync's s_instance at all points where it is needed
+        // so that we needn't check for its existence
+        BackgroundSync* sync = BackgroundSync::get();
+
         boost::thread t(startSyncThread);
 
-        replset::BackgroundSync* sync = replset::BackgroundSync::get();
-        boost::thread producer(boost::bind(&replset::BackgroundSync::producerThread, sync));
-        boost::thread notifier(boost::bind(&replset::BackgroundSync::notifierThread, sync));
-
-        task::fork(ghost);
+        boost::thread producer(stdx::bind(&BackgroundSync::producerThread, sync));
+        boost::thread feedback(stdx::bind(&SyncSourceFeedback::run,
+                                          &theReplSet->syncSourceFeedback));
 
         // member heartbeats are started in ReplSetImpl::initFromConfig
     }
 
-}
+} // namespace repl
+} // namespace mongo
 
 /* todo:
    stop bg job and delete on removefromset

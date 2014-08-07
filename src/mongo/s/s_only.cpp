@@ -2,17 +2,29 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/pch.h"
@@ -24,7 +36,6 @@
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/matcher.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
@@ -55,7 +66,6 @@ namespace mongo {
 
     Client::Client(const string& desc, AbstractMessagingPort *p) :
         ClientBasic(p),
-        _context(0),
         _shutdown(false),
         _desc(desc),
         _god(0),
@@ -64,7 +74,7 @@ namespace mongo {
     Client::~Client() {}
     bool Client::shutdown() { return true; }
 
-    Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
+    void Client::initThread(const char *desc, AbstractMessagingPort *mp) {
         // mp is non-null only for client connections, and mongos uses ClientInfo for those
         massert(16478, "Client being used for incoming connection thread in mongos", mp == NULL);
 
@@ -81,42 +91,30 @@ namespace mongo {
         mongo::lastError.initThread();
         c->setAuthorizationSession(new AuthorizationSession(new AuthzSessionExternalStateMongos(
                 getGlobalAuthorizationManager())));
-        return *c;
-    }
-
-    /* resets the client for the current thread */
-    // Needed here since we may want to use for testing when linked against mongos
-    void Client::resetThread( const StringData& origThreadName ) {
-        verify( currentClient.get() != 0 );
-
-        // Detach all client info from thread
-        mongo::lastError.reset(NULL);
-        currentClient.get()->shutdown();
-        currentClient.reset(NULL);
-
-        setThreadName( origThreadName.rawData() );
     }
 
     string Client::clientAddress(bool includePort) const {
         ClientInfo * ci = ClientInfo::get();
         if ( ci )
-            return ci->getRemote();
+            return ci->getRemote().toString();
         return "";
     }
 
     // Need a version that takes a Client to match the mongod interface so the web server can call
     // execCommand and not need to worry if it's in a mongod or mongos.
-    void Command::execCommand(Command * c,
+    void Command::execCommand(OperationContext* txn,
+                              Command * c,
                               Client& client,
                               int queryOptions,
                               const char *ns,
                               BSONObj& cmdObj,
                               BSONObjBuilder& result,
                               bool fromRepl ) {
-        execCommandClientBasic(c, client, queryOptions, ns, cmdObj, result, fromRepl);
+        execCommandClientBasic(txn, c, client, queryOptions, ns, cmdObj, result, fromRepl);
     }
 
-    void Command::execCommandClientBasic(Command * c ,
+    void Command::execCommandClientBasic(OperationContext* txn,
+                                         Command * c ,
                                          ClientBasic& client,
                                          int queryOptions,
                                          const char *ns,
@@ -130,7 +128,7 @@ namespace mongo {
             help << "help for: " << c->name << " ";
             c->help( help );
             result.append( "help" , help.str() );
-            result.append( "lockType" , c->locktype() );
+            result.append("lockType", c->isWriteCommandForConfigServer() ? 1 : 0);
             appendCommandStatus(result, true, "");
             return;
         }
@@ -144,7 +142,7 @@ namespace mongo {
         std::string errmsg;
         bool ok;
         try {
-            ok = c->run( dbname , cmdObj, queryOptions, errmsg, result, false );
+            ok = c->run( txn, dbname , cmdObj, queryOptions, errmsg, result, false );
         }
         catch (DBException& e) {
             ok = false;

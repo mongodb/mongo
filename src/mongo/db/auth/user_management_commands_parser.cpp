@@ -43,6 +43,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/password_digest.h"
 
 namespace mongo {
 namespace auth {
@@ -153,7 +154,7 @@ namespace auth {
         return _parseNamesFromBSONArray(rolesArray,
                                         dbname,
                                         AuthorizationManager::ROLE_NAME_FIELD_NAME,
-                                        AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
+                                        AuthorizationManager::ROLE_DB_FIELD_NAME,
                                         parsedRoleNames);
     }
 
@@ -203,7 +204,7 @@ namespace auth {
         }
         return Status::OK();
     }
-
+    
     Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
                                            const StringData& cmdName,
                                            const std::string& dbname,
@@ -215,6 +216,7 @@ namespace auth {
         validFieldNames.insert("pwd");
         validFieldNames.insert("roles");
         validFieldNames.insert("writeConcern");
+        validFieldNames.insert("mechanism");
 
         Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
         if (!status.isOK()) {
@@ -237,6 +239,14 @@ namespace auth {
 
         parsedArgs->userName = UserName(userName, dbname);
 
+        // Parse authMechanism
+        if (cmdObj.hasField("mechanism")) {
+            status = bsonExtractStringField(cmdObj, "mechanism", &parsedArgs->mechanism);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+
         // Parse password
         if (cmdObj.hasField("pwd")) {
             std::string password;
@@ -258,7 +268,8 @@ namespace auth {
             }
 
             if (digestPassword) {
-                parsedArgs->hashedPassword = auth::createPasswordDigest(userName, password);
+                parsedArgs->hashedPassword = mongo::createPasswordDigest(
+                    userName, password);
             } else {
                 parsedArgs->hashedPassword = password;
             }
@@ -423,7 +434,7 @@ namespace auth {
             status = _parseNameFromBSONElement(cmdObj["rolesInfo"],
                                                dbname,
                                                AuthorizationManager::ROLE_NAME_FIELD_NAME,
-                                               AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
+                                               AuthorizationManager::ROLE_DB_FIELD_NAME,
                                                &name);
             if (!status.isOK()) {
                 return status;
@@ -634,6 +645,64 @@ namespace auth {
         }
 
         status = _extractWriteConcern(cmdObj, parsedWriteConcern);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return Status::OK();
+    }
+
+    Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
+                                             MergeAuthzCollectionsArgs* parsedArgs) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert("_mergeAuthzCollections");
+        validFieldNames.insert("tempUsersCollection");
+        validFieldNames.insert("tempRolesCollection");
+        validFieldNames.insert("db");
+        validFieldNames.insert("drop");
+        validFieldNames.insert("writeConcern");
+
+        Status status = _checkNoExtraFields(cmdObj, "_mergeAuthzCollections", validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _extractWriteConcern(cmdObj, &parsedArgs->writeConcern);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = bsonExtractStringFieldWithDefault(cmdObj,
+                                                   "tempUsersCollection",
+                                                   "",
+                                                   &parsedArgs->usersCollName);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = bsonExtractStringFieldWithDefault(cmdObj,
+                                                   "tempRolesCollection",
+                                                   "",
+                                                   &parsedArgs->rolesCollName);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = bsonExtractStringField(cmdObj, "db", &parsedArgs->db);
+        if (!status.isOK()) {
+            if (status == ErrorCodes::NoSuchKey) {
+                return Status(ErrorCodes::OutdatedClient,
+                              "Missing \"db\" field for _mergeAuthzCollections command. This is "
+                              "most likely due to running an outdated (pre-2.6.4) version of "
+                              "mongorestore.");
+            }
+            return status;
+        }
+
+        status = bsonExtractBooleanFieldWithDefault(cmdObj,
+                                                   "drop",
+                                                   false,
+                                                   &parsedArgs->drop);
         if (!status.isOK()) {
             return status;
         }

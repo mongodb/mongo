@@ -43,6 +43,7 @@ namespace mongo {
     class BSONObjBuilder;
     class CurOp;
     class OpCounters;
+    class OperationContext;
     struct LastError;
 
     struct WriteOpStats;
@@ -55,7 +56,11 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(WriteBatchExecutor);
     public:
 
-        WriteBatchExecutor( const BSONObj& defaultWriteConcern,
+        // State object used by private execInserts.  TODO: Do not expose this type.
+        class ExecInsertsState;
+
+        WriteBatchExecutor( OperationContext* txn,
+                            const BSONObj& defaultWriteConcern,
                             Client* client,
                             OpCounters* opCounters,
                             LastError* le );
@@ -69,7 +74,6 @@ namespace mongo {
         const WriteBatchStats& getStats() const;
 
     private:
-
         /**
          * Executes the writes in the batch and returns upserted _ids and write errors.
          * Dispatches to one of the three functions below for DBLock, CurOp, and stats management.
@@ -87,6 +91,11 @@ namespace mongo {
          */
         void execInserts( const BatchedCommandRequest& request,
                           std::vector<WriteErrorDetail*>* errors );
+
+        /**
+         * Executes a single insert from a batch, described in the opaque "state" object.
+         */
+        void execOneInsert( ExecInsertsState* state, WriteErrorDetail** error );
 
         /**
          * Executes an update item (which may update many documents or upsert), and returns the
@@ -124,6 +133,8 @@ namespace mongo {
                             const WriteOpStats& stats,
                             const WriteErrorDetail* error,
                             CurOp* currentOp );
+
+        OperationContext* _txn;
 
         // Default write concern, if one isn't provide in the batches.
         const BSONObj _defaultWriteConcern;
@@ -177,12 +188,12 @@ namespace mongo {
     public:
 
         WriteBatchStats() :
-            numInserted( 0 ), numUpserted( 0 ), numUpdated( 0 ), numModified( 0 ), numDeleted( 0 ) {
+            numInserted( 0 ), numUpserted( 0 ), numMatched( 0 ), numModified( 0 ), numDeleted( 0 ) {
         }
 
         int numInserted;
         int numUpserted;
-        int numUpdated;
+        int numMatched;
         int numModified;
         int numDeleted;
     };

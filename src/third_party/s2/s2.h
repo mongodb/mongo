@@ -37,7 +37,7 @@ typedef Vector3_d S2Point;
 
 HASH_NAMESPACE_START
 
-template<> class hash<S2Point> {
+template<> struct hash<S2Point> {
 public:
   size_t operator()(S2Point const& p) const;
 };

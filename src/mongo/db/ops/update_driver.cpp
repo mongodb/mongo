@@ -49,8 +49,6 @@ namespace mongo {
     UpdateDriver::UpdateDriver(const Options& opts)
         : _replacementMode(false)
         , _indexedFields(NULL)
-        , _multi(opts.multi)
-        , _upsert(opts.upsert)
         , _logOp(opts.logOp)
         , _modOptions(opts.modOptions)
         , _affectIndices(false)
@@ -61,12 +59,12 @@ namespace mongo {
         clear();
     }
 
-    Status UpdateDriver::parse(const BSONObj& updateExpr) {
+    Status UpdateDriver::parse(const BSONObj& updateExpr, const bool multi) {
         clear();
 
         // Check if the update expression is a full object replacement.
         if (*updateExpr.firstElementFieldName() != '$') {
-            if (_multi) {
+            if (multi) {
                 return Status(ErrorCodes::FailedToParse,
                               "multi update only works with $ operators");
             }
@@ -117,7 +115,7 @@ namespace mongo {
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << "'" << outerModElem.fieldName()
                                             << "' is empty. You must specify a field like so: "
-                                                    "{$mod: {<field>: ...}}");
+                                                    "{" << outerModElem.fieldName() << ": {<field>: ...}}");
             }
 
             BSONObjIterator innerIter(outerModElem.embeddedObject());
@@ -169,7 +167,9 @@ namespace mongo {
                                                          mutablebson::Document& doc) const {
         CanonicalQuery* rawCG;
         // We canonicalize the query to collapse $and/$or, and the first arg (ns) is not needed
-        Status s = CanonicalQuery::canonicalize("", query, &rawCG);
+        // Also, because this is for the upsert case, where we insert a new document if one was
+        // not found, the $where clause does not make sense, hence empty WhereCallback.
+        Status s = CanonicalQuery::canonicalize("", query, &rawCG, WhereCallbackNoop());
         if (!s.isOK())
             return s;
         scoped_ptr<CanonicalQuery> cq(rawCG);
@@ -205,8 +205,6 @@ namespace mongo {
         // Create a new UpdateDriver to create the base doc from the query
         Options opts;
         opts.logOp = false;
-        opts.multi = false;
-        opts.upsert = true;
         opts.modOptions = modOptions();
 
         UpdateDriver insertDriver(opts);
@@ -365,7 +363,7 @@ namespace mongo {
             }
 
             // If we require a replication oplog entry for this update, go ahead and generate one.
-            if (_logOp && logOpRec) {
+            if (!execInfo.noOp && _logOp && logOpRec) {
                 status = (*it)->log(&logBuilder);
                 if (!status.isOK()) {
                     return status;
@@ -392,24 +390,8 @@ namespace mongo {
         return _affectIndices;
     }
 
-    void UpdateDriver::refreshIndexKeys(const IndexPathSet* indexedFields) {
+    void UpdateDriver::refreshIndexKeys(const UpdateIndexData* indexedFields) {
         _indexedFields = indexedFields;
-    }
-
-    bool UpdateDriver::multi() const {
-        return _multi;
-    }
-
-    void UpdateDriver::setMulti(bool multi) {
-        _multi = multi;
-    }
-
-    bool UpdateDriver::upsert() const {
-        return _upsert;
-    }
-
-    void UpdateDriver::setUpsert(bool upsert) {
-        _upsert = upsert;
     }
 
     bool UpdateDriver::logOp() const {
@@ -459,6 +441,7 @@ namespace mongo {
         for (vector<ModifierInterface*>::iterator it = _mods.begin(); it != _mods.end(); ++it) {
             delete *it;
         }
+        _mods.clear();
         _indexedFields = NULL;
         _replacementMode = false;
         _positional = false;

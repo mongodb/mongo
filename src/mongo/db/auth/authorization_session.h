@@ -71,13 +71,13 @@ namespace mongo {
         // Should be called at the beginning of every new request.  This performs the checks
         // necessary to determine if localhost connections should be given full access.
         // TODO: try to eliminate the need for this call.
-        void startRequest();
+        void startRequest(OperationContext* txn);
 
         /**
          * Adds the User identified by "UserName" to the authorization session, acquiring privileges
          * for it in the process.
          */
-        Status addAndAuthorizeUser(const UserName& userName);
+        Status addAndAuthorizeUser(OperationContext* txn, const UserName& userName);
 
         // Returns the authenticated user with the given name.  Returns NULL
         // if no such user is found.
@@ -85,14 +85,14 @@ namespace mongo {
         // and ownership of the user stays with the AuthorizationManager
         User* lookupUser(const UserName& name);
 
-        // Returns the number of authenticated users in this session.
-        size_t getNumAuthenticatedUsers();
-
         // Gets an iterator over the names of all authenticated users stored in this manager.
         UserNameIterator getAuthenticatedUserNames();
 
-        // Returns a string representing all logged-in users on the current session.
-        // WARNING: this string will contain NUL bytes so don't call c_str()!
+        // Gets an iterator over the roles of all authenticated users stored in this manager.
+        RoleNameIterator getAuthenticatedRoleNames();
+
+        // Returns a std::string representing all logged-in users on the current session.
+        // WARNING: this std::string will contain NUL bytes so don't call c_str()!
         std::string getAuthenticatedUserNamesToken();
 
         // Removes any authenticated principals whose authorization credentials came from the given
@@ -102,6 +102,13 @@ namespace mongo {
         // Adds the internalSecurity user to the set of authenticated users.
         // Used to grant internal threads full access.
         void grantInternalAuthorization();
+
+        // Generates a vector of default privileges that are granted to any user,
+        // regardless of which roles that user does or does not possess.
+        // If localhost exception is active, the permissions include the ability to create
+        // the first user and the ability to run the commands needed to bootstrap the system
+        // into a state where the first user can be created.
+        PrivilegeVector getDefaultPrivileges();
 
         // Checks if this connection has the privileges necessary to perform the given query on the
         // given namespace.
@@ -163,7 +170,7 @@ namespace mongo {
 
         // Like isAuthorizedForPrivilege, above, except returns true if the session is authorized
         // for all of the listed privileges.
-        bool isAuthorizedForPrivileges(const vector<Privilege>& privileges);
+        bool isAuthorizedForPrivileges(const std::vector<Privilege>& privileges);
 
         // Utility function for isAuthorizedForPrivilege(Privilege(resource, action)).
         bool isAuthorizedForActionsOnResource(const ResourcePattern& resource, ActionType action);
@@ -178,20 +185,24 @@ namespace mongo {
 
         // Utility function for
         // isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns), actions).
-        bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns, const ActionSet& actions);
+        bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
+                                               const ActionSet& actions);
 
-        // Replaces the vector of UserNames that a system user is impersonating with a new vector.
-        // The auditing system adds these to each audit record in the log.
-        void setImpersonatedUserNames(const std::vector<UserName>& names);
+        // Replaces the data for users that a system user is impersonating with new data.
+        // The auditing system adds these users and their roles to each audit record in the log.
+        void setImpersonatedUserData(std::vector<UserName> usernames, std::vector<RoleName> roles);
 
-        // Returns an iterator to a vector of impersonated usernames.  
-        UserNameIterator getImpersonatedUserNames() const;
+        // Gets an iterator over the names of all users that the system user is impersonating.
+        UserNameIterator getImpersonatedUserNames();
 
-        // Clears the vector of impersonated UserNames.
-        void clearImpersonatedUserNames();
+        // Gets an iterator over the roles of all users that the system user is impersonating.
+        RoleNameIterator getImpersonatedRoleNames();
+
+        // Clears the data for impersonated users.
+        void clearImpersonatedUserData();
 
         // Tells whether impersonation is active or not.  This state is set when
-        // setImpersonatedUserNames is called and cleared when clearImpersonatedUserNames is 
+        // setImpersonatedUserData is called and cleared when clearImpersonatedUserData is
         // called.
         bool isImpersonating() const;
 
@@ -199,7 +210,12 @@ namespace mongo {
 
         // If any users authenticated on this session are marked as invalid this updates them with
         // up-to-date information. May require a read lock on the "admin" db to read the user data.
-        void _refreshUserInfoAsNeeded();
+        void _refreshUserInfoAsNeeded(OperationContext* txn);
+
+        // Builds a vector of all roles held by users who are authenticated on this connection. The
+        // vector is stored in _authenticatedRoleNames. This function is called when users are
+        // logged in or logged out, as well as when the user cache is determined to be out of date.
+        void _buildAuthenticatedRolesVector();
 
         // Checks if this connection is authorized for the given Privilege, ignoring whether or not
         // we should even be doing authorization checks in general.  Note: this may acquire a read
@@ -208,12 +224,16 @@ namespace mongo {
 
         scoped_ptr<AuthzSessionExternalState> _externalState;
 
-        // All Users who have been authenticated on this connection
+        // All Users who have been authenticated on this connection.
         UserSet _authenticatedUsers;
+        // The roles of the authenticated users. This vector is generated when the authenticated
+        // users set is changed.
+        std::vector<RoleName> _authenticatedRoleNames;
 
-        // A vector of impersonated UserNames.  These are used in the auditing system.
-        // They are not used for authz checks.
+        // A vector of impersonated UserNames and a vector of those users' RoleNames.
+        // These are used in the auditing system. They are not used for authz checks.
         std::vector<UserName> _impersonatedUserNames;
+        std::vector<RoleName> _impersonatedRoleNames;
         bool _impersonationFlag;
     };
 

@@ -30,13 +30,15 @@
 
 #pragma once
 
-#include <pcrecpp.h>
-
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/matcher/expression.h"
+
+namespace pcrecpp {
+    class RE;
+} // namespace pcrecpp;
 
 namespace mongo {
 
@@ -91,6 +93,8 @@ namespace mongo {
         virtual const BSONElement& getRHS() const { return _rhs; }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
 
@@ -186,7 +190,8 @@ namespace mongo {
          */
         static const size_t MaxPatternSize = 32764;
 
-        RegexMatchExpression() : LeafMatchExpression( REGEX ){}
+        RegexMatchExpression();
+        ~RegexMatchExpression();
 
         Status init( const StringData& path, const StringData& regex, const StringData& options );
         Status init( const StringData& path, const BSONElement& e );
@@ -204,10 +209,14 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level ) const;
 
+        virtual void toBSON(BSONObjBuilder* out) const;
+
+        void shortDebugString( StringBuilder& debug ) const;
+
         virtual bool equivalent( const MatchExpression* other ) const;
 
-        const string& getString() const { return _regex; }
-        const string& getFlags() const { return _flags; }
+        const std::string& getString() const { return _regex; }
+        const std::string& getFlags() const { return _flags; }
 
     private:
         std::string _regex;
@@ -233,6 +242,8 @@ namespace mongo {
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
 
@@ -262,6 +273,8 @@ namespace mongo {
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
     };
@@ -296,6 +309,10 @@ namespace mongo {
 
         void copyTo( ArrayFilterEntries& toFillIn ) const;
 
+        void debugString( StringBuilder& debug ) const;
+
+        void toBSON(BSONArrayBuilder* out) const;
+
     private:
         bool _hasNull; // if _equalities has a jstNULL element in it
         bool _hasEmptyArray;
@@ -318,6 +335,8 @@ namespace mongo {
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
 
@@ -358,6 +377,8 @@ namespace mongo {
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
 
         virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual void toBSON(BSONObjBuilder* out) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
 

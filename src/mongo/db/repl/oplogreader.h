@@ -37,6 +37,8 @@
 namespace mongo {
 
     extern const BSONObj reverseNaturalObj; // { $natural : -1 }
+
+namespace repl {
     /**
      * Authenticates conn using the server's cluster-membership credentials.
      *
@@ -74,13 +76,13 @@ namespace mongo {
         /* ok to call if already connected */
         bool connect(const std::string& hostname);
 
-        bool connect(const std::string& hostname, const BSONObj& me);
+        bool connect(const std::string& hostname, const OID& myRID);
 
-        bool connect(const mongo::OID& rid, const int from, const string& to);
+        bool connect(const mongo::OID& rid, const int from, const std::string& to);
 
         void tailCheck() {
             if( cursor.get() && cursor->isDead() ) {
-                log() << "repl: old cursor isDead, will initiate a new one" << endl;
+                log() << "repl: old cursor isDead, will initiate a new one" << std::endl;
                 resetCursor();
             }
         }
@@ -149,7 +151,7 @@ namespace mongo {
         int getTailingQueryOptions() const { return _tailingQueryOptions; }
         void setTailingQueryOptions( int tailingQueryOptions ) { _tailingQueryOptions = tailingQueryOptions; }
 
-        void peek(vector<BSONObj>& v, int n) {
+        void peek(std::vector<BSONObj>& v, int n) {
             if( cursor.get() )
                 cursor->peek(v,n);
         }
@@ -159,8 +161,9 @@ namespace mongo {
         
     private:
         /** @return true iff connection was successful */ 
-        bool commonConnect(const string& hostName);
+        bool commonConnect(const std::string& hostName);
         bool passthroughHandshake(const mongo::OID& rid, const int f);
     };
 
-}
+} // namespace repl
+} // namespace mongo

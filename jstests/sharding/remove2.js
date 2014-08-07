@@ -19,7 +19,7 @@ removeShard = function(st, replTest) {
         printjson(res);
         return res.ok && res.msg == 'removeshard completed successfully';
     }
-    assert.soon( checkRemoveShard , "failed to remove shard" );
+    assert.soon( checkRemoveShard, "failed to remove shard", 5 * 60000 );
 
     // Need to wait for migration to be over... only works for inline deletes
     checkNSLock = function() {
@@ -59,7 +59,7 @@ addShard = function(st, replTest) {
         var x = st.chunkDiff( coll.getName() , coll.getDB().getName() );
         print( "chunk diff: " + x );
         return x < 2;
-    } , "no balance happened", 5 * 60 * 1000 );
+    } , "no balance happened", 30 * 60 * 1000 );
 
     try {
         assert.eq( 300, coll.find().itcount() );
@@ -78,7 +78,8 @@ var st = new ShardingTest( testName = "remove2",
                            { chunkSize : 1,
                              rs : true,
                              rs0 : { nodes : 2 },
-                             rs1 : { nodes : 2 }
+                             rs1 : { nodes : 2 },
+                             enableBalancer: true
                            });
 
 // Pending resolution of SERVER-8598, we need to wait for deletion after chunk migrations to avoid
@@ -110,17 +111,18 @@ var str = 'a';
 while( str.length < 1024 * 16 ) {
     str += str;
 }
-for( var i = 0; i < 300; i++ ){
-    coll.insert( { i : i % 10, str : str } );
-}
 
-coll.getDB().getLastError();
+var bulk = coll.initializeUnorderedBulkOp();
+for( var i = 0; i < 300; i++ ){
+    bulk.insert({ i: i % 10, str: str });
+}
+assert.writeOK(bulk.execute());
 
 assert.eq( 300, coll.find().itcount() );
 
 assert.soon( function() {
     var x = st.chunkDiff( 'remove2' , "test" ); print( "chunk diff: " + x ); return x < 2;
-} , "no balance happened", 5 * 60 * 1000 );
+} , "no balance happened", 30 * 60 * 1000 );
 
 assert.eq( 300, coll.find().itcount() );
 

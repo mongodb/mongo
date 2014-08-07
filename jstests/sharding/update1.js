@@ -41,13 +41,10 @@ for(i=0; i < 2; i++){
         assert.eq(x._id, x.other, "_id == other");
     });
 
-
-    coll.update({_id:1, key:1}, {$set: {key:2}});
-    err = db.getLastErrorObj();
+    assert.writeError(coll.update({ _id: 1, key: 1 }, { $set: { key: 2 }}));
     assert.eq(coll.findOne({_id:1}).key, 1, 'key unchanged');
 
-    coll.update({_id:1, key:1}, {$set: {foo:2}});
-    assert.isnull(db.getLastError(), 'getLastError reset');
+    assert.writeOK(coll.update({ _id: 1, key: 1 }, { $set: { foo: 2 }}));
 
     coll.update( { key : 17 } , { $inc : { x : 5 } } , true  );
     assert.eq( 5 , coll.findOne( { key : 17 } ).x , "up1" )

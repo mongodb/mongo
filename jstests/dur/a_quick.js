@@ -5,7 +5,37 @@
 */
 
 testname = "a_quick";
-load("jstests/_tst.js");
+tst = {}
+
+tst.log = function (optional_msg) {
+    print("\n\nstep " + ++this._step + " " + (optional_msg || ""));
+}
+
+tst.success = function () {
+    print(testname + " SUCCESS");
+}
+
+/* diff files a and b, returning the difference (empty str if no difference) */
+tst.diff = function(a, b) {
+    function reSlash(s) {
+        var x = s;
+        if (_isWindows()) {
+            while (1) {
+                var y = x.replace('/', '\\');
+                if (y == x)
+                    break;
+                x = y;
+            }
+        }
+        return x;
+    }
+    a = reSlash(a);
+    b = reSlash(b);
+    print("diff " + a + " " + b);
+    return run("diff", a, b);
+}
+print(testname + " BEGIN");
+tst._step = 0;
 
 function checkNoJournalFiles(path, pass) {
     var files = listFiles(path);
@@ -32,8 +62,7 @@ tst.log("start mongod without dur");
 var conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur");
 tst.log("without dur work");
 var d = conn.getDB("test");
-d.foo.insert({ _id:123 });
-d.getLastError();
+assert.writeOK(d.foo.insert({ _id: 123 }));
 tst.log("stop without dur");
 stopMongod(30000);
 
@@ -42,8 +71,7 @@ tst.log("start mongod with dur");
 conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--durOptions", 8);
 tst.log("with dur work");
 d = conn.getDB("test");
-d.foo.insert({ _id: 123 });
-d.getLastError(); // wait
+assert.writeOK(d.foo.insert({ _id: 123 }));
 
 // we could actually do getlasterror fsync:1 now, but maybe this is agood 
 // as it will assure that commits happen on a timely basis.  a bunch of the other dur/*js

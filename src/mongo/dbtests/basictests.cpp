@@ -32,6 +32,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/db.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/array.h"
 #include "mongo/util/base64.h"
@@ -351,11 +352,12 @@ namespace BasicTests {
         void run() {
             ThreadSafeString s;
             s = "eliot";
-            ASSERT_EQUALS( s , "eliot" );
-            ASSERT( s != "eliot2" );
+            ASSERT_EQUALS( s.toString() , "eliot" );
+            ASSERT( s.toString() != "eliot2" );
 
-            ThreadSafeString s2 = s;
-            ASSERT_EQUALS( s2 , "eliot" );
+            ThreadSafeString s2;
+            s2 = s.toString().c_str();
+            ASSERT_EQUALS( s2.toString() , "eliot" );
 
 
             {
@@ -374,19 +376,17 @@ namespace BasicTests {
     class DatabaseOwnsNS {
     public:
         void run() {
-            Lock::GlobalWrite lk;
-            bool isNew = false;
-            // this leaks as ~Database is private
-            // if that changes, should put this on the stack
-            {
-                Database * db = new Database( "dbtests_basictests_ownsns" , isNew );
-                verify( isNew );
+            OperationContextImpl txn;
+            Lock::GlobalWrite lk(txn.lockState());
 
-                ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x" ) );
-                ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x.y" ) );
-                ASSERT( ! db->ownsNS( "dbtests_basictests_ownsn.x.y" ) );
-                ASSERT( ! db->ownsNS( "dbtests_basictests_ownsnsa.x.y" ) );
-            }
+            WriteUnitOfWork wunit(txn.recoveryUnit());
+            Database db( &txn, "dbtests_basictests_ownsns", NULL );
+            wunit.commit();
+
+            ASSERT( db.ownsNS( "dbtests_basictests_ownsns.x" ) );
+            ASSERT( db.ownsNS( "dbtests_basictests_ownsns.x.y" ) );
+            ASSERT( !db.ownsNS( "dbtests_basictests_ownsn.x.y" ) );
+            ASSERT( !db.ownsNS( "dbtests_basictests_ownsnsa.x.y" ) );
         }
     };
 

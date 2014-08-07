@@ -41,16 +41,29 @@ namespace mongo {
      */
     struct OrderedIntervalList {
         OrderedIntervalList() { }
-        OrderedIntervalList(const string& n) : name(n) { }
+        OrderedIntervalList(const std::string& n) : name(n) { }
 
         // Must be ordered according to the index order.
-        vector<Interval> intervals;
+        std::vector<Interval> intervals;
 
         // TODO: We could drop this.  Only used in IndexBounds::isValidFor.
-        string name;
+        std::string name;
 
         bool isValidFor(int expectedOrientation) const;
         std::string toString() const;
+
+        /**
+         * Complements the OIL. Used by the index bounds builder in order
+         * to create index bounds for $not predicates.
+         *
+         * Assumes the OIL is increasing, and therefore must be called prior to
+         * alignBounds(...).
+         *
+         * Example:
+         *   The complement of [3, 6), [8, 10] is [MinKey, 3), [6, 8), (20, MaxKey],
+         *   where this OIL has direction==1.
+         */
+        void complement();
     };
 
     /**
@@ -58,10 +71,10 @@ namespace mongo {
      * interpret.  Previously known as FieldRangeVector.
      */
     struct IndexBounds {
-        IndexBounds() : isSimpleRange(false) { }
+        IndexBounds() : isSimpleRange(false), endKeyInclusive(false) { }
 
         // For each indexed field, the values that the field is allowed to take on.
-        vector<OrderedIntervalList> fields;
+        std::vector<OrderedIntervalList> fields;
 
         // Debugging check.
         // We must have as many fields the key pattern does.
@@ -80,6 +93,25 @@ namespace mongo {
         size_t getNumIntervals(size_t i) const;
         Interval getInterval(size_t i, size_t j) const;
         std::string toString() const;
+
+        /**
+         * Legacy BSON format for explain. The format is an array of arrays for each field.
+         *
+         * TODO remove this function once the new explain format is on by default.
+         *
+         * Ex.
+         *   {a: [ [1, 1], [3, 10] ], b: [ [Infinity, 10] ] }
+         */
+        BSONObj toLegacyBSON() const;
+
+        /**
+         * BSON format for explain. The format is an array of strings for each field.
+         * Each string represents an interval. The strings use "[" and "]" if the interval
+         * bounds are inclusive, and "(" / ")" if exclusive.
+         *
+         * Ex.
+         *  {a: ["[1, 1]", "(3, 10)"], b: ["[Infinity, 10)"] }
+         */
         BSONObj toBSON() const;
 
         // TODO: we use this for max/min scan.  Consider migrating that.
@@ -108,7 +140,7 @@ namespace mongo {
          *
          * Returns true if there is a valid start key.  Returns false otherwise.
          */
-        bool getStartKey(vector<const BSONElement*>* valueOut, vector<bool>* inclusiveOut);
+        bool getStartKey(std::vector<const BSONElement*>* valueOut, std::vector<bool>* inclusiveOut);
 
         /**
          * The states of a key from an index scan.  See checkKey below.
@@ -166,44 +198,17 @@ namespace mongo {
          *         If the i-th element is true, seek to the i-th element of out.
          */
         KeyState checkKey(const BSONObj& key, int* keyEltsToUse, bool* movePastKeyElts,
-                          vector<const BSONElement*>* out, vector<bool>* incOut);
+                          std::vector<const BSONElement*>* out, std::vector<bool>* incOut);
 
-    private:
+        /**
+         * Relative position of a key to an interval.
+         * Exposed for testing only.
+         */
         enum Location {
             BEHIND = -1,
             WITHIN = 0,
             AHEAD = 1,
         };
-
-        /**
-         * Find the first field in the key that isn't within the interval we think it is.  Returns
-         * false if every field is in the interval we think it is.  Returns true and populates out
-         * parameters if a field isn't in the interval we think it is.
-         *
-         * Out parameters set if we return true:
-         * 'where' is the leftmost field that isn't in the interval we think it is.
-         * 'what' is the orientation of the field with respect to that interval.
-         */
-        bool findLeftmostProblem(const vector<BSONElement>& keyValues, size_t* where,
-                                 Location* what);
-
-        /**
-         * Returns true if it's possible to advance any of the first 'fieldsToCheck' fields of the
-         * index key and still be within valid index bounds.
-         *
-         * keyValues are the elements of the index key in order.
-         */
-        bool spaceLeftToAdvance(size_t fieldsToCheck, const vector<BSONElement>& keyValues);
-
-        /**
-         * Returns BEHIND if the key is behind the interval.
-         * Returns WITHIN if the key is within the interval.
-         * Returns AHEAD if the key is ahead the interval.
-         *
-         * All directions are oriented along 'direction'.
-         */
-        static Location intervalCmp(const Interval& interval, const BSONElement& key,
-                                    const int expectedDirection);
 
         /**
          * If 'elt' is in any interval, return WITHIN and set 'newIntervalIndex' to the index of the
@@ -214,20 +219,42 @@ namespace mongo {
          *
          * If 'elt' cannot be advanced to any interval, return AHEAD.
          *
+         * Exposed for testing only.
+         *
          * TODO(efficiency): Start search from a given index.
-         * TODO(efficiency): Binary search for the answer.
          */
         static Location findIntervalForField(const BSONElement &elt, const OrderedIntervalList& oil,
                                              const int expectedDirection, size_t* newIntervalIndex);
+
+    private:
+        /**
+         * Find the first field in the key that isn't within the interval we think it is.  Returns
+         * false if every field is in the interval we think it is.  Returns true and populates out
+         * parameters if a field isn't in the interval we think it is.
+         *
+         * Out parameters set if we return true:
+         * 'where' is the leftmost field that isn't in the interval we think it is.
+         * 'what' is the orientation of the field with respect to that interval.
+         */
+        bool findLeftmostProblem(const std::vector<BSONElement>& keyValues, size_t* where,
+                                 Location* what);
+
+        /**
+         * Returns true if it's possible to advance any of the first 'fieldsToCheck' fields of the
+         * index key and still be within valid index bounds.
+         *
+         * keyValues are the elements of the index key in order.
+         */
+        bool spaceLeftToAdvance(size_t fieldsToCheck, const std::vector<BSONElement>& keyValues);
 
         // The actual bounds.  Must outlive this object.  Not owned by us.
         const IndexBounds* _bounds;
 
         // For each field, which interval are we currently in?
-        vector<size_t> _curInterval;
+        std::vector<size_t> _curInterval;
 
         // Direction of scan * direction of indexing.
-        vector<int> _expectedDirection;
+        std::vector<int> _expectedDirection;
     };
 
 }  // namespace mongo

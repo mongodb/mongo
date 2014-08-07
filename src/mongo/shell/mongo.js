@@ -8,17 +8,17 @@ if ( typeof Mongo == "undefined" ){
 }
 
 if ( ! Mongo.prototype ){
-    throw "Mongo.prototype not defined";
+    throw Error("Mongo.prototype not defined");
 }
 
 if ( ! Mongo.prototype.find )
-    Mongo.prototype.find = function( ns , query , fields , limit , skip , batchSize , options ){ throw "find not implemented"; }
+    Mongo.prototype.find = function( ns , query , fields , limit , skip , batchSize , options ){ throw Error("find not implemented"); }
 if ( ! Mongo.prototype.insert )
-    Mongo.prototype.insert = function( ns , obj ){ throw "insert not implemented"; }
+    Mongo.prototype.insert = function( ns , obj ){ throw Error("insert not implemented"); }
 if ( ! Mongo.prototype.remove )
-    Mongo.prototype.remove = function( ns , pattern ){ throw "remove not implemented;" }
+    Mongo.prototype.remove = function( ns , pattern ){ throw Error("remove not implemented"); }
 if ( ! Mongo.prototype.update )
-    Mongo.prototype.update = function( ns , query , obj , upsert ){ throw "update not implemented;" }
+    Mongo.prototype.update = function( ns , query , obj , upsert ){ throw Error("update not implemented"); }
 
 if ( typeof mongoInject == "function" ){
     mongoInject( Mongo.prototype );
@@ -44,7 +44,7 @@ Mongo.prototype.getDB = function( name ){
 Mongo.prototype.getDBs = function(){
     var res = this.getDB( "admin" ).runCommand( { "listDatabases" : 1 } );
     if ( ! res.ok )
-        throw "listDatabases failed:" + tojson( res );
+        throw Error( "listDatabases failed:" + tojson( res ) );
     return res;
 }
 
@@ -67,7 +67,7 @@ Mongo.prototype.getDBNames = function(){
 Mongo.prototype.getCollection = function(ns){
     var idx = ns.indexOf( "." );
     if ( idx < 0 ) 
-        throw "need . in ns";
+        throw Error("need . in ns");
     var db = ns.substring( 0 , idx );
     var c = ns.substring( idx + 1 );
     return this.getDB( db ).getCollection( c );
@@ -81,7 +81,7 @@ Mongo.prototype.tojson = Mongo.prototype.toString;
 /**
  * Sets the read preference.
  *
- * @param mode {string} read prefrence mode to use. Pass null to disable read
+ * @param mode {string} read preference mode to use. Pass null to disable read
  *     preference.
  * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
  *     Note that this object only keeps a shallow copy of this array.
@@ -155,34 +155,63 @@ connect = function(url, user, pass) {
     return db;
 }
 
+/** deprecated, use writeMode below
+ * 
+ */
+Mongo.prototype.useWriteCommands = function() {
+	return (this.writeMode() != "legacy");
+}
+
+Mongo.prototype.forceWriteMode = function( mode ) {
+    this._writeMode = mode;
+}
+
+Mongo.prototype.hasWriteCommands = function() {
+    if ( !('_hasWriteCommands' in this) ) {
+        var isMaster = this.getDB("admin").runCommand({ isMaster : 1 });
+        this._hasWriteCommands = (isMaster.ok && 
+                                  'minWireVersion' in isMaster &&
+                                  isMaster.minWireVersion <= 2 && 
+                                  2 <= isMaster.maxWireVersion );
+    }
+    
+    return this._hasWriteCommands;
+}
+
 /**
- * {Boolean} If true, uses the write commands instead of the legacy write ops.
+ * {String} Returns the current mode set. Will be commands/legacy/compatibility
  * 
  * Sends isMaster to determine if the connection is capable of using bulk write operations, and
  * caches the result.
  */
-Mongo.prototype.useWriteCommands = function() {
 
-    if ( '_useWriteCommands' in this ) {
-        return this._useWriteCommands;
+Mongo.prototype.writeMode = function() {
+
+    if ( '_writeMode' in this ) {
+        return this._writeMode;
     }
 
-    // always use legacy write commands against old servers
-    var isMaster = this.getDB("admin").runCommand({ isMaster : 1 });
-    if ( isMaster.ok && 'minWireVersion' in isMaster &&
-         isMaster.minWireVersion <= 2 && 2 <= isMaster.maxWireVersion ) {
-        this._useWriteCommands = _useWriteCommandsDefault();
+    // get default from shell params
+    if ( _writeMode )
+        this._writeMode = _writeMode();
+    
+    // can't use "commands" mode unless server version is good.
+    if ( this.hasWriteCommands() ) {
+        // good with whatever is already set
     }
-    else {
-        this._useWriteCommands = false;
+    else if ( this._writeMode == "commands" ) {
+        print("Cannot use commands write mode, degrading to compatibility mode");
+        this._writeMode = "compatibility";
     }
     
-    return this._useWriteCommands;
+    return this._writeMode;
 };
 
+
+
 //
-// Write Concern can be set at the connection level, and is used for all write operations
-// TODO: (unless overridden)
+// Write Concern can be set at the connection level, and is used for all write operations unless
+// overridden at the collection level.
 //
 
 Mongo.prototype.setWriteConcern = function( wc ) {

@@ -33,6 +33,7 @@
 #include "pcrecpp.h"
 
 #include "mongo/base/status.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
@@ -73,7 +74,8 @@ namespace mongo {
 
     Status addRemoteServerToolOptions(moe::OptionSection* options) {
         options->addOptionChaining("host", "host,h", moe::String,
-                "mongo host to connect to ( <set name>/s1,s2 for sets)");
+                "mongo host to connect to ( <set name>/s1,s2 for sets)")
+                                  .incompatibleWith("dbpath");
 
         options->addOptionChaining("port", "port", moe::Int,
                 "server port. Can also use --host hostname:port")
@@ -114,6 +116,13 @@ namespace mongo {
                 moe::String, "authentication mechanism")
                                   .setDefault(moe::Value(std::string("MONGODB-CR")));
 
+        options->addOptionChaining("gssapiServiceName", "gssapiServiceName",
+                 moe::String,
+                "Service name to use when authenticating using GSSAPI/Kerberos")
+            .setDefault(moe::Value(std::string(saslDefaultServiceName)));
+
+        options->addOptionChaining("gssapiHostName", "gssapiHostName", moe::String,
+                "Remote host name to use for purpose of GSSAPI/Kerberos authentication");
 
         return Status::OK();
     }
@@ -122,7 +131,8 @@ namespace mongo {
         options->addOptionChaining("dbpath", "dbpath", moe::String,
                 "directly access mongod database files in the given path, instead of "
                 "connecting to a mongod  server - needs to lock the data directory, "
-                "so cannot be used if a mongod is currently accessing the same path");
+                "so cannot be used if a mongod is currently accessing the same path")
+                                  .incompatibleWith("host");
 
         options->addOptionChaining("directoryperdb", "directoryperdb", moe::Switch,
                 "each db is in a separate directory (relevant only if dbpath specified)");
@@ -223,6 +233,13 @@ namespace mongo {
                 params["authenticationMechanism"].as<string>();
         }
 
+        if (params.count("gssapiServiceName")) {
+            toolGlobalParams.gssapiServiceName = params["gssapiServiceName"].as<string>();
+        }
+
+        if (params.count("gssapiHostName")) {
+            toolGlobalParams.gssapiHostName = params["gssapiHostName"].as<string>();
+        }
         if (params.count("verbose")) {
             logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
         }

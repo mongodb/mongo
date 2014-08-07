@@ -28,6 +28,7 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/timer.h"
@@ -47,7 +48,7 @@ namespace {
         }
 
         void start( int increments ) {
-            _t = new boost::thread( boost::bind(&LockTester::test, this, increments) );
+            _t = new boost::thread( mongo::stdx::bind(&LockTester::test, this, increments) );
         }
 
         void join() {

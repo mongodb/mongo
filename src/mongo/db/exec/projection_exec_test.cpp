@@ -34,6 +34,7 @@
 
 #include <memory>
 #include "mongo/db/json.h"
+#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/unittest/unittest.h"
 
@@ -64,12 +65,14 @@ namespace {
      * specStr - projection specification
      * queryStr - query
      * objStr - object to run projection on
+     * data - computed data. Owned by working set member created in this function if not null.
      * expectedStatusOK - expected status of transformation
      * expectedObjStr - expected object after successful projection.
      *                  Ignored if expectedStatusOK is false.
      */
 
     void testTransform(const char* specStr, const char* queryStr, const char* objStr,
+                       WorkingSetComputedData* data,
                        bool expectedStatusOK, const char* expectedObjStr) {
         // Create projection exec object.
         BSONObj spec = fromjson(specStr);
@@ -81,6 +84,9 @@ namespace {
         WorkingSetMember wsm;
         wsm.state = WorkingSetMember::OWNED_OBJ;
         wsm.obj = fromjson(objStr);
+        if (data) {
+            wsm.addComputed(data);
+        }
 
         // Transform object
         Status status = exec.transform(&wsm);
@@ -123,6 +129,14 @@ namespace {
                << "\nactual object after projection: " << obj.toString();
             FAIL(ss);
         }
+    }
+
+    /**
+     * testTransform without computed data argument.
+     */
+    void testTransform(const char* specStr, const char* queryStr, const char* objStr,
+                       bool expectedStatusOK, const char* expectedObjStr) {
+        testTransform(specStr, queryStr, objStr, NULL, expectedStatusOK, expectedObjStr);
     }
 
     //
@@ -184,6 +198,22 @@ namespace {
         testTransform("{a: {$slice: [1, 1]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [6]}");
         testTransform("{a: {$slice: [3, 5]}}", "{}", "{a: [4, 6, 8]}", true, "{a: []}");
         testTransform("{a: {$slice: [10, 10]}}", "{}", "{a: [4, 6, 8]}", true, "{a: []}");
+    }
+
+    //
+    // $meta
+    // $meta projections add computed values to the projected object.
+    //
+
+    TEST(ProjectionExecTest, TransformMetaTextScore) {
+        // Query {} is ignored.
+        testTransform("{b: {$meta: 'textScore'}}", "{}", "{a: 'hello'}",
+                      new mongo::TextScoreComputedData(100),
+                      true, "{a: 'hello', b: 100}");
+        // Projected meta field should overwrite existing field.
+        testTransform("{b: {$meta: 'textScore'}}", "{}", "{a: 'hello', b: -1}",
+                      new mongo::TextScoreComputedData(100),
+                      true, "{a: 'hello', b: 100}");
     }
 
 }  // namespace

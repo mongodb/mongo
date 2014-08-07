@@ -28,6 +28,7 @@
 
 #include "mongo/db/mongod_options.h"
 
+#include <boost/filesystem.hpp>
 #include <string>
 #include <vector>
 
@@ -35,9 +36,9 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/db.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/pdfile.h"
-#include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/util/mongoutils/str.h"
@@ -89,44 +90,33 @@ namespace mongo {
         // Way to enable or disable auth on command line and in Legacy config file
         general_options.addOptionChaining("auth", "auth", moe::Switch, "run with security")
                                          .setSources(moe::SourceAllLegacy)
-                                         .incompatibleWith("security.authentication");
+                                         .incompatibleWith("noauth");
 
         general_options.addOptionChaining("noauth", "noauth", moe::Switch, "run without security")
                                          .setSources(moe::SourceAllLegacy)
-                                         .incompatibleWith("security.authentication");
+                                         .incompatibleWith("auth");
 
         // Way to enable or disable auth in JSON Config
-        general_options.addOptionChaining("security.authentication", "", moe::String,
-                "How the database behaves with respect to authentication of clients.  "
-                "Options are \"optional\", which means that a client can connect with or without "
-                "authentication, and \"required\" which means clients must use authentication")
+        general_options.addOptionChaining("security.authorization", "", moe::String,
+                "How the database behaves with respect to authorization of clients.  "
+                "Options are \"disabled\", which means that authorization checks are not "
+                "performed, and \"enabled\" which means that a client cannot perform actions it is "
+                "not authorized to do.")
                                          .setSources(moe::SourceYAMLConfig)
-                                         .incompatibleWith("auth")
-                                         .incompatibleWith("noauth")
-                                         .format("(:?optional)|(:?required)",
-                                                 "(optional/required)");
+                                         .format("(:?disabled)|(:?enabled)",
+                                                 "(disabled/enabled)");
 
         // setParameter parameters that we want as config file options
         // TODO: Actually read these into our environment.  Currently they have no effect
         general_options.addOptionChaining("security.authSchemaVersion", "", moe::String, "TODO")
                                          .setSources(moe::SourceYAMLConfig);
 
-        general_options.addOptionChaining("security.authenticationMechanisms", "", moe::String,
-                "TODO")
-                                         .setSources(moe::SourceYAMLConfig);
-
         general_options.addOptionChaining("security.enableLocalhostAuthBypass", "", moe::String,
                 "TODO")
                                          .setSources(moe::SourceYAMLConfig);
 
-        general_options.addOptionChaining("security.supportCompatibilityFormPrivilegeDocuments", "",
-                moe::String, "TODO")
-                                         .setSources(moe::SourceYAMLConfig);
 
         // Network Options
-
-        general_options.addOptionChaining("net.ipv6", "ipv6", moe::Switch,
-                "enable IPv6 support (disabled by default)");
 
         general_options.addOptionChaining("net.http.JSONPEnabled", "jsonp", moe::Switch,
                 "allow JSONP access via http (has security implications)");
@@ -149,9 +139,10 @@ namespace mongo {
                 "0=off 1=slow, 2=all")
                                          .setSources(moe::SourceAllLegacy);
 
-        general_options.addOptionChaining("operationProfiling.mode", "", moe::Int,
+        general_options.addOptionChaining("operationProfiling.mode", "", moe::String,
                 "(off/slowOp/all)")
-                                         .setSources(moe::SourceYAMLConfig);
+                                         .setSources(moe::SourceYAMLConfig)
+                                         .format("(:?off)|(:?slowOp)|(:?all)", "(off/slowOp/all)");
 
         general_options.addOptionChaining("cpu", "cpu", moe::Switch,
                 "periodically show cpu and iowait utilization")
@@ -163,15 +154,25 @@ namespace mongo {
 
         // Storage Options
 
+        general_options.addOptionChaining("storage.engine", "storageEngine", moe::String,
+                                          "what storage engine to use")
+            .setDefault(moe::Value(std::string("mmapv1")));
+
+
 #ifdef _WIN32
+        boost::filesystem::path currentPath = boost::filesystem::current_path();
+
+        std::string defaultPath = currentPath.root_name().string()
+                                  + storageGlobalParams.kDefaultDbPath;
         general_options.addOptionChaining("storage.dbPath", "dbpath", moe::String,
-                "directory for datafiles - defaults to \\data\\db\\")
-                                         .setDefault(moe::Value(std::string("\\data\\db\\")));
+                std::string("directory for datafiles - defaults to ")
+                + storageGlobalParams.kDefaultDbPath
+                + " which is " + defaultPath + " based on the current working drive");
 
 #else
         general_options.addOptionChaining("storage.dbPath", "dbpath", moe::String,
-                "directory for datafiles - defaults to /data/db/")
-                                         .setDefault(moe::Value(std::string("/data/db")));
+                std::string("directory for datafiles - defaults to ")
+                + storageGlobalParams.kDefaultDbPath);
 
 #endif
         general_options.addOptionChaining("storage.directoryPerDB", "directoryperdb", moe::Switch,
@@ -231,6 +232,10 @@ namespace mongo {
                 "disable scripting engine")
                                          .setSources(moe::SourceAllLegacy);
 
+        general_options.addOptionChaining("security.javascriptEnabled", "", moe::Bool,
+                "Enable javascript execution")
+                                         .setSources(moe::SourceYAMLConfig);
+
         // Query Options
 
         general_options.addOptionChaining("notablescan", "notablescan", moe::Switch,
@@ -289,25 +294,37 @@ namespace mongo {
         // Master Slave Options
 
         ms_options.addOptionChaining("master", "master", moe::Switch, "master mode")
+                                    .incompatibleWith("replication.replSet")
+                                    .incompatibleWith("replication.replSetName")
                                     .setSources(moe::SourceAllLegacy);
 
         ms_options.addOptionChaining("slave", "slave", moe::Switch, "slave mode")
+                                    .incompatibleWith("replication.replSet")
+                                    .incompatibleWith("replication.replSetName")
                                     .setSources(moe::SourceAllLegacy);
 
         ms_options.addOptionChaining("source", "source", moe::String,
                 "when slave: specify master as <server:port>")
+                                    .incompatibleWith("replication.replSet")
+                                    .incompatibleWith("replication.replSetName")
                                     .setSources(moe::SourceAllLegacy);
 
         ms_options.addOptionChaining("only", "only", moe::String,
                 "when slave: specify a single database to replicate")
+                                    .incompatibleWith("replication.replSet")
+                                    .incompatibleWith("replication.replSetName")
                                     .setSources(moe::SourceAllLegacy);
 
         ms_options.addOptionChaining("slavedelay", "slavedelay", moe::Int,
                 "specify delay (in seconds) to be used when applying master ops to slave")
+                                    .incompatibleWith("replication.replSet")
+                                    .incompatibleWith("replication.replSetName")
                                     .setSources(moe::SourceAllLegacy);
 
         ms_options.addOptionChaining("autoresync", "autoresync", moe::Switch,
                 "automatically resync if slave data is stale")
+                                    .incompatibleWith("replication.replSet")
+                                    .incompatibleWith("replication.replSetName")
                                     .setSources(moe::SourceAllLegacy);
 
         // Replication Options
@@ -318,13 +335,11 @@ namespace mongo {
 
         rs_options.addOptionChaining("replication.replSet", "replSet", moe::String,
                 "arg is <setname>[/<optionalseedhostlist>]")
-                                    .setSources(moe::SourceAllLegacy)
-                                    .incompatibleWith("replication.replSetName");
+                                    .setSources(moe::SourceAllLegacy);
 
         rs_options.addOptionChaining("replication.replSetName", "", moe::String, "arg is <setname>")
                                     .setSources(moe::SourceYAMLConfig)
-                                    .format("[^/]", "[replica set name with no \"/\"]")
-                                    .incompatibleWith("replication.replSet");
+                                    .format("[^/]+", "[replica set name with no \"/\"]");
 
         rs_options.addOptionChaining("replication.secondaryIndexPrefetch", "replIndexPrefetch", moe::String,
                 "specify index prefetching behavior (if secondary) [none|_id_only|all]")
@@ -333,16 +348,16 @@ namespace mongo {
 
         // Sharding Options
 
-        sharding_options.addOptionChaining("sharding.configsvr", "configsvr", moe::Switch,
+        sharding_options.addOptionChaining("configsvr", "configsvr", moe::Switch,
                 "declare this is a config db of a cluster; default port 27019; "
                 "default dir /data/configdb")
                                           .setSources(moe::SourceAllLegacy)
-                                          .incompatibleWith("sharding.clusterRole");
+                                          .incompatibleWith("shardsvr");
 
-        sharding_options.addOptionChaining("sharding.shardsvr", "shardsvr", moe::Switch,
+        sharding_options.addOptionChaining("shardsvr", "shardsvr", moe::Switch,
                 "declare this is a shard db of a cluster; default port 27018")
                                           .setSources(moe::SourceAllLegacy)
-                                          .incompatibleWith("sharding.clusterRole");
+                                          .incompatibleWith("configsvr");
 
         sharding_options.addOptionChaining("sharding.clusterRole", "", moe::String,
                 "Choose what role this mongod has in a sharded cluster.  Possible values are:\n"
@@ -351,20 +366,28 @@ namespace mongo {
                 "    \"shardsvr\": Start this node as a shard server.  Starts on port 27018 by "
                 "default.")
                                           .setSources(moe::SourceYAMLConfig)
-                                          .incompatibleWith("sharding.configsvr")
-                                          .incompatibleWith("sharding.shardsvr")
                                           .format("(:?configsvr)|(:?shardsvr)",
                                                   "(configsvr/shardsvr)");
 
-        sharding_options.addOptionChaining("sharding.noMoveParanoia", "noMoveParanoia", moe::Switch,
+        sharding_options.addOptionChaining("noMoveParanoia", "noMoveParanoia", moe::Switch,
                 "turn off paranoid saving of data for the moveChunk command; default")
                                           .hidden()
-                                          .setSources(moe::SourceAllLegacy);
+                                          .setSources(moe::SourceAllLegacy)
+                                          .incompatibleWith("moveParanoia");
 
-        sharding_options.addOptionChaining("sharding.archiveMovedChunks", "moveParanoia",
+        sharding_options.addOptionChaining("moveParanoia", "moveParanoia",
                 moe::Switch, "turn on paranoid saving of data during the moveChunk command "
                 "(used for internal system diagnostics)")
-                                          .hidden();
+                                          .hidden()
+                                          .setSources(moe::SourceAllLegacy)
+                                          .incompatibleWith("noMoveParanoia");
+
+        sharding_options.addOptionChaining("sharding.archiveMovedChunks", "",
+                moe::Bool, "config file option to turn on paranoid saving of data during the "
+                "moveChunk command (used for internal system diagnostics)")
+                                          .hidden()
+                                          .setSources(moe::SourceYAMLConfig);
+
 
         options->addSection(general_options);
 #if defined(_WIN32)
@@ -404,11 +427,6 @@ namespace mongo {
                                   .hidden()
                                   .setSources(moe::SourceAllLegacy);
 
-        // things we don't want people to use
-        options->addOptionChaining("nohints", "nohints", moe::Switch, "ignore query hints")
-                                  .hidden()
-                                  .setSources(moe::SourceAllLegacy);
-
         // deprecated pairing command line options
         options->addOptionChaining("pairwith", "pairwith", moe::Switch, "DEPRECATED")
                                   .hidden()
@@ -431,37 +449,399 @@ namespace mongo {
 
     namespace {
         void sysRuntimeInfo() {
-            out() << "sysinfo:" << endl;
+            log() << "sysinfo:" << endl;
 #if defined(_SC_PAGE_SIZE)
-            out() << "  page size: " << (int) sysconf(_SC_PAGE_SIZE) << endl;
+            log() << "  page size: " << (int) sysconf(_SC_PAGE_SIZE) << endl;
 #endif
 #if defined(_SC_PHYS_PAGES)
-            out() << "  _SC_PHYS_PAGES: " << sysconf(_SC_PHYS_PAGES) << endl;
+            log() << "  _SC_PHYS_PAGES: " << sysconf(_SC_PHYS_PAGES) << endl;
 #endif
 #if defined(_SC_AVPHYS_PAGES)
-            out() << "  _SC_AVPHYS_PAGES: " << sysconf(_SC_AVPHYS_PAGES) << endl;
+            log() << "  _SC_AVPHYS_PAGES: " << sysconf(_SC_AVPHYS_PAGES) << endl;
 #endif
         }
     } // namespace
 
     bool handlePreValidationMongodOptions(const moe::Environment& params,
                                             const std::vector<std::string>& args) {
-        if (params.count("help")) {
+        if (params.count("help") &&
+            params["help"].as<bool>() == true) {
             printMongodHelp(moe::startupOptions);
             return false;
         }
-        if (params.count("version")) {
+        if (params.count("version") &&
+            params["version"].as<bool>() == true) {
             cout << mongodVersion() << endl;
             printGitVersion();
             printOpenSSLVersion();
             return false;
         }
-        if (params.count("sysinfo")) {
+        if (params.count("sysinfo") &&
+            params["sysinfo"].as<bool>() == true) {
             sysRuntimeInfo();
             return false;
         }
 
         return true;
+    }
+
+    Status validateMongodOptions(const moe::Environment& params) {
+
+        Status ret = validateServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        if ((params.count("nodur") || params.count("nojournal")) &&
+            (params.count("dur") || params.count("journal"))) {
+            return Status(ErrorCodes::BadValue,
+                          "Can't specify both --journal and --nojournal options.");
+        }
+
+        // SERVER-10019 Enabling rest/jsonp without --httpinterface should break in all cases in the
+        // future
+        if (params.count("net.http.RESTInterfaceEnabled") &&
+            params["net.http.RESTInterfaceEnabled"].as<bool>() == true) {
+
+            // If we are explicitly setting httpinterface to false in the config file (the source of
+            // "net.http.enabled") and not overriding it on the command line (the source of
+            // "httpinterface"), then we can fail with an error message without breaking backwards
+            // compatibility.
+            if (!params.count("httpinterface") &&
+                 params.count("net.http.enabled") &&
+                 params["net.http.enabled"].as<bool>() == false) {
+                return Status(ErrorCodes::BadValue,
+                              "httpinterface must be enabled to use the rest api");
+            }
+        }
+
+        if (params.count("net.http.JSONPEnabled") &&
+            params["net.http.JSONPEnabled"].as<bool>() == true) {
+
+            // If we are explicitly setting httpinterface to false in the config file (the source of
+            // "net.http.enabled") and not overriding it on the command line (the source of
+            // "httpinterface"), then we can fail with an error message without breaking backwards
+            // compatibility.
+            if (!params.count("httpinterface") &&
+                 params.count("net.http.enabled") &&
+                 params["net.http.enabled"].as<bool>() == false) {
+                return Status(ErrorCodes::BadValue,
+                        "httpinterface must be enabled to use jsonp");
+            }
+        }
+
+#ifdef _WIN32
+        if (params.count("install") || params.count("reinstall")) {
+            if (params.count("storage.dbPath") &&
+                !boost::filesystem::path(params["storage.dbPath"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "dbPath requires an absolute file path with Windows services");
+            }
+        }
+#endif
+
+        return Status::OK();
+    }
+
+    Status canonicalizeMongodOptions(moe::Environment* params) {
+
+        // Need to handle this before canonicalizing the general "server options", since
+        // httpinterface and nohttpinterface are shared between mongos and mongod, but mongod has
+        // extra validation required.
+        if (params->count("net.http.RESTInterfaceEnabled") &&
+            (*params)["net.http.RESTInterfaceEnabled"].as<bool>() == true) {
+            bool httpEnabled = false;
+            if (params->count("net.http.enabled")) {
+                Status ret = params->get("net.http.enabled", &httpEnabled);
+                if (!ret.isOK()) {
+                    return ret;
+                }
+            }
+            if (params->count("nohttpinterface")) {
+                log() << "** WARNING: Should not specify both --rest and --nohttpinterface" <<
+                    startupWarningsLog;
+            }
+            else if (!(params->count("httpinterface") ||
+                       (params->count("net.http.enabled") && httpEnabled == true))) {
+                log() << "** WARNING: --rest is specified without --httpinterface," <<
+                    startupWarningsLog;
+                log() << "**          enabling http interface" << startupWarningsLog;
+                Status ret = params->set("httpinterface", moe::Value(true));
+                if (!ret.isOK()) {
+                    return ret;
+                }
+            }
+        }
+
+        if (params->count("net.http.JSONPEnabled") &&
+            (*params)["net.http.JSONPEnabled"].as<bool>() == true) {
+            if (params->count("nohttpinterface")) {
+                log() << "** WARNING: Should not specify both --jsonp and --nohttpinterface" <<
+                    startupWarningsLog;
+            }
+            else if (!params->count("httpinterface")) {
+                log() << "** WARNING --jsonp is specified without --httpinterface," <<
+                    startupWarningsLog;
+                log() << "**         enabling http interface" << startupWarningsLog;
+                Status ret = params->set("httpinterface", moe::Value(true));
+                if (!ret.isOK()) {
+                    return ret;
+                }
+            }
+        }
+
+        Status ret = canonicalizeServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+#ifdef MONGO_SSL
+        ret = canonicalizeSSLServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
+#endif
+
+        // "storage.journal.enabled" comes from the config file, so override it if any of "journal",
+        // "nojournal", "dur", and "nodur" are set, since those come from the command line.
+        if (params->count("journal")) {
+            Status ret = params->set("storage.journal.enabled",
+                                     moe::Value((*params)["journal"].as<bool>()));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("journal");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+        if (params->count("nojournal")) {
+            Status ret = params->set("storage.journal.enabled",
+                                     moe::Value(!(*params)["nojournal"].as<bool>()));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("nojournal");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+        if (params->count("dur")) {
+            Status ret = params->set("storage.journal.enabled",
+                                     moe::Value((*params)["dur"].as<bool>()));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("dur");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+        if (params->count("nodur")) {
+            Status ret = params->set("storage.journal.enabled",
+                                     moe::Value(!(*params)["nodur"].as<bool>()));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("nodur");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "storage.journal.durOptions" comes from the config file, so override it if "durOptions"
+        // is set since that comes from the command line.
+        if (params->count("durOptions")) {
+            int durOptions;
+            Status ret = params->get("durOptions", &durOptions);
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->set("storage.journal.debugFlags", moe::Value(durOptions));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("durOptions");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "security.authorization" comes from the config file, so override it if "noauth" or
+        // "auth" are set since those come from the command line.
+        if (params->count("noauth")) {
+            Status ret = params->set("security.authorization",
+                                     (*params)["noauth"].as<bool>() ?
+                                        moe::Value(std::string("disabled")) :
+                                        moe::Value(std::string("enabled")));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("noauth");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+        if (params->count("auth")) {
+            Status ret = params->set("security.authorization",
+                                     (*params)["auth"].as<bool>() ?
+                                        moe::Value(std::string("enabled")) :
+                                        moe::Value(std::string("disabled")));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("auth");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "storage.preallocDataFiles" comes from the config file, so override it if "noprealloc" is
+        // set since that comes from the command line.
+        if (params->count("noprealloc")) {
+            Status ret = params->set("storage.preallocDataFiles",
+                                     moe::Value(!(*params)["noprealloc"].as<bool>()));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("noprealloc");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "sharding.archiveMovedChunks" comes from the config file, so override it if
+        // "noMoveParanoia" or "moveParanoia" are set since those come from the command line.
+        if (params->count("noMoveParanoia")) {
+            Status ret = params->set("sharding.archiveMovedChunks",
+                                     moe::Value(!(*params)["noMoveParanoia"].as<bool>()));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("noMoveParanoia");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+        if (params->count("moveParanoia")) {
+            Status ret = params->set("sharding.archiveMovedChunks",
+                                     moe::Value((*params)["moveParanoia"].as<bool>()));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("moveParanoia");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "sharding.clusterRole" comes from the config file, so override it if "configsvr" or
+        // "shardsvr" are set since those come from the command line.
+        if (params->count("configsvr")) {
+            if ((*params)["configsvr"].as<bool>() == false) {
+                // Handle the case where "configsvr" comes from the legacy config file and is set to
+                // false.  This option is not allowed in the YAML config.
+                return Status(ErrorCodes::BadValue,
+                              "configsvr option cannot be set to false in config file");
+            }
+            Status ret = params->set("sharding.clusterRole", moe::Value(std::string("configsvr")));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("configsvr");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+        if (params->count("shardsvr")) {
+            if ((*params)["shardsvr"].as<bool>() == false) {
+                // Handle the case where "shardsvr" comes from the legacy config file and is set to
+                // false.  This option is not allowed in the YAML config.
+                return Status(ErrorCodes::BadValue,
+                              "shardsvr option cannot be set to false in config file");
+            }
+            Status ret = params->set("sharding.clusterRole", moe::Value(std::string("shardsvr")));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("shardsvr");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        if (params->count("profile")) {
+            int profilingMode;
+            Status ret = params->get("profile", &profilingMode);
+            if (!ret.isOK()) {
+                return ret;
+            }
+            std::string profilingModeString;
+            if (profilingMode == 0) {
+                profilingModeString = "off";
+            }
+            else if (profilingMode == 1) {
+                profilingModeString = "slowOp";
+            }
+            else if (profilingMode == 2) {
+                profilingModeString = "all";
+            }
+            else {
+                StringBuilder sb;
+                sb << "Bad value for profile: " << profilingMode
+                    << ".  Supported modes are: (0=off|1=slowOp|2=all)";
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+            ret = params->set("operationProfiling.mode", moe::Value(profilingModeString));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("profile");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "storage.indexBuildRetry" comes from the config file, so override it if
+        // "noIndexBuildRetry" is set since that comes from the command line.
+        if (params->count("noIndexBuildRetry")) {
+            Status ret = params->set("storage.indexBuildRetry",
+                                     moe::Value(!(*params)["noIndexBuildRetry"].as<bool>()));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("noIndexBuildRetry");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // Ensure that "replication.replSet" logically overrides "replication.replSetName".  We
+        // can't canonicalize them as the same option, because they mean slightly different things.
+        // "replication.replSet" can include a seed list, while "replication.replSetName" just has
+        // the replica set name.
+        if (params->count("replication.replSet") && params->count("replication.replSetName")) {
+            ret = params->remove("replication.replSetName");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "security.javascriptEnabled" comes from the config file, so override it if "noscripting"
+        // is set since that comes from the command line.
+        if (params->count("noscripting")) {
+            Status ret = params->set("security.javascriptEnabled",
+                                     moe::Value(!(*params)["noscripting"].as<bool>()));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("noscripting");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        return Status::OK();
     }
 
     Status storeMongodOptions(const moe::Environment& params,
@@ -478,23 +858,13 @@ namespace mongo {
                           "security.authSchemaVersion is currently not supported in config files");
         }
 
-        if (params.count("security.authenticationMechanisms")) {
-            return Status(ErrorCodes::BadValue,
-                          "security.authenticationMechanisms is currently not supported in config "
-                          "files");
-        }
-
         if (params.count("security.enableLocalhostAuthBypass")) {
             return Status(ErrorCodes::BadValue,
                           "security.enableLocalhostAuthBypass is currently not supported in config "
                           "files");
         }
 
-        if (params.count("security.supportCompatibilityFormPrivilegeDocuments")) {
-            return Status(ErrorCodes::BadValue,
-                          "security.supportCompatibilityFormPrivilegeDocuments is currently not "
-                          "supported in config files");
-        }
+        storageGlobalParams.engine = params["storage.engine"].as<string>();
 
         if (params.count("storage.dbPath")) {
             storageGlobalParams.dbpath = params["storage.dbPath"].as<string>();
@@ -515,6 +885,26 @@ namespace mongo {
                 storageGlobalParams.dbpath.erase(storageGlobalParams.dbpath.size()-1);
         }
 #endif
+
+        if (params.count("operationProfiling.mode")) {
+            std::string profilingMode = params["operationProfiling.mode"].as<std::string>();
+            if (profilingMode == "off") {
+                serverGlobalParams.defaultProfile = 0;
+            }
+            else if (profilingMode == "slowOp") {
+                serverGlobalParams.defaultProfile = 1;
+            }
+            else if (profilingMode == "all") {
+                serverGlobalParams.defaultProfile = 2;
+            }
+            else {
+                StringBuilder sb;
+                sb << "Bad value for operationProfiling.mode: " << profilingMode
+                    << ".  Supported modes are: (off|slowOp|all)";
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+        }
+
         if ( params.count("operationProfiling.slowOpThresholdMs")) {
             serverGlobalParams.slowMS = params["operationProfiling.slowOpThresholdMs"].as<int>();
         }
@@ -524,51 +914,31 @@ namespace mongo {
         }
 
         if (params.count("storage.directoryPerDB")) {
-            storageGlobalParams.directoryperdb = true;
+            storageGlobalParams.directoryperdb = params["storage.directoryPerDB"].as<bool>();
         }
         if (params.count("cpu")) {
-            serverGlobalParams.cpu = true;
+            serverGlobalParams.cpu = params["cpu"].as<bool>();
         }
-        if (params.count("noauth") ||
-            (params.count("security.authentication") &&
-             params["security.authentication"].as<std::string>() == "optional")) {
+        if (params.count("security.authorization") &&
+            params["security.authorization"].as<std::string>() == "disabled") {
             getGlobalAuthorizationManager()->setAuthEnabled(false);
         }
-        if (params.count("auth") ||
-            (params.count("security.authentication") &&
-             params["security.authentication"].as<std::string>() == "required")) {
+        if (params.count("security.authorization") &&
+            params["security.authorization"].as<std::string>() == "enabled") {
             getGlobalAuthorizationManager()->setAuthEnabled(true);
         }
         if (params.count("storage.quota.enforced")) {
-            storageGlobalParams.quota = true;
+            storageGlobalParams.quota = params["storage.quota.enforced"].as<bool>();
         }
         if (params.count("storage.quota.maxFilesPerDB")) {
             storageGlobalParams.quota = true;
             storageGlobalParams.quotaFiles = params["storage.quota.maxFilesPerDB"].as<int>() - 1;
         }
-        if ((params.count("nodur") || params.count("nojournal")) &&
-            (params.count("dur") || params.count("journal"))) {
-            return Status(ErrorCodes::BadValue,
-                          "Can't specify both --journal and --nojournal options.");
-        }
 
-        // "storage.journal.enabled" comes from the config file, so check it before we check
-        // "journal", "nojournal", "dur", and "nodur", since those come from the command line.
         if (params.count("storage.journal.enabled")) {
             storageGlobalParams.dur = params["storage.journal.enabled"].as<bool>();
         }
 
-        if (params.count("nodur") || params.count("nojournal")) {
-            storageGlobalParams.dur = false;
-        }
-
-        if (params.count("dur") || params.count("journal")) {
-            storageGlobalParams.dur = true;
-        }
-
-        if (params.count("durOptions")) {
-            storageGlobalParams.durOptions = params["durOptions"].as<int>();
-        }
         if (params.count("storage.journal.commitIntervalMs")) {
             // don't check if dur is false here as many will just use the default, and will default
             // to off on win32.  ie no point making life a little more complex by giving an error on
@@ -584,88 +954,25 @@ namespace mongo {
         if (params.count("storage.journal.debugFlags")) {
             storageGlobalParams.durOptions = params["storage.journal.debugFlags"].as<int>();
         }
-        if (params.count("nohints")) {
-            storageGlobalParams.useHints = false;
-        }
         if (params.count("nopreallocj")) {
-            storageGlobalParams.preallocj = false;
+            storageGlobalParams.preallocj = !params["nopreallocj"].as<bool>();
         }
 
-        // Check "net.http.enabled" before "httpinterface" and "nohttpinterface", since this comes
-        // from a config file and those come from the command line
-        if (params.count("net.http.enabled")) {
-            serverGlobalParams.isHttpInterfaceEnabled = params["net.http.enabled"].as<bool>();
-        }
-
-        if (params.count("httpinterface")) {
-            if (params.count("nohttpinterface")) {
-                return Status(ErrorCodes::BadValue,
-                              "can't have both --httpinterface and --nohttpinterface");
-            }
-            serverGlobalParams.isHttpInterfaceEnabled = true;
-        }
-        // SERVER-10019 Enabling rest/jsonp without --httpinterface should break in the future
         if (params.count("net.http.RESTInterfaceEnabled")) {
-
-            // If we are explicitly setting httpinterface to false in the config file (the source of
-            // "net.http.enabled") and not overriding it on the command line (the source of
-            // "httpinterface"), then we can fail with an error message without breaking backwards
-            // compatibility.
-            if (!params.count("httpinterface") &&
-                params.count("net.http.enabled") &&
-                params["net.http.enabled"].as<bool>() == false) {
-                return Status(ErrorCodes::BadValue,
-                              "httpinterface must be enabled to use the rest api");
-            }
-
-            if (params.count("nohttpinterface")) {
-                log() << "** WARNING: Should not specify both --rest and --nohttpinterface" <<
-                    startupWarningsLog;
-            }
-            else if (!params.count("httpinterface")) {
-                log() << "** WARNING: --rest is specified without --httpinterface," <<
-                    startupWarningsLog;
-                log() << "**          enabling http interface" << startupWarningsLog;
-                serverGlobalParams.isHttpInterfaceEnabled = true;
-            }
-            serverGlobalParams.rest = true;
+            serverGlobalParams.rest = params["net.http.RESTInterfaceEnabled"].as<bool>();
         }
         if (params.count("net.http.JSONPEnabled")) {
-
-            // If we are explicitly setting httpinterface to false in the config file (the source of
-            // "net.http.enabled") and not overriding it on the command line (the source of
-            // "httpinterface"), then we can fail with an error message without breaking backwards
-            // compatibility.
-            if (!params.count("httpinterface") &&
-                params.count("net.http.enabled") &&
-                params["net.http.enabled"].as<bool>() == false) {
-                return Status(ErrorCodes::BadValue,
-                              "httpinterface must be enabled to use jsonp");
-            }
-
-            if (params.count("nohttpinterface")) {
-                log() << "** WARNING: Should not specify both --jsonp and --nohttpinterface" <<
-                    startupWarningsLog;
-            }
-            else if (!params.count("httpinterface")) {
-                log() << "** WARNING --jsonp is specified without --httpinterface," <<
-                    startupWarningsLog;
-                log() << "**         enabling http interface" << startupWarningsLog;
-                serverGlobalParams.isHttpInterfaceEnabled = true;
-            }
-            serverGlobalParams.jsonp = true;
+            serverGlobalParams.jsonp = params["net.http.JSONPEnabled"].as<bool>();
         }
-        if (params.count("noscripting")) {
-            mongodGlobalParams.scriptingEnabled = false;
+        if (params.count("security.javascriptEnabled")) {
+            mongodGlobalParams.scriptingEnabled = params["security.javascriptEnabled"].as<bool>();
         }
-        if (params.count("noprealloc") ||
-            (params.count("storage.preallocDataFiles") &&
-             params["storage.preallocDataFiles"].as<bool>() == false)) {
-            storageGlobalParams.prealloc = false;
+        if (params.count("storage.preallocDataFiles")) {
+            storageGlobalParams.prealloc = params["storage.preallocDataFiles"].as<bool>();
             cout << "note: noprealloc may hurt performance in many applications" << endl;
         }
         if (params.count("storage.smallFiles")) {
-            storageGlobalParams.smallfiles = true;
+            storageGlobalParams.smallfiles = params["storage.smallFiles"].as<bool>();
         }
         if (params.count("diaglog")) {
             warning() << "--diaglog is deprecated and will be removed in a future release";
@@ -676,48 +983,39 @@ namespace mongo {
             _diaglog.setLevel(x);
         }
 
-        if ((params.count("dur") || params.count("journal")) && params.count("repair")) {
+        if ((params.count("storage.journal.enabled") &&
+             params["storage.journal.enabled"].as<bool>() == true) && params.count("repair")) {
             return Status(ErrorCodes::BadValue,
-                          "Can't specify both --journal and --repair options.");
+                          "Can't have journaling enabled when using --repair option.");
         }
 
-        if (params.count("repair")) {
-            Record::MemoryTrackingEnabled = false;
-            mongodGlobalParams.upgrade = 1; // --repair implies --upgrade
-            mongodGlobalParams.repair = 1;
+        if (params.count("repair") && params["repair"].as<bool>() == true) {
+            storageGlobalParams.upgrade = 1; // --repair implies --upgrade
+            storageGlobalParams.repair = 1;
             storageGlobalParams.dur = false;
         }
-        if (params.count("upgrade")) {
-            Record::MemoryTrackingEnabled = false;
-            mongodGlobalParams.upgrade = 1;
+        if (params.count("upgrade") && params["upgrade"].as<bool>() == true) {
+            storageGlobalParams.upgrade = 1;
         }
         if (params.count("notablescan")) {
-            storageGlobalParams.noTableScan = true;
+            storageGlobalParams.noTableScan = params["notablescan"].as<bool>();
         }
+
+        repl::ReplSettings replSettings;
         if (params.count("master")) {
-            replSettings.master = true;
+            replSettings.master = params["master"].as<bool>();
         }
-        if (params.count("slave")) {
-            replSettings.slave = SimpleSlave;
+        if (params.count("slave") && params["slave"].as<bool>() == true) {
+            replSettings.slave = repl::SimpleSlave;
         }
         if (params.count("slavedelay")) {
             replSettings.slavedelay = params["slavedelay"].as<int>();
         }
         if (params.count("fastsync")) {
-            replSettings.fastsync = true;
+            replSettings.fastsync = params["fastsync"].as<bool>();
         }
         if (params.count("autoresync")) {
-            replSettings.autoresync = true;
-            if( params.count("replication.replSet") ) {
-                return Status(ErrorCodes::BadValue,
-                              "--autoresync is not used with --replSet\nsee "
-                              "http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember");
-            }
-            if( params.count("replication.replSetName") ) {
-                return Status(ErrorCodes::BadValue,
-                              "--autoresync is not used with replication.replSetName\nsee "
-                              "http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember");
-            }
+            replSettings.autoresync = params["autoresync"].as<bool>();
         }
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
@@ -727,23 +1025,9 @@ namespace mongo {
             replSettings.pretouch = params["pretouch"].as<int>();
         }
         if (params.count("replication.replSetName")) {
-            if (params.count("slavedelay")) {
-                return Status(ErrorCodes::BadValue,
-                              "--slavedelay cannot be used with replication.replSetName");
-            }
-            else if (params.count("only")) {
-                return Status(ErrorCodes::BadValue,
-                              "--only cannot be used with replication.replSetName");
-            }
             replSettings.replSet = params["replication.replSetName"].as<string>().c_str();
         }
         if (params.count("replication.replSet")) {
-            if (params.count("slavedelay")) {
-                return Status(ErrorCodes::BadValue, "--slavedelay cannot be used with --replSet");
-            }
-            else if (params.count("only")) {
-                return Status(ErrorCodes::BadValue, "--only cannot be used with --replSet");
-            }
             /* seed list of hosts for the repl set */
             replSettings.replSet = params["replication.replSet"].as<string>().c_str();
         }
@@ -752,10 +1036,8 @@ namespace mongo {
                 params["replication.secondaryIndexPrefetch"].as<std::string>();
         }
 
-        if (params.count("noIndexBuildRetry") ||
-            (params.count("storage.indexBuildRetry") &&
-             !params["storage.indexBuildRetry"].as<bool>())) {
-            serverGlobalParams.indexBuildRetry = false;
+        if (params.count("storage.indexBuildRetry")) {
+            serverGlobalParams.indexBuildRetry = params["storage.indexBuildRetry"].as<bool>();
         }
 
         if (params.count("only")) {
@@ -772,7 +1054,9 @@ namespace mongo {
         if (params.count("replication.oplogSizeMB")) {
             long long x = params["replication.oplogSizeMB"].as<int>();
             if (x <= 0) {
-                return Status(ErrorCodes::BadValue, "bad --oplogSize arg");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "bad --oplogSize, arg must be greater than 0,"
+                                      "found: " << x);
             }
             // note a small size such as x==1 is ok for an arbiter.
             if( x > 1000 && sizeof(void*) == 4 ) {
@@ -782,7 +1066,7 @@ namespace mongo {
                 return Status(ErrorCodes::BadValue, sb.str());
             }
             replSettings.oplogSize = x * 1024 * 1024;
-            verify(replSettings.oplogSize > 0);
+            invariant(replSettings.oplogSize > 0);
         }
         if (params.count("cacheSize")) {
             long x = params["cacheSize"].as<long>();
@@ -792,16 +1076,6 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "--cacheSize option not currently supported");
         }
         if (!params.count("net.port")) {
-            if( params.count("sharding.configsvr") ) {
-                serverGlobalParams.port = ServerGlobalParams::ConfigServerPort;
-            }
-            if( params.count("sharding.shardsvr") ) {
-                if( params.count("sharding.configsvr") ) {
-                    return Status(ErrorCodes::BadValue,
-                                  "can't do --shardsvr and --configsvr at the same time");
-                }
-                serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
-            }
             if (params.count("sharding.clusterRole")) {
                 std::string clusterRole = params["sharding.clusterRole"].as<std::string>();
                 if (clusterRole == "configsvr") {
@@ -823,66 +1097,34 @@ namespace mongo {
                 return Status(ErrorCodes::BadValue, "bad --port number");
             }
         }
-        if (params.count("sharding.configsvr") ||
-            (params.count("sharding.clusterRole") &&
-             params["sharding.clusterRole"].as<std::string>() == "configsvr")) {
+        if (params.count("sharding.clusterRole") &&
+            params["sharding.clusterRole"].as<std::string>() == "configsvr") {
             serverGlobalParams.configsvr = true;
             storageGlobalParams.smallfiles = true; // config server implies small files
-            if (replSettings.usingReplSets() || replSettings.master || replSettings.slave) {
+            if (replSettings.usingReplSets()
+                    || replSettings.master
+                    || replSettings.slave) {
                 return Status(ErrorCodes::BadValue,
                               "replication should not be enabled on a config server");
             }
 
             // If we haven't explicitly specified a journal option, default journaling to true for
             // the config server role
-            if (!params.count("nodur") &&
-                !params.count("nojournal") &&
-                !params.count("storage.journal.enabled"))
+            if (!params.count("storage.journal.enabled")) {
                 storageGlobalParams.dur = true;
+            }
 
-            if (!params.count("storage.dbPath"))
-                storageGlobalParams.dbpath = "/data/configdb";
+            if (!params.count("storage.dbPath")) {
+                storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
+            }
             replSettings.master = true;
             if (!params.count("replication.oplogSizeMB"))
                 replSettings.oplogSize = 5 * 1024 * 1024;
         }
-        if (params.count("profile")) {
-            serverGlobalParams.defaultProfile = params["profile"].as<int>();
-        }
-        else {
-            if (params.count("operationProfiling.mode")) {
-                std::string profilingMode = params["operationProfiling.mode"].as<std::string>();
-                if (profilingMode == "off") {
-                    serverGlobalParams.defaultProfile = 0;
-                }
-                else if (profilingMode == "slowOp") {
-                    serverGlobalParams.defaultProfile = 1;
-                }
-                else if (profilingMode == "all") {
-                    serverGlobalParams.defaultProfile = 2;
-                }
-                else {
-                    StringBuilder sb;
-                    sb << "Bad value for operationProfiling.mode: " << profilingMode
-                       << ".  Supported modes are: (off|slowOp|all)";
-                    return Status(ErrorCodes::BadValue, sb.str());
-                }
-            }
-        }
-        if (params.count("net.ipv6")) {
-            enableIPv6();
-        }
 
-        if (params.count("sharding.noMoveParanoia") && params.count("sharding.archiveMovedChunks")) {
-            return Status(ErrorCodes::BadValue,
-                          "The moveParanoia and noMoveParanoia flags cannot both be set");
+        if (params.count("sharding.archiveMovedChunks")) {
+            serverGlobalParams.moveParanoia = params["sharding.archiveMovedChunks"].as<bool>();
         }
-
-        if (params.count("sharding.noMoveParanoia"))
-            serverGlobalParams.moveParanoia = false;
-
-        if (params.count("sharding.archiveMovedChunks"))
-            serverGlobalParams.moveParanoia = true;
 
         if (params.count("pairwith") || params.count("arbiter") || params.count("opIdMem")) {
             return Status(ErrorCodes::BadValue,
@@ -913,13 +1155,10 @@ namespace mongo {
         }
 
         if (replSettings.pretouch)
-            log() << "--pretouch " << replSettings.pretouch << endl;
+            log() << "--pretouch " << replSettings.pretouch;
 
         // Check if we are 32 bit and have not explicitly specified any journaling options
-        if (sizeof(void*) == 4 &&
-            !(params.count("nodur") || params.count("nojournal") ||
-              params.count("dur") || params.count("journal") ||
-              params.count("storage.journal.enabled"))) {
+        if (sizeof(void*) == 4 && !params.count("storage.journal.enabled")) {
             // trying to make this stand out more like startup warnings
             log() << endl;
             warning() << "32-bit servers don't have journaling enabled by default. "
@@ -927,6 +1166,17 @@ namespace mongo {
             log() << endl;
         }
 
+#ifdef _WIN32
+        // If dbPath is a default value, prepend with drive name so log entries are explicit
+        if (storageGlobalParams.dbpath == storageGlobalParams.kDefaultDbPath
+            || storageGlobalParams.dbpath == storageGlobalParams.kDefaultConfigDbPath) {
+            boost::filesystem::path currentPath = boost::filesystem::current_path();
+            storageGlobalParams.dbpath = currentPath.root_name().string()
+                                         + storageGlobalParams.dbpath;
+        }
+#endif
+
+        setGlobalReplSettings(replSettings);
         return Status::OK();
     }
 

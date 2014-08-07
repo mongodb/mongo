@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/util/atomic_int.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -43,12 +43,12 @@ namespace mongo {
         RWLockBase m;
 #endif
 #if defined(_WIN32) && defined(_DEBUG)
-        AtomicUInt shares;
+        AtomicUInt32 shares;
         ThreadLocalValue<int> s;
         unsigned tid;
 #endif
     public:
-        const string name;
+        const std::string name;
         SimpleRWLock(const StringData& name = "" );
         void lock();
         void unlock();

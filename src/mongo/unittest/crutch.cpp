@@ -45,7 +45,9 @@ namespace mongo {
         return false;
     }
 
-    DBClientBase *createDirectClient() {
+    class OperationContext;
+
+    DBClientBase* createDirectClient(OperationContext* txn) {
         fassertFailed(17249);
         return NULL;
     }

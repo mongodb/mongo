@@ -1,17 +1,31 @@
 /* Copyright 2013 10gen Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/net/ssl_options.h"
 
@@ -26,10 +40,11 @@ namespace mongo {
     Status addSSLServerOptions(moe::OptionSection* options) {
         options->addOptionChaining("net.ssl.sslOnNormalPorts", "sslOnNormalPorts", moe::Switch,
                 "use ssl on configured ports")
-                                  .setSources(moe::SourceAllLegacy);
+                                  .setSources(moe::SourceAllLegacy)
+                                  .incompatibleWith("net.ssl.mode");
 
         options->addOptionChaining("net.ssl.mode", "sslMode", moe::String,
-                "set the SSL operation mode (noSSL|acceptSSL|sendAcceptSSL|sslOnly)");
+                "set the SSL operation mode (disabled|allowSSL|preferSSL|requireSSL)");
 
         options->addOptionChaining("net.ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
                 "PEM file for ssl");
@@ -54,6 +69,9 @@ namespace mongo {
         options->addOptionChaining("net.ssl.weakCertificateValidation",
                 "sslWeakCertificateValidation", moe::Switch, "allow client to connect without "
                 "presenting a certificate");
+
+        options->addOptionChaining("net.ssl.allowInvalidHostnames", "sslAllowInvalidHostnames",
+                moe::Switch, "Allow server certificates to provide non-matching hostnames");
 
         options->addOptionChaining("net.ssl.allowInvalidCertificates", "sslAllowInvalidCertificates",
                     moe::Switch, "allow connections to servers with invalid certificates");
@@ -84,6 +102,10 @@ namespace mongo {
                                   .requires("ssl")
                                   .requires("ssl.CAFile");
 
+        options->addOptionChaining("net.ssl.allowInvalidHostnames", "sslAllowInvalidHostnames",
+                    moe::Switch, "allow connections to servers with non-matching hostnames")
+                                  .requires("ssl");
+
         options->addOptionChaining("ssl.allowInvalidCertificates", "sslAllowInvalidCertificates",
                     moe::Switch, "allow connections to servers with invalid certificates")
                                   .requires("ssl");
@@ -91,6 +113,57 @@ namespace mongo {
         options->addOptionChaining("ssl.FIPSMode", "sslFIPSMode", moe::Switch,
                 "activate FIPS 140-2 mode at startup")
                                   .requires("ssl");
+
+        return Status::OK();
+    }
+
+    Status validateSSLServerOptions(const moe::Environment& params) {
+#ifdef _WIN32
+        if (params.count("install") || params.count("reinstall")) {
+            if (params.count("net.ssl.PEMKeyFile") &&
+                !boost::filesystem::path(params["net.ssl.PEMKeyFile"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "PEMKeyFile requires an absolute file path with Windows services");
+            }
+
+            if (params.count("net.ssl.clusterFile") &&
+                !boost::filesystem::path(
+                    params["net.ssl.clusterFile"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "clusterFile requires an absolute file path with Windows services");
+            }
+
+            if (params.count("net.ssl.CAFile") &&
+                !boost::filesystem::path(params["net.ssl.CAFile"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "CAFile requires an absolute file path with Windows services");
+            }
+
+            if (params.count("net.ssl.CRLFile") &&
+                !boost::filesystem::path(params["net.ssl.CRLFile"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "CRLFile requires an absolute file path with Windows services");
+            }
+
+        }
+#endif
+
+        return Status::OK();
+    }
+
+    Status canonicalizeSSLServerOptions(moe::Environment* params) {
+
+        if (params->count("net.ssl.sslOnNormalPorts") &&
+            (*params)["net.ssl.sslOnNormalPorts"].as<bool>() == true) {
+            Status ret = params->set("net.ssl.mode", moe::Value(std::string("requireSSL")));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("net.ssl.sslOnNormalPorts");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
 
         return Status::OK();
     }
@@ -147,23 +220,19 @@ namespace mongo {
         }
 
         if (params.count("net.ssl.weakCertificateValidation")) {
-            sslGlobalParams.sslWeakCertificateValidation = true;
+            sslGlobalParams.sslWeakCertificateValidation =
+                params["net.ssl.weakCertificateValidation"].as<bool>();
+        }
+        if (params.count("net.ssl.allowInvalidHostnames")) {
+            sslGlobalParams.sslAllowInvalidHostnames =
+                params["net.ssl.allowInvalidHostnames"].as<bool>();
         }
         if (params.count("net.ssl.allowInvalidCertificates")) {
-            sslGlobalParams.sslAllowInvalidCertificates = true;
+            sslGlobalParams.sslAllowInvalidCertificates =
+                params["net.ssl.allowInvalidCertificates"].as<bool>();
         }
         if (params.count("net.ssl.FIPSMode")) {
-            sslGlobalParams.sslFIPSMode = true;
-        }
-
-        if (params.count("net.ssl.sslOnNormalPorts")) {
-            if (params.count("net.ssl.mode")) {
-                    return Status(ErrorCodes::BadValue, 
-                                  "can't have both sslMode and sslOnNormalPorts");
-            }
-            else {
-                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_requireSSL);
-            }
+            sslGlobalParams.sslFIPSMode = params["net.ssl.FIPSMode"].as<bool>();
         }
 
         if (sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_disabled) {
@@ -201,16 +270,22 @@ namespace mongo {
         if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile ||
             clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509 ||
             clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
-            if (sslGlobalParams.sslMode.load() == SSLGlobalParams::SSLMode_disabled){
+            if (sslGlobalParams.sslMode.load() == SSLGlobalParams::SSLMode_disabled) {
                 return Status(ErrorCodes::BadValue, "need to enable SSL via the sslMode flag");
+            } 
+        }
+        if (sslGlobalParams.sslMode.load() == SSLGlobalParams::SSLMode_allowSSL) {
+            if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509 ||
+                clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
+                    return Status(ErrorCodes::BadValue,
+                                  "cannot have x.509 cluster authentication in allowSSL mode");
             }
         }
-
         return Status::OK();
     }
 
     Status storeSSLClientOptions(const moe::Environment& params) {
-        if (params.count("ssl")) {
+        if (params.count("ssl") && params["ssl"].as<bool>() == true) {
             sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_requireSSL);
         }
         if (params.count("ssl.PEMKeyFile")) {
@@ -224,6 +299,10 @@ namespace mongo {
         }
         if (params.count("ssl.CRLFile")) {
             sslGlobalParams.sslCRLFile = params["ssl.CRLFile"].as<std::string>();
+        }
+        if (params.count("net.ssl.allowInvalidHostnames")) {
+            sslGlobalParams.sslAllowInvalidHostnames =
+                params["net.ssl.allowInvalidHostnames"].as<bool>();
         }
         if (params.count("ssl.allowInvalidCertificates")) {
             sslGlobalParams.sslAllowInvalidCertificates = true;

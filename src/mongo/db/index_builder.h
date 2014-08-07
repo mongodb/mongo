@@ -30,14 +30,19 @@
 
 #include <string>
 
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/background.h"
 
 /**
  * Forks off a thread to build an index.
  */
 namespace mongo {
+
+    class Collection;
+    class OperationContext;
 
     class IndexBuilder : public BackgroundJob {
     public:
@@ -51,13 +56,16 @@ namespace mongo {
          */
         virtual std::string name() const;
 
-        Status build( Client::Context& context ) const;
+        Status build(OperationContext* txn, Database* db) const;
 
         /**
-         * Kill all in-progress indexes matching criteria and, optionally, store them in the
-         * indexes list.
+         * Kill all in-progress indexes matching criteria, if non-empty:
+         * index ns, index name, and/or index key spec.
+         * Returns a vector of the indexes that were killed.
          */
-        static std::vector<BSONObj> killMatchingIndexBuilds(const BSONObj& criteria);
+        static std::vector<BSONObj> 
+            killMatchingIndexBuilds(Collection* collection,
+                                    const IndexCatalog::IndexKillCriteria& criteria);
 
         /**
          * Retry all index builds in the list. Builds each index in a separate thread. If ns does
@@ -69,7 +77,7 @@ namespace mongo {
     private:
         const BSONObj _index;
         std::string _name; // name of this builder, not related to the index
-        static AtomicUInt _indexBuildCount;
+        static AtomicUInt32 _indexBuildCount;
     };
 
 }

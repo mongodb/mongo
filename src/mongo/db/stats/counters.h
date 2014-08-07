@@ -31,10 +31,10 @@
 
 #include "mongo/pch.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/concurrency/spin_lock.h"
-#include "mongo/db/pdfile.h"
 
 namespace mongo {
 
@@ -46,38 +46,37 @@ namespace mongo {
     public:
 
         OpCounters();
-        void incInsertInWriteLock(int n) { _insert.x += n; }
-        void gotInsert() { _insert++; }
-        void gotQuery() { _query++; }
-        void gotUpdate() { _update++; }
-        void gotDelete() { _delete++; }
-        void gotGetMore() { _getmore++; }
-        void gotCommand() { _command++; }
+        void incInsertInWriteLock(int n);
+        void gotInsert();
+        void gotQuery();
+        void gotUpdate();
+        void gotDelete();
+        void gotGetMore();
+        void gotCommand();
 
         void gotOp( int op , bool isCommand );
 
         BSONObj getObj() const;
         
         // thse are used by snmp, and other things, do not remove
-        const AtomicUInt * getInsert() const { return &_insert; }
-        const AtomicUInt * getQuery() const { return &_query; }
-        const AtomicUInt * getUpdate() const { return &_update; }
-        const AtomicUInt * getDelete() const { return &_delete; }
-        const AtomicUInt * getGetMore() const { return &_getmore; }
-        const AtomicUInt * getCommand() const { return &_command; }
-
+        const AtomicUInt32 * getInsert() const { return &_insert; }
+        const AtomicUInt32 * getQuery() const { return &_query; }
+        const AtomicUInt32 * getUpdate() const { return &_update; }
+        const AtomicUInt32 * getDelete() const { return &_delete; }
+        const AtomicUInt32 * getGetMore() const { return &_getmore; }
+        const AtomicUInt32 * getCommand() const { return &_command; }
 
     private:
         void _checkWrap();
         
         // todo: there will be a lot of cache line contention on these.  need to do something 
         //       else eventually.
-        AtomicUInt _insert;
-        AtomicUInt _query;
-        AtomicUInt _update;
-        AtomicUInt _delete;
-        AtomicUInt _getmore;
-        AtomicUInt _command;
+        AtomicUInt32 _insert;
+        AtomicUInt32 _query;
+        AtomicUInt32 _update;
+        AtomicUInt32 _delete;
+        AtomicUInt32 _getmore;
+        AtomicUInt32 _command;
     };
 
     extern OpCounters globalOpCounters;

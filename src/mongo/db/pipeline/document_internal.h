@@ -40,7 +40,7 @@ namespace mongo {
      */
     class Position {
     public:
-        // This represents "not found" similar to string::npos
+        // This represents "not found" similar to std::string::npos
         Position() :index(static_cast<unsigned>(-1)) {}
         bool found() const { return index != Position().index; }
 

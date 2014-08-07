@@ -29,10 +29,10 @@
 import sys
 from os.path import join, dirname, abspath
 root_dir = dirname(File('SConscript').rfile().abspath)
-sys.path.append(join(root_dir, 'tools'))
+sys.path.insert(0, join(root_dir, 'tools'))
 import js2c
 
-Import("env windows linux darwin solaris freebsd debugBuild")
+Import("env windows linux darwin solaris freebsd debugBuild openbsd")
 
 # pared-down copies of the equivalent structures in v8's SConstruct/SConscript:
 LIBRARY_FLAGS = {
@@ -241,6 +241,7 @@ SOURCES = {
     x64/stub-cache-x64.cc
     """),
   'os:freebsd': ['platform-freebsd.cc', 'platform-posix.cc'],
+  'os:openbsd': ['platform-openbsd.cc', 'platform-posix.cc'],
   'os:linux':   ['platform-linux.cc', 'platform-posix.cc'],
   'os:macos':   ['platform-macos.cc', 'platform-posix.cc'],
   'os:solaris': ['platform-solaris.cc', 'platform-posix.cc'],
@@ -304,6 +305,8 @@ def get_options():
         os_string = 'os:freebsd'
     elif solaris:
         os_string = 'os:solaris'
+    elif openbsd:
+        os_string = 'os:openbsd'
     else:
         os_string = 'os:nullos'
 
@@ -351,8 +354,8 @@ env = env.Clone()
 # in addition, v8 source needs to compile with src/parser.h, which
 # is being placed here earlier in the search path than windows sdk's
 # Include/parser.h (v8 doesn't even use any of those header files)
-env['CPPPATH'].remove('$BUILD_DIR/third_party/v8/include')
-env.Prepend(CPPPATH='$BUILD_DIR/third_party/v8/src')
+env['CPPPATH'].remove('#/src/third_party/v8/include')
+env.Prepend(CPPPATH='#/src/third_party/v8/src')
 
 # add v8 ccflags and cppdefines to environment if they're not already
 # present

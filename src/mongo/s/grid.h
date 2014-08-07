@@ -35,7 +35,8 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/concurrency/mutex.h"
 
-#include "config.h"  // DBConfigPtr
+#include "mongo/s/config.h"  // DBConfigPtr
+#include "mongo/s/type_settings.h"
 
 namespace mongo {
 
@@ -51,7 +52,7 @@ namespace mongo {
          * gets the config the db.
          * will return an empty DBConfig if not in db already
          */
-        DBConfigPtr getDBConfig( const StringData& ns , bool create=true , const string& shardNameHint="" );
+        DBConfigPtr getDBConfig( const StringData& ns , bool create=true , const std::string& shardNameHint="" );
 
         /**
          * removes db entry.
@@ -91,25 +92,45 @@ namespace mongo {
          * addShard will create a new shard in the grid. It expects a mongod process to be running
          * on the provided address. Adding a shard that is a replica set is supported.
          *
-         * @param name is an optional string with the name of the shard. if omitted, grid will
+         * @param name is an optional std::string with the name of the shard. if omitted, grid will
          *        generate one and update the parameter.
-         * @param servers is the connection string of the shard being added
+         * @param servers is the connection std::string of the shard being added
          * @param maxSize is the optional space quota in bytes. Zeros means there's no limitation to
          *        space usage
          * @param errMsg is the error description in case the operation failed.
          * @return true if shard was successfully added.
          */
-        bool addShard( string* name , const ConnectionString& servers , long long maxSize , string& errMsg );
+        bool addShard( std::string* name , const ConnectionString& servers , long long maxSize , std::string& errMsg );
 
         /**
          * @return true if the config database knows about a host 'name'
          */
-        bool knowAboutShard( const string& name ) const;
+        bool knowAboutShard( const std::string& name ) const;
 
         /**
-         * @return true if the chunk balancing functionality is enabled
+         * Returns true if the balancer should be running. Caller is responsible
+         * for making sure settings has the balancer key.
          */
-        bool shouldBalance( const string& ns = "", BSONObj* balancerDocOut = 0 ) const;
+        bool shouldBalance(const SettingsType& balancerSettings) const;
+
+        /**
+         * Retrieve the balancer settings from the config server. Returns false if an error
+         * occurred while retrieving the document. If the balancer settings document does not
+         * exist, it is not considered as an error, but the "key" property of the settings
+         * output parameter will not be set.
+         */
+        bool getBalancerSettings(SettingsType* settings, string* errMsg) const;
+
+        /**
+         * Returns true if the config server settings indicate that the balancer should be active.
+         */
+        bool getConfigShouldBalance() const;
+
+        /**
+         * Returns true if the given collection can be balanced based on the config.collections
+         * document.
+         */
+        bool getCollShouldBalance(const std::string& ns) const;
 
         /**
          * 
@@ -135,7 +156,7 @@ namespace mongo {
 
     private:
         mongo::mutex              _lock;            // protects _databases; TODO: change to r/w lock ??
-        map<string, DBConfigPtr > _databases;       // maps ns to DBConfig's
+        std::map<std::string, DBConfigPtr > _databases;       // maps ns to DBConfig's
         bool                      _allowLocalShard; // can 'localhost' be used in shard addresses?
 
         /**
@@ -143,20 +164,12 @@ namespace mongo {
          * @return true if it managed to generate a shard name. May return false if (currently)
          * 10000 shard
          */
-        bool _getNewShardName( string* name ) const;
+        bool _getNewShardName( std::string* name ) const;
 
         /**
          * @return whether a give dbname is used for shard "local" databases (e.g., admin or local)
          */
-        static bool _isSpecialLocalDB( const string& dbName );
-
-        /**
-         * @param balancerDoc bson that may contain a marker to stop the balancer
-         *        format { ... , stopped: [ "true" | "false" ] , ... }
-         * @return true if the marker is present and is set to true
-         */
-        static bool _balancerStopped( const BSONObj& balancerDoc );
-
+        static bool _isSpecialLocalDB( const std::string& dbName );
     };
 
     extern Grid grid;

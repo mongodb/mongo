@@ -115,6 +115,8 @@ namespace {
             << ActionType::dbStats
             << ActionType::find
             << ActionType::killCursors
+            << ActionType::listCollections
+            << ActionType::listIndexes
             << ActionType::planCacheRead;
 
         // Read-write role
@@ -179,6 +181,7 @@ namespace {
             << ActionType::listDatabases
             << ActionType::listShards // clusterManager gets this also
             << ActionType::netstat
+            << ActionType::replSetGetConfig // clusterManager gets this also
             << ActionType::replSetGetStatus // clusterManager gets this also
             << ActionType::serverStatus
             << ActionType::top
@@ -221,6 +224,7 @@ namespace {
             << ActionType::appendOplogNote // backup gets this also
             << ActionType::applicationMessage // hostManager gets this also
             << ActionType::replSetConfigure
+            << ActionType::replSetGetConfig // clusterMonitor gets this also
             << ActionType::replSetGetStatus // clusterMonitor gets this also
             << ActionType::replSetStateChange
             << ActionType::resync // hostManager gets this also
@@ -242,6 +246,10 @@ namespace {
     void addReadOnlyDbPrivileges(PrivilegeVector* privileges, const StringData& dbName) {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges, Privilege(ResourcePattern::forDatabaseName(dbName), readRoleActions));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forAnyResource(), ActionType::listCollections));
+
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forExactNamespace(
@@ -288,7 +296,10 @@ namespace {
                 Privilege(ResourcePattern::forExactNamespace(
                                   NamespaceString(dbName, "system.namespaces")),
                           readRoleActions));
+
         ActionSet profileActions = readRoleActions;
+        profileActions.addAction(ActionType::convertToCapped);
+        profileActions.addAction(ActionType::createCollection);
         profileActions.addAction(ActionType::dropCollection);
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
@@ -348,6 +359,12 @@ namespace {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forClusterResource(), ActionType::invalidateUserCache));
+
+
+        ActionSet readRoleAndIndexActions;
+        readRoleAndIndexActions += readRoleActions;
+        readRoleAndIndexActions << ActionType::createIndex << ActionType::dropIndex;
+
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forCollectionName("system.users"),
@@ -356,12 +373,12 @@ namespace {
                 privileges,
                 Privilege(ResourcePattern::forExactNamespace(
                                   AuthorizationManager::usersCollectionNamespace),
-                          readRoleActions));
+                          readRoleAndIndexActions));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forExactNamespace(
                                   AuthorizationManager::rolesCollectionNamespace),
-                          readRoleActions));
+                          readRoleAndIndexActions));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forExactNamespace(
@@ -468,7 +485,13 @@ namespace {
     void addBackupPrivileges(PrivilegeVector* privileges) {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
+                Privilege(ResourcePattern::forAnyResource(), ActionType::collStats));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
                 Privilege(ResourcePattern::forAnyNormalResource(), ActionType::find));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forAnyResource(), ActionType::listCollections));
 
         ActionSet clusterActions;
         clusterActions << ActionType::getParameter // To check authSchemaVersion
@@ -534,6 +557,32 @@ namespace {
                 privileges,
                 Privilege(ResourcePattern::forCollectionName("system.js"), actions));
 
+        // Need to be able to query system.namespaces to check existing collection options.
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forCollectionName("system.namespaces"),
+                          ActionType::find));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forAnyResource(), ActionType::listCollections));
+
+        // Privileges for user/role management
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forAnyNormalResource(), userAdminRoleActions));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::defaultTempUsersCollectionNamespace),
+                          ActionType::find));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::defaultTempRolesCollectionNamespace),
+                          ActionType::find));
+
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forExactNamespace(
@@ -546,12 +595,7 @@ namespace {
                                   AuthorizationManager::usersBackupCollectionNamespace),
                           actions));
 
-        Privilege::addPrivilegeToPrivilegeVector(
-                privileges,
-                Privilege(ResourcePattern::forExactNamespace(
-                                  AuthorizationManager::rolesCollectionNamespace),
-                          actions));
-
+        actions << ActionType::find;
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(
@@ -560,21 +604,22 @@ namespace {
                         actions));
 
         // Need additional actions on system.users.
-        actions << ActionType::find << ActionType::update << ActionType::remove;
+        actions << ActionType::update << ActionType::remove;
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forCollectionName("system.users"), actions));
-
-        // Need to be able to query system.namespaces to check existing collection options.
-        Privilege::addPrivilegeToPrivilegeVector(
-                privileges,
-                Privilege(ResourcePattern::forCollectionName("system.namespaces"),
-                          ActionType::find));
 
         // Need to be able to run getParameter to check authSchemaVersion
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges, Privilege(ResourcePattern::forClusterResource(),
                                       ActionType::getParameter));
+
+        // Need to be able to create an index on the system.roles collection.
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::rolesCollectionNamespace),
+                          ActionType::createIndex));
     }
 
     void addRootRolePrivileges(PrivilegeVector* privileges) {

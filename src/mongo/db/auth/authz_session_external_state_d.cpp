@@ -45,13 +45,15 @@ namespace mongo {
                 AuthzSessionExternalStateServerCommon(authzManager) {}
     AuthzSessionExternalStateMongod::~AuthzSessionExternalStateMongod() {}
 
-    void AuthzSessionExternalStateMongod::startRequest() {
-        if (!Lock::isLocked()) {
-            _checkShouldAllowLocalhost();
-        }
+    void AuthzSessionExternalStateMongod::startRequest(OperationContext* txn) {
+        // No locks should be held as this happens before any database accesses occur
+        fassert(17506, txn->lockState()->threadState() == 0);
+
+        _checkShouldAllowLocalhost(txn);
     }
 
     bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {
+        // TODO(spencer): get "isGod" from OperationContext
         return cc().isGod() || AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks();
     }
 

@@ -2,7 +2,10 @@
 
 Import("env")
 
-env.Library('options_parser', ['environment.cpp',
+optsEnv = env.Clone()
+optsEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
+
+optsEnv.Library('options_parser', ['environment.cpp',
                                'value.cpp',
                                'constraints.cpp',
                                'option_section.cpp',

@@ -46,15 +46,7 @@ namespace mongo {
     struct QuerySolutionNode;
 
     /**
-     * TODO HK notes
-
-     * cache should be LRU with some cap on size
-
-     * {x:1} and {x:{$gt:7}} not same shape for now -- operator matters
-     */
-
-    /**
-     * When the CachedPlanRunner runs a cached query, it can provide feedback to the cache.  This
+     * When the CachedPlanStage runs a cached query, it can provide feedback to the cache.  This
      * feedback is available to anyone who retrieves that query in the future.
      */
     struct PlanCacheEntryFeedback {
@@ -93,7 +85,7 @@ namespace mongo {
         PlanCacheIndexTree() : entry(NULL), index_pos(0) { }
 
         ~PlanCacheIndexTree() {
-            for (vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
+            for (std::vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
                     it != children.end(); ++it) {
                 delete *it;
             }
@@ -244,7 +236,9 @@ namespace mongo {
         // used to produce a backup solution in the case of a blocking sort.
         boost::optional<size_t> backupSoln;
 
-        // XXX: Replace with copy of canonical query?
+        // TODO: Do we really want to just hold a copy of the CanonicalQuery?  For now we just
+        // extract the data we need.
+        //
         // Used by the plan cache commands to display an example query
         // of the appropriate shape.
         BSONObj query;
@@ -259,7 +253,7 @@ namespace mongo {
         // the other plans lost.
         boost::scoped_ptr<PlanRankingDecision> decision;
 
-        // Annotations from cached runs.  The CachedSolutionRunner provides these stats about its
+        // Annotations from cached runs.  The CachedPlanStage provides these stats about its
         // runs when they complete.
         std::vector<PlanCacheEntryFeedback*> feedback;
 
@@ -269,15 +263,9 @@ namespace mongo {
         // The standard deviation of the scores from stored as feedback.
         boost::optional<double> stddevScore;
 
-        // Determines the amount of feedback that we are willing to store. Must be >= 1.
-        // TODO: how do we tune this?
-        static const size_t kMaxFeedback;
-
-        // The number of standard deviations which must be exceeded
-        // in order to determine that the cache entry should be removed.
-        // Must be positive. TODO how do we tune this?
-        static const double kStdDevThreshold;
-
+        // In order to justify eviction, the deviation from the mean must exceed a
+        // minimum threshold.
+        static const double kMinDeviation;
     };
 
     /**
@@ -290,17 +278,6 @@ namespace mongo {
     private:
         MONGO_DISALLOW_COPYING(PlanCache);
     public:
-        /**
-         * Flush cache when the number of write operations since last
-         * clear() reaches this limit.
-         */
-        static const int kPlanCacheMaxWriteOperations;
-
-        /**
-         * The maximum number of plan cache entries allowed.
-         */
-        static const int kMaxCacheSize;
-
         /**
          * We don't want to cache every possible query. This function
          * encapsulates the criteria for what makes a canonical query
@@ -344,8 +321,8 @@ namespace mongo {
         Status get(const CanonicalQuery& query, CachedSolution** crOut) const;
 
         /**
-         * When the CachedPlanRunner runs a plan out of the cache, we want to record data about the
-         * plan's performance.  The CachedPlanRunner calls feedback(...) at the end of query
+         * When the CachedPlanStage runs a plan out of the cache, we want to record data about the
+         * plan's performance.  The CachedPlanStage calls feedback(...) at the end of query
          * execution in order to do this.
          *
          * Cache takes ownership of 'feedback'.
@@ -390,6 +367,12 @@ namespace mongo {
          * Used by planCacheListQueryShapes and index_filter_commands_test.cpp.
          */
         std::vector<PlanCacheEntry*> getAllEntries() const;
+
+        /**
+         * Returns true if there is an entry in the cache for the 'query'.
+         * Internally calls hasKey() on the LRU cache.
+         */
+        bool contains(const CanonicalQuery& cq) const;
 
         /**
          * Returns number of entries in cache.

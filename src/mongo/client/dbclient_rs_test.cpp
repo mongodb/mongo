@@ -89,7 +89,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -173,7 +172,7 @@ namespace {
             vector<HostAndPort> hostList(_replSet->getHosts());
             for (vector<HostAndPort>::const_iterator iter = hostList.begin();
                     iter != hostList.end(); ++iter) {
-                _replSet->kill(iter->toString(true));
+                _replSet->kill(iter->toString());
             }
         }
 
@@ -181,7 +180,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -255,7 +253,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -344,7 +341,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -427,7 +423,10 @@ namespace {
             // Tests for pinning behavior require this.
             ReplicaSetMonitor::useDeterministicHostSelection = true;
 
+            // This shuts down the background RSMWatcher thread and prevents it from running. These
+            // tests depend on controlling when the RSMs are updated.
             ReplicaSetMonitor::cleanup();
+
             _replSet.reset(new MockReplicaSet("test", 5));
             _originalConnectionHook = ConnectionString::getConnectionHook();
             ConnectionString::setConnectionHook(
@@ -500,7 +499,6 @@ namespace {
             ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
-            // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
             mongo::ScopedDbConnection::clearPool();
         }
 
@@ -538,6 +536,39 @@ namespace {
             BSONObj doc = cursor->next();
             const string newDest = doc[HostField.name()].str();
             ASSERT_EQUALS(dest, newDest);
+        }
+    }
+
+    TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfHostMarkedAsFailed) {
+        MockReplicaSet* replSet = getReplSet();
+        vector<HostAndPort> seedList;
+        seedList.push_back(HostAndPort(replSet->getPrimary()));
+
+        DBClientReplicaSet replConn(replSet->getSetName(), seedList);
+
+        string dest;
+        {
+            Query query;
+            query.readPref(mongo::ReadPreference_PrimaryPreferred, BSONArray());
+
+            // Note: IdentityNS contains the name of the server.
+            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            BSONObj doc = cursor->next();
+            dest = doc[HostField.name()].str();
+        }
+
+        // This is the only difference from ConnShouldPinIfSameSettings which tests that we *do* pin
+        // in if the host is still marked as up. Note that this only notifies the RSM, and does not
+        // directly effect the DBClientRS.
+        ReplicaSetMonitor::get(replSet->getSetName())->failedHost(HostAndPort(dest));
+
+        {
+            Query query;
+            query.readPref(mongo::ReadPreference_PrimaryPreferred, BSONArray());
+            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            BSONObj doc = cursor->next();
+            const string newDest = doc[HostField.name()].str();
+            ASSERT_NOT_EQUALS(dest, newDest);
         }
     }
 

@@ -493,6 +493,7 @@ var authCommandsLib = {
                         dbOwner: 1,
                         clusterMonitor: 1,
                         clusterAdmin: 1,
+                        backup: 1,
                         root: 1,
                         __system: 1
                     },
@@ -508,6 +509,7 @@ var authCommandsLib = {
                         dbAdminAnyDatabase: 1,
                         clusterMonitor: 1,
                         clusterAdmin: 1,
+                        backup: 1,
                         root: 1,
                         __system: 1
                     },
@@ -621,6 +623,7 @@ var authCommandsLib = {
         {
             testname: "copydb",
             command: {copydb: 1, fromdb: firstDbName, todb: secondDbName},
+            skipSharded: true, // Does not work sharded due to SERVER-13080
             testcases: [
                 {
                     runOnDb: adminDbName,
@@ -721,6 +724,27 @@ var authCommandsLib = {
                     roles: roles_writeDbAdminAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "x"}, actions: ["insert", "convertToCapped"] }
+                    ]
+                }
+            ]
+        },
+        {
+            testname: "createIndexes",
+            command: {createIndexes: "x", indexes: [{ns: firstDbName + ".x", key: {a:1}, name: "a_1"}] },
+            teardown: function (db) { db.x.drop(); },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: Object.extend({readWrite: 1,
+                                          readWriteAnyDatabase: 1,
+                                          dbAdmin: 1,
+                                          dbAdminAnyDatabase: 1,
+                                          dbOwner: 1,
+                                          restore: 1,
+                                          root: 1,
+                                          __system: 1}),
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "x"}, actions: ["createIndex"] }
                     ]
                 }
             ]
@@ -1226,15 +1250,6 @@ var authCommandsLib = {
             ]
         },
         {
-            testname: "getoptime",
-            command: {getoptime: 1},
-            skipSharded: true,
-            testcases: [
-                { runOnDb: firstDbName, roles: roles_all, privileges: [ ] },
-                { runOnDb: secondDbName, roles: roles_all, privileges: [ ] }
-            ]
-        },
-        {
             testname: "getShardMap",
             command: {getShardMap: "x"},
             testcases: [
@@ -1326,6 +1341,7 @@ var authCommandsLib = {
                 }
             ]
         },
+/*      temporarily removed see SERVER-13555 
         {
             testname: "indexStats",
             command: {indexStats: "x", index: "a_1"},
@@ -1352,6 +1368,7 @@ var authCommandsLib = {
                 }
             ]
         },
+*/
         {
             testname: "isMaster",
             command: {isMaster: 1},
@@ -1754,7 +1771,6 @@ var authCommandsLib = {
             command: {renameCollection: firstDbName + ".x", to: secondDbName + ".y"},
             setup: function (db) {
                 db.getSisterDB(firstDbName).x.save( {} );
-                db.getSisterDB(firstDbName).getLastError();
                 db.getSisterDB(adminDbName).runCommand({movePrimary: firstDbName, to: shard0name});
                 db.getSisterDB(adminDbName).runCommand({movePrimary: secondDbName, to: shard0name});
             },
@@ -1945,6 +1961,29 @@ var authCommandsLib = {
                     },
                     privileges: [
                         { resource: {cluster: true}, actions: ["replSetGetStatus"] }
+                    ],
+                    expectFail: true
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
+            testname: "replSetGetConfig",
+            command: {replSetGetConfig: 1},
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: {
+                        clusterMonitor: 1,
+                        clusterManager: 1,
+                        clusterAdmin: 1,
+                        root: 1,
+                        __system: 1
+                    },
+                    privileges: [
+                        { resource: {cluster: true}, actions: ["replSetGetConfig"] }
                     ],
                     expectFail: true
                 },
@@ -2250,7 +2289,8 @@ var authCommandsLib = {
                 }
             ]
         },
-        {
+/*      temporarily removed see SERVER-13555 
+         {
             testname: "storageDetails",
             command: {storageDetails: "x", analyze: "diskStorage"},
             skipSharded: true,
@@ -2272,7 +2312,7 @@ var authCommandsLib = {
                     ]
                 }
             ]
-        },
+        }, */
         {
             testname: "text",
             command: {text: "x"},

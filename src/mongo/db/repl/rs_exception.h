@@ -31,6 +31,7 @@
 #pragma once
 
 namespace mongo {
+namespace repl {
 
     class VoteException : public std::exception {
     public:
@@ -42,4 +43,5 @@ namespace mongo {
         const char * what() const throw () { return "RetryAfterSleepException"; }
     };
 
-}
+} // namespace repl
+} // namespace mongo

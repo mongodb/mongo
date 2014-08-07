@@ -42,6 +42,7 @@
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/hostandport.h"
@@ -74,7 +75,7 @@ namespace mongo {
 
 #if !defined(_WIN32) && !defined(__sunos__)
 
-    vector<string> getMyAddrs() {
+    static vector<string> getMyAddrs() {
         vector<string> out;
         ifaddrs * addrs;
         
@@ -124,7 +125,7 @@ namespace mongo {
         return out;
     }
 
-    vector<string> getAllIPs(const string& iporhost) {
+    static vector<string> getAllIPs(const string& iporhost) {
         addrinfo* addrs = NULL;
         addrinfo hints;
         memset(&hints, 0, sizeof(addrinfo));
@@ -177,14 +178,14 @@ namespace mongo {
     public:
         IsSelfCommand() : Command("_isSelf") , _cacheLock( "IsSelfCommand::_cacheLock" ) {}
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream &help ) const {
             help << "{ _isSelf : 1 } INTERNAL ONLY";
         }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             init();
             result.append( "id" , _id );
             return true;
@@ -202,17 +203,11 @@ namespace mongo {
         map<string,bool> _cache;
     } isSelfCommand;
 
-    bool HostAndPort::isSelf() const {
+    bool repl::isSelf(const HostAndPort& hostAndPort) {
 
-        int _p = port();
-        int p = _p == -1 ? ServerGlobalParams::DefaultDBPort : _p;
+        int p = hostAndPort.port();
 
-        if (p != serverGlobalParams.port) {
-            // shortcut - ports have to match at the very least
-            return false;
-        }
-
-        string host = str::stream() << this->host() << ":" << p;
+        string host = str::stream() << hostAndPort.host() << ":" << p;
 
         {
             // check cache for this host
@@ -226,22 +221,24 @@ namespace mongo {
 #if !defined(_WIN32) && !defined(__sunos__)
         // on linux and os x we can do a quick check for an ip match
 
-        const vector<string> myaddrs = getMyAddrs();
-        const vector<string> addrs = getAllIPs(_host);
+        // no need for ip match if the ports do not match
+        if (p == serverGlobalParams.port) {
+            const vector<string> myaddrs = getMyAddrs();
+            const vector<string> addrs = getAllIPs(hostAndPort.host());
 
-        for (vector<string>::const_iterator i=myaddrs.begin(), iend=myaddrs.end(); i!=iend; ++i) {
-            for (vector<string>::const_iterator j=addrs.begin(), jend=addrs.end(); j!=jend; ++j) {
-                string a = *i;
-                string b = *j;
+            for (vector<string>::const_iterator i=myaddrs.begin(), iend=myaddrs.end();
+                 i!=iend; ++i) {
+                for (vector<string>::const_iterator j=addrs.begin(), jend=addrs.end();
+                     j!=jend; ++j) {
+                    string a = *i;
+                    string b = *j;
 
-                if ( a == b ||
-                        ( str::startsWith( a , "127." ) && str::startsWith( b , "127." ) )  // 127. is all loopback
-                   ) {
-
-                    // add to cache
-                    scoped_lock lk( isSelfCommand._cacheLock );
-                    isSelfCommand._cache[host] = true;
-                    return true;
+                    if (a == b) {
+                        // add to cache
+                        scoped_lock lk( isSelfCommand._cacheLock );
+                        isSelfCommand._cache[host] = true;
+                        return true;
+                    }
                 }
             }
         }
@@ -258,7 +255,7 @@ namespace mongo {
             isSelfCommand.init();
             DBClientConnection conn;
             string errmsg;
-            if ( ! conn.connect( host , errmsg ) ) {
+            if ( ! conn.connect( hostAndPort , errmsg ) ) {
                 // should this go in the cache?
                 return false;
             }

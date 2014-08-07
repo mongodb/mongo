@@ -55,7 +55,9 @@ namespace mongo {
      */
     class MergeSortStage : public PlanStage {
     public:
-        MergeSortStage(const MergeSortStageParams& params, WorkingSet* ws);
+        MergeSortStage(const MergeSortStageParams& params, 
+                       WorkingSet* ws, 
+                       const Collection* collection);
         virtual ~MergeSortStage();
 
         void addChild(PlanStage* child);
@@ -63,13 +65,26 @@ namespace mongo {
         virtual bool isEOF();
         virtual StageState work(WorkingSetID* out);
 
-        virtual void prepareToYield();
-        virtual void recoverFromYield();
+        virtual void saveState();
+        virtual void restoreState(OperationContext* opCtx);
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_SORT_MERGE; }
 
         PlanStageStats* getStats();
 
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
+        static const char* kStageType;
+
     private:
+        // Not owned by us.
+        const Collection* _collection;
+
         // Not owned by us.
         WorkingSet* _ws;
 
@@ -83,7 +98,7 @@ namespace mongo {
         unordered_set<DiskLoc, DiskLoc::Hasher> _seen;
 
         // Owned by us.  All the children we're reading from.
-        vector<PlanStage*> _children;
+        std::vector<PlanStage*> _children;
 
         // In order to pick the next smallest value, we need each child work(...) until it produces
         // a result.  This is the queue of children that haven't given us a result yet.
@@ -103,12 +118,13 @@ namespace mongo {
         // priority_queue to remove the item from the list and quickly.
 
         struct StageWithValue {
+            StageWithValue() : id(WorkingSet::INVALID_ID), stage(NULL) { }
             WorkingSetID id;
             PlanStage* stage;
         };
 
         // We have a priority queue of these.
-        typedef list<StageWithValue>::iterator MergingRef;
+        typedef std::list<StageWithValue>::iterator MergingRef;
 
         // The comparison function used in our priority queue.
         class StageWithValueComparison {
@@ -126,10 +142,10 @@ namespace mongo {
         };
 
         // The min heap of the results we're returning.
-        std::priority_queue<MergingRef, vector<MergingRef>, StageWithValueComparison> _merging;
+        std::priority_queue<MergingRef, std::vector<MergingRef>, StageWithValueComparison> _merging;
 
         // The data referred to by the _merging queue above.
-        list<StageWithValue> _mergingData;
+        std::list<StageWithValue> _mergingData;
 
         // Stats
         CommonStats _commonStats;

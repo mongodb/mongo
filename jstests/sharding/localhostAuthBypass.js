@@ -23,6 +23,13 @@ var addUsersToEachShard = function(st) {
     }
 };
 
+var addShard = function(st, expectedResult) {
+    var m = MongoRunner.runMongod({ auth: "", keyFile: keyfile })
+    assert.eq(st.getDB("admin").runCommand({ addShard: m.host }).ok, expectedResult, "Add shard");
+    return m.port;
+};
+
+
 var findEmptyShard = function(st, ns) {
     var counts = st.chunkCounts( "foo" )
 
@@ -41,18 +48,10 @@ var assertCannotRunCommands = function(mongo, st) {
     // CRUD
     var test = mongo.getDB("test");
     assert.throws( function() { test.system.users.findOne(); });
-
-    test.foo.save({_id:0});
-    assert(test.getLastError());
-    
+    assert.writeError(test.foo.save({ _id: 0 }));
     assert.throws( function() { test.foo.findOne({_id:0}); });
-    
-    test.foo.update({_id:0}, {$set:{x:20}});
-    assert(test.getLastError());
-    
-    test.foo.remove({_id:0});
-    assert(test.getLastError());
-
+    assert.writeError(test.foo.update({ _id: 0 }, { $set: { x: 20 }}));
+    assert.writeError(test.foo.remove({ _id: 0 }));
 
     // Multi-shard
     assert.throws(function() { 
@@ -67,14 +66,45 @@ var assertCannotRunCommands = function(mongo, st) {
         mongo.getDB("config").shards.findOne();
     });
 
-    var to = findEmptyShard(st, "test.foo");
-
+    var authorizeErrorCode = 13;
     var res = mongo.getDB("admin").runCommand({
         moveChunk: "test.foo",
         find: {_id: 1},
-        to: to
+        to: "shard0000" // Arbitrary shard.
     });
-    assert.commandFailed(res);
+    assert.commandFailedWithCode(res, authorizeErrorCode, "moveChunk");
+    assert.commandFailedWithCode(mongo.getDB("test").copyDatabase("admin",  "admin2"),
+        authorizeErrorCode, "copyDatabase");
+    // Create collection
+    assert.commandFailedWithCode(mongo.getDB("test").createCollection(
+        "log", { capped: true, size: 5242880, max: 5000 } ),
+        authorizeErrorCode, "createCollection");
+    // Set/Get system parameters
+    var params = [{ param: "journalCommitInterval", val: 200 },
+                  { param: "logLevel", val: 2 },
+                  { param: "logUserIds", val: 1 },
+                  { param: "notablescan", val: 1 },
+                  { param: "quiet", val: 1 },
+                  { param: "replApplyBatchSize", val: 10 },
+                  { param: "replIndexPrefetch", val: "none" },
+                  { param: "syncdelay", val: 30 },
+                  { param: "traceExceptions", val: true },
+                  { param: "sslMode", val: "preferSSL" },
+                  { param: "clusterAuthMode", val: "sendX509" },
+                  { param: "userCacheInvalidationIntervalSecs", val: 300 }
+                 ];
+    params.forEach(function(p) {
+        var cmd = { setParameter: 1 };
+        cmd[p.param] = p.val;
+        assert.commandFailedWithCode(mongo.getDB("admin").runCommand(cmd),
+            authorizeErrorCode, "setParameter: "+p.param);
+    });
+    params.forEach(function(p) {
+        var cmd = { getParameter: 1 };
+        cmd[p.param] = 1;
+        assert.commandFailedWithCode(mongo.getDB("admin").runCommand(cmd),
+            authorizeErrorCode, "getParameter: "+p.param);
+    });
 };
 
 var assertCanRunCommands = function(mongo, st) {
@@ -86,15 +116,10 @@ var assertCanRunCommands = function(mongo, st) {
     // this will throw if it fails
     test.system.users.findOne();
 
-    test.foo.save({_id: 0});
-    assert(test.getLastError() == null);
-    
-    test.foo.update({_id: 0}, {$set:{x:20}});
-    assert(test.getLastError() == null);
-    
-    test.foo.remove({_id: 0});
-    assert(test.getLastError() == null);
-    
+    assert.writeOK(test.foo.save({ _id: 0 }));
+    assert.writeOK(test.foo.update({ _id: 0 }, { $set: { x: 20 }}));
+    assert.writeOK(test.foo.remove({ _id: 0 }));
+
     // Multi-shard
     test.foo.mapReduce(
         function() { emit(1, 1); }, 
@@ -133,6 +158,7 @@ var setupSharding = function(mongo) {
 
 var start = function(useHostName) {
     return new ShardingTest({
+        auth: "",
         keyFile: keyfile, 
         shards: numShards, 
         chunksize: 1, 
@@ -189,26 +215,21 @@ var runTest = function(useHostName) {
     print("=====================");
     var st = start(useHostName);
     var host = st.s.host;
+    var extraShards = [];
 
     var mongo = new Mongo(host);
 
-    setupSharding(mongo);
-
-    assertCanRunCommands(mongo, st);
-
-    addUsersToEachShard(st);
-
-    assertCanRunCommands(mongo, st);
-
-    createUser(mongo);
-
-    // now that we have a user, we need to make sure 
-    // helper functions on st work for the rest of the script.
-    authenticate(st.s); 
-
     assertCannotRunCommands(mongo, st);
 
+    extraShards.push(addShard(st, 1));
+    createUser(mongo);
+
     authenticate(mongo);
+    setupSharding(mongo);
+
+    addUsersToEachShard(st);
+    authenticate(st.s);
+    st.printShardingStatus();
 
     assertCanRunCommands(mongo, st);
 
@@ -219,12 +240,18 @@ var runTest = function(useHostName) {
     mongo = new Mongo(host);
 
     assertCannotRunCommands(mongo, st);
+    extraShards.push(addShard(mongo, 0));
 
     authenticate(mongo);
 
     assertCanRunCommands(mongo, st);
+    extraShards.push(addShard(mongo, 1));
+    st.printShardingStatus();
 
     shutdown(st);
+    extraShards.forEach(function(sh) {
+        MongoRunner.stopMongod(sh);
+    });
 }
 
 runTest(false);

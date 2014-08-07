@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -35,8 +36,6 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
-
-    class NamespaceDetails;
 
     /**
      * OplogStart walks a collection backwards to find the first object in the collection that
@@ -61,39 +60,53 @@ namespace mongo {
     class OplogStart : public PlanStage {
     public:
         // Does not take ownership.
-        OplogStart(const string& ns, MatchExpression* filter, WorkingSet* ws);
+        OplogStart(OperationContext* txn,
+                   const Collection* collection,
+                   MatchExpression* filter,
+                   WorkingSet* ws);
         virtual ~OplogStart();
 
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
 
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
-        virtual void prepareToYield();
-        virtual void recoverFromYield();
+        virtual void saveState();
+        virtual void restoreState(OperationContext* opCtx);
 
-        // PS. don't call this.
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        //
+        // Exec stats -- do not call these for the oplog start stage.
+        //
+
         virtual PlanStageStats* getStats() { return NULL; }
+
+        virtual const CommonStats* getCommonStats() { return NULL; }
+
+        virtual const SpecificStats* getSpecificStats() { return NULL; }
+
+        virtual StageType stageType() const { return STAGE_OPLOG_START; }
 
         // For testing only.
         void setBackwardsScanTime(int newTime) { _backwardsScanTime = newTime; }
         bool isExtentHopping() { return _extentHopping; }
         bool isBackwardsScanning() { return _backwardsScanning; }
     private:
-        // Copied verbatim.
-        static DiskLoc prevExtentFirstLoc(NamespaceDetails* nsd, const DiskLoc& rec);
-
         StageState workBackwardsScan(WorkingSetID* out);
 
         void switchToExtentHopping();
 
         StageState workExtentHopping(WorkingSetID* out);
 
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
+
         // If we're backwards scanning we just punt to a collscan.
         scoped_ptr<CollectionScan> _cs;
 
-        // What's our current DiskLoc?  Set by both collscan and extent hopping.
-        // Only written by collscan, read and written by extent hopping.
-        DiskLoc _curloc;
+        // This is only used for the extent hopping scan.
+        typedef OwnedPointerVector<RecordIterator> SubIterators;
+        SubIterators _subIterators;
 
         // Have we done our heavy init yet?
         bool _needInit;
@@ -107,7 +120,7 @@ namespace mongo {
         // Our final state: done.
         bool _done;
 
-        NamespaceDetails* _nsd;
+        const Collection* _collection;
 
         // We only go backwards via a collscan for a few seconds.
         Timer _timer;
@@ -115,8 +128,8 @@ namespace mongo {
         // WorkingSet is not owned by us.
         WorkingSet* _workingSet;
 
-        string _ns;
-        
+        std::string _ns;
+
         MatchExpression* _filter;
 
         static int _backwardsScanTime;

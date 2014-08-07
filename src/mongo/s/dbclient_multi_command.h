@@ -71,7 +71,7 @@ namespace mongo {
 
             // What to send
             const ConnectionString endpoint;
-            const string dbName;
+            const std::string dbName;
             const BSONObj cmdObj;
 
             // Where to send it

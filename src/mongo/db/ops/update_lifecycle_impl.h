@@ -52,7 +52,7 @@ namespace mongo {
 
         virtual bool canContinue() const;
 
-        virtual const IndexPathSet* getIndexKeys() const;
+        virtual const UpdateIndexData* getIndexKeys() const;
 
         virtual const std::vector<FieldRef*>* getImmutableFields() const;
 

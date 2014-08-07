@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
@@ -38,6 +37,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/role_graph.h"
@@ -47,18 +47,19 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
     class AuthzManagerExternalState;
     class UserDocumentParser;
+    class OperationContext;
 
     /**
      * Internal secret key info.
      */
     struct AuthInfo {
         User* user;
-        BSONObj authParams;
     };
     extern AuthInfo internalSecurity; // set at startup and not changed after initialization.
 
@@ -77,7 +78,7 @@ namespace mongo {
         static const std::string USER_NAME_FIELD_NAME;
         static const std::string USER_DB_FIELD_NAME;
         static const std::string ROLE_NAME_FIELD_NAME;
-        static const std::string ROLE_SOURCE_FIELD_NAME;
+        static const std::string ROLE_DB_FIELD_NAME;
         static const std::string PASSWORD_FIELD_NAME;
         static const std::string V1_USER_NAME_FIELD_NAME;
         static const std::string V1_USER_SOURCE_FIELD_NAME;
@@ -88,6 +89,8 @@ namespace mongo {
         static const NamespaceString usersBackupCollectionNamespace;
         static const NamespaceString usersCollectionNamespace;
         static const NamespaceString versionCollectionNamespace;
+        static const NamespaceString defaultTempUsersCollectionNamespace; // for mongorestore
+        static const NamespaceString defaultTempRolesCollectionNamespace; // for mongorestore
 
         /**
          * Query to match the auth schema version document in the versionCollectionNamespace.
@@ -126,17 +129,6 @@ namespace mongo {
         // TODO: Make the following functions no longer static.
 
         /**
-         * Sets whether or not we allow old style (pre v2.4) privilege documents for this whole
-         * server.  Only relevant prior to upgrade.
-         */
-        static void setSupportOldStylePrivilegeDocuments(bool enabled);
-
-        /**
-         * Returns true if we allow old style privilege privilege documents for this whole server.
-         */
-        static bool getSupportOldStylePrivilegeDocuments();
-
-        /**
          * Takes a vector of privileges and fills the output param "resultArray" with a BSON array
          * representation of the privileges.
          */
@@ -167,12 +159,21 @@ namespace mongo {
         bool isAuthEnabled() const;
 
         /**
-         * Returns the version number of the authorization system.
+         * Returns via the output parameter "version" the version number of the authorization
+         * system.  Returns Status::OK() if it was able to successfully fetch the current
+         * authorization version.  If it has problems fetching the most up to date version it
+         * returns a non-OK status.  When returning a non-OK status, *version will be set to
+         * schemaVersionInvalid (0).
          */
-        int getAuthorizationVersion();
+        Status getAuthorizationVersion(OperationContext* txn, int* version);
+
+        /**
+         * Returns the user cache generation identifier.
+         */
+        OID getCacheGeneration();
 
         // Returns true if there exists at least one privilege document in the system.
-        bool hasAnyPrivilegeDocuments() const;
+        bool hasAnyPrivilegeDocuments(OperationContext* txn) const;
 
         /**
          * Updates the auth schema version document to reflect that the system is upgraded to
@@ -237,7 +238,7 @@ namespace mongo {
                                     bool upsert,
                                     bool multi,
                                     const BSONObj& writeConcern,
-                                    int* numUpdated) const;
+                                    int* nMatched) const;
 
         /*
          * Removes roles matching the given query.
@@ -255,10 +256,11 @@ namespace mongo {
          * Should only be called on collections with authorization documents in them
          * (ie admin.system.users and admin.system.roles).
          */
-        Status queryAuthzDocument(const NamespaceString& collectionName,
+        Status queryAuthzDocument(OperationContext* txn,
+                                  const NamespaceString& collectionName,
                                   const BSONObj& query,
                                   const BSONObj& projection,
-                                  const boost::function<void(const BSONObj&)>& resultProcessor);
+                                  const stdx::function<void(const BSONObj&)>& resultProcessor);
 
         // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
         // "system.users" collection of database "dbname".
@@ -276,12 +278,12 @@ namespace mongo {
          * membership and delegation information, a full list of the user's privileges, and a full
          * list of the user's roles, including those roles held implicitly through other roles
          * (indirect roles).  In the event that some of this information is inconsistent, the
-         * document will contain a "warnings" array, with string messages describing
+         * document will contain a "warnings" array, with std::string messages describing
          * inconsistencies.
          *
          * If the user does not exist, returns ErrorCodes::UserNotFound.
          */
-        Status getUserDescription(const UserName& userName, BSONObj* result);
+        Status getUserDescription(OperationContext* txn, const UserName& userName, BSONObj* result);
 
         /**
          * Writes into "result" a document describing the named role and returns Status::OK().  The
@@ -290,7 +292,7 @@ namespace mongo {
          * implicitly through other roles (indirect roles). If "showPrivileges" is true, then the
          * description documents will also include a full list of the role's privileges.
          * In the event that some of this information is inconsistent, the document will contain a
-         * "warnings" array, with string messages describing inconsistencies.
+         * "warnings" array, with std::string messages describing inconsistencies.
          *
          * If the role does not exist, returns ErrorCodes::RoleNotFound.
          */
@@ -306,13 +308,13 @@ namespace mongo {
          * contain description documents for all the builtin roles for the given database, if it
          * is false the result will just include user defined roles.
          * In the event that some of the information in a given role description is inconsistent,
-         * the document will contain a "warnings" array, with string messages describing
+         * the document will contain a "warnings" array, with std::string messages describing
          * inconsistencies.
          */
         Status getRoleDescriptionsForDB(const std::string dbname,
                                         bool showPrivileges,
                                         bool showBuiltinRoles,
-                                        vector<BSONObj>* result);
+                                        std::vector<BSONObj>* result);
 
         /**
          *  Returns the User object for the given userName in the out parameter "acquiredUser".
@@ -324,23 +326,13 @@ namespace mongo {
          *  The AuthorizationManager retains ownership of the returned User object.
          *  On non-OK Status return values, acquiredUser will not be modified.
          */
-        Status acquireUser(const UserName& userName, User** acquiredUser);
+        Status acquireUser(OperationContext* txn, const UserName& userName, User** acquiredUser);
 
         /**
          * Decrements the refcount of the given User object.  If the refcount has gone to zero,
          * deletes the User.  Caller must stop using its pointer to "user" after calling this.
          */
         void releaseUser(User* user);
-
-        /**
-         * Returns a User object for a V1-style user with the given "userName" in "*acquiredUser",
-         * On success, "acquiredUser" will have any privileges that the named user has on
-         * database "dbname".
-         *
-         * Bumps the returned **acquiredUser's reference count on success.
-         */
-        Status acquireV1UserProbedForDb(
-                const UserName& userName, const StringData& dbname, User** acquiredUser);
 
         /**
          * Marks the given user as invalid and removes it from the user cache.
@@ -357,7 +349,7 @@ namespace mongo {
          * system is at, this may involve building up the user cache and/or the roles graph.
          * Call this function at startup and after resynchronizing a slave/secondary.
          */
-        Status initialize();
+        Status initialize(OperationContext* txn);
 
         /**
          * Invalidates all of the contents of the user cache.
@@ -399,7 +391,8 @@ namespace mongo {
          * On failure, returns a status other than Status::OK().  In this case, is is typically safe
          * to try again.
          */
-        Status upgradeSchemaStep(const BSONObj& writeConcern, bool* isDone);
+        Status upgradeSchemaStep(
+                        OperationContext* txn, const BSONObj& writeConcern, bool* isDone);
 
         /**
          * Performs up to maxSteps steps in the process of upgrading the stored authorization data
@@ -414,7 +407,7 @@ namespace mongo {
          * progress performing the upgrade, and the specific code and message in the returned status
          * may provide additional information.
          */
-        Status upgradeSchema(int maxSteps, const BSONObj& writeConcern);
+        Status upgradeSchema(OperationContext* txn, int maxSteps, const BSONObj& writeConcern);
 
         /**
          * Hook called by replication code to let the AuthorizationManager observe changes
@@ -440,19 +433,27 @@ namespace mongo {
         void _invalidateUserCache_inlock();
 
         /**
+         * Given the objects describing an oplog entry that affects authorization data, invalidates
+         * the portion of the user cache that is affected by that operation.  Should only be called
+         * with oplog entries that have been pre-verified to actually affect authorization data.
+         */
+        void _invalidateRelevantCacheData(const char* op,
+                                          const char* ns,
+                                          const BSONObj& o,
+                                          const BSONObj* o2);
+
+        /**
+         * Updates _cacheGeneration to a new OID
+         */
+        void _updateCacheGeneration_inlock();
+
+        /**
          * Fetches user information from a v2-schema user document for the named user,
          * and stores a pointer to a new user object into *acquiredUser on success.
          */
-        Status _fetchUserV2(const UserName& userName, std::auto_ptr<User>* acquiredUser);
-
-        /**
-         * Fetches user information from a v1-schema user document for the named user, possibly
-         * examining system.users collections from userName.getDB() and admin.system.users in the
-         * process.  Stores a pointer to a new user object into *acquiredUser on success.
-         */
-        Status _fetchUserV1(const UserName& userName, std::auto_ptr<User>* acquiredUser);
-
-        static bool _doesSupportOldStylePrivileges;
+        Status _fetchUserV2(OperationContext* txn,
+                            const UserName& userName,
+                            std::auto_ptr<User>* acquiredUser);
 
         /**
          * True if access control enforcement is enabled in this AuthorizationManager.
@@ -483,10 +484,10 @@ namespace mongo {
         unordered_map<UserName, User*> _userCache;
 
         /**
-         * Current generation of cached data.  Bumped every time part of the cache gets
-         * invalidated.
+         * Current generation of cached data.  Updated every time part of the cache gets
+         * invalidated.  Protected by CacheGuard.
          */
-        uint64_t _cacheGeneration;
+        OID _cacheGeneration;
 
         /**
          * True if there is an update to the _userCache in progress, and that update is currently in

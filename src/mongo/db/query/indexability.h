@@ -50,18 +50,7 @@ namespace mongo {
                 return true;
             }
 
-            return    me->matchType() == MatchExpression::LTE
-                   || me->matchType() == MatchExpression::LT
-                   || me->matchType() == MatchExpression::EQ
-                   || me->matchType() == MatchExpression::GT
-                   || me->matchType() == MatchExpression::GTE
-                   || me->matchType() == MatchExpression::REGEX
-                   || me->matchType() == MatchExpression::MOD
-                   || me->matchType() == MatchExpression::MATCH_IN
-                   || me->matchType() == MatchExpression::TYPE_OPERATOR
-                   || me->matchType() == MatchExpression::GEO
-                   || me->matchType() == MatchExpression::GEO_NEAR
-                   || me->matchType() == MatchExpression::TEXT;
+            return isIndexOnOwnFieldTypeNode(me);
         }
 
         /**
@@ -70,7 +59,24 @@ namespace mongo {
          * Example: a: {$elemMatch: {$gte: 1, $lte: 1}}.
          */
         static bool arrayUsesIndexOnOwnField(const MatchExpression* me) {
-            return me->isArray() && MatchExpression::ELEM_MATCH_VALUE == me->matchType();
+            if (!me->isArray()) {
+                return false;
+            }
+
+            if (MatchExpression::ELEM_MATCH_VALUE != me->matchType()) {
+                return false;
+            }
+
+            // We have an ELEM_MATCH_VALUE expression. In order to be
+            // considered "indexable" all children of the ELEM_MATCH_VALUE
+            // must be "indexable" type expressions as well.
+            for (size_t i = 0; i < me->numChildren(); i++) {
+                if (!isIndexOnOwnFieldTypeNode(me->getChild(i))) {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /**
@@ -82,7 +88,47 @@ namespace mongo {
         static bool arrayUsesIndexOnChildren(const MatchExpression* me) {
             return me->isArray() && (MatchExpression::ELEM_MATCH_OBJECT == me->matchType()
                                      || MatchExpression::ALL == me->matchType());
-        };
+        }
+
+        /**
+         * Returns true if 'me' is a NOT, and the child of the NOT can use
+         * an index on its own field.
+         */
+        static bool isBoundsGeneratingNot(const MatchExpression* me) {
+            return MatchExpression::NOT == me->matchType() &&
+                   nodeCanUseIndexOnOwnField(me->getChild(0));
+        }
+
+        /**
+         * Returns true if either 'me' is a bounds generating NOT,
+         * or 'me' can use an index on its own field.
+         */
+        static bool isBoundsGenerating(const MatchExpression* me) {
+            return isBoundsGeneratingNot(me) || nodeCanUseIndexOnOwnField(me);
+        }
+
+    private:
+        /**
+         * Returns true if 'me' is "sargable" but is not a negation and
+         * is not an array node such as ELEM_MATCH_VALUE.
+         *
+         * Used as a helper for nodeCanUseIndexOnOwnField().
+         */
+        static bool isIndexOnOwnFieldTypeNode(const MatchExpression* me) {
+            return    me->matchType() == MatchExpression::LTE
+                   || me->matchType() == MatchExpression::LT
+                   || me->matchType() == MatchExpression::EQ
+                   || me->matchType() == MatchExpression::GT
+                   || me->matchType() == MatchExpression::GTE
+                   || me->matchType() == MatchExpression::REGEX
+                   || me->matchType() == MatchExpression::MOD
+                   || me->matchType() == MatchExpression::MATCH_IN
+                   || me->matchType() == MatchExpression::TYPE_OPERATOR
+                   || me->matchType() == MatchExpression::GEO
+                   || me->matchType() == MatchExpression::GEO_NEAR
+                   || me->matchType() == MatchExpression::EXISTS
+                   || me->matchType() == MatchExpression::TEXT;
+        }
     };
 
 }  // namespace mongo

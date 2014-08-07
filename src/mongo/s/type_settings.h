@@ -31,10 +31,13 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
+
+    struct WriteConcernOptions;
 
     /**
      * This class represents the layout and contents of documents contained in the
@@ -50,12 +53,16 @@ namespace mongo {
      *
      *     // Process the response.
      *     SettingsType exampleType;
-     *     string errMsg;
+     *     std::string errMsg;
      *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
      *         // Can't use 'exampleType'. Take action.
      *     }
      *     // use 'exampleType'
      *
+     * It is the responsibility of the caller to make sure that this object has
+     * the right "key" when calling the getter and serialize methods. The key is
+     * used for identifying the type of document this object represents (for example,
+     * balancer settings or chunk size settings document).
      */
     class SettingsType {
         MONGO_DISALLOW_COPYING(SettingsType);
@@ -67,14 +74,17 @@ namespace mongo {
 
         // Name of the settings collection in the config server.
         static const std::string ConfigNS;
+        static const std::string BalancerDocKey;
+        static const std::string ChunkSizeDocKey;
 
         // Field names and types in the settings collection type.
         static const BSONField<std::string> key;
         static const BSONField<int> chunksize;
         static const BSONField<bool> balancerStopped;
         static const BSONField<BSONObj> balancerActiveWindow;
-        static const BSONField<bool> shortBalancerSleep;
-        static const BSONField<bool> secondaryThrottle;
+        static const BSONField<bool> deprecated_secondaryThrottle;
+        static const BSONField<BSONObj> migrationWriteConcern;
+        static const BSONField<bool> waitForDelete;
 
         //
         // settings type methods
@@ -111,7 +121,7 @@ namespace mongo {
         void cloneTo(SettingsType* other) const;
 
         /**
-         * Returns a string representation of the current internal state.
+         * Returns a std::string representation of the current internal state.
          */
         std::string toString() const;
 
@@ -150,6 +160,7 @@ namespace mongo {
         // Calling get*() methods when the member is not set and has no default results in undefined
         // behavior
         int getChunksize() const {
+            dassert(_key == ChunkSizeDocKey);
             if (_isChunksizeSet) {
                 return _chunksize;
             } else {
@@ -171,6 +182,7 @@ namespace mongo {
         // Calling get*() methods when the member is not set and has no default results in undefined
         // behavior
         bool getBalancerStopped() const {
+            dassert(_key == BalancerDocKey);
             if (_isBalancerStoppedSet) {
                 return _balancerStopped;
             } else {
@@ -192,6 +204,7 @@ namespace mongo {
         // Calling get*() methods when the member is not set and has no default results in undefined
         // behavior
         BSONObj getBalancerActiveWindow() const {
+            dassert(_key == BalancerDocKey);
             if (_isBalancerActiveWindowSet) {
                 return _balancerActiveWindow;
             } else {
@@ -199,27 +212,7 @@ namespace mongo {
                 return balancerActiveWindow.getDefault();
             }
         }
-        void setShortBalancerSleep(bool shortBalancerSleep) {
-            _shortBalancerSleep = shortBalancerSleep;
-            _isShortBalancerSleepSet = true;
-        }
 
-        void unsetShortBalancerSleep() { _isShortBalancerSleepSet = false; }
-
-        bool isShortBalancerSleepSet() const {
-            return _isShortBalancerSleepSet || shortBalancerSleep.hasDefault();
-        }
-
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        bool getShortBalancerSleep() const {
-            if (_isShortBalancerSleepSet) {
-                return _shortBalancerSleep;
-            } else {
-                dassert(shortBalancerSleep.hasDefault());
-                return shortBalancerSleep.getDefault();
-            }
-        }
         void setSecondaryThrottle(bool secondaryThrottle) {
             _secondaryThrottle = secondaryThrottle;
             _isSecondaryThrottleSet = true;
@@ -228,19 +221,71 @@ namespace mongo {
         void unsetSecondaryThrottle() { _isSecondaryThrottleSet = false; }
 
         bool isSecondaryThrottleSet() const {
-            return _isSecondaryThrottleSet || secondaryThrottle.hasDefault();
+            return _isSecondaryThrottleSet || deprecated_secondaryThrottle.hasDefault();
         }
 
         // Calling get*() methods when the member is not set and has no default results in undefined
         // behavior
         bool getSecondaryThrottle() const {
+            dassert(_key == BalancerDocKey);
             if (_isSecondaryThrottleSet) {
                 return _secondaryThrottle;
             } else {
-                dassert(secondaryThrottle.hasDefault());
-                return secondaryThrottle.getDefault();
+                dassert(deprecated_secondaryThrottle.hasDefault());
+                return deprecated_secondaryThrottle.getDefault();
             }
         }
+
+        void setMigrationWriteConcern(const BSONObj& writeConcern) {
+            _migrationWriteConcern = writeConcern;
+            _isMigrationWriteConcernSet = true;
+        }
+
+        void unsetMigrationWriteConcern() {
+            _isMigrationWriteConcernSet = false;
+        }
+
+        bool isMigrationWriteConcernSet() const {
+            return _isMigrationWriteConcernSet;
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        BSONObj getMigrationWriteConcern() const {
+            dassert(_key == BalancerDocKey);
+            dassert (_isMigrationWriteConcernSet);
+            return _migrationWriteConcern;
+        }
+
+        void setWaitForDelete(bool waitForDelete) {
+            _waitForDelete = waitForDelete;
+            _isWaitForDeleteSet = true;
+        }
+
+        void unsetWaitForDelete() {
+            _isWaitForDeleteSet = false;
+        }
+
+        bool isWaitForDeleteSet() const {
+            return _isWaitForDeleteSet;
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        bool getWaitForDelete() const {
+            dassert(_key == BalancerDocKey);
+            dassert (_isWaitForDeleteSet);
+            return _waitForDelete;
+        }
+
+        // Helper methods
+
+        /**
+         * Extract the write concern settings from this settings. This is only valid when
+         * key is "balancer". Returns NULL if secondary throttle is true but write
+         * concern is not specified.
+         */
+        StatusWith<WriteConcernOptions*> extractWriteConcern() const;
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
@@ -259,11 +304,19 @@ namespace mongo {
                                          // Format: { start: "08:00" , stop:
                                          // "19:30" }, strftime format is %H:%M
 
-        bool _shortBalancerSleep;        // (O)  controls how long the balancer sleeps
-        bool _isShortBalancerSleepSet;   // in some situations
 
         bool _secondaryThrottle;         // (O)  only migrate chunks as fast as at least
         bool _isSecondaryThrottleSet;    // one secondary can keep up with
+
+        // (O)  detailed write concern for *individual* writes during migration.
+        // From side: deletes during cleanup.
+        // To side: deletes to clear the incoming range, deletes to undo migration at abort,
+        //          and writes during cloning.
+        BSONObj _migrationWriteConcern;
+        bool _isMigrationWriteConcernSet;
+
+        bool _waitForDelete;             // (O)  synchronous migration cleanup.
+        bool _isWaitForDeleteSet;
     };
 
 } // namespace mongo

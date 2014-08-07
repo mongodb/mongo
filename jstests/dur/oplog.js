@@ -81,9 +81,6 @@ function work() {
     d.foo.insert({ _id: 6, q: "aaaaa", b: big, z: 3 });
     d.foo.update({ _id: 5 }, { $set: { z: 99} });
 
-    // assure writes applied in case we kill -9 on return from this function
-    d.getLastError();
-
     log("endwork");
 
     verify();

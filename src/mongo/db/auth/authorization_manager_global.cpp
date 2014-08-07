@@ -44,7 +44,7 @@ namespace {
         MONGO_DISALLOW_COPYING(AuthzVersionParameter);
     public:
         AuthzVersionParameter(ServerParameterSet* sps, const std::string& name);
-        virtual void append(BSONObjBuilder& b, const std::string& name);
+        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
         virtual Status set(const BSONElement& newValueElement);
         virtual Status setFromString(const std::string& str);
     };
@@ -60,8 +60,12 @@ namespace {
     AuthzVersionParameter::AuthzVersionParameter(ServerParameterSet* sps, const std::string& name) :
         ServerParameter(sps, name, false, false) {}
 
-    void AuthzVersionParameter::append(BSONObjBuilder& b, const std::string& name) {
-        b.append(name, getGlobalAuthorizationManager()->getAuthorizationVersion());
+    void AuthzVersionParameter::append(
+                    OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+        int authzVersion;
+        uassertStatusOK(
+                getGlobalAuthorizationManager()->getAuthorizationVersion(txn, &authzVersion));
+        b.append(name, authzVersion);
     }
 
     Status AuthzVersionParameter::set(const BSONElement& newValueElement) {
@@ -80,6 +84,7 @@ namespace {
 
     void clearGlobalAuthorizationManager() {
         fassert(16843, globalAuthManager != NULL);
+        delete globalAuthManager;
         globalAuthManager = NULL;
     }
 

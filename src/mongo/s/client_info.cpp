@@ -28,14 +28,14 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/timer_stats.h"
@@ -48,10 +48,13 @@
 #include "mongo/s/request.h"
 #include "mongo/s/writeback_listener.h"
 #include "mongo/server.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     ClientInfo::ClientInfo(AbstractMessagingPort* messagingPort) : ClientBasic(messagingPort) {
         _cur = &_a;
@@ -130,10 +133,6 @@ namespace mongo {
 
     bool ClientInfo::exists() {
         return _tlInfo.get();
-    }
-
-    bool ClientBasic::hasCurrent() {
-        return ClientInfo::exists();
     }
 
     ClientBasic* ClientBasic::getCurrent() {

@@ -16,7 +16,6 @@ for ( i=0; i<N; i++ ){
     forward.push( i )
     backward.push( ( N - 1 ) - i )
 }
-db.getLastError();
 
 s.adminCommand( { split : "test.data" , middle : { 'sub.num' : 33 } } )
 s.adminCommand( { split : "test.data" , middle : { 'sub.num' : 66 } } )

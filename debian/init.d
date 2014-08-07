@@ -128,7 +128,15 @@ start_server() {
             ulimit -v unlimited
             ulimit -n 64000
             ulimit -m unlimited
-            ulimit -u 32000
+
+            # In dash, ulimit takes -p for maximum user processes
+            # In bash, it's -u
+            if readlink /proc/$$/exe | grep -q dash
+            then
+                    ulimit -p 32000
+            else
+                    ulimit -u 32000
+            fi
 
             # Start the process using the wrapper
             start-stop-daemon --background --start --quiet --pidfile $PIDFILE \

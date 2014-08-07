@@ -36,9 +36,8 @@ namespace mongo {
     class CmdConnectionStatus : public Command {
     public:
         CmdConnectionStatus() : Command("connectionStatus") {}
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -47,7 +46,7 @@ namespace mongo {
             h << "Returns connection-specific information such as logged-in users";
         }
 
-        bool run(const string&, BSONObj& cmdObj, int, string& errmsg,
+        bool run(OperationContext* txn, const string&, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool fromRepl) {
             AuthorizationSession* authSession =
                     ClientBasic::getCurrent()->getAuthorizationSession();

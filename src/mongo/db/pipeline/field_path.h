@@ -38,12 +38,12 @@ namespace mongo {
         /**
          * Constructor.
          *
-         * @param fieldPath the dotted field path string or non empty pre-split vector.
+         * @param fieldPath the dotted field path std::string or non empty pre-split vector.
          * The constructed object will have getPathLength() > 0.
          * Uassert if any component field names do not pass validation.
          */
-        FieldPath(const string& fieldPath);
-        FieldPath(const vector<string>& fieldPath);
+        FieldPath(const std::string& fieldPath);
+        FieldPath(const std::vector<std::string>& fieldPath);
 
         /**
           Get the number of path elements in the field path.
@@ -58,7 +58,7 @@ namespace mongo {
           @param i the zero based index of the path element.
           @returns the path element
          */
-        const string& getFieldName(size_t i) const;
+        const std::string& getFieldName(size_t i) const;
 
         /**
           Get the full path.
@@ -66,7 +66,7 @@ namespace mongo {
           @param fieldPrefix whether or not to include the field prefix
           @returns the complete field path
          */
-        string getPath(bool fieldPrefix) const;
+        std::string getPath(bool fieldPrefix) const;
 
         /**
           Write the full path.
@@ -74,7 +74,7 @@ namespace mongo {
           @param outStream where to write the path to
           @param fieldPrefix whether or not to include the field prefix
         */
-        void writePath(ostream &outStream, bool fieldPrefix) const;
+        void writePath(std::ostream &outStream, bool fieldPrefix) const;
 
         /**
            Get the prefix string.
@@ -93,15 +93,15 @@ namespace mongo {
 
     private:
         /** Uassert if a field name does not pass validation. */
-        static void uassertValidFieldName(const string& fieldName);
+        static void uassertValidFieldName(const std::string& fieldName);
 
         /**
          * Push a new field name to the back of the vector of names comprising the field path.
          * Uassert if 'fieldName' does not pass validation.
          */
-        void pushFieldName(const string& fieldName);
+        void pushFieldName(const std::string& fieldName);
 
-        vector<string> vFieldName;
+        std::vector<std::string> vFieldName;
     };
 }
 
@@ -114,7 +114,7 @@ namespace mongo {
         return vFieldName.size();
     }
 
-    inline const string& FieldPath::getFieldName(size_t i) const {
+    inline const std::string& FieldPath::getFieldName(size_t i) const {
         dassert(i < getPathLength());
         return vFieldName[i];
     }

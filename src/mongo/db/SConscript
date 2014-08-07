@@ -56,3 +56,14 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/mongohasher',
     ],
 )
+
+env.CppUnitTest(
+    target="dbmessage_test",
+    source=[
+        "dbmessage_test.cpp"
+    ],
+    LIBDEPS=[
+        "common",
+        "$BUILD_DIR/mongo/clientdriver",
+    ],
+)

@@ -42,6 +42,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/config_coordinator.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -306,59 +307,79 @@ namespace mongo {
         return false;
     }
 
-    void ClusterWriter::write( const BatchedCommandRequest& request,
+    static void toBatchError( const Status& status, BatchedCommandResponse* response ) {
+        response->clear();
+        response->setErrCode( status.code() );
+        response->setErrMessage( status.reason() );
+        response->setOk( false );
+        dassert( response->isValid(NULL) );
+    }
+
+    void ClusterWriter::write( const BatchedCommandRequest& origRequest,
                                BatchedCommandResponse* response ) {
 
-        // App-level validation of a create index insert
-        if ( request.isInsertIndexRequest() ) {
-            if ( request.sizeWriteOps() != 1 ) {
+        // Add _ids to insert request if req'd
+        auto_ptr<BatchedCommandRequest> idRequest(BatchedCommandRequest::cloneWithIds(origRequest));
+        const BatchedCommandRequest& request = NULL != idRequest.get() ? *idRequest : origRequest;
 
-                // Invalid request to create index
-                response->setOk( false );
-                response->setErrCode( ErrorCodes::InvalidOptions );
-                response->setErrMessage( "invalid batch request for index creation" );
-
-                dassert( response->isValid( NULL ) );
-                return;
-            }
-
-            NamespaceString ns( request.getTargetingNS() );
-            if ( !ns.isValid() ) {
-                response->setOk( false );
-                response->setN( 0 );
-                response->setErrCode( ErrorCodes::InvalidNamespace );
-                string errMsg( str::stream() << ns.ns() << " is not a valid namespace to index" );
-                response->setErrMessage( errMsg );
-                return;
-            }
+        const NamespaceString nss = NamespaceString( request.getNS() );
+        if ( !nss.isValid() ) {
+            toBatchError( Status( ErrorCodes::InvalidNamespace,
+                                  nss.ns() + " is not a valid namespace" ),
+                          response );
+            return;
         }
 
-        NamespaceString ns( request.getNS() );
-        if ( !ns.isValid() ) {
-            response->setOk( false );
-            response->setN( 0 );
-            response->setErrCode( ErrorCodes::InvalidNamespace );
-            string errMsg( str::stream() << ns.ns() << " is not a valid namespace" );
-            response->setErrMessage( errMsg );
+        if ( !NamespaceString::validCollectionName( nss.coll() ) ) {
+            toBatchError( Status( ErrorCodes::BadValue,
+                                  str::stream() << "invalid collection name " << nss.coll() ),
+                          response );
+            return;
+        }
+
+        if ( request.sizeWriteOps() == 0u ) {
+            toBatchError( Status( ErrorCodes::InvalidLength,
+                                  "no write ops were included in the batch" ),
+                          response );
+            return;
+        }
+
+        if ( request.sizeWriteOps() > BatchedCommandRequest::kMaxWriteBatchSize ) {
+            toBatchError( Status( ErrorCodes::InvalidLength,
+                                  str::stream() << "exceeded maximum write batch size of "
+                                                << BatchedCommandRequest::kMaxWriteBatchSize ),
+                          response );
+            return;
+        }
+
+        string errMsg;
+        if ( request.isInsertIndexRequest() && !request.isValidIndexRequest( &errMsg ) ) {
+            toBatchError( Status( ErrorCodes::InvalidOptions, errMsg ), response );
             return;
         }
 
         // Config writes and shard writes are done differently
-        string dbName = ns.db().toString();
+        string dbName = nss.db().toString();
         if ( dbName == "config" || dbName == "admin" ) {
 
             bool verboseWC = request.isVerboseWC();
 
-            // We only support batch sizes of one and {w:0} write concern for config writes
-            if ( request.sizeWriteOps() != 1 ||
-                    ( request.isWriteConcernSet() &&
-                            !validConfigWC( request.getWriteConcern() ))) {
-                // Invalid config server write
-                response->setOk( false );
-                response->setErrCode( ErrorCodes::InvalidOptions );
-                response->setErrMessage( "invalid batch request for config write" );
+            // We only support batch sizes of one for config writes
+            if ( request.sizeWriteOps() != 1 ) {
+                toBatchError( Status( ErrorCodes::InvalidOptions,
+                                      mongoutils::str::stream() << "Writes to config servers must "
+                                              "have batch size of 1, found "
+                                              << request.sizeWriteOps() ),
+                              response );
+                return;
+            }
 
-                dassert( response->isValid( NULL ) );
+            // We only support {w: 0}, {w: 1}, and {w: 'majority'} write concern for config writes
+            if ( request.isWriteConcernSet() && !validConfigWC( request.getWriteConcern() )) {
+                toBatchError( Status( ErrorCodes::InvalidOptions,
+                                      mongoutils::str::stream() << "Invalid write concern for write"
+                                      " to config servers: " << request.getWriteConcern() ),
+                              response );
                 return;
             }
 
@@ -411,7 +432,21 @@ namespace mongo {
                                      bool fsyncCheck ) {
 
         DBClientMultiCommand dispatcher;
-        ConfigCoordinator exec( &dispatcher, getConfigHosts() );
+        vector<ConnectionString> configHosts = getConfigHosts();
+
+        if (configHosts.size() > 1) {
+
+            // We can't support no-_id upserts to multiple config servers - the _ids will differ
+            if (BatchedCommandRequest::containsNoIDUpsert(request)) {
+                toBatchError(Status(ErrorCodes::InvalidOptions,
+                                    mongoutils::str::stream() << "upserts to multiple config servers must"
+                                    " include _id"),
+                             response);
+                return;
+            }
+        }
+
+        ConfigCoordinator exec( &dispatcher, configHosts );
         exec.executeBatch( request, response, fsyncCheck );
     }
 

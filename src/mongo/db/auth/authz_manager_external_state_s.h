@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/function.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <string>
@@ -38,6 +37,7 @@
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/s/distlock.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -51,18 +51,19 @@ namespace mongo {
         AuthzManagerExternalStateMongos();
         virtual ~AuthzManagerExternalStateMongos();
 
-        virtual Status initialize();
-        virtual Status getStoredAuthorizationVersion(int* outVersion);
-        virtual Status getUserDescription(const UserName& userName, BSONObj* result);
+        virtual Status initialize(OperationContext* txn);
+        virtual Status getStoredAuthorizationVersion(OperationContext* txn, int* outVersion);
+        virtual Status getUserDescription(
+                            OperationContext* txn, const UserName& userName, BSONObj* result);
         virtual Status getRoleDescription(const RoleName& roleName,
                                           bool showPrivileges,
                                           BSONObj* result);
         virtual Status getRoleDescriptionsForDB(const std::string dbname,
                                                 bool showPrivileges,
                                                 bool showBuiltinRoles,
-                                                vector<BSONObj>* result);
+                                                std::vector<BSONObj>* result);
 
-        virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
+        virtual Status getAllDatabaseNames(OperationContext* txn, std::vector<std::string>* dbnames);
 
         /**
          * Implements findOne of the AuthzManagerExternalState interface
@@ -70,7 +71,8 @@ namespace mongo {
          * NOTE: The data returned from this helper may be from any config server or replica set
          * node.  The first config server or primary node is preferred, when available.
          */
-        virtual Status findOne(const NamespaceString& collectionName,
+        virtual Status findOne(OperationContext* txn,
+                               const NamespaceString& collectionName,
                                const BSONObj& query,
                                BSONObj* result);
 
@@ -80,10 +82,11 @@ namespace mongo {
          * NOTE: The data returned from this helper may be from any config server or replica set
          * node.  The first config server or primary node is preferred, when available.
          */
-        virtual Status query(const NamespaceString& collectionName,
+        virtual Status query(OperationContext* txn,
+                             const NamespaceString& collectionName,
                              const BSONObj& query,
                              const BSONObj& projection,
-                             const boost::function<void(const BSONObj&)>& resultProcessor);
+                             const stdx::function<void(const BSONObj&)>& resultProcessor);
 
         virtual Status insert(const NamespaceString& collectionName,
                               const BSONObj& document,
@@ -94,7 +97,7 @@ namespace mongo {
                               bool upsert,
                               bool multi,
                               const BSONObj& writeConcern,
-                              int* numUpdated);
+                              int* nMatched);
         virtual Status remove(const NamespaceString& collectionName,
                               const BSONObj& query,
                               const BSONObj& writeConcern,

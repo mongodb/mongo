@@ -45,7 +45,7 @@ namespace mongo {
      *  change. However if you have a non-const Value you replace it with
      *  operator=. These rules are the same as BSONObj, and similar to
      *  shared_ptr<const Object> with stronger guarantees of constness. This is
-     *  also the same as Java's String type.
+     *  also the same as Java's std::string type.
      *
      *  Thread-safety: A single Value instance can be safely shared between
      *  threads as long as there are no writers while other threads are
@@ -73,12 +73,12 @@ namespace mongo {
         explicit Value(const OpTime& value)       : _storage(Timestamp, value.asDate()) {}
         explicit Value(const OID& value)          : _storage(jstOID, value) {}
         explicit Value(const StringData& value)   : _storage(String, value) {}
-        explicit Value(const string& value)       : _storage(String, StringData(value)) {}
+        explicit Value(const std::string& value)       : _storage(String, StringData(value)) {}
         explicit Value(const char* value)         : _storage(String, StringData(value)) {}
         explicit Value(const Document& doc)       : _storage(Object, doc) {}
         explicit Value(const BSONObj& obj);
         explicit Value(const BSONArray& arr);
-        explicit Value(const vector<Value>& vec)  : _storage(Array, new RCVector(vec)) {}
+        explicit Value(const std::vector<Value>& vec)  : _storage(Array, new RCVector(vec)) {}
         explicit Value(const BSONBinData& bd)     : _storage(BinData, bd) {}
         explicit Value(const BSONRegEx& re)       : _storage(RegEx, re) {}
         explicit Value(const BSONCodeWScope& cws) : _storage(CodeWScope, cws) {}
@@ -109,7 +109,7 @@ namespace mongo {
          *  consumed is replaced with an empty vector.
          *  In C++11 this would be spelled Value(std::move(consumed)).
          */
-        static Value consume(vector<Value>& consumed) {
+        static Value consume(std::vector<Value>& consumed) {
             RCVector* vec = new RCVector();
             std::swap(vec->vec, consumed);
             return Value(ValueStorage(Array, vec));
@@ -143,7 +143,7 @@ namespace mongo {
          *  See coerceTo methods below for a more type-flexible alternative.
          */
         double getDouble() const;
-        string getString() const;
+        std::string getString() const;
         Document getDocument() const;
         OID getOid() const;
         bool getBool() const;
@@ -151,11 +151,11 @@ namespace mongo {
         OpTime getTimestamp() const;
         const char* getRegex() const;
         const char* getRegexFlags() const;
-        string getSymbol() const;
-        string getCode() const;
+        std::string getSymbol() const;
+        std::string getCode() const;
         int getInt() const;
         long long getLong() const;
-        const vector<Value>& getArray() const { return _storage.getArray(); }
+        const std::vector<Value>& getArray() const { return _storage.getArray(); }
         size_t getArrayLength() const;
 
         /// Access an element of a subarray. Returns Value() if missing or getType() != Array
@@ -183,7 +183,7 @@ namespace mongo {
          *  These currently assert if called on an unconvertible type.
          *  TODO: decided how to handle unsupported types.
          */
-        string coerceToString() const;
+        std::string coerceToString() const;
         int coerceToInt() const;
         long long coerceToLong() const;
         double coerceToDouble() const;
@@ -218,8 +218,8 @@ namespace mongo {
         }
 
         /// This is for debugging, logging, etc. See getString() for how to extract a string.
-        string toString() const;
-        friend ostream& operator << (ostream& out, const Value& v);
+        std::string toString() const;
+        friend std::ostream& operator << (std::ostream& out, const Value& v);
 
         void swap(Value& rhs) {
             _storage.swap(rhs._storage);
@@ -243,7 +243,7 @@ namespace mongo {
         void hash_combine(size_t& seed) const;
 
         /// struct Hash is defined to enable the use of Values as keys in unordered_map.
-        struct Hash : unary_function<const Value&, size_t> {
+        struct Hash : std::unary_function<const Value&, size_t> {
             size_t operator()(const Value& rV) const;
         };
 
@@ -304,7 +304,7 @@ namespace mongo {
         return _storage.getString();
     }
 
-    inline string Value::getString() const {
+    inline std::string Value::getString() const {
         verify(getType() == String);
         return _storage.getString().toString();
     }
@@ -341,11 +341,11 @@ namespace mongo {
         return flags;
     }
 
-    inline string Value::getSymbol() const {
+    inline std::string Value::getSymbol() const {
         verify(getType() == Symbol);
         return _storage.getString().toString();
     }
-    inline string Value::getCode() const {
+    inline std::string Value::getCode() const {
         verify(getType() == Code);
         return _storage.getString().toString();
     }

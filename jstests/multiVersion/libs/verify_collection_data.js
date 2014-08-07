@@ -56,9 +56,7 @@ createCollectionWithData = function (db, collectionName, dataGenerator) {
         nextDoc._id = numInserted;
         print("collection.insert(" + JSON.stringify(nextDoc) + ");");
         var insertResult = collection.insert(nextDoc);
-        // XXX: Is this the real way to check for errors?
-        assert(insertResult === undefined || insertResult._result.ok == 1,
-               JSON.stringify(insertResult));
+        assert(db.getLastError() == null);
         numInserted++;
     }
 
@@ -92,6 +90,10 @@ function CollectionDataValidator() {
         // XXX: in 2.4 avgObjSize was a double, but in 2.6 it is an int
         collectionStats['avgObjSize'] = Math.floor(collectionStats['avgObjSize']);
 
+        // Delete keys that appear just because we shard
+        delete collectionStats["primary"];
+        delete collectionStats["sharded"];
+
         initialized = true;
 
         return collection;
@@ -100,7 +102,7 @@ function CollectionDataValidator() {
     this.validateCollectionData = function (collection) {
 
         if (!initialized) {
-            throw "validateCollectionWithAllData called, but data is not initialized";
+            throw Error("validateCollectionWithAllData called, but data is not initialized");
         }
 
         // Get the metadata for this collection
@@ -108,6 +110,14 @@ function CollectionDataValidator() {
 
         // XXX: in 2.4 avgObjSize was a double, but in 2.6 it is an int
         newCollectionStats['avgObjSize'] = Math.floor(newCollectionStats['avgObjSize']);
+
+        // as of 2.7.1, we no longer use systemFlags
+        delete collectionStats.systemFlags;
+        delete newCollectionStats.systemFlags;
+
+        // Delete keys that appear just because we shard
+        delete newCollectionStats["primary"];
+        delete newCollectionStats["sharded"];
 
         assert.docEq(collectionStats, newCollectionStats, "collection metadata not equal");
 

@@ -28,34 +28,94 @@
 
 #include "mongo/db/query/plan_executor.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/pdfile.h"
 
 namespace mongo {
 
-    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt)
-        : _workingSet(ws) , _root(rt) , _killed(false) { }
+    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, const Collection* collection)
+        : _collection(collection),
+          _cq(NULL),
+          _workingSet(ws),
+          _qs(NULL),
+          _root(rt),
+          _killed(false) {
+        initNs();
+    }
+
+    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, std::string ns)
+        : _collection(NULL),
+          _cq(NULL),
+          _workingSet(ws),
+          _qs(NULL),
+          _root(rt),
+          _ns(ns),
+          _killed(false) { }
+
+    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, CanonicalQuery* cq,
+                               const Collection* collection)
+        : _collection(collection),
+          _cq(cq),
+          _workingSet(ws),
+          _qs(NULL),
+          _root(rt),
+          _killed(false) {
+        initNs();
+    }
+
+    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, QuerySolution* qs,
+                               CanonicalQuery* cq, const Collection* collection)
+        : _collection(collection),
+          _cq(cq),
+          _workingSet(ws),
+          _qs(qs),
+          _root(rt),
+          _killed(false) {
+        initNs();
+    }
+
+    void PlanExecutor::initNs() {
+        if (NULL != _collection) {
+            _ns = _collection->ns().ns();
+        }
+        else {
+            invariant(NULL != _cq.get());
+            _ns = _cq->getParsed().ns();
+        }
+    }
 
     PlanExecutor::~PlanExecutor() { }
 
-    WorkingSet* PlanExecutor::getWorkingSet() {
+    WorkingSet* PlanExecutor::getWorkingSet() const {
         return _workingSet.get();
+    }
+
+    PlanStage* PlanExecutor::getRootStage() const {
+        return _root.get();
+    }
+
+    CanonicalQuery* PlanExecutor::getCanonicalQuery() const {
+        return _cq.get();
     }
 
     PlanStageStats* PlanExecutor::getStats() const {
         return _root->getStats();
     }
 
-    void PlanExecutor::saveState() {
-        if (!_killed) { _root->prepareToYield(); }
+    const Collection* PlanExecutor::collection() const {
+        return _collection;
     }
 
-    bool PlanExecutor::restoreState() {
+    void PlanExecutor::saveState() {
+        if (!_killed) { _root->saveState(); }
+    }
+
+    bool PlanExecutor::restoreState(OperationContext* opCtx) {
         if (!_killed) {
-            _root->recoverFromYield();
+            _root->restoreState(opCtx);
         }
         return !_killed;
     }
@@ -64,28 +124,11 @@ namespace mongo {
         if (!_killed) { _root->invalidate(dl, type); }
     }
 
-    void PlanExecutor::setYieldPolicy(Runner::YieldPolicy policy) {
-        if (Runner::YIELD_MANUAL == policy) {
-            _yieldPolicy.reset();
-        }
-        else {
-            _yieldPolicy.reset(new RunnerYieldPolicy());
-        }
-    }
-
-    Runner::RunnerState PlanExecutor::getNext(BSONObj* objOut, DiskLoc* dlOut) {
-        if (_killed) { return Runner::RUNNER_DEAD; }
+    PlanExecutor::ExecState PlanExecutor::getNext(BSONObj* objOut, DiskLoc* dlOut) {
+        if (_killed) { return PlanExecutor::DEAD; }
 
         for (;;) {
-            // Yield, if we can yield ourselves.
-            if (NULL != _yieldPolicy.get() && _yieldPolicy->shouldYield()) {
-                saveState();
-                _yieldPolicy->yield();
-                if (_killed) { return Runner::RUNNER_DEAD; }
-                restoreState();
-            }
-
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState code = _root->work(&id);
 
             if (PlanStage::ADVANCED == code) {
@@ -93,7 +136,7 @@ namespace mongo {
                 if (WorkingSet::INVALID_ID == id) {
                     invariant(NULL == objOut);
                     invariant(NULL == dlOut);
-                    return Runner::RUNNER_ADVANCED;
+                    return PlanExecutor::ADVANCED;
                 }
 
                 WorkingSetMember* member = _workingSet->get(id);
@@ -130,56 +173,25 @@ namespace mongo {
 
                 if (hasRequestedData) {
                     _workingSet->free(id);
-                    return Runner::RUNNER_ADVANCED;
+                    return PlanExecutor::ADVANCED;
                 }
                 // This result didn't have the data the caller wanted, try again.
             }
             else if (PlanStage::NEED_TIME == code) {
                 // Fall through to yield check at end of large conditional.
             }
-            else if (PlanStage::NEED_FETCH == code) {
-                // id has a loc and refers to an obj we need to fetch.
-                WorkingSetMember* member = _workingSet->get(id);
-
-                // This must be true for somebody to request a fetch and can only change when an
-                // invalidation happens, which is when we give up a lock.  Don't give up the
-                // lock between receiving the NEED_FETCH and actually fetching(?).
-                verify(member->hasLoc());
-
-                // Actually bring record into memory.
-                Record* record = member->loc.rec();
-
-                // If we're allowed to, go to disk outside of the lock.
-                if (NULL != _yieldPolicy.get()) {
-                    saveState();
-                    _yieldPolicy->yield(record);
-                    if (_killed) { return Runner::RUNNER_DEAD; }
-                    restoreState();
-                }
-                else {
-                    // We're set to manually yield.  We go to disk in the lock.
-                    record->touch();
-                }
-
-                // Record should be in memory now.  Log if it's not.
-                if (!Record::likelyInPhysicalMemory(record->dataNoThrowing())) {
-                    OCCASIONALLY {
-                        warning() << "Record wasn't in memory immediately after fetch: "
-                                  << member->loc.toString() << endl;
-                    }
-                }
-
-                // Note that we're not freeing id.  Fetch semantics say that we shouldn't.
-            }
             else if (PlanStage::IS_EOF == code) {
-                return Runner::RUNNER_EOF;
+                return PlanExecutor::IS_EOF;
             }
             else if (PlanStage::DEAD == code) {
-                return Runner::RUNNER_DEAD;
+                return PlanExecutor::DEAD;
             }
             else {
                 verify(PlanStage::FAILURE == code);
-                return Runner::RUNNER_ERROR;
+                if (NULL != objOut) {
+                    WorkingSetCommon::getStatusMemberObject(*_workingSet, id, objOut);
+                }
+                return PlanExecutor::EXEC_ERROR;
             }
         }
     }
@@ -188,8 +200,51 @@ namespace mongo {
         return _killed || _root->isEOF();
     }
 
+    void PlanExecutor::registerExecInternalPlan() {
+        _safety.reset(new ScopedExecutorRegistration(this));
+    }
+
     void PlanExecutor::kill() {
         _killed = true;
+        _collection = NULL;
+    }
+
+    Status PlanExecutor::executePlan() {
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState code = PlanStage::NEED_TIME;
+        while (PlanStage::NEED_TIME == code || PlanStage::ADVANCED == code) {
+            code = _root->work(&id);
+        }
+
+        if (PlanStage::FAILURE == code) {
+            BSONObj obj;
+            WorkingSetCommon::getStatusMemberObject(*_workingSet, id, &obj);
+            return Status(ErrorCodes::BadValue,
+                          "Exec error: " + WorkingSetCommon::toStatusString(obj));
+        }
+
+        return Status::OK();
+    }
+
+    const string& PlanExecutor::ns() {
+        return _ns;
+    }
+
+    //
+    // ScopedExecutorRegistration
+    //
+
+    ScopedExecutorRegistration::ScopedExecutorRegistration(PlanExecutor* exec)
+        : _exec(exec) {
+        // Collection can be null for an EOFStage plan, or other places where registration
+        // is not needed.
+        if ( _exec->collection() )
+            _exec->collection()->cursorCache()->registerExecutor( exec );
+    }
+
+    ScopedExecutorRegistration::~ScopedExecutorRegistration() {
+        if ( _exec->collection() )
+            _exec->collection()->cursorCache()->deregisterExecutor( _exec );
     }
 
 } // namespace mongo

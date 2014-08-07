@@ -44,6 +44,7 @@ namespace mongo {
     public:
         virtual ~AuthzSessionExternalStateServerCommon();
 
+        virtual bool shouldAllowLocalhost() const;
         virtual bool shouldIgnoreAuthChecks() const;
 
     protected:
@@ -52,7 +53,7 @@ namespace mongo {
         // Checks whether or not localhost connections should be given full access and stores the
         // result in _allowLocalhost.  Currently localhost connections are only given full access
         // if there are no users in the admin database.
-        virtual void _checkShouldAllowLocalhost();
+        void _checkShouldAllowLocalhost(OperationContext* txn);
 
     private:
 

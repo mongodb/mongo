@@ -49,7 +49,7 @@
  *         --cpppath=/usr/local/include --libpath=/usr/local/lib
  */
 
-#include "third_party/gperftools-2.0/src/gperftools/profiler.h"
+#include "third_party/gperftools-2.2/src/gperftools/profiler.h"
 
 #include <string>
 #include <vector>
@@ -58,6 +58,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 
@@ -85,7 +86,7 @@ namespace mongo {
             // This is an abuse of the global dbmutex.  We only really need to
             // ensure that only one cpuprofiler command runs at once; it would
             // be fine for it to run concurrently with other operations.
-            virtual LockType locktype() const { return WRITE; }
+            virtual bool isWriteCommandForConfigServer() const { return true; }
         };
 
         /**
@@ -95,10 +96,11 @@ namespace mongo {
         public:
             CpuProfilerStartCommand() : CpuProfilerCommand( commandName ) {}
 
-            virtual bool run( string const &db,
+            virtual bool run( OperationContext* txn,
+                              std::string const &db,
                               BSONObj &cmdObj,
                               int options,
-                              string &errmsg,
+                              std::string &errmsg,
                               BSONObjBuilder &result,
                               bool fromRepl );
 
@@ -112,10 +114,11 @@ namespace mongo {
         public:
             CpuProfilerStopCommand() : CpuProfilerCommand( commandName ) {}
 
-            virtual bool run( string const &db,
+            virtual bool run( OperationContext* txn,
+                              std::string const &db,
                               BSONObj &cmdObj,
                               int options,
-                              string &errmsg,
+                              std::string &errmsg,
                               BSONObjBuilder &result,
                               bool fromRepl );
 
@@ -125,12 +128,16 @@ namespace mongo {
         char const *const CpuProfilerStartCommand::commandName = "_cpuProfilerStart";
         char const *const CpuProfilerStopCommand::commandName = "_cpuProfilerStop";
 
-        bool CpuProfilerStartCommand::run( string const &db,
+        bool CpuProfilerStartCommand::run( OperationContext* txn,
+                                           std::string const &db,
                                            BSONObj &cmdObj,
                                            int options,
-                                           string &errmsg,
+                                           std::string &errmsg,
                                            BSONObjBuilder &result,
                                            bool fromRepl ) {
+            Lock::DBWrite dbXLock(txn->lockState(), db);
+            // The lock here is just to prevent concurrency, nothing will write.
+            Client::Context ctx(txn, db);
 
             std::string profileFilename = cmdObj[commandName]["profileFilename"].String();
             if ( ! ::ProfilerStart( profileFilename.c_str() ) ) {
@@ -140,13 +147,19 @@ namespace mongo {
             return true;
         }
 
-        bool CpuProfilerStopCommand::run( string const &db,
+        bool CpuProfilerStopCommand::run( OperationContext* txn,
+                                          std::string const &db,
                                           BSONObj &cmdObj,
                                           int options,
-                                          string &errmsg,
+                                          std::string &errmsg,
                                           BSONObjBuilder &result,
                                           bool fromRepl ) {
+            Lock::DBWrite dbXLock(txn->lockState(), db);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
+            Client::Context ctx(txn, db);
+
             ::ProfilerStop();
+            wunit.commit();
             return true;
         }
 

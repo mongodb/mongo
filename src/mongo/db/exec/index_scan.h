@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -70,36 +70,67 @@ namespace mongo {
      * Stage scans over an index from startKey to endKey, returning results that pass the provided
      * filter.  Internally dedups on DiskLoc.
      *
-     * XXX: we probably should split this into 2 stages: one btree-only "fast" ixscan and one
-     *      that strictly talks through the index API.  Need to figure out what we really want
-     *      to ship down through that API predicate-wise though, currently is a BSONObj but that's
-     *      not going to be enough. See SERVER-12397 for tracking.
+     * TODO: we probably should split this into 2 stages: one btree-only "fast" ixscan and one that
+     * strictly talks through the index API.  Need to figure out what we really want to ship down
+     * through that API predicate-wise though, currently the language is a BSONObj but that's
+     * clearly not enough (or we need different index scan exec nodes per index type?). See
+     * SERVER-12397 for tracking.
      *
      * Sub-stage preconditions: None.  Is a leaf and consumes no stage data.
      */
     class IndexScan : public PlanStage {
     public:
-        IndexScan(const IndexScanParams& params, WorkingSet* workingSet,
+        IndexScan(OperationContext* txn,
+                  const IndexScanParams& params,
+                  WorkingSet* workingSet,
                   const MatchExpression* filter);
 
         virtual ~IndexScan() { }
 
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
-        virtual void prepareToYield();
-        virtual void recoverFromYield();
+        virtual void saveState();
+        virtual void restoreState(OperationContext* opCtx);
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_IXSCAN; }
 
         virtual PlanStageStats* getStats();
 
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
+        static const char* kStageType;
+
     private:
         /**
-         * Initialize the underlying IndexCursor
+         * Initialize the underlying IndexCursor, grab information from the catalog for stats.
          */
-        void initIndexCursor();
+        void initIndexScan();
 
         /** See if the cursor is pointing at or past _endKey, if _endKey is non-empty. */
         void checkEnd();
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
+
+        // The number of keys examined during a call to checkEnd() that have not yet been
+        // accounted for by returning a NEED_TIME.
+        //
+        // Good plan ranking requires that the index scan uses one work cycle per index key
+        // examined. Since checkEnd() may examine multiple keys, we keep track of them here
+        // and make up for it later by returning NEED_TIME.
+        //
+        // Example of how this is useful for plan ranking:
+        //   Say you have indices {a: 1, b: 1} and {a: 1, x: 1, b: 1}, with predicates over
+        //   fields 'a' and 'b'. It's cheaper to use index {a: 1, b: 1}. Why? Because for
+        //   index {a: 1, x: 1, b: 1} you have to skip lots of keys due to the interceding
+        //   'x' field. This skipping is done inside checkEnd(), and we use '_checkEndKeys'
+        //   to account for it.
+        size_t _checkEndKeys;
 
         // The WorkingSet we annotate with results.  Not owned by us.
         WorkingSet* _workingSet;
@@ -107,7 +138,7 @@ namespace mongo {
         // Index access.
         const IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
         scoped_ptr<IndexCursor> _indexCursor;
-        const IndexDescriptor* _descriptor; // owned by Collection -> IndexCatalog
+        BSONObj _keyPattern;
 
         // Have we hit the end of the index scan?
         bool _hitEnd;
@@ -135,8 +166,8 @@ namespace mongo {
         BtreeIndexCursor* _btreeCursor;
         int _keyEltsToUse;
         bool _movePastKeyElts;
-        vector<const BSONElement*> _keyElts;
-        vector<bool> _keyEltsInc;
+        std::vector<const BSONElement*> _keyElts;
+        std::vector<bool> _keyEltsInc;
 
         // Stats
         CommonStats _commonStats;

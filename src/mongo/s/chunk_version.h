@@ -68,10 +68,6 @@ namespace mongo {
             : _minor(minor),_major(major), _epoch(epoch) {
         }
 
-        ChunkVersion( unsigned long long ll, const OID& epoch )
-            : _combined( ll ), _epoch(epoch) {
-        }
-
         static ChunkVersion DROPPED() {
             return ChunkVersion( 0, 0, OID() ); // dropped OID is zero time, zero machineId/inc
         }
@@ -84,6 +80,12 @@ namespace mongo {
         static ChunkVersion IGNORED() {
             ChunkVersion version = ChunkVersion();
             version._epoch.init( 0, true ); // ignored OID is zero time, max machineId/inc
+            return version;
+        }
+
+        static ChunkVersion fromDeprecatedLong(unsigned long long num, const OID& epoch) {
+            ChunkVersion version(0, 0, epoch);
+            version._combined = num;
             return version;
         }
 
@@ -138,8 +140,8 @@ namespace mongo {
             return _epoch.isSet();
         }
 
-        string toString() const {
-            stringstream ss;
+        std::string toString() const {
+            std::stringstream ss;
             // Similar to month/day/year.  For the most part when debugging, we care about major
             // so it's first
             ss << _major << "|" << _minor << "||" << _epoch;
@@ -178,13 +180,13 @@ namespace mongo {
 
         // Can we write to this data and not have a problem?
         bool isWriteCompatibleWith( const ChunkVersion& otherVersion ) const {
-            if( ! hasCompatibleEpoch( otherVersion ) ) return false;
+            if( ! hasEqualEpoch( otherVersion ) ) return false;
             return otherVersion._major == _major;
         }
 
         // Is this the same version?
-        bool isEquivalentTo( const ChunkVersion& otherVersion ) const {
-            if( ! hasCompatibleEpoch( otherVersion ) ) return false;
+        bool equals( const ChunkVersion& otherVersion ) const {
+            if( ! hasEqualEpoch( otherVersion ) ) return false;
             return otherVersion._combined == _combined;
         }
 
@@ -214,14 +216,12 @@ namespace mongo {
         }
 
         // Is this in the same epoch?
-        bool hasCompatibleEpoch( const ChunkVersion& otherVersion ) const {
-            return hasCompatibleEpoch( otherVersion._epoch );
+        bool hasEqualEpoch( const ChunkVersion& otherVersion ) const {
+            return hasEqualEpoch( otherVersion._epoch );
         }
 
-        bool hasCompatibleEpoch( const OID& otherEpoch ) const {
-            // TODO : Change logic from eras are not-unequal to eras are equal
-            if( otherEpoch.isSet() && _epoch.isSet() && otherEpoch != _epoch ) return false;
-            return true;
+        bool hasEqualEpoch( const OID& otherEpoch ) const {
+            return _epoch == otherEpoch;
         }
 
         //
@@ -237,19 +237,19 @@ namespace mongo {
         // { version : <TS> } and { version : [<TS>,<OID>] } format
         //
 
-        static bool canParseBSON( const BSONElement& el, const string& prefix="" ){
+        static bool canParseBSON( const BSONElement& el, const std::string& prefix="" ){
             bool canParse;
             fromBSON( el, prefix, &canParse );
             return canParse;
         }
 
-        static ChunkVersion fromBSON( const BSONElement& el, const string& prefix="" ){
+        static ChunkVersion fromBSON( const BSONElement& el, const std::string& prefix="" ){
             bool canParse;
             return fromBSON( el, prefix, &canParse );
         }
 
         static ChunkVersion fromBSON( const BSONElement& el,
-                                      const string& prefix,
+                                      const std::string& prefix,
                                       bool* canParse )
         {
             *canParse = true;
@@ -264,50 +264,46 @@ namespace mongo {
                 return ChunkVersion( 0, 0, el.OID() );
             }
 
-            if( el.isNumber() ){
-                return ChunkVersion( static_cast<unsigned long long>(el.numberLong()), OID() );
-            }
-
             if( type == Timestamp || type == Date ){
-                return ChunkVersion( el._numberLong(), OID() );
+                return fromDeprecatedLong( el._numberLong(), OID() );
             }
 
             *canParse = false;
 
-            return ChunkVersion( 0, OID() );
+            return ChunkVersion( 0, 0, OID() );
         }
 
         //
         // { version : <TS>, versionEpoch : <OID> } object format
         //
 
-        static bool canParseBSON( const BSONObj& obj, const string& prefix="" ){
+        static bool canParseBSON( const BSONObj& obj, const std::string& prefix="" ){
             bool canParse;
             fromBSON( obj, prefix, &canParse );
             return canParse;
         }
 
-        static ChunkVersion fromBSON( const BSONObj& obj, const string& prefix="" ){
+        static ChunkVersion fromBSON( const BSONObj& obj, const std::string& prefix="" ){
             bool canParse;
             return fromBSON( obj, prefix, &canParse );
         }
 
         static ChunkVersion fromBSON( const BSONObj& obj,
-                                      const string& prefixIn,
+                                      const std::string& prefixIn,
                                       bool* canParse )
         {
             *canParse = true;
 
-            string prefix = prefixIn;
+            std::string prefix = prefixIn;
             // "version" doesn't have a "cluster constanst" because that field is never
             // written to the config.
             if( prefixIn == "" && ! obj[ "version" ].eoo() ){
-                prefix = (string)"version";
+                prefix = (std::string)"version";
             }
             // TODO: use ChunkType::DEPRECATED_lastmod()
             // NOTE: type_chunk.h includes this file
             else if( prefixIn == "" && ! obj["lastmod"].eoo() ){
-                prefix = (string)"lastmod";
+                prefix = (std::string)"lastmod";
             }
 
             ChunkVersion version = fromBSON( obj[ prefix ], prefixIn, canParse );
@@ -413,10 +409,10 @@ namespace mongo {
         // versions that know nothing about epochs.
         //
 
-        BSONObj toBSONWithPrefix( const string& prefixIn ) const {
+        BSONObj toBSONWithPrefix( const std::string& prefixIn ) const {
             BSONObjBuilder b;
 
-            string prefix = prefixIn;
+            std::string prefix = prefixIn;
             if( prefix == "" ) prefix = "version";
 
             b.appendTimestamp( prefix, _combined );
@@ -424,11 +420,11 @@ namespace mongo {
             return b.obj();
         }
 
-        void addToBSON( BSONObjBuilder& b, const string& prefix="" ) const {
+        void addToBSON( BSONObjBuilder& b, const std::string& prefix="" ) const {
             b.appendElements( toBSONWithPrefix( prefix ) );
         }
 
-        void addEpochToBSON( BSONObjBuilder& b, const string& prefix="" ) const {
+        void addEpochToBSON( BSONObjBuilder& b, const std::string& prefix="" ) const {
             b.append( prefix + "Epoch", _epoch );
         }
 
@@ -482,7 +478,7 @@ namespace mongo {
 
     };
 
-    inline ostream& operator<<( ostream &s , const ChunkVersion& v) {
+    inline std::ostream& operator<<( std::ostream &s , const ChunkVersion& v) {
         s << v.toString();
         return s;
     }

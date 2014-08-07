@@ -42,6 +42,12 @@ namespace mongo {
 
     const size_t MaxDatabaseNameLen = 128; // max str len for the db name, including null char
 
+    /** @return true if a client can modify this namespace even though it is under ".system."
+        For example <dbname>.system.users is ok for regular clients to update.
+        @param write used when .system.js
+    */
+    bool legalClientSystemNS( const StringData& ns , bool write );
+
     /* e.g.
        NamespaceString ns("acme.orders");
        cout << ns.coll; // "orders"
@@ -56,7 +62,7 @@ namespace mongo {
         /**
          * Constructs a NamespaceString from the fully qualified namespace named in "ns".
          */
-        NamespaceString( const StringData& ns );
+        explicit NamespaceString( const StringData& ns );
 
         /**
          * Constructs a NamespaceString for the given database and collection names.
@@ -64,13 +70,30 @@ namespace mongo {
          */
         NamespaceString( const StringData& dbName, const StringData& collectionName );
 
+        /**
+         * Note that these values are derived from the mmap_v1 implementation and that
+         * is the only reason they are constrained as such.
+         */
+        enum MaxNsLenValue {
+            // Maximum possible length of name any namespace, including special ones like $extra.
+            // This includes rum for the NUL byte so it can be used when sizing buffers.
+            MaxNsLenWithNUL = 128,
+
+            // MaxNsLenWithNUL excluding the NUL byte. Use this when comparing std::string lengths.
+            MaxNsLen = MaxNsLenWithNUL - 1,
+
+            // Maximum allowed length of fully qualified namespace name of any real collection.
+            // Does not include NUL so it can be directly compared to std::string lengths.
+            MaxNsCollectionLen = MaxNsLen - 7/*strlen(".$extra")*/,
+        };
+
         StringData db() const;
         StringData coll() const;
 
         const std::string& ns() const { return _ns; }
 
-        operator std::string() const { return _ns; }
-        std::string toString() const { return _ns; }
+        operator const std::string&() const { return ns(); }
+        const std::string& toString() const { return ns(); }
 
         size_t size() const { return _ns.size(); }
 
@@ -89,6 +112,7 @@ namespace mongo {
         bool isValid() const { return validDBName( db() ) && !coll().empty(); }
 
         bool operator==( const std::string& nsIn ) const { return nsIn == _ns; }
+        bool operator==( const StringData& nsIn ) const { return nsIn == _ns; }
         bool operator==( const NamespaceString& nsIn ) const { return nsIn._ns == _ns; }
 
         bool operator!=( const std::string& nsIn ) const { return nsIn != _ns; }
@@ -201,7 +225,7 @@ namespace mongo {
 
     /**
      * NamespaceDBHash and NamespaceDBEquals allow you to do something like
-     * unordered_map<string,int,NamespaceDBHash,NamespaceDBEquals>
+     * unordered_map<std::string,int,NamespaceDBHash,NamespaceDBEquals>
      * and use the full namespace for the string
      * but comparisons are done only on the db piece
      */

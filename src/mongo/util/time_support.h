@@ -2,23 +2,37 @@
 
 /*    Copyright 2010 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
 
+#include <iosfwd>
 #include <ctime>
 #include <string>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/thread/xtime.hpp>
 #include <boost/version.hpp>
 
@@ -26,6 +40,9 @@
 #include "mongo/client/export_macros.h"
 
 namespace mongo {
+
+    typedef boost::posix_time::milliseconds Milliseconds;
+    typedef boost::posix_time::seconds Seconds;
 
     void time_t_to_Struct(time_t t, struct tm * buf , bool local = false );
     std::string time_t_to_String(time_t t);
@@ -44,6 +61,7 @@ namespace mongo {
         int64_t asInt64() const {
             return static_cast<int64_t>(millis);
         }
+        bool isFormatable() const;
     };
 
     // uses ISO 8601 dates without trailing Z
@@ -82,7 +100,7 @@ namespace mongo {
     std::string dateToCtimeString(Date_t date);
 
     /**
-     * Parses a Date_t from an ISO 8601 string representation.
+     * Parses a Date_t from an ISO 8601 std::string representation.
      *
      * Sample formats: "2013-07-23T18:42:14.072-05:00"
      *                 "2013-07-23T18:42:14.072Z"
@@ -90,6 +108,21 @@ namespace mongo {
      * Local times are currently not supported.
      */
     StatusWith<Date_t> dateFromISOString(const StringData& dateString);
+
+    /**
+     * Like dateToISOStringUTC, except outputs to a std::ostream.
+     */
+    void outputDateAsISOStringUTC(std::ostream& os, Date_t date);
+
+    /**
+     * Like dateToISOStringLocal, except outputs to a std::ostream.
+     */
+    void outputDateAsISOStringLocal(std::ostream& os, Date_t date);
+
+    /**
+     * Like dateToCtimeString, except outputs to a std::ostream.
+     */
+    void outputDateAsCtime(std::ostream& os, Date_t date);
 
     boost::gregorian::date currentDate();
 

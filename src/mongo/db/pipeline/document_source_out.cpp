@@ -64,10 +64,10 @@ namespace mongo {
                                      << "' is capped so it can't be used for $out",
                 !_mongod->isCapped(_outputNs));
 
-        _tempNs = StringData(str::stream() << _outputNs.db()
-                                           << ".tmp.agg_out."
-                                           << aggOutCounter.addAndFetch(1)
-                                           );
+        _tempNs = NamespaceString(StringData(str::stream() << _outputNs.db()
+                                             << ".tmp.agg_out."
+                                             << aggOutCounter.addAndFetch(1)
+                                             ));
 
         {
             BSONObj info;
@@ -171,6 +171,8 @@ namespace mongo {
                 elem.type() == String);
         
         NamespaceString outputNs(pExpCtx->ns.db().toString() + '.' + elem.str());
+        uassert(17385, "Can't $out to special collection: " + elem.str(),
+                !outputNs.isSpecial());
         return new DocumentSourceOut(outputNs, pExpCtx);
     }
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,19 +28,24 @@
 
 #include "mongo/db/exec/oplogstart.h"
 
-#include "mongo/db/pdfile.h"
-#include "mongo/db/storage/extent.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 
 namespace mongo {
 
     // Does not take ownership.
-    OplogStart::OplogStart(const string& ns, MatchExpression* filter, WorkingSet* ws)
-        : _needInit(true),
+    OplogStart::OplogStart(OperationContext* txn,
+                           const Collection* collection,
+                           MatchExpression* filter,
+                           WorkingSet* ws)
+        : _txn(txn),
+          _needInit(true),
           _backwardsScanning(false),
           _extentHopping(false),
           _done(false),
+          _collection(collection),
           _workingSet(ws),
-          _ns(ns),
           _filter(filter) { }
 
     OplogStart::~OplogStart() { }
@@ -49,23 +54,17 @@ namespace mongo {
         // We do our (heavy) init in a work(), where work is expected.
         if (_needInit) {
             CollectionScanParams params;
-            params.ns = _ns;
+            params.collection = _collection;
             params.direction = CollectionScanParams::BACKWARD;
-            _cs.reset(new CollectionScan(params, _workingSet, NULL));
-            _nsd = nsdetails(_ns.c_str());
+            _cs.reset(new CollectionScan(_txn, params, _workingSet, NULL));
             _needInit = false;
             _backwardsScanning = true;
             _timer.reset();
         }
 
-        // If we don't have a _curloc yet, then we'll have
-        // to backwards scan this time in order to initialize it.
-        if (_curloc.isNull() && !_extentHopping) {
-            return workBackwardsScan(out);
-        }
-
-        // If we're reading backwards, try again.
+        // If we're still reading backwards, keep trying until timing out.
         if (_backwardsScanning) {
+            verify(!_extentHopping);
             // Still have time to succeed with reading backwards.
             if (_timer.seconds() < _backwardsScanTime) {
                 return workBackwardsScan(out);
@@ -79,23 +78,25 @@ namespace mongo {
     }
 
     PlanStage::StageState OplogStart::workExtentHopping(WorkingSetID* out) {
-        if (_curloc.isNull()) {
-            _done = true;
+        if (_done || _subIterators.empty()) {
             return PlanStage::IS_EOF;
         }
 
-        if (!_filter->matchesBSON(_curloc.obj())) {
+        // we work from the back to the front since the back has the newest data.
+        const DiskLoc loc = _subIterators.back()->getNext();
+        _subIterators.popAndDeleteBack();
+
+        if (!loc.isNull() && !_filter->matchesBSON(_collection->docFor(loc))) {
             _done = true;
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
-            member->loc = _curloc;
-            member->obj = member->loc.obj();
+            member->loc = loc;
+            member->obj = _collection->docFor(member->loc);
             member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
             *out = id;
             return PlanStage::ADVANCED;
         }
 
-        _curloc = prevExtentFirstLoc(_nsd, _curloc);
         return PlanStage::NEED_TIME;
     }
 
@@ -107,20 +108,8 @@ namespace mongo {
         // Toss the collection scan we were using.
         _cs.reset();
 
-        // Set up our extent hopping state.  Get the start of the extent that we were collection
-        // scanning.
-        Extent* e = _curloc.rec()->myExtent(_curloc);
-        if (!_nsd->capLooped() || (e->myLoc != _nsd->capExtent())) {
-            _curloc = e->firstRecord;
-        }
-        else {
-            // Direct quote:
-            // Likely we are on the fresh side of capExtent, so return first fresh
-            // record.  If we are on the stale side of capExtent, then the collection is
-            // small and it doesn't matter if we start the extent scan with
-            // capFirstNewRecord.
-            _curloc = _nsd->capFirstNewRecord();
-        }
+        // Set up our extent hopping state.
+        _subIterators = _collection->getManyIterators(_txn);
     }
 
     PlanStage::StageState OplogStart::workBackwardsScan(WorkingSetID* out) {
@@ -144,7 +133,6 @@ namespace mongo {
             return PlanStage::ADVANCED;
         }
         else {
-            _curloc = member->loc;
             _workingSet->free(*out);
             return PlanStage::NEED_TIME;
         }
@@ -157,64 +145,42 @@ namespace mongo {
 
         if (INVALIDATION_DELETION != type) { return; }
 
-        if (_backwardsScanning) {
+        if (_cs) {
             _cs->invalidate(dl, type);
         }
-        else {
-            verify(_extentHopping);
-            if (dl == _curloc) {
-                _curloc = DiskLoc();
+
+        for (size_t i = 0; i < _subIterators.size(); i++) {
+            _subIterators[i]->invalidate(dl);
+        }
+    }
+
+    void OplogStart::saveState() {
+        if (_cs) {
+            _cs->saveState();
+        }
+
+        for (size_t i = 0; i < _subIterators.size(); i++) {
+            _subIterators[i]->saveState();
+        }
+    }
+
+    void OplogStart::restoreState(OperationContext* opCtx) {
+        if (_cs) {
+            _cs->restoreState(opCtx);
+        }
+
+        for (size_t i = 0; i < _subIterators.size(); i++) {
+            if (!_subIterators[i]->restoreState()) {
+                _subIterators.erase(_subIterators.begin() + i);
+                // need to hit same i on next pass through loop
+                i--;
             }
         }
     }
 
-    void OplogStart::prepareToYield() {
-        if (_backwardsScanning) {
-            _cs->prepareToYield();
-        }
-    }
-
-    void OplogStart::recoverFromYield() {
-        if (_backwardsScanning) {
-            _cs->recoverFromYield();
-        }
-    }
-
-    // static
-    DiskLoc OplogStart::prevExtentFirstLoc(NamespaceDetails* nsd, const DiskLoc& rec ) {
-        Extent *e = rec.rec()->myExtent( rec );
-        if (nsd->capLooped() ) {
-            while( true ) {
-                // Advance e to preceding extent (looping to lastExtent if necessary).
-                if ( e->xprev.isNull() ) {
-                    e = nsd->lastExtent().ext();
-                }
-                else {
-                    e = e->xprev.ext();
-                }
-                if ( e->myLoc == nsd->capExtent() ) {
-                    // Reached the extent containing the oldest data in the collection.
-                    return DiskLoc();
-                }
-                if ( !e->firstRecord.isNull() ) {
-                    // Return the first record of the first non empty extent encountered.
-                    return e->firstRecord;
-                }
-            }
-        }
-        else {
-            while( true ) {
-                if ( e->xprev.isNull() ) {
-                    // Reached the beginning of the collection.
-                    return DiskLoc();
-                }
-                e = e->xprev.ext();
-                if ( !e->firstRecord.isNull() ) {
-                    // Return the first record of the first non empty extent encountered.
-                    return e->firstRecord;
-                }
-            }
-        }
+    vector<PlanStage*> OplogStart::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
     }
 
     int OplogStart::_backwardsScanTime = 5;

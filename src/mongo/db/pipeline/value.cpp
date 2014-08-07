@@ -148,7 +148,7 @@ namespace mongo {
         case Code:
         case Symbol:
         case String:
-            _storage.putString(StringData(elem.valuestr(), elem.valuestrsize()-1));
+            _storage.putString(elem.valueStringData());
             break;
 
         case Object: {

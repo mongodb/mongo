@@ -29,110 +29,59 @@
 
 #pragma once
 
-#include "mongo/db/repl/oplogreader.h"
-#include "mongo/util/background.h"
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 
+#include "mongo/client/constants.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
+    class OperationContext;
+
+namespace repl {
+
     class Member;
 
-    class SyncSourceFeedback : public BackgroundJob {
+    class SyncSourceFeedback {
     public:
-        SyncSourceFeedback() : BackgroundJob(false /*don't selfdelete*/),
-                              _syncTarget(NULL),
-                              _oplogReader(new OplogReader()),
-                              _supportsUpdater(false),
-                              _positionChanged(false),
-                              _handshakeNeeded(false) {}
-
-        ~SyncSourceFeedback() {
-            delete _oplogReader;
-        }
-
-        /// Adds an entry to _member for a secondary that has connected to us.
-        void associateMember(const BSONObj& id, const int memberId);
+        SyncSourceFeedback();
+        ~SyncSourceFeedback();
 
         /// Ensures local.me is populated and populates it if not.
-        void ensureMe();
+        /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
+        void ensureMe(OperationContext* txn);
 
-        /// Passes handshake up the replication chain, upon receiving a handshake.
+        /// Notifies the SyncSourceFeedbackThread to wake up and send a handshake up the replication
+        /// chain, upon receiving a handshake.
         void forwardSlaveHandshake();
 
-        void updateSelfInMap(const OpTime& ot) {
-            updateMap(_me["_id"].OID(), ot);
-        }
+        /// Notifies the SyncSourceFeedbackThread to wake up and send an update upstream of slave
+        /// replication progress.
+        void forwardSlaveProgress();
 
-        /// Connect to sync target and create OplogReader if needed.
-        bool connect(const Member* target);
+        /// Returns the RID for this process.  ensureMe() must have been called before this can be.
+        /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
+        OID getMyRID() const { return _me["_id"].OID(); }
 
-        void resetConnection() {
+        /// Loops continuously until shutdown() is called, passing updates when they are present.
+        /// TODO(spencer): Currently also can terminate when the global inShutdown() function
+        /// returns true.  Remove that once the legacy repl coordinator is gone.
+        void run();
+
+        /// Signals the run() method to terminate.
+        void shutdown();
+
+    private:
+        void _resetConnection() {
+            MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
             LOG(1) << "resetting connection in sync source feedback";
             _connection.reset();
         }
 
-        void resetOplogReaderConnection() {
-            _oplogReader->resetConnection();
-        }
-
-        /// Used extensively in bgsync, to see if we need to use the OplogReader syncing method.
-        bool supportsUpdater() const {
-            // oplogReader will be NULL if new updater is supported
-            //boost::unique_lock<boost::mutex> lock(_mtx);
-            return _supportsUpdater;
-        }
-
-        /// Transfers information about a chained node's oplog position from downstream to upstream
-        void percolate(const mongo::OID& rid, const OpTime& ot);
-
-        /// Updates the _slaveMap to be forwarded to the sync target.
-        void updateMap(const mongo::OID& rid, const OpTime& ot);
-
-        std::string name() const { return "SyncSourceFeedbackThread"; }
-
-        /// Loops forever, passing updates when they are present.
-        void run();
-
-        /* The below methods just fall through to OplogReader and are only used when our sync target
-         * does not support the update command.
-         */
-        bool connectOplogReader(const std::string& hostName) {
-            return _oplogReader->connect(hostName, _me);
-        }
-
-        bool connect(const mongo::OID& rid, const int from, const string& to) {
-            return _oplogReader->connect(rid, from, to);
-        }
-
-        void ghostQueryGTE(const char *ns, OpTime t) {
-            _oplogReader->ghostQueryGTE(ns, t);
-        }
-
-        bool haveCursor() {
-            return _oplogReader->haveCursor();
-        }
-
-        bool more() {
-            return _oplogReader->more();
-        }
-
-        bool moreInCurrentBatch() {
-            return _oplogReader->moreInCurrentBatch();
-        }
-
-        BSONObj nextSafe() {
-            return _oplogReader->nextSafe();
-        }
-
-        void tailCheck() {
-            _oplogReader->tailCheck();
-        }
-
-        void tailingQueryGTE(const char *ns, OpTime t, const BSONObj* fields=0) {
-            _oplogReader->tailingQueryGTE(ns, t, fields);
-        }
-
-    private:
         /**
          * Authenticates _connection using the server's cluster-membership credentials.
          *
@@ -143,44 +92,37 @@ namespace mongo {
         /* Sends initialization information to our sync target, also determines whether or not they
          * support the updater command.
          */
-        bool replHandshake();
+        bool replHandshake(OperationContext* txn);
 
         /* Inform the sync target of our current position in the oplog, as well as the positions
          * of all secondaries chained through us.
          */
-        bool updateUpstream();
+        bool updateUpstream(OperationContext* txn);
 
         bool hasConnection() {
             return _connection.get();
         }
 
-        /// Connect to sync target and create OplogReader if needed.
-        bool _connect(const std::string& hostName);
+        /// Connect to sync target.
+        bool _connect(OperationContext* txn, const std::string& hostName);
 
         // stores our OID to be passed along in commands
+        /// TODO(spencer): Remove this once the LegacyReplicationCoordinator is gone.
         BSONObj _me;
         // the member we are currently syncing from
         const Member* _syncTarget;
-        // holds the oplogReader for use when we fall back to old style updates
-        OplogReader* _oplogReader;
         // our connection to our sync target
         boost::scoped_ptr<DBClientConnection> _connection;
-        // tracks whether we are in fallback mode or not
-        bool _supportsUpdater;
-        // protects connection
-        boost::mutex _connmtx;
-        // protects cond and maps and the indicator bools
+        // protects cond, _shutdownSignaled, and the indicator bools.
         boost::mutex _mtx;
-        // contains the most recent optime of each member syncing to us
-        map<mongo::OID, OpTime> _slaveMap;
-        typedef map<mongo::OID, Member*> OIDMemberMap;
-        // contains a pointer to each member, which we can look up by oid
-        OIDMemberMap _members;
         // used to alert our thread of changes which need to be passed up the chain
         boost::condition _cond;
         // used to indicate a position change which has not yet been pushed along
         bool _positionChanged;
         // used to indicate a connection change which has not yet been shook on
         bool _handshakeNeeded;
+        // Once this is set to true the _run method will terminate
+        bool _shutdownSignaled;
     };
-}
+} // namespace repl
+} // namespace mongo

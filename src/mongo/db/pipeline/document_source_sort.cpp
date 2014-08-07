@@ -26,15 +26,15 @@
 *    it in the license file.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source.h"
 
-#include "db/jsobj.h"
-#include "db/pipeline/document.h"
-#include "db/pipeline/expression.h"
-#include "db/pipeline/expression_context.h"
-#include "db/pipeline/value.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/value.h"
 
 namespace mongo {
     const char DocumentSourceSort::sortName[] = "$sort";
@@ -92,7 +92,7 @@ namespace mongo {
     bool DocumentSourceSort::coalesce(const intrusive_ptr<DocumentSource> &pNextSource) {
         if (!limitSrc) {
             limitSrc = dynamic_cast<DocumentSourceLimit*>(pNextSource.get());
-            return limitSrc; // false if next is not a $limit
+            return limitSrc.get(); // false if next is not a $limit
         }
         else {
             return limitSrc->coalesce(pNextSource);
@@ -246,7 +246,7 @@ namespace mongo {
 
         bool more() { return _cursor->more(); }
         Data next() {
-            const Document doc = Document::fromBsonWithMetaData(_cursor->next());
+            const Document doc = DocumentSourceMergeCursors::nextSafeFrom(_cursor);
             return make_pair(_sorter->extractKey(doc), doc);
         }
     private:
@@ -355,5 +355,5 @@ namespace mongo {
     }
 }
 
-#include "db/sorter/sorter.cpp"
+#include "mongo/db/sorter/sorter.cpp"
 // Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

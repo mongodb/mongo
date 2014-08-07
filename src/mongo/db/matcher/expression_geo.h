@@ -31,7 +31,7 @@
 
 #pragma once
 
-#include "mongo/db/geo/geoquery.h"
+#include "mongo/db/geo/geo_query.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 
@@ -42,22 +42,28 @@ namespace mongo {
         GeoMatchExpression() : LeafMatchExpression( GEO ){}
         virtual ~GeoMatchExpression(){}
 
-        Status init( const StringData& path, const GeoQuery& query, const BSONObj& rawObj );
+        /**
+         * Takes ownership of the passed-in GeoQuery.
+         */
+        Status init( const StringData& path, const GeoQuery* query, const BSONObj& rawObj );
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
 
+        virtual void toBSON(BSONObjBuilder* out) const;
+
         virtual bool equivalent( const MatchExpression* other ) const;
 
         virtual LeafMatchExpression* shallowClone() const;
 
-        const GeoQuery& getGeoQuery() const { return _query; }
+        const GeoQuery& getGeoQuery() const { return *_query; }
         const BSONObj getRawObj() const { return _rawObj; }
 
     private:
         BSONObj _rawObj;
-        GeoQuery _query;
+        // Share ownership of our query with all of our clones
+        shared_ptr<const GeoQuery> _query;
     };
 
     class GeoNearMatchExpression : public LeafMatchExpression {
@@ -65,22 +71,25 @@ namespace mongo {
         GeoNearMatchExpression() : LeafMatchExpression( GEO_NEAR ){}
         virtual ~GeoNearMatchExpression(){}
 
-        Status init( const StringData& path, const NearQuery& query, const BSONObj& rawObj );
+        Status init( const StringData& path, const NearQuery* query, const BSONObj& rawObj );
 
         // This shouldn't be called and as such will crash.  GeoNear always requires an index.
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
 
+        virtual void toBSON(BSONObjBuilder* out) const;
+
         virtual bool equivalent( const MatchExpression* other ) const;
 
         virtual LeafMatchExpression* shallowClone() const;
 
-        const NearQuery& getData() const { return _query; }
+        const NearQuery& getData() const { return *_query; }
         const BSONObj getRawObj() const { return _rawObj; }
     private:
-        NearQuery _query;
         BSONObj _rawObj;
+        // Share ownership of our query with all of our clones
+        shared_ptr<const NearQuery> _query;
     };
 
 }  // namespace mongo

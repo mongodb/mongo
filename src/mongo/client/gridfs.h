@@ -2,17 +2,29 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
@@ -61,7 +73,7 @@ namespace mongo {
          * @param dbName - root database name
          * @param prefix - if you want your data somewhere besides <dbname>.fs
          */
-        GridFS( DBClientBase& client , const string& dbName , const string& prefix="fs" );
+        GridFS( DBClientBase& client , const std::string& dbName , const std::string& prefix="fs" );
         ~GridFS();
 
         /**
@@ -80,7 +92,7 @@ namespace mongo {
          *                    (default is to omit)
          * @return the file object
          */
-        BSONObj storeFile( const string& fileName , const string& remoteName="" , const string& contentType="");
+        BSONObj storeFile( const std::string& fileName , const std::string& remoteName="" , const std::string& contentType="");
 
         /**
          * puts the file represented by data into the db
@@ -91,14 +103,14 @@ namespace mongo {
          *                    (default is to omit)
          * @return the file object
          */
-        BSONObj storeFile( const char* data , size_t length , const string& remoteName , const string& contentType="");
+        BSONObj storeFile( const char* data , size_t length , const std::string& remoteName , const std::string& contentType="");
 
         /**
          * removes file referenced by fileName from the db
          * @param fileName filename (in GridFS) of the file to remove
          * @return the file object
          */
-        void removeFile( const string& fileName );
+        void removeFile( const std::string& fileName );
 
         /**
          * returns a file object matching the query
@@ -108,28 +120,28 @@ namespace mongo {
         /**
          * equiv to findFile( { filename : filename } )
          */
-        GridFile findFile( const string& fileName ) const;
+        GridFile findFile( const std::string& fileName ) const;
 
         /**
          * convenience method to get all the files
          */
-        auto_ptr<DBClientCursor> list() const;
+        std::auto_ptr<DBClientCursor> list() const;
 
         /**
          * convenience method to get all the files with a filter
          */
-        auto_ptr<DBClientCursor> list( BSONObj query ) const;
+        std::auto_ptr<DBClientCursor> list( BSONObj query ) const;
 
     private:
         DBClientBase& _client;
-        string _dbName;
-        string _prefix;
-        string _filesNS;
-        string _chunksNS;
+        std::string _dbName;
+        std::string _prefix;
+        std::string _filesNS;
+        std::string _chunksNS;
         unsigned int _chunkSize;
 
         // insert fileobject. All chunks must be in DB.
-        BSONObj insertFile(const string& name, const OID& id, gridfs_offset length, const string& contentType);
+        BSONObj insertFile(const std::string& name, const OID& id, gridfs_offset length, const std::string& contentType);
 
         friend class GridFile;
     };
@@ -147,7 +159,7 @@ namespace mongo {
             return ! _obj.isEmpty();
         }
 
-        string getFilename() const {
+        std::string getFilename() const {
             return _obj["filename"].str();
         }
 
@@ -159,7 +171,7 @@ namespace mongo {
             return (gridfs_offset)(_obj["length"].number());
         }
 
-        string getContentType() const {
+        std::string getContentType() const {
             return _obj["contentType"].valuestr();
         }
 
@@ -167,11 +179,11 @@ namespace mongo {
             return _obj["uploadDate"].date();
         }
 
-        string getMD5() const {
+        std::string getMD5() const {
             return _obj["md5"].str();
         }
 
-        BSONElement getFileField( const string& name ) const {
+        BSONElement getFileField( const std::string& name ) const {
             return _obj[name];
         }
 
@@ -186,12 +198,12 @@ namespace mongo {
         /**
            write the file to the output stream
          */
-        gridfs_offset write( ostream & out ) const;
+        gridfs_offset write( std::ostream & out ) const;
 
         /**
            write the file to this filename
          */
-        gridfs_offset write( const string& where ) const;
+        gridfs_offset write( const std::string& where ) const;
 
     private:
         GridFile(const GridFS * grid , BSONObj obj );

@@ -74,12 +74,12 @@ namespace mongo {
     /**
      * Creates a suffix for an upgrade's working collection
      */
-    string genWorkingSuffix(const OID& lastUpgradeId);
+    std::string genWorkingSuffix(const OID& lastUpgradeId);
 
     /**
      * Creates a suffix for an upgrade's backup collection
      */
-    string genBackupSuffix(const OID& lastUpgradeId);
+    std::string genBackupSuffix(const OID& lastUpgradeId);
 
     /**
      * Checks whether an unsuccessful upgrade was performed last time and also checks whether

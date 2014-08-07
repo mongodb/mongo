@@ -1,7 +1,7 @@
 // find_and_modify.cpp
 
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2012-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/find_and_modify.h"
 
@@ -36,14 +36,17 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/pagefault.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
-#include "mongo/db/queryutil.h"
+#include "mongo/db/query/get_executor.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     /* Find and Modify an object returning either the old (default) or new value*/
     class CmdFindAndModify : public Command {
@@ -57,19 +60,18 @@ namespace mongo {
         }
 
         CmdFindAndModify() : Command("findAndModify", false, "findandmodify") { }
-        virtual bool logTheOp() { return false; } // the modifications will be logged directly
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
         }
         /* this will eventually replace run,  once sort is handled */
-        bool runNoDirectClient( const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool runNoDirectClient( OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             verify( cmdObj["sort"].eoo() );
 
-            string ns = dbname + '.' + cmdObj.firstElement().valuestr();
+            const string ns = dbname + '.' + cmdObj.firstElement().valuestr();
 
             BSONObj query = cmdObj.getObjectField("query");
             BSONObj fields = cmdObj.getObjectField("fields");
@@ -89,28 +91,25 @@ namespace mongo {
                     return false;
                 }
             }
-            else if ( update.isEmpty() ) {
+            else if ( !cmdObj.hasField("update") ) {
                 errmsg = "need remove or update";
                 return false;
             }
-            
-            PageFaultRetryableSection s;
-            while ( 1 ) {
-                try {
-                    return runNoDirectClient( ns , 
-                                              query , fields , update , 
-                                              upsert , returnNew , remove , 
-                                              result , errmsg );
-                }
-                catch ( PageFaultException& e ) {
-                    e.touch();
-                }
-            }
 
-                    
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Client::Context ctx(txn, ns);
+            
+            return runNoDirectClient( txn, ns , 
+                                      query , fields , update , 
+                                      upsert , returnNew , remove , 
+                                      result , errmsg );
         }
 
-        void _appendHelper( BSONObjBuilder& result , const BSONObj& doc , bool found , const BSONObj& fields ) {
+        static void _appendHelper(BSONObjBuilder& result,
+                                  const BSONObj& doc,
+                                  bool found,
+                                  const BSONObj& fields,
+                                  const MatchExpressionParser::WhereCallback& whereCallback) {
             if ( ! found ) {
                 result.appendNull( "value" );
                 return;
@@ -122,25 +121,54 @@ namespace mongo {
             }
 
             Projection p;
-            p.init( fields );
+            p.init(fields, whereCallback);
             result.append( "value" , p.transform( doc ) );
-                
         }
 
-        bool runNoDirectClient( const string& ns , 
-                                const BSONObj& queryOriginal , const BSONObj& fields , const BSONObj& update , 
-                                bool upsert , bool returnNew , bool remove ,
-                                BSONObjBuilder& result , string& errmsg ) {
+        static bool runNoDirectClient(OperationContext* txn,
+                                      const string& ns, 
+                                      const BSONObj& queryOriginal,
+                                      const BSONObj& fields,
+                                      const BSONObj& update,
+                                      bool upsert,
+                                      bool returnNew,
+                                      bool remove ,
+                                      BSONObjBuilder& result,
+                                      string& errmsg) {
+
+            Lock::DBWrite lk(txn->lockState(), ns);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
+            Client::Context cx(txn, ns);
             
-            
-            Lock::DBWrite lk( ns );
-            Client::Context cx( ns );
+            Collection* collection = cx.db()->getCollection( txn, ns );
+
+            const WhereCallbackReal whereCallback = WhereCallbackReal(txn, StringData(ns));
 
             BSONObj doc;
-            bool found = Helpers::findOne( ns.c_str() , queryOriginal , doc );
+            bool found = false;
+            {
+                CanonicalQuery* cq;
+                massert(17383, "Could not canonicalize " + queryOriginal.toString(),
+                    CanonicalQuery::canonicalize(ns, queryOriginal, &cq, whereCallback).isOK());
+
+                PlanExecutor* rawExec;
+                massert(17384, "Could not get plan executor for query " + queryOriginal.toString(),
+                        getExecutor(txn, collection, cq, &rawExec, QueryPlannerParams::DEFAULT).isOK());
+
+                auto_ptr<PlanExecutor> exec(rawExec);
+
+                // We need to keep this PlanExecutor registration: we are concurrently modifying
+                // state and may continue doing that with document-level locking (approach is TBD).
+                const ScopedExecutorRegistration safety(exec.get());
+
+                PlanExecutor::ExecState state;
+                if (PlanExecutor::ADVANCED == (state = exec->getNext(&doc, NULL))) {
+                    found = true;
+                }
+            }
 
             BSONObj queryModified = queryOriginal;
-            if ( found && doc["_id"].type() && ! isSimpleIdQuery( queryOriginal ) ) {
+            if ( found && doc["_id"].type() && ! CanonicalQuery::isSimpleIdQuery( queryOriginal ) ) {
                 // we're going to re-write the query to be more efficient
                 // we have to be a little careful because of positional operators
                 // maybe we can pass this all through eventually, but right now isn't an easy way
@@ -198,9 +226,9 @@ namespace mongo {
             }
 
             if ( remove ) {
-                _appendHelper( result , doc , found , fields );
+                _appendHelper(result, doc, found, fields, whereCallback);
                 if ( found ) {
-                    deleteObjects( ns , queryModified , true , true );
+                    deleteObjects(txn, cx.db(), ns, queryModified, true, true);
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
                     le.appendNumber( "n" , 1 );
                     le.done();
@@ -210,17 +238,17 @@ namespace mongo {
                 // update
                 if ( ! found && ! upsert ) {
                     // didn't have it, and am not upserting
-                    _appendHelper( result , doc , found , fields );
+                    _appendHelper(result, doc, found, fields, whereCallback);
                 }
                 else {
                     // we found it or we're updating
                     
                     if ( ! returnNew ) {
-                        _appendHelper( result , doc , found , fields );
+                        _appendHelper(result, doc, found, fields, whereCallback);
                     }
                     
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(requestNs);
+                    UpdateRequest request(txn, requestNs);
 
                     request.setQuery(queryModified);
                     request.setUpdates(update);
@@ -230,7 +258,14 @@ namespace mongo {
                     // the shard version below, but for now no
                     UpdateLifecycleImpl updateLifecycle(false, requestNs);
                     request.setLifecycle(&updateLifecycle);
-                    UpdateResult res = mongo::update(request, &cc().curop()->debug());
+                    UpdateResult res = mongo::update(cx.db(),
+                                                     request,
+                                                     &txn->getCurOp()->debug());
+
+                    if ( !collection ) {
+                        // collection created by an upsert
+                        collection = cx.db()->getCollection( txn, ns );
+                    }
 
                     LOG(3) << "update result: "  << res ;
                     if ( returnNew ) {
@@ -246,7 +281,7 @@ namespace mongo {
                         }
 
                         LOG(3) << "using modified query to return the new doc: " << queryModified;
-                        if ( ! Helpers::findOne( ns.c_str() , queryModified , doc ) ) {
+                        if ( ! Helpers::findOne( txn, collection, queryModified, doc ) ) {
                             errmsg = str::stream() << "can't find object after modification  " 
                                                    << " ns: " << ns 
                                                    << " queryModified: " << queryModified 
@@ -254,7 +289,7 @@ namespace mongo {
                             log() << errmsg << endl;
                             return false;
                         }
-                        _appendHelper( result , doc , true , fields );
+                        _appendHelper(result, doc, true, fields, whereCallback);
                     }
                     
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
@@ -267,17 +302,18 @@ namespace mongo {
                     
                 }
             }
-            
+            wunit.commit();
             return true;
         }
         
-        virtual bool run(const string& dbname, BSONObj& cmdObj, int x, string& errmsg, BSONObjBuilder& result, bool y) {
-            static DBDirectClient db;
+        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int x, string& errmsg, BSONObjBuilder& result, bool y) {
+            DBDirectClient db(txn);
 
-            if ( cmdObj["sort"].eoo() )
-                return runNoDirectClient( dbname , cmdObj , x, errmsg , result, y );
+            if (cmdObj["sort"].eoo()) {
+                return runNoDirectClient(txn, dbname, cmdObj, x, errmsg, result, y);
+            }
 
-            string ns = dbname + '.' + cmdObj.firstElement().valuestr();
+            const string ns = dbname + '.' + cmdObj.firstElement().valuestr();
 
             BSONObj origQuery = cmdObj.getObjectField("query"); // defaults to {}
             Query q (origQuery);
@@ -292,10 +328,15 @@ namespace mongo {
 
             Projection projection;
             if (fields) {
-                projection.init(fieldsHolder);
-                if (!projection.includeID())
+                projection.init(fieldsHolder, WhereCallbackReal(txn, StringData(dbname)));
+                if (!projection.includeID()) {
                     fields = NULL; // do projection in post-processing
+                }
             }
+
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
+            Client::Context ctx(txn, ns);
 
             BSONObj out = db.findOne(ns, q, fields);
             if (out.isEmpty()) {
@@ -316,16 +357,19 @@ namespace mongo {
                     return false;
                 }
 
-                if (cmdObj["new"].trueValue()) {
-                    BSONObjBuilder bob;
-                    BSONElement _id = gle[kUpsertedFieldName];
-                    if (!_id.eoo())
-                        bob.appendAs(_id, "_id");
-                    else
-                        bob.appendAs(origQuery["_id"], "_id");
-
-                    out = db.findOne(ns, bob.done(), fields);
+                if (!cmdObj["new"].trueValue()) {
+                    result.appendNull("value");
+                    return true;
                 }
+
+                BSONObjBuilder bob;
+                BSONElement _id = gle[kUpsertedFieldName];
+                if (!_id.eoo())
+                    bob.appendAs(_id, "_id");
+                else
+                    bob.appendAs(origQuery["_id"], "_id");
+
+                out = db.findOne(ns, bob.done(), fields);
 
             }
             else {
@@ -385,9 +429,9 @@ namespace mongo {
 
             result.append("value", out);
 
+            wunit.commit();
             return true;
         }
     } cmdFindAndModify;
-
 
 }

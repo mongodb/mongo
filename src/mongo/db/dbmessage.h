@@ -33,6 +33,7 @@
 #include "mongo/bson/bson_validate.h"
 #include "mongo/client/constants.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_port.h"
 
@@ -57,20 +58,20 @@ namespace mongo {
    then for:
 
    dbInsert:
-      string collection;
+      std::string collection;
       a series of JSObjects
    dbDelete:
-      string collection;
+      std::string collection;
       int flags=0; // 1=DeleteSingle
       JSObject query;
    dbUpdate:
-      string collection;
+      std::string collection;
       int flags; // 1=upsert
       JSObject query;
       JSObject objectToUpdate;
         objectToUpdate may include { $inc: <field> } or { $set: ... }, see struct Mod.
    dbQuery:
-      string collection;
+      std::string collection;
       int nToSkip;
       int nToReturn; // how many you want back as the beginning of the cursor data (0=no limit)
                      // greater than zero is simply a hint on how many objects to send back per "cursor batch".
@@ -78,7 +79,7 @@ namespace mongo {
       JSObject query;
       [JSObject fieldsToReturn]
    dbGetMore:
-      string collection; // redundant, might use for security.
+      std::string collection; // redundant, might use for security.
       int nToReturn;
       int64 cursorID;
    dbKillCursors=2007:
@@ -121,135 +122,74 @@ namespace mongo {
        See http://dochub.mongodb.org/core/mongowireprotocol
     */
     class DbMessage {
+    // Assume sizeof(int) == 4 bytes
+    BOOST_STATIC_ASSERT(sizeof(int) == 4);
+
     public:
-        DbMessage(const Message& _m) : m(_m) , mark(0) {
-            // for received messages, Message has only one buffer
-            theEnd = _m.singleData()->_data + _m.header()->dataLen();
-            char *r = _m.singleData()->_data;
-            reserved = (int *) r;
-            data = r + 4;
-            nextjsobj = data;
+        // Note: DbMessage constructor reads the first 4 bytes and stores it in reserved
+        DbMessage(const Message& msg);
+
+        // Indicates whether this message is expected to have a ns
+        // or in the case of dbMsg, a string in the same place as ns
+        bool messageShouldHaveNs() const {
+            return (_msg.operation() >= dbMsg) & (_msg.operation() <= dbDelete);
         }
 
-        /** the 32 bit field before the ns 
+        /** the 32 bit field before the ns
          * track all bit usage here as its cross op
          * 0: InsertOption_ContinueOnError
          * 1: fromWriteback
          */
-        int& reservedField() { return *reserved; }
+        int reservedField() const { return _reserved; }
 
-        const char * getns() const {
-            return data;
-        }
+        const char * getns() const;
+        int getQueryNToReturn() const;
 
-        const char * afterNS() const {
-            return data + strlen( data ) + 1;
-        }
-
-        int getInt( int num ) const {
-            const int * foo = (const int*)afterNS();
-            return foo[num];
-        }
-
-        int getQueryNToReturn() const {
-            return getInt( 1 );
-        }
-
-        /**
-         * get an int64 at specified offsetBytes after ns
-         */
-        long long getInt64( int offsetBytes ) const {
-            const char * x = afterNS();
-            x += offsetBytes;
-            const long long * ll = (const long long*)x;
-            return ll[0];
-        }
-
-        void resetPull() { nextjsobj = data; }
-        int pullInt() const { return pullInt(); }
-        int& pullInt() {
-            if ( nextjsobj == data )
-                nextjsobj += strlen(data) + 1; // skip namespace
-            int& i = *((int *)nextjsobj);
-            nextjsobj += 4;
-            return i;
-        }
-        long long pullInt64() const {
-            return pullInt64();
-        }
-        long long &pullInt64() {
-            if ( nextjsobj == data )
-                nextjsobj += strlen(data) + 1; // skip namespace
-            long long &i = *((long long *)nextjsobj);
-            nextjsobj += 8;
-            return i;
-        }
-
-        OID* getOID() const {
-            return (OID *) (data + strlen(data) + 1); // skip namespace
-        }
-
-        void getQueryStuff(const char *&query, int& ntoreturn) {
-            int *i = (int *) (data + strlen(data) + 1);
-            ntoreturn = *i;
-            i++;
-            query = (const char *) i;
-        }
+        int pullInt();
+        long long pullInt64();
+        const long long* getArray(size_t count) const;
 
         /* for insert and update msgs */
         bool moreJSObjs() const {
-            return nextjsobj != 0;
-        }
-        BSONObj nextJsObj() {
-            if ( nextjsobj == data ) {
-                nextjsobj += strlen(data) + 1; // skip namespace
-                massert( 13066 ,  "Message contains no documents", theEnd > nextjsobj );
-            }
-            massert( 10304,
-                     "Client Error: Remaining data too small for BSON object",
-                     theEnd - nextjsobj >= 5 );
-
-            if (serverGlobalParams.objcheck) {
-                Status status = validateBSON( nextjsobj, theEnd - nextjsobj );
-                massert( 10307,
-                         str::stream() << "Client Error: bad object in message: " << status.reason(),
-                         status.isOK() );
-            }
-
-            BSONObj js(nextjsobj);
-            verify( js.objsize() >= 5 );
-            verify( js.objsize() < ( theEnd - data ) );
-
-            nextjsobj += js.objsize();
-            if ( nextjsobj >= theEnd )
-                nextjsobj = 0;
-            return js;
+            return _nextjsobj != 0;
         }
 
-        const Message& msg() const { return m; }
+        BSONObj nextJsObj();
 
-        const char * markGet() {
-            return nextjsobj;
+        const Message& msg() const { return _msg; }
+
+        const char * markGet() const {
+            return _nextjsobj;
         }
 
         void markSet() {
-            mark = nextjsobj;
+            _mark = _nextjsobj;
         }
 
-        void markReset( const char * toMark = 0) {
-            if( toMark == 0 ) toMark = mark;
-            verify( toMark );
-            nextjsobj = toMark;
-        }
+        void markReset(const char * toMark);
 
     private:
-        const Message& m;
-        int* reserved;
-        const char *data;
-        const char *nextjsobj;
-        const char *theEnd;
+        // Check if we have enough data to read
+        template<typename T>
+        void checkRead(const char* start, size_t count = 0) const;
 
-        const char * mark;
+        // Read some type without advancing our position
+        template<typename T>
+        T read() const;
+
+        // Read some type, and advance our position
+        template<typename T> T readAndAdvance();
+
+        const Message& _msg;
+        int _reserved; // flags or zero depending on packet, starts the packet
+
+        const char* _nsStart; // start of namespace string, +4 from message start
+        const char* _nextjsobj; // current position reading packet
+        const char* _theEnd; // end of packet
+
+        const char* _mark;
+
+        unsigned int _nsLen;
     };
 
 
@@ -263,7 +203,10 @@ namespace mongo {
         BSONObj query;
         BSONObj fields;
 
-        /* parses the message into the above fields */
+        /**
+         * parses the message into the above fields
+         * Warning: constructor mutates DbMessage.
+         */
         QueryMessage(DbMessage& d) {
             ns = d.getns();
             ntoskip = d.pullInt();
@@ -282,7 +225,7 @@ namespace mongo {
     struct DbResponse {
         Message *response;
         MSGID responseTo;
-        string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
+        std::string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
         DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt){ }
         DbResponse() {
             response = 0;

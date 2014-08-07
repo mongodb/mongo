@@ -76,7 +76,7 @@ namespace mongo {
          * notes that this client use this shard
          * keeps track of all shards accessed this request
          */
-        void addShardHost( const string& shardHost );
+        void addShardHost( const std::string& shardHost );
 
         /**
          * Notes that this client wrote to these particular hosts with write commands.
@@ -87,7 +87,7 @@ namespace mongo {
         /**
          * gets shards used on the previous request
          */
-        set<string>* getPrevShardHosts() const { return &_prev->shardHostsWritten; }
+        std::set<std::string>* getPrevShardHosts() const { return &_prev->shardHostsWritten; }
 
         /**
          * Gets the shards, hosts, and opTimes the client last wrote to with write commands.
@@ -99,7 +99,7 @@ namespace mongo {
         /**
          * gets all shards we've accessed since the last time we called clearSinceLastGetError
          */
-        const set<string>& sinceLastGetError() const { return _sinceLastGetError; }
+        const std::set<std::string>& sinceLastGetError() const { return _sinceLastGetError; }
 
         /**
          * clears list of shards we've talked to
@@ -140,7 +140,7 @@ namespace mongo {
                 hostOpTimes.clear();
             }
 
-            std::set<string> shardHostsWritten;
+            std::set<std::string> shardHostsWritten;
             HostOpTimeMap hostOpTimes;
         };
 
@@ -154,7 +154,7 @@ namespace mongo {
         RequestInfo* _prev; //  ""
 
 
-        std::set<string> _sinceLastGetError; // all shards accessed since last getLastError
+        std::set<std::string> _sinceLastGetError; // all shards accessed since last getLastError
 
         int _lastAccess;
         bool _autoSplitOk;
@@ -167,7 +167,7 @@ namespace mongo {
      * This data will be used by subsequent GLE calls, to ensure we look for the correct
      * write on the correct PRIMARY.
      * result: the result from calling runCommand
-     * conn: the string name of the hostAndPort where the command ran. This can be a replica set
+     * conn: the std::string name of the hostAndPort where the command ran. This can be a replica set
      *       seed list.
      */
     void saveGLEStats(const BSONObj& result, const std::string& conn);

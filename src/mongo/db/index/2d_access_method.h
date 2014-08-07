@@ -40,74 +40,24 @@ namespace mongo {
     class IndexDescriptor;
     struct TwoDIndexingParams;
 
-    namespace twod_exec {
-        class GeoPoint;
-        class GeoAccumulator;
-        class GeoBrowse;
-        class GeoHopper;
-        class GeoSearch;
-        class GeoCircleBrowse;
-        class GeoBoxBrowse;
-        class GeoPolygonBrowse;
-        class TwoDGeoNearRunner;
-    }
-
-    namespace twod_internal {
-        class GeoPoint;
-        class GeoAccumulator;
-        class GeoBrowse;
-        class GeoHopper;
-        class GeoSearch;
-        class GeoCircleBrowse;
-        class GeoBoxBrowse;
-        class GeoPolygonBrowse;
-        class TwoDGeoNearRunner;
-    }
-
     class TwoDAccessMethod : public BtreeBasedAccessMethod {
     public:
         using BtreeBasedAccessMethod::_descriptor;
-        using BtreeBasedAccessMethod::_interface;
 
-        TwoDAccessMethod(IndexCatalogEntry* btreeState);
+        TwoDAccessMethod(IndexCatalogEntry* btreeState,
+                         SortedDataInterface* btree);
         virtual ~TwoDAccessMethod() { }
 
     private:
-        friend class TwoDIndexCursor;
-        friend class twod_internal::GeoPoint;
-        friend class twod_internal::GeoAccumulator;
-        friend class twod_internal::GeoBrowse;
-        friend class twod_internal::GeoHopper;
-        friend class twod_internal::GeoSearch;
-        friend class twod_internal::GeoCircleBrowse;
-        friend class twod_internal::GeoBoxBrowse;
-        friend class twod_internal::GeoPolygonBrowse;
 
-        friend class twod_exec::GeoPoint;
-        friend class twod_exec::GeoAccumulator;
-        friend class twod_exec::GeoBrowse;
-        friend class twod_exec::GeoHopper;
-        friend class twod_exec::GeoSearch;
-        friend class twod_exec::GeoCircleBrowse;
-        friend class twod_exec::GeoBoxBrowse;
-        friend class twod_exec::GeoPolygonBrowse;
-
-        friend class twod_internal::TwoDGeoNearRunner;
-
-        BtreeInterface* getInterface() { return _interface; }
         const IndexDescriptor* getDescriptor() { return _descriptor; }
         TwoDIndexingParams& getParams() { return _params; }
 
         // This really gets the 'locs' from the provided obj.
-        void getKeys(const BSONObj& obj, vector<BSONObj>& locs) const;
+        void getKeys(const BSONObj& obj, std::vector<BSONObj>& locs) const;
 
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
-        // This is called by the two getKeys above.
-        void getKeys(const BSONObj &obj, BSONObjSet* keys, vector<BSONObj>* locs) const;
-
-        BSONObj _nullObj;
-        BSONElement _nullElt;
         TwoDIndexingParams _params;
     };
 

@@ -1,17 +1,29 @@
 /**
  *    Copyright 2013 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/db/query/lite_parsed_query.h"
@@ -48,6 +60,7 @@ namespace mongo {
                                  const BSONObj& hint,
                                  const BSONObj& minObj, const BSONObj& maxObj,
                                  bool snapshot,
+                                 bool explain,
                                  LiteParsedQuery** out) {
         auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
         pq->_sort = sort;
@@ -55,6 +68,7 @@ namespace mongo {
         pq->_min = minObj;
         pq->_max = maxObj;
         pq->_snapshot = snapshot;
+        pq->_explain = explain;
 
         Status status = pq->init(ns, ntoskip, ntoreturn, queryOptions, query, proj, false);
         if (status.isOK()) { *out = pq.release(); }
@@ -160,6 +174,11 @@ namespace mongo {
         BSONObjIterator i(sortObj);
         while (i.more()) {
             BSONElement e = i.next();
+            // fieldNameSize() includes NULL terminator. For empty field name,
+            // we should be checking for 1 instead of 0.
+            if (1 == e.fieldNameSize()) {
+                return false;
+            }
             if (isTextScoreMeta(e)) {
                 continue;
             }
@@ -169,6 +188,19 @@ namespace mongo {
             }
         }
         return true;
+    }
+
+    // static
+    bool LiteParsedQuery::isQueryIsolated(const BSONObj& query) {
+        BSONObjIterator iter(query);
+        while (iter.more()) {
+            BSONElement elt = iter.next();
+            if (str::equals(elt.fieldName(), "$isolated") && elt.trueValue())
+                return true;
+            if (str::equals(elt.fieldName(), "$atomic") && elt.trueValue())
+                return true;
+        }
+        return false;
     }
 
     // static
@@ -204,7 +236,12 @@ namespace mongo {
         if (_ntoskip < 0) {
             return Status(ErrorCodes::BadValue, "bad skip value in query");
         }
-        
+
+        if (_ntoreturn == std::numeric_limits<int>::min()) {
+            // _ntoreturn is negative but can't be negated.
+            return Status(ErrorCodes::BadValue, "bad limit value in query");
+        }
+
         if (_ntoreturn < 0) {
             // _ntoreturn greater than zero is simply a hint on how many objects to send back per
             // "cursor batch".  A negative number indicates a hard limit.
@@ -359,7 +396,8 @@ namespace mongo {
                         _returnKey = true;
                         BSONObjBuilder projBob;
                         projBob.appendElements(_proj);
-                        // XXX: what's the syntax here?
+                        // We use $$ because it's never going to show up in a user's projection.
+                        // The exact text doesn't matter.
                         BSONObj indexKey = BSON("$$" <<
                                                 BSON("$meta" << LiteParsedQuery::metaIndexKey));
                         projBob.append(indexKey.firstElement());
@@ -373,6 +411,8 @@ namespace mongo {
                 else if (str::equals("showDiskLoc", name)) {
                     // Won't throw.
                     if (e.trueValue()) {
+                        _showDiskLoc = true;
+
                         BSONObjBuilder projBob;
                         projBob.appendElements(_proj);
                         BSONObj metaDiskLoc = BSON("$diskLoc" <<

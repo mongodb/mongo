@@ -38,16 +38,22 @@
 
  */
 namespace mongo {
-
     class CurOp;
 
-    bool updateSlaveLocations(BSONArray optimes);
+namespace repl {
 
-    void updateSlaveLocation( CurOp& curop, const char * oplog_ns , OpTime lastOp );
+    /**
+     * This updates the slave tracking map and updates the tag groups.
+     *
+     * @returns false when the member cannot be found
+     */
+    bool updateSlaveTracking(const BSONObj& rid,
+                             const BSONObj config,
+                             OpTime last);
 
     /** @return true if op has made it to w servers */
     bool opReplicatedEnough( OpTime op , int w );
-    bool opReplicatedEnough( OpTime op , const string& w );
+    bool opReplicatedEnough( OpTime op , const std::string& w );
     bool opReplicatedEnough( OpTime op , BSONElement w );
 
     bool waitForReplication( OpTime op , int w , int maxSecondsToWait );
@@ -56,4 +62,5 @@ namespace mongo {
 
     void resetSlaveCache();
     unsigned getSlaveCount();
-}
+} // namespace repl
+} // namespace mongo

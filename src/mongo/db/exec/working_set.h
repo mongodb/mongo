@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -70,7 +70,7 @@ namespace mongo {
          * Do not delete the returned pointer as the WorkingSet retains ownership. Call free() to
          * release it.
          */
-        WorkingSetMember* get(const WorkingSetID& i) {
+        WorkingSetMember* get(const WorkingSetID& i) const {
             dassert(i < _data.size()); // ID has been allocated.
             dassert(_data[i].nextFreeOrSelf == i); // ID currently in use.
             return _data[i].member;
@@ -101,6 +101,11 @@ namespace mongo {
          */
         const unordered_set<WorkingSetID>& getFlagged() const;
 
+        /**
+         * Removes and deallocates all members of this working set.
+         */
+        void clear();
+
     private:
         struct MemberHolder {
             MemberHolder();
@@ -115,7 +120,7 @@ namespace mongo {
 
         // All WorkingSetIDs are indexes into this, except for INVALID_ID.
         // Elements are added to _freeList rather than removed when freed.
-        vector<MemberHolder> _data;
+        std::vector<MemberHolder> _data;
 
         // Index into _data, forming a linked-list using MemberHolder::nextFreeOrSelf as the next
         // link. INVALID_ID is the list terminator since 0 is a valid index.
@@ -221,7 +226,7 @@ namespace mongo {
 
         DiskLoc loc;
         BSONObj obj;
-        vector<IndexKeyDatum> keyData;
+        std::vector<IndexKeyDatum> keyData;
         MemberState state;
 
         bool hasLoc() const;
@@ -246,7 +251,12 @@ namespace mongo {
          *
          * Returns false otherwise.  Returning false indicates a query planning error.
          */
-        bool getFieldDotted(const string& field, BSONElement* out) const;
+        bool getFieldDotted(const std::string& field, BSONElement* out) const;
+
+        /**
+         * Returns expected memory usage of working set member.
+         */
+        size_t getMemUsage() const;
 
     private:
         boost::scoped_ptr<WorkingSetComputedData> _computed[WSM_COMPUTED_NUM_TYPES];

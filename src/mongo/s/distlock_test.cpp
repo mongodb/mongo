@@ -2,20 +2,32 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/distlock.h"
 
@@ -28,8 +40,10 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/bson_util.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 // Modify some config options for the RNG, since they cause MSVC to fail
@@ -59,6 +73,8 @@
 
 namespace mongo {
 
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+
     class TestDistLockWithSync: public Command {
     public:
         TestDistLockWithSync() :
@@ -74,9 +90,8 @@ namespace mongo {
         virtual bool adminOnly() const {
             return true;
         }
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false;  }
+
         // No auth needed because it only works when enabled via command line.
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -85,10 +100,9 @@ namespace mongo {
             while (keepGoing) {
                 try {
                     if (current->lock_try( "test" )) {
-                        count++;
-                        int before = count;
+                        int before = count.addAndFetch(1);
                         sleepmillis(3);
-                        int after = count;
+                        int after = count.loadRelaxed();
 
                         if (after != before) {
                             error() << " before: " << before << " after: " << after
@@ -98,19 +112,19 @@ namespace mongo {
                         current->unlock();
                     }
                 }
-                catch ( const LockException& ex ) {
+                catch ( const DBException& ex ) {
                     log() << "*** !Could not try distributed lock." << causedBy( ex ) << endl;
                 }
             }
         }
 
-        bool run(const string&, BSONObj& cmdObj, int, string& errmsg,
+        bool run(OperationContext* txn, const string&, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool) {
             Timer t;
             DistributedLock lk(ConnectionString(cmdObj["host"].String(),
                                                 ConnectionString::SYNC), "testdistlockwithsync", 0, 0);
             current = &lk;
-            count = 0;
+            count.store(0);
             gotit = 0;
             errors = 0;
             keepGoing = true;
@@ -132,7 +146,7 @@ namespace mongo {
 
             current = 0;
 
-            result.append("count", count);
+            result.append("count", count.loadRelaxed());
             result.append("gotit", gotit);
             result.append("errors", errors);
             result.append("timeMS", t.millis());
@@ -144,7 +158,7 @@ namespace mongo {
         static DistributedLock * current;
         static int gotit;
         static int errors;
-        static AtomicUInt count;
+        static AtomicUInt32 count;
 
         static bool keepGoing;
 
@@ -158,7 +172,7 @@ namespace mongo {
     }
 
     DistributedLock * TestDistLockWithSync::current;
-    AtomicUInt TestDistLockWithSync::count;
+    AtomicUInt32 TestDistLockWithSync::count;
     int TestDistLockWithSync::gotit;
     int TestDistLockWithSync::errors;
     bool TestDistLockWithSync::keepGoing;
@@ -183,9 +197,7 @@ namespace mongo {
         virtual bool adminOnly() const {
             return true;
         }
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         // No auth needed because it only works when enabled via command line.
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -261,23 +273,22 @@ namespace mongo {
 
                         log() << "**** Locked for thread " << threadId << " with ts " << lockObj["ts"] << endl;
 
-                        if( count % 2 == 1 && ! myLock->lock_try( "Testing lock re-entry.", true ) ) {
+                        if( count.loadRelaxed() % 2 == 1 && ! myLock->lock_try( "Testing lock re-entry.", true ) ) {
                             errors = true;
                             log() << "**** !Could not re-enter lock already held" << endl;
                             break;
                         }
 
-                        if( count % 3 == 1 && myLock->lock_try( "Testing lock non-re-entry.", false ) ) {
+                        if( count.loadRelaxed() % 3 == 1 && myLock->lock_try( "Testing lock non-re-entry.", false ) ) {
                             errors = true;
                             log() << "**** !Invalid lock re-entry" << endl;
                             break;
                         }
 
-                        count++;
-                        int before = count;
+                        int before = count.addAndFetch(1);
                         int sleep = randomWait();
                         sleepmillis(sleep);
-                        int after = count;
+                        int after = count.loadRelaxed();
 
                         if(after != before) {
                             errors = true;
@@ -299,7 +310,7 @@ namespace mongo {
                     }
 
                 }
-                catch( const LockException& ex ) {
+                catch( const DBException& ex ) {
                     log() << "*** !Could not try distributed lock." << causedBy( ex ) << endl;
                     break;
                 }
@@ -324,7 +335,7 @@ namespace mongo {
             return;
         }
 
-        bool run(const string&, BSONObj& cmdObj, int, string& errmsg,
+        bool run(OperationContext* txn, const string&, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool) {
 
             Timer t;
@@ -350,7 +361,7 @@ namespace mongo {
                 return false;
             }
 
-            count = 0;
+            count.store(0);
             keepGoing = true;
 
             vector<shared_ptr<boost::thread> > threads;
@@ -358,7 +369,7 @@ namespace mongo {
             for (int i = 0; i < numThreads; i++) {
                 results.push_back(shared_ptr<BSONObjBuilder> (new BSONObjBuilder()));
                 threads.push_back(shared_ptr<boost::thread> (new boost::thread(
-                                      boost::bind(&TestDistLockWithSkew::runThread, this,
+                                      stdx::bind(&TestDistLockWithSkew::runThread, this,
                                                   hostConn, (unsigned) i, seed + i, boost::ref(cmdObj),
                                                   boost::ref(*(results[i].get()))))));
             }
@@ -372,7 +383,7 @@ namespace mongo {
                 errors = errors || results[i].get()->obj()["errors"].Bool();
             }
 
-            result.append("count", count);
+            result.append("count", count.loadRelaxed());
             result.append("errors", errors);
             result.append("timeMS", t.millis());
 
@@ -427,7 +438,7 @@ namespace mongo {
 
         // variables for test
         thread_specific_ptr<DistributedLock> lock;
-        AtomicUInt count;
+        AtomicUInt32 count;
         bool keepGoing;
 
     };
@@ -458,15 +469,13 @@ namespace mongo {
         virtual bool adminOnly() const {
             return true;
         }
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         // No auth needed because it only works when enabled via command line.
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
 
-        bool run(const string&, BSONObj& cmdObj, int, string& errmsg,
+        bool run(OperationContext* txn, const string&, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool) {
 
             long long skew = (long long) number_field(cmdObj, "skew", 0);

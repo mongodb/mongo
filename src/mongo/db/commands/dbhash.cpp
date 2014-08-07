@@ -1,7 +1,7 @@
 // dbhash.cpp
 
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2013-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -33,6 +33,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/timer.h"
@@ -42,12 +43,7 @@ namespace mongo {
     DBHashCmd dbhashCmd;
 
 
-    void logOpForDbHash( const char* opstr,
-                         const char* ns,
-                         const BSONObj& obj,
-                         BSONObj* patt,
-                         const BSONObj* fullObj,
-                         bool forMigrateCleanup ) {
+    void logOpForDbHash(const char* ns) {
         dbhashCmd.wipeCacheForCollection( ns );
     }
 
@@ -66,7 +62,7 @@ namespace mongo {
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
     }
 
-    string DBHashCmd::hashCollection( const string& fullCollectionName, bool* fromCache ) {
+    string DBHashCmd::hashCollection( OperationContext* opCtx, Database* db, const string& fullCollectionName, bool* fromCache ) {
 
         scoped_ptr<scoped_lock> cachedHashedLock;
 
@@ -80,24 +76,27 @@ namespace mongo {
         }
 
         *fromCache = false;
-        Collection* collection = cc().database()->getCollection( fullCollectionName );
+        Collection* collection = db->getCollection( opCtx, fullCollectionName );
         if ( !collection )
             return "";
 
         IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex();
 
-        auto_ptr<Runner> runner;
+        auto_ptr<PlanExecutor> exec;
         if ( desc ) {
-            runner.reset(InternalPlanner::indexScan(collection,
-                                                    desc,
-                                                    BSONObj(),
-                                                    BSONObj(),
-                                                    false,
-                                                    InternalPlanner::FORWARD,
-                                                    InternalPlanner::IXSCAN_FETCH));
+            exec.reset(InternalPlanner::indexScan(opCtx,
+                                                  collection,
+                                                  desc,
+                                                  BSONObj(),
+                                                  BSONObj(),
+                                                  false,
+                                                  InternalPlanner::FORWARD,
+                                                  InternalPlanner::IXSCAN_FETCH));
         }
-        else if ( collection->details()->isCapped() ) {
-            runner.reset(InternalPlanner::collectionScan(fullCollectionName));
+        else if ( collection->isCapped() ) {
+            exec.reset(InternalPlanner::collectionScan(opCtx,
+                                                       fullCollectionName,
+                                                       collection));
         }
         else {
             log() << "can't find _id index for: " << fullCollectionName << endl;
@@ -108,14 +107,14 @@ namespace mongo {
         md5_init(&st);
 
         long long n = 0;
-        Runner::RunnerState state;
+        PlanExecutor::ExecState state;
         BSONObj c;
-        verify(NULL != runner.get());
-        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&c, NULL))) {
+        verify(NULL != exec.get());
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&c, NULL))) {
             md5_append( &st , (const md5_byte_t*)c.objdata() , c.objsize() );
             n++;
         }
-        if (Runner::RUNNER_EOF != state) {
+        if (PlanExecutor::IS_EOF != state) {
             warning() << "error while hashing, db dropped? ns=" << fullCollectionName << endl;
         }
         md5digest d;
@@ -129,7 +128,7 @@ namespace mongo {
         return hash;
     }
 
-    bool DBHashCmd::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+    bool DBHashCmd::run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
         Timer timer;
 
         set<string> desiredCollections;
@@ -146,9 +145,12 @@ namespace mongo {
         }
 
         list<string> colls;
-        Database* db = cc().database();
+        const string ns = parseNs(dbname, cmdObj);
+
+        Client::ReadContext ctx(txn, ns);
+        Database* db = ctx.ctx().db();
         if ( db )
-            db->namespaceIndex().getNamespaces( colls );
+            db->getDatabaseCatalogEntry()->getCollectionNamespaces( &colls );
         colls.sort();
 
         result.appendNumber( "numCollections" , (long long)colls.size() );
@@ -176,7 +178,7 @@ namespace mongo {
                 continue;
 
             bool fromCache = false;
-            string hash = hashCollection( fullCollectionName, &fromCache );
+            string hash = hashCollection( txn, db, fullCollectionName, &fromCache );
 
             bb.append( shortCollectionName, hash );
 

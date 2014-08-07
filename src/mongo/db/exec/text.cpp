@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -31,224 +31,278 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
 
 namespace mongo {
 
-    TextStage::TextStage(const TextStageParams& params,
+    // static
+    const char* TextStage::kStageType = "TEXT";
+
+    TextStage::TextStage(OperationContext* txn,
+                         const TextStageParams& params,
                          WorkingSet* ws,
                          const MatchExpression* filter)
-        : _params(params),
+        : _txn(txn),
+          _params(params),
           _ftsMatcher(params.query, params.spec),
           _ws(ws),
           _filter(filter),
-          _filledOutResults(false),
-          _curResult(0) { }
+          _commonStats(kStageType),
+          _internalState(INIT_SCANS),
+          _currentIndexScanner(0) {
+        _scoreIterator = _scores.end();
+        _specificStats.indexPrefix = _params.indexPrefix;
+    }
 
     TextStage::~TextStage() { }
 
     bool TextStage::isEOF() {
-        // If we haven't filled out our results yet we can't be EOF.
-        if (!_filledOutResults) { return false; }
-
-        // We're EOF when we've returned all our results.
-        return _curResult >= _results.size();
+        return _internalState == DONE;
     }
 
     PlanStage::StageState TextStage::work(WorkingSetID* out) {
         ++_commonStats.works;
+
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (isEOF()) { return PlanStage::IS_EOF; }
+        invariant(_internalState != DONE);
 
-        // Fill out our result queue.
-        if (!_filledOutResults) {
-            PlanStage::StageState ss = fillOutResults();
-            if (ss == PlanStage::IS_EOF || ss == PlanStage::FAILURE) {
-                return ss;
-            }
-            verify(ss == PlanStage::NEED_TIME);
+        PlanStage::StageState stageState = PlanStage::IS_EOF;
+
+        switch (_internalState) {
+        case INIT_SCANS:
+            stageState = initScans(out);
+            break;
+        case READING_TERMS:
+            stageState = readFromSubScanners(out);
+            break;
+        case RETURNING_RESULTS:
+            stageState = returnResults(out);
+            break;
+        case DONE:
+            // Handled above.
+            break;
         }
 
-        // Having cached all our results, return them one at a time.
-        WorkingSetID id = _results[_curResult];
-
-        // Advance to next result.
-        ++_curResult;
-        *out = id;
-
-        // If we're returning something, take it out of our DL -> WSID map so that future
-        // calls to invalidate don't cause us to take action for a DL we're done with.
-        WorkingSetMember* member = _ws->get(*out);
-        if (member->hasLoc()) {
-            _wsidByDiskLoc.erase(member->loc);
+        // Increment common stats counters that are specific to the return value of work().
+        switch (stageState) {
+        case PlanStage::ADVANCED:
+            ++_commonStats.advanced;
+            break;
+        case PlanStage::NEED_TIME:
+            ++_commonStats.needTime;
+            break;
+        default:
+            break;
         }
 
-        return PlanStage::ADVANCED;
+        return stageState;
     }
 
-    void TextStage::prepareToYield() {
+    void TextStage::saveState() {
         ++_commonStats.yields;
-        // TODO: When we incrementally read results, tell our sub-runners to yield.
+
+        for (size_t i = 0; i < _scanners.size(); ++i) {
+            _scanners.mutableVector()[i]->saveState();
+        }
     }
 
-    void TextStage::recoverFromYield() {
+    void TextStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
-        // TODO: When we incrementally read results, tell our sub-runners to unyield.
+
+        for (size_t i = 0; i < _scanners.size(); ++i) {
+            _scanners.mutableVector()[i]->restoreState(opCtx);
+        }
     }
 
     void TextStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
-        // Invalidation does not affect the number of results added in fillOutResults().
-        // All it affects is whether the WSM returned to the caller has a DiskLoc.
-
-        // _results contains indices into the WorkingSet, not actual data.  If a WorkingSetMember in
-        // the WorkingSet needs to change state as a result of a DiskLoc invalidation, it will still
-        // be at the same spot in the WorkingSet.  As such, we don't need to modify _results.
-        DataMap::iterator it = _wsidByDiskLoc.find(dl);
-
-        // If we're holding on to data that's got the DiskLoc we're invalidating...
-        if (_wsidByDiskLoc.end() != it) {
-            // Grab the WSM that we're converting from LOC_AND_UNOWNED to OWNED_OBJ.
-            WorkingSetMember* member = _ws->get(it->second);
-            verify(member->loc == dl);
-            verify(member->state == WorkingSetMember::LOC_AND_UNOWNED_OBJ);
-
-            member->loc.Null();
-            member->obj = member->obj.getOwned();
-            member->state = WorkingSetMember::OWNED_OBJ;
-
-            // Remove the DiskLoc from our set of active DLs.
-            _wsidByDiskLoc.erase(it);
+        // Propagate invalidate to children.
+        for (size_t i = 0; i < _scanners.size(); ++i) {
+            _scanners.mutableVector()[i]->invalidate(dl, type);
         }
+
+        // We store the score keyed by DiskLoc.  We have to toss out our state when the DiskLoc
+        // changes.
+        // TODO: If we're RETURNING_RESULTS we could somehow buffer the object.
+        ScoreMap::iterator scoreIt = _scores.find(dl);
+        if (scoreIt != _scores.end()) {
+            if (scoreIt == _scoreIterator) {
+                _scoreIterator++;
+            }
+            _scores.erase(scoreIt);
+        }
+    }
+
+    vector<PlanStage*> TextStage::getChildren() const {
+        vector<PlanStage*> empty;
+        return empty;
     }
 
     PlanStageStats* TextStage::getStats() {
         _commonStats.isEOF = isEOF();
+
+        // Add a BSON representation of the filter to the stats tree, if there is one.
+        if (NULL != _filter) {
+            BSONObjBuilder bob;
+            _filter->toBSON(&bob);
+            _commonStats.filter = bob.obj();
+        }
+
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_TEXT));
         ret->specific.reset(new TextStats(_specificStats));
         return ret.release();
     }
 
-    PlanStage::StageState TextStage::fillOutResults() {
-        Database* db = cc().database();
-        Collection* collection = db->getCollection( _params.ns );
-        if (NULL == collection) {
-            warning() << "TextStage params namespace error";
-            return PlanStage::FAILURE;
-        }
-        vector<IndexDescriptor*> idxMatches;
-        collection->getIndexCatalog()->findIndexByType("text", idxMatches);
-        if (1 != idxMatches.size()) {
-            warning() << "Expected exactly one text index";
-            return PlanStage::FAILURE;
-        }
+    const CommonStats* TextStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* TextStage::getSpecificStats() {
+        return &_specificStats;
+    }
+
+    PlanStage::StageState TextStage::initScans(WorkingSetID* out) {
+        invariant(0 == _scanners.size());
+
+        _specificStats.parsedTextQuery = _params.query.toBSON();
 
         // Get all the index scans for each term in our query.
-        OwnedPointerVector<PlanStage> scanners;
         for (size_t i = 0; i < _params.query.getTerms().size(); i++) {
             const string& term = _params.query.getTerms()[i];
             IndexScanParams params;
-            params.bounds.startKey = FTSIndexFormat::getIndexKey(MAX_WEIGHT, term,
-                                                                 _params.indexPrefix);
-            params.bounds.endKey = FTSIndexFormat::getIndexKey(0, term, _params.indexPrefix);
+            params.bounds.startKey = FTSIndexFormat::getIndexKey(MAX_WEIGHT,
+                                                                 term,
+                                                                 _params.indexPrefix,
+                                                                 _params.spec.getTextIndexVersion());
+            params.bounds.endKey = FTSIndexFormat::getIndexKey(0,
+                                                               term,
+                                                                _params.indexPrefix,
+                                                               _params.spec.getTextIndexVersion());
             params.bounds.endKeyInclusive = true;
             params.bounds.isSimpleRange = true;
-            params.descriptor = idxMatches[0];
+            params.descriptor = _params.index;
             params.direction = -1;
-            IndexScan* ixscan = new IndexScan(params, _ws, NULL);
-            scanners.mutableVector().push_back(ixscan);
+            _scanners.mutableVector().push_back(new IndexScan(_txn, params, _ws, NULL));
         }
 
-        // Map: diskloc -> aggregate score for doc.
-        typedef unordered_map<DiskLoc, double, DiskLoc::Hasher> ScoreMap;
-        ScoreMap scores;
+        // If we have no terms we go right to EOF.
+        if (0 == _scanners.size()) {
+            _internalState = DONE;
+            return PlanStage::IS_EOF;
+        }
 
-        // For each index scan, read all results and store scores.
-        size_t currentIndexScanner = 0;
-        while (currentIndexScanner < scanners.size()) {
-            BSONObj keyObj;
-            DiskLoc loc;
+        // Transition to the next state.
+        _internalState = READING_TERMS;
+        return PlanStage::NEED_TIME;
+    }
 
-            WorkingSetID id;
-            PlanStage::StageState state = scanners.vector()[currentIndexScanner]->work(&id);
+    PlanStage::StageState TextStage::readFromSubScanners(WorkingSetID* out) {
+        // This should be checked before we get here.
+        invariant(_currentIndexScanner < _scanners.size());
 
-            if (PlanStage::ADVANCED == state) {
-                WorkingSetMember* wsm = _ws->get(id);
-                IndexKeyDatum& keyDatum = wsm->keyData.back();
-                filterAndScore(keyDatum.keyData, wsm->loc, &scores[wsm->loc]);
-                _ws->free(id);
+        // Read the next result from our current scanner.
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState childState = _scanners.vector()[_currentIndexScanner]->work(&id);
+
+        if (PlanStage::ADVANCED == childState) {
+            WorkingSetMember* wsm = _ws->get(id);
+            invariant(1 == wsm->keyData.size());
+            invariant(wsm->hasLoc());
+            IndexKeyDatum& keyDatum = wsm->keyData.back();
+            addTerm(keyDatum.keyData, wsm->loc);
+            _ws->free(id);
+            return PlanStage::NEED_TIME;
+        }
+        else if (PlanStage::IS_EOF == childState) {
+            // Done with this scan.
+            ++_currentIndexScanner;
+
+            if (_currentIndexScanner < _scanners.size()) {
+                // We have another scan to read from.
+                return PlanStage::NEED_TIME;
             }
-            else if (PlanStage::IS_EOF == state) {
-                // Done with this scan.
-                ++currentIndexScanner;
+
+            // If we're here we are done reading results.  Move to the next state.
+            _scoreIterator = _scores.begin();
+            _internalState = RETURNING_RESULTS;
+
+            // Don't need to keep these around.
+            _scanners.clear();
+            return PlanStage::NEED_TIME;
+        }
+        else {
+            if (PlanStage::FAILURE == childState) {
+                // Propagate failure from below.
+                *out = id;
+                // If a stage fails, it may create a status WSM to indicate why it
+                // failed, in which case 'id' is valid.  If ID is invalid, we
+                // create our own error message.
+                if (WorkingSet::INVALID_ID == id) {
+                    mongoutils::str::stream ss;
+                    ss << "text stage failed to read in results from child";
+                    Status status(ErrorCodes::InternalError, ss);
+                    *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+                }
             }
-            else if (PlanStage::NEED_FETCH == state) {
-                // We're calling work() on ixscans and they have no way to return a fetch.
-                verify(false);
-            }
-            else if (PlanStage::NEED_TIME == state) {
-                // We are a blocking stage, so ignore scanner's request for more time.
-            }
-            else {
-                verify(PlanStage::FAILURE == state);
-                warning() << "error from index scan during text stage: invalid FAILURE state";
-                return PlanStage::FAILURE;
-            }
+            return childState;
+        }
+    }
+
+    PlanStage::StageState TextStage::returnResults(WorkingSetID* out) {
+        if (_scoreIterator == _scores.end()) {
+            _internalState = DONE;
+            return PlanStage::IS_EOF;
         }
 
         // Filter for phrases and negative terms, score and truncate.
-        for (ScoreMap::iterator i = scores.begin(); i != scores.end(); ++i) {
-            DiskLoc loc = i->first;
-            double score = i->second;
+        DiskLoc loc = _scoreIterator->first;
+        double score = _scoreIterator->second;
+        _scoreIterator++;
 
-            // Ignore non-matched documents.
-            if (score < 0) {
-                continue;
-            }
-
-            // Filter for phrases and negated terms
-            if (_params.query.hasNonTermPieces()) {
-                if (!_ftsMatcher.matchesNonTerm(loc.obj())) {
-                    continue;
-                }
-            }
-
-            // Add results to working set as LOC_AND_UNOWNED_OBJ initially.
-            // On invalidation, we copy the object and change the state to
-            // OWNED_OBJ.
-            // Fill out a WSM.
-            WorkingSetID id = _ws->allocate();
-            WorkingSetMember* member = _ws->get(id);
-            member->loc = loc;
-            member->obj = member->loc.obj();
-            member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-            member->addComputed(new TextScoreComputedData(score));
-
-            _results.push_back(id);
-            _wsidByDiskLoc[member->loc] = id;
+        // Ignore non-matched documents.
+        if (score < 0) {
+            return PlanStage::NEED_TIME;
         }
 
-        _filledOutResults = true;
-
-        if (_results.size() == 0) {
-            return PlanStage::IS_EOF;
+        // Filter for phrases and negated terms
+        if (_params.query.hasNonTermPieces()) {
+            if (!_ftsMatcher.matchesNonTerm(_params.index->getCollection()->docFor(loc))) {
+                return PlanStage::NEED_TIME;
+            }
         }
-        return PlanStage::NEED_TIME;
+
+        *out = _ws->allocate();
+        WorkingSetMember* member = _ws->get(*out);
+        member->loc = loc;
+        member->obj = _params.index->getCollection()->docFor(member->loc);
+        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+        member->addComputed(new TextScoreComputedData(score));
+        return PlanStage::ADVANCED;
     }
 
     class TextMatchableDocument : public MatchableDocument {
     public:
-        TextMatchableDocument(const BSONObj& keyPattern, const BSONObj& key, DiskLoc loc, bool *fetched)
-            : _keyPattern(keyPattern),
+        TextMatchableDocument(const BSONObj& keyPattern,
+                              const BSONObj& key,
+                              DiskLoc loc,
+                              const Collection* collection,
+                              bool *fetched)
+            : _collection(collection),
+              _keyPattern(keyPattern),
               _key(key),
               _loc(loc),
               _fetched(fetched) { }
 
         BSONObj toBSON() const {
             *_fetched = true;
-            return _loc.obj();
+            return _collection->docFor(_loc);
         }
 
         virtual ElementIterator* allocateIterator(const ElementPath* path) const {
@@ -273,7 +327,7 @@ namespace mongo {
 
             // All else fails, fetch.
             *_fetched = true;
-            return new BSONElementIterator(path, _loc.obj());
+            return new BSONElementIterator(path, _collection->docFor(_loc));
         }
 
         virtual void releaseIterator( ElementIterator* iterator ) const {
@@ -281,14 +335,15 @@ namespace mongo {
         }
 
     private:
+        const Collection* _collection;
         BSONObj _keyPattern;
         BSONObj _key;
         DiskLoc _loc;
         bool* _fetched;
     };
 
-    void TextStage::filterAndScore(BSONObj key, DiskLoc loc, double* documentAggregateScore) {
-        invariant(documentAggregateScore);
+    void TextStage::addTerm(const BSONObj& key, const DiskLoc& loc) {
+        double *documentAggregateScore = &_scores[loc];
 
         ++_specificStats.keysExamined;
 
@@ -313,7 +368,11 @@ namespace mongo {
             if (_filter) {
                 // We have not seen this document before and need to apply a filter.
                 bool fetched = false;
-                TextMatchableDocument tdoc(_params.index->keyPattern(), key, loc, &fetched);
+                TextMatchableDocument tdoc(_params.index->keyPattern(), 
+                                           key, 
+                                           loc, 
+                                           _params.index->getCollection(), 
+                                           &fetched);
 
                 if (!_filter->matches(&tdoc)) {
                     // We had to fetch but we're not going to return it.

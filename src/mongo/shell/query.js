@@ -50,6 +50,8 @@ DBQuery.prototype.help = function () {
     print("\t.next()")
     print("\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)")
     print("\t.itcount() - iterates through documents and counts them")
+    print("\t.getQueryPlan() - get query plans associated with shape. To get more info on query plans, " +
+          "call getQueryPlan().help().");
     print("\t.pretty() - pretty print each document, possibly over multiple lines")
 }
 
@@ -72,7 +74,7 @@ DBQuery.prototype._ensureSpecial = function(){
 
 DBQuery.prototype._checkModify = function(){
     if ( this._cursor )
-        throw "query already executed";
+        throw Error("query already executed");
 }
 
 DBQuery.prototype._exec = function(){
@@ -124,11 +126,11 @@ DBQuery.prototype.next = function(){
     if ( o )
         this._cursorSeen++;
     else
-        throw "error hasNext: " + o;
+        throw Error( "error hasNext: " + o );
     
     var ret = this._cursor.next();
     if ( ret.$err )
-        throw "error: " + tojson( ret );
+        throw Error( "error: " + tojson( ret ) );
 
     this._numReturned++;
     return ret;
@@ -139,7 +141,7 @@ DBQuery.prototype.objsLeftInBatch = function(){
 
     var ret = this._cursor.objsLeftInBatch();
     if ( ret.$err )
-        throw "error: " + tojson( ret );
+        throw Error( "error: " + tojson( ret ) );
 
     return ret;
 }
@@ -167,7 +169,7 @@ DBQuery.prototype.count = function( applySkipLimit ) {
         if ( this._special ) {
             cmd.query = this._query.query;
             if ( this._query.$maxTimeMS ) {
-                cmd.$maxTimeMS = this._query.$maxTimeMS;
+                cmd.maxTimeMS = this._query.$maxTimeMS;
             }
             if ( this._query.$hint ) {
                 cmd.hint = this._query.$hint;
@@ -188,7 +190,7 @@ DBQuery.prototype.count = function( applySkipLimit ) {
     
     var res = this._db.runCommand( cmd );
     if( res && res.n != null ) return res.n;
-    throw "count failed: " + tojson( res );
+    throw Error( "count failed: " + tojson( res ) );
 }
 
 DBQuery.prototype.size = function(){
@@ -256,7 +258,7 @@ DBQuery.prototype.maxTimeMS = function( maxTimeMS ) {
 /**
  * Sets the read preference for this cursor.
  * 
- * @param mode {string} read prefrence mode to use.
+ * @param mode {string} read preference mode to use.
  * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
  *     Note that this object only keeps a shallow copy of this array.
  * 
@@ -369,6 +371,13 @@ DBQuery.prototype.shellPrint = function(){
     
 }
 
+/**
+ * Returns a QueryPlan for the query.
+ */
+DBQuery.prototype.getQueryPlan = function() {
+    return new QueryPlan( this );
+}
+
 DBQuery.prototype.toString = function(){
     return "DBQuery: " + this._ns + " -> " + tojson( this._query );
 }
@@ -407,7 +416,7 @@ DBCommandCursor.prototype.next = function() {
     else {
         var ret = this._cursor.next();
         if ( ret.$err )
-            throw "error: " + tojson( ret );
+            throw Error( "error: " + tojson( ret ) );
         return ret;
     }
 }
@@ -441,3 +450,56 @@ DBCommandCursor.prototype.itcount = DBQuery.prototype.itcount
 DBCommandCursor.prototype.shellPrint = DBQuery.prototype.shellPrint
 DBCommandCursor.prototype.pretty = DBQuery.prototype.pretty
 
+/**
+ * QueryCache
+ * Holds a reference to the cursor.
+ * Proxy for planCache* query shape-specific commands.
+ */
+if ( ( typeof  QueryPlan ) == "undefined" ){
+    QueryPlan = function( cursor ){
+        this._cursor = cursor;
+    }
+}
+
+/**
+ * Name of QueryPlan.
+ * Same as collection.
+ */
+QueryPlan.prototype.getName = function() {
+    return this._cursor._collection.getName();
+}
+
+/**
+ * tojson prints the name of the collection
+ */
+
+QueryPlan.prototype.tojson = function(indent, nolint) {
+    return tojson(this.getPlans());
+}
+
+/**
+ * Displays help for a PlanCache object.
+ */
+QueryPlan.prototype.help = function () {
+    var shortName = this.getName();
+    print("QueryPlan help");
+    print("\t.help() - show QueryPlan help");
+    print("\t.clearPlans() - drops query shape from plan cache");
+    print("\t.getPlans() - displays the cached plans for a query shape");
+    return __magicNoPrint;
+}
+
+/**
+ * List plans for a query shape.
+ */
+QueryPlan.prototype.getPlans = function() {
+    return this._cursor._collection.getPlanCache().getPlansByQuery(this._cursor);
+}
+
+/**
+ * Drop query shape from the plan cache.
+ */
+QueryPlan.prototype.clearPlans = function() {
+    this._cursor._collection.getPlanCache().clearPlansByQuery(this._cursor);
+    return;
+}

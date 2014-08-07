@@ -34,17 +34,19 @@
 
 namespace mongo {
 
+    class Collection;
     class DiskLoc;
+    class OperationContext;
 
     /**
      * A PlanStage ("stage") is the basic building block of a "Query Execution Plan."  A stage is
      * the smallest piece of machinery used in executing a compiled query.  Stages either access
      * data (from a collection or an index) to create a stream of results, or transform a stream of
-     * results (e.g. AND, OR, SORT) to create a stream of results.  
+     * results (e.g. AND, OR, SORT) to create a stream of results.
      *
      * Stages have zero or more input streams but only one output stream.  Data-accessing stages are
      * leaves and data-transforming stages have children.  Stages can be connected together to form
-     * a tree which is then executed (see plan_runner.h) to solve a query.  
+     * a tree which is then executed (see plan_executor.h) to solve a query.
      *
      * A stage's input and output are each typed.  Only stages with compatible types can be
      * connected.
@@ -63,8 +65,8 @@ namespace mongo {
      * passed through the WorkingSet interface; see working_set.h for details.
      *
      * All synchronization is the responsibility of the caller.  Queries must be told to yield with
-     * prepareToYield() if any underlying database state changes.  If prepareToYield() is called,
-     * recoverFromYield() must be called again before any work() is done.
+     * saveState() if any underlying database state changes.  If saveState() is called,
+     * restoreState() must be called again before any work() is done.
      *
      * Here is a very simple usage example:
      *
@@ -76,7 +78,7 @@ namespace mongo {
      *     case PlanStage::ADVANCED:
      *         // do something with result
      *         WorkingSetMember* member = workingSet.get(result);
-     *         cout << "Result: " << member->obj << endl;
+     *         cout << "Result: " << member->obj << std::endl;
      *         break;
      *     case PlanStage::IS_EOF:
      *         // All done.  Will fall out of while loop.
@@ -87,16 +89,13 @@ namespace mongo {
      *     case PlanStage::FAILURE:
      *         // Throw exception or return error
      *         break;
-     *     case PlanStage::NEED_FETCH:
-     *         // Go to disk and fetch stuff.
-     *         break;
      *     }
      *
      *     if (shouldYield) {
      *         // Occasionally yield.
-     *         stage->prepareToYield();
+     *         stage->saveState();
      *         // Do work that requires a yield here (execute other plans, insert, delete, etc.).
-     *         stage->recoverFromYield();
+     *         stage->restoreState();
      *     }
      * }
      */
@@ -124,24 +123,15 @@ namespace mongo {
             // dropped or state deleted.
             DEAD,
 
-            // Something has gone unrecoverably wrong.  Stop running this query.  There is nothing
-            // output in the out parameter.
+            // Something has gone unrecoverably wrong.  Stop running this query.
+            // If the out parameter does not refer to an invalid working set member,
+            // call WorkingSetCommon::getStatusMemberObject() to get details on the failure.
+            // Any class implementing this interface must set the WSID out parameter to
+            // INVALID_ID or a valid WSM ID if FAILURE is returned.
             FAILURE,
-
-            // Something isn't in memory.  Fetch it.
-            //
-            // Full fetch semantics:
-            // The fetch-requesting stage populates the out parameter of work(...) with a WSID that
-            // refers to a WSM with a valid loc.  Each stage that receives a NEED_FETCH from a child
-            // must propagate the NEED_FETCH up and perform no work.  The plan runner is responsible
-            // for paging in the data upon receipt of a NEED_FETCH. The plan runner does NOT free
-            // the WSID of the requested fetch.  The stage that requested the fetch holds the WSID
-            // of the loc it wants fetched.  On the next call to work() that stage can assume a
-            // fetch was performed on the WSM that the held WSID refers to.
-            NEED_FETCH,
         };
 
-        static string stateStr(const StageState& state) {
+        static std::string stateStr(const StageState& state) {
             if (ADVANCED == state) {
                 return "ADVANCED";
             }
@@ -150,9 +140,6 @@ namespace mongo {
             }
             else if (NEED_TIME == state) {
                 return "NEED_TIME";
-            }
-            else if (NEED_FETCH == state) {
-                return "NEED_FETCH";
             }
             else {
                 verify(FAILURE == state);
@@ -189,34 +176,75 @@ namespace mongo {
 
         /**
          * Notifies the stage that all locks are about to be released.  The stage must save any
-         * state required to resume where it was before prepareToYield was called.
+         * state required to resume where it was before saveState was called.
          */
-        virtual void prepareToYield() = 0;
+        virtual void saveState() = 0;
 
         /**
          * Notifies the stage that any required locks have been reacquired.  The stage must restore
          * any saved state and be ready to handle calls to work().
          *
-         * Can only be called after prepareToYield.
+         * Can only be called after saveState.
+         *
+         * XXX: We may not need to pass down 'opCtx' if getMore'd queries use the same
+         * OperationContext they were created with.
          */
-        virtual void recoverFromYield() = 0;
+        virtual void restoreState(OperationContext* opCtx) = 0;
 
         /**
          * Notifies a stage that a DiskLoc is going to be deleted (or in-place updated) so that the
          * stage can invalidate or modify any state required to continue processing without this
          * DiskLoc.
          *
-         * Can only be called after a prepareToYield but before a recoverFromYield.
+         * Can only be called after a saveState but before a restoreState.
          */
         virtual void invalidate(const DiskLoc& dl, InvalidationType type) = 0;
+
+        /**
+         * Retrieve a list of this stage's children. This stage keeps ownership of
+         * its children.
+         */
+        virtual std::vector<PlanStage*> getChildren() const = 0;
+
+        /**
+         * What type of stage is this?
+         */
+        virtual StageType stageType() const = 0;
+
+        //
+        // Execution stats.
+        //
 
         /**
          * Returns a tree of stats.  See plan_stats.h for the details of this structure.  If the
          * stage has any children it must propagate the request for stats to them.
          *
+         * Creates plan stats tree which has the same topology as the original execution tree,
+         * but has a separate lifetime.
+         *
          * Caller owns returned pointer.
          */
         virtual PlanStageStats* getStats() = 0;
+
+        /**
+         * Get the CommonStats for this stage. The pointer is *not* owned by the caller.
+         *
+         * The returned pointer is only valid when the corresponding stage is also valid.
+         * It must not exist past the stage. If you need the stats to outlive the stage,
+         * use the getStats(...) method above.
+         */
+        virtual const CommonStats* getCommonStats() = 0;
+
+        /**
+         * Get stats specific to this stage. Some stages may not have specific stats, in which
+         * case they return NULL. The pointer is *not* owned by the caller.
+         *
+         * The returned pointer is only valid when the corresponding stage is also valid.
+         * It must not exist past the stage. If you need the stats to outlive the stage,
+         * use the getStats(...) method above.
+         */
+        virtual const SpecificStats* getSpecificStats() = 0;
+
     };
 
 }  // namespace mongo

@@ -31,6 +31,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -66,7 +67,10 @@ namespace mongo {
         typedef StringMap<MatchExpression*> Matchers;
         typedef StringMap<MetaProjection> MetaMap;
 
-        ProjectionExec(const BSONObj& spec, const MatchExpression* queryExpression);
+        ProjectionExec(const BSONObj& spec, 
+                       const MatchExpression* queryExpression,
+                       const MatchExpressionParser::WhereCallback& whereCallback =
+                                    MatchExpressionParser::WhereCallback());
         ~ProjectionExec();
 
         /**
@@ -76,7 +80,6 @@ namespace mongo {
 
         /**
          * Apply this projection to the object 'in'.
-         * 'this' must be a simple inclusion/exclusion projection.
          *
          * Upon success, 'out' is set to the new object and Status::OK() is returned.
          * Otherwise, returns an error Status and *out is not mutated.
@@ -93,12 +96,12 @@ namespace mongo {
         /**
          * Add 'field' as a field name that is included or excluded as part of the projection.
          */
-        void add(const string& field, bool include);
+        void add(const std::string& field, bool include);
 
         /**
          * Add 'field' as a field name that is sliced as part of the projection.
          */
-        void add(const string& field, int skip, int limit);
+        void add(const std::string& field, int skip, int limit);
 
         //
         // Execution
@@ -140,7 +143,10 @@ namespace mongo {
                       const MatchDetails* details = NULL,
                       const ArrayOpType arrayOpType = ARRAY_OP_NORMAL) const;
 
-        // XXX document
+        /**
+         * Like append, but for arrays.
+         * Deals with slice and calls appendArray to preserve the array-ness.
+         */
         void appendArray(BSONObjBuilder* bob, const BSONObj& array, bool nested = false) const;
 
         // True if default at this level is to include.
@@ -150,8 +156,11 @@ namespace mongo {
         bool _special; 
 
         // We must group projections with common prefixes together.
-        // TODO: benchmark vector<pair> vs map
-        // XXX: document
+        // TODO: benchmark std::vector<pair> vs map
+        //
+        // Projection is a rooted tree.  If we have {a.b: 1, a.c: 1} we don't want to
+        // double-traverse the document when we're projecting it.  Instead, we have an entry in
+        // _fields for 'a' with two sub projections: b:1 and c:1.
         FieldMap _fields;
 
         // The raw projection spec. that is passed into init(...)
@@ -168,14 +177,14 @@ namespace mongo {
         Matchers _matchers;
 
         // The matchers above point into BSONObjs and this is where those objs live.
-        vector<BSONObj> _elemMatchObjs;
+        std::vector<BSONObj> _elemMatchObjs;
 
         ArrayOpType _arrayOpType;
 
-        // Is there an elemMatch or positional operator?
+        // Is there an slice, elemMatch or meta operator?
         bool _hasNonSimple;
 
-        // Is there a projection over a dotted field?
+        // Is there a projection over a dotted field or a $ positional operator?
         bool _hasDottedField;
 
         // The full query expression.  Used when we need MatchDetails.

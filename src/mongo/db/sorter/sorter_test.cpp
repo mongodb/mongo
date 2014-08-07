@@ -337,9 +337,9 @@ namespace mongo {
                     ASSERT_ITERATORS_EQUIVALENT(done(sorter), correctReverse());
                 }
 
-                // The MSVC++ STL includes extra checks in debug mode that make these tests too
-                // slow to run. Among other things, they make all heap functions O(N) not O(logN).
-#if !(defined(_MSC_VER) && defined(_DEBUG))
+                // The debug builds are too slow to run these tests.
+                // Among other things, MSVC++ makes all heap functions O(N) not O(logN).
+#if !defined(_DEBUG)
                 { // merge all data ASC
                     boost::shared_ptr<IWSorter> sorters[] = {
                         makeSorter(opts, IWComparator(ASC)),
@@ -491,8 +491,8 @@ namespace mongo {
             }
 
             enum Constants {
-                NUM_ITEMS = 10*1000*1000,
-                MEM_LIMIT = 1024*1024,
+                NUM_ITEMS = 500*1000,
+                MEM_LIMIT = 64*1024,
             };
             boost::scoped_array<int> _array;
         };
@@ -503,8 +503,9 @@ namespace mongo {
             typedef LotsOfDataLittleMemory<Random> Parent;
             SortOptions adjustSortOptions(SortOptions opts) {
                 // Make sure our tests will spill or not as desired
-                BOOST_STATIC_ASSERT(MEM_LIMIT / 2 > (     100 * sizeof(IWPair)));
-                BOOST_STATIC_ASSERT(MEM_LIMIT     < (100*1000 * sizeof(IWPair)));
+                BOOST_STATIC_ASSERT(MEM_LIMIT / 2 > ( 100 * sizeof(IWPair)));
+                BOOST_STATIC_ASSERT(MEM_LIMIT     < (5000 * sizeof(IWPair)));
+                BOOST_STATIC_ASSERT(MEM_LIMIT * 2 > (5000 * sizeof(IWPair)));
 
                 // Make sure we use a reasonable number of files when we spill
                 BOOST_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 100);
@@ -518,7 +519,7 @@ namespace mongo {
             virtual boost::shared_ptr<IWIterator> correctReverse() {
                 return make_shared<LimitIterator>(Limit, Parent::correctReverse());
             }
-            enum { MEM_LIMIT = 512*1024 };
+            enum { MEM_LIMIT = 32*1024 };
         };
     }
 
@@ -541,8 +542,8 @@ namespace mongo {
             add<SorterTests::LotsOfDataWithLimit<1,/*random=*/true> >();  // limit=1 is special case
             add<SorterTests::LotsOfDataWithLimit<100,/*random=*/false> >(); // fits in mem
             add<SorterTests::LotsOfDataWithLimit<100,/*random=*/true> >();  // fits in mem
-            add<SorterTests::LotsOfDataWithLimit<100*1000,/*random=*/false> >(); // spills
-            add<SorterTests::LotsOfDataWithLimit<100*1000,/*random=*/true> >(); // spills
+            add<SorterTests::LotsOfDataWithLimit<5000,/*random=*/false> >(); // spills
+            add<SorterTests::LotsOfDataWithLimit<5000,/*random=*/true> >(); // spills
         }
     } extSortTests;
 }

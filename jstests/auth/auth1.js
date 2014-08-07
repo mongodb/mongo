@@ -8,15 +8,19 @@ baseName = "jstests_auth_auth1";
 m = startMongod( "--auth", "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( "test" );
 
-t = db[ baseName ];
-t.drop();
-
 // these are used by read-only user
 mro = new Mongo(m.host);
 dbRO = mro.getDB( "test" );
 tRO = dbRO[ baseName ];
 
+db.getSisterDB("admin").createUser({user: "root", pwd: "root", roles: ["root"]});
+db.getSisterDB("admin").auth("root", "root");
+
+t = db[ baseName ];
+t.drop();
+
 db.dropAllUsers();
+db.logout();
 
 db.getSisterDB( "admin" ).createUser({user: "super", pwd: "super", roles: ["__system"] });
 db.getSisterDB("admin").auth("super", "super");
@@ -64,9 +68,8 @@ assert.eq( 1000, tRO.count() , "B1" );
 assert.eq( 1000, tRO.find().toArray().length , "B2" ); // make sure we have a getMore in play
 assert.commandWorked( dbRO.runCommand( {ismaster:1} ) , "B3" );
 
-assert( !dbRO.getLastError() , "B4" );
-tRO.save( {} ); // fail
-assert( dbRO.getLastError() , "B5: " + tojson( dbRO.getLastErrorObj() ) );
+assert.writeError(tRO.save({}));
+
 assert.eq( 1000, tRO.count() , "B6" );
 
 assert.eq( 1000, tRO.group( p ).length , "C1" );

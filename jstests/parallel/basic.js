@@ -1,4 +1,5 @@
 // perform basic js tests in parallel
+load('jstests/libs/parallelTester.js')
 
 Random.setRandomSeed();
 

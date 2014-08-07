@@ -28,11 +28,16 @@
 
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/filter.h"
+#include "mongo/db/exec/working_set_common.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
+    // static
+    const char* OrStage::kStageType = "OR";
+
     OrStage::OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter)
-        : _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup) { }
+        : _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup), _commonStats(kStageType) { }
 
     OrStage::~OrStage() {
         for (size_t i = 0; i < _children.size(); ++i) {
@@ -47,13 +52,16 @@ namespace mongo {
     PlanStage::StageState OrStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         if (0 == _specificStats.matchTested.size()) {
             _specificStats.matchTested = vector<size_t>(_children.size(), 0);
         }
 
-        WorkingSetID id;
+        WorkingSetID id = WorkingSet::INVALID_ID;
         StageState childStatus = _children[_currentChild]->work(&id);
 
         if (PlanStage::ADVANCED == childStatus) {
@@ -106,12 +114,21 @@ namespace mongo {
                 return PlanStage::NEED_TIME;
             }
         }
-        else {
-            if (PlanStage::NEED_FETCH == childStatus) {
-                *out = id;
-                ++_commonStats.needFetch;
+        else if (PlanStage::FAILURE == childStatus) {
+            *out = id;
+            // If a stage fails, it may create a status WSM to indicate why it
+            // failed, in which case 'id' is valid.  If ID is invalid, we
+            // create our own error message.
+            if (WorkingSet::INVALID_ID == id) {
+                mongoutils::str::stream ss;
+                ss << "OR stage failed to read in results from child " << _currentChild;
+                Status status(ErrorCodes::InternalError, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
             }
-            else if (PlanStage::NEED_TIME == childStatus) {
+            return childStatus;
+        }
+        else {
+            if (PlanStage::NEED_TIME == childStatus) {
                 ++_commonStats.needTime;
             }
 
@@ -120,17 +137,17 @@ namespace mongo {
         }
     }
 
-    void OrStage::prepareToYield() {
+    void OrStage::saveState() {
         ++_commonStats.yields;
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->prepareToYield();
+            _children[i]->saveState();
         }
     }
 
-    void OrStage::recoverFromYield() {
+    void OrStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->recoverFromYield();
+            _children[i]->restoreState(opCtx);
         }
     }
 
@@ -154,8 +171,19 @@ namespace mongo {
         }
     }
 
+    vector<PlanStage*> OrStage::getChildren() const {
+        return _children;
+    }
+
     PlanStageStats* OrStage::getStats() {
         _commonStats.isEOF = isEOF();
+
+        // Add a BSON representation of the filter to the stats tree, if there is one.
+        if (NULL != _filter) {
+            BSONObjBuilder bob;
+            _filter->toBSON(&bob);
+            _commonStats.filter = bob.obj();
+        }
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_OR));
         ret->specific.reset(new OrStats(_specificStats));
@@ -164,6 +192,14 @@ namespace mongo {
         }
 
         return ret.release();
+    }
+
+    const CommonStats* OrStage::getCommonStats() {
+        return &_commonStats;
+    }
+
+    const SpecificStats* OrStage::getSpecificStats() {
+        return &_specificStats;
     }
 
 }  // namespace mongo

@@ -57,6 +57,8 @@ namespace mongo {
                                     const BSONObj& writeConcern,
                                     BSONObj* gleResponse );
 
+        Status clearErrors( DBClientBase* conn,
+                            const StringData& dbName );
     };
 
 }

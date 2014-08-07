@@ -69,7 +69,7 @@ namespace mongo {
 
         virtual bool adminOnly() const { return true; }
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         // Required
         static BSONField<string> nsField;
@@ -109,7 +109,7 @@ namespace mongo {
         }
 
 
-        bool run( const string& dbname,
+        bool run(OperationContext* txn, const string& dbname,
                   BSONObj& cmdObj,
                   int,
                   string& errmsg,

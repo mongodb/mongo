@@ -40,10 +40,10 @@ namespace mongo {
 
     class ServerStatusSection {
     public:
-        ServerStatusSection( const string& sectionName );
+        ServerStatusSection( const std::string& sectionName );
         virtual ~ServerStatusSection(){}
 
-        const string& getSectionName() const { return _sectionName; }
+        const std::string& getSectionName() const { return _sectionName; }
 
         /**
          * if this returns true, if the user doesn't mention this section
@@ -77,69 +77,18 @@ namespace mongo {
         virtual BSONObj generateSection(const BSONElement& configElement) const = 0;
 
     private:
-        const string _sectionName;
+        const std::string _sectionName;
     };
 
     class OpCounterServerStatusSection : public ServerStatusSection {
     public:
-        OpCounterServerStatusSection( const string& sectionName, OpCounters* counters );
+        OpCounterServerStatusSection( const std::string& sectionName, OpCounters* counters );
         virtual bool includeByDefault() const { return true; }
         
         virtual BSONObj generateSection(const BSONElement& configElement) const;
 
     private:
         const OpCounters* _counters;
-    };
-
-    class ServerStatusMetric {
-    public:
-        /**
-         * @param name is a dotted path of a counter name
-         *             if name starts with . its treated as a path from the serverStatus root
-         *             otherwise it will live under the "counters" namespace
-         *             so foo.bar would be serverStatus().counters.foo.bar
-         */
-        ServerStatusMetric(const string& name);
-        virtual ~ServerStatusMetric(){}
-
-        string getMetricName() const { return _name; }
-
-        virtual void appendAtLeaf( BSONObjBuilder& b ) const = 0;
-
-    protected:
-        static string _parseLeafName( const string& name );
-
-        const string _name;
-        const string _leafName;
-    };
-
-    /**
-     * usage
-     * 
-     * declared once
-     *    Counter counter;
-     *    ServerStatusMetricField myAwesomeCounterDisplay( "path.to.counter", &counter );
-     * 
-     * call
-     *    counter.hit();
-     * 
-     * will show up in db.serverStatus().metrics.path.to.counter
-     */
-    template< typename T >
-    class ServerStatusMetricField : public ServerStatusMetric {
-    public:
-        ServerStatusMetricField( const string& name, const T* t )
-            : ServerStatusMetric(name), _t(t) {
-        }
-        
-        const T* get() { return _t; }
-
-        virtual void appendAtLeaf( BSONObjBuilder& b ) const {
-            b.append( _leafName, *_t );
-        }
-
-    private:
-        const T* _t;
     };
 
 }

@@ -41,15 +41,24 @@ namespace mongo {
      */
     class IndexBoundsBuilder {
     public:
+        /**
+         * Describes various degrees of precision with which predicates can be evaluated based
+         * on the index bounds.
+         *
+         * The integer values of the enum are significant, and are assigned in order of
+         * increasing tightness. These values are used when we need to do comparison between two
+         * BoundsTightness values. Such comparisons can answer questions such as "Does predicate
+         * X have tighter or looser bounds than predicate Y?".
+         */
         enum BoundsTightness {
-            // Index bounds are exact.
-            EXACT,
-
             // Index bounds are inexact, and a fetch is required.
-            INEXACT_FETCH,
+            INEXACT_FETCH = 0,
 
             // Index bounds are inexact, but no fetch is required
-            INEXACT_COVERED
+            INEXACT_COVERED = 1,
+
+            // Index bounds are exact.
+            EXACT = 2
         };
 
         /**
@@ -104,8 +113,8 @@ namespace mongo {
                                           bool startInclusive,
                                           bool endInclusive);
 
-        static Interval makeRangeInterval(const string& start,
-                                          const string& end,
+        static Interval makeRangeInterval(const std::string& start,
+                                          const std::string& end,
                                           bool startInclusive,
                                           bool endInclusive);
 
@@ -114,7 +123,8 @@ namespace mongo {
          * The object must have exactly one field which is the value of the point interval.
          */
         static Interval makePointInterval(const BSONObj& obj);
-        static Interval makePointInterval(const string& str);
+        static Interval makePointInterval(const std::string& str);
+        static Interval makePointInterval(double d);
 
         /**
          * Since we have no BSONValue we must make an object that's a copy of a piece of another
@@ -130,13 +140,13 @@ namespace mongo {
         /**
          * Copied almost verbatim from db/queryutil.cpp.
          *
-         *  returns a string that when used as a matcher, would match a super set of regex()
+         *  returns a std::string that when used as a matcher, would match a super set of regex()
          *
          *  returns "" for complex regular expressions
          *
          *  used to optimize queries in some simple regex cases that start with '^'
          */
-        static string simpleRegex(const char* regex,
+        static std::string simpleRegex(const char* regex,
                                   const char* flags,
                                   BoundsTightness* tightnessOut);
 
@@ -170,6 +180,17 @@ namespace mongo {
          * Aligns OILs (and bounds) according to the 'kp' direction * the scanDir.
          */
         static void alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir = 1);
+
+        /**
+         * Returns 'true' if the bounds 'bounds' can be represented as one interval between
+         * 'startKey' and 'endKey'.  Inclusivity of each bound is set through the relevant
+         * (name)KeyInclusive parameter.  Returns 'false' if otherwise.
+         */
+        static bool isSingleInterval(const IndexBounds& bounds,
+                                     BSONObj* startKey,
+                                     bool* startKeyInclusive,
+                                     BSONObj* endKey,
+                                     bool* endKeyInclusive);
     };
 
 }  // namespace mongo

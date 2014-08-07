@@ -48,7 +48,7 @@ namespace mongo {
 
     void TextMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace(debug, level);
-        debug << "TEXT : query=" << _query << ", language = " << _language << ", tag=";
+        debug << "TEXT : query=" << _query << ", language=" << _language << ", tag=";
         MatchExpression::TagData* td = getTag();
         if ( NULL != td ) {
             td->debugString( &debug );
@@ -57,6 +57,10 @@ namespace mongo {
             debug << "NULL";
         }
         debug << "\n";
+    }
+
+    void TextMatchExpression::toBSON(BSONObjBuilder* out) const {
+        out->append("$text", BSON("$search" << _query << "$language" << _language));
     }
 
     bool TextMatchExpression::equivalent( const MatchExpression* other ) const {

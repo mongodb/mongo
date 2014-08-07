@@ -32,9 +32,9 @@
 
 #include <boost/scoped_ptr.hpp>
 
-#include "mongo/db/index_set.h"
-#include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/query_settings.h"
+#include "mongo/db/update_index_data.h"
 
 namespace mongo {
 
@@ -50,7 +50,7 @@ namespace mongo {
         CollectionInfoCache( Collection* collection );
 
         /*
-         * resets entire cache state
+         * Resets entire cache state. Must be called under exclusive DB lock.
          */
         void reset();
 
@@ -73,7 +73,7 @@ namespace mongo {
         /* get set of index keys for this namespace.  handy to quickly check if a given
            field is indexed (Note it might be a secondary component of a compound index.)
         */
-        const IndexPathSet& indexKeys() {
+        const UpdateIndexData& indexKeys() {
             if ( !_keysComputed )
                 computeIndexKeys();
             return _indexedPaths;
@@ -97,7 +97,7 @@ namespace mongo {
 
         // ---  index keys cache
         bool _keysComputed;
-        IndexPathSet _indexedPaths;
+        UpdateIndexData _indexedPaths;
 
         // A cache for query plans.
         boost::scoped_ptr<PlanCache> _planCache;
@@ -106,6 +106,9 @@ namespace mongo {
         // Includes index filters.
         boost::scoped_ptr<QuerySettings> _querySettings;
 
+        /**
+         * Must be called under exclusive DB lock.
+         */
         void computeIndexKeys();
     };
 

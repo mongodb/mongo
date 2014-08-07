@@ -28,16 +28,19 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/chunk.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/util/log.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     ShardKeyPattern::ShardKeyPattern( BSONObj p ) : pattern( p.getOwned() ) {
         pattern.toBSON().getFieldNames( patternfields );
@@ -56,21 +59,34 @@ namespace mongo {
         gMax = max.obj();
     }
 
-    bool ShardKeyPattern::hasShardKey( const BSONObj& obj ) const {
-        /* this is written s.t. if obj has lots of fields, if the shard key fields are early,
-           it is fast.  so a bit more work to try to be semi-fast.
-           */
+    static bool _hasShardKey(const BSONObj& doc,
+                             const set<string>& patternFields,
+                             bool allowRegex) {
 
-        for(set<string>::const_iterator it = patternfields.begin(); it != patternfields.end(); ++it) {
-            BSONElement e = obj.getFieldDotted(it->c_str());
-            if(     e.eoo() ||
-                    e.type() == Array ||
-                    (e.type() == Object && !e.embeddedObject().okForStorage())) {
+        // this is written s.t. if doc has lots of fields, if the shard key fields are early,
+        // it is fast.  so a bit more work to try to be semi-fast.
+
+        for (set<string>::const_iterator it = patternFields.begin(); it != patternFields.end();
+            ++it) {
+            BSONElement shardKeyField = doc.getFieldDotted(it->c_str());
+            if (shardKeyField.eoo()
+                || shardKeyField.type() == Array
+                || (!allowRegex && shardKeyField.type() == RegEx)
+                || (shardKeyField.type() == Object &&
+                    !shardKeyField.embeddedObject().okForStorage())) {
                 // Don't allow anything for a shard key we can't store -- like $gt/$lt ops
                 return false;
             }
         }
         return true;
+    }
+
+    bool ShardKeyPattern::hasShardKey(const BSONObj& doc) const {
+        return _hasShardKey(doc, patternfields, true);
+    }
+
+    bool ShardKeyPattern::hasTargetableShardKey(const BSONObj& doc) const {
+        return _hasShardKey(doc, patternfields, false);
     }
 
     bool ShardKeyPattern::isUniqueIndexCompatible( const KeyPattern& uniqueIndexPattern ) const {

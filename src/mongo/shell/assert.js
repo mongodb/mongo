@@ -1,10 +1,16 @@
 doassert = function(msg) {
-    if (msg.indexOf("assert") == 0)
+    // eval if msg is a function
+    if (typeof(msg) == "function")
+        msg = msg();
+
+    if (typeof (msg) == "string" && msg.indexOf("assert") == 0)
         print(msg);
     else
         print("assert: " + msg);
-    printStackTrace();
-    throw msg;
+
+    var ex = Error(msg);
+    print(ex.stack);
+    throw ex;
 }
 
 assert = function(b, msg){
@@ -234,7 +240,7 @@ assert.commandWorked = function(res, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
 
     if (res.ok == 1)
-        return;
+        return res;
     doassert("command failed: " + tojson(res) + " : " + msg);
 }
 
@@ -242,7 +248,7 @@ assert.commandFailed = function(res, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
 
     if (res.ok == 0)
-        return;
+        return res;
     doassert("command worked when it should have failed: " + tojson(res) + " : " + msg);
 }
 
@@ -318,17 +324,132 @@ assert.close = function(a, b, msg, places){
               " places, diff: " + (a-b) + " : " + msg);
 };
 
-assert.gleSuccess = function(db, msg) {
-    var gle = db.getLastErrorObj();
+/**
+ * Asserts if the times in millis are not withing delta milliseconds, in either direction.
+ * Default Delta: 1 second
+ */
+assert.closeWithinMS = function(a, b, msg, deltaMS) {
+    "use strict";
+    if (deltaMS === undefined) {
+        deltaMS = 1000;
+    }
+    var aMS = a instanceof Date ? a.getTime() : a;
+    var bMS = b instanceof Date ? b.getTime() : b;
+    var actualDelta = Math.abs(Math.abs(aMS) - Math.abs(bMS));
+    if (actualDelta <= deltaMS) return;
+
+    doassert(a + " is not equal to " + b + " within " + deltaMS +
+              " millis, actual delta: " + actualDelta + " millis : " + msg);
+};
+
+assert.writeOK = function(res, msg) {
+    
+    var errMsg = null;
+
+    if (res instanceof WriteResult) {
+        if (res.hasWriteError()) {
+            errMsg = "write failed with error: " + tojson(res); 
+        }
+        else if(res.hasWriteConcernError()) {
+            errMsg = "write concern failed with errors: " + tojson(res);
+        }
+    }
+    else if (res instanceof BulkWriteResult) {
+        // Can only happen with bulk inserts
+        if (res.hasWriteErrors()) {
+            errMsg = "write failed with errors: " + tojson(res);
+        }
+        else if(res.hasWriteConcernError()) {
+            errMsg = "write concern failed with errors: " + tojson(res);
+        }
+    }
+    else if (res instanceof WriteCommandError) {
+        // Can only happen with bulk inserts
+        errMsg = "write command failed: " + tojson(res);
+    }
+    else {
+        errMsg = "unknown type of write result, cannot check ok: " 
+                 + tojson(res);
+    }
+    
+    if (errMsg) {
+        if (msg)
+            errMsg = errMsg + ": " + msg;
+        doassert(errMsg);
+    }
+    
+    return res;
+}
+
+assert.writeError = function(res, msg) {
+    
+    var errMsg = null;
+
+    if (res instanceof WriteResult) {
+        if (!res.hasWriteError() && !res.hasWriteConcernError()) {
+            errMsg = "no write error: " + tojson(res); 
+        }
+    }
+    else if (res instanceof BulkWriteResult) {
+        // Can only happen with bulk inserts
+        if (!res.hasWriteErrors() && !res.hasWriteConcernError()) {
+            errMsg = "no write errors: " + tojson(res);
+        }
+    }
+    else if (res instanceof WriteCommandError) {
+        // Can only happen with bulk inserts
+        // No-op since we're expecting an error
+    }
+    else {
+        errMsg = "unknown type of write result, cannot check error: "
+                 + tojson(res);
+    }
+    
+    if (errMsg) {
+        if (msg)
+            errMsg = errMsg + ": " + msg;
+        doassert(errMsg);
+    }
+    
+    return res;
+}
+
+assert.gleOK = function(res, msg) {
+    
+    var errMsg = null;
+
+    if (!res) {
+        errMsg = "missing first argument, no response to check"
+    }
+    else if (!res.ok) {
+        errMsg = "getLastError failed: " + tojson(res);
+    }
+    else if ('code' in res || 'errmsg' in res
+             || ('err' in res && res['err'] != null)) {
+        errMsg = "write or write concern failed: " + tojson(res);
+    }
+    
+    if (errMsg) {
+        if (msg)
+            errMsg = errMsg + ": " + msg;
+        doassert(errMsg);
+    }
+    
+    return res;
+}
+
+assert.gleSuccess = function(dbOrGLEDoc, msg) {
+    var gle = dbOrGLEDoc instanceof DB ? dbOrGLEDoc.getLastErrorObj() : dbOrGLEDoc;
     if (gle.err) {
         if (typeof(msg) == "function") 
             msg = msg(gle);
         doassert("getLastError not null:" + tojson(gle) + " :" + msg);
     }
+    return gle;
 }
 
-assert.gleError = function(db, msg) {
-    var gle = db.getLastErrorObj();
+assert.gleError = function(dbOrGLEDoc, msg) {
+    var gle = dbOrGLEDoc instanceof DB ? dbOrGLEDoc.getLastErrorObj() : dbOrGLEDoc;
     if (!gle.err) {
         if (typeof(msg) == "function") 
             msg = msg(gle);
@@ -336,8 +457,8 @@ assert.gleError = function(db, msg) {
     }
 }
 
-assert.gleErrorCode = function(db, code, msg) {
-    var gle = db.getLastErrorObj();
+assert.gleErrorCode = function(dbOrGLEDoc, code, msg) {
+    var gle = dbOrGLEDoc instanceof DB ? dbOrGLEDoc.getLastErrorObj() : dbOrGLEDoc;
     if (!gle.err || gle.code != code) {
         if (typeof(msg) == "function") 
             msg = msg(gle);
@@ -346,8 +467,8 @@ assert.gleErrorCode = function(db, code, msg) {
     }
 }
 
-assert.gleErrorRegex = function(db, regex, msg) {
-    var gle = db.getLastErrorObj();
+assert.gleErrorRegex = function(dbOrGLEDoc, regex, msg) {
+    var gle = dbOrGLEDoc instanceof DB ? dbOrGLEDoc.getLastErrorObj() : dbOrGLEDoc;
     if (!gle.err || !regex.test(gle.err)) {
         if (typeof(msg) == "function") 
             msg = msg(gle);

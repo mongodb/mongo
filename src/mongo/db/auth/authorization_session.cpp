@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/auth/authorization_session.h"
 
 #include <string>
@@ -47,6 +49,8 @@
 
 namespace mongo {
 
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kAccessControl);
+
 namespace {
     const std::string ADMIN_DBNAME = "admin";
 }  // namespace
@@ -67,20 +71,18 @@ namespace {
         return _externalState->getAuthorizationManager();
     }
 
-    void AuthorizationSession::startRequest() {
-        _externalState->startRequest();
-        _refreshUserInfoAsNeeded();
+    void AuthorizationSession::startRequest(OperationContext* txn) {
+        _externalState->startRequest(txn);
+        _refreshUserInfoAsNeeded(txn);
     }
 
-    Status AuthorizationSession::addAndAuthorizeUser(const UserName& userName) {
+    Status AuthorizationSession::addAndAuthorizeUser(
+                        OperationContext* txn, const UserName& userName) {
         User* user;
-        Status status = getAuthorizationManager().acquireUser(userName, &user);
+        Status status = getAuthorizationManager().acquireUser(txn, userName, &user);
         if (!status.isOK()) {
             return status;
         }
-
-        // If there are any users in the impersonate list, clear them.
-        clearImpersonatedUserNames();
 
         // Calling add() on the UserSet may return a user that was replaced because it was from the
         // same database.
@@ -89,6 +91,10 @@ namespace {
             getAuthorizationManager().releaseUser(replacedUser);
         }
 
+        // If there are any users and roles in the impersonation data, clear it out.
+        clearImpersonatedUserData();
+
+        _buildAuthenticatedRolesVector();
         return Status::OK();
     }
 
@@ -96,20 +102,22 @@ namespace {
         return _authenticatedUsers.lookup(name);
     }
 
-    size_t AuthorizationSession::getNumAuthenticatedUsers() {
-        return _authenticatedUsers.size();
-    }
-
     void AuthorizationSession::logoutDatabase(const std::string& dbname) {
-        clearImpersonatedUserNames();
         User* removedUser = _authenticatedUsers.removeByDBName(dbname);
         if (removedUser) {
             getAuthorizationManager().releaseUser(removedUser);
         }
+        clearImpersonatedUserData();
+        _buildAuthenticatedRolesVector();
     }
 
     UserNameIterator AuthorizationSession::getAuthenticatedUserNames() {
         return _authenticatedUsers.getNames();
+    }
+
+    RoleNameIterator AuthorizationSession::getAuthenticatedRoleNames() {
+        return makeRoleNameIterator(_authenticatedRoleNames.begin(),
+                                    _authenticatedRoleNames.end());
     }
 
     std::string AuthorizationSession::getAuthenticatedUserNamesToken() {
@@ -126,6 +134,43 @@ namespace {
 
     void AuthorizationSession::grantInternalAuthorization() {
         _authenticatedUsers.add(internalSecurity.user);
+        _buildAuthenticatedRolesVector();
+    }
+
+    PrivilegeVector AuthorizationSession::getDefaultPrivileges() {
+        PrivilegeVector defaultPrivileges;
+
+        // If localhost exception is active (and no users exist),
+        // return a vector of the minimum privileges required to bootstrap
+        // a system and add the first user.
+        if (_externalState->shouldAllowLocalhost()) {
+            ResourcePattern adminDBResource = ResourcePattern::forDatabaseName(ADMIN_DBNAME);
+            ActionSet setupAdminUserActionSet;
+            setupAdminUserActionSet.addAction(ActionType::createUser);
+            setupAdminUserActionSet.addAction(ActionType::grantRole);
+            Privilege setupAdminUserPrivilege =
+                Privilege(adminDBResource, setupAdminUserActionSet);
+
+            ResourcePattern externalDBResource = ResourcePattern::forDatabaseName("$external");
+            Privilege setupExternalUserPrivilege =
+                Privilege(externalDBResource, ActionType::createUser);
+
+            ActionSet setupServerConfigActionSet;
+            setupServerConfigActionSet.addAction(ActionType::addShard);
+            setupServerConfigActionSet.addAction(ActionType::replSetConfigure);
+            setupServerConfigActionSet.addAction(ActionType::replSetGetStatus);
+            Privilege setupServerConfigPrivilege =
+                Privilege(ResourcePattern::forClusterResource(), setupServerConfigActionSet);
+
+            Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges, setupAdminUserPrivilege);
+            Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges,
+                                                     setupExternalUserPrivilege);
+            Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges,
+                                                     setupServerConfigPrivilege);
+            return defaultPrivileges;
+        }
+
+        return defaultPrivileges;
     }
 
     Status AuthorizationSession::checkAuthForQuery(const NamespaceString& ns,
@@ -219,7 +264,8 @@ namespace {
                                       << resource.databaseToMatch() << "database");
             }
         } else if (!isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName("admin"), ActionType::grantRole)) {
+                        ResourcePattern::forDatabaseName("admin"),
+                        ActionType::grantRole)) {
             return Status(ErrorCodes::Unauthorized,
                           "To grant privileges affecting multiple databases or the cluster,"
                           " must be authorized to grant roles from the admin database");
@@ -239,7 +285,8 @@ namespace {
                                       << resource.databaseToMatch() << "database");
             }
         } else if (!isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName("admin"), ActionType::revokeRole)) {
+                        ResourcePattern::forDatabaseName("admin"),
+                        ActionType::revokeRole)) {
             return Status(ErrorCodes::Unauthorized,
                           "To revoke privileges affecting multiple databases or the cluster,"
                           " must be authorized to revoke roles from the admin database");
@@ -249,14 +296,14 @@ namespace {
 
     bool AuthorizationSession::isAuthorizedToGrantRole(const RoleName& role) {
         return isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(role.getDB()),
-                ActionType::grantRole);
+                    ResourcePattern::forDatabaseName(role.getDB()),
+                    ActionType::grantRole);
     }
 
     bool AuthorizationSession::isAuthorizedToRevokeRole(const RoleName& role) {
         return isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(role.getDB()),
-                ActionType::revokeRole);
+                    ResourcePattern::forDatabaseName(role.getDB()),
+                    ActionType::revokeRole);
     }
 
     bool AuthorizationSession::isAuthorizedForPrivilege(const Privilege& privilege) {
@@ -290,12 +337,14 @@ namespace {
 
     bool AuthorizationSession::isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
                                                                  ActionType action) {
-        return isAuthorizedForPrivilege(Privilege(ResourcePattern::forExactNamespace(ns), action));
+        return isAuthorizedForPrivilege(
+                    Privilege(ResourcePattern::forExactNamespace(ns), action));
     }
 
     bool AuthorizationSession::isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
-                                                                const ActionSet& actions) {
-        return isAuthorizedForPrivilege(Privilege(ResourcePattern::forExactNamespace(ns), actions));
+                                                                 const ActionSet& actions) {
+        return isAuthorizedForPrivilege(
+                    Privilege(ResourcePattern::forExactNamespace(ns), actions));
     }
 
     static const int resourceSearchListCapacity = 5;
@@ -390,7 +439,7 @@ namespace {
         return false;
     }
 
-    void AuthorizationSession::_refreshUserInfoAsNeeded() {
+    void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* txn) {
         AuthorizationManager& authMan = getAuthorizationManager();
         UserSet::iterator it = _authenticatedUsers.begin();
         while (it != _authenticatedUsers.end()) {
@@ -402,7 +451,7 @@ namespace {
                 UserName name = user->getName();
                 User* updatedUser;
 
-                Status status = authMan.acquireUser(name, &updatedUser);
+                Status status = authMan.acquireUser(txn, name, &updatedUser);
                 switch (status.code()) {
                 case ErrorCodes::OK: {
                     // Success! Replace the old User object with the updated one.
@@ -429,6 +478,21 @@ namespace {
             }
             ++it;
         }
+        _buildAuthenticatedRolesVector();
+    }
+
+    void AuthorizationSession::_buildAuthenticatedRolesVector() {
+        _authenticatedRoleNames.clear();
+        for (UserSet::iterator it = _authenticatedUsers.begin();
+                it != _authenticatedUsers.end();
+                ++it) {
+            RoleNameIterator roles = (*it)->getIndirectRoles();
+            while (roles.more()) {
+                RoleName roleName = roles.next();
+                _authenticatedRoleNames.push_back(RoleName(roleName.getRole(),
+                                                           roleName.getDB()));
+            }
+        }
     }
 
     bool AuthorizationSession::_isAuthorizedForPrivilege(const Privilege& privilege) {
@@ -439,35 +503,25 @@ namespace {
 
         ActionSet unmetRequirements = privilege.getActions();
 
+        PrivilegeVector defaultPrivileges = getDefaultPrivileges();
+        for (PrivilegeVector::iterator it = defaultPrivileges.begin();
+                it != defaultPrivileges.end(); ++it) {
+
+            for (int i = 0; i < resourceSearchListLength; ++i) {
+                if (!(it->getResourcePattern() == resourceSearchList[i]))
+                    continue;
+
+                ActionSet userActions = it->getActions();
+                unmetRequirements.removeAllActionsFromSet(userActions);
+
+                if (unmetRequirements.empty())
+                    return true;
+            }
+        }
+
         for (UserSet::iterator it = _authenticatedUsers.begin();
                 it != _authenticatedUsers.end(); ++it) {
             User* user = *it;
-
-            if (user->getSchemaVersion() == AuthorizationManager::schemaVersion24 &&
-                (target.isDatabasePattern() || target.isExactNamespacePattern()) &&
-                !user->hasProbedV1(target.databaseToMatch())) {
-
-                UserName name = user->getName();
-                User* updatedUser;
-                Status status = getAuthorizationManager().acquireV1UserProbedForDb(
-                        name,
-                        target.databaseToMatch(),
-                        &updatedUser);
-                if (status.isOK()) {
-                    if (user != updatedUser) {
-                        LOG(1) << "Updated session cache for V1 user " << name;
-                        fassert(17226, _authenticatedUsers.replaceAt(it, updatedUser) == user);
-                    }
-                    getAuthorizationManager().releaseUser(user);
-                    user = updatedUser;
-                }
-                else if (status != ErrorCodes::UserNotFound) {
-                    warning() << "Could not fetch updated user privilege information for V1-style "
-                        "user " << name << "; continuing to use old information.  Reason is "
-                              << status;
-                }
-            }
-
             for (int i = 0; i < resourceSearchListLength; ++i) {
                 ActionSet userActions = user->getActionsForResource(resourceSearchList[i]);
                 unmetRequirements.removeAllActionsFromSet(userActions);
@@ -480,20 +534,30 @@ namespace {
         return false;
     }
 
-    void AuthorizationSession::setImpersonatedUserNames(const std::vector<UserName>& names) {
-        _impersonatedUserNames = names;
+    void AuthorizationSession::setImpersonatedUserData(std::vector<UserName> usernames,
+                                                       std::vector<RoleName> roles) {
+        _impersonatedUserNames = usernames;
+        _impersonatedRoleNames = roles;
         _impersonationFlag = true;
     }
 
-    // Clear the vector of impersonated UserNames.
-    void AuthorizationSession::clearImpersonatedUserNames() {
+    UserNameIterator AuthorizationSession::getImpersonatedUserNames() {
+        return makeUserNameIterator(_impersonatedUserNames.begin(),
+                                    _impersonatedUserNames.end());
+    }
+
+    RoleNameIterator AuthorizationSession::getImpersonatedRoleNames() {
+        return makeRoleNameIterator(_impersonatedRoleNames.begin(),
+                                    _impersonatedRoleNames.end());
+    }
+
+    // Clear the vectors of impersonated usernames and roles.
+    void AuthorizationSession::clearImpersonatedUserData() {
         _impersonatedUserNames.clear();
+        _impersonatedRoleNames.clear();
         _impersonationFlag = false;
     }
 
-    UserNameIterator AuthorizationSession::getImpersonatedUserNames() const {
-         return makeUserNameIteratorForContainer(_impersonatedUserNames);
-    }
 
     bool AuthorizationSession::isImpersonating() const {
         return _impersonationFlag;

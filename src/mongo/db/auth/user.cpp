@@ -1,17 +1,29 @@
 /*    Copyright 2013 10gen Inc.
 
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/db/auth/user.h"
@@ -31,7 +43,6 @@ namespace mongo {
 
     User::User(const UserName& name) :
         _name(name),
-        _schemaVersion(AuthorizationManager::schemaVersion26Final),
         _refCount(0),
         _isValid(1) {}
 
@@ -45,6 +56,10 @@ namespace mongo {
 
     RoleNameIterator User::getRoles() const {
         return makeRoleNameIteratorForContainer(_roles);
+    }
+
+    RoleNameIterator User::getIndirectRoles() const {
+         return makeRoleNameIteratorForContainer(_indirectRoles);
     }
 
     bool User::hasRole(const RoleName& roleName) const {
@@ -75,9 +90,7 @@ namespace mongo {
         std::auto_ptr<User> result(new User(_name));
         result->_privileges = _privileges;
         result->_roles = _roles;
-        result->_probedDatabases = _probedDatabases;
         result->_credentials = _credentials;
-        result->_schemaVersion = _schemaVersion;
         return result.release();
     }
 
@@ -89,6 +102,13 @@ namespace mongo {
         _roles.clear();
         while (roles.more()) {
             _roles.insert(roles.next());
+        }
+    }
+
+    void User::setIndirectRoles(RoleNameIterator indirectRoles) {
+        _indirectRoles.clear();
+        while (indirectRoles.more()) {
+            _indirectRoles.push_back(indirectRoles.next());
         }
     }
 
@@ -126,21 +146,6 @@ namespace mongo {
                 it != privileges.end(); ++it) {
             addPrivilege(*it);
         }
-    }
-
-    void User::setSchemaVersion1() {
-        _schemaVersion = AuthorizationManager::schemaVersion24;
-    }
-
-    void User::markProbedV1(const StringData& dbname) {
-        dassert(_schemaVersion == AuthorizationManager::schemaVersion24);
-        if (!hasProbedV1(dbname))
-            _probedDatabases.push_back(dbname.toString());
-    }
-
-    bool User::hasProbedV1(const StringData& dbname) const {
-        dassert(_schemaVersion == AuthorizationManager::schemaVersion24);
-        return sequenceContains(_probedDatabases, dbname);
     }
 
     void User::invalidate() {

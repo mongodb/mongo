@@ -49,19 +49,19 @@ namespace mongo {
               max(chunk[ChunkType::max()].Obj().getOwned()) {
         }
 
-        string toString() const;
+        std::string toString() const;
     };
 
     struct TagRange {
         BSONObj min;
         BSONObj max;
-        string tag;
+        std::string tag;
         
         TagRange(){}
 
-        TagRange( const BSONObj& a_min, const BSONObj& a_max, const string& a_tag ) 
+        TagRange( const BSONObj& a_min, const BSONObj& a_max, const std::string& a_tag )
             : min( a_min.getOwned() ), max( a_max.getOwned() ), tag( a_tag ){}
-        string toString() const;
+        std::string toString() const;
     };
     
     class ShardInfo {
@@ -69,13 +69,13 @@ namespace mongo {
         ShardInfo();
         ShardInfo( long long maxSize, long long currSize, 
                    bool draining, bool opsQueued, 
-                   const set<string>& tags = set<string>(),
-                   const string& _mongoVersion = string("") );
+                   const std::set<std::string>& tags = std::set<std::string>(),
+                   const std::string& _mongoVersion = std::string("") );
 
-        void addTag( const string& tag );
+        void addTag( const std::string& tag );
 
         /** @return true if we have the tag OR if the tag is "" */
-        bool hasTag( const string& tag ) const;
+        bool hasTag( const std::string& tag ) const;
         
         /**
          * @return true if a shard cannot receive any new chunks because it reaches 'shardLimits'.
@@ -99,33 +99,33 @@ namespace mongo {
 
         long long getCurrSize() const { return _currSize; }
 
-        string getMongoVersion() const { return _mongoVersion; }
+        std::string getMongoVersion() const { return _mongoVersion; }
 
-        string toString() const;
+        std::string toString() const;
         
     private:
         long long _maxSize;
         long long _currSize;
         bool _draining;
         bool _hasOpsQueued;
-        set<string> _tags;
-        string _mongoVersion;
+        std::set<std::string> _tags;
+        std::string _mongoVersion;
     };
     
     struct MigrateInfo {
-        const string ns;
-        const string to;
-        const string from;
+        const std::string ns;
+        const std::string to;
+        const std::string from;
         const ChunkInfo chunk;
 
-        MigrateInfo( const string& a_ns , const string& a_to , const string& a_from , const BSONObj& a_chunk )
+        MigrateInfo( const std::string& a_ns , const std::string& a_to , const std::string& a_from , const BSONObj& a_chunk )
             : ns( a_ns ) , to( a_to ) , from( a_from ), chunk( a_chunk ) {}
 
 
     };
 
-    typedef map< string,ShardInfo > ShardInfoMap;
-    typedef map< string,vector<BSONObj> > ShardToChunksMap;
+    typedef std::map< std::string,ShardInfo > ShardInfoMap;
+    typedef std::map< std::string,std::vector<BSONObj> > ShardToChunksMap;
 
     class DistributionStatus : boost::noncopyable {
     public:
@@ -145,13 +145,13 @@ namespace mongo {
          * @param forTag "" if you don't care, or a tag
          * @return shard best suited to receive a chunk
          */
-        string getBestReceieverShard( const string& forTag ) const;
+        std::string getBestReceieverShard( const std::string& forTag ) const;
 
         /**
          * @return the shard with the most chunks
          *         based on # of chunks with the given tag
          */
-        string getMostOverloadedShard( const string& forTag ) const;
+        std::string getMostOverloadedShard( const std::string& forTag ) const;
 
 
         // ---- basic accessors, counters, etc...
@@ -160,25 +160,25 @@ namespace mongo {
         unsigned totalChunks() const;
 
         /** @return number of chunks in this shard */
-        unsigned numberOfChunksInShard( const string& shard ) const;
+        unsigned numberOfChunksInShard( const std::string& shard ) const;
 
         /** @return number of chunks in this shard with the given tag */
-        unsigned numberOfChunksInShardWithTag( const string& shard, const string& tag ) const;
+        unsigned numberOfChunksInShardWithTag( const std::string& shard, const std::string& tag ) const;
 
         /** @return chunks for the shard */
-        const vector<BSONObj>& getChunks( const string& shard ) const;
+        const std::vector<BSONObj>& getChunks( const std::string& shard ) const;
 
         /** @return all tags we know about, not include "" */
-        const set<string>& tags() const { return _allTags; }
+        const std::set<std::string>& tags() const { return _allTags; }
 
         /** @return the right tag for chunk, possibly "" */
-        string getTagForChunk( const BSONObj& chunk ) const;
+        std::string getTagForChunk( const BSONObj& chunk ) const;
         
         /** @return all shards we know about */
-        const set<string>& shards() const { return _shards; }
+        const std::set<std::string>& shards() const { return _shards; }
 
         /** @return the ShardInfo for the shard */
-        const ShardInfo& shardInfo( const string& shard ) const;
+        const ShardInfo& shardInfo( const std::string& shard ) const;
         
         /** writes all state to log() */
         void dump() const;
@@ -186,9 +186,9 @@ namespace mongo {
     private:
         const ShardInfoMap& _shardInfo;
         const ShardToChunksMap& _shardChunks;
-        map<BSONObj,TagRange> _tagRanges;
-        set<string> _allTags;
-        set<string> _shards;
+        std::map<BSONObj,TagRange> _tagRanges;
+        std::set<std::string> _allTags;
+        std::set<std::string> _shards;
     };
 
     class BalancerPolicy {
@@ -205,7 +205,7 @@ namespace mongo {
          * @returns NULL or MigrateInfo of the best move to make towards balacing the collection.
          *          caller owns the MigrateInfo instance
          */
-        static MigrateInfo* balance( const string& ns,
+        static MigrateInfo* balance( const std::string& ns,
                                      const DistributionStatus& distribution,
                                      int balancedLastTime );
 

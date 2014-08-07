@@ -2,17 +2,29 @@
 
 /*    Copyright 2010 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
@@ -28,7 +40,7 @@ namespace mongo {
     using std::string;
 
     /**
-     * A StringData object wraps a 'const string&' or a 'const char*' without copying its
+     * A StringData object wraps a 'const std::string&' or a 'const char*' without copying its
      * contents. The most common usage is as a function argument that takes any of the two
      * forms of strings above. Fundamentally, this class tries go around the fact that string
      * literals in C++ are char[N]'s.
@@ -37,25 +49,25 @@ namespace mongo {
      *
      *  + The object StringData wraps around must be alive while the StringData is.
      *
-     *  + Because string data can be used to pass a substring around, one should never assume a
+     *  + Because std::string data can be used to pass a substring around, one should never assume a
      *    rawData() terminates with a null.
      */
     class StringData {
     public:
 
-        /** Constructs an empty string data */
+        /** Constructs an empty std::string data */
         StringData()
             : _data(NULL), _size(0) {}
 
         /**
-         * Constructs a StringData, for the case where the length of string is not known. 'c'
+         * Constructs a StringData, for the case where the length of std::string is not known. 'c'
          * must be a pointer to a null-terminated string.
          */
         StringData( const char* c )
-            : _data(c), _size((c == NULL) ? 0 : string::npos) {}
+            : _data(c), _size((c == NULL) ? 0 : std::string::npos) {}
 
         /**
-         * Constructs a StringData explicitly, for the case where the length of the string is
+         * Constructs a StringData explicitly, for the case where the length of the std::string is
          * already known. 'c' must be a pointer to a null-terminated string, and len must
          * be the length that strlen(c) would return, a.k.a the index of the terminator in c.
          */
@@ -98,7 +110,7 @@ namespace mongo {
 
         size_t find( char c , size_t fromPos = 0 ) const;
         size_t find( const StringData& needle ) const;
-        size_t rfind( char c, size_t fromPos = string::npos ) const;
+        size_t rfind( char c, size_t fromPos = std::string::npos ) const;
 
         /**
          * Returns true if 'prefix' is a substring of this instance, anchored at position 0.
@@ -123,7 +135,7 @@ namespace mongo {
 
         size_t size() const { fillSize(); return _size; }
         bool empty() const { return size() == 0; }
-        string toString() const { return string(_data, size()); }
+        std::string toString() const { return std::string(_data, size()); }
         char operator[] ( unsigned pos ) const { return _data[pos]; }
 
         /**
@@ -149,7 +161,7 @@ namespace mongo {
         mutable size_t _size;     // 'size' does not include the null terminator
 
         void fillSize() const {
-            if (_size == string::npos) {
+            if (_size == std::string::npos) {
                 _size = strlen(_data);
             }
         }

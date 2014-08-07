@@ -125,8 +125,11 @@ namespace mongo {
                 _exprObj = _exprElt.wrap("");
             }
 
-            // Build the matcher around the object we built above.
-            StatusWithMatchExpression parseResult = MatchExpressionParser::parse(_exprObj);
+            // Build the matcher around the object we built above. Currently, we do not allow
+            // $pull operations to contain $where clauses, so preserving this behaviour.
+            StatusWithMatchExpression parseResult = 
+                        MatchExpressionParser::parse(_exprObj, 
+                                                     MatchExpressionParser::WhereCallback()); 
             if (!parseResult.isOK())
                 return parseResult.getStatus();
 

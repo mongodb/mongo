@@ -28,15 +28,21 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     /* reset any errors so that getlasterror comes back clean.
 
@@ -46,10 +52,7 @@ namespace mongo {
     */
     class CmdResetError : public Command {
     public:
-        virtual LockType locktype() const { return NONE; }
-        virtual bool logTheOp() {
-            return false;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const {
             return true;
         }
@@ -60,7 +63,7 @@ namespace mongo {
             help << "reset error state (used with getpreverror)";
         }
         CmdResetError() : Command("resetError", false, "reseterror") {}
-        bool run(const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(OperationContext* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.get();
             verify( le );
             le->reset();
@@ -68,19 +71,10 @@ namespace mongo {
         }
     } cmdResetError;
 
-    /* set by replica sets if specified in the configuration.
-       a pointer is used to avoid any possible locking issues with lockless reading (see below locktype() is NONE
-       and would like to keep that)
-       (for now, it simply orphans any old copy as config changes should be extremely rare).
-       note: once non-null, never goes to null again.
-    */
-    BSONObj *getLastErrorDefault = 0;
-
     class CmdGetLastError : public Command {
     public:
         CmdGetLastError() : Command("getLastError", false, "getlasterror") { }
-        virtual LockType locktype() const { return NONE;  }
-        virtual bool logTheOp()           { return false; }
+        virtual bool isWriteCommandForConfigServer() const      { return false; }
         virtual bool slaveOk() const      { return true;  }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -96,7 +90,7 @@ namespace mongo {
                  << "  { wtimeout:m} - timeout for w in m milliseconds";
         }
 
-        bool run( const string& dbname,
+        bool run(OperationContext* txn, const string& dbname,
                   BSONObj& cmdObj,
                   int,
                   string& errmsg,
@@ -182,8 +176,12 @@ namespace mongo {
                 (nFields == 2 && lastOpTimePresent) ||
                 (nFields == 3 && lastOpTimePresent && electionIdPresent);
 
-            if ( useDefaultGLEOptions && getLastErrorDefault ) {
-                writeConcernDoc = *getLastErrorDefault;
+            if (useDefaultGLEOptions) {
+                BSONObj getLastErrorDefault =
+                        repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
+                if (!getLastErrorDefault.isEmpty()) {
+                    writeConcernDoc = getLastErrorDefault;
+                }
             }
 
             //
@@ -215,7 +213,8 @@ namespace mongo {
 
             // If we got an electionId, make sure it matches
             if (electionIdPresent) {
-                if (!theReplSet) {
+                if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+                        repl::ReplicationCoordinator::modeReplSet) {
                     // Ignore electionIds of 0 from mongos.
                     if (electionId != OID()) {
                         errmsg = "wElectionId passed but no replication active";
@@ -224,9 +223,10 @@ namespace mongo {
                     }
                 } 
                 else {
-                    if (electionId != theReplSet->getElectionId()) {
+                    if (electionId != repl::getGlobalReplicationCoordinator()->getElectionId()) {
                         LOG(3) << "oid passed in is " << electionId
-                               << ", but our id is " << theReplSet->getElectionId();
+                               << ", but our id is "
+                               << repl::getGlobalReplicationCoordinator()->getElectionId();
                         errmsg = "election occurred after write";
                         result.append("code", ErrorCodes::WriteConcernFailed);
                         return false;
@@ -234,11 +234,11 @@ namespace mongo {
                 }
             }
 
-            cc().curop()->setMessage( "waiting for write concern" );
+            txn->setMessage( "waiting for write concern" );
 
             WriteConcernResult wcResult;
-            status = waitForWriteConcern( writeConcern, lastOpTime, &wcResult );
-            wcResult.appendTo( &result );
+            status = waitForWriteConcern( txn, writeConcern, lastOpTime, &wcResult );
+            wcResult.appendTo( writeConcern, &result );
 
             // For backward compatibility with 2.4, wtimeout returns ok : 1.0
             if ( wcResult.wTimedOut ) {
@@ -256,10 +256,7 @@ namespace mongo {
 
     class CmdGetPrevError : public Command {
     public:
-        virtual LockType locktype() const { return NONE; }
-        virtual bool logTheOp() {
-            return false;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream& help ) const {
             help << "check for errors since last reseterror commandcal";
         }
@@ -270,7 +267,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         CmdGetPrevError() : Command("getPrevError", false, "getpreverror") {}
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.disableForCommand();
             le->appendSelf( result );
             if ( le->valid )

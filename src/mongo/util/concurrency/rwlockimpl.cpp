@@ -79,13 +79,13 @@ namespace mongo {
         dassert( state == 0 );
         state++;
         AcquireSRWLockShared(&_lock);
-        shares++;
+        shares.fetchAndAdd(1);
     }
     void SimpleRWLock::unlock_shared() { 
         int& state = s.getRef();
         dassert( state == 1 );
         state--;
-        shares--;
+        shares.fetchAndSubtract(1);
         ReleaseSRWLockShared(&_lock); 
     }
 # else

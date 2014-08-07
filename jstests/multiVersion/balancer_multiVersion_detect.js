@@ -10,7 +10,8 @@ var options = {
     configOptions : {  },
     shardOptions : { binVersion : [ "latest", "last-stable" ] },
     separateConfig : true,
-    sync : false
+    sync : false,
+    enableBalancer : true
 }
 
 var st = new ShardingTest({ shards : 3, mongos : 1, other : options });
@@ -24,8 +25,8 @@ printjson(admin.runCommand({ shardCollection : coll + "", key : { _id : 1 } }));
 
 assert.soon( function() {
     var log = cat(mongos.fullOptions.logFile);
-    return /warning: multiVersion/.test(log);
-}, "multiVersion warning not printed!", 5 * 60 * 1000, 5 * 1000);
+    return /multiVersion cluster detected/.test(log);
+}, "multiVersion warning not printed!", 30 * 16 * 60 * 1000, 5 * 1000);
 
 jsTest.log("DONE!");
 

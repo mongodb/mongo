@@ -61,14 +61,14 @@ var admin_s2 = slave2.getDB("admin");
 
 var config = replTest.getReplSetConfig();
 config.version = 2;
-config.members.push({_id:2, host:hostname+":"+ports[2]});
 
-try {
-  admin.runCommand({replSetReconfig:config});
-}
-catch(e) {
-  print(e);
-}
+// Add #3 using rs.add() configuration document.
+// Since 'db' currently points to slave2, reset 'db' to admin db on master before running rs.add().
+db = admin;
+
+// If _id is not provided, rs.add() will generate _id for #3 based on existing members' _ids.
+assert.commandWorked(rs.add({host:hostname+":"+ports[2]}), "failed to add #3 to replica set");
+
 reconnect(slave1);
 reconnect(slave2);
 

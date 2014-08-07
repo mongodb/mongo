@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -32,11 +32,12 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/structure/collection_iterator.h"
 
 namespace mongo {
 
+    class RecordIterator;
     class WorkingSet;
+    class OperationContext;
 
     /**
      * Scans over a collection, starting at the DiskLoc provided in params and continuing until
@@ -46,7 +47,8 @@ namespace mongo {
      */
     class CollectionScan : public PlanStage {
     public:
-        CollectionScan(const CollectionScanParams& params,
+        CollectionScan(OperationContext* txn,
+                       const CollectionScanParams& params,
                        WorkingSet* workingSet,
                        const MatchExpression* filter);
 
@@ -54,23 +56,41 @@ namespace mongo {
         virtual bool isEOF();
 
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
-        virtual void prepareToYield();
-        virtual void recoverFromYield();
+        virtual void saveState();
+        virtual void restoreState(OperationContext* opCtx);
+
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_COLLSCAN; }
 
         virtual PlanStageStats* getStats();
 
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
+        static const char* kStageType;
+
     private:
+        /**
+         * Returns true if the record 'loc' references is in memory, false otherwise.
+         */
+        bool diskLocInMemory(DiskLoc loc);
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
+
         // WorkingSet is not owned by us.
         WorkingSet* _workingSet;
 
         // The filter is not owned by us.
         const MatchExpression* _filter;
 
-        scoped_ptr<CollectionIterator> _iter;
+        scoped_ptr<RecordIterator> _iter;
 
         CollectionScanParams _params;
 
-        // True if nsdetails(_ns) == NULL on our first call to work.
+        // True if Database::getCollection(_ns) == NULL on our first call to work.
         bool _nsDropped;
 
         // Stats

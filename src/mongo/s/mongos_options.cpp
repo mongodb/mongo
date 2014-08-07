@@ -91,10 +91,7 @@ namespace mongo {
         sharding_options.addOptionChaining("sharding.chunkSize", "chunkSize", moe::Int,
                 "maximum amount of data per chunk");
 
-        sharding_options.addOptionChaining("net.ipv6", "ipv6", moe::Switch,
-                "enable IPv6 support (disabled by default)");
-
-        sharding_options.addOptionChaining("net.jsonp", "jsonp", moe::Switch,
+        sharding_options.addOptionChaining("net.http.JSONPEnabled", "jsonp", moe::Switch,
                 "allow JSONP access via http (has security implications)")
                                          .setSources(moe::SourceAllLegacy);
 
@@ -134,15 +131,18 @@ namespace mongo {
 
     bool handlePreValidationMongosOptions(const moe::Environment& params,
                                             const std::vector<std::string>& args) {
-        if (params.count("help")) {
+        if (params.count("help") &&
+            params["help"].as<bool>() == true) {
             printMongosHelp(moe::startupOptions);
             return false;
         }
-        if (params.count("version")) {
+        if (params.count("version") &&
+            params["version"].as<bool>() == true) {
             printShardingVersionInfo(true);
             return false;
         }
-        if ( params.count( "test" ) ) {
+        if (params.count("test") &&
+            params["test"].as<bool>() == true) {
             ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
                     ::mongo::logger::LogSeverity::Debug(5));
             StartupTest::runTests();
@@ -150,6 +150,47 @@ namespace mongo {
         }
 
         return true;
+    }
+
+    Status validateMongosOptions(const moe::Environment& params) {
+
+        Status ret = validateServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        return Status::OK();
+    }
+
+    Status canonicalizeMongosOptions(moe::Environment* params) {
+
+        Status ret = canonicalizeServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+#ifdef MONGO_SSL
+        ret = canonicalizeSSLServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
+#endif
+
+        // "sharding.autoSplit" comes from the config file, so override it if "noAutoSplit" is set
+        // since that comes from the command line.
+        if (params->count("noAutoSplit")) {
+            Status ret = params->set("sharding.autoSplit",
+                                     moe::Value(!(*params)["noAutoSplit"].as<bool>()));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("noAutoSplit");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        return Status::OK();
     }
 
     Status storeMongosOptions(const moe::Environment& params,
@@ -186,38 +227,19 @@ namespace mongo {
                 params["replication.localPingThresholdMs"].as<int>();
         }
 
-        if ( params.count( "net.ipv6" ) ) {
-            enableIPv6();
-        }
-
-        if ( params.count( "net.jsonp" ) ) {
-            serverGlobalParams.jsonp = true;
+        if (params.count("net.http.JSONPEnabled")) {
+            serverGlobalParams.jsonp = params["net.http.JSONPEnabled"].as<bool>();
         }
 
         if (params.count("noscripting")) {
             // This option currently has no effect for mongos
         }
 
-        // Check "net.http.enabled" before "httpinterface" and "nohttpinterface", since this comes
-        // from a config file and those come from the command line
-        if (params.count("net.http.enabled")) {
-            serverGlobalParams.isHttpInterfaceEnabled = params["net.http.enabled"].as<bool>();
-        }
-
-        if (params.count("httpinterface")) {
-            if (params.count("nohttpinterface")) {
-                return Status(ErrorCodes::BadValue,
-                              "can't have both --httpinterface and --nohttpinterface");
+        if (params.count("sharding.autoSplit")) {
+            Chunk::ShouldAutoSplit = params["sharding.autoSplit"].as<bool>();
+            if (Chunk::ShouldAutoSplit == false) {
+                warning() << "running with auto-splitting disabled" << endl;
             }
-            serverGlobalParams.isHttpInterfaceEnabled = true;
-        }
-
-        // --noAutoSplit is on the command line, while sharding.autoSplit is in the JSON config.
-        // Disable auto splitting if either one specifies that we should.
-        if (params.count("noAutoSplit") ||
-            (params.count("sharding.autoSplit") && !params["sharding.autoSplit"].as<bool>())) {
-            warning() << "running with auto-splitting disabled" << endl;
-            Chunk::ShouldAutoSplit = false;
         }
 
         if ( ! params.count( "sharding.configDB" ) ) {
@@ -235,7 +257,9 @@ namespace mongo {
                       << "and is not recommended for production" << endl;
         }
 
-        mongosGlobalParams.upgrade = params.count("upgrade");
+        if (params.count("upgrade")) {
+            mongosGlobalParams.upgrade = params["upgrade"].as<bool>();
+        }
 
         return Status::OK();
     }

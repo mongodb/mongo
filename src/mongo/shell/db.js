@@ -40,15 +40,20 @@ DB.prototype.commandHelp = function( name ){
     c.help = true;
     var res = this.runCommand( c );
     if ( ! res.ok )
-        throw res.errmsg;
+        throw Error(res.errmsg);
     return res.help;
 }
 
-DB.prototype.runCommand = function( obj ){
+DB.prototype.runCommand = function( obj, extra ){
     if ( typeof( obj ) == "string" ){
         var n = {};
         n[obj] = 1;
         obj = n;
+        if ( extra && typeof( extra ) == "object" ) {
+            for ( var x in extra ) {
+                n[x] = extra[x];
+            }
+        }
     }
     return this.getCollection( "$cmd" ).findOne( obj );
 }
@@ -125,7 +130,7 @@ DB.prototype.getProfilingLevel  = function() {
 DB.prototype.getProfilingStatus  = function() {
     var res = this._dbCommand( { profile: -1 } );
     if ( ! res.ok )
-        throw "profile command failed: " + tojson( res );
+        throw Error( "profile command failed: " + tojson( res ) );
     delete res.ok
     return res;
 }
@@ -138,7 +143,7 @@ DB.prototype.getProfilingStatus  = function() {
  */
 DB.prototype.dropDatabase = function() {
     if ( arguments.length )
-        throw "dropDatabase doesn't take arguments";
+        throw Error("dropDatabase doesn't take arguments");
     return this._dbCommand( { dropDatabase: 1 } );
 }
 
@@ -164,8 +169,8 @@ DB.prototype.shutdownServer = function(opts) {
     try {
         var res = this.runCommand(cmd);
         if( res )
-            throw "shutdownServer failed: " + res.errmsg;
-        throw "shutdownServer failed";
+            throw Error( "shutdownServer failed: " + res.errmsg );
+        throw Error( "shutdownServer failed" );
     }
     catch ( e ){
         assert( tojson( e ).indexOf( "error doing query: failed" ) >= 0 , "unexpected error: " + tojson( e ) );
@@ -288,6 +293,7 @@ DB.prototype.help = function() {
     print("\tdb.getProfilingStatus() - returns if profiling is on and slow threshold");
     print("\tdb.getReplicationInfo()");
     print("\tdb.getSiblingDB(name) get the db at the same server as this one");
+    print("\tdb.getWriteConcern() - returns the write concern used for any operations on this db, inherited from server object if set");
     print("\tdb.hostInfo() get details about the server's host"); 
     print("\tdb.isMaster() check replica primary status");
     print("\tdb.killOp(opid) kills the current operation in the db");
@@ -304,6 +310,8 @@ DB.prototype.help = function() {
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
     print("\tdb.serverStatus()");
     print("\tdb.setProfilingLevel(level,<slowms>) 0=off 1=slow 2=all");
+    print("\tdb.setWriteConcern( <write concern doc> ) - sets the write concern for writes to the db");
+    print("\tdb.unsetWriteConcern( <write concern doc> ) - unsets the write concern for writes to the db");
     print("\tdb.setVerboseShell(flag) display extra information in shell output");
     print("\tdb.shutdownServer()");
     print("\tdb.stats()");
@@ -396,7 +404,7 @@ DB.prototype.eval = function(jsfunction) {
     var res = this._dbCommand( cmd );
     
     if (!res.ok)
-        throw tojson( res );
+        throw Error( tojson( res ) );
     
     return res.retval;
 }
@@ -480,7 +488,7 @@ DB.prototype.groupeval = function(parmsObj) {
 DB.prototype.groupcmd = function( parmsObj ){
     var ret = this.runCommand( { "group" : this._groupFixParms( parmsObj ) } );
     if ( ! ret.ok ){
-        throw "group command failed: " + tojson( ret );
+        throw Error( "group command failed: " + tojson( ret ) );
     }
     return ret.retval;
 }
@@ -514,7 +522,7 @@ DB.prototype.forceError = function(){
 DB.prototype.getLastError = function( w , wtimeout ){
     var res = this.getLastErrorObj( w , wtimeout );
     if ( ! res.ok )
-        throw "getlasterror failed: " + tojson( res );
+        throw Error( "getlasterror failed: " + tojson( res ) );
     return res.err;
 }
 DB.prototype.getLastErrorObj = function( w , wtimeout ){
@@ -527,7 +535,7 @@ DB.prototype.getLastErrorObj = function( w , wtimeout ){
     var res = this.runCommand( cmd );
 
     if ( ! res.ok )
-        throw "getlasterror failed: " + tojson( res );
+        throw Error( "getlasterror failed: " + tojson( res ) );
     return res;
 }
 DB.prototype.getLastErrorCmd = DB.prototype.getLastErrorObj;
@@ -544,7 +552,7 @@ DB.prototype.getPrevError = function(){
     return this.runCommand( { getpreverror : 1 } );
 }
 
-DB.prototype.getCollectionNames = function(){
+DB.prototype._getCollectionNamesSystemNamespaces = function(){
     var all = [];
 
     var nsLength = this._name.length + 1;
@@ -560,6 +568,39 @@ DB.prototype.getCollectionNames = function(){
     }
     
     return all.sort();
+}
+
+
+DB.prototype._getCollectionNamesCommand = function() {
+    var res = this.runCommand( "listCollections" );
+    if ( res.code == 59 ) {
+        // command doesn't exist, old mongod
+        return null;
+    }
+
+    if ( !res.ok ) {
+        if ( res.errmsg && res.errmsg.startsWith( "no such cmd" ) ) {
+            return null;
+        }
+
+        throw Error( "listCollections failed: " + tojson( res ) );
+    }
+
+    var all = [];
+    for ( var i = 0; i < res.collections.length; i++ ) {
+        var name = res.collections[i].name;
+        all.push( name );
+    }
+
+    return all;
+}
+
+DB.prototype.getCollectionNames = function(){
+    var res = this._getCollectionNamesCommand();
+    if ( res ) {
+        return res;
+    }
+    return this._getCollectionNamesSystemNamespaces();
 }
 
 DB.prototype.tojson = function(){
@@ -586,7 +627,7 @@ DB.prototype.currentOP = DB.prototype.currentOp;
 
 DB.prototype.killOp = function(op) {
     if( !op ) 
-        throw "no opNum to kill specified";
+        throw Error("no opNum to kill specified");
     return this.$cmd.sys.killop.findOne({'op':op});
 }
 DB.prototype.killOP = DB.prototype.killOp;
@@ -857,101 +898,6 @@ function getUserObjString(userObj) {
     return toreturn;
 }
 
-/**
- * Used for creating users in systems with v1 style user information (ie MongoDB v2.4 and prior)
- */
-DB.prototype._addUserWithInsert = function(userObj, replicatedTo, timeout) {
-    var c = this.getCollection( "system.users" );
-    var oldPwd;
-    if (userObj.pwd != null) {
-        oldPwd = userObj.pwd;
-        userObj.pwd = _hashPassword(userObj.user, userObj.pwd);
-    }
-    try {
-        c.save(userObj);
-    } catch (e) {
-        // SyncClusterConnections call GLE automatically after every write and will throw an
-        // exception if the insert failed.
-        if ( tojson(e).indexOf( "login" ) >= 0 ){
-            // TODO: this check is a hack
-            print( "Creating user seems to have succeeded but threw an exception because we no " +
-                   "longer have auth." );
-        } else {
-            throw "Could not insert into system.users: " + tojson(e);
-        }
-    } finally {
-        if (userObj.pwd != null)
-            userObj.pwd = oldPwd;
-    }
-    print("Successfully added user: " + getUserObjString(userObj));
-
-    //
-    // When saving users to replica sets, the shell user will want to know if the user hasn't
-    // been fully replicated everywhere, since this will impact security.  By default, replicate to
-    // majority of nodes with wtimeout 15 secs, though user can override
-    //
-    
-    replicatedTo = replicatedTo != undefined && replicatedTo != null ? replicatedTo : "majority"
-    
-    // in mongod version 2.1.0-, this worked
-    var le = {};
-    try {        
-        le = this.getLastErrorObj( replicatedTo, timeout || 30 * 1000 );
-        // printjson( le )
-    }
-    catch (e) {
-        errjson = tojson(e);
-        if ( errjson.indexOf( "login" ) >= 0 || errjson.indexOf( "unauthorized" ) >= 0 ) {
-            // TODO: this check is a hack
-            print( "addUser succeeded, but cannot wait for replication since we no longer have auth" );
-            return "";
-        }
-        print( "could not find getLastError object : " + tojson( e ) )
-    }
-
-    if (!le.err) {
-        return;
-    }
-
-    // We can't detect replica set shards via mongos, so we'll sometimes get this error
-    // In this case though, we've already checked the local error before returning norepl, so
-    // the user has been written and we're happy
-    if (le.err == "norepl" || le.err == "noreplset") {
-        // nothing we can do
-        return;
-    }
-
-    if (le.err == "timeout") {
-        throw "timed out while waiting for user authentication to replicate - " +
-              "database will not be fully secured until replication finishes"
-    }
-
-    if (le.err.startsWith("E11000 duplicate key error")) {
-        throw "User already exists with that username/userSource combination";
-    }
-
-    throw "couldn't add user: " + le.err;
-}
-
-/**
- * Helper method to convert "replicatedTo" and "timeout" fields into a writeConcern object
- */
-DB.prototype._getWriteConcern = function(replicatedTo, timeout) {
-    return { w: replicatedTo != null ? replicatedTo : _defaultWriteConcern.w,
-             wtimeout: timeout || _defaultWriteConcern.wtimeout };
-}
-
-DB.prototype._addUser = function(userObj, replicatedTo, timeout) {
-    if (typeof replicatedTo == "object") {
-        throw Error("Cannot provide write concern object to addUser shell helper, " +
-                    "use createUser instead");
-    }
-    var commandExisted = this._createUser(userObj, this._getWriteConcern(replicatedTo, timeout));
-    if (!commandExisted) {
-        this._addUserWithInsert(userObj, replicatedTo, timeout);
-    }
-}
-
 DB.prototype._modifyCommandToDigestPasswordIfNecessary = function(cmdObj, username) {
     if (!cmdObj["pwd"]) {
         return;
@@ -973,9 +919,7 @@ DB.prototype._modifyCommandToDigestPasswordIfNecessary = function(cmdObj, userna
     delete cmdObj["passwordDigestor"];
 }
 
-// Returns true if it worked, false if the createUser command wasn't found, and throws on all other
-// failures
-DB.prototype._createUser = function(userObj, writeConcern) {
+DB.prototype.createUser = function(userObj, writeConcern) {
     var name = userObj["user"];
     var cmdObj = {createUser:name};
     cmdObj = Object.extend(cmdObj, userObj);
@@ -989,11 +933,12 @@ DB.prototype._createUser = function(userObj, writeConcern) {
 
     if (res.ok) {
         print("Successfully added user: " + getUserObjString(userObj));
-        return true;
+        return;
     }
 
     if (res.errmsg == "no such cmd: createUser") {
-        return false;
+        throw Error("'createUser' command not found.  This is most likely because you are " +
+                    "talking to an old (pre v2.6) MongoDB server");
     }
 
     if (res.errmsg == "timeout") {
@@ -1005,63 +950,13 @@ DB.prototype._createUser = function(userObj, writeConcern) {
 }
 
 function _hashPassword(username, password) {
+    if (typeof password != 'string') {
+        throw Error("User passwords must be of type string. Was given password with type: " +
+                    typeof(password));
+    }
     return hex_md5(username + ":mongo:" + password);
 }
 
-// We need to continue to support the addUser(username, password, readOnly) form of addUser for at
-// least one release, even though its behavior of creating a super-user by default is bad.
-// TODO(spencer): remove this form from v2.8
-DB.prototype._addUserDeprecatedV22Version = function(username, pass, readOnly, replicatedTo, timeout) {
-    if ( pass == null || pass.length == 0 )
-        throw "password can't be empty";
-
-    var userObjForCommand = { user: username, pwd: pass };
-    if (this.getName() == "admin") {
-        if (readOnly) {
-            userObjForCommand["roles"] = ['readAnyDatabase'];
-        } else {
-            userObjForCommand["roles"] = ['root'];
-        }
-    } else {
-        if (readOnly) {
-            userObjForCommand["roles"] = ['read'];
-        } else {
-            userObjForCommand["roles"] = ['dbOwner'];
-        }
-    }
-
-    var commandExisted = this._createUser(userObjForCommand,
-                                          this._getWriteConcern(replicatedTo, timeout));
-    if (!commandExisted) {
-        var userObjForInsert = { user: username, pwd: pass, readOnly: readOnly || false };
-        this._addUserWithInsert(userObjForInsert, replicatedTo, timeout);
-    }
-}
-
-/**
- * TODO(spencer): Remove this from 2.8, in favor of "createUser"
- */
-DB.prototype.addUser = function() {
-    print("WARNING: The 'addUser' shell helper is DEPRECATED. Please use 'createUser' instead");
-
-    if (arguments.length == 0) {
-        throw Error("No arguments provided to addUser");
-    }
-
-    if (typeof arguments[0] == "object") {
-        this._addUser.apply(this, arguments);
-    } else {
-        this._addUserDeprecatedV22Version.apply(this, arguments);
-    }
-}
-
-DB.prototype.createUser = function(userObj, writeConcern) {
-    var commandExisted = this._createUser(userObj, writeConcern);
-    if (!commandExisted) {
-        throw Error("'createUser' command not found.  This is most likely because you are " +
-                    "talking to an old (pre v2.6) MongoDB server");
-    }
-}
 /**
  * Used for updating users in systems with V1 style user information
  * (ie MongoDB v2.4 and prior)
@@ -1149,7 +1044,7 @@ DB.prototype._removeUserV1 = function(username, writeConcern) {
     var le = db.getLastErrorObj(writeConcern['w'], writeConcern['wtimeout']);
 
     if (le.err) {
-        throw "Couldn't remove user: " + le.err;
+        throw Error( "Couldn't remove user: " + le.err );
     }
 
     if (le.n == 1) {
@@ -1175,6 +1070,7 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
 }
 
 DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
+DB.prototype._defaultGssapiServiceName = null;
 
 DB.prototype._authOrThrow = function () {
     var params;
@@ -1196,6 +1092,13 @@ DB.prototype._authOrThrow = function () {
 
     if (params.db !== undefined) {
         throw Error("Do not override db field on db.auth(). Use getMongo().auth(), instead.");
+    }
+
+    if (params.mechanism == "GSSAPI" &&
+        params.serviceName == null &&
+        this._defaultGssapiServiceName != null) {
+
+        params.serviceName = this._defaultGssapiServiceName;
     }
 
     params.db = this.getName();
@@ -1240,17 +1143,20 @@ DB.prototype.revokeRolesFromUser = function(username, roles, writeConcern) {
     }
 }
 
-DB.prototype.getUser = function(username) {
+DB.prototype.getUser = function(username, args) {
     if (typeof username != "string") {
         throw Error("User name for getUser shell helper must be a string");
     }
-    var res = this.runCommand({usersInfo: username});
+    var cmdObj = {usersInfo: username};
+    Object.extend(cmdObj, args);
+
+    var res = this.runCommand(cmdObj);
     if (!res.ok) {
         throw Error(res.errmsg);
     }
 
     if (res.users.length == 0) {
-        throw Error("User " + username + "@" + db.getName() + " not found");
+        return null;
     }
     return res.users[0];
 }
@@ -1260,6 +1166,13 @@ DB.prototype.getUsers = function(args) {
     Object.extend(cmdObj, args);
     var res = this.runCommand(cmdObj);
     if (!res.ok) {
+        var authSchemaIncompatibleCode = 69;
+        if (res.code == authSchemaIncompatibleCode ||
+                (res.code == null && res.errmsg == "no such cmd: usersInfo")) {
+            // Working with 2.4 schema user data
+            return this.system.users.find({}).toArray();
+        }
+
         throw Error(res.errmsg);
     }
 
@@ -1370,7 +1283,7 @@ DB.prototype.getRole = function(rolename, args) {
     }
 
     if (res.roles.length == 0) {
-        throw Error("Role " + rolename + "@" + db.getName() + " not found");
+        return null;
     }
     return res.roles[0];
 }
@@ -1385,5 +1298,29 @@ DB.prototype.getRoles = function(args) {
 
     return res.roles;
 }
+
+DB.prototype.setWriteConcern = function( wc ) {
+    if ( wc instanceof WriteConcern ) {
+        this._writeConcern = wc;
+    }
+    else {
+        this._writeConcern = new WriteConcern( wc );
+    }
+};
+
+DB.prototype.getWriteConcern = function() {
+    if (this._writeConcern)
+        return this._writeConcern;
+    
+    if (this._mongo.getWriteConcern())
+        return this._mongo.getWriteConcern();
+
+    return null;
+};
+
+DB.prototype.unsetWriteConcern = function() {
+    delete this._writeConcern;
+};
+
 
 }());

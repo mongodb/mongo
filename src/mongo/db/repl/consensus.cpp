@@ -26,13 +26,22 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/commands.h"
+#include "mongo/db/repl/consensus.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/global_optime.h"
 #include "mongo/db/repl/multicmd.h"
-#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replset_commands.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
+namespace repl {
 
     /** the first cmd called by a node seeking election and it's a basic sanity 
         test: do any of the nodes it can reach know that it can't be the primary?
@@ -48,92 +57,27 @@ namespace mongo {
             actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-    private:
 
-        bool shouldVeto(const BSONObj& cmdObj, string& errmsg) {
-            // don't veto older versions
-            if (cmdObj["id"].eoo()) {
-                // they won't be looking for the veto field
-                return false;
-            }
+        virtual bool run(OperationContext* txn,
+                         const string&,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+            Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+            if (!status.isOK())
+                return appendCommandStatus(result, status);
 
-            unsigned id = cmdObj["id"].Int();
-            const Member* primary = theReplSet->box.getPrimary();
-            const Member* hopeful = theReplSet->findById(id);
-            const Member *highestPriority = theReplSet->getMostElectable();
+            ReplicationCoordinator::ReplSetFreshArgs parsedArgs;
+            parsedArgs.id = cmdObj["id"].Int();
+            parsedArgs.setName = cmdObj["set"].checkAndGetStringData();
+            parsedArgs.who = HostAndPort(cmdObj["who"].String());
+            parsedArgs.cfgver = cmdObj["cfgver"].Int();
+            parsedArgs.opTime = OpTime(cmdObj["opTime"].Date());
 
-            if (!hopeful) {
-                errmsg = str::stream() << "replSet couldn't find member with id " << id;
-                return true;
-            }
-
-            if (theReplSet->isPrimary() &&
-                theReplSet->lastOpTimeWritten >= hopeful->hbinfo().opTime) {
-                // hbinfo is not updated, so we have to check the primary's last optime separately
-                errmsg = str::stream() << "I am already primary, " << hopeful->fullName() <<
-                    " can try again once I've stepped down";
-                return true;
-            }
-
-            if (primary &&
-                    (hopeful->hbinfo().id() != primary->hbinfo().id()) &&
-                    (primary->hbinfo().opTime >= hopeful->hbinfo().opTime)) {
-                // other members might be aware of more up-to-date nodes
-                errmsg = str::stream() << hopeful->fullName() <<
-                    " is trying to elect itself but " << primary->fullName() <<
-                    " is already primary and more up-to-date";
-                return true;
-            }
-
-            if (highestPriority &&
-                highestPriority->config().priority > hopeful->config().priority) {
-                errmsg = str::stream() << hopeful->fullName() << " has lower priority than " <<
-                    highestPriority->fullName();
-                return true;
-            }
-
-            if (!theReplSet->isElectable(id)) {
-                errmsg = str::stream() << "I don't think " << hopeful->fullName() <<
-                    " is electable";
-                return true;
-            }
-
-            return false;
-        }
-
-        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( !check(errmsg, result) )
-                return false;
-
-            if( cmdObj["set"].String() != theReplSet->name() ) {
-                errmsg = "wrong repl set name";
-                return false;
-            }
-            string who = cmdObj["who"].String();
-            int cfgver = cmdObj["cfgver"].Int();
-            OpTime opTime(cmdObj["opTime"].Date());
-
-            bool weAreFresher = false;
-            if( theReplSet->config().version > cfgver ) {
-                log() << "replSet member " << who << " is not yet aware its cfg version " << cfgver << " is stale" << rsLog;
-                result.append("info", "config version stale");
-                weAreFresher = true;
-            }
-            // check not only our own optime, but any other member we can reach
-            else if( opTime < theReplSet->lastOpTimeWritten ||
-                     opTime < theReplSet->lastOtherOpTime())  {
-                weAreFresher = true;
-            }
-            result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
-            result.append("fresher", weAreFresher);
-
-            bool veto = shouldVeto(cmdObj, errmsg);
-            result.append("veto", veto);
-            if (veto) {
-                result.append("errmsg", errmsg);
-            }
-
-            return true;
+            status = getGlobalReplicationCoordinator()->processReplSetFresh(parsedArgs, &result);
+            return appendCommandStatus(result, status);
         }
     } cmdReplSetFresh;
 
@@ -149,85 +93,37 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
     private:
-        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( !check(errmsg, result) )
-                return false;
-            theReplSet->elect.electCmdReceived(cmdObj, &result);
-            return true;
+        virtual bool run(OperationContext* txn,
+                         const string&,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+            DEV log() << "replSet received elect msg " << cmdObj.toString() << rsLog;
+            else LOG(2) << "replSet received elect msg " << cmdObj.toString() << rsLog;
+
+            Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+            if (!status.isOK())
+                return appendCommandStatus(result, status);
+
+            ReplicationCoordinator::ReplSetElectArgs parsedArgs;
+            parsedArgs.set = cmdObj["set"].checkAndGetStringData();
+            parsedArgs.whoid = cmdObj["whoid"].Int();
+            parsedArgs.cfgver = cmdObj["cfgver"].Int();
+            parsedArgs.round = cmdObj["round"].OID();
+
+            status = getGlobalReplicationCoordinator()->processReplSetElect(parsedArgs, &result);
+            return appendCommandStatus(result, status);
         }
     } cmdReplSetElect;
 
-    int Consensus::totalVotes() const {
-        static int complain = 0;
-        int vTot = rs._self->config().votes;
-        for( Member *m = rs.head(); m; m=m->next() )
-            vTot += m->config().votes;
-        if( vTot % 2 == 0 && vTot && complain++ == 0 )
-            log() << "replSet " /*buildbot! warning */ "total number of votes is even - add arbiter or give one member an extra vote" << rsLog;
-        return vTot;
-    }
-
-    bool Consensus::aMajoritySeemsToBeUp() const {
-        int vUp = rs._self->config().votes;
-        for( Member *m = rs.head(); m; m=m->next() )
-            vUp += m->hbinfo().up() ? m->config().votes : 0;
-        return vUp * 2 > totalVotes();
-    }
-
-    bool Consensus::shouldRelinquish() const {
-        int vUp = rs._self->config().votes;
-        for( Member *m = rs.head(); m; m=m->next() ) {
-            if (m->hbinfo().up()) {
-                vUp += m->config().votes;
-            }
-        }
-
-        // the manager will handle calling stepdown if another node should be
-        // primary due to priority
-
-        return !( vUp * 2 > totalVotes() );
-    }
-
-    static const int VETO = -10000;
-
-    const time_t LeaseTime = 30;
-
-    SimpleMutex Consensus::lyMutex("ly");
-
-    unsigned Consensus::yea(unsigned memberId) { /* throws VoteException */
-        SimpleMutex::scoped_lock lk(lyMutex);
-        LastYea &L = this->ly.ref(lk);
-        time_t now = time(0);
-        if( L.when + LeaseTime >= now && L.who != memberId ) {
-            LOG(1) << "replSet not voting yea for " << memberId <<
-                   " voted for " << L.who << ' ' << now-L.when << " secs ago" << rsLog;
-            throw VoteException();
-        }
-        L.when = now;
-        L.who = memberId;
-        return rs._self->config().votes;
-    }
-
-    /* we vote for ourself at start of election.  once it fails, we can cancel the lease we had in
-       place instead of leaving it for a long time.
-       */
-    void Consensus::electionFailed(unsigned meid) {
-        SimpleMutex::scoped_lock lk(lyMutex);
-        LastYea &L = ly.ref(lk);
-        DEV verify( L.who == meid ); // this may not always always hold, so be aware, but adding for now as a quick sanity test
-        if( L.who == meid )
-            L.when = 0;
-    }
-
-    /* todo: threading **************** !!!!!!!!!!!!!!!! */
-    void Consensus::electCmdReceived(BSONObj cmd, BSONObjBuilder* _b) {
+    void Consensus::electCmdReceived(const StringData& set,
+                                     unsigned whoid,
+                                     int cfgver,
+                                     const OID& round,
+                                     BSONObjBuilder* _b) {
         BSONObjBuilder& b = *_b;
-        DEV log() << "replSet received elect msg " << cmd.toString() << rsLog;
-        else LOG(2) << "replSet received elect msg " << cmd.toString() << rsLog;
-        string set = cmd["set"].String();
-        unsigned whoid = cmd["whoid"].Int();
-        int cfgver = cmd["cfgver"].Int();
-        OID round = cmd["round"].OID();
         int myver = rs.config().version;
 
         const Member* primary = rs.box.getPrimary();
@@ -266,7 +162,7 @@ namespace mongo {
         }
         else {
             try {
-                vote = yea(whoid);
+                vote = _yea(whoid);
                 dassert( hopeful->id() == whoid );
                 log() << "replSet info voting yea for " <<  hopeful->fullName() << " (" << whoid << ')' << rsLog;
             }
@@ -277,6 +173,67 @@ namespace mongo {
 
         b.append("vote", vote);
         b.append("round", round);
+    }
+
+    int Consensus::_totalVotes() const {
+        static int complain = 0;
+        int vTot = rs._self->config().votes;
+        for( Member *m = rs.head(); m; m=m->next() )
+            vTot += m->config().votes;
+        if( vTot % 2 == 0 && vTot && complain++ == 0 )
+            log() << "replSet warning: even number of voting members in replica set config - "
+                     "add an arbiter or set votes to 0 on one of the existing members" << rsLog;
+        return vTot;
+    }
+
+    bool Consensus::aMajoritySeemsToBeUp() const {
+        int vUp = rs._self->config().votes;
+        for( Member *m = rs.head(); m; m=m->next() )
+            vUp += m->hbinfo().up() ? m->config().votes : 0;
+        return vUp * 2 > _totalVotes();
+    }
+
+    bool Consensus::shouldRelinquish() const {
+        int vUp = rs._self->config().votes;
+        for( Member *m = rs.head(); m; m=m->next() ) {
+            if (m->hbinfo().up()) {
+                vUp += m->config().votes;
+            }
+        }
+
+        // the manager will handle calling stepdown if another node should be
+        // primary due to priority
+
+        return !( vUp * 2 > _totalVotes() );
+    }
+
+    const time_t LeaseTime = 3;
+
+    SimpleMutex Consensus::lyMutex("ly");
+
+    unsigned Consensus::_yea(unsigned memberId) { /* throws VoteException */
+        SimpleMutex::scoped_lock lk(lyMutex);
+        LastYea &L = _ly;
+        time_t now = time(0);
+        if( L.when + LeaseTime >= now && L.who != memberId ) {
+            LOG(1) << "replSet not voting yea for " << memberId <<
+                   " voted for " << L.who << ' ' << now-L.when << " secs ago" << rsLog;
+            throw VoteException();
+        }
+        L.when = now;
+        L.who = memberId;
+        return rs._self->config().votes;
+    }
+
+    /* we vote for ourself at start of election.  once it fails, we can cancel the lease we had in
+       place instead of leaving it for a long time.
+       */
+    void Consensus::_electionFailed(unsigned meid) {
+        SimpleMutex::scoped_lock lk(lyMutex);
+        LastYea &L = _ly;
+        DEV verify( L.who == meid ); // this may not always always hold, so be aware, but adding for now as a quick sanity test
+        if( L.who == meid )
+            L.when = 0;
     }
 
     void ReplSetImpl::_getTargets(list<Target>& L, int& configVersion) {
@@ -301,7 +258,7 @@ namespace mongo {
        @param allUp - set to true if all members are up.  Only set if true returned.
        @return true if we are freshest.  Note we may tie.
     */
-    bool Consensus::weAreFreshest(bool& allUp, int& nTies) {
+    bool Consensus::_weAreFreshest(bool& allUp, int& nTies) {
         const OpTime ord = theReplSet->lastOpTimeWritten;
         nTies = 0;
         verify( !ord.isNull() );
@@ -321,7 +278,7 @@ namespace mongo {
            not fetching them herein happen.
            */
         rs.getTargets(L, ver);
-        multiCommand(cmd, L);
+        _multiCommand(cmd, L);
         int nok = 0;
         allUp = true;
         for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
@@ -358,11 +315,9 @@ namespace mongo {
         return true;
     }
 
-    extern time_t started;
-
-    void Consensus::multiCommand(BSONObj cmd, list<Target>& L) {
+    void Consensus::_multiCommand(BSONObj cmd, list<Target>& L) {
         verify( !rs.lockedByMe() );
-        mongo::multiCommand(cmd, L);
+        multiCommand(cmd, L);
     }
 
     void Consensus::_electSelf() {
@@ -379,7 +334,7 @@ namespace mongo {
 
         bool allUp;
         int nTies;
-        if( !weAreFreshest(allUp, nTies) ) {
+        if( !_weAreFreshest(allUp, nTies) ) {
             return;
         }
 
@@ -399,7 +354,7 @@ namespace mongo {
         if( nTies ) {
             /* tie?  we then randomly sleep to try to not collide on our voting. */
             /* todo: smarter. */
-            if( me.id() == 0 || sleptLast ) {
+            if( me.id() == 0 || _sleptLast ) {
                 // would be fine for one node not to sleep
                 // todo: biggest / highest priority nodes should be the ones that get to not sleep
             }
@@ -407,16 +362,16 @@ namespace mongo {
                 verify( !rs.lockedByMe() ); // bad to go to sleep locked
                 unsigned ms = ((unsigned) rand()) % 1000 + 50;
                 DEV log() << "replSet tie " << nTies << " sleeping a little " << ms << "ms" << rsLog;
-                sleptLast = true;
+                _sleptLast = true;
                 sleepmillis(ms);
                 throw RetryAfterSleepException();
             }
         }
-        sleptLast = false;
+        _sleptLast = false;
 
         time_t start = time(0);
         unsigned meid = me.id();
-        int tally = yea( meid );
+        int tally = _yea( meid );
         bool success = false;
         try {
             log() << "replSet info electSelf " << meid << rsLog;
@@ -433,17 +388,17 @@ namespace mongo {
             int configVersion;
             list<Target> L;
             rs.getTargets(L, configVersion);
-            multiCommand(electCmd, L);
+            _multiCommand(electCmd, L);
 
             {
                 for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
-                    DEV log() << "replSet elect res: " << i->result.toString() << rsLog;
+                    LOG(1) << "replSet elect res: " << i->result.toString() << rsLog;
                     if( i->ok ) {
                         int v = i->result["vote"].Int();
                         tally += v;
                     }
                 }
-                if( tally*2 <= totalVotes() ) {
+                if( tally*2 <= _totalVotes() ) {
                     log() << "replSet couldn't elect self, only received " << tally << " votes" << rsLog;
                 }
                 else if( time(0) - start > 30 ) {
@@ -457,15 +412,18 @@ namespace mongo {
                     /* succeeded. */
                     LOG(1) << "replSet election succeeded, assuming primary role" << rsLog;
                     success = true;
-                    rs.assumePrimary();
+
+                    setElectionTime(getNextGlobalOptime());
+
+                    rs._assumePrimary();
                 }
             }
         }
         catch( std::exception& ) {
-            if( !success ) electionFailed(meid);
+            if( !success ) _electionFailed(meid);
             throw;
         }
-        if( !success ) electionFailed(meid);
+        if( !success ) _electionFailed(meid);
     }
 
     void Consensus::electSelf() {
@@ -489,4 +447,5 @@ namespace mongo {
         }
     }
 
-}
+} // namespace repl
+} // namespace mongo

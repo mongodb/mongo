@@ -1,16 +1,28 @@
 /*    Copyright 2012 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
@@ -24,38 +36,40 @@ namespace mongo {
     /**
      * An std::map wrapper that deletes pointers within a vector on destruction.  The objects
      * referenced by the vector's pointers are 'owned' by an object of this class.
-     * NOTE that an OwnedPointerMap<K,T> wraps an std::map<K,T*>.
+     * NOTE that an OwnedPointerMap<K,T,Compare> wraps an std::map<K,T*,Compare>.
      */
-    template<class K, class T>
+    template<class K, class T, class Compare = std::less<K> >
     class OwnedPointerMap {
         MONGO_DISALLOW_COPYING(OwnedPointerMap);
 
     public:
+        typedef typename std::map<K, T*, Compare> MapType;
+
         OwnedPointerMap();
         ~OwnedPointerMap();
 
         /** Access the map. */
-        const std::map<K, T*>& map() { return _map; }
-        std::map<K, T*>& mutableMap() { return _map; }
+        const MapType& map() { return _map; }
+        MapType& mutableMap() { return _map; }
 
         void clear();
 
     private:
-        std::map<K, T*> _map;
+        MapType _map;
     };
 
-    template<class K, class T>
-    OwnedPointerMap<K, T>::OwnedPointerMap() {
+    template<class K, class T, class Compare>
+    OwnedPointerMap<K, T, Compare>::OwnedPointerMap() {
     }
 
-    template<class K, class T>
-    OwnedPointerMap<K, T>::~OwnedPointerMap() {
+    template<class K, class T, class Compare>
+    OwnedPointerMap<K, T, Compare>::~OwnedPointerMap() {
         clear();
     }
 
-    template<class K, class T>
-    void OwnedPointerMap<K, T>::clear() {
-        for( typename std::map<K, T*>::iterator i = _map.begin(); i != _map.end(); ++i ) {
+    template<class K, class T, class Compare>
+    void OwnedPointerMap<K, T, Compare>::clear() {
+        for( typename MapType::iterator i = _map.begin(); i != _map.end(); ++i ) {
             delete i->second;
         }
         _map.clear();

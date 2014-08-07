@@ -49,7 +49,6 @@ namespace {
      * <OID> is a value of type OID.
      *
      */
-
     TEST(Compatibility, LegacyFormatA) {
         BSONObjBuilder versionObjB;
         versionObjB.appendTimestamp( "testVersion",

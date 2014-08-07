@@ -51,7 +51,7 @@ function wait(f) {
 
 doTest = function (signal) {
 
-    var replTest = new ReplSetTest({ name: 'unicomplex', nodes: 3 });
+    var replTest = new ReplSetTest({ name: 'unicomplex', nodes: 3, oplogSize: 1 });
     var nodes = replTest.nodeList();
     //print(tojson(nodes));
 
@@ -93,8 +93,13 @@ doTest = function (signal) {
         var first = a.getSisterDB("local").oplog.rs.find().sort({ $natural: 1 }).limit(1)[0];
         a.roll.insert({ x: 1 });
         while (1) {
-            for (var i = 0; i < 10000; i++)
-                a.roll.update({}, { $inc: { x: 1} });
+            var bulk = a.roll.initializeUnorderedBulkOp();
+            for (var i = 0; i < 1000; i++) {
+                bulk.find({}).update({ $inc: { x: 1 }});
+            }
+            // unlikely secondary isn't keeping up, but let's avoid possible intermittent issues with that.
+            bulk.execute({ w: 2 });
+
             var op = a.getSisterDB("local").oplog.rs.find().sort({ $natural: 1 }).limit(1)[0];
             if (tojson(op.h) != tojson(first.h)) {
                 printjson(op);
@@ -102,7 +107,6 @@ doTest = function (signal) {
                 break;
             }
             pass++;
-            a.getLastError(2); // unlikely secondary isn't keeping up, but let's avoid possible intermittent issues with that.
         }
         print("PASSES FOR OPLOG ROLL: " + pass);
     }

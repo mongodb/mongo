@@ -2,20 +2,32 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/net/message_port.h"
 
@@ -24,6 +36,7 @@
 
 #include "mongo/util/background.h"
 #include "mongo/util/goodies.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -41,6 +54,7 @@
 
 namespace mongo {
 
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
 
 // if you want trace output:
 #define mmm(x)
@@ -94,13 +108,13 @@ namespace mongo {
     };
 
     class Ports {
-        set<MessagingPort*> ports;
+        std::set<MessagingPort*> ports;
         mongo::mutex m;
     public:
         Ports() : ports(), m("Ports") {}
         void closeAll(unsigned skip_mask) {
             scoped_lock bl(m);
-            for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ ) {
+            for ( std::set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ ) {
                 if( (*i)->tag & skip_mask )
                     continue;
                 (*i)->shutdown();
@@ -167,8 +181,8 @@ again:
             if ( len == 542393671 ) {
                 // an http GET
                 string msg = "It looks like you are trying to access MongoDB over HTTP on the native driver port.\n";
-                LOG( psock->getLogLevel() ) << msg << endl;
-                stringstream ss;
+                LOG( psock->getLogLevel() ) << msg;
+                std::stringstream ss;
                 ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
                 string s = ss.str();
                 send( s.c_str(), s.size(), "http" );
@@ -202,9 +216,10 @@ again:
                         sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_requireSSL);
 #endif // MONGO_SSL
             }
-            else if ( len < static_cast<int>(sizeof(MSGHEADER)) || len > MaxMessageSizeBytes ) {
+            if ( static_cast<size_t>(len) < sizeof(MSGHEADER) || 
+                 static_cast<size_t>(len) > MaxMessageSizeBytes ) {
                 LOG(0) << "recv(): message len " << len << " is invalid. "
-                       << "Min " << sizeof(MSGHEADER) << " Max: " << MaxMessageSizeBytes << endl;
+                       << "Min " << sizeof(MSGHEADER) << " Max: " << MaxMessageSizeBytes;
                 return false;
             }
 
@@ -229,7 +244,7 @@ again:
             logger::LogSeverity severity = psock->getLogLevel();
             if (!e.shouldPrint())
                 severity = severity.lessSevere();
-            LOG(severity) << "SocketException: remote: " << remote() << " error: " << e << endl;
+            LOG(severity) << "SocketException: remote: " << remote() << " error: " << e;
             m.reset();
             return false;
         }
@@ -259,13 +274,13 @@ again:
             //log() << "got response: " << response.data->responseTo << endl;
             if ( response.header()->responseTo == toSend.header()->id )
                 break;
-            error() << "MessagingPort::call() wrong id got:" << hex << (unsigned)response.header()->responseTo << " expect:" << (unsigned)toSend.header()->id << '\n'
-                    << dec
+            error() << "MessagingPort::call() wrong id got:" << std::hex << (unsigned)response.header()->responseTo << " expect:" << (unsigned)toSend.header()->id << '\n'
+                    << std::dec
                     << "  toSend op: " << (unsigned)toSend.operation() << '\n'
                     << "  response msgid:" << (unsigned)response.header()->id << '\n'
                     << "  response len:  " << (unsigned)response.header()->len << '\n'
                     << "  response op:  " << response.operation() << '\n'
-                    << "  remote: " << psock->remoteString() << endl;
+                    << "  remote: " << psock->remoteString();
             verify(false);
             response.reset();
         }
@@ -314,8 +329,10 @@ again:
     }
 
     HostAndPort MessagingPort::remote() const {
-        if ( ! _remoteParsed.hasPort() )
-            _remoteParsed = HostAndPort( psock->remoteAddr() );
+        if ( ! _remoteParsed.hasPort() ) {
+            SockAddr sa = psock->remoteAddr();
+            _remoteParsed = HostAndPort( sa.getAddr(), sa.getPort());
+        }
         return _remoteParsed;
     }
 

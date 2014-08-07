@@ -40,24 +40,21 @@ namespace mongo {
     public:
         static void disableAuthMechanism(std::string authMechanism);
 
-        virtual bool logTheOp() {
-            return false;
-        }
         virtual bool slaveOk() const {
             return true;
         }
-        virtual LockType locktype() const { return NONE; }
-        virtual void help(stringstream& ss) const { ss << "internal"; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
+        virtual void help(std::stringstream& ss) const { ss << "internal"; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         virtual void redactForLogging(mutablebson::Document* cmdObj);
 
         CmdAuthenticate() : Command("authenticate") {}
-        bool run(const string& dbname,
+        bool run(OperationContext* txn, const std::string& dbname,
                  BSONObj& cmdObj,
                  int options,
-                 string& errmsg,
+                 std::string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl);
 
@@ -74,11 +71,15 @@ namespace mongo {
          * mechanism, and ProtocolError, indicating an error in the use of the authentication
          * protocol.
          */
-        Status _authenticate(const std::string& mechanism,
+        Status _authenticate(OperationContext* txn,
+                             const std::string& mechanism,
                              const UserName& user,
                              const BSONObj& cmdObj);
-        Status _authenticateCR(const UserName& user, const BSONObj& cmdObj);
-        Status _authenticateX509(const UserName& user, const BSONObj& cmdObj);
+        Status _authenticateCR(
+                    OperationContext* txn, const UserName& user, const BSONObj& cmdObj);
+        Status _authenticateX509(
+                    OperationContext* txn, const UserName& user, const BSONObj& cmdObj);
+        bool _clusterIdMatch(const std::string& subjectName, const std::string& srvSubjectName);
     };
 
     extern CmdAuthenticate cmdAuthenticate;

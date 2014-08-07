@@ -50,10 +50,11 @@ assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(),
 //
 // Insert 100 documents into sharded collection, such that each shard owns 50.
 //
+var bulk = coll.initializeUnorderedBulkOp();
 for (i=-50; i<50; i++) {
-    coll.insert({_id: i});
+    bulk.insert({ _id: i });
 }
-assert.eq(null, coll.getDB().getLastError());
+assert.writeOK(bulk.execute());
 assert.eq(50, shards[0].getCollection(coll.getFullName()).count());
 assert.eq(50, shards[1].getCollection(coll.getFullName()).count());
 

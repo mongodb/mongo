@@ -54,17 +54,11 @@ namespace mongo {
         virtual ~ClusterPlanCacheCmd() {
         }
 
-        bool logTheOp() {
-            return false;
-        }
-
         bool slaveOk() const {
             return false;
         }
 
-        LockType locktype() const {
-            return Command::NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         void help(stringstream& ss) const {
             ss << _helpText;
@@ -84,7 +78,7 @@ namespace mongo {
         }
 
         // Cluster plan cache command entry point.
-        bool run( const std::string& dbname,
+        bool run(OperationContext* txn, const std::string& dbname,
                   BSONObj& cmdObj,
                   int options,
                   std::string& errmsg,
@@ -112,7 +106,7 @@ namespace mongo {
     // Cluster plan cache command implementation(s) below
     //
 
-    bool ClusterPlanCacheCmd::run( const std::string& dbName,
+    bool ClusterPlanCacheCmd::run(OperationContext* txn, const std::string& dbName,
                                BSONObj& cmdObj,
                                int options,
                                std::string& errMsg,
@@ -166,12 +160,7 @@ namespace mongo {
 
             new ClusterPlanCacheCmd(
                 "planCacheClear",
-                "Drops all cached queries in a collection.",
-                ActionType::planCacheWrite );
-
-            new ClusterPlanCacheCmd(
-                "planCacheDrop",
-                "Drops query shape from plan cache.",
+                "Drops one or all cached queries in a collection.",
                 ActionType::planCacheWrite );
 
             new ClusterPlanCacheCmd(

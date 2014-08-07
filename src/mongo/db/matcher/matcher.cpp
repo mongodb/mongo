@@ -41,10 +41,11 @@
 
 namespace mongo {
 
-    Matcher2::Matcher2( const BSONObj& pattern, bool nested )
-        : _pattern( pattern ) {
+    Matcher::Matcher(const BSONObj& pattern, 
+                     const MatchExpressionParser::WhereCallback& whereCallback)
+        : _pattern(pattern) {
 
-        StatusWithMatchExpression result = MatchExpressionParser::parse( pattern );
+        StatusWithMatchExpression result = MatchExpressionParser::parse(pattern, whereCallback);
         uassert( 16810,
                  mongoutils::str::stream() << "bad query: " << result.toString(),
                  result.isOK() );
@@ -52,7 +53,7 @@ namespace mongo {
         _expression.reset( result.getValue() );
     }
 
-    bool Matcher2::matches(const BSONObj& doc, MatchDetails* details ) const {
+    bool Matcher::matches(const BSONObj& doc, MatchDetails* details ) const {
         if ( !_expression )
             return true;
 

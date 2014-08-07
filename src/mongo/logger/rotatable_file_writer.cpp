@@ -1,22 +1,35 @@
 /*    Copyright 2013 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/logger/rotatable_file_writer.h"
 
+#include <boost/filesystem/operations.hpp>
 #include <boost/scoped_array.hpp>
 #include <cstdio>
 #include <fstream>
@@ -82,6 +95,8 @@ namespace {
     private:
         virtual std::streamsize xsputn(const char* s, std::streamsize count);
         virtual int_type overflow(int_type ch = traits_type::eof());
+
+        std::streamsize writeToFile(const char* s, std::streamsize count);
 
         HANDLE _fileHandle;
     };
@@ -152,8 +167,9 @@ namespace {
         return false;
     }
 
-    std::streamsize Win32FileStreambuf::xsputn(const char* s, std::streamsize count) {
+    std::streamsize Win32FileStreambuf::writeToFile(const char* s, std::streamsize count) {
         DWORD totalBytesWritten = 0;
+
         while (count > totalBytesWritten) {
             DWORD bytesWritten;
             if (!WriteFile(
@@ -166,9 +182,36 @@ namespace {
             }
             totalBytesWritten += bytesWritten;
         }
+
         return totalBytesWritten;
     }
 
+    // Called when strings are written to ostream
+    std::streamsize Win32FileStreambuf::xsputn(const char* s, std::streamsize count) {
+        DWORD totalBytesWritten = 0;
+
+        // Scan for embedded newlines before end
+        // this should be rare since the newline should only be at the end
+        const char* startPos = s;
+        for (int i = 0; i < count; i++) {
+            if (s[i] == '\n') {
+                totalBytesWritten += writeToFile(startPos, i - (startPos - s));
+                writeToFile("\r\n", 2);
+                totalBytesWritten += 1; // Caller expected we only wrote 1 char, so tell them so
+                startPos = &s[i + 1];
+            }
+        }
+
+        // Did the string not end on "\n"? Write the remaining, no need for CRLF
+        // as upper layers are responsible for it
+        if ((startPos - s) != count) {
+            totalBytesWritten += writeToFile(startPos, count - (startPos - s));
+        }
+
+        return totalBytesWritten;
+    }
+
+    // Overflow is called for single character writes to the ostream
     Win32FileStreambuf::int_type Win32FileStreambuf::overflow(int_type ch) {
         if (ch == traits_type::eof())
             return ~ch;  // Returning traits_type::eof() => failure, anything else => success.
@@ -208,15 +251,31 @@ namespace {
         return _openFileStream(append);
     }
 
-    Status RotatableFileWriter::Use::rotate(const std::string& renameTarget) {
+    Status RotatableFileWriter::Use::rotate(bool renameOnRotate, const std::string& renameTarget) {
         if (_writer->_stream) {
             _writer->_stream->flush();
-            if (0 != renameFile(_writer->_fileName, renameTarget)) {
-                return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
-                              "Failed  to rename \"" << _writer->_fileName << "\" to \"" <<
-                              renameTarget << "\": " << strerror(errno) << " (" << errno << ')');
-                //TODO(schwerin): Make errnoWithDescription() available in the logger library, and
-                //use it here.
+
+            if(renameOnRotate) {
+                try {
+                    if (boost::filesystem::exists(renameTarget)) {
+                        return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
+                                      "Renaming file " << _writer->_fileName << " to " <<
+                                      renameTarget << " failed; destination already exists");
+                    }
+                } catch (const std::exception& e) {
+                        return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
+                                      "Renaming file " << _writer->_fileName << " to " <<
+                                      renameTarget << " failed; Cannot verify whether destination "
+                                      "already exists: " << e.what());
+                }
+
+                if (0 != renameFile(_writer->_fileName, renameTarget)) {
+                    return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
+                                  "Failed  to rename \"" << _writer->_fileName << "\" to \"" <<
+                                  renameTarget << "\": " << strerror(errno) << " (" << errno << ')');
+                    //TODO(schwerin): Make errnoWithDescription() available in the logger library, and
+                    //use it here.
+                }
             }
         }
         return _openFileStream(false);

@@ -211,11 +211,17 @@ namespace audit {
 
     void appendImpersonatedUsers(BSONObjBuilder* cmd) MONGO_AUDIT_STUB
 
-    void parseAndRemoveImpersonatedUserField(BSONObj cmdObj, 
-                                             AuthorizationSession* authSession,
-                                             std::vector<UserName>* parsedUserNames,
-                                             bool* fieldIsPresent)
-                                             MONGO_AUDIT_STUB
+    void parseAndRemoveImpersonatedUsersField(
+            BSONObj cmdObj,
+            AuthorizationSession* authSession,
+            std::vector<UserName>* parsedUserNames,
+            bool* fieldIsPresent) MONGO_AUDIT_STUB
+
+    void parseAndRemoveImpersonatedRolesField(
+            BSONObj cmdObj,
+            AuthorizationSession* authSession,
+            std::vector<RoleName>* parsedRoleNames,
+            bool* fieldIsPresent) MONGO_AUDIT_STUB
 
 }  // namespace audit
 }  // namespace mongo

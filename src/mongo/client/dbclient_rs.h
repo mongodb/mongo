@@ -2,17 +2,29 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
@@ -46,7 +58,7 @@ namespace mongo {
         using DBClientBase::remove;
 
         /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet connections. */
-        DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout=0 );
+        DBClientReplicaSet( const std::string& name , const std::vector<HostAndPort>& servers, double so_timeout=0 );
         virtual ~DBClientReplicaSet();
 
         /**
@@ -63,26 +75,26 @@ namespace mongo {
          * @param info the result object for the logout command (provided for backwards
          *     compatibility with mongo shell)
          */
-        virtual void logout(const string& dbname, BSONObj& info);
+        virtual void logout(const std::string& dbname, BSONObj& info);
 
         // ----------- simple functions --------------
 
         /** throws userassertion "no master found" */
-        virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
+        virtual std::auto_ptr<DBClientCursor> query(const std::string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 );
 
         /** throws userassertion "no master found" */
-        virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        virtual BSONObj findOne(const std::string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
-        virtual void insert( const string &ns , BSONObj obj , int flags=0);
+        virtual void insert( const std::string &ns , BSONObj obj , int flags=0);
 
         /** insert multiple objects.  Note that single object insert is asynchronous, so this version
             is only nominally faster and not worth a special effort to try to use.  */
-        virtual void insert( const string &ns, const vector< BSONObj >& v , int flags=0);
+        virtual void insert( const std::string &ns, const std::vector< BSONObj >& v , int flags=0);
 
-        virtual void remove( const string &ns , Query obj , int flags );
+        virtual void remove( const std::string &ns , Query obj , int flags );
 
-        virtual void update( const string &ns , Query query , BSONObj obj , int flags );
+        virtual void update( const std::string &ns , Query query , BSONObj obj , int flags );
 
         virtual void killCursor( long long cursorID );
 
@@ -107,9 +119,9 @@ namespace mongo {
 
         // ---- callback pieces -------
 
-        virtual void say( Message &toSend, bool isRetry = false , string* actualServer = 0);
+        virtual void say( Message &toSend, bool isRetry = false , std::string* actualServer = 0);
         virtual bool recv( Message &toRecv );
-        virtual void checkResponse( const char* data, int nReturned, bool* retry = NULL, string* targetHost = NULL );
+        virtual void checkResponse( const char* data, int nReturned, bool* retry = NULL, std::string* targetHost = NULL );
 
         /* this is the callback from our underlying connections to notify us that we got a "not master" error.
          */
@@ -128,16 +140,16 @@ namespace mongo {
 
         double getSoTimeout() const { return _so_timeout; }
 
-        string toString() const { return getServerAddress(); }
+        std::string toString() const { return getServerAddress(); }
 
-        string getServerAddress() const;
+        std::string getServerAddress() const;
 
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::SET; }
         virtual bool lazySupported() const { return true; }
 
         // ---- low level ------
 
-        virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true , std::string * actualServer = 0 );
         virtual bool callRead( Message& toSend , Message& response ) { return checkMaster()->callRead( toSend , response ); }
 
         /**
@@ -150,12 +162,24 @@ namespace mongo {
          *
          * @return true if the query/cmd could potentially be sent to a secondary, false otherwise
          */
-        static bool isSecondaryQuery( const string& ns,
+        static bool isSecondaryQuery( const std::string& ns,
                                       const BSONObj& queryObj,
                                       int queryOptions );
 
         virtual void setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func);
         virtual void setPostRunCommandHook(DBClientWithCommands::PostRunCommandHookFunc func);
+
+        /**
+         * Performs a "soft reset" by clearing all states relating to secondary nodes and
+         * returning secondary connections to the pool.
+         */
+        virtual void reset();
+
+        /**
+         * @bool setting if true, DBClientReplicaSet connections will make sure that secondary
+         *    connections are authenticated and log them before returning them to the pool.
+         */
+        static void setAuthPooledSecondaryConn(bool setting);
 
     protected:
         /** Authorize.  Authorizes all nodes as needed
@@ -172,7 +196,7 @@ namespace mongo {
          * @throws DBException if the directed node cannot accept the query because it
          *     is not a master
          */
-        auto_ptr<DBClientCursor> checkSlaveQueryResult( auto_ptr<DBClientCursor> result );
+        std::auto_ptr<DBClientCursor> checkSlaveQueryResult( std::auto_ptr<DBClientCursor> result );
 
         DBClientConnection * checkMaster();
 
@@ -204,29 +228,45 @@ namespace mongo {
         void _auth( DBClientConnection * conn );
 
         /**
+         * Calls logout on the connection for all known database this DBClientRS instance has
+         * logged in.
+         */
+        void logoutAll(DBClientConnection* conn);
+
+        /**
+         * Clears the master connection.
+         */
+        void resetMaster();
+
+        /**
+         * Clears the slaveOk connection and returns it to the pool if not the same as _master.
+         */
+        void resetSlaveOkConn();
+
+        /**
          * Maximum number of retries to make for auto-retry logic when performing a slave ok
          * operation.
          */
         static const size_t MAX_RETRY;
 
+        // TODO: remove this when processes other than mongos uses the driver version.
+        static bool _authPooledSecondaryConn;
+
         // Throws a DBException if the monitor doesn't exist and there isn't a cached seed to use.
         ReplicaSetMonitorPtr _getMonitor() const;
 
-        string _setName;
+        std::string _setName;
 
         HostAndPort _masterHost;
-        // Note: reason why this is a shared_ptr is because we want _lastSlaveOkConn to
-        // keep a reference of the _master connection when it selected a primary node.
-        // This is because the primary connection is special in mongos - it is the only
-        // connection that is versioned.
-        // WARNING: do not assign this variable (which will increment the internal ref
-        // counter) to any other variable other than _lastSlaveOkConn.
-        boost::shared_ptr<DBClientConnection> _master;
+        boost::scoped_ptr<DBClientConnection> _master;
 
-        // Last used host in a slaveOk query (can be a primary)
+        // Last used host in a slaveOk query (can be a primary).
         HostAndPort _lastSlaveOkHost;
-        // Last used connection in a slaveOk query (can be a primary)
-        boost::shared_ptr<DBClientConnection> _lastSlaveOkConn;
+        // Last used connection in a slaveOk query (can be a primary).
+        // Connection can either be owned here or returned to the connection pool. Note that
+        // if connection is primary, it is owned by _master so it is incorrect to return
+        // it to the pool.
+        std::auto_ptr<DBClientConnection> _lastSlaveOkConn;
         boost::shared_ptr<ReadPreferenceSetting> _lastReadPref;
 
         double _so_timeout;
@@ -235,7 +275,7 @@ namespace mongo {
         // we can re-auth
         // this could be a security issue, as the password is stored in memory
         // not sure if/how we should handle
-        std::map<string, BSONObj> _auths; // dbName -> auth parameters
+        std::map<std::string, BSONObj> _auths; // dbName -> auth parameters
 
     protected:
 

@@ -99,9 +99,8 @@ var CLUSTER_PERM = { killOp: 1, currentOp: 1, fsync_unlock: 1, killCursor: 1, pr
  *
  * @param shouldPass {Boolean} true means that the operation should succeed.
  * @param opFunc {function()} a function object which contains the operation to perform.
- * @param db {DB?} an optional parameter that will be used to call getLastError if present.
  */
-var checkErr = function(shouldPass, opFunc, db) {
+var checkErr = function(shouldPass, opFunc) {
     var success = true;
 
     var exception = null;
@@ -112,17 +111,10 @@ var checkErr = function(shouldPass, opFunc, db) {
         success = false;
     }
 
-    var gle = null;
-    if (db != null) {
-        gle = db.getLastError();
-        success = success && (gle == null);
-    }
-
     assert(success == shouldPass, 'expected shouldPass: ' + shouldPass +
         ', got: ' + success +
         ', op: ' + tojson(opFunc) +
-        ', exception: ' + tojson(exception) +
-        ', gle: ' + tojson(gle));
+        ', exception: ' + tojson(exception));
 };
 
 /**
@@ -130,7 +122,7 @@ var checkErr = function(shouldPass, opFunc, db) {
  *
  * @param db {DB} the database object to use.
  * @param allowedActions {Object} the lists of operations that are allowed for the
- *     current user. The data structure is represented as a map with the presense of
+ *     current user. The data structure is represented as a map with the presence of
  *     a field name means that the operation is allowed and not allowed if it is
  *     not present. The list of field names are: insert, update, remove, query, killOp,
  *     currentOp, index_r, index_w, profile_r, profile_w, user_r, user_w, killCursor,
@@ -138,16 +130,19 @@ var checkErr = function(shouldPass, opFunc, db) {
  */
 var testOps = function(db, allowedActions) {
     checkErr(allowedActions.hasOwnProperty('insert'), function() {
-        db.user.insert({ y: 1 });
-    }, db);
+        var res = db.user.insert({ y: 1 });
+        if (res.hasWriteError()) throw Error("insert failed: " + tojson(res.getRawResponse()));
+    });
 
     checkErr(allowedActions.hasOwnProperty('update'), function() {
-        db.user.update({ y: 1 }, { z: 3 });
-    }, db);
+        var res = db.user.update({ y: 1 }, { z: 3 });
+        if (res.hasWriteError()) throw Error("update failed: " + tojson(res.getRawResponse()));
+    });
 
     checkErr(allowedActions.hasOwnProperty('remove'), function() {
-        db.user.remove({ y: 1 });
-    }, db);
+        var res = db.user.remove({ y: 1 });
+        if (res.hasWriteError()) throw Error("remove failed: " + tojson(res.getRawResponse()));
+    });
 
     checkErr(allowedActions.hasOwnProperty('query'), function() {
         db.user.findOne({ y: 1 });
@@ -157,7 +152,7 @@ var testOps = function(db, allowedActions) {
         var res = db.killOp(1);
 
         if (res.err == 'unauthorized') {
-            throw 'unauthorized killOp';
+            throw Error("unauthorized killOp");
         }
     });
 
@@ -165,7 +160,7 @@ var testOps = function(db, allowedActions) {
         var res = db.currentOp();
 
         if (res.err == 'unauthorized') {
-            throw 'unauthorized currentOp';
+            throw Error("unauthorized currentOp");
         }
     });
 
@@ -174,16 +169,22 @@ var testOps = function(db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty('index_w'), function() {
-        db.user.ensureIndex({ x: 1 });
-    }, db);
+        var res = db.user.ensureIndex({ x: 1 });
+        if (res.code == 13) { // Unauthorized
+            throw Error("unauthorized currentOp");
+        }
+    });
 
     checkErr(allowedActions.hasOwnProperty('profile_r'), function() {
         db.system.profile.findOne();
     });
 
     checkErr(allowedActions.hasOwnProperty('profile_w'), function() {
-        db.system.profile.insert({ x: 1 });
-    }, db);
+        var res = db.system.profile.insert({ x: 1 });
+        if (res.hasWriteError()) {
+            throw Error("profile insert failed: " + tojson(res.getRawResponse()));
+        }
+    });
 
     checkErr(allowedActions.hasOwnProperty('user_r'), function() {
         var result = db.runCommand({usersInfo: 1});
@@ -194,8 +195,8 @@ var testOps = function(db, allowedActions) {
 
     checkErr(allowedActions.hasOwnProperty('user_w'), function() {
         db.createUser({user:'a', pwd: 'a', roles: jsTest.basicUserRoles});
-        db.dropUser('a');
-    }, db);
+        assert(db.dropUser('a'));
+    });
 
     // Test for kill cursor
     (function() {
@@ -238,7 +239,7 @@ var testOps = function(db, allowedActions) {
             var res = db.fsyncUnlock();
 
             if (res.err == 'unauthorized') {
-                throw 'unauthorized fsync unlock';
+                throw Error("unauthorized unauthorized fsyncUnlock");
             }
         });
     }
@@ -476,14 +477,14 @@ var runTests = function(conn) {
         var testDB = conn.getDB('test');
         var adminDB = conn.getDB('admin');
 
+        adminDB.createUser({ user: 'root', pwd: AUTH_INFO.admin.root.pwd,
+                             roles: AUTH_INFO.admin.root.roles });
+        adminDB.auth('root', AUTH_INFO.admin.root.pwd);
+
         for (var x = 0; x < 10; x++) {
             testDB.kill_cursor.insert({ x: x });
             adminDB.kill_cursor.insert({ x: x });
         }
-
-        adminDB.createUser({ user: 'root', pwd: AUTH_INFO.admin.root.pwd,
-                             roles: AUTH_INFO.admin.root.roles });
-        adminDB.auth('root', AUTH_INFO.admin.root.pwd);
 
         for (var dbName in AUTH_INFO) {
             var dbObj = AUTH_INFO[dbName];
@@ -525,10 +526,12 @@ var runTests = function(conn) {
         }
     });
 
+    teardown();
+
     if (failures.length > 0) {
         var list = '';
         failures.forEach(function(test) { list += (test + '\n'); });
-        throw 'Tests failed:\n' + list;
+        throw Error('Tests failed:\n' + list);
     }
 };
 
@@ -541,3 +544,4 @@ var st = new ShardingTest({ shards: 1, keyFile: 'jstests/libs/key1' });
 runTests(st.s);
 st.stop();
 
+print('SUCCESS! Completed basic_role_auth.js');

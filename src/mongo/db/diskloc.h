@@ -40,12 +40,6 @@
 
 namespace mongo {
 
-    class Record;
-    class DeletedRecord;
-    class Extent;
-    class DataFile;
-    class DiskLoc;
-
     template< class Version > class BtreeBucket;
 
 #pragma pack(1)
@@ -83,22 +77,24 @@ namespace mongo {
         }
 
         bool isNull() const { return _a == -1; }
-        void Null() {
+        DiskLoc& Null() {
             _a = -1;
             ofs = 0; /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but outside DiskLoc context so confusing as-is. */
+            return *this;
         }
         void assertOk() const { verify(!isNull()); }
-        void setInvalid() {
+        DiskLoc& setInvalid() {
             _a = -2;
             ofs = 0;
+            return *this;
         }
         bool isValid() const { return _a != -2; }
 
-        string toString() const {
+        std::string toString() const {
             if ( isNull() )
                 return "null";
-            stringstream ss;
-            ss << _a << ':' << hex << ofs;
+            std::stringstream ss;
+            ss << _a << ':' << std::hex << ofs;
             return ss.str();
         }
 
@@ -151,30 +147,6 @@ namespace mongo {
         struct Hasher {
             size_t operator()( DiskLoc loc ) const;
         };
-
-        /**
-         * Marks this disk loc for writing
-         * @returns a non const reference to this disk loc
-         * This function explicitly signals we are writing and casts away const
-         */
-        DiskLoc& writing() const; // see dur.h
-
-        /* Get the "thing" associated with this disk location.
-           it is assumed the object is what you say it is -- you must assure that
-           (think of this as an unchecked type cast)
-           Note: set your Context first so that the database to which the diskloc applies is known.
-        */
-        BSONObj obj() const; // TODO(ERH): remove
-        Record* rec() const; // TODO(ERH): remove
-        DeletedRecord* drec() const; // TODO(ERH): remove
-        Extent* ext() const; // TODO(ERH): remove
-
-        template< class V >
-        const BtreeBucket<V> * btree() const; // TODO(ERH): remove
-
-        // Explicitly signals we are writing and casts away const
-        template< class V >
-        BtreeBucket<V> * btreemod() const; // TODO(ERH): remove
 
         /// members for Sorter
         struct SorterDeserializeSettings {}; // unused

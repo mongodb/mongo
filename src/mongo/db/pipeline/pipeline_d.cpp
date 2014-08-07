@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012 10gen Inc.
+ * Copyright (c) 2012-2014 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -32,11 +32,11 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/s/d_logic.h"
 
@@ -45,7 +45,17 @@ namespace mongo {
 namespace {
     class MongodImplementation : public DocumentSourceNeedsMongod::MongodInterface {
     public:
-        DBClientBase* directClient() { return &_client; }
+        MongodImplementation(const intrusive_ptr<ExpressionContext>& ctx)
+            : _ctx(ctx)
+            , _client(ctx->opCtx)
+        {}
+
+        DBClientBase* directClient() {
+            // opCtx may have changed since our last call
+            invariant(_ctx->opCtx);
+            _client.setOpCtx(_ctx->opCtx);
+            return &_client;
+        }
 
         bool isSharded(const NamespaceString& ns) {
             const ChunkVersion unsharded(0, 0, OID());
@@ -53,19 +63,25 @@ namespace {
         }
 
         bool isCapped(const NamespaceString& ns) {
-            Client::ReadContext ctx(ns.ns());
-            Collection* collection = ctx.ctx().db()->getCollection(ns);
+            Client::ReadContext ctx(_ctx->opCtx, ns.ns());
+            Collection* collection = ctx.ctx().db()->getCollection(_ctx->opCtx, ns);
             return collection && collection->isCapped();
         }
 
     private:
+        intrusive_ptr<ExpressionContext> _ctx;
         DBDirectClient _client;
     };
 }
 
-    void PipelineD::prepareCursorSource(
-        const intrusive_ptr<Pipeline> &pPipeline,
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
+    boost::shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
+            OperationContext* txn,
+            Collection* collection,
+            const intrusive_ptr<Pipeline>& pPipeline,
+            const intrusive_ptr<ExpressionContext>& pExpCtx) {
+        // get the full "namespace" name
+        const string& fullName = pExpCtx->ns.ns();
+        pExpCtx->opCtx->lockState()->assertAtLeastReadLocked(fullName);
 
         // We will be modifying the source vector as we go
         Pipeline::SourceContainer& sources = pPipeline->sources;
@@ -75,7 +91,8 @@ namespace {
             DocumentSourceNeedsMongod* needsMongod =
                 dynamic_cast<DocumentSourceNeedsMongod*>(sources[i].get());
             if (needsMongod) {
-                needsMongod->injectMongodInterface(boost::make_shared<MongodImplementation>());
+                needsMongod->injectMongodInterface(
+                    boost::make_shared<MongodImplementation>(pExpCtx));
             }
         }
 
@@ -87,7 +104,7 @@ namespace {
                 // on secondaries, this is needed.
                 ShardedConnectionInfo::addHook();
             }
-            return; // don't need a cursor
+            return boost::shared_ptr<PlanExecutor>(); // don't need a cursor
         }
 
 
@@ -125,58 +142,33 @@ namespace {
             }
         }
 
-        // get the full "namespace" name
-        const string& fullName = pExpCtx->ns.ns();
-
-        // for debugging purposes, show what the query and sort are
-        DEV {
-            (log() << "\n---- query BSON\n" <<
-             queryObj.jsonString(Strict, 1) << "\n----\n");
-            (log() << "\n---- sort BSON\n" <<
-             sortObj.jsonString(Strict, 1) << "\n----\n");
-            (log() << "\n---- fullName\n" <<
-             fullName << "\n----\n");
-        }
-
-        // Create the necessary context to use a Runner, including taking a namespace read lock.
-        // Note: this may throw if the sharding version for this connection is out of date.
-        Client::ReadContext context(fullName);
-        Collection* collection = context.ctx().db()->getCollection(fullName);
-        if ( !collection ) {
-            intrusive_ptr<DocumentSource> source(DocumentSourceBsonArray::create(BSONObj(),
-                                                                                 pExpCtx));
-            while (!sources.empty() && source->coalesce(sources.front())) {
-                sources.pop_front();
-            }
-            pPipeline->addInitialSource( source );
-            return;
-        }
-
-        // Create the Runner.
+        // Create the PlanExecutor.
         //
-        // If we try to create a Runner that includes both the match and the
+        // If we try to create a PlanExecutor that includes both the match and the
         // sort, and the two are incompatible wrt the available indexes, then
-        // we don't get a Runner back.
+        // we don't get a PlanExecutor back.
         //
         // So we try to use both first.  If that fails, try again, without the
         // sort.
         //
-        // If we don't have a sort, jump straight to just creating a Runner
+        // If we don't have a sort, jump straight to just creating a PlanExecutor.
         // without the sort.
         //
-        // If we are able to incorporate the sort into the Runner, remove it
+        // If we are able to incorporate the sort into the PlanExecutor, remove it
         // from the head of the pipeline.
         //
         // LATER - we should be able to find this out before we create the
         // cursor.  Either way, we can then apply other optimizations there
         // are tickets for, such as SERVER-4507.
         const size_t runnerOptions = QueryPlannerParams::DEFAULT
-                                   | QueryPlannerParams::INCLUDE_COLLSCAN
                                    | QueryPlannerParams::INCLUDE_SHARD_FILTER
                                    | QueryPlannerParams::NO_BLOCKING_SORT
                                    ;
-        auto_ptr<Runner> runner;
+        boost::shared_ptr<PlanExecutor> exec;
         bool sortInRunner = false;
+
+        const WhereCallbackReal whereCallback(pExpCtx->opCtx, pExpCtx->ns.db());
+
         if (sortStage) {
             CanonicalQuery* cq;
             Status status =
@@ -184,11 +176,12 @@ namespace {
                                              queryObj,
                                              sortObj,
                                              projectionForQuery,
-                                             &cq);
-            Runner* rawRunner;
-            if (status.isOK() && getRunner(cq, &rawRunner, runnerOptions).isOK()) {
-                // success: The Runner will handle sorting for us using an index.
-                runner.reset(rawRunner);
+                                             &cq,
+                                             whereCallback);
+            PlanExecutor* rawExec;
+            if (status.isOK() && getExecutor(txn, collection, cq, &rawExec, runnerOptions).isOK()) {
+                // success: The PlanExecutor will handle sorting for us using an index.
+                exec.reset(rawExec);
                 sortInRunner = true;
 
                 sources.pop_front();
@@ -199,7 +192,7 @@ namespace {
             }
         }
 
-        if (!runner.get()) {
+        if (!exec.get()) {
             const BSONObj noSort;
             CanonicalQuery* cq;
             uassertStatusOK(
@@ -207,26 +200,21 @@ namespace {
                                              queryObj,
                                              noSort,
                                              projectionForQuery,
-                                             &cq));
+                                             &cq,
+                                             whereCallback));
 
-            Runner* rawRunner;
-            uassertStatusOK(getRunner(cq, &rawRunner, runnerOptions));
-            runner.reset(rawRunner);
+            PlanExecutor* rawExec;
+            uassertStatusOK(getExecutor(txn, collection, cq, &rawExec, runnerOptions));
+            exec.reset(rawExec);
         }
 
-        // Now wrap the Runner in ClientCursor
-        auto_ptr<ClientCursor> cursor(new ClientCursor(collection, runner.release()));
-        verify(cursor->getRunner());
-        CursorId cursorId = cursor->cursorid();
 
-        // Prepare the cursor for data to change under it when we unlock
-        cursor->getRunner()->setYieldPolicy(Runner::YIELD_AUTO);
-        cursor->getRunner()->saveState();
-        cursor.release(); // it is now owned by the client cursor manager
+        // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved.
+        exec->saveState();
 
-        /* wrap the cursor with a DocumentSource and return that */
-        intrusive_ptr<DocumentSourceCursor> pSource(
-            DocumentSourceCursor::create( fullName, cursorId, pExpCtx ) );
+        // Put the PlanExecutor into a DocumentSourceCursor and add it to the front of the pipeline.
+        intrusive_ptr<DocumentSourceCursor> pSource =
+            DocumentSourceCursor::create(fullName, exec, pExpCtx);
 
         // Note the query, sort, and projection for explain.
         pSource->setQuery(queryObj);
@@ -240,6 +228,8 @@ namespace {
         }
 
         pPipeline->addInitialSource(pSource);
+
+        return exec;
     }
 
 } // namespace mongo

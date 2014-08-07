@@ -29,7 +29,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 
@@ -37,10 +37,12 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/unittest/unittest.h"
+
 
 namespace mongo {
     // This specifies default dbpath for our testing framework
@@ -702,7 +704,7 @@ namespace Plan {
             lk_.reset( new Lock::GlobalWrite );
         }
         void run() {
-            Client::Context ctx( ns_ );
+            Client::Context ctx(txn,  ns_ );
             for( int i = 0; i < 10000; ++i ) {
                 scoped_ptr<MultiPlanScanner> s
                         ( MultiPlanScanner::make( ns_.c_str(), BSONObj(), BSON( "a" << 1 ) ) );
@@ -723,7 +725,7 @@ namespace Plan {
             lk_.reset( new Lock::GlobalWrite );
         }
         void run() {
-            Client::Context ctx( ns_.c_str() );
+            Client::Context ctx(txn,  ns_.c_str() );
             for( int i = 0; i < 10000; ++i ) {
                 scoped_ptr<MultiPlanScanner>
                         s( MultiPlanScanner::make( ns_.c_str(), BSON( "a" << 1 ), BSONObj() ) );
@@ -780,7 +782,9 @@ int main( int argc, char **argv, char** envp ) {
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
     mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(mongo::logger::LogSeverity::Log());
-    client_ = new DBDirectClient();
+
+    OperationContextImpl txn;
+    client_ = new DBDirectClient(&txn);
 
     return mongo::dbtests::runDbTests(argc, argv);
 }

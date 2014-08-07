@@ -41,8 +41,8 @@ namespace mongo {
 
         bool isVersionableCB( DBClientBase* );
         bool initShardVersionCB( DBClientBase*, BSONObj& );
-        bool forceRemoteCheckShardVersionCB( const string& );
-        bool checkShardVersionCB( DBClientBase*, const string&, bool, int );
+        bool forceRemoteCheckShardVersionCB( const std::string& );
+        bool checkShardVersionCB( DBClientBase*, const std::string&, bool, int );
         bool checkShardVersionCB( ShardConnection*, bool, int );
         void resetShardVersionCB( DBClientBase* );
 

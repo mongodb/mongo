@@ -27,7 +27,9 @@
 
 #include "mongo/db/write_concern_options.h"
 
+#include "mongo/bson/bson_field.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/field_parser.h"
 
 namespace mongo {
 
@@ -36,13 +38,49 @@ namespace mongo {
     const BSONObj WriteConcernOptions::AllConfigs = BSONObj();
     const BSONObj WriteConcernOptions::Unacknowledged(BSON("w" << W_NONE));
 
+    static const BSONField<bool> mongosSecondaryThrottleField("_secondaryThrottle", true);
+    static const BSONField<bool> secondaryThrottleField("secondaryThrottle", true);
+    static const BSONField<BSONObj> writeConcernField("writeConcern");
+
+    WriteConcernOptions::WriteConcernOptions(int numNodes,
+                                             SyncMode sync,
+                                             int timeout):
+                            syncMode(sync),
+                            wNumNodes(numNodes),
+                            wTimeout(timeout) {
+    }
+
+    WriteConcernOptions::WriteConcernOptions(const std::string& mode,
+                                             SyncMode sync,
+                                             int timeout):
+                            syncMode(sync),
+                            wNumNodes(0),
+                            wMode(mode),
+                            wTimeout(timeout) {
+    }
+
     Status WriteConcernOptions::parse( const BSONObj& obj ) {
+        if ( obj.isEmpty() ) {
+            return Status( ErrorCodes::FailedToParse, "write concern object cannot be empty" );
+        }
 
-        bool j = obj["j"].trueValue();
-        bool fsync = obj["fsync"].trueValue();
+        BSONElement jEl = obj["j"];
+        if ( !jEl.eoo() && !jEl.isNumber() && jEl.type() != Bool ) {
+            return Status( ErrorCodes::FailedToParse, "j must be numeric or a boolean value" );
+        }
 
-        if ( j & fsync )
-            return Status( ErrorCodes::BadValue, "fsync and j options cannot be used together" );
+        const bool j = jEl.trueValue();
+
+        BSONElement fsyncEl = obj["fsync"];
+        if ( !fsyncEl.eoo() && !fsyncEl.isNumber() && fsyncEl.type() != Bool ) {
+            return Status( ErrorCodes::FailedToParse, "fsync must be numeric or a boolean value" );
+        }
+
+        const bool fsync = fsyncEl.trueValue();
+
+        if ( j && fsync )
+            return Status( ErrorCodes::FailedToParse,
+                           "fsync and j options cannot be used together" );
 
         if ( j ) {
             syncMode = JOURNAL;
@@ -61,13 +99,94 @@ namespace mongo {
         else if ( e.eoo() ||
                   e.type() == jstNULL ||
                   e.type() == Undefined ) {
+            wNumNodes = 1;
         }
         else {
-            return Status( ErrorCodes::BadValue, "w has to be a number or a string" );
+            return Status( ErrorCodes::FailedToParse, "w has to be a number or a string" );
         }
 
         wTimeout = obj["wtimeout"].numberInt();
 
         return Status::OK();
+    }
+
+    Status WriteConcernOptions::parseSecondaryThrottle(const BSONObj& doc,
+                                                       BSONObj* rawWriteConcernObj) {
+        string errMsg;
+        bool isSecondaryThrottle;
+        FieldParser::FieldState fieldState = FieldParser::extract(doc,
+                                                                  secondaryThrottleField,
+                                                                  &isSecondaryThrottle,
+                                                                  &errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) {
+            return Status(ErrorCodes::FailedToParse, errMsg);
+        }
+
+        if (fieldState != FieldParser::FIELD_SET) {
+            fieldState = FieldParser::extract(doc,
+                                              mongosSecondaryThrottleField,
+                                              &isSecondaryThrottle,
+                                              &errMsg);
+
+            if (fieldState == FieldParser::FIELD_INVALID) {
+                return Status(ErrorCodes::FailedToParse, errMsg);
+            }
+        }
+
+        BSONObj dummyBSON;
+        if (!rawWriteConcernObj) {
+            rawWriteConcernObj = &dummyBSON;
+        }
+
+        fieldState = FieldParser::extract(doc,
+                                          writeConcernField,
+                                          rawWriteConcernObj,
+                                          &errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) {
+            return Status(ErrorCodes::FailedToParse, errMsg);
+        }
+
+        if (!isSecondaryThrottle) {
+            if (!rawWriteConcernObj->isEmpty()) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Cannot have write concern when secondary throttle is false");
+            }
+
+            wNumNodes = 1;
+            return Status::OK();
+        }
+
+        if (rawWriteConcernObj->isEmpty()) {
+            return Status(ErrorCodes::WriteConcernNotDefined,
+                          "Secondary throttle is on, but write concern is not specified");
+        }
+
+        return parse(*rawWriteConcernObj);
+    }
+
+    BSONObj WriteConcernOptions::toBSON() const {
+        BSONObjBuilder builder;
+
+        if (wMode.empty()) {
+            builder.append("w", wNumNodes);
+        }
+        else {
+            builder.append("w", wMode);
+        }
+
+        if (syncMode == FSYNC) {
+            builder.append("fsync", true);
+        }
+        else if (syncMode == JOURNAL) {
+            builder.append("j", true);
+        }
+
+        builder.append("wtimeout", wTimeout);
+
+        return builder.obj();
+    }
+
+    bool WriteConcernOptions::shouldWaitForOtherNodes() const {
+        return !wMode.empty() || wNumNodes > 1;
     }
 }

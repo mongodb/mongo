@@ -101,10 +101,10 @@ namespace mongo {
         int numDeltas() const { return _stored-1; }
 
         const SnapshotData& getPrev( int numBack = 0 );
-        auto_ptr<SnapshotDelta> computeDelta( int numBack = 0 );
+        std::auto_ptr<SnapshotDelta> computeDelta( int numBack = 0 );
 
 
-        void outputLockInfoHTML( stringstream& ss );
+        void outputLockInfoHTML( std::stringstream& ss );
     private:
         mongo::mutex _lock;
         int _n;
@@ -115,7 +115,7 @@ namespace mongo {
 
     class SnapshotThread : public BackgroundJob {
     public:
-        virtual string name() const { return "snapshot"; }
+        virtual std::string name() const { return "snapshot"; }
         void run();
     };
 

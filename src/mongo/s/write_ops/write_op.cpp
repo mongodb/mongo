@@ -47,6 +47,10 @@ namespace mongo {
         clear( &_history );
     }
 
+    const BatchItemRef& WriteOp::getWriteItem() const {
+        return _itemRef;
+    }
+
     WriteOpState WriteOp::getWriteState() const {
         return _state;
     }
@@ -83,7 +87,7 @@ namespace mongo {
             }
             else {
                 // TODO: Retry index writes with stale version?
-                targetStatus = targeter.targetAll( &endpoints );
+                targetStatus = targeter.targetCollection( &endpoints );
             }
 
             if ( !targetStatus.isOK() ) {
@@ -93,6 +97,16 @@ namespace mongo {
 
             // Store single endpoint result if we targeted a single endpoint
             if ( endpoint ) endpoints.push_back( endpoint );
+        }
+
+        // If we're targeting more than one endpoint with an update/delete, we have to target
+        // everywhere since we cannot currently retry partial results.
+        // NOTE: Index inserts are currently specially targeted only at the current collection to
+        // avoid creating collections everywhere.
+        if ( targetStatus.isOK() && endpoints.size() > 1u && !isIndexInsert ) {
+            endpointsOwned.clear();
+            invariant( endpoints.empty() );
+            targetStatus = targeter.targetAllShards( &endpoints );
         }
 
         // If we had an error, stop here
@@ -107,7 +121,7 @@ namespace mongo {
 
             WriteOpRef ref( _itemRef.getItemIndex(), _childOps.size() - 1 );
 
-            // For now, multiple endpoints imply no versioning
+            // For now, multiple endpoints imply no versioning - we can't retry half a multi-write
             if ( endpoints.size() == 1u ) {
                 targetedWrites->push_back( new TargetedWrite( *endpoint, ref ) );
             }
@@ -123,6 +137,10 @@ namespace mongo {
 
         _state = WriteOpState_Pending;
         return Status::OK();
+    }
+
+    size_t WriteOp::getNumTargeted() {
+        return _childOps.size();
     }
 
     static bool isRetryErrCode( int errCode ) {
@@ -154,6 +172,7 @@ namespace mongo {
         }
 
         error->setErrInfo( BSON( "causedBy" << errB.arr() ) );
+        error->setIndex( errOps.front()->error->getIndex() );
         error->setErrMessage( msg.str() );
     }
 

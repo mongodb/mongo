@@ -47,12 +47,14 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
 
+        virtual void toBSON(BSONObjBuilder* out) const;
+
         virtual bool equivalent( const MatchExpression* other ) const;
 
         virtual LeafMatchExpression* shallowClone() const;
 
-        const string& getQuery() const { return _query; }
-        const string& getLanguage() const { return _language; }
+        const std::string& getQuery() const { return _query; }
+        const std::string& getLanguage() const { return _language; }
     private:
         std::string _query;
         std::string _language;

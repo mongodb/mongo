@@ -31,6 +31,13 @@ function testVersions(versions) {
                                                                allowDiskUse:true}));
             assert.commandFailed(coll.runCommand('aggregate', {pipeline: [{$limit: 10}],
                                                                cursor: {}}));
+
+            // need the look at the result of failed explain due to SERVER-12760
+            var res = coll.runCommand('aggregate', {pipeline: [{$limit: 10}], explain: true});
+            printjson(res);
+            assert.commandFailed(res);
+            assert(!('shards' in res));
+            assert(!('splitPipeline' in res));
         }
     }
 

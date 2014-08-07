@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 MongoDB Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -15,10 +15,9 @@
  */
 
 /**
- * This file tests db/exec/oplogstart.{h,cpp}. OplogStart is a planner stage
- * used by an InternalRunner. It is responsible for walking the oplog
- * backwards in order to find where the oplog should be replayed from for
- * replication.
+ * This file tests db/exec/oplogstart.{h,cpp}. OplogStart is an execution stage
+ * responsible for walking the oplog backwards in order to find where the oplog should
+ * be replayed from for replication.
  */
 
 #include "mongo/dbtests/dbtests.h"
@@ -27,25 +26,30 @@
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/internal_runner.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
 
 namespace OplogStartTests {
 
     class Base {
     public:
-        Base() : _context(ns()) {
-            Collection* c = _context.db()->getCollection(ns());
+        Base() : _lk(_txn.lockState()),
+                 _wunit(_txn.recoveryUnit()),
+                 _context(&_txn, ns()),
+                 _client(&_txn) {
+
+            Collection* c = _context.db()->getCollection(&_txn, ns());
             if (!c) {
-                c = _context.db()->createCollection(ns(), false, NULL, true);
+                c = _context.db()->createCollection(&_txn, ns());
             }
-            c->getIndexCatalog()->ensureHaveIdIndex();
+            c->getIndexCatalog()->ensureHaveIdIndex(&_txn);
         }
 
         ~Base() {
             client()->dropCollection(ns());
+            _wunit.commit();
         }
 
     protected:
@@ -59,7 +63,11 @@ namespace OplogStartTests {
             return "oplogstarttests";
         }
 
-        DBDirectClient *client() const { return &_client; }
+        Collection* collection() {
+            return _context.db()->getCollection( &_txn, ns() );
+        }
+
+        DBDirectClient* client() { return &_client; }
 
         void setupFromQuery(const BSONObj& query) {
             CanonicalQuery* cq;
@@ -67,7 +75,7 @@ namespace OplogStartTests {
             ASSERT(s.isOK());
             _cq.reset(cq);
             _oplogws.reset(new WorkingSet());
-            _stage.reset(new OplogStart(_cq->ns(), _cq->root(), _oplogws.get()));
+            _stage.reset(new OplogStart(&_txn, collection(), _cq->root(), _oplogws.get()));
         }
 
         void assertWorkingSetMemberHasId(WorkingSetID id, int expectedId) {
@@ -83,14 +91,15 @@ namespace OplogStartTests {
         scoped_ptr<OplogStart> _stage;
 
     private:
-        Lock::GlobalWrite lk;
+        // The order of these is important in order to ensure order of destruction
+        OperationContextImpl _txn;
+        Lock::GlobalWrite _lk;
+        WriteUnitOfWork _wunit;
         Client::Context _context;
 
-        static DBDirectClient _client;
+        DBDirectClient _client;
     };
 
-    // static
-    DBDirectClient Base::_client;
 
     /**
      * When the ts is newer than the oldest document, the OplogStart
@@ -106,7 +115,7 @@ namespace OplogStartTests {
 
             setupFromQuery(BSON( "ts" << BSON( "$gte" << 10 )));
 
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             // collection scan needs to be initialized
             ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);
             // finds starting record
@@ -130,7 +139,7 @@ namespace OplogStartTests {
 
             setupFromQuery(BSON( "ts" << BSON( "$gte" << 1 )));
 
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             // collection scan needs to be initialized
             ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);
             // full collection scan back to the first oplog record
@@ -157,17 +166,11 @@ namespace OplogStartTests {
 
             setupFromQuery(BSON( "ts" << BSON( "$gte" << 1 )));
 
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             // ensure that we go into extent hopping mode immediately
             _stage->setBackwardsScanTime(0);
 
-            // collection scan needs to initialize itself
-            ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);
-            // collection scan finds the first diskloc in
-            // the backwards scan
-            ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);
-            ASSERT(_stage->isBackwardsScanning());
-            // Now we switch to extent hopping mode, and
+            // We immediately switch to extent hopping mode, and
             // should find the beginning of the extent
             ASSERT_EQUALS(_stage->work(&id), PlanStage::ADVANCED);
             ASSERT(_stage->isExtentHopping());
@@ -188,18 +191,12 @@ namespace OplogStartTests {
         void run() {
             buildCollection();
 
-            WorkingSetID id;
+            WorkingSetID id = WorkingSet::INVALID_ID;
             setupFromQuery(BSON( "ts" << BSON( "$gte" << tsGte() )));
 
             // ensure that we go into extent hopping mode immediately
             _stage->setBackwardsScanTime(0);
 
-            // collection scan needs to initialize itself
-            ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);
-            // collection scan finds the first diskloc in
-            // the backwards scan
-            ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);
-            ASSERT(_stage->isBackwardsScanning());
             // hop back extent by extent
             for (int i = 0; i < numHops(); i++) {
                 ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);

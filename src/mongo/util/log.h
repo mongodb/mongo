@@ -2,23 +2,36 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/logger/log_component.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/logger/tee.h"
@@ -73,48 +86,42 @@ namespace logger {
     }
 
 
-    /**
-     * Synonym for log().
-     */
-    inline LogstreamBuilder out() { return log(); }
-
-    /**
-     * For logging which we may not want during unit tests (dbtests) runs.  Set tlogLevel to -1 to
-     * suppress MONGO_TLOG() output in a test program.
-     */
-    extern int tlogLevel;
-
+// MONGO_LOG uses log component from MongoLogDefaultComponent from current or global namespace.
 #define MONGO_LOG(DLEVEL) \
-    if (!(::mongo::logger::globalLogDomain())->shouldLog(::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
-    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))
+    if (!(::mongo::logger::globalLogDomain())->shouldLog(MongoLogDefaultComponent_component, ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
+    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL), MongoLogDefaultComponent_component)
 
 #define LOG MONGO_LOG
 
-#define MONGO_DLOG(DLEVEL) \
-    if (!(DEBUG_BUILD) && !::mongo::logger::globalLogDomain()->shouldLog(::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
-    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))
+#define MONGO_LOG_COMPONENT(DLEVEL, COMPONENT1) \
+    if (!(::mongo::logger::globalLogDomain())->shouldLog((COMPONENT1), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
+    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL), (COMPONENT1))
 
-#define MONGO_TLOG(DLEVEL) \
-    if ((!::mongo::debug && ((DLEVEL) > tlogLevel)) || !::mongo::logger::globalLogDomain()->shouldLog(::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
-    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))
+#define MONGO_LOG_COMPONENT2(DLEVEL, COMPONENT1, COMPONENT2) \
+    if (!(::mongo::logger::globalLogDomain())->shouldLog((COMPONENT1), (COMPONENT2), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
+    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL), (COMPONENT1))
 
-    /* default impl returns "" -- mongod overrides */
-    extern const char * (*getcurns)();
-
-    inline LogstreamBuilder problem() {
-        std::string curns = getcurns();
-        return log().setBaseMessage(curns);
-    }
+#define MONGO_LOG_COMPONENT3(DLEVEL, COMPONENT1, COMPONENT2, COMPONENT3) \
+    if (!(::mongo::logger::globalLogDomain())->shouldLog((COMPONENT1), (COMPONENT2), (COMPONENT3), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
+    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL), (COMPONENT1))
 
     /**
      * Rotates the log files.  Returns true if all logs rotate successfully.
+     *
+     * renameFiles - true means we rename files, false means we expect the file to be renamed
+     *               externally
+     *
+     * logrotate on *nix systems expects us not to rename the file, it is expected that the program
+     * simply open the file again with the same name.
+     * We expect logrotate to rename the existing file before we rotate, and so the next open
+     * we do should result in a file create.
      */
-    bool rotateLogs();
+    bool rotateLogs(bool renameFiles);
 
     /** output the error # and error message with prefix.
         handy for use as parm in uassert/massert.
         */
-    string errnoWithPrefix( const char * prefix );
+    std::string errnoWithPrefix( const char * prefix );
 
     // Guard that alters the indentation level used by log messages on the current thread.
     // Used only by mongodump (mongo/tools/dump.cpp).  Do not introduce new uses.
@@ -126,20 +133,7 @@ namespace logger {
     extern Tee* const warnings; // Things put here go in serverStatus
     extern Tee* const startupWarningsLog; // Things put here get reported in MMS
 
-    string errnoWithDescription(int errorcode = -1);
-    void rawOut( const StringData &s );
-
-    /*
-     * Redirects the output of "rawOut" to stderr.  The default is stdout.
-     *
-     * NOTE: This needs to be here because the tools such as mongoexport and mongodump sometimes
-     * send data to stdout and share this code, so they need to be able to redirect output to
-     * stderr.  Eventually rawOut should be replaced with something better and our tools should not
-     * need to call internal server shutdown functions.
-     *
-     * NOTE: This function is not thread safe and should not be called from a multithreaded context.
-     */
-    void setRawOutToStderr();
+    std::string errnoWithDescription(int errorcode = -1);
 
     /**
      * Write the current context (backtrace), along with the optional "msg".
@@ -147,3 +141,24 @@ namespace logger {
     void logContext(const char *msg = NULL);
 
 } // namespace mongo
+
+/**
+ * Defines default log component for MONGO_LOG.
+ * Use this macro inside an implementation namespace or code block where debug messages
+ * are logged using MONGO_LOG().
+ *
+ * Note: Do not use more than once inside any namespace/code block.
+ *       Using static function instead of enum to support use inside function code block.
+ */
+#define MONGO_LOG_DEFAULT_COMPONENT_FILE(COMPONENT) \
+    static const ::mongo::logger::LogComponent MongoLogDefaultComponent_component = (COMPONENT);
+
+/**
+ * MONGO_LOG_DEFAULT_COMPONENT for local code block.
+ */
+#define MONGO_LOG_DEFAULT_COMPONENT_LOCAL(COMPONENT) \
+    const ::mongo::logger::LogComponent MongoLogDefaultComponent_component = (COMPONENT);
+
+// Provide log component in global scope so that MONGO_LOG will always have a valid component.
+const ::mongo::logger::LogComponent MongoLogDefaultComponent_component =
+    ::mongo::logger::LogComponent::kDefault;

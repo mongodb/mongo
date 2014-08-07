@@ -51,7 +51,7 @@ namespace mongo {
 
     AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() {}
 
-    Status AuthzManagerExternalStateMongos::initialize() {
+    Status AuthzManagerExternalStateMongos::initialize(OperationContext* txn) {
         return Status::OK();
     }
 
@@ -70,7 +70,8 @@ namespace mongo {
         }
     }
 
-    Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(int* outVersion) {
+    Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(
+                                                OperationContext* txn, int* outVersion) {
         scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
                 AuthorizationManager::usersCollectionNamespace));
         Status status = auth::getRemoteStoredAuthorizationVersion(conn->get(), outVersion);
@@ -78,8 +79,8 @@ namespace mongo {
         return status;
     }
 
-    Status AuthzManagerExternalStateMongos::getUserDescription(const UserName& userName,
-                                                               BSONObj* result) {
+    Status AuthzManagerExternalStateMongos::getUserDescription(
+                    OperationContext* txn, const UserName& userName, BSONObj* result) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
                     AuthorizationManager::usersCollectionNamespace));
@@ -131,7 +132,7 @@ namespace mongo {
                     BSON("rolesInfo" <<
                          BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
                                          roleName.getRole() <<
-                                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                         AuthorizationManager::ROLE_DB_FIELD_NAME <<
                                          roleName.getDB())) <<
                          "showPrivileges" << showPrivileges),
                     cmdResult);
@@ -190,6 +191,7 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::findOne(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& queryDoc,
             BSONObj* result) {
@@ -210,10 +212,11 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::query(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& queryDoc,
             const BSONObj& projection,
-            const boost::function<void(const BSONObj&)>& resultProcessor) {
+            const stdx::function<void(const BSONObj&)>& resultProcessor) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
             Query query(queryDoc);
@@ -226,6 +229,7 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::getAllDatabaseNames(
+            OperationContext* txn,
             std::vector<std::string>* dbnames) {
         try {
             scoped_ptr<ScopedDbConnection> conn(
@@ -261,7 +265,7 @@ namespace mongo {
                                                    bool upsert,
                                                    bool multi,
                                                    const BSONObj& writeConcern,
-                                                   int* numUpdated) {
+                                                   int* nMatched) {
         BatchedCommandResponse response;
         Status res = clusterUpdate(collectionName,
                 query,
@@ -272,7 +276,7 @@ namespace mongo {
                 &response);
 
         if (res.isOK()) {
-            *numUpdated = response.getN();
+            *nMatched = response.getN();
         }
 
         return res;

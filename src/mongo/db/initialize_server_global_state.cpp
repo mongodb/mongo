@@ -44,6 +44,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/security_key.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/message_event.h"
@@ -364,15 +365,6 @@ namespace mongo {
         }
 #endif
         return true;
-    }
-
-    static void ignoreSignal( int sig ) {}
-
-    void setupCoreSignals() {
-#if !defined(_WIN32)
-        verify( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
-        verify( signal(SIGUSR2, ignoreSignal ) != SIG_ERR );
-#endif
     }
 
 }  // namespace mongo

@@ -29,12 +29,11 @@
 #include "mongo/pch.h"
 
 #include "mongo/base/counter.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/kill_current_op.h"
-#include "mongo/db/matcher.h"
 #include "mongo/util/fail_point_service.h"
+
 
 namespace mongo {
 
@@ -63,12 +62,8 @@ namespace mongo {
         _active = false;
         _reset();
         _op = 0;
-        _opNum = _nextOpNum++;
+        _opNum = _nextOpNum.fetchAndAdd(1);
         _command = NULL;
-        // These addresses should never be written to again.  The zeroes are
-        // placed here as a precaution because currentOp may be accessed
-        // without the db mutex.
-        memset(_ns, 0, sizeof(_ns));
     }
 
     void CurOp::_reset() {
@@ -81,7 +76,6 @@ namespace mongo {
         _message = "";
         _progressMeter.finished();
         _killPending.store(0);
-        killCurrentOp.notifyAllWaiters();
         _numYields = 0;
         _expectedLatencyMs = 0;
         _lockStat.reset();
@@ -90,49 +84,10 @@ namespace mongo {
     void CurOp::reset() {
         _reset();
         _start = 0;
-        _opNum = _nextOpNum++;
-        _ns[0] = 0;
+        _opNum = _nextOpNum.fetchAndAdd(1);
         _debug.reset();
         _query.reset();
         _active = true; // this should be last for ui clarity
-    }
-
-    CurOp* CurOp::getOp(const BSONObj& criteria) {
-        // Regarding Matcher: This is not quite the right hammer to use here.
-        // Future: use an actual property of CurOp to flag index builds
-        // and use that to filter.
-        // This will probably need refactoring once we change index builds
-        // to be a real command instead of an insert into system.indexes
-        Matcher matcher(criteria);
-
-        Client& me = cc();
-
-        scoped_lock client_lock(Client::clientsMutex);
-        for (std::set<Client*>::iterator it = Client::clients.begin();
-             it != Client::clients.end();
-             it++) {
-
-            Client *client = *it;
-            verify(client);
-
-            CurOp* curop = client->curop();
-            if (client == &me || curop == NULL) {
-                continue;
-            }
-
-            if ( !curop->active() )
-                continue;
-
-            if ( curop->killPendingStrict() )
-                continue;
-
-            BSONObj info = curop->description();
-            if (matcher.matches(info)) {
-                return curop;
-            }
-        }
-
-        return NULL;
     }
 
     void CurOp::reset( const HostAndPort& remote, int op ) {
@@ -164,8 +119,6 @@ namespace mongo {
     }
 
     CurOp::~CurOp() {
-        killCurrentOp.notifyAllWaiters();
-
         if ( _wrapped ) {
             scoped_lock bl(Client::clientsMutex);
             _client->_curOp = _wrapped;
@@ -174,9 +127,9 @@ namespace mongo {
     }
 
     void CurOp::setNS( const StringData& ns ) {
-        ns.substr( 0, Namespace::MaxNsLen ).copyTo( _ns, true );
+        // _ns copies the data in the null-terminated ptr it's given
+        _ns = ns.toString().c_str();
     }
-
 
     void CurOp::ensureStarted() {
         if ( _start == 0 ) {
@@ -193,84 +146,64 @@ namespace mongo {
 
     void CurOp::enter( Client::Context * context ) {
         ensureStarted();
-
-        strncpy( _ns, context->ns(), Namespace::MaxNsLen);
-        _ns[Namespace::MaxNsLen] = 0;
-
+        _ns = context->ns();
         _dbprofile = std::max( context->_db ? context->_db->getProfilingLevel() : 0 , _dbprofile );
     }
 
-    void CurOp::leave( Client::Context * context ) {
+    void CurOp::recordGlobalTime(bool isWriteLocked, long long micros) const {
+        string nsStr = _ns.toString();
+        Top::global.record(nsStr, _op, isWriteLocked ? 1 : -1, micros, _isCommand);
     }
 
-    void CurOp::recordGlobalTime( long long micros ) const {
-        if ( _client ) {
-            const LockState& ls = _client->lockState();
-            verify( ls.threadState() );
-            Top::global.record( _ns , _op , ls.hasAnyWriteLock() ? 1 : -1 , micros , _isCommand );
-        }
-    }
-
-    BSONObj CurOp::info() {
-        BSONObjBuilder b;
-        b.append("opid", _opNum);
+    void CurOp::reportState(BSONObjBuilder* builder) {
+        builder->append("opid", _opNum);
         bool a = _active && _start;
-        b.append("active", a);
+        builder->append("active", a);
 
         if( a ) {
-            b.append("secs_running", elapsedSeconds() );
+            builder->append("secs_running", elapsedSeconds() );
+            builder->append("microsecs_running", static_cast<long long int>(elapsedMicros()) );
         }
 
-        b.append( "op" , opToString( _op ) );
+        builder->append( "op" , opToString( _op ) );
 
-        b.append("ns", _ns);
+        builder->append("ns", _ns.toString());
 
         if (_op == dbInsert) {
-            _query.append(b, "insert");
+            _query.append(*builder, "insert");
         }
         else {
-            _query.append(b , "query");
+            _query.append(*builder, "query");
         }
 
         if ( !debug().planSummary.empty() ) {
-            b.append( "planSummary" , debug().planSummary );
+            builder->append( "planSummary" , debug().planSummary.toString() );
         }
 
         if( !_remote.empty() ) {
-            b.append("client", _remote.toString());
-        }
-
-        if ( _client ) {
-            b.append( "desc" , _client->desc() );
-            if ( _client->_threadId.size() )
-                b.append( "threadId" , _client->_threadId );
-            if ( _client->_connectionId )
-                b.appendNumber( "connectionId" , _client->_connectionId );
-            _client->_ls.reportState(b);
+            builder->append("client", _remote.toString());
         }
 
         if ( ! _message.empty() ) {
             if ( _progressMeter.isActive() ) {
                 StringBuilder buf;
                 buf << _message.toString() << " " << _progressMeter.toString();
-                b.append( "msg" , buf.str() );
-                BSONObjBuilder sub( b.subobjStart( "progress" ) );
+                builder->append( "msg" , buf.str() );
+                BSONObjBuilder sub( builder->subobjStart( "progress" ) );
                 sub.appendNumber( "done" , (long long)_progressMeter.done() );
                 sub.appendNumber( "total" , (long long)_progressMeter.total() );
                 sub.done();
             }
             else {
-                b.append( "msg" , _message.toString() );
+                builder->append( "msg" , _message.toString() );
             }
         }
 
         if( killPending() )
-            b.append("killPending", true);
+            builder->append("killPending", true);
 
-        b.append( "numYields" , _numYields );
-        b.append( "lockStats" , _lockStat.report() );
-
-        return b.obj();
+        builder->append( "numYields" , _numYields );
+        builder->append( "lockStats" , _lockStat.report() );
     }
 
     BSONObj CurOp::description() {
@@ -278,7 +211,7 @@ namespace mongo {
         bool a = _active && _start;
         bob.append("active", a);
         bob.append( "op" , opToString( _op ) );
-        bob.append("ns", _ns);
+        bob.append("ns", _ns.toString());
         if (_op == dbInsert) {
             _query.append(bob, "insert");
         }
@@ -290,17 +223,8 @@ namespace mongo {
         return bob.obj();
     }
 
-    void CurOp::setKillWaiterFlags() {
-        for (size_t i = 0; i < _notifyList.size(); ++i)
-            *(_notifyList[i]) = true;
-        _notifyList.clear();
-    }
-
-    void CurOp::kill(bool* pNotifyFlag /* = NULL */) {
+    void CurOp::kill() {
         _killPending.store(1);
-        if (pNotifyFlag) {
-            _notifyList.push_back(pNotifyFlag);
-        }
     }
 
     void CurOp::setMaxTimeMicros(uint64_t maxTimeMicros) {
@@ -334,19 +258,22 @@ namespace mongo {
         return _maxTimeTracker.getRemainingMicros();
     }
 
-    AtomicUInt CurOp::_nextOpNum;
+    AtomicUInt32 CurOp::_nextOpNum;
 
     static Counter64 returnedCounter;
     static Counter64 insertedCounter;
     static Counter64 updatedCounter;
     static Counter64 deletedCounter;
     static Counter64 scannedCounter;
+    static Counter64 scannedObjectCounter;
 
     static ServerStatusMetricField<Counter64> displayReturned( "document.returned", &returnedCounter );
     static ServerStatusMetricField<Counter64> displayUpdated( "document.updated", &updatedCounter );
     static ServerStatusMetricField<Counter64> displayInserted( "document.inserted", &insertedCounter );
     static ServerStatusMetricField<Counter64> displayDeleted( "document.deleted", &deletedCounter );
     static ServerStatusMetricField<Counter64> displayScanned( "queryExecutor.scanned", &scannedCounter );
+    static ServerStatusMetricField<Counter64> displayScannedObjects( "queryExecutor.scannedObjects",
+                                                                     &scannedObjectCounter );
 
     static Counter64 idhackCounter;
     static Counter64 scanAndOrderCounter;
@@ -361,12 +288,14 @@ namespace mongo {
             returnedCounter.increment( nreturned );
         if ( ninserted > 0 )
             insertedCounter.increment( ninserted );
-        if ( nupdated > 0 )
-            updatedCounter.increment( nupdated );
+        if ( nMatched > 0 )
+            updatedCounter.increment( nMatched );
         if ( ndeleted > 0 )
             deletedCounter.increment( ndeleted );
         if ( nscanned > 0 )
             scannedCounter.increment( nscanned );
+        if ( nscannedObjects > 0 )
+            scannedObjectCounter.increment( nscannedObjects );
 
         if ( idhack )
             idhackCounter.increment();

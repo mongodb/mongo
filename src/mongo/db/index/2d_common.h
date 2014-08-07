@@ -36,8 +36,8 @@
 namespace mongo {
 
     struct TwoDIndexingParams {
-        string geo;
-        vector<pair<string, int> > other;
+        std::string geo;
+        std::vector<std::pair<std::string, int> > other;
         shared_ptr<GeoHashConverter> geoHashConverter;
     };
 

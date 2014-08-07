@@ -40,22 +40,19 @@ namespace mongo {
         virtual bool requiresAuth() { return true; }
         virtual bool adminOnly() const { return true; }
         virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { return true; }
-        virtual bool logTheOp() {
-            return false;
-        }
         virtual bool slaveOk() const {
             return true;
         }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out);
-        virtual LockType locktype() const { return NONE; }
-        virtual void help( stringstream& help ) const;
+        virtual bool isWriteCommandForConfigServer() const { return false; }
+        virtual void help( std::stringstream& help ) const;
         CmdShutdown() : Command("shutdown") {}
-        bool run(const string& dbname,
+        bool run(OperationContext* txn, const std::string& dbname,
                  BSONObj& cmdObj,
                  int options,
-                 string& errmsg,
+                 std::string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl);
     private:

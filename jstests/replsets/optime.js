@@ -43,8 +43,8 @@ var initialInfo = master.getDB('admin').serverStatus({oplog:true}).oplog;
 
 // Do an insert to increment optime, but without rolling the oplog
 // latestOptime should be updated, but earliestOptime should be unchanged
-master.getDB('test').foo.insert({a:1});
-master.getDB('test').getLastError(replTest.nodes.length);
+var options = { writeConcern: { w: replTest.nodes.length }};
+assert.writeOK(master.getDB('test').foo.insert({ a: 1 }, options));
 assert(optimesAreEqual(replTest));
 
 var info = master.getDB('admin').serverStatus({oplog:true}).oplog;
@@ -54,8 +54,7 @@ assert.eq(timestampCompare(info.earliestOptime, initialInfo.earliestOptime), 0);
 // Insert some large documents to force the oplog to roll over
 var largeString = new Array(1024*100).toString();
 for (var i = 0; i < 15; i++) {
-    master.getDB('test').foo.insert({largeString: largeString});
-    master.getDB('test').getLastError(replTest.nodes.length);
+    master.getDB('test').foo.insert({ largeString: largeString }, options);
 }
 assert(optimesAreEqual(replTest));
 

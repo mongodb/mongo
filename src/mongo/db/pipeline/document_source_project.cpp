@@ -70,25 +70,6 @@ namespace mongo {
         pEO->addToDocument(out, *input, _variables.get());
         _variables->clearRoot();
 
-#if defined(_DEBUG)
-        if (!_simpleProjection.getSpec().isEmpty()) {
-            // Make sure we return the same results as Projection class
-
-            BSONObj inputBson = input->toBson();
-            BSONObj outputBson = out.peek().toBson();
-
-            BSONObj projected = _simpleProjection.transform(inputBson);
-
-            if (projected != outputBson) {
-                log() << "$project applied incorrectly: " << getRaw() << endl;
-                log() << "input:  " << inputBson << endl;
-                log() << "out: " << outputBson << endl;
-                log() << "projected: " << projected << endl;
-                verify(false); // exits in _DEBUG builds
-            }
-        }
-#endif
-
         return out.freeze();
     }
 
@@ -128,15 +109,6 @@ namespace mongo {
 
         BSONObj projectObj = elem.Obj();
         pProject->_raw = projectObj.getOwned();
-
-#if defined(_DEBUG)
-        if (exprObj->isSimple()) {
-            DepsTracker deps;
-            vector<string> path;
-            exprObj->addDependencies(&deps, &path);
-            pProject->_simpleProjection.init(deps.toProjection());
-        }
-#endif
 
         return pProject;
     }

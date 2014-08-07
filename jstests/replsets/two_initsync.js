@@ -63,7 +63,7 @@ doTest = function (signal) {
 
     // Add the second node.
     // This runs the equivalent of rs.add(newNode);
-    replTest.reInitiate();
+    replTest.reInitiate(60000);
 
     var b = second.getDB("admin");
 

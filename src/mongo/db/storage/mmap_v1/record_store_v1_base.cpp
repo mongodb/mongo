@@ -1,0 +1,974 @@
+// record_store_v1_base.cpp
+
+/**
+ *    Copyright (C) 2013-2014 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
+
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/concurrency/lock_mgr.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/mmap_v1/extent.h"
+#include "mongo/db/storage/mmap_v1/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/record.h"
+#include "mongo/db/storage/mmap_v1/record_store_v1_repair_iterator.h"
+#include "mongo/util/progress_meter.h"
+#include "mongo/util/timer.h"
+#include "mongo/util/touch_pages.h"
+
+namespace mongo {
+
+    const int RecordStoreV1Base::Buckets = 19;
+    const int RecordStoreV1Base::MaxBucket = 18;
+
+    /* Deleted list buckets are used to quickly locate free space based on size.  Each bucket
+       contains records up to that size.  All records >= 4mb are placed into the 16mb bucket.
+    */
+    const int RecordStoreV1Base::bucketSizes[] = {
+        0x20,     0x40,     0x80,     0x100,      // 32,   64,   128,  256
+        0x200,    0x400,    0x800,    0x1000,     // 512,  1K,   2K,   4K
+        0x2000,   0x4000,   0x8000,   0x10000,    // 8K,   16K,  32K,  64K
+        0x20000,  0x40000,  0x80000,  0x100000,   // 128K, 256K, 512K, 1M
+        0x200000, 0x400000, 0x1000000,            // 2M,   4M,   16M (see above)
+     };
+
+
+    RecordStoreV1Base::RecordStoreV1Base( const StringData& ns,
+                                          RecordStoreV1MetaData* details,
+                                          ExtentManager* em,
+                                          bool isSystemIndexes )
+        : RecordStore( ns ),
+          _details( details ),
+          _extentManager( em ),
+          _isSystemIndexes( isSystemIndexes ) {
+    }
+
+    RecordStoreV1Base::~RecordStoreV1Base() {
+    }
+
+
+    int64_t RecordStoreV1Base::storageSize( OperationContext* txn,
+                                            BSONObjBuilder* extraInfo,
+                                            int level ) const {
+        BSONArrayBuilder extentInfo;
+
+        int64_t total = 0;
+        int n = 0;
+
+        DiskLoc cur = _details->firstExtent(txn);
+
+        while ( !cur.isNull() ) {
+            Extent* e = _extentManager->getExtent( cur );
+
+            total += e->length;
+            n++;
+
+            if ( extraInfo && level > 0 ) {
+                extentInfo.append( BSON( "len" << e->length << "loc: " << e->myLoc.toBSONObj() ) );
+            }
+            cur = e->xnext;            
+        }
+
+        if ( extraInfo ) {
+            extraInfo->append( "numExtents", n );
+            if ( level > 0 )
+                extraInfo->append( "extents", extentInfo.arr() );
+        }
+
+        return total;
+    }
+
+    RecordData RecordStoreV1Base::dataFor( const DiskLoc& loc ) const {
+        return recordFor(loc)->toRecordData();
+    }
+
+    Record* RecordStoreV1Base::recordFor( const DiskLoc& loc ) const {
+        return _extentManager->recordForV1( loc );
+    }
+
+    const DeletedRecord* RecordStoreV1Base::deletedRecordFor( const DiskLoc& loc ) const {
+        invariant( loc.a() != -1 );
+        return reinterpret_cast<const DeletedRecord*>( recordFor( loc ) );
+    }
+
+    DeletedRecord* RecordStoreV1Base::drec( const DiskLoc& loc ) const {
+        invariant( loc.a() != -1 );
+        return reinterpret_cast<DeletedRecord*>( recordFor( loc ) );
+    }
+
+    Extent* RecordStoreV1Base::_getExtent( OperationContext* txn, const DiskLoc& loc ) const {
+        return _extentManager->getExtent( loc );
+    }
+
+    DiskLoc RecordStoreV1Base::_getExtentLocForRecord( OperationContext* txn, const DiskLoc& loc ) const {
+        return _extentManager->extentLocForV1( loc );
+    }
+
+
+    DiskLoc RecordStoreV1Base::getNextRecord( OperationContext* txn, const DiskLoc& loc ) const {
+        DiskLoc next = getNextRecordInExtent( txn, loc );
+        if ( !next.isNull() ) {
+            return next;
+        }
+
+        // now traverse extents
+
+        Extent* e = _getExtent( txn, _getExtentLocForRecord(txn, loc) );
+        while ( 1 ) {
+            if ( e->xnext.isNull() )
+                return DiskLoc(); // end of collection
+            e = _getExtent( txn, e->xnext );
+            if ( !e->firstRecord.isNull() )
+                break;
+            // entire extent could be empty, keep looking
+        }
+        return e->firstRecord;
+    }
+
+    DiskLoc RecordStoreV1Base::getPrevRecord( OperationContext* txn, const DiskLoc& loc ) const {
+        DiskLoc prev = getPrevRecordInExtent( txn, loc );
+        if ( !prev.isNull() ) {
+            return prev;
+        }
+
+        // now traverse extents
+
+        Extent *e = _getExtent(txn, _getExtentLocForRecord(txn, loc));
+        while ( 1 ) {
+            if ( e->xprev.isNull() )
+                return DiskLoc(); // end of collection
+            e = _getExtent( txn, e->xprev );
+            if ( !e->firstRecord.isNull() )
+                break;
+            // entire extent could be empty, keep looking
+        }
+        return e->lastRecord;
+
+    }
+
+    DiskLoc RecordStoreV1Base::_findFirstSpot( OperationContext* txn,
+                                               const DiskLoc& extDiskLoc,
+                                               Extent* e ) {
+        DiskLoc emptyLoc = extDiskLoc;
+        emptyLoc.inc( Extent::HeaderSize() );
+        int delRecLength = e->length - Extent::HeaderSize();
+        if ( delRecLength >= 32*1024 && _ns.find('$') != string::npos && !isCapped() ) {
+            // probably an index. so skip forward to keep its records page aligned
+            int& ofs = emptyLoc.GETOFS();
+            int newOfs = (ofs + 0xfff) & ~0xfff;
+            delRecLength -= (newOfs-ofs);
+            dassert( delRecLength > 0 );
+            ofs = newOfs;
+        }
+
+        DeletedRecord* empty = txn->recoveryUnit()->writing(drec(emptyLoc));
+        empty->lengthWithHeaders() = delRecLength;
+        empty->extentOfs() = e->myLoc.getOfs();
+        empty->nextDeleted().Null();
+        return emptyLoc;
+
+    }
+
+    DiskLoc RecordStoreV1Base::getNextRecordInExtent( OperationContext* txn, const DiskLoc& loc ) const {
+        int nextOffset = recordFor( loc )->nextOfs();
+
+        if ( nextOffset == DiskLoc::NullOfs )
+            return DiskLoc();
+
+        fassert( 17441, abs(nextOffset) >= 8 ); // defensive
+        DiskLoc result( loc.a(), nextOffset );
+        return result;
+    }
+
+    DiskLoc RecordStoreV1Base::getPrevRecordInExtent( OperationContext* txn, const DiskLoc& loc ) const {
+        int prevOffset = recordFor( loc )->prevOfs();
+
+        if ( prevOffset == DiskLoc::NullOfs )
+            return DiskLoc();
+
+        fassert( 17442, abs(prevOffset) >= 8 ); // defensive
+        DiskLoc result( loc.a(), prevOffset );
+        return result;
+    }
+
+
+    StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( OperationContext* txn,
+                                                         const DocWriter* doc,
+                                                         bool enforceQuota ) {
+        int docSize = doc->documentSize();
+        if ( docSize < 4 ) {
+            return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
+                                        "record has to be >= 4 bytes" );
+        }
+        int lenWHdr = docSize + Record::HeaderSize;
+        if ( doc->addPadding() )
+            lenWHdr = getRecordAllocationSize( lenWHdr );
+
+        StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, enforceQuota );
+        if ( !loc.isOK() )
+            return loc;
+
+        Record *r = recordFor( loc.getValue() );
+        fassert( 17319, r->lengthWithHeaders() >= lenWHdr );
+
+        r = reinterpret_cast<Record*>( txn->recoveryUnit()->writingPtr(r, lenWHdr) );
+        doc->writeDocument( r->data() );
+
+        _addRecordToRecListInExtent(txn, r, loc.getValue());
+
+        _details->incrementStats( txn, r->netLength(), 1 );
+
+        _paddingFits( txn );
+
+        return loc;
+    }
+
+
+    StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( OperationContext* txn,
+                                                         const char* data,
+                                                         int len,
+                                                         bool enforceQuota ) {
+        if ( len < 4 ) {
+            return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
+                                        "record has to be >= 4 bytes" );
+        }
+
+        StatusWith<DiskLoc> status = _insertRecord( txn, data, len, enforceQuota );
+        if ( status.isOK() )
+            _paddingFits( txn );
+
+        return status;
+    }
+
+    StatusWith<DiskLoc> RecordStoreV1Base::_insertRecord( OperationContext* txn,
+                                                          const char* data,
+                                                          int len,
+                                                          bool enforceQuota ) {
+
+        int lenWHdr = getRecordAllocationSize( len + Record::HeaderSize );
+        fassert( 17208, lenWHdr >= ( len + Record::HeaderSize ) );
+
+        StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, enforceQuota );
+        if ( !loc.isOK() )
+            return loc;
+
+        Record *r = recordFor( loc.getValue() );
+        fassert( 17210, r->lengthWithHeaders() >= lenWHdr );
+
+        // copy the data
+        r = reinterpret_cast<Record*>( txn->recoveryUnit()->writingPtr(r, lenWHdr) );
+        memcpy( r->data(), data, len );
+
+        _addRecordToRecListInExtent(txn, r, loc.getValue());
+
+        _details->incrementStats( txn, r->netLength(), 1 );
+
+        return loc;
+    }
+
+    StatusWith<DiskLoc> RecordStoreV1Base::updateRecord( OperationContext* txn,
+                                                         const DiskLoc& oldLocation,
+                                                         const char* data,
+                                                         int dataSize,
+                                                         bool enforceQuota,
+                                                         UpdateMoveNotifier* notifier ) {
+        Record* oldRecord = recordFor( oldLocation );
+        if ( oldRecord->netLength() >= dataSize ) {
+            // we fit
+            _paddingFits( txn );
+            memcpy( txn->recoveryUnit()->writingPtr( oldRecord->data(), dataSize ), data, dataSize );
+            return StatusWith<DiskLoc>( oldLocation );
+        }
+
+        if ( isCapped() )
+            return StatusWith<DiskLoc>( ErrorCodes::InternalError,
+                                        "failing update: objects in a capped ns cannot grow",
+                                        10003 );
+
+        // we have to move
+
+        _paddingTooSmall( txn );
+
+        StatusWith<DiskLoc> newLocation = _insertRecord( txn, data, dataSize, enforceQuota );
+        if ( !newLocation.isOK() )
+            return newLocation;
+
+        // insert worked, so we delete old record
+        if ( notifier ) {
+            Status moveStatus = notifier->recordStoreGoingToMove( txn,
+                                                                  oldLocation,
+                                                                  oldRecord->data(),
+                                                                  oldRecord->netLength() );
+            if ( !moveStatus.isOK() )
+                return StatusWith<DiskLoc>( moveStatus );
+        }
+
+        deleteRecord( txn, oldLocation );
+
+        return newLocation;
+    }
+
+
+    Status RecordStoreV1Base::updateWithDamages( OperationContext* txn,
+                                                 const DiskLoc& loc,
+                                                 const char* damageSource,
+                                                 const mutablebson::DamageVector& damages ) {
+        _paddingFits( txn );
+
+        Record* rec = recordFor( loc );
+        char* root = rec->data();
+
+        // All updates were in place. Apply them via durability and writing pointer.
+        mutablebson::DamageVector::const_iterator where = damages.begin();
+        const mutablebson::DamageVector::const_iterator end = damages.end();
+        for( ; where != end; ++where ) {
+            const char* sourcePtr = damageSource + where->sourceOffset;
+            void* targetPtr = txn->recoveryUnit()->writingPtr(root + where->targetOffset, where->size);
+            std::memcpy(targetPtr, sourcePtr, where->size);
+        }
+
+        return Status::OK();
+    }
+
+    void RecordStoreV1Base::deleteRecord( OperationContext* txn, const DiskLoc& dl ) {
+
+        Record* todelete = recordFor( dl );
+        invariant( todelete->netLength() >= 4 ); // this is required for defensive code
+
+        /* remove ourself from the record next/prev chain */
+        {
+            if ( todelete->prevOfs() != DiskLoc::NullOfs ) {
+                DiskLoc prev = getPrevRecordInExtent( txn, dl );
+                Record* prevRecord = recordFor( prev );
+                txn->recoveryUnit()->writingInt( prevRecord->nextOfs() ) = todelete->nextOfs();
+            }
+
+            if ( todelete->nextOfs() != DiskLoc::NullOfs ) {
+                DiskLoc next = getNextRecord( txn, dl );
+                Record* nextRecord = recordFor( next );
+                txn->recoveryUnit()->writingInt( nextRecord->prevOfs() ) = todelete->prevOfs();
+            }
+        }
+
+        /* remove ourself from extent pointers */
+        {
+            DiskLoc extentLoc = todelete->myExtentLoc(dl);
+            Extent *e =  _getExtent( txn, extentLoc );
+            if ( e->firstRecord == dl ) {
+                txn->recoveryUnit()->writing(&e->firstRecord);
+                if ( todelete->nextOfs() == DiskLoc::NullOfs )
+                    e->firstRecord.Null();
+                else
+                    e->firstRecord.set(dl.a(), todelete->nextOfs() );
+            }
+            if ( e->lastRecord == dl ) {
+                txn->recoveryUnit()->writing(&e->lastRecord);
+                if ( todelete->prevOfs() == DiskLoc::NullOfs )
+                    e->lastRecord.Null();
+                else
+                    e->lastRecord.set(dl.a(), todelete->prevOfs() );
+            }
+        }
+
+        /* add to the free list */
+        {
+            _details->incrementStats( txn, -1 * todelete->netLength(), -1 );
+
+            if ( _isSystemIndexes ) {
+                /* temp: if in system.indexes, don't reuse, and zero out: we want to be
+                   careful until validated more, as IndexDetails has pointers
+                   to this disk location.  so an incorrectly done remove would cause
+                   a lot of problems.
+                */
+                memset( txn->recoveryUnit()->writingPtr(todelete, todelete->lengthWithHeaders() ),
+                        0, todelete->lengthWithHeaders() );
+            }
+            else {
+                // this is defensive so we can detect if we are still using a location
+                // that was deleted
+                memset(txn->recoveryUnit()->writingPtr(todelete->data(), 4), 0xee, 4);
+                addDeletedRec(txn, dl);
+            }
+        }
+
+    }
+
+    RecordIterator* RecordStoreV1Base::getIteratorForRepair(OperationContext* txn) const {
+        return new RecordStoreV1RepairIterator(txn, this);
+    }
+
+    void RecordStoreV1Base::_addRecordToRecListInExtent(OperationContext* txn,
+                                                        Record *r,
+                                                        DiskLoc loc) {
+        dassert( recordFor(loc) == r );
+        DiskLoc extentLoc = _getExtentLocForRecord( txn, loc );
+        Extent *e = _getExtent( txn, extentLoc );
+        if ( e->lastRecord.isNull() ) {
+            *txn->recoveryUnit()->writing(&e->firstRecord) = loc;
+            *txn->recoveryUnit()->writing(&e->lastRecord) = loc;
+            r->prevOfs() = r->nextOfs() = DiskLoc::NullOfs;
+        }
+        else {
+            Record *oldlast = recordFor(e->lastRecord);
+            r->prevOfs() = e->lastRecord.getOfs();
+            r->nextOfs() = DiskLoc::NullOfs;
+            txn->recoveryUnit()->writingInt(oldlast->nextOfs()) = loc.getOfs();
+            *txn->recoveryUnit()->writing(&e->lastRecord) = loc;
+        }
+    }
+
+    void RecordStoreV1Base::increaseStorageSize( OperationContext* txn,
+                                                 int size,
+                                                 bool enforceQuota ) {
+        DiskLoc eloc = _extentManager->allocateExtent( txn,
+                                                       isCapped(),
+                                                       size,
+                                                       enforceQuota );
+        Extent *e = _extentManager->getExtent( eloc );
+        invariant( e );
+
+        *txn->recoveryUnit()->writing( &e->nsDiagnostic ) = _ns;
+
+        txn->recoveryUnit()->writing( &e->xnext )->Null();
+        txn->recoveryUnit()->writing( &e->xprev )->Null();
+        txn->recoveryUnit()->writing( &e->firstRecord )->Null();
+        txn->recoveryUnit()->writing( &e->lastRecord )->Null();
+
+        DiskLoc emptyLoc = _findFirstSpot( txn, eloc, e );
+
+        if ( _details->lastExtent(txn).isNull() ) {
+            invariant( _details->firstExtent(txn).isNull() );
+            _details->setFirstExtent( txn, eloc );
+            _details->setLastExtent( txn, eloc );
+            _details->setCapExtent( txn, eloc );
+            invariant( e->xprev.isNull() );
+            invariant( e->xnext.isNull() );
+        }
+        else {
+            invariant( !_details->firstExtent(txn).isNull() );
+            *txn->recoveryUnit()->writing(&e->xprev) = _details->lastExtent(txn);
+            *txn->recoveryUnit()->writing(&_extentManager->getExtent(_details->lastExtent(txn))->xnext) = eloc;
+            _details->setLastExtent( txn, eloc );
+        }
+
+        _details->setLastExtentSize( txn, e->length );
+
+        addDeletedRec(txn, emptyLoc);
+    }
+
+    Status RecordStoreV1Base::validate( OperationContext* txn,
+                                        bool full, bool scanData,
+                                        ValidateAdaptor* adaptor,
+                                        ValidateResults* results, BSONObjBuilder* output ) const {
+
+        // 1) basic status that require no iteration
+        // 2) extent level info
+        // 3) check extent start and end
+        // 4) check each non-deleted record
+        // 5) check deleted list
+
+        // -------------
+
+        // 1111111111111111111
+        if ( isCapped() ){
+            output->appendBool("capped", true);
+            output->appendNumber("max", _details->maxCappedDocs());
+        }
+
+        output->appendNumber("datasize", _details->dataSize());
+        output->appendNumber("nrecords", _details->numRecords());
+        output->appendNumber("lastExtentSize", _details->lastExtentSize(txn));
+        output->appendNumber("padding", _details->paddingFactor());
+
+        if ( _details->firstExtent(txn).isNull() )
+            output->append( "firstExtent", "null" );
+        else
+            output->append( "firstExtent",
+                            str::stream() << _details->firstExtent(txn).toString()
+                            << " ns:"
+                            << _getExtent( txn, _details->firstExtent(txn) )->nsDiagnostic.toString());
+        if ( _details->lastExtent(txn).isNull() )
+            output->append( "lastExtent", "null" );
+        else
+            output->append( "lastExtent", str::stream() << _details->lastExtent(txn).toString()
+                            << " ns:"
+                            << _getExtent( txn, _details->lastExtent(txn) )->nsDiagnostic.toString());
+
+        // 22222222222222222222222222
+        { // validate extent basics
+            BSONArrayBuilder extentData;
+            int extentCount = 0;
+            DiskLoc extentDiskLoc;
+            try {
+                if ( !_details->firstExtent(txn).isNull() ) {
+                    _getExtent( txn, _details->firstExtent(txn) )->assertOk();
+                    _getExtent( txn, _details->lastExtent(txn) )->assertOk();
+                }
+
+                extentDiskLoc = _details->firstExtent(txn);
+                while (!extentDiskLoc.isNull()) {
+                    Extent* thisExtent = _getExtent( txn, extentDiskLoc );
+                    if (full) {
+                        extentData << thisExtent->dump();
+                    }
+                    if (!thisExtent->validates(extentDiskLoc, &results->errors)) {
+                        results->valid = false;
+                    }
+                    DiskLoc nextDiskLoc = thisExtent->xnext;
+                    
+                    if (extentCount > 0 && !nextDiskLoc.isNull()
+                        &&  _getExtent( txn, nextDiskLoc )->xprev != extentDiskLoc) {
+                        StringBuilder sb;
+                        sb << "'xprev' pointer " << _getExtent( txn, nextDiskLoc )->xprev.toString()
+                           << " in extent " << nextDiskLoc.toString()
+                           << " does not point to extent " << extentDiskLoc.toString();
+                        results->errors.push_back( sb.str() );
+                        results->valid = false;
+                    }
+                    if (nextDiskLoc.isNull() && extentDiskLoc != _details->lastExtent(txn)) {
+                        StringBuilder sb;
+                        sb << "'lastExtent' pointer " << _details->lastExtent(txn).toString()
+                           << " does not point to last extent in list " << extentDiskLoc.toString();
+                        results->errors.push_back( sb.str() );
+                        results->valid = false;
+                    }
+                    extentDiskLoc = nextDiskLoc;
+                    extentCount++;
+                    txn->checkForInterrupt();
+                }
+            }
+            catch (const DBException& e) {
+                StringBuilder sb;
+                sb << "exception validating extent " << extentCount
+                   << ": " << e.what();
+                results->errors.push_back( sb.str() );
+                results->valid = false;
+                return Status::OK();
+            }
+            output->append("extentCount", extentCount);
+
+            if ( full )
+                output->appendArray( "extents" , extentData.arr() );
+
+        }
+
+        try {
+            // 333333333333333333333333333
+            bool testingLastExtent = false;
+            try {
+                DiskLoc firstExtentLoc = _details->firstExtent(txn);
+                if (firstExtentLoc.isNull()) {
+                    // this is ok
+                }
+                else {
+                    output->append("firstExtentDetails", _getExtent(txn, firstExtentLoc)->dump());
+                    if (!_getExtent(txn, firstExtentLoc)->xprev.isNull()) {
+                        StringBuilder sb;
+                        sb << "'xprev' pointer in 'firstExtent' " << _details->firstExtent(txn).toString()
+                           << " is " << _getExtent(txn, firstExtentLoc)->xprev.toString()
+                           << ", should be null";
+                        results->errors.push_back( sb.str() );
+                        results->valid = false;
+                    }
+                }
+                testingLastExtent = true;
+                DiskLoc lastExtentLoc = _details->lastExtent(txn);
+                if (lastExtentLoc.isNull()) {
+                    // this is ok
+                }
+                else {
+                    if (firstExtentLoc != lastExtentLoc) {
+                        output->append("lastExtentDetails", _getExtent(txn, lastExtentLoc)->dump());
+                        if (!_getExtent(txn, lastExtentLoc)->xnext.isNull()) {
+                            StringBuilder sb;
+                            sb << "'xnext' pointer in 'lastExtent' " << lastExtentLoc.toString()
+                               << " is " << _getExtent(txn, lastExtentLoc)->xnext.toString()
+                               << ", should be null";
+                            results->errors.push_back( sb.str() );
+                            results->valid = false;
+                        }
+                    }
+                }
+            }
+            catch (const DBException& e) {
+                StringBuilder sb;
+                sb << "exception processing '"
+                   << (testingLastExtent ? "lastExtent" : "firstExtent")
+                   << "': " << e.what();
+                results->errors.push_back( sb.str() );
+                results->valid = false;
+            }
+
+            // 4444444444444444444444444
+
+            set<DiskLoc> recs;
+            if( scanData ) {
+                int n = 0;
+                int nInvalid = 0;
+                long long nQuantizedSize = 0;
+                long long nPowerOf2QuantizedSize = 0;
+                long long len = 0;
+                long long nlen = 0;
+                long long bsonLen = 0;
+                int outOfOrder = 0;
+                DiskLoc cl_last;
+
+                scoped_ptr<RecordIterator> iterator( getIterator( txn,
+                                                                  DiskLoc(),
+                                                                  false,
+                                                                  CollectionScanParams::FORWARD ) );
+                DiskLoc cl;
+                while ( !( cl = iterator->getNext() ).isNull() ) {
+                    n++;
+
+                    if ( n < 1000000 )
+                        recs.insert(cl);
+                    if ( isCapped() ) {
+                        if ( cl < cl_last )
+                            outOfOrder++;
+                        cl_last = cl;
+                    }
+
+                    Record *r = recordFor(cl);
+                    len += r->lengthWithHeaders();
+                    nlen += r->netLength();
+
+                    if ( r->lengthWithHeaders() ==
+                         quantizeAllocationSpace( r->lengthWithHeaders() ) ) {
+                        // Count the number of records having a size consistent with
+                        // the quantizeAllocationSpace quantization implementation.
+                        ++nQuantizedSize;
+                    }
+
+                    if ( r->lengthWithHeaders() ==
+                         quantizePowerOf2AllocationSpace( r->lengthWithHeaders() ) ) {
+                        // Count the number of records having a size consistent with the
+                        // quantizePowerOf2AllocationSpace quantization implementation.
+                        ++nPowerOf2QuantizedSize;
+                    }
+
+                    if (full){
+                        size_t dataSize = 0;
+                        const Status status = adaptor->validate( r->toRecordData(), &dataSize );
+                        if (!status.isOK()) {
+                            results->valid = false;
+                            if (nInvalid == 0) // only log once;
+                                results->errors.push_back( "invalid object detected (see logs)" );
+
+                            nInvalid++;
+                            log() << "Invalid object detected in " << _ns
+                                  << ": " << status.reason();
+                        }
+                        else {
+                            bsonLen += dataSize;
+                        }
+                    }
+                }
+
+                if ( isCapped() && !_details->capLooped() ) {
+                    output->append("cappedOutOfOrder", outOfOrder);
+                    if ( outOfOrder > 1 ) {
+                        results->valid = false;
+                        results->errors.push_back( "too many out of order records" );
+                    }
+                }
+                output->append("objectsFound", n);
+
+                if (full) {
+                    output->append("invalidObjects", nInvalid);
+                }
+
+                output->appendNumber("nQuantizedSize", nQuantizedSize);
+                output->appendNumber("nPowerOf2QuantizedSize", nPowerOf2QuantizedSize);
+                output->appendNumber("bytesWithHeaders", len);
+                output->appendNumber("bytesWithoutHeaders", nlen);
+
+                if (full) {
+                    output->appendNumber("bytesBson", bsonLen);
+                }
+            } // end scanData
+
+            // 55555555555555555555555555
+            BSONArrayBuilder deletedListArray;
+            for ( int i = 0; i < Buckets; i++ ) {
+                deletedListArray << _details->deletedListEntry(i).isNull();
+            }
+
+            int ndel = 0;
+            long long delSize = 0;
+            BSONArrayBuilder delBucketSizes;
+            int incorrect = 0;
+            for ( int i = 0; i < Buckets; i++ ) {
+                DiskLoc loc = _details->deletedListEntry(i);
+                try {
+                    int k = 0;
+                    while ( !loc.isNull() ) {
+                        if ( recs.count(loc) )
+                            incorrect++;
+                        ndel++;
+
+                        if ( loc.questionable() ) {
+                            if( isCapped() && !loc.isValid() && i == 1 ) {
+                                /* the constructor for NamespaceDetails intentionally sets deletedList[1] to invalid
+                                   see comments in namespace.h
+                                */
+                                break;
+                            }
+
+                            string err( str::stream() << "bad pointer in deleted record list: "
+                                        << loc.toString()
+                                        << " bucket: " << i
+                                        << " k: " << k );
+                            results->errors.push_back( err );
+                            results->valid = false;
+                            break;
+                        }
+
+                        const DeletedRecord* d = deletedRecordFor(loc);
+                        delSize += d->lengthWithHeaders();
+                        loc = d->nextDeleted();
+                        k++;
+                        txn->checkForInterrupt();
+                    }
+                    delBucketSizes << k;
+                }
+                catch (...) {
+                    results->errors.push_back( (string)"exception in deleted chain for bucket " +
+                                               BSONObjBuilder::numStr(i) );
+                    results->valid = false;
+                }
+            }
+            output->appendNumber("deletedCount", ndel);
+            output->appendNumber("deletedSize", delSize);
+            if ( full ) {
+                output->append( "delBucketSizes", delBucketSizes.arr() );
+            }
+
+            if ( incorrect ) {
+                results->errors.push_back( BSONObjBuilder::numStr(incorrect) +
+                                           " records from datafile are in deleted list" );
+                results->valid = false;
+            }
+
+        }
+        catch (AssertionException) {
+            results->errors.push_back( "exception during validate" );
+            results->valid = false;
+        }
+
+        return Status::OK();
+    }
+
+    void RecordStoreV1Base::appendCustomStats( OperationContext* txn,
+                                               BSONObjBuilder* result,
+                                               double scale ) const {
+        result->append( "lastExtentSize", _details->lastExtentSize(txn) / scale );
+        result->append( "paddingFactor", _details->paddingFactor() );
+        result->append( "userFlags", _details->userFlags() );
+
+        if ( isCapped() ) {
+            result->appendBool( "capped", true );
+            result->appendNumber( "max", _details->maxCappedDocs() );
+        }
+    }
+
+
+    namespace {
+        struct touch_location {
+            const char* root;
+            size_t length;
+        };
+    }
+
+    Status RecordStoreV1Base::touch( OperationContext* txn, BSONObjBuilder* output ) const {
+        Timer t;
+
+        std::vector<touch_location> ranges;
+        {
+            DiskLoc nextLoc = _details->firstExtent(txn);
+            Extent* ext = _getExtent( txn, nextLoc );
+            while ( ext ) {
+                touch_location tl;
+                tl.root = reinterpret_cast<const char*>(ext);
+                tl.length = ext->length;
+                ranges.push_back(tl);
+
+                nextLoc = ext->xnext;
+                if ( nextLoc.isNull() )
+                    ext = NULL;
+                else
+                    ext = _getExtent( txn, nextLoc );
+            }
+        }
+
+        std::string progress_msg = "touch " + std::string(txn->getNS()) + " extents";
+        ProgressMeterHolder pm(*txn->setMessage(progress_msg.c_str(),
+                                                "Touch Progress",
+                                                ranges.size()));
+
+        for ( std::vector<touch_location>::iterator it = ranges.begin(); it != ranges.end(); ++it ) {
+            touch_pages( it->root, it->length );
+            pm.hit();
+            txn->checkForInterrupt();
+        }
+        pm.finished();
+
+        if ( output ) {
+            output->append( "numRanges", static_cast<int>( ranges.size() ) );
+            output->append( "millis", t.millis() );
+        }
+
+        return Status::OK();
+    }
+
+    int RecordStoreV1Base::getRecordAllocationSize( int minRecordSize ) const {
+
+        if ( isCapped() )
+            return minRecordSize;
+
+        invariant( _details->paddingFactor() >= 1 );
+
+        if ( _details->isUserFlagSet( Flag_UsePowerOf2Sizes ) ) {
+            // quantize to the nearest bucketSize (or nearest 1mb boundary for large sizes).
+            return quantizePowerOf2AllocationSpace(minRecordSize);
+        }
+
+        // adjust for padding factor
+        return static_cast<int>(minRecordSize * _details->paddingFactor());
+    }
+
+    DiskLoc RecordStoreV1Base::IntraExtentIterator::getNext() {
+        if (_curr.isNull())
+            return DiskLoc();
+
+        const DiskLoc out = _curr; // we always return where we were, not where we will be.
+        const Record* rec = recordFor(_curr);
+        const int nextOfs = _forward ? rec->nextOfs() : rec->prevOfs();
+        _curr = (nextOfs == DiskLoc::NullOfs ? DiskLoc() : DiskLoc(_curr.a(), nextOfs));
+        return out;
+    }
+
+    void RecordStoreV1Base::IntraExtentIterator::invalidate(const DiskLoc& dl) {
+        if (dl == _curr) {
+            getNext();
+        }
+    }
+
+    /* @return the size for an allocated record quantized to 1/16th of the BucketSize
+       @param allocSize    requested size to allocate
+    */
+    int RecordStoreV1Base::quantizeAllocationSpace(int allocSize) {
+        const int bucketIdx = bucket(allocSize);
+        int bucketSize = bucketSizes[bucketIdx];
+        int quantizeUnit = bucketSize / 16;
+        if (allocSize >= (1 << 22)) // 4mb
+            // all allocatons >= 4mb result in 4mb/16 quantization units, even if >= 8mb.  idea is
+            // to reduce quantization overhead of large records at the cost of increasing the
+            // DeletedRecord size distribution in the largest bucket by factor of 4.
+            quantizeUnit = (1 << 18); // 256k
+        if (allocSize % quantizeUnit == 0)
+            // size is already quantized
+            return allocSize;
+        const int quantizedSpace = (allocSize | (quantizeUnit - 1)) + 1;
+        fassert(16484, quantizedSpace >= allocSize);
+        return quantizedSpace;
+    }
+
+    int RecordStoreV1Base::quantizePowerOf2AllocationSpace(int allocSize) {
+        for ( int i = 0; i < MaxBucket; i++ ) { // skips the largest (16MB) bucket
+            if ( bucketSizes[i] >= allocSize ) {
+                // Return the size of the first bucket sized >= the requested size.
+                return bucketSizes[i];
+            }
+        }
+
+        // if we get here, it means we're allocating more than 4mb, so round up
+        // to the nearest megabyte >= allocSize
+        const int MB = 1024*1024;
+        invariant(allocSize > 4*MB);
+        return (allocSize + (MB - 1)) & ~(MB - 1); // round up to MB alignment
+    }
+
+    int RecordStoreV1Base::bucket(int size) {
+        for ( int i = 0; i < Buckets; i++ ) {
+            if ( bucketSizes[i] > size ) {
+                // Return the first bucket sized _larger_ than the requested size.
+                return i;
+            }
+        }
+        return MaxBucket;
+    }
+
+    void RecordStoreV1Base::_paddingFits( OperationContext* txn ) {
+        MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less
+            double x = max(1.0, _details->paddingFactor() - 0.001 );
+            _details->setPaddingFactor( txn, x );
+        }
+    }
+
+    void RecordStoreV1Base::_paddingTooSmall( OperationContext* txn ) {
+        MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less
+            /* the more indexes we have, the higher the cost of a move.  so we take that into
+               account herein.  note on a move that insert() calls paddingFits(), thus
+               here for example with no inserts and nIndexes = 1 we have
+               .001*4-.001 or a 3:1 ratio to non moves -> 75% nonmoves.  insert heavy
+               can pushes this down considerably. further tweaking will be a good idea but
+               this should be an adequate starting point.
+            */
+            double N = 4; // magic
+            double x = min(2.0,_details->paddingFactor() + (0.001 * N));
+            _details->setPaddingFactor( txn, x );
+        }
+    }
+
+    Status RecordStoreV1Base::setCustomOption( OperationContext* txn,
+                                               const BSONElement& option,
+                                               BSONObjBuilder* info ) {
+        if ( str::equals( "usePowerOf2Sizes", option.fieldName() ) ) {
+            bool oldPowerOf2 = _details->isUserFlagSet( Flag_UsePowerOf2Sizes );
+            bool newPowerOf2 = option.trueValue();
+
+            if ( oldPowerOf2 != newPowerOf2 ) {
+                // change userFlags
+                info->appendBool( "usePowerOf2Sizes_old", oldPowerOf2 );
+
+                if ( newPowerOf2 )
+                    _details->setUserFlag( txn, Flag_UsePowerOf2Sizes );
+                else
+                    _details->clearUserFlag( txn, Flag_UsePowerOf2Sizes );
+
+                info->appendBool( "usePowerOf2Sizes_new", newPowerOf2 );
+            }
+
+            return Status::OK();
+        }
+
+        return Status( ErrorCodes::InvalidOptions,
+                       str::stream() << "no such option: " << option.fieldName() );
+    }
+}

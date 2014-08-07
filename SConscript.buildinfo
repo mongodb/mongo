@@ -64,4 +64,3 @@ env.Command(buildinfo_filename,
             Action(generate_buildinfo, "Generating $TARGET"))
 env.AlwaysBuild(buildinfo_filename)
 env.Install('$BUILD_DIR/mongo', buildinfo_filename)
-env.Install('$BUILD_DIR/client_build/mongo', buildinfo_filename)

@@ -35,27 +35,24 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/background.h"
-#include "mongo/db/commands.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/curop-inl.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/kill_current_op.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 
 namespace mongo {
 
-    // from repl/rs.cpp
-    bool isCurrentlyAReplSetPrimary();
-
     class CompactCmd : public Command {
     public:
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool adminOnly() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool maintenanceMode() const { return true; }
-        virtual bool logTheOp() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -65,7 +62,7 @@ namespace mongo {
         }
         virtual void help( stringstream& help ) const {
             help << "compact collection\n"
-                "warning: this operation blocks the server and is slow. you can cancel with cancelOp()\n"
+                "warning: this operation locks the database and is slow. you can cancel with killOp()\n"
                 "{ compact : <collection_name>, [force:<bool>], [validate:<bool>],\n"
                 "  [paddingFactor:<num>], [paddingBytes:<num>] }\n"
                 "  force - allows to run on a replica set primary\n"
@@ -73,24 +70,28 @@ namespace mongo {
         }
         CompactCmd() : Command("compact") { }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname,
+        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
+                                                     Database* db,
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname+".system.indexes";
             std::string coll = cmdObj.firstElement().valuestr();
-            std::string ns = dbname + "." + coll;
-            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
+            std::string ns = db->name() + "." + coll;
 
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
+            IndexCatalog::IndexKillCriteria criteria;
+            criteria.ns = ns;
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
         }
 
-        virtual bool run(const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string coll = cmdObj.firstElement().valuestr();
             if( coll.empty() || db.empty() ) {
                 errmsg = "no collection name specified";
                 return false;
             }
 
-            if( isCurrentlyAReplSetPrimary() && !cmdObj["force"].trueValue() ) {
+            repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+            if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet
+                    && replCoord->getCurrentMemberState().primary()
+                    && !cmdObj["force"].trueValue()) {
                 errmsg = "will not run compact on an active replica set primary as this is a slow blocking operation. use force:true to force";
                 return false;
             }
@@ -142,11 +143,13 @@ namespace mongo {
                 compactOptions.validateDocuments = cmdObj["validate"].trueValue();
 
 
-            Lock::DBWrite lk(ns.ns());
+            Lock::DBWrite lk(txn->lockState(), ns.ns());
+            //  SERVER-14085: The following will have to go as we push down WOUW
+            WriteUnitOfWork wunit(txn->recoveryUnit());
             BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
-            Client::Context ctx(ns);
+            Client::Context ctx(txn, ns);
 
-            Collection* collection = ctx.db()->getCollection(ns.ns());
+            Collection* collection = ctx.db()->getCollection(txn, ns.ns());
             if( ! collection ) {
                 errmsg = "namespace does not exist";
                 return false;
@@ -159,9 +162,9 @@ namespace mongo {
 
             log() << "compact " << ns << " begin, options: " << compactOptions.toString();
 
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(db, cmdObj);
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, ctx.db(), cmdObj);
 
-            StatusWith<CompactStats> status = collection->compact( &compactOptions );
+            StatusWith<CompactStats> status = collection->compact( txn, &compactOptions );
             if ( !status.isOK() )
                 return appendCommandStatus( result, status.getStatus() );
 
@@ -171,6 +174,7 @@ namespace mongo {
             log() << "compact " << ns << " end";
 
             IndexBuilder::restoreIndexes(indexesInProg);
+            wunit.commit();
 
             return true;
         }

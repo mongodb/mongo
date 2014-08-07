@@ -65,13 +65,14 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         r = st.adminCommand({ shardCollection : "test.col" , key : { _id : 1 } });
         assert.eq(r, true, "error sharding collection for this configuration");
 
-	// Test mongos talking to shards
+        // Test mongos talking to shards
         var bigstr = Array(1024*1024).join("#");
 
+        var bulk = db1.col.initializeUnorderedBulkOp();
         for(var i = 0; i < 128; i++){
-            db1.col.insert({_id:i, string:bigstr});
+            bulk.insert({ _id: i, string: bigstr });
         }
-        db1.getLastError();
+        assert.writeOK(bulk.execute());
         assert.eq(128, db1.col.count(), "error retrieving documents from cluster");
 
         // Test shards talking to each other
@@ -79,7 +80,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
                                             find: { _id: 0 }, to: 'shard0000' });
         assert(r.ok, "error moving chunks: " + tojson(r));
 
-        db1.col.remove();
+        db1.col.remove({});
 
     } catch(e) {
         if (shouldSucceed) throw e;
@@ -101,7 +102,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
 // TODO: merge this with that file and add to utils?
 //
 
-ReplSetTest.prototype.upgradeSet = function( options ){
+ReplSetTest.prototype.upgradeSet = function( options, user, pwd ){
     options = options || {}
 
     var nodes = this.nodes
@@ -129,15 +130,18 @@ ReplSetTest.prototype.upgradeSet = function( options ){
             this.nodeOptions[nodeName] = Object.merge(this.nodeOptions[nodeName], options);
         }
         printjson(this.nodeOptions);
-        this.upgradeNode( node, options, true )
+        this.upgradeNode( node, options, true, user, pwd )
 
         if( noDowntimePossible )
             assert.eq( this.getNodeId( primary ), prevPrimaryId )
     }
 }
 
-ReplSetTest.prototype.upgradeNode = function( node, opts, waitForState ){
+ReplSetTest.prototype.upgradeNode = function( node, opts, waitForState, user, pwd ){
     var node = this.restart( node, opts )
+    if (user != undefined) {
+        node.getDB("admin").auth(user, pwd);
+    }
     // By default, wait for primary or secondary state
     if( waitForState == undefined ) waitForState = true
     if( waitForState == true ) waitForState = [ ReplSetTest.State.PRIMARY,

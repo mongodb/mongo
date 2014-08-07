@@ -35,6 +35,7 @@
 namespace mongo {
 
     class CachedSolution;
+    class Collection;
 
     /**
      * QueryPlanner's job is to provide an entry point to the query planning and optimization
@@ -42,6 +43,9 @@ namespace mongo {
      */
     class QueryPlanner {
     public:
+        // Identifies the version of the query planner module. Reported in explain.
+        static const int kPlannerVersion;
+
         /**
          * Outputs a series of possible solutions for the provided 'query' into 'out'.  Uses the
          * indices and other data in 'params' to plan with.
@@ -101,7 +105,7 @@ namespace mongo {
          * On failure, 'out' is set to NULL.
          */
         static Status cacheDataFromTaggedTree(const MatchExpression* const taggedTree,
-                                              const vector<IndexEntry>& relevantIndices,
+                                              const std::vector<IndexEntry>& relevantIndices,
                                               PlanCacheIndexTree** out);
 
         /**
@@ -123,7 +127,7 @@ namespace mongo {
          */
         static Status tagAccordingToCache(MatchExpression* filter,
                                           const PlanCacheIndexTree* const indexTree,
-                                          const map<BSONObj, size_t>& indexMap);
+                                          const std::map<BSONObj, size_t>& indexMap);
     };
 
 }  // namespace mongo

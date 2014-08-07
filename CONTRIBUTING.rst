@@ -17,6 +17,7 @@ Getting Started
 - Create a `MongoDB JIRA account`_.
 - Create a `Github account`_.
 - Fork the repository on Github at https://github.com/mongodb/mongo.
+- For more details see http://www.mongodb.org/about/contributors/
 
 .. _MongoDB JIRA account: https://jira.mongodb.org/secure/Signup!default.jspa
 .. _Github account: https://github.com/signup/free
@@ -77,7 +78,7 @@ Testing
 -------
 
 Every non-trivial change to the code base should be accompanied by a relevant addition to or
-modification of the test suite.  If you don't believe this is necessary, please add an explanation
+modification of the test suite.  If you do not believe this is necessary, please add an explanation
 in the JIRA ticket why no such changes are either needed or possible.
 
 All changes must also pass the full test suite (including your test additions/changes) on your

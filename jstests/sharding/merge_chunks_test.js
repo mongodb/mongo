@@ -35,19 +35,16 @@ assert( admin.runCommand({ moveChunk : coll + "", find : { _id : 90 }, to : shar
 st.printShardingStatus();
 
 // Insert some data into each of the consolidated ranges
-coll.insert({ _id : 0 });
-coll.insert({ _id : 40 });
-coll.insert({ _id : 110 });
-assert.eq( null, coll.getDB().getLastError() );
+assert.writeOK(coll.insert({ _id : 0 }));
+assert.writeOK(coll.insert({ _id : 40 }));
+assert.writeOK(coll.insert({ _id : 110 }));
 
 var staleCollection = staleMongos.getCollection( coll + "" );
 
 jsTest.log( "Trying merges that should fail..." );
 
-// Make sure merging three chunks is invalid (for now)
-
-assert( !admin.runCommand({ mergeChunks : coll + "", 
-                            bounds : [{ _id : 20 }, { _id : 90 }] }).ok );
+// S0: min->0, 0->10, 20->40, 40->50, 50->90, 100->110, 110->max
+// S1: 10->20, 90->100
 
 // Make sure merging non-exact chunks is invalid
 
@@ -75,7 +72,9 @@ assert( !admin.runCommand({ mergeChunks : coll + "",
 
 assert( !admin.runCommand({ mergeChunks : coll + "", 
                             bounds : [{ _id : 0 }, { _id : 40 }] }).ok );
-assert( !admin.runCommand({ mergeChunks : coll + "", 
+assert( !admin.runCommand({ mergeChunks : coll + "",
+                            bounds : [{ _id : 40 }, { _id : 110 }] }).ok );
+assert( !admin.runCommand({ mergeChunks : coll + "",
                             bounds : [{ _id : 50 }, { _id : 110 }] }).ok );
 
 // Make sure merging between shards is invalid
@@ -84,6 +83,8 @@ assert( !admin.runCommand({ mergeChunks : coll + "",
                             bounds : [{ _id : 0 }, { _id : 20 }] }).ok );
 assert( !admin.runCommand({ mergeChunks : coll + "", 
                             bounds : [{ _id : 10 }, { _id : 40 }] }).ok );
+assert( !admin.runCommand({ mergeChunks : coll + "",
+                            bounds : [{ _id : 40 }, { _id : 100 }] }).ok );
 
 assert.eq( 3, staleCollection.find().itcount() );
 
@@ -94,18 +95,26 @@ assert( admin.runCommand({ mergeChunks : coll + "",
 
 assert.eq( 3, staleCollection.find().itcount() );
 
-assert( admin.runCommand({ mergeChunks : coll + "", 
-                           bounds : [{ _id : 20 }, { _id : 50 }] }).ok );
+// S0: min->10, 20->40, 40->50, 50->90, 100->110, 110->max
+// S1: 10->20, 90->100
 
-assert( admin.runCommand({ mergeChunks : coll + "", 
-                           bounds : [{ _id : 20 }, { _id : 90 }] }).ok );
+// Make sure merging three chunks is valid.
+
+jsTest.log(tojson( admin.runCommand({ mergeChunks : coll + "",
+                           bounds : [{ _id : 20 }, { _id : 90 }] }) ));
+
+// S0: min->10, 20->90, 100->110, 110->max
+// S1: 10->20, 90->100
 
 assert.eq( 3, staleCollection.find().itcount() );
 
-assert( admin.runCommand({ mergeChunks : coll + "", 
+assert( admin.runCommand({ mergeChunks : coll + "",
                            bounds : [{ _id : 100 }, { _id : MaxKey }] }).ok );
 
 assert.eq( 3, staleCollection.find().itcount() );
+
+// S0: min->10, 20->90, 100->max
+// S1: 10->20, 90->100
 
 st.printShardingStatus();
 

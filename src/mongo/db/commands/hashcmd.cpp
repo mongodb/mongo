@@ -50,7 +50,7 @@ namespace mongo {
     class CmdHashElt : public Command {
     public:
         CmdHashElt() : Command("_hashBSONElement") {};
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
         // No auth needed because it only works when enabled via command line.
         virtual void addRequiredPrivileges(const std::string& dbname,
@@ -72,7 +72,7 @@ namespace mongo {
          *>  "out" : NumberLong(6271151123721111923),
          *>  "ok" : 1 }
          **/
-        bool run( const string& db,
+        bool run(OperationContext* txn, const string& db,
                   BSONObj& cmdObj,
                   int options, string& errmsg,
                   BSONObjBuilder& result,

@@ -205,7 +205,7 @@ replTest.awaitReplication(60000);
 printjson(replTest.status());
 
 print("force 2 to sync from 3");
-// This briefly causes 2 to sync from 3, but members have a strong prefrence for not syncing from
+// This briefly causes 2 to sync from 3, but members have a strong preference for not syncing from
 // a slave delayed node so it may switch to another sync source quickly.
 result = replTest.nodes[2].getDB("admin")
     .runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[3]});

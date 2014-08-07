@@ -26,16 +26,22 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/range_deleter.h"
 
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <memory>
 
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/range_arithmetic.h"
-#include "mongo/db/range_deleter_stats.h"
 #include "mongo/util/concurrency/synchronization.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 using std::auto_ptr;
 using std::set;
@@ -47,6 +53,9 @@ using mongoutils::str::stream;
 namespace {
     const long int NotEmptyTimeoutMillis = 200;
     const long long int MaxCurorCheckIntervalMillis = 500;
+    const unsigned long long LogCursorsThresholdMillis = 60 * 1000;
+    const unsigned long long LogCursorsIntervalMillis = 10 * 1000;
+    const size_t DeleteJobsHistory = 10; // entries
 
     /**
      * Removes an element from the container that holds a pointer type, and deletes the
@@ -64,49 +73,31 @@ namespace {
         container->erase(iter);
         return true;
     }
+
+    void logCursorsWaiting(const std::string& ns,
+                           const mongo::BSONObj& min,
+                           const mongo::BSONObj& max,
+                           unsigned long long int elapsedMS,
+                           const std::set<mongo::CursorId>& cursorsToWait) {
+        mongo::StringBuilder cursorList;
+        for (std::set<mongo::CursorId>::const_iterator it = cursorsToWait.begin();
+                it != cursorsToWait.end(); ++it) {
+            cursorList << *it << " ";
+        }
+
+        mongo::log() << "Waiting for open cursors before deleting ns: " << ns
+                     << ", min: " << min
+                     << ", max: " << max
+                     << ", elapsedMS: " << elapsedMS
+                     << ", cursors: [ " << cursorList.str() << "]" << std::endl;
+    }
 }
 
 namespace mongo {
 
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+
     namespace duration = boost::posix_time;
-
-    struct RangeDeleter::RangeDeleteEntry {
-        RangeDeleteEntry():
-                secondaryThrottle(true),
-                notifyDone(NULL) {
-        }
-
-        std::string ns;
-
-        // Inclusive lower range.
-        BSONObj min;
-
-        // Exclusive upper range.
-        BSONObj max;
-
-        // The key pattern of the index the range refers to.
-        // This is relevant especially with special indexes types
-        // like hash indexes.
-        BSONObj shardKeyPattern;
-
-        bool secondaryThrottle;
-
-        // Sets of cursors to wait to close until this can be ready
-        // for deletion.
-        std::set<CursorId> cursorsToWait;
-
-        // Not owned here.
-        // Important invariant: Can only be set and used by one thread.
-        Notification* notifyDone;
-
-        // For debugging only
-        BSONObj toBSON() const {
-            return BSON("ns" << ns
-                    << "min" << min
-                    << "max" << max
-                    << "notifyDoneAddr" << reinterpret_cast<long long>(notifyDone));
-        }
-    };
 
     struct RangeDeleter::NSMinMax {
         NSMinMax(std::string ns, const BSONObj min, const BSONObj max):
@@ -142,7 +133,8 @@ namespace mongo {
         _stopMutex("stopRangeDeleter"),
         _stopRequested(false),
         _queueMutex("RangeDeleter"),
-        _stats(new RangeDeleterStats(&_queueMutex)) {
+        _deletesInProgress(0),
+        _statsHistoryMutex("RangeDeleterStatsHistory") {
     }
 
     RangeDeleter::~RangeDeleter() {
@@ -173,7 +165,7 @@ namespace mongo {
 
     void RangeDeleter::startWorkers() {
         if (!_worker) {
-            _worker.reset(new boost::thread(boost::bind(&RangeDeleter::doWork, this)));
+            _worker.reset(new boost::thread(stdx::bind(&RangeDeleter::doWork, this)));
         }
     }
 
@@ -188,7 +180,7 @@ namespace mongo {
         }
 
         scoped_lock sl(_queueMutex);
-        while (_stats->hasInProgress_inlock()) {
+        while (_deletesInProgress > 0) {
             _nothingInProgressCV.wait(sl.boost());
         }
     }
@@ -197,18 +189,17 @@ namespace mongo {
                                    const BSONObj& min,
                                    const BSONObj& max,
                                    const BSONObj& shardKeyPattern,
-                                   bool secondaryThrottle,
+                                   const WriteConcernOptions& writeConcern,
                                    Notification* notifyDone,
                                    std::string* errMsg) {
         string dummy;
         if (errMsg == NULL) errMsg = &dummy;
 
-        auto_ptr<RangeDeleteEntry> toDelete(new RangeDeleteEntry);
-        toDelete->ns = ns;
-        toDelete->min = min.getOwned();
-        toDelete->max = max.getOwned();
-        toDelete->shardKeyPattern = shardKeyPattern.getOwned();
-        toDelete->secondaryThrottle = secondaryThrottle;
+        auto_ptr<RangeDeleteEntry> toDelete(new RangeDeleteEntry(ns,
+                                                                 min.getOwned(),
+                                                                 max.getOwned(),
+                                                                 shardKeyPattern.getOwned(),
+                                                                 writeConcern));
         toDelete->notifyDone = notifyDone;
 
         {
@@ -223,20 +214,27 @@ namespace mongo {
             }
 
             _deleteSet.insert(new NSMinMax(ns, min, max));
-            _stats->incTotalDeletes_inlock();
-            _stats->incPendingDeletes_inlock();
         }
 
-        _env->getCursorIds(ns, &toDelete->cursorsToWait);
+        {
+            boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
+            _env->getCursorIds(txn.get(), ns, &toDelete->cursorsToWait);
+        }
+
+        toDelete->stats.queueStartTS = jsTime();
 
         {
             scoped_lock sl(_queueMutex);
 
             if (toDelete->cursorsToWait.empty()) {
+                toDelete->stats.queueEndTS = jsTime();
                 _taskQueue.push_back(toDelete.release());
                 _taskQueueNotEmptyCV.notify_one();
             }
             else {
+                log() << "rangeDeleter waiting for " << toDelete->cursorsToWait.size()
+                      << " cursors in " << ns << " to finish" << endl;
+
                 _notReadyQueue.push_back(toDelete.release());
             }
         }
@@ -244,11 +242,47 @@ namespace mongo {
         return true;
     }
 
-    bool RangeDeleter::deleteNow(const std::string& ns,
+namespace {
+    const int kWTimeoutMillis = 60 * 60 * 1000;
+
+    bool _waitForMajority(OperationContext* txn, std::string* errMsg) {
+        const WriteConcernOptions writeConcern("majority",
+                                               WriteConcernOptions::NONE,
+                                               kWTimeoutMillis);
+
+        repl::ReplicationCoordinator::StatusAndDuration replStatus =
+                repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOp(txn,
+                                                                                  writeConcern);
+        repl::ReplicationCoordinator::Milliseconds elapsedTime = replStatus.duration;
+        if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
+            *errMsg = str::stream() << "rangeDeleter timed out after "
+                                    << elapsedTime.seconds() << " seconds while waiting"
+                                    << " for deletions to be replicated to majority nodes";
+            log() << *errMsg;
+        }
+        else if (replStatus.status.code() == ErrorCodes::NotMaster) {
+            *errMsg = str::stream() << "rangeDeleter no longer PRIMARY after "
+                                    << elapsedTime.seconds() << " seconds while waiting"
+                                    << " for deletions to be replicated to majority nodes";
+        }
+        else {
+            LOG(elapsedTime.seconds() < 30 ? 1 : 0)
+                << "rangeDeleter took " << elapsedTime.seconds() << " seconds "
+                << " waiting for deletes to be replicated to majority nodes";
+
+            fassert(18512, replStatus.status);
+        }
+
+        return replStatus.status.isOK();
+    }
+}
+
+    bool RangeDeleter::deleteNow(OperationContext* txn,
+                                 const std::string& ns,
                                  const BSONObj& min,
                                  const BSONObj& max,
                                  const BSONObj& shardKeyPattern,
-                                 bool secondaryThrottle,
+                                 const WriteConcernOptions& writeConcern,
                                  string* errMsg) {
         if (stopRequested()) {
             *errMsg = "deleter is already stopped.";
@@ -266,22 +300,41 @@ namespace mongo {
             }
 
             _deleteSet.insert(&deleteRange);
-            _stats->incTotalDeletes_inlock();
 
             // Note: count for pending deletes is an integral part of the shutdown story.
             // Therefore, to simplify things, there is no "pending" state for deletes in
             // deleteNow, the state transition is simply inProgress -> done.
-            _stats->incInProgressDeletes_inlock();
+            _deletesInProgress++;
         }
 
         set<CursorId> cursorsToWait;
-        _env->getCursorIds(ns, &cursorsToWait);
+        _env->getCursorIds(txn, ns, &cursorsToWait);
 
         long long checkIntervalMillis = 5;
 
-        while (!cursorsToWait.empty()) {
+        if (!cursorsToWait.empty()) {
+            log() << "rangeDeleter waiting for " << cursorsToWait.size()
+                  << " cursors in " << ns << " to finish" << endl;
+        }
+
+        RangeDeleteEntry taskDetails(ns, min, max, shardKeyPattern, writeConcern);
+        taskDetails.stats.queueStartTS = jsTime();
+
+        Date_t timeSinceLastLog;
+        for (; !cursorsToWait.empty(); sleepmillis(checkIntervalMillis)) {
+            const unsigned long long timeNow = curTimeMillis64();
+            const unsigned long long elapsedTimeMillis =
+                timeNow - taskDetails.stats.queueStartTS.millis;
+            const unsigned long long lastLogMillis = timeNow - timeSinceLastLog.millis;
+
+            if (elapsedTimeMillis > LogCursorsThresholdMillis &&
+                    lastLogMillis > LogCursorsIntervalMillis) {
+                timeSinceLastLog = jsTime();
+                logCursorsWaiting(ns, min, max, elapsedTimeMillis, cursorsToWait);
+            }
+
             set<CursorId> cursorsNow;
-            _env->getCursorIds(ns, &cursorsNow);
+            _env->getCursorIds(txn, ns, &cursorsNow);
 
             set<CursorId> cursorsLeft;
             std::set_intersection(cursorsToWait.begin(),
@@ -298,10 +351,9 @@ namespace mongo {
                 scoped_lock sl(_queueMutex);
                 _deleteSet.erase(&deleteRange);
 
-                _stats->decInProgressDeletes_inlock();
-                _stats->decTotalDeletes_inlock();
+                _deletesInProgress--;
 
-                if (!_stats->hasInProgress_inlock()) {
+                if (_deletesInProgress == 0) {
                     _nothingInProgressCV.notify_one();
                 }
 
@@ -311,25 +363,35 @@ namespace mongo {
             if (checkIntervalMillis < MaxCurorCheckIntervalMillis) {
                 checkIntervalMillis *= 2;
             }
-
-            sleepmillis(checkIntervalMillis);
         }
+        taskDetails.stats.queueEndTS = jsTime();
 
-        bool result = _env->deleteRange(ns, min, max, shardKeyPattern,
-                                        secondaryThrottle, errMsg);
+        taskDetails.stats.deleteStartTS = jsTime();
+        bool result = _env->deleteRange(txn,
+                                        taskDetails,
+                                        &taskDetails.stats.deletedDocCount,
+                                        errMsg);
+
+        taskDetails.stats.deleteEndTS = jsTime();
+
+        if (result) {
+            taskDetails.stats.waitForReplStartTS = jsTime();
+            result = _waitForMajority(txn, errMsg);
+            taskDetails.stats.waitForReplEndTS = jsTime();
+        }
 
         {
             scoped_lock sl(_queueMutex);
             _deleteSet.erase(&deleteRange);
 
-            _stats->decInProgressDeletes_inlock();
-            _stats->decTotalDeletes_inlock();
+            _deletesInProgress--;
 
-            if (!_stats->hasInProgress_inlock()) {
+            if (_deletesInProgress == 0) {
                 _nothingInProgressCV.notify_one();
             }
         }
 
+        recordDelStats(new DeleteJobStats(taskDetails.stats));
         return result;
     }
 
@@ -370,8 +432,15 @@ namespace mongo {
         return deletePtrElement(&_blackList, &entry);
     }
 
-    const RangeDeleterStats* RangeDeleter::getStats() const {
-        return _stats.get();
+    void RangeDeleter::getStatsHistory(std::vector<DeleteJobStats*>* stats) const {
+        stats->clear();
+        stats->reserve(DeleteJobsHistory);
+
+        scoped_lock sl(_statsHistoryMutex);
+        for (deque<DeleteJobStats*>::const_iterator it = _statsHistory.begin();
+                it != _statsHistory.end(); ++it) {
+            stats->push_back(new DeleteJobStats(**it));
+        }
     }
 
     BSONObj RangeDeleter::toBSON() const {
@@ -424,7 +493,10 @@ namespace mongo {
                             RangeDeleteEntry* entry = *iter;
 
                             set<CursorId> cursorsNow;
-                            _env->getCursorIds(entry->ns, &cursorsNow);
+                            {
+                                boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
+                                _env->getCursorIds(txn.get(), entry->ns, &cursorsNow);
+                            }
 
                             set<CursorId> cursorsLeft;
                             std::set_intersection(entry->cursorsToWait.begin(),
@@ -437,11 +509,25 @@ namespace mongo {
                             entry->cursorsToWait.swap(cursorsLeft);
 
                             if (entry->cursorsToWait.empty()) {
+                               (*iter)->stats.queueEndTS = jsTime();
                                 _taskQueue.push_back(*iter);
                                 _taskQueueNotEmptyCV.notify_one();
                                 iter = _notReadyQueue.erase(iter);
                             }
                             else {
+                                const unsigned long long int elapsedMillis =
+                                    entry->stats.queueStartTS.millis - curTimeMillis64();
+                                if ( elapsedMillis > LogCursorsThresholdMillis &&
+                                    entry->timeSinceLastLog.millis > LogCursorsIntervalMillis) {
+
+                                    entry->timeSinceLastLog = jsTime();
+                                    logCursorsWaiting(entry->ns,
+                                                      entry->min,
+                                                      entry->max,
+                                                      elapsedMillis,
+                                                      entry->cursorsToWait);
+                                }
+
                                 ++iter;
                             }
                         }
@@ -456,18 +542,32 @@ namespace mongo {
                 nextTask = _taskQueue.front();
                 _taskQueue.pop_front();
 
-                _stats->decPendingDeletes_inlock();
-                _stats->incInProgressDeletes_inlock();
+                _deletesInProgress++;
             }
 
-            if (!_env->deleteRange(nextTask->ns,
-                                   nextTask->min,
-                                   nextTask->max,
-                                   nextTask->shardKeyPattern,
-                                   nextTask->secondaryThrottle,
-                                   &errMsg)) {
-                warning() << "Error encountered while trying to delete range: "
-                          << errMsg << endl;
+            {
+                boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
+
+                nextTask->stats.deleteStartTS = jsTime();
+                bool delResult = _env->deleteRange(txn.get(),
+                                                   *nextTask,
+                                                   &nextTask->stats.deletedDocCount,
+                                                   &errMsg);
+                nextTask->stats.deleteEndTS = jsTime();
+
+                if (delResult) {
+                    nextTask->stats.waitForReplStartTS = jsTime();
+
+                    if (!_waitForMajority(txn.get(), &errMsg)) {
+                        warning() << "Error encountered while waiting for replication: " << errMsg;
+                    }
+
+                    nextTask->stats.waitForReplEndTS = jsTime();
+                }
+                else {
+                    warning() << "Error encountered while trying to delete range: "
+                              << errMsg << endl;
+                }
             }
 
             {
@@ -475,16 +575,16 @@ namespace mongo {
 
                 NSMinMax setEntry(nextTask->ns, nextTask->min, nextTask->max);
                 deletePtrElement(&_deleteSet, &setEntry);
-                _stats->decInProgressDeletes_inlock();
-                _stats->decTotalDeletes_inlock();
+                _deletesInProgress--;
 
                 if (nextTask->notifyDone) {
                     nextTask->notifyDone->notifyOne();
                 }
-
-                delete nextTask;
-                nextTask = NULL;
             }
+
+            recordDelStats(new DeleteJobStats(nextTask->stats));
+            delete nextTask;
+            nextTask = NULL;
         }
     }
 
@@ -534,6 +634,60 @@ namespace mongo {
     bool RangeDeleter::stopRequested() const {
         scoped_lock sl(_stopMutex);
         return _stopRequested;
+    }
+
+    size_t RangeDeleter::getTotalDeletes() const {
+        scoped_lock sl(_queueMutex);
+        return _deleteSet.size();
+    }
+
+    size_t RangeDeleter::getPendingDeletes() const {
+        scoped_lock sl(_queueMutex);
+        return _notReadyQueue.size() + _taskQueue.size();
+    }
+
+    size_t RangeDeleter::getDeletesInProgress() const {
+        scoped_lock sl(_queueMutex);
+        return _deletesInProgress;
+    }
+
+    void RangeDeleter::recordDelStats(DeleteJobStats* newStat) {
+        scoped_lock sl(_statsHistoryMutex);
+        if (_statsHistory.size() == DeleteJobsHistory) {
+            delete _statsHistory.front();
+            _statsHistory.pop_front();
+        }
+
+        _statsHistory.push_back(newStat);
+    }
+
+    RangeDeleteEntry::RangeDeleteEntry(const std::string& ns,
+                                       const BSONObj& min,
+                                       const BSONObj& max,
+                                       const BSONObj& shardKey,
+                                       const WriteConcernOptions& writeConcern):
+                                               ns(ns),
+                                               min(min),
+                                               max(max),
+                                               shardKeyPattern(shardKey),
+                                               writeConcern(writeConcern),
+                                               notifyDone(NULL) {
+    }
+
+    BSONObj RangeDeleteEntry::toBSON() const {
+        BSONObjBuilder builder;
+        builder.append("ns", ns);
+        builder.append("min", min);
+        builder.append("max", max);
+        BSONArrayBuilder cursorBuilder(builder.subarrayStart("cursors"));
+
+        for (std::set<CursorId>::const_iterator it = cursorsToWait.begin();
+                it != cursorsToWait.end(); ++it) {
+            cursorBuilder.append((long long)*it);
+        }
+        cursorBuilder.doneFast();
+
+        return builder.done().copy();
     }
 
 }

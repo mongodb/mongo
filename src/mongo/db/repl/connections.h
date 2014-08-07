@@ -35,9 +35,11 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/security_key.h"
-#include "mongo/db/repl/rs.h" // extern Tee* rslog
+#include "mongo/db/repl/health.h"
+#include "mongo/db/repl/rs_config.h"
 
 namespace mongo {
+namespace repl {
 
     /** here we keep a single connection (with reconnect) for a set of hosts,
         one each, and allow one user at a time per host.  if in use already for that
@@ -80,18 +82,18 @@ namespace mongo {
            So here what we do is wrapper known safe methods and not allow cursor-style queries at all.  This makes
            ScopedConn limited in functionality but very safe.  More non-cursor wrappers can be added here if needed.
            */
-        bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0) {
+        bool runCommand(const std::string &dbname, const BSONObj& cmd, BSONObj &info, int options=0) {
             return conn()->runCommand(dbname, cmd, info, options);
         }
-        unsigned long long count(const string &ns) {
+        unsigned long long count(const std::string &ns) {
             return conn()->count(ns);
         }
-        BSONObj findOne(const string &ns, const Query& q, const BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
+        BSONObj findOne(const std::string &ns, const Query& q, const BSONObj *fieldsToReturn = 0, int queryOptions = 0) {
             return conn()->findOne(ns, q, fieldsToReturn, queryOptions);
         }
 
     private:
-        auto_ptr<scoped_lock> connLock;
+        std::auto_ptr<scoped_lock> connLock;
         static mongo::mutex mapMutex;
         struct ConnectionInfo {
             mongo::mutex lock;
@@ -122,15 +124,15 @@ namespace mongo {
         private:
             int _timeout;
         } *connInfo;
-        typedef map<string,ScopedConn::ConnectionInfo*> M;
+        typedef std::map<std::string,ScopedConn::ConnectionInfo*> M;
         static M& _map;
         scoped_ptr<DBClientConnection>& conn() { return connInfo->cc; }
-        const string _hostport;
+        const std::string _hostport;
 
         // we should already be locked...
         bool connect() {
-          string err;
-          if (!connInfo->cc->connect(_hostport, err)) {
+          std::string err;
+          if (!connInfo->cc->connect(HostAndPort(_hostport), err)) {
             log() << "couldn't connect to " << _hostport << ": " << err << rsLog;
             return false;
           }
@@ -175,4 +177,5 @@ namespace mongo {
         // Keep trying to connect if we're not yet connected
         connect();
     }
-}
+} // namespace repl
+} // namespace mongo

@@ -49,11 +49,21 @@ namespace mongo {
         virtual bool isEOF();
         virtual StageState work(WorkingSetID* out);
 
-        virtual void prepareToYield();
-        virtual void recoverFromYield();
+        virtual void saveState();
+        virtual void restoreState(OperationContext* opCtx);
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_LIMIT; }
+
         virtual PlanStageStats* getStats();
+
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
+        static const char* kStageType;
 
     private:
         WorkingSet* _ws;
@@ -64,6 +74,7 @@ namespace mongo {
 
         // Stats
         CommonStats _commonStats;
+        LimitStats _specificStats;
     };
 
 }  // namespace mongo

@@ -1,6 +1,6 @@
 // shard3.js
 
-s = new ShardingTest( "shard3" , 2 , 1 , 2 );
+s = new ShardingTest( "shard3" , 2 , 1 , 2 , { enableBalancer : 1 } );
 
 s2 = s._mongos[1];
 
@@ -61,8 +61,7 @@ function doCounts( name , total , onlyItCounts ){
 }
 
 var total = doCounts( "before wrong save" )
-secondary.save( { _id : 111 , num : -3 } );
-printjson( secondary.getDB().getLastError() )
+assert.writeOK(secondary.insert( { _id : 111 , num : -3 } ));
 doCounts( "after wrong save" , total , true )
 e = a.find().explain();
 assert.eq( 3 , e.n , "ex1" )
@@ -110,21 +109,6 @@ s.printCollectionInfo( "test.foo" , "after counts" );
 assert.eq( 0 , primary.count() , "p count after drop" )
 assert.eq( 0 , secondary.count() , "s count after drop" )
 
-// NOTE
-//   the following bypasses the sharding layer and writes straight to the servers
-//   this is not supported at all but we'd like to leave this backdoor for now
-primary.save( { num : 1 } );
-secondary.save( { num : 4 } );
-assert.eq( 1 , primary.count() , "p count after drop and save" )
-assert.eq( 1 , secondary.count() , "s count after drop and save " )
-
-print("*** makes sure that sharded access respects the drop command" );
-
-assert.isnull( a.findOne() , "lookup via mongos 'a' accessed dropped data" );
-assert.isnull( b.findOne() , "lookup via mongos 'b' accessed dropped data" );
-
-s.printCollectionInfo( "test.foo" , "after b findOne tests" );
-
 print( "*** dropDatabase setup" )
 
 s.printShardingStatus()
@@ -158,7 +142,6 @@ dbb = s2.getDB( "test2" );
 dba.foo.save( { num : 1 } );
 dba.foo.save( { num : 2 } );
 dba.foo.save( { num : 3 } );
-dba.getLastError();
 
 assert.eq( 1 , s.onNumShards( "foo" , "test2" ) , "B on 1 shards" );
 assert.eq( 3 , dba.foo.count() , "Ba" );

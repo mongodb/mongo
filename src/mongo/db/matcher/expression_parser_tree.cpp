@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsonobjiterator.h"
-#include "mongo/bson/bson-inl.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -42,7 +41,12 @@
 
 namespace mongo {
 
-    Status MatchExpressionParser::_parseTreeList( const BSONObj& arr, ListOfMatchExpression* out ) {
+    // static
+    const int MatchExpressionParser::kMaximumTreeDepth = 100;
+
+    Status MatchExpressionParser::_parseTreeList( const BSONObj& arr,
+                                                  ListOfMatchExpression* out,
+                                                  int level ) {
         if ( arr.isEmpty() )
             return Status( ErrorCodes::BadValue,
                            "$and/$or/$nor must be a nonempty array" );
@@ -55,7 +59,7 @@ namespace mongo {
                 return Status( ErrorCodes::BadValue,
                                "$or/$and/$nor entries need to be full objects" );
 
-            StatusWithMatchExpression sub = _parse( e.Obj(), false );
+            StatusWithMatchExpression sub = _parse( e.Obj(), level );
             if ( !sub.isOK() )
                 return sub.getStatus();
 
@@ -65,7 +69,8 @@ namespace mongo {
     }
 
     StatusWithMatchExpression MatchExpressionParser::_parseNot( const char* name,
-                                                      const BSONElement& e ) {
+                                                                const BSONElement& e,
+                                                                int level ) {
         if ( e.type() == RegEx ) {
             StatusWithMatchExpression s = _parseRegexElement( name, e );
             if ( !s.isOK() )
@@ -85,7 +90,7 @@ namespace mongo {
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$not cannot be empty" );
 
         std::auto_ptr<AndMatchExpression> theAnd( new AndMatchExpression() );
-        Status s = _parseSub( name, notObject, theAnd.get() );
+        Status s = _parseSub( name, notObject, theAnd.get(), level );
         if ( !s.isOK() )
             return StatusWithMatchExpression( s );
 

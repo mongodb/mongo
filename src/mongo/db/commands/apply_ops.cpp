@@ -39,15 +39,16 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
     class ApplyOpsCmd : public Command {
     public:
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return WRITE; }
-        virtual bool lockGlobally() const { return true; } // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple ns used so locking individually requires more analysis
+        virtual bool isWriteCommandForConfigServer() const { return true; }
+
         ApplyOpsCmd() : Command( "applyOps" ) {}
         virtual void help( stringstream &help ) const {
             help << "internal (sharding)\n{ applyOps : [ ] , preCondition : [ { ns : ... , q : ... , res : ... } ] }";
@@ -58,7 +59,7 @@ namespace mongo {
             // applyOps can do pretty much anything, so require all privileges.
             RoleGraph::generateUniversalPrivileges(out);
         }
-        virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
 
             if ( cmdObj.firstElement().type() != Array ) {
                 errmsg = "ops has to be an array";
@@ -80,14 +81,25 @@ namespace mongo {
                 }
             }
 
+            // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple 
+            // ns used so locking individually requires more analysis
+            Lock::GlobalWrite globalWriteLock(txn->lockState());
+            WriteUnitOfWork wunit(txn->recoveryUnit());
+
+            DBDirectClient db(txn);
+
+            // Preconditions check reads the database state, so needs to be done locked
             if ( cmdObj["preCondition"].type() == Array ) {
                 BSONObjIterator i( cmdObj["preCondition"].Obj() );
                 while ( i.more() ) {
                     BSONObj f = i.next().Obj();
 
+                    DBDirectClient db( txn );
                     BSONObj realres = db.findOne( f["ns"].String() , f["q"].Obj() );
 
-                    Matcher m( f["res"].Obj() );
+                    // Apply-ops would never have a $where matcher, so use the default callback,
+                    // which will throw an error if $where is found.
+                    Matcher m(f["res"].Obj());
                     if ( ! m.matches( realres ) ) {
                         result.append( "got" , realres );
                         result.append( "whatFailed" , f );
@@ -112,15 +124,29 @@ namespace mongo {
 
                 string ns = temp["ns"].String();
 
-                Client::Context ctx(ns);
-                bool failed = applyOperation_inlock(temp, false, alwaysUpsert);
+                // Run operations under a nested lock as a hack to prevent them from yielding.
+                //
+                // The list of operations is supposed to be applied atomically; yielding would break
+                // atomicity by allowing an interruption or a shutdown to occur after only some
+                // operations are applied.  We are already locked globally at this point, so taking
+                // a DBWrite on the namespace creates a nested lock, and yields are disallowed for
+                // operations that hold a nested lock.
+                Lock::DBWrite lk(txn->lockState(), ns);
+                invariant(txn->lockState()->isRecursive());
+
+                Client::Context ctx(txn, ns);
+                bool failed = repl::applyOperation_inlock(txn,
+                                                             ctx.db(),
+                                                             temp,
+                                                             false,
+                                                             alwaysUpsert);
                 ab.append(!failed);
                 if ( failed )
                     errors++;
 
                 num++;
 
-                logOpForDbHash( "u", ns.c_str(), BSONObj(), NULL, NULL, false );
+                logOpForDbHash(ns.c_str());
             }
 
             result.append( "applied" , num );
@@ -144,14 +170,16 @@ namespace mongo {
                     }
                 }
 
-                logOp("c", tempNS.c_str(), cmdBuilder.done());
+                repl::logOp(txn, "c", tempNS.c_str(), cmdBuilder.done());
             }
 
-            return errors == 0;
+            if (errors != 0) {
+                return false;
+            }
+
+            wunit.commit();
+            return true;
         }
-
-        DBDirectClient db;
-
     } applyOpsCmd;
 
 }

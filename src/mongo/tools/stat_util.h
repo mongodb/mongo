@@ -37,14 +37,14 @@ namespace mongo {
 
 
     struct NamespaceInfo {
-        string ns;
+        std::string ns;
         
         // these need to be in millis
         long long read;
         long long write;
         
-        string toString() const {
-            stringstream ss;
+        std::string toString() const {
+            std::stringstream ss;
             ss << ns << " r: " << read << " w: " << write;
             return ss.str();
         }
@@ -52,7 +52,7 @@ namespace mongo {
     };
 
     struct NamespaceDiff {
-        string ns;
+        std::string ns;
         
         long long read;
         long long write;
@@ -70,7 +70,7 @@ namespace mongo {
         }
     };
 
-    typedef map<string,NamespaceInfo> NamespaceStats;
+    typedef std::map<std::string,NamespaceInfo> NamespaceStats;
 
     /**
      * static methods useful for computing status from serverStatus type things
@@ -96,20 +96,20 @@ namespace mongo {
         void setAll( bool all ) { _all = all; }
 
         static NamespaceStats parseServerStatusLocks( const BSONObj& serverStatus );
-        static vector<NamespaceDiff> computeDiff( const NamespaceStats& prev , const NamespaceStats& current );
+        static std::vector<NamespaceDiff> computeDiff( const NamespaceStats& prev , const NamespaceStats& current );
     private:
 
 
         double percent( const char * outof , const char * val , const BSONObj& a , const BSONObj& b );
         
-        double diff( const string& name , const BSONObj& a , const BSONObj& b );
+        double diff( const std::string& name , const BSONObj& a , const BSONObj& b );
 
-        void _appendMem( BSONObjBuilder& result , const string& name , unsigned width , double sz );
+        void _appendMem( BSONObjBuilder& result , const std::string& name , unsigned width , double sz );
 
-        void _appendNet( BSONObjBuilder& result , const string& name , double diff );
+        void _appendNet( BSONObjBuilder& result , const std::string& name , double diff );
 
         template<typename T>
-        void _append( BSONObjBuilder& result , const string& name , unsigned width , const T& t ) {
+        void _append( BSONObjBuilder& result , const std::string& name , unsigned width , const T& t ) {
             if ( name.size() > width )
                 width = name.size();
             result.append( name , BSON( "width" << (int)width << "data" << t ) );

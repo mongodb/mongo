@@ -91,7 +91,7 @@ namespace mongo {
 
         ShardedPoolStats() : Command( "shardConnPoolStats" ) {}
         virtual void help( stringstream &help ) const { help << "stats about the shard connection pool"; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
 
         // Same privs as connPoolStats
@@ -104,7 +104,7 @@ namespace mongo {
             out->push_back( Privilege( ResourcePattern::forClusterResource(), actions ) );
         }
 
-        virtual bool run ( const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool ) {
+        virtual bool run( OperationContext* txn, const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool ) {
             // Base pool info
             shardConnectionPool.appendInfo( result );
             // Thread connection info
@@ -493,48 +493,6 @@ namespace mongo {
             }
         }
     }
-
-    bool ShardConnection::releaseConnectionsAfterResponse( true );
-
-    namespace {
-
-        /**
-         * Custom deprecated RCAR server parameter
-         */
-        class DeprecatedRCARParameter : public ExportedServerParameter<bool> {
-        public:
-
-            DeprecatedRCARParameter( ServerParameterSet* sps,
-                                     const std::string& name,
-                                     bool* value,
-                                     bool allowedToChangeAtStartup,
-                                     bool allowedToChangeAtRuntime ) :
-                ExportedServerParameter<bool>( sps,
-                                               name,
-                                               value,
-                                               allowedToChangeAtStartup,
-                                               allowedToChangeAtRuntime ) {
-            }
-
-            virtual ~DeprecatedRCARParameter() {}
-
-        protected:
-            virtual Status validate( const bool& newValue ) {
-                if ( newValue == true )
-                    return Status::OK();
-
-                return Status( ErrorCodes::BadValue,
-                               "releaseConnectionAfterResponse is always true in v2.6 and above" );
-            }
-        };
-    }
-
-    DeprecatedRCARParameter //
-    ReleaseConnectionsAfterResponse( ServerParameterSet::getGlobal(),
-                                     "releaseConnectionsAfterResponse",
-                                     &ShardConnection::releaseConnectionsAfterResponse,
-                                     true,
-                                     true );
 
     void ShardConnection::releaseMyConnections() {
         ClientConnections::threadInstance()->releaseAll();

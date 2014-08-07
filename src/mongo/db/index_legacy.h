@@ -35,6 +35,7 @@ namespace mongo {
 
     class Collection;
     class IndexDescriptor;
+    class OperationContext;
 
     /**
      * There has been some behavior concerning indexed access patterns -- both pre and post-index
@@ -49,8 +50,9 @@ namespace mongo {
         /**
          * Adjust the provided index spec BSONObj depending on the type of index obj describes.
          *
-         * This is a no-op unless the object describes a FTS index.  To see what FTS does, look in
-         * FTSSpec::fixSpec in fts/fts_spec.cpp.
+         * This is a no-op unless the object describes a TEXT or a GEO_2DSPHERE index.  TEXT and
+         * GEO_2DSPHERE provide additional validation on the index spec, and tweak the index spec
+         * object to conform to their expected format.
          */
         static BSONObj adjustIndexSpecObject(const BSONObj& obj);
 
@@ -65,15 +67,10 @@ namespace mongo {
          *
          * This is a significant leak of index functionality out of the index layer.
          */
-        static BSONObj getMissingField(Collection* collection, const BSONObj& infoObj);
+        static BSONObj getMissingField(OperationContext* txn,
+                                       Collection* collection,
+                                       const BSONObj& infoObj);
 
-        /**
-         * Perform any post-build steps for this index.
-         *
-         * This is a no-op unless the index is a FTS index.  In that case, we set the flag for using
-         * power of 2 sizes for space allocation.
-         */
-        static void postBuildHook(Collection* collection, const BSONObj& keyPattern );
     };
 
 }  // namespace mongo

@@ -2,35 +2,43 @@
 
 /*    Copyright 2010 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
 
-/* Things in the mongoutils namespace
-   (1) are not database specific, rather, true utilities
-   (2) are cross platform
-   (3) may require boost headers, but not libs
-   (4) are clean and easy to use in any c++ project without pulling in lots of other stuff
-
-   Note: within this module, we use int for all offsets -- there are no unsigned offsets
-   and no size_t's.  If you need 3 gigabyte long strings, don't use this module.
-*/
+/**
+ * String utilities.
+ *
+ * TODO: De-inline.
+ * TODO: Retire the mongoutils namespace, and move str under the mongo namespace.
+ */
 
 #include <string>
 #include <sstream>
 
-// this violates the README rules for mongoutils:
 #include "mongo/bson/util/builder.h"
 
 namespace mongoutils {
@@ -43,7 +51,7 @@ namespace mongoutils {
 
             since the following doesn't work:
 
-               (stringstream() << 1).str();
+               (std::stringstream() << 1).str();
         */
         class stream {
         public:
@@ -86,7 +94,7 @@ namespace mongoutils {
 
         inline bool equals( const char * a , const char * b ) { return strcmp( a , b ) == 0; }
 
-        /** find char x, and return rest of string thereafter, or "" if not found */
+        /** find char x, and return rest of std::string thereafter, or "" if not found */
         inline const char * after(const char *s, char x) {
             const char *p = strchr(s, x);
             return (p != 0) ? p+1 : "";
@@ -96,7 +104,7 @@ namespace mongoutils {
             return (p != 0) ? std::string(p+1) : "";
         }
 
-        /** find string x, and return rest of string thereafter, or "" if not found */
+        /** find std::string x, and return rest of std::string thereafter, or "" if not found */
         inline const char * after(const char *s, const char *x) {
             const char *p = strstr(s, x);
             return (p != 0) ? p+strlen(x) : "";
@@ -117,13 +125,13 @@ namespace mongoutils {
             return strchr(s.c_str(), x) != 0;
         }
 
-        /** @return everything before the character x, else entire string */
+        /** @return everything before the character x, else entire std::string */
         inline std::string before(const std::string& s, char x) {
             const char *p = strchr(s.c_str(), x);
             return (p != 0) ? s.substr(0, p-s.c_str()) : s;
         }
 
-        /** @return everything before the string x, else entire string */
+        /** @return everything before the std::string x, else entire std::string */
         inline std::string before(const std::string& s, const std::string& x) {
             const char *p = strstr(s.c_str(), x.c_str());
             return (p != 0) ? s.substr(0, p-s.c_str()) : s;
@@ -145,7 +153,7 @@ namespace mongoutils {
         inline int shareCommonPrefix(const std::string &a, const std::string &b)
         { return shareCommonPrefix(a.c_str(), b.c_str()); }
 
-        /** string to unsigned. zero if not a number. can end with non-num chars */
+        /** std::string to unsigned. zero if not a number. can end with non-num chars */
         inline unsigned toUnsigned(const std::string& a) {
             unsigned x = 0;
             const char *p = a.c_str();
@@ -158,8 +166,8 @@ namespace mongoutils {
             return x;
         }
 
-        /** split a string on a specific char.  We don't split N times, just once
-            on the first occurrence.  If char not present entire string is in L
+        /** split a std::string on a specific char.  We don't split N times, just once
+            on the first occurrence.  If char not present entire std::string is in L
             and R is empty.
             @return true if char found
         */
@@ -214,6 +222,10 @@ namespace mongoutils {
             }
         }
 
-    }
+    }  // namespace str
 
-}
+}  // namespace mongoutils
+
+namespace mongo {
+    using namespace mongoutils;
+}  // namespace mongo

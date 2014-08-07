@@ -32,32 +32,30 @@
 
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
-#include "mongo/db/ops/count.h"
+#include "mongo/db/commands/count.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/operation_context_impl.h"
 
 #include "mongo/dbtests/dbtests.h"
 
 namespace CountTests {
 
     class Base {
-        Lock::DBWrite lk;
-        Client::Context _context;
-        Database* _database;
-        Collection* _collection;
     public:
-        Base() : lk(ns()), _context( ns() ) {
+        Base() : lk(_txn.lockState(), ns()), _wunit(_txn.recoveryUnit()), _context(&_txn, ns()) {
             _database = _context.db();
-            _collection = _database->getCollection( ns() );
+            _collection = _database->getCollection( &_txn, ns() );
             if ( _collection ) {
-                _database->dropCollection( ns() );
+                _database->dropCollection( &_txn, ns() );
             }
-            _collection = _database->createCollection( ns(), false, NULL, true );
+            _collection = _database->createCollection( &_txn, ns() );
 
             addIndex( fromjson( "{\"a\":1}" ) );
         }
         ~Base() {
             try {
-                uassertStatusOK( _database->dropCollection( ns() ) );
+                uassertStatusOK( _database->dropCollection( &_txn, ns() ) );
+                _wunit.commit();
             }
             catch ( ... ) {
                 FAIL( "Exception while cleaning up collection" );
@@ -73,7 +71,7 @@ namespace CountTests {
             b.append( "ns", ns() );
             b.append( "key", key );
             BSONObj o = b.done();
-            Status s = _collection->getIndexCatalog()->createIndex( o, false );
+            Status s = _collection->getIndexCatalog()->createIndex(&_txn, o, false);
             uassertStatusOK( s );
         }
         void insert( const char *s ) {
@@ -86,15 +84,27 @@ namespace CountTests {
                 oid.init();
                 b.appendOID( "_id", &oid );
                 b.appendElements( o );
-                _collection->insertDocument( b.obj(), false );
+                _collection->insertDocument( &_txn, b.obj(), false );
             }
             else {
-                _collection->insertDocument( o, false );
+                _collection->insertDocument( &_txn, o, false );
             }
         }
         static BSONObj countCommand( const BSONObj &query ) {
             return BSON( "query" << query );
         }
+
+        OperationContextImpl _txn;
+
+    private:
+        Lock::DBWrite lk;
+        WriteUnitOfWork _wunit;
+
+        Client::Context _context;
+
+        Database* _database;
+        Collection* _collection;
+
     };
     
     class Basic : public Base {
@@ -104,7 +114,7 @@ namespace CountTests {
             BSONObj cmd = fromjson( "{\"query\":{}}" );
             string err;
             int errCode;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err, errCode ) );
+            ASSERT_EQUALS( 1, runCount( &_txn, ns(), cmd, err, errCode ) );
         }
     };
     
@@ -117,7 +127,7 @@ namespace CountTests {
             BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"}}" );
             string err;
             int errCode;
-            ASSERT_EQUALS( 2, runCount( ns(), cmd, err, errCode ) );
+            ASSERT_EQUALS( 2, runCount( &_txn, ns(), cmd, err, errCode ) );
         }
     };
     
@@ -129,7 +139,7 @@ namespace CountTests {
             BSONObj cmd = fromjson( "{\"query\":{},\"fields\":{\"a\":1}}" );
             string err;
             int errCode;
-            ASSERT_EQUALS( 2, runCount( ns(), cmd, err, errCode ) );
+            ASSERT_EQUALS( 2, runCount( &_txn, ns(), cmd, err, errCode ) );
         }
     };
     
@@ -142,7 +152,7 @@ namespace CountTests {
             BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"},\"fields\":{\"a\":1}}" );
             string err;
             int errCode;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err, errCode ) );
+            ASSERT_EQUALS( 1, runCount( &_txn, ns(), cmd, err, errCode ) );
         }
     };
     
@@ -154,7 +164,7 @@ namespace CountTests {
             BSONObj cmd = fromjson( "{\"query\":{\"a\":/^b/}}" );
             string err;
             int errCode;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err, errCode ) );
+            ASSERT_EQUALS( 1, runCount( &_txn, ns(), cmd, err, errCode ) );
         }
     };
 
@@ -182,75 +192,6 @@ namespace CountTests {
         mutable boost::condition _condition;
     };
 
-    /** A writer client will be registered for the lifetime of an object of this class. */
-    class WriterClientScope {
-    public:
-        WriterClientScope() :
-            _state( Initial ),
-            _dummyWriter( boost::bind( &WriterClientScope::runDummyWriter, this ) ) {
-            _state.await( Ready );
-        }
-        ~WriterClientScope() {
-            // Terminate the writer thread even on exception.
-            _state.set( Finished );
-            DESTRUCTOR_GUARD( _dummyWriter.join() );
-        }
-    private:
-        enum State {
-            Initial,
-            Ready,
-            Finished
-        };
-        void runDummyWriter() {
-            Client::initThread( "dummy writer" );
-            scoped_ptr<Acquiring> a( new Acquiring( 0 , cc().lockState() ) );
-            _state.set( Ready );
-            _state.await( Finished );
-            a.reset(0);
-            cc().shutdown();
-        }
-        PendingValue _state;
-        boost::thread _dummyWriter;
-    };
-    
-    /**
-     * The runCount() function yields deterministically with sufficient cursor iteration and a
-     * mutually exclusive thread awaiting its mutex.  SERVER-5428
-     */
-    class Yield : public Base {
-    public:
-        void run() {
-            // Insert enough documents that counting them will exceed the iteration threshold
-            // to trigger a yield.
-            for( int i = 0; i < 1000; ++i ) {
-                insert( BSON( "a" << 1 ) );
-            }
-            
-            // Call runCount() under a read lock.
-            dbtemprelease release;
-            Client::ReadContext ctx( ns() );
-
-            int numYieldsBeforeCount = numYields();
-            
-            string err;
-            int errCode;
-            ASSERT_EQUALS( 1000, runCount( ns(), countCommand( BSON( "a" << 1 ) ), err, errCode ) );
-            ASSERT_EQUALS( "", err );
-
-            int numYieldsAfterCount = numYields();
-            int numYieldsDuringCount = numYieldsAfterCount - numYieldsBeforeCount;
-
-            // The runCount() function yieled.
-            ASSERT_NOT_EQUALS( 0, numYieldsDuringCount );
-            ASSERT( 0 < numYieldsDuringCount );
-        }
-    private:
-        int numYields() const {
-            return cc().curop()->info()[ "numYields" ].Int();
-        }
-        // A writer client is registered while the test runs, causing runCount() to yield.
-        WriterClientScope _writer;
-    };
     
     class All : public Suite {
     public:
@@ -263,7 +204,6 @@ namespace CountTests {
             add<Fields>();
             add<QueryFields>();
             add<IndexedRegex>();
-            add<Yield>();
         }
     } myall;
     

@@ -257,9 +257,17 @@ namespace mongo {
             return Status::OK();
         }
 
-        void _addFTSStuff( BSONObjBuilder* b ) {
-            b->append( "_fts", INDEX_NAME );
-            b->append( "_ftsx", 1 );
+        namespace {
+            void _addFTSStuff( BSONObjBuilder* b ) {
+                b->append( "_fts", INDEX_NAME );
+                b->append( "_ftsx", 1 );
+            }
+
+            void verifyFieldNameNotReserved( StringData s ) {
+                uassert( 17289,
+                         "text index with reserved fields _fts/_ftsx not allowed",
+                         s != "_fts" && s != "_ftsx" );
+            }
         }
 
         BSONObj FTSSpec::fixSpec( const BSONObj& spec ) {
@@ -314,13 +322,15 @@ namespace mongo {
                 // fields, then extraAfter fields.
                 {
                     BSONObjIterator i( spec["key"].Obj() );
-                    BSONElement e;
+                    verify( i.more() );
+                    BSONElement e = i.next();
 
                     // extraBefore fields
-                    do {
+                    while ( String != e.type() ) {
+                        verifyFieldNameNotReserved( e.fieldNameStringData() );
                         verify( i.more() );
                         e = i.next();
-                    } while ( INDEX_NAME != e.valuestrsafe() );
+                    }
 
                     // text fields
                     bool alreadyFixed = str::equals( e.fieldName(), "_fts" );
@@ -334,19 +344,17 @@ namespace mongo {
                     }
                     else {
                         do {
-                            uassert( 17289,
-                                     "text index with reserved fields _fts/ftsx not allowed",
-                                     !str::equals( e.fieldName(), "_fts" ) &&
-                                         !str::equals( e.fieldName(), "_ftsx" ) );
+                            verifyFieldNameNotReserved( e.fieldNameStringData() );
                             e = i.next();
-                        } while ( !e.eoo() && INDEX_NAME == e.valuestrsafe() );
+                        } while ( !e.eoo() && e.type() == String );
                     }
 
                     // extraAfterFields
                     while ( !e.eoo() ) {
-                        uassert( 17290,
-                                 "compound text index key suffix fields must have value 1",
-                                 e.numberInt() == 1 && !str::equals( "_ftsx", e.fieldName() ) );
+                        uassert( 17389,
+                                 "'text' fields in index must all be adjacent",
+                                 e.type() != String );
+                        verifyFieldNameNotReserved( e.fieldNameStringData() );
                         e = i.next();
                     }
                 }
@@ -361,22 +369,6 @@ namespace mongo {
                              "weight for text index needs numeric type",
                              e.isNumber() );
                     m[e.fieldName()] = e.numberInt();
-
-                    // Verify weight refers to a valid field.
-                    if ( str::equals( e.fieldName(), "$**" ) ) {
-                        continue;
-                    }
-                    FieldRef keyField( e.fieldName() );
-                    uassert( 17294,
-                             "weight cannot be on an empty field",
-                             keyField.numParts() != 0 );
-                    for ( size_t i = 0; i < keyField.numParts(); i++ ) {
-                        StringData part = keyField.getPart(i);
-                        uassert( 17291, "weight cannot have empty path component", !part.empty() );
-                        uassert( 17292,
-                                 "weight cannot have path component with $ prefix",
-                                 !part.startsWith( "$" ) );
-                    }
                 }
             }
             else if ( spec["weights"].str() == WILDCARD ) {
@@ -392,6 +384,24 @@ namespace mongo {
                 for ( map<string,int>::iterator i = m.begin(); i != m.end(); ++i ) {
                     uassert( 16674, "score for word too high",
                              i->second > 0 && i->second < MAX_WORD_WEIGHT );
+
+                    // Verify weight refers to a valid field.
+                    if ( i->first != "$**" ) {
+                        FieldRef keyField( i->first );
+                        uassert( 17294,
+                                 "weight cannot be on an empty field",
+                                 keyField.numParts() != 0 );
+                        for ( size_t partNum = 0; partNum < keyField.numParts(); partNum++ ) {
+                            StringData part = keyField.getPart(partNum);
+                            uassert( 17291,
+                                     "weight cannot have empty path component",
+                                     !part.empty() );
+                            uassert( 17292,
+                                     "weight cannot have path component with $ prefix",
+                                     !part.startsWith( "$" ) );
+                        }
+                    }
+
                     b.append( i->first, i->second );
                 }
                 weights = b.obj();

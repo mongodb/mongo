@@ -32,11 +32,15 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/query_knobs.h"
 
 namespace mongo {
 
     struct QueryPlannerParams {
-        QueryPlannerParams() : options(DEFAULT), indexFiltersApplied(false) { }
+
+        QueryPlannerParams() : options(DEFAULT),
+                               indexFiltersApplied(false),
+                               maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions) { }
 
         enum Options {
             // You probably want to set this.
@@ -46,7 +50,8 @@ namespace mongo {
             // See http://docs.mongodb.org/manual/reference/parameters/
             NO_TABLE_SCAN = 1,
 
-            // Set this if you want a collscan outputted even if there's an ixscan.
+            // Set this if you *always* want a collscan outputted, even if there's an ixscan.  This
+            // makes ranking less accurate, especially in the presence of blocking stages.
             INCLUDE_COLLSCAN = 1 << 1,
 
             // Set this if you're running on a sharded cluster.  We'll add a "drop all docs that
@@ -54,8 +59,8 @@ namespace mongo {
             //
             // In order to set this, you must check
             // shardingState.needCollectionMetadata(current_namespace) in the same lock that you use
-            // to build the query runner. You must also wrap the Runner in a ClientCursor within the
-            // same lock. See the comment on ShardFilterStage for details.
+            // to build the query executor. You must also wrap the PlanExecutor in a ClientCursor
+            // within the same lock. See the comment on ShardFilterStage for details.
             INCLUDE_SHARD_FILTER = 1 << 2,
 
             // Set this if you don't want any plans with a blocking sort stage.  All sorts must be
@@ -69,16 +74,21 @@ namespace mongo {
             // of the query in the query results.
             KEEP_MUTATIONS = 1 << 5,
 
-            // Nobody should set this above the getRunner interface.  Internal flag set as a hint to
-            // the planner that the caller is actually the count command.
+            // Nobody should set this above the getExecutor interface.  Internal flag set as a hint
+            // to the planner that the caller is actually the count command.
             PRIVATE_IS_COUNT = 1 << 6,
+
+            // Set this if you want to handle batchSize properly with sort(). If limits on SORT
+            // stages are always actually limits, then this should be left off. If they are
+            // sometimes to be interpreted as batchSize, then this should be turned on.
+            SPLIT_LIMITED_SORT = 1 << 7
         };
 
         // See Options enum above.
         size_t options;
 
         // What indices are available for planning?
-        vector<IndexEntry> indices;
+        std::vector<IndexEntry> indices;
 
         // What's our shard key?  If INCLUDE_SHARD_FILTER is set we will create a shard filtering
         // stage.  If we know the shard key, we can perform covering analysis instead of always
@@ -87,6 +97,11 @@ namespace mongo {
 
         // Were index filters applied to indices?
         bool indexFiltersApplied;
+
+        // What's the max number of indexed solutions we want to output?  It's expensive to compare
+        // plans via the MultiPlanStage, and the set of possible plans is very large for certain
+        // index+query combinations.
+        size_t maxIndexedSolutions;
     };
 
 }  // namespace mongo

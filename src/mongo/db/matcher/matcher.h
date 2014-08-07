@@ -36,18 +36,22 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/match_details.h"
+
 
 namespace mongo {
 
     /**
      * Matcher is a simple wrapper around a BSONObj and the MatchExpression created from it.
      */
-    class Matcher2 {
-        MONGO_DISALLOW_COPYING( Matcher2 );
+    class Matcher {
+        MONGO_DISALLOW_COPYING(Matcher);
 
     public:
-        explicit Matcher2( const BSONObj& pattern, bool nested=false /* do not use */ );
+        explicit Matcher(const BSONObj& pattern, 
+                         const MatchExpressionParser::WhereCallback& whereCallback =
+                                    MatchExpressionParser::WhereCallback());
 
         bool matches(const BSONObj& doc, MatchDetails* details = NULL ) const;
 

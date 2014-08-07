@@ -47,6 +47,8 @@ namespace mongo {
         bool restoreUsersAndRoles;
         int w;
         std::string restoreDirectory;
+        std::string tempUsersColl;
+        std::string tempRolesColl;
     };
 
     extern MongoRestoreGlobalParams mongoRestoreGlobalParams;

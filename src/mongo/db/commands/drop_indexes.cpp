@@ -28,26 +28,33 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/background.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     /* "dropIndexes" is now the preferred form - "deleteIndexes" deprecated */
     class CmdDropIndexes : public Command {
     public:
-        virtual bool logTheOp() {
-            return true;
-        }
         virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void help( stringstream& help ) const {
             help << "drop indexes for a collection";
         }
@@ -59,14 +66,12 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
+                                                     Database* db, 
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname+".system.indexes";
-            std::string toDeleteNs = dbname+"."+cmdObj.firstElement().valuestr();
-            BSONObjBuilder builder;
-            builder.append("ns", systemIndexes);
-            builder.append("op", "insert");
-            builder.append("insert.ns", toDeleteNs);
+            std::string toDeleteNs = db->name() + "." + cmdObj.firstElement().valuestr();
+            Collection* collection = db->getCollection(opCtx, toDeleteNs);
+            IndexCatalog::IndexKillCriteria criteria;
 
             // Get index name to drop
             BSONElement toDrop = cmdObj.getField("index");
@@ -74,41 +79,59 @@ namespace mongo {
             if (toDrop.type() == String) {
                 // Kill all in-progress indexes
                 if (strcmp("*", toDrop.valuestr()) == 0) {
-                    BSONObj criteria = builder.done();
-                    return IndexBuilder::killMatchingIndexBuilds(criteria);
+                    criteria.ns = toDeleteNs;
+                    return IndexBuilder::killMatchingIndexBuilds(collection, criteria);
                 }
                 // Kill an in-progress index by name
                 else {
-                    builder.append("insert.name", toDrop.valuestr());
-                    BSONObj criteria = builder.done();
-                    return IndexBuilder::killMatchingIndexBuilds(criteria);
+                    criteria.name = toDrop.valuestr();
+                    return IndexBuilder::killMatchingIndexBuilds(collection, criteria);
                 }
             }
             // Kill an in-progress index build by index key
             else if (toDrop.type() == Object) {
-                builder.append("insert.key", toDrop.Obj());
-                BSONObj criteria = builder.done();
-                return IndexBuilder::killMatchingIndexBuilds(criteria);
+                criteria.key = toDrop.Obj();
+                return IndexBuilder::killMatchingIndexBuilds(collection, criteria);
             }
 
             return std::vector<BSONObj>();
         }
 
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
-        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
+            bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
+            if (!ok) {
+                return false;
+            }
+            if (!fromRepl)
+                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+            wunit.commit();
+            return true;
+        }
+
+        bool wrappedRun(OperationContext* txn,
+                        const string& dbname,
+                        BSONObj& jsobj,
+                        string& errmsg,
+                        BSONObjBuilder& anObjBuilder) {
             BSONElement e = jsobj.firstElement();
-            string toDeleteNs = dbname + '.' + e.valuestr();
+            const string toDeleteNs = dbname + '.' + e.valuestr();
             if (!serverGlobalParams.quiet) {
-                MONGO_TLOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
+                LOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
             }
 
-            Collection* collection = cc().database()->getCollection( toDeleteNs );
+            Client::Context ctx(txn, toDeleteNs);
+            Database* db = ctx.db();
+
+            Collection* collection = db->getCollection( txn, toDeleteNs );
             if ( ! collection ) {
                 errmsg = "ns not found";
                 return false;
             }
 
-            stopIndexBuilds(dbname, jsobj);
+            stopIndexBuilds(txn, db, jsobj);
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             anObjBuilder.appendNumber("nIndexesWas", indexCatalog->numIndexesTotal() );
@@ -120,7 +143,7 @@ namespace mongo {
                 string indexToDelete = f.valuestr();
 
                 if ( indexToDelete == "*" ) {
-                    Status s = indexCatalog->dropAllIndexes( false );
+                    Status s = indexCatalog->dropAllIndexes(txn, false);
                     if ( !s.isOK() ) {
                         appendCommandStatus( anObjBuilder, s );
                         return false;
@@ -140,7 +163,7 @@ namespace mongo {
                     return false;
                 }
 
-                Status s = indexCatalog->dropIndex( desc );
+                Status s = indexCatalog->dropIndex(txn, desc);
                 if ( !s.isOK() ) {
                     appendCommandStatus( anObjBuilder, s );
                     return false;
@@ -162,7 +185,7 @@ namespace mongo {
                     return false;
                 }
 
-                Status s = indexCatalog->dropIndex( desc );
+                Status s = indexCatalog->dropIndex(txn, desc);
                 if ( !s.isOK() ) {
                     appendCommandStatus( anObjBuilder, s );
                     return false;
@@ -179,9 +202,8 @@ namespace mongo {
 
     class CmdReIndex : public Command {
     public:
-        virtual bool logTheOp() { return false; } // only reindexes on the one node
         virtual bool slaveOk() const { return true; }    // can reindex on a secondary
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void help( stringstream& help ) const {
             help << "re-index a collection";
         }
@@ -194,24 +216,28 @@ namespace mongo {
         }
         CmdReIndex() : Command("reIndex") { }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
+                                                     Database* db,
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname + ".system.indexes";
-            std::string ns = dbname + '.' + cmdObj["reIndex"].valuestrsafe();
-            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
-
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
+            std::string ns = db->name() + '.' + cmdObj["reIndex"].valuestrsafe();
+            IndexCatalog::IndexKillCriteria criteria;
+            criteria.ns = ns;
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
         }
 
-        bool run(const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
-            static DBDirectClient db;
+        bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+            DBDirectClient db(txn);
 
             BSONElement e = jsobj.firstElement();
             string toDeleteNs = dbname + '.' + e.valuestr();
 
-            MONGO_TLOG(0) << "CMD: reIndex " << toDeleteNs << endl;
+            LOG(0) << "CMD: reIndex " << toDeleteNs << endl;
 
-            Collection* collection = cc().database()->getCollection( toDeleteNs );
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            WriteUnitOfWork wunit(txn->recoveryUnit());
+            Client::Context ctx(txn, toDeleteNs);
+
+            Collection* collection = ctx.db()->getCollection( txn, toDeleteNs );
 
             if ( !collection ) {
                 errmsg = "ns not found";
@@ -220,36 +246,40 @@ namespace mongo {
 
             BackgroundOperation::assertNoBgOpInProgForNs( toDeleteNs );
 
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(dbname, jsobj);
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, ctx.db(), jsobj);
 
-            list<BSONObj> all;
-            auto_ptr<DBClientCursor> i = db.query( dbname + ".system.indexes" , BSON( "ns" << toDeleteNs ) , 0 , 0 , 0 , QueryOption_SlaveOk );
-            BSONObjBuilder b;
-            while ( i->more() ) {
-                BSONObj o = i->next().removeField("v").getOwned();
-                b.append( BSONObjBuilder::numStr( all.size() ) , o );
-                all.push_back( o );
+            vector<BSONObj> all;
+            {
+                vector<string> indexNames;
+                collection->getCatalogEntry()->getAllIndexes( &indexNames );
+                for ( size_t i = 0; i < indexNames.size(); i++ ) {
+                    const string& name = indexNames[i];
+                    BSONObj spec = collection->getCatalogEntry()->getIndexSpec( name );
+                    all.push_back( spec.getOwned() );
+                }
             }
-            result.appendNumber( "nIndexesWas", collection->getIndexCatalog()->numIndexesTotal() );
 
-            Status s = collection->getIndexCatalog()->dropAllIndexes( true );
+            result.appendNumber( "nIndexesWas", all.size() );
+
+            Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
             if ( !s.isOK() ) {
                 errmsg = "dropIndexes failed";
                 return appendCommandStatus( result, s );
             }
 
-            for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
-                BSONObj o = *i;
+            for ( size_t i = 0; i < all.size(); i++ ) {
+                BSONObj o = all[i];
                 LOG(1) << "reIndex ns: " << toDeleteNs << " index: " << o << endl;
-                Status s = collection->getIndexCatalog()->createIndex( o, false );
+                Status s = collection->getIndexCatalog()->createIndex(txn, o, false);
                 if ( !s.isOK() )
                     return appendCommandStatus( result, s );
             }
 
-            result.append( "nIndexes" , (int)all.size() );
-            result.appendArray( "indexes" , b.obj() );
+            result.append( "nIndexes", (int)all.size() );
+            result.append( "indexes", all );
 
             IndexBuilder::restoreIndexes(indexesInProg);
+            wunit.commit();
             return true;
         }
     } cmdReIndex;

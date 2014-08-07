@@ -2,24 +2,35 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/client/auth_helpers.h"
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientcursor.h"
@@ -30,11 +41,14 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 #include "mongo/util/assert_util.h"
-#include "mongo/util/md5.hpp"
+#include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/password_digest.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
 
     AtomicInt64 DBClientBase::ConnectionIdSequence;
 
@@ -61,10 +75,10 @@ namespace mongo {
 
         string::size_type idx;
         while ( ( idx = s.find( ',' ) ) != string::npos ) {
-            _servers.push_back( s.substr( 0 , idx ) );
+            _servers.push_back(HostAndPort(s.substr(0, idx)));
             s = s.substr( idx + 1 );
         }
-        _servers.push_back( s );
+        _servers.push_back(HostAndPort(s));
 
     }
     
@@ -544,10 +558,28 @@ namespace mongo {
     BSONObj getnoncecmdobj = fromjson("{getnonce:1}");
 
     string DBClientWithCommands::createPasswordDigest( const string & username , const string & clearTextPassword ) {
-        return auth::createPasswordDigest(username, clearTextPassword);
+        return mongo::createPasswordDigest(username, clearTextPassword);
     }
 
+    namespace {
+        class RunCommandHookOverrideGuard {
+            MONGO_DISALLOW_COPYING(RunCommandHookOverrideGuard);
+        public:
+            RunCommandHookOverrideGuard(DBClientWithCommands* cli,
+                                        const DBClientWithCommands::RunCommandHookFunc& hookFunc)
+                : _cli(cli), _oldHookFunc(cli->getRunCommandHook()) {
+                cli->setRunCommandHook(hookFunc);
+            }
+            ~RunCommandHookOverrideGuard() {
+                _cli->setRunCommandHook(_oldHookFunc);
+            }
+        private:
+            DBClientWithCommands* const _cli;
+            DBClientWithCommands::RunCommandHookFunc const _oldHookFunc;
+        };
+    }  // namespace
     void DBClientWithCommands::_auth(const BSONObj& params) {
+        RunCommandHookOverrideGuard hookGuard(this, RunCommandHookFunc());
         std::string mechanism;
 
         uassertStatusOK(bsonExtractStringField(params,
@@ -832,24 +864,68 @@ namespace mongo {
     }
 
     list<string> DBClientWithCommands::getCollectionNames( const string& db ) {
+        list<BSONObj> infos = getCollectionInfos( db );
         list<string> names;
-
-        string ns = db + ".system.namespaces";
-        auto_ptr<DBClientCursor> c = query( ns.c_str() , BSONObj() );
-        while ( c->more() ) {
-            string name = c->nextSafe()["name"].valuestr();
-            if ( name.find( "$" ) != string::npos )
-                continue;
-            names.push_back( name );
+        for ( list<BSONObj>::iterator it = infos.begin(); it != infos.end(); ++it ) {
+            names.push_back( db + "." + (*it)["name"].valuestr() );
         }
         return names;
     }
 
-    bool DBClientWithCommands::exists( const string& ns ) {
+    list<BSONObj> DBClientWithCommands::getCollectionInfos( const string& db,
+                                                            const BSONObj& filter ) {
+        list<BSONObj> infos;
 
-        string db = nsGetDB( ns ) + ".system.namespaces";
-        BSONObj q = BSON( "name" << ns );
-        return count( db.c_str() , q, QueryOption_SlaveOk ) != 0;
+        // first we're going to try the command
+        // it was only added in 2.8, so if we're talking to an older server
+        // we'll fail back to querying system.namespaces
+
+        {
+            BSONObj res;
+            if ( runCommand( db, BSON( "listCollections" << 1 << "filter" << filter ), res ) ) {
+                BSONObj collections = res["collections"].Obj();
+                BSONObjIterator it( collections );
+                while ( it.more() ) {
+                    BSONElement e = it.next();
+                    infos.push_back( e.Obj().getOwned() );
+                }
+                return infos;
+            }
+
+            // command failed
+
+            int code = res["code"].numberInt();
+            string errmsg = res["errmsg"].valuestrsafe();
+            if ( code == ErrorCodes::CommandNotFound ||
+                 errmsg.find( "no such cmd" ) != string::npos ) {
+                // old version of server, ok, fall through to old code
+            }
+            else {
+                uasserted( 18630, str::stream() << "listCollections failed: " << res );
+            }
+
+        }
+
+        string ns = db + ".system.namespaces";
+        auto_ptr<DBClientCursor> c = query( ns.c_str(), filter );
+        while ( c->more() ) {
+            BSONObj obj = c->nextSafe();
+            string ns = obj["name"].valuestr();
+            if ( ns.find( "$" ) != string::npos )
+                continue;
+            BSONObjBuilder b;
+            b.append( "name", ns.substr( db.size() + 1 ) );
+            b.appendElementsUnique( obj );
+            infos.push_back( b.obj() );
+        }
+
+        return infos;
+    }
+
+    bool DBClientWithCommands::exists( const string& ns ) {
+        BSONObj filter = BSON( "name" << nsToCollectionSubstring( ns ) );
+        list<BSONObj> results = getCollectionInfos( nsToDatabase( ns ), filter );
+        return !results.empty();
     }
 
     /* --- dbclientconnection --- */
@@ -1042,18 +1118,18 @@ namespace mongo {
                 _f( i.nextSafe() );
             }
         }
-        boost::function<void(const BSONObj &)> _f;
+        stdx::function<void(const BSONObj &)> _f;
     };
 
-    unsigned long long DBClientBase::query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn, int queryOptions ) {
+    unsigned long long DBClientBase::query( stdx::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn, int queryOptions ) {
         DBClientFunConvertor fun;
         fun._f = f;
-        boost::function<void(DBClientCursorBatchIterator &)> ptr( fun );
+        stdx::function<void(DBClientCursorBatchIterator &)> ptr( fun );
         return this->query( ptr, ns, query, fieldsToReturn, queryOptions );
     }
 
     unsigned long long DBClientBase::query(
-            boost::function<void(DBClientCursorBatchIterator &)> f,
+            stdx::function<void(DBClientCursorBatchIterator &)> f,
             const string& ns,
             Query query,
             const BSONObj *fieldsToReturn,
@@ -1080,7 +1156,7 @@ namespace mongo {
     }
 
     unsigned long long DBClientConnection::query(
-            boost::function<void(DBClientCursorBatchIterator &)> f,
+            stdx::function<void(DBClientCursorBatchIterator &)> f,
             const string& ns,
             Query query,
             const BSONObj *fieldsToReturn,
@@ -1231,6 +1307,42 @@ namespace mongo {
     auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ) {
         return query( NamespaceString( ns ).getSystemIndexesCollection() , BSON( "ns" << ns ) );
     }
+
+    list<BSONObj> DBClientWithCommands::getIndexSpecs( const string &ns, int options ) {
+        list<BSONObj> specs;
+
+        {
+            BSONObj cmd = BSON( "listIndexes" << nsToCollectionSubstring( ns ) );
+            BSONObj res;
+            if ( runCommand( nsToDatabase( ns ), cmd, res, options ) ) {
+                BSONObjIterator i( res["indexes"].Obj() );
+                while ( i.more() ) {
+                    specs.push_back( i.next().Obj().getOwned() );
+                }
+                return specs;
+            }
+            int code = res["code"].numberInt();
+            string errmsg = res["errmsg"].valuestrsafe();
+            if ( code == ErrorCodes::CommandNotFound ||
+                 errmsg.find( "no such cmd" ) != string::npos ) {
+                // old version of server, ok, fall through to old code
+            }
+            else if ( code == ErrorCodes::NamespaceNotFound ) {
+                return specs;
+            }
+            else {
+                uasserted( 18631, str::stream() << "listIndexes failed: " << res );
+            }
+        }
+
+        auto_ptr<DBClientCursor> cursor = getIndexes( ns );
+        while ( cursor->more() ) {
+            BSONObj spec = cursor->nextSafe();
+            specs.push_back( spec.getOwned() );
+        }
+        return specs;
+    }
+
 
     void DBClientWithCommands::dropIndex( const string& ns , BSONObj keys ) {
         dropIndex( ns , genIndexName( keys ) );
@@ -1485,14 +1597,14 @@ namespace mongo {
     }
 #endif
 
-    AtomicUInt DBClientConnection::_numConnections;
+    AtomicInt32 DBClientConnection::_numConnections;
     bool DBClientConnection::_lazyKillCursor = true;
 
 
     bool serverAlive( const string &uri ) {
         DBClientConnection c( false, 0, 20 ); // potentially the connection to server could fail while we're checking if it's alive - so use timeouts
         string err;
-        if ( !c.connect( uri, err ) )
+        if ( !c.connect( HostAndPort(uri), err ) )
             return false;
         if ( !c.simpleCommand( "admin", 0, "ping" ) )
             return false;

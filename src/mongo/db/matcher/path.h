@@ -143,7 +143,7 @@ namespace mongo {
             bool isArrayOffsetMatch( const StringData& fieldName ) const;
             bool nextEntireRest() const { return nextPieceOfPath.size() == restOfPath.size(); }
 
-            string restOfPath;
+            std::string restOfPath;
             bool hasMore;
             StringData nextPieceOfPath;
             bool nextPieceOfPathIsNumber;

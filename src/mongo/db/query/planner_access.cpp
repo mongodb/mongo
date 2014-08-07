@@ -56,6 +56,8 @@ namespace {
 
 namespace mongo {
 
+    using std::vector;
+
     // static
     QuerySolutionNode* QueryPlannerAccess::makeCollectionScan(const CanonicalQuery& query,
                                                               bool tailable,
@@ -67,7 +69,16 @@ namespace mongo {
         csn->tailable = tailable;
         csn->maxScan = query.getParsed().getMaxScan();
 
-        // If the sort is {$natural: +-1} this changes the direction of the collection scan.
+        // If the hint is {$natural: +-1} this changes the direction of the collection scan.
+        if (!query.getParsed().getHint().isEmpty()) {
+            BSONElement natural = query.getParsed().getHint().getFieldDotted("$natural");
+            if (!natural.eoo()) {
+                csn->direction = natural.numberInt() >= 0 ? 1 : -1;
+            }
+        }
+
+        // The sort can specify $natural as well. The sort direction should override the hint
+        // direction if both are specified.
         const BSONObj& sortObj = query.getParsed().getSort();
         if (!sortObj.isEmpty()) {
             BSONElement natural = sortObj.getFieldDotted("$natural");
@@ -76,24 +87,53 @@ namespace mongo {
             }
         }
 
-        // The hint can specify $natural as well.
-        if (!query.getParsed().getHint().isEmpty()) {
-            BSONElement natural = query.getParsed().getHint().getFieldDotted("$natural");
-            if (!natural.eoo()) {
-                csn->direction = natural.numberInt() >= 0 ? 1 : -1;
+        return csn;
+    }
+
+    // Helper needed for GeoNear until we remove the default 100 limit
+    static MatchExpression* cloneExcludingGeoNear(const MatchExpression* expr) {
+
+        if (MatchExpression::GEO_NEAR == expr->matchType()) {
+            return NULL;
+        }
+
+        auto_ptr<MatchExpression> clone(expr->shallowClone());
+        vector<MatchExpression*> stack;
+        stack.push_back(clone.get());
+
+        while (!stack.empty()) {
+
+            MatchExpression* next = stack.back();
+            stack.pop_back();
+
+            vector<MatchExpression*>* childVector = next->getChildVector();
+            if (!childVector)
+                continue;
+
+            for (vector<MatchExpression*>::iterator it = childVector->begin();
+                it != childVector->end();) {
+
+                MatchExpression* child = *it;
+                if (MatchExpression::GEO_NEAR == child->matchType()) {
+                    it = childVector->erase(it);
+                    delete child;
+                }
+                else {
+                    stack.push_back(child);
+                    ++it;
+                }
             }
         }
 
-        // QLOG() << "Outputting collscan " << soln->toString() << endl;
-        return csn;
+        return clone.release();
     }
 
     // static
     QuerySolutionNode* QueryPlannerAccess::makeLeafNode(const CanonicalQuery& query,
                                                         const IndexEntry& index,
+                                                        size_t pos,
                                                         MatchExpression* expr,
                                                         IndexBoundsBuilder::BoundsTightness* tightnessOut) {
-        // QLOG() << "making leaf node for " << expr->toString() << endl;
         // We're guaranteed that all GEO_NEARs are first.  This slightly violates the "sort index
         // predicates by their position in the compound index" rule but GEO_NEAR isn't an ixscan.
         // This saves our bacon when we have {foo: 1, bar: "2dsphere"} and the predicate on bar is a
@@ -103,50 +143,55 @@ namespace mongo {
         // This should gracefully deal with the case where we have a pred over foo but no geo clause
         // over bar.  In that case there is no GEO_NEAR to appear first and it's treated like a
         // straight ixscan.
-        BSONElement elt = index.keyPattern.firstElement();
-        bool indexIs2D = (String == elt.type() && "2d" == elt.String());
 
         if (MatchExpression::GEO_NEAR == expr->matchType()) {
             // We must not keep the expression node around.
             *tightnessOut = IndexBoundsBuilder::EXACT;
             GeoNearMatchExpression* nearExpr = static_cast<GeoNearMatchExpression*>(expr);
-            // 2d geoNear requires a hard limit and as such we take it out before it gets here.  If
-            // this happens it's a bug.
-            verify(!indexIs2D);
-            GeoNear2DSphereNode* ret = new GeoNear2DSphereNode();
-            ret->indexKeyPattern = index.keyPattern;
-            ret->nq = nearExpr->getData();
-            ret->baseBounds.fields.resize(index.keyPattern.nFields());
-            if (NULL != query.getProj()) {
-                ret->addPointMeta = query.getProj()->wantGeoNearPoint();
-                ret->addDistMeta = query.getProj()->wantGeoNearDistance();
+
+            BSONElement elt = index.keyPattern.firstElement();
+            bool indexIs2D = (String == elt.type() && "2d" == elt.String());
+
+            if (indexIs2D) {
+                GeoNear2DNode* ret = new GeoNear2DNode();
+                ret->indexKeyPattern = index.keyPattern;
+                ret->nq = nearExpr->getData();
+                ret->baseBounds.fields.resize(index.keyPattern.nFields());
+                if (NULL != query.getProj()) {
+                    ret->addPointMeta = query.getProj()->wantGeoNearPoint();
+                    ret->addDistMeta = query.getProj()->wantGeoNearDistance();
+                }
+
+                ret->numToReturn = query.getParsed().getNumToReturn();
+                if (ret->numToReturn == 0)
+                    ret->numToReturn = 100;
+                ret->fullFilterExcludingNear.reset(cloneExcludingGeoNear(query.root()));
+
+                return ret;
             }
-            return ret;
-        }
-        else if (indexIs2D) {
-            // We must not keep the expression node around.
-            *tightnessOut = IndexBoundsBuilder::EXACT;
-            verify(MatchExpression::GEO == expr->matchType());
-            GeoMatchExpression* nearExpr = static_cast<GeoMatchExpression*>(expr);
-            verify(indexIs2D);
-            Geo2DNode* ret = new Geo2DNode();
-            ret->indexKeyPattern = index.keyPattern;
-            ret->gq = nearExpr->getGeoQuery();
-            return ret;
+            else {
+                GeoNear2DSphereNode* ret = new GeoNear2DSphereNode();
+                ret->indexKeyPattern = index.keyPattern;
+                ret->nq = nearExpr->getData();
+                ret->baseBounds.fields.resize(index.keyPattern.nFields());
+                if (NULL != query.getProj()) {
+                    ret->addPointMeta = query.getProj()->wantGeoNearPoint();
+                    ret->addDistMeta = query.getProj()->wantGeoNearDistance();
+                }
+                return ret;
+            }
         }
         else if (MatchExpression::TEXT == expr->matchType()) {
             // We must not keep the expression node around.
             *tightnessOut = IndexBoundsBuilder::EXACT;
             TextMatchExpression* textExpr = static_cast<TextMatchExpression*>(expr);
             TextNode* ret = new TextNode();
-            ret->_indexKeyPattern = index.keyPattern;
-            ret->_query = textExpr->getQuery();
-            ret->_language = textExpr->getLanguage();
+            ret->indexKeyPattern = index.keyPattern;
+            ret->query = textExpr->getQuery();
+            ret->language = textExpr->getLanguage();
             return ret;
         }
         else {
-            // QLOG() << "making ixscan for " << expr->toString() << endl;
-
             // Note that indexKeyPattern.firstElement().fieldName() may not equal expr->path()
             // because expr might be inside an array operator that provides a path prefix.
             IndexScanNode* isn = new IndexScanNode();
@@ -156,37 +201,157 @@ namespace mongo {
             isn->maxScan = query.getParsed().getMaxScan();
             isn->addKeyMetadata = query.getParsed().returnKey();
 
-            IndexBoundsBuilder::translate(expr, index.keyPattern.firstElement(), index,
-                                          &isn->bounds.fields[0], tightnessOut);
+            // Get the ixtag->pos-th element of the index key pattern.
+            // TODO: cache this instead/with ixtag->pos?
+            BSONObjIterator it(index.keyPattern);
+            BSONElement keyElt = it.next();
+            for (size_t i = 0; i < pos; ++i) {
+                verify(it.more());
+                keyElt = it.next();
+            }
+            verify(!keyElt.eoo());
 
-            // QLOG() << "bounds are " << isn->bounds.toString() << " exact " << *exact << endl;
+            IndexBoundsBuilder::translate(expr, keyElt, index, &isn->bounds.fields[pos],
+                                          tightnessOut);
+
             return isn;
         }
     }
 
-    void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, const IndexEntry& index,
-                                         size_t pos, IndexBoundsBuilder::BoundsTightness* tightnessOut,
-                                         QuerySolutionNode* node, MatchExpression::MatchType mergeType) {
+    bool QueryPlannerAccess::shouldMergeWithLeaf(const MatchExpression* expr,
+                                                 const ScanBuildingState& scanState) {
+        const QuerySolutionNode* node = scanState.currentScan.get();
+        if (NULL == node || NULL == expr) {
+            return false;
+        }
+
+        if (NULL == scanState.ixtag) {
+            return false;
+        }
+
+        if (scanState.currentIndexNumber != scanState.ixtag->index) {
+            return false;
+        }
+
+        size_t pos = scanState.ixtag->pos;
+        const IndexEntry& index = scanState.indices[scanState.currentIndexNumber];
+        const MatchExpression::MatchType mergeType = scanState.root->matchType();
 
         const StageType type = node->getType();
-        verify(STAGE_GEO_NEAR_2D != type);
+        const MatchExpression::MatchType exprType = expr->matchType();
 
-        if (STAGE_GEO_2D == type || STAGE_TEXT == type) {
-            // XXX: 'expr' is possibly indexed by 'node'.  Right now we don't take advantage
-            // of covering here (??).
-            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+        //
+        // First handle special solution tree leaf types. In general, normal index bounds
+        // building is not used for special leaf types, and hence we cannot merge leaves.
+        //
+        // This rule is always true for OR, but there are exceptions for AND.
+        // Specifically, we can often merge a predicate with a special leaf type
+        // by adding a filter to the special leaf type.
+        //
+
+        if (STAGE_TEXT == type) {
+            // Currently only one text predicate is allowed, but to be safe, make sure that we
+            // do not try to merge two text predicates.
+            return MatchExpression::AND == mergeType
+                && MatchExpression::TEXT != exprType;
+        }
+
+        if (STAGE_GEO_NEAR_2D == type || STAGE_GEO_NEAR_2DSPHERE == type) {
+            // Currently only one GEO_NEAR is allowed, but to be safe, make sure that we
+            // do not try to merge two GEO_NEAR predicates.
+            return MatchExpression::AND == mergeType
+                && MatchExpression::GEO_NEAR != exprType;
+        }
+
+        //
+        // If we're here, then we're done checking for special leaf nodes, and the leaf
+        // must be a regular index scan.
+        //
+
+        invariant(type == STAGE_IXSCAN);
+        const IndexScanNode* scan = static_cast<const IndexScanNode*>(node);
+        const IndexBounds* boundsToFillOut =  &scan->bounds;
+
+        if (boundsToFillOut->fields[pos].name.empty()) {
+            // The bounds will be compounded. This is OK because the
+            // plan enumerator told us that it is OK.
+            return true;
+        }
+        else {
+            if (MatchExpression::AND == mergeType) {
+                // The bounds will be intersected. This is OK provided
+                // that the index is NOT multikey.
+                return !index.multikey;
+            }
+            else {
+                // The bounds will be unionized.
+                return true;
+            }
+        }
+
+
+    }
+
+    void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr,
+                                               ScanBuildingState* scanState) {
+        QuerySolutionNode* node = scanState->currentScan.get();
+        invariant(NULL != node);
+
+        const MatchExpression::MatchType mergeType = scanState->root->matchType();
+        size_t pos = scanState->ixtag->pos;
+        const IndexEntry& index = scanState->indices[scanState->currentIndexNumber];
+
+        const StageType type = node->getType();
+
+        // Text data is covered, but not exactly.  Text covering is unlike any other covering
+        // so we deal with it in addFilterToSolutionNode.
+        if (STAGE_TEXT == type) {
+            scanState->tightness = IndexBoundsBuilder::INEXACT_COVERED;
             return;
         }
 
         IndexBounds* boundsToFillOut = NULL;
 
-        if (STAGE_GEO_NEAR_2DSPHERE == type) {
+        if (STAGE_GEO_NEAR_2D == type) {
+
+            invariant(INDEX_2D == index.type);
+
+            // 2D indexes are weird - the "2d" field stores a normally-indexed BinData field, but
+            // additional array fields are *not* exploded into multi-keys - they are stored directly
+            // as arrays in the index.  Also, no matter what the index expression, the "2d" field is
+            // always first.
+            // This means that we can only generically accumulate bounds for 2D indexes over the
+            // first "2d" field (pos == 0) - MatchExpressions over other fields in the 2D index may
+            // be covered (can be evaluated using only the 2D index key).  The additional fields
+            // must not affect the index scan bounds, since they are not stored in an
+            // IndexScan-compatible format.
+
+            if (pos > 0) {
+                // Marking this field as covered allows the planner to accumulate a MatchExpression
+                // over the returned 2D index keys instead of adding to the index bounds.
+                scanState->tightness = IndexBoundsBuilder::INEXACT_COVERED;
+                return;
+            }
+
+            // We may have other $geoPredicates on a near index - generate bounds for these
+            GeoNear2DNode* gn = static_cast<GeoNear2DNode*>(node);
+            boundsToFillOut = &gn->baseBounds;
+        }
+        else if (STAGE_GEO_NEAR_2DSPHERE == type) {
             GeoNear2DSphereNode* gn = static_cast<GeoNear2DSphereNode*>(node);
             boundsToFillOut = &gn->baseBounds;
         }
         else {
             verify(type == STAGE_IXSCAN);
             IndexScanNode* scan = static_cast<IndexScanNode*>(node);
+
+            // See STAGE_GEO_NEAR_2D above - 2D indexes can only accumulate scan bounds over the
+            // first "2d" field (pos == 0)
+            if (INDEX_2D == index.type && pos > 0) {
+                scanState->tightness = IndexBoundsBuilder::INEXACT_COVERED;
+                return;
+            }
+
             boundsToFillOut = &scan->bounds;
         }
 
@@ -199,44 +364,194 @@ namespace mongo {
             keyElt = it.next();
         }
         verify(!keyElt.eoo());
-        *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
-
-        //QLOG() << "current bounds are " << currentScan->bounds.toString() << endl;
-        //QLOG() << "node merging in " << child->toString() << endl;
-        //QLOG() << "merging with field " << keyElt.toString(true, true) << endl;
-        //QLOG() << "taking advantage of compound index "
-        //<< indices[currentIndexNumber].keyPattern.toString() << endl;
+        scanState->tightness = IndexBoundsBuilder::INEXACT_FETCH;
 
         verify(boundsToFillOut->fields.size() > pos);
 
         OrderedIntervalList* oil = &boundsToFillOut->fields[pos];
 
         if (boundsToFillOut->fields[pos].name.empty()) {
-            IndexBoundsBuilder::translate(expr, keyElt, index, oil, tightnessOut);
+            IndexBoundsBuilder::translate(expr, keyElt, index, oil, &scanState->tightness);
         }
         else {
             if (MatchExpression::AND == mergeType) {
-                IndexBoundsBuilder::translateAndIntersect(expr, keyElt, index, oil, tightnessOut);
+                IndexBoundsBuilder::translateAndIntersect(expr, keyElt, index, oil,
+                                                          &scanState->tightness);
             }
             else {
                 verify(MatchExpression::OR == mergeType);
-                IndexBoundsBuilder::translateAndUnion(expr, keyElt, index, oil, tightnessOut);
+                IndexBoundsBuilder::translateAndUnion(expr, keyElt, index, oil,
+                                                      &scanState->tightness);
             }
         }
     }
 
     // static
+    void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntry& index) {
+        TextNode* tn = static_cast<TextNode*>(node);
+
+        // Figure out what positions are prefix positions.  We build an index key prefix from
+        // the predicates over the text index prefix keys.
+        // For example, say keyPattern = { a: 1, _fts: "text", _ftsx: 1, b: 1 }
+        // prefixEnd should be 1.
+        size_t prefixEnd = 0;
+        BSONObjIterator it(tn->indexKeyPattern);
+        // Count how many prefix terms we have.
+        while (it.more()) {
+            // We know that the only key pattern with a type of String is the _fts field
+            // which is immediately after all prefix fields.
+            if (String == it.next().type()) {
+                break;
+            }
+            ++prefixEnd;
+        }
+
+        // If there's no prefix, the filter is already on the node and the index prefix is null.
+        // We can just return.
+        if (!prefixEnd) {
+            return;
+        }
+
+        // We can't create a text stage if there aren't EQ predicates on its prefix terms.  So
+        // if we've made it this far, we should have collected the prefix predicates in the
+        // filter.
+        invariant(NULL != tn->filter.get());
+        MatchExpression* textFilterMe = tn->filter.get();
+
+        BSONObjBuilder prefixBob;
+
+        if (MatchExpression::AND != textFilterMe->matchType()) {
+            // Only one prefix term.
+            invariant(1 == prefixEnd);
+            // Sanity check: must be an EQ.
+            invariant(MatchExpression::EQ == textFilterMe->matchType());
+
+            EqualityMatchExpression* eqExpr = static_cast<EqualityMatchExpression*>(textFilterMe);
+            prefixBob.append(eqExpr->getData());
+            tn->filter.reset();
+        }
+        else {
+            invariant(MatchExpression::AND == textFilterMe->matchType());
+
+            // Indexed by the keyPattern position index assignment.  We want to add
+            // prefixes in order but we must order them first.
+            vector<MatchExpression*> prefixExprs(prefixEnd, NULL);
+
+            AndMatchExpression* amExpr = static_cast<AndMatchExpression*>(textFilterMe);
+            invariant(amExpr->numChildren() >= prefixEnd);
+
+            // Look through the AND children.  The prefix children we want to
+            // stash in prefixExprs.
+            size_t curChild = 0;
+            while (curChild < amExpr->numChildren()) {
+                MatchExpression* child = amExpr->getChild(curChild);
+                IndexTag* ixtag = static_cast<IndexTag*>(child->getTag());
+                invariant(NULL != ixtag);
+                // Only want prefixes.
+                if (ixtag->pos >= prefixEnd) {
+                    ++curChild;
+                    continue;
+                }
+                prefixExprs[ixtag->pos] = child;
+                amExpr->getChildVector()->erase(amExpr->getChildVector()->begin() + curChild);
+                // Don't increment curChild.
+            }
+
+            // Go through the prefix equalities in order and create an index prefix out of them.
+            for (size_t i = 0; i < prefixExprs.size(); ++i) {
+                MatchExpression* prefixMe = prefixExprs[i];
+                invariant(NULL != prefixMe);
+                invariant(MatchExpression::EQ == prefixMe->matchType());
+                EqualityMatchExpression* eqExpr = static_cast<EqualityMatchExpression*>(prefixMe);
+                prefixBob.append(eqExpr->getData());
+                // We removed this from the AND expression that owned it, so we must clean it
+                // up ourselves.
+                delete prefixMe;
+            }
+
+            // Clear out an empty $and.
+            if (0 == amExpr->numChildren()) {
+                tn->filter.reset();
+            }
+            else if (1 == amExpr->numChildren()) {
+                // Clear out unsightly only child of $and
+                MatchExpression* child = amExpr->getChild(0);
+                amExpr->getChildVector()->clear();
+                // Deletes current filter which is amExpr.
+                tn->filter.reset(child);
+            }
+        }
+
+        tn->indexPrefix = prefixBob.obj();
+    }
+
+    // static
+    bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
+        if (scanState->loosestBounds == IndexBoundsBuilder::EXACT) {
+            return false;
+        }
+        else if (scanState->loosestBounds == IndexBoundsBuilder::INEXACT_FETCH) {
+            return true;
+        }
+        else {
+            invariant(scanState->loosestBounds == IndexBoundsBuilder::INEXACT_COVERED);
+            const IndexEntry& index = scanState->indices[scanState->currentIndexNumber];
+            return index.multikey;
+        }
+    }
+
+    // static
+    void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
+                                                 vector<QuerySolutionNode*>* out) {
+        finishLeafNode(scanState->currentScan.get(),
+                       scanState->indices[scanState->currentIndexNumber]);
+
+        if (MatchExpression::OR == scanState->root->matchType()) {
+            if (orNeedsFetch(scanState)) {
+                // In order to correctly evaluate the predicates for this index, we have to
+                // fetch the full documents. Add a fetch node above the index scan whose filter
+                // includes *all* of the predicates used to generate the ixscan.
+                FetchNode* fetch = new FetchNode();
+                // Takes ownership.
+                fetch->filter.reset(scanState->curOr.release());
+                // Takes ownership.
+                fetch->children.push_back(scanState->currentScan.release());
+
+                scanState->currentScan.reset(fetch);
+            }
+            else if (scanState->loosestBounds == IndexBoundsBuilder::INEXACT_COVERED) {
+                // This an OR, at least one of the predicates used to generate 'currentScan'
+                // is inexact covered, but none is inexact fetch. This means that we can put
+                // these predicates, joined by an $or, as filters on the index scan. This avoids
+                // a fetch and allows the predicates to be covered by the index.
+                //
+                // Ex.
+                //   Say we have index {a: 1} and query {$or: [{a: /foo/}, {a: /bar/}]}.
+                //   The entire query, {$or: [{a: /foo/}, {a: /bar/}]}, should be a filter
+                //   in the index scan stage itself.
+                scanState->currentScan->filter.reset(scanState->curOr.release());
+            }
+        }
+
+        out->push_back(scanState->currentScan.release());
+    }
+
+    // static
     void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntry& index) {
         const StageType type = node->getType();
-        verify(STAGE_GEO_NEAR_2D != type);
 
-        if (STAGE_GEO_2D == type || STAGE_TEXT == type) {
+        if (STAGE_TEXT == type) {
+            finishTextNode(node, index);
             return;
         }
 
         IndexBounds* bounds = NULL;
 
-        if (STAGE_GEO_NEAR_2DSPHERE == type) {
+        if (STAGE_GEO_NEAR_2D == type) {
+            GeoNear2DNode* gnode = static_cast<GeoNear2DNode*>(node);
+            bounds = &gnode->baseBounds;
+        }
+        else if (STAGE_GEO_NEAR_2DSPHERE == type) {
             GeoNear2DSphereNode* gnode = static_cast<GeoNear2DSphereNode*>(node);
             bounds = &gnode->baseBounds;
         }
@@ -245,9 +560,6 @@ namespace mongo {
             IndexScanNode* scan = static_cast<IndexScanNode*>(node);
             bounds = &scan->bounds;
         }
-
-        // XXX: this currently fills out minkey/maxkey bounds for near queries, fix that.  just
-        // set the field name of the near query field when starting a near scan.
 
         // Find the first field in the scan's bounds that was not filled out.
         // TODO: could cache this.
@@ -297,63 +609,70 @@ namespace mongo {
     }
 
     // static
+    void QueryPlannerAccess::findElemMatchChildren(const MatchExpression* node,
+                                                   vector<MatchExpression*>* out,
+                                                   vector<MatchExpression*>* subnodesOut) {
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            MatchExpression* child = node->getChild(i);
+            if (Indexability::isBoundsGenerating(child) &&
+                NULL != child->getTag()) {
+                out->push_back(child);
+            }
+            else if (MatchExpression::AND == child->matchType() ||
+                     Indexability::arrayUsesIndexOnChildren(child)) {
+                findElemMatchChildren(child, out, subnodesOut);
+            }
+            else if (NULL != child->getTag()) {
+                subnodesOut->push_back(child);
+            }
+        }
+    }
+
+    // static
     bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
-                                         MatchExpression* root,
-                                         bool inArrayOperator,
-                                         const vector<IndexEntry>& indices,
-                                         vector<QuerySolutionNode*>* out) {
+                                               MatchExpression* root,
+                                               bool inArrayOperator,
+                                               const std::vector<IndexEntry>& indices,
+                                               std::vector<QuerySolutionNode*>* out) {
+        // Initialize the ScanBuildingState.
+        ScanBuildingState scanState(root, inArrayOperator, indices);
 
-        auto_ptr<QuerySolutionNode> currentScan;
-        size_t currentIndexNumber = IndexTag::kNoIndex;
-        size_t curChild = 0;
-
-        // This 'while' processes all IXSCANs, possibly merging scans by combining the bounds.  We
-        // can merge scans in two cases:
-        // 1. Filling out subsequent fields in a compound index.
-        // 2. Intersecting bounds.  Currently unimplemented.
-        while (curChild < root->numChildren()) {
-            MatchExpression* child = root->getChild(curChild);
+        while (scanState.curChild < root->numChildren()) {
+            MatchExpression* child = root->getChild(scanState.curChild);
 
             // If there is no tag, it's not using an index.  We've sorted our children such that the
             // children with tags are first, so we stop now.
             if (NULL == child->getTag()) { break; }
 
-            IndexTag* ixtag = static_cast<IndexTag*>(child->getTag());
+            scanState.ixtag = static_cast<IndexTag*>(child->getTag());
             // If there's a tag it must be valid.
-            verify(IndexTag::kNoIndex != ixtag->index);
+            verify(IndexTag::kNoIndex != scanState.ixtag->index);
 
-            // If the child can't use an index on its own field, it's indexed by virtue of one of
-            // its children having an index.  We don't do anything special here, just add it to
-            // the output as-is.
+            // If the child can't use an index on its own field (and the child is not a negation
+            // of a bounds-generating expression), then it's indexed by virtue of one of
+            // its children having an index.
             //
             // NOTE: If the child is logical, it could possibly collapse into a single ixscan.  we
             // ignore this for now.
-            if (!Indexability::nodeCanUseIndexOnOwnField(child)) {
-                if (!inArrayOperator) {
-                    // The logical sub-tree is responsible for fully evaluating itself.  Any
-                    // required filters or fetches are already hung on it.  As such, we remove the
-                    // filter branch from our tree.  buildIndexedDataAccess takes ownership of the
-                    // child.
-                    root->getChildVector()->erase(root->getChildVector()->begin() + curChild);
-                    // The curChild of today is the curChild+1 of yesterday.
+            if (!Indexability::isBoundsGenerating(child)) {
+                // If we're here, then the child is indexed by virtue of its children.
+                // In most cases this means that we recursively build indexed data
+                // access on 'child'.
+                if (!processIndexScansSubnode(query, &scanState, out)) {
+                    return false;
                 }
-                else {
-                    ++curChild;
-                }
-
-                // If inArrayOperator: takes ownership of child, which is OK, since we detached
-                // child from root.
-                QuerySolutionNode* childSolution = buildIndexedDataAccess(query,
-                                                                          child,
-                                                                          inArrayOperator,
-                                                                          indices);
-                if (NULL == childSolution) { return false; }
-                out->push_back(childSolution);
                 continue;
             }
 
             // If we're here, we now know that 'child' can use an index directly and the index is
             // over the child's field.
+
+            // If 'child' is a NOT, then the tag we're interested in is on the NOT's
+            // child node.
+            if (MatchExpression::NOT == child->matchType()) {
+                scanState.ixtag = static_cast<IndexTag*>(child->getChild(0)->getTag());
+                invariant(IndexTag::kNoIndex != scanState.ixtag->index);
+            }
 
             // If the child we're looking at uses a different index than the current index scan, add
             // the current index scan to the output as we're done with it.  The index scan created
@@ -370,166 +689,182 @@ namespace mongo {
             // If the index is NOT multikey, it's always semantically correct to combine bounds,
             // as there are no arrays to worry about.
             //
-            // If the index is multikey, there are arrays of values.  There are three issues:
-            //
-            // 1. We can't intersect bounds even if the bounds are not on a compound index.
-            //    Example:
-            //    Let's say we have the document {a: [5, 7]}.
-            //    This document satisfies the query {$and: [ {a: 5}, {a: 7} ] }
-            //    For the index {a:1} we have the keys {"": 5} and {"": 7}.
-            //    Each child of the AND is tagged with the index {a: 1}
-            //    The interval for the {a: 5} branch is [5, 5].  It is exact.
-            //    The interval for the {a: 7} branch is [7, 7].  It is exact.
-            //    The intersection of the intervals is {}.
-            //    If we scan over {}, the intersection of the intervals, we will retrieve nothing.
-            //
-            // 2. If we're using a compound index, we can only specify bounds for the first field.
-            //    Example:
-            //    Let's say we have the document {a: [ {b: 3}, {c: 4} ] }
-            //    This document satisfies the query {'a.b': 3, 'a.c': 4}.
-            //    For the index {'a.b': 1, 'a.c': 1} we have the keys {"": 3, "": null} and
-            //                                                        {"": null, "": 4}.
-            //    Let's use the aforementioned index to answer the query.
-            //    The bounds for 'a.b' are [3,3], and the bounds for 'a.c' are [4,4].
-            //    If we combine the bounds, we would only look at keys {"": 3, "":4 }.
-            //    Therefore we wouldn't look at the document's keys in the index.
-            //    Therefore we don't combine bounds.
-            //
-            // 3. There is an exception to (2), and that is when we're evaluating an $elemMatch.
-            //    Example:
-            //    Our query is a: {$elemMatch: {b:3, c:4}}.
-            //    Let's say that we have the index {'a.b': 1, 'a.c': 1} as in (2).
-            //    $elemMatch requires if a.b==3 and a.c==4, the predicates must be satisfied from
-            //    the same array entry.
-            //    If those values are both present in the same array, the index key for the
-            //    aforementioned index will be {"":3, "":4}
-            //    Therefore we can intersect bounds.
-
-            // TODO: we should also merge if we're in an array operator, but only when we figure out index13.js.
-            if (NULL != currentScan.get() && (currentIndexNumber == ixtag->index) && !indices[currentIndexNumber].multikey) {
+            // If the index is multikey, there are arrays of values.  There are several
+            // complications in the multikey case that have to be obeyed both by the enumerator
+            // and here as we try to merge predicates into query solution leaves. The hairy
+            // details of these rules are documented near the top of planner_access.h.
+            if (shouldMergeWithLeaf(child, scanState)) {
                 // The child uses the same index we're currently building a scan for.  Merge
                 // the bounds and filters.
-                verify(currentIndexNumber == ixtag->index);
-
-                IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::INEXACT_FETCH;
-                mergeWithLeafNode(child, indices[currentIndexNumber], ixtag->pos, &tightness,
-                                  currentScan.get(), root->matchType());
-
-                if (tightness == IndexBoundsBuilder::EXACT) {
-                    root->getChildVector()->erase(root->getChildVector()->begin()
-                                                  + curChild);
-                    delete child;
-                }
-                else if (tightness == IndexBoundsBuilder::INEXACT_COVERED) {
-                    // The bounds are not exact, but the information needed to
-                    // evaluate the predicate is in the index key. Remove the
-                    // MatchExpression from its parent and attach it to the filter
-                    // of the index scan we're building.
-                    root->getChildVector()->erase(root->getChildVector()->begin()
-                                                  + curChild);
-
-                    _addFilterToSolutionNode(currentScan.get(), child, root->matchType());
-                }
-                else if (root->matchType() == MatchExpression::OR) {
-                    // In the AND case, the filter can be brought above the AND node.
-                    // But in the OR case, the filter only applies to one branch, so
-                    // we must affix curChild's filter now. In order to apply the filter
-                    // to the proper OR branch, create a FETCH node with the filter whose
-                    // child is the IXSCAN.
-                    finishLeafNode(currentScan.get(), indices[currentIndexNumber]);
-                    root->getChildVector()->erase(root->getChildVector()->begin()
-                                                  + curChild);
-
-                    FetchNode* fetch = new FetchNode();
-                    // takes ownership
-                    fetch->filter.reset(child);
-                    // takes ownership
-                    fetch->children.push_back(currentScan.release());
-                    // takes ownership
-                    out->push_back(fetch);
-
-                    currentIndexNumber = IndexTag::kNoIndex;
-                }
-                else {
-                    // We keep curChild in the AND for affixing later.
-                    ++curChild;
-                }
+                verify(scanState.currentIndexNumber == scanState.ixtag->index);
+                scanState.tightness = IndexBoundsBuilder::INEXACT_FETCH;
+                mergeWithLeafNode(child, &scanState);
+                handleFilter(&scanState);
             }
             else {
-                if (NULL != currentScan.get()) {
-                    finishLeafNode(currentScan.get(), indices[currentIndexNumber]);
-                    out->push_back(currentScan.release());
+                if (NULL != scanState.currentScan.get()) {
+                    // Output the current scan before starting to construct a new out.
+                    finishAndOutputLeaf(&scanState, out);
                 }
                 else {
-                    verify(IndexTag::kNoIndex == currentIndexNumber);
+                    verify(IndexTag::kNoIndex == scanState.currentIndexNumber);
                 }
 
-                currentIndexNumber = ixtag->index;
+                // Reset state before producing a new leaf.
+                scanState.resetForNextScan(scanState.ixtag);
 
-                IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::INEXACT_FETCH;
-                currentScan.reset(makeLeafNode(query, indices[currentIndexNumber],
-                                                child, &tightness));
+                scanState.currentScan.reset(makeLeafNode(query,
+                                                         indices[scanState.currentIndexNumber],
+                                                         scanState.ixtag->pos, child,
+                                                         &scanState.tightness));
 
-                if (tightness == IndexBoundsBuilder::EXACT && !inArrayOperator) {
-                    // The bounds answer the predicate, and we can remove the expression from the
-                    // root.  NOTE(opt): Erasing entry 0, 1, 2, ... could be kind of n^2, maybe
-                    // optimize later.
-                    root->getChildVector()->erase(root->getChildVector()->begin()
-                                                  + curChild);
-                    delete child;
-                    // Don't increment curChild.
-                }
-                else if (tightness == IndexBoundsBuilder::INEXACT_COVERED
-                         && !indices[currentIndexNumber].multikey) {
-                    // The bounds are not exact, but the information needed to
-                    // evaluate the predicate is in the index key. Remove the
-                    // MatchExpression from its parent and attach it to the filter
-                    // of the index scan we're building.
-                    //
-                    // We can only use this optimization if the index is NOT multikey.
-                    // Suppose that we had the multikey index {x: 1} and a document
-                    // {x: ["a", "b"]}. Now if we query for {x: /b/} the filter might
-                    // ever only be applied to the index key "a". We'd incorrectly
-                    // conclude that the document does not match the query :( so we
-                    // gotta stick to non-multikey indices.
-                    root->getChildVector()->erase(root->getChildVector()->begin()
-                                                  + curChild);
-
-                    _addFilterToSolutionNode(currentScan.get(), child, root->matchType());
-                }
-                else if (root->matchType() == MatchExpression::OR) {
-                    // In the AND case, the filter can be brought above the AND node.
-                    // But in the OR case, the filter only applies to one branch, so
-                    // we must affix curChild's filter now. In order to apply the filter
-                    // to the proper OR branch, create a FETCH node with the filter whose
-                    // child is the IXSCAN.
-                    finishLeafNode(currentScan.get(), indices[currentIndexNumber]);
-                    root->getChildVector()->erase(root->getChildVector()->begin()
-                                                  + curChild);
-
-                    FetchNode* fetch = new FetchNode();
-                    // takes ownership
-                    fetch->filter.reset(child);
-                    // takes ownership
-                    fetch->children.push_back(currentScan.release());
-                    // takes ownership
-                    out->push_back(fetch);
-
-                    currentIndexNumber = IndexTag::kNoIndex;
-                }
-                else {
-                    // We keep curChild in the AND for affixing later as a filter.
-                    ++curChild;
-                }
+                handleFilter(&scanState);
             }
         }
 
         // Output the scan we're done with, if it exists.
-        if (NULL != currentScan.get()) {
-            finishLeafNode(currentScan.get(), indices[currentIndexNumber]);
-            out->push_back(currentScan.release());
+        if (NULL != scanState.currentScan.get()) {
+            finishAndOutputLeaf(&scanState, out);
         }
 
+        return true;
+    }
+
+    // static
+    bool QueryPlannerAccess::processIndexScansElemMatch(const CanonicalQuery& query,
+                                                        ScanBuildingState* scanState,
+                                                        std::vector<QuerySolutionNode*>* out) {
+        MatchExpression* root = scanState->root;
+        MatchExpression* child = root->getChild(scanState->curChild);
+        const vector<IndexEntry>& indices = scanState->indices;
+
+        // We have an AND with an ELEM_MATCH_OBJECT child. The plan enumerator produces
+        // index taggings which indicate that we should try to compound with
+        // predicates retrieved from inside the subtree rooted at the ELEM_MATCH.
+        // In order to obey the enumerator's tagging, we need to retrieve these
+        // predicates from inside the $elemMatch, and try to merge them with
+        // the current index scan.
+
+        // Contains tagged predicates from inside the tree rooted at 'child'
+        // which are logically part of the AND.
+        vector<MatchExpression*> emChildren;
+
+        // Contains tagged nodes that are not logically part of the AND and
+        // cannot use the index directly (e.g. OR nodes which are tagged to
+        // be indexed).
+        vector<MatchExpression*> emSubnodes;
+
+        // Populate 'emChildren' and 'emSubnodes'.
+        findElemMatchChildren(child, &emChildren, &emSubnodes);
+
+        // Recursively build data access for the nodes inside 'emSubnodes'.
+        for (size_t i = 0; i < emSubnodes.size(); ++i) {
+            MatchExpression* subnode = emSubnodes[i];
+
+            if (!Indexability::isBoundsGenerating(subnode)) {
+                // Must pass true for 'inArrayOperator' because the subnode is
+                // beneath an ELEM_MATCH_OBJECT.
+                QuerySolutionNode* childSolution = buildIndexedDataAccess(query,
+                                                                          subnode,
+                                                                          true,
+                                                                          indices);
+
+                // buildIndexedDataAccess(...) returns NULL in error conditions, when
+                // it is unable to construct a query solution from a tagged match
+                // expression tree. If we are unable to construct a solution according
+                // to the instructions from the enumerator, then we bail out early
+                // (by returning false) rather than continuing on and potentially
+                // constructing an invalid solution tree.
+                if (NULL == childSolution) { return false; }
+
+                // Output the resulting solution tree.
+                out->push_back(childSolution);
+            }
+        }
+
+        // For each predicate in 'emChildren', try to merge it with the current index scan.
+        //
+        // This loop is similar to that in processIndexScans(...), except it does not call into
+        // handleFilters(...). Instead, we leave the entire $elemMatch filter intact. This way,
+        // the complete $elemMatch expression will be affixed as a filter later on.
+        for (size_t i = 0; i < emChildren.size(); ++i) {
+            MatchExpression* emChild = emChildren[i];
+            invariant(NULL != emChild->getTag());
+            scanState->ixtag = static_cast<IndexTag*>(emChild->getTag());
+
+            // If 'emChild' is a NOT, then the tag we're interested in is on the NOT's
+            // child node.
+            if (MatchExpression::NOT == emChild->matchType()) {
+                invariant(NULL != emChild->getChild(0)->getTag());
+                scanState->ixtag = static_cast<IndexTag*>(emChild->getChild(0)->getTag());
+                invariant(IndexTag::kNoIndex != scanState->ixtag->index);
+            }
+
+            if (shouldMergeWithLeaf(emChild, *scanState)) {
+                // The child uses the same index we're currently building a scan for.  Merge
+                // the bounds and filters.
+                verify(scanState->currentIndexNumber == scanState->ixtag->index);
+
+                scanState->tightness = IndexBoundsBuilder::INEXACT_FETCH;
+                mergeWithLeafNode(emChild, scanState);
+            }
+            else {
+                if (NULL != scanState->currentScan.get()) {
+                    finishAndOutputLeaf(scanState, out);
+                }
+                else {
+                    verify(IndexTag::kNoIndex == scanState->currentIndexNumber);
+                }
+
+                scanState->currentIndexNumber = scanState->ixtag->index;
+
+                scanState->tightness = IndexBoundsBuilder::INEXACT_FETCH;
+                scanState->currentScan.reset(makeLeafNode(query, indices[scanState->currentIndexNumber],
+                                                          scanState->ixtag->pos,
+                                                          emChild, &scanState->tightness));
+            }
+        }
+
+        // We're done processing the $elemMatch child. We leave it hanging off
+        // it's AND parent so that it will be affixed as a filter later on,
+        // and move on to the next child of the AND.
+        ++scanState->curChild;
+        return true;
+    }
+
+    // static
+    bool QueryPlannerAccess::processIndexScansSubnode(const CanonicalQuery& query,
+                                                      ScanBuildingState* scanState,
+                                                      std::vector<QuerySolutionNode*>* out) {
+        MatchExpression* root = scanState->root;
+        MatchExpression* child = root->getChild(scanState->curChild);
+        const vector<IndexEntry>& indices = scanState->indices;
+        bool inArrayOperator = scanState->inArrayOperator;
+
+        if (MatchExpression::AND == root->matchType() &&
+            MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
+            return processIndexScansElemMatch(query, scanState, out);
+        }
+        else if (!inArrayOperator) {
+            // The logical sub-tree is responsible for fully evaluating itself.  Any
+            // required filters or fetches are already hung on it.  As such, we remove the
+            // filter branch from our tree.  buildIndexedDataAccess takes ownership of the
+            // child.
+            root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
+            // The curChild of today is the curChild+1 of yesterday.
+        }
+        else {
+            ++scanState->curChild;
+        }
+
+        // If inArrayOperator: takes ownership of child, which is OK, since we detached
+        // child from root.
+        QuerySolutionNode* childSolution = buildIndexedDataAccess(query,
+                                                                  child,
+                                                                  inArrayOperator,
+                                                                  indices);
+        if (NULL == childSolution) { return false; }
+        out->push_back(childSolution);
         return true;
     }
 
@@ -689,7 +1024,8 @@ namespace mongo {
                     }
                 }
 
-                // XXX: consider reversing?
+                // TODO: If we're looking for the reverse of one of these sort orders we could
+                // possibly reverse the ixscan nodes.
                 shouldMergeSort = (sharedSortOrders.end() != sharedSortOrders.find(desiredSort));
             }
 
@@ -722,7 +1058,7 @@ namespace mongo {
                                                             MatchExpression* root,
                                                             bool inArrayOperator,
                                                             const vector<IndexEntry>& indices) {
-        if (root->isLogical()) {
+        if (root->isLogical() && !Indexability::isBoundsGeneratingNot(root)) {
             if (MatchExpression::AND == root->matchType()) {
                 // Takes ownership of root.
                 return buildIndexedAnd(query, root, inArrayOperator, indices);
@@ -733,6 +1069,9 @@ namespace mongo {
             }
             else {
                 // Can't do anything with negated logical nodes index-wise.
+                if (!inArrayOperator) {
+                    delete root;
+                }
                 return NULL;
             }
         }
@@ -748,13 +1087,13 @@ namespace mongo {
                 // No index to use here, not in the context of logical operator, so we're SOL.
                 return NULL;
             }
-            else if (Indexability::nodeCanUseIndexOnOwnField(root)) {
+            else if (Indexability::isBoundsGenerating(root)) {
                 // Make an index scan over the tagged index #.
                 IndexTag* tag = static_cast<IndexTag*>(root->getTag());
 
                 IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::EXACT;
-                QuerySolutionNode* soln = makeLeafNode(query, indices[tag->index], root,
-                                                       &tightness);
+                QuerySolutionNode* soln = makeLeafNode(query, indices[tag->index], tag->pos,
+                                                       root, &tightness);
                 verify(NULL != soln);
                 finishLeafNode(soln, indices[tag->index]);
 
@@ -822,7 +1161,9 @@ namespace mongo {
                     // The child is an AND.
                     verify(1 == root->numChildren());
                     solution = buildIndexedDataAccess(query, root->getChild(0), true, indices);
-                    if (NULL == solution) { return NULL; }
+                    if (NULL == solution) {
+                        return NULL;
+                    }
                 }
 
                 // There may be an array operator above us.
@@ -835,6 +1176,10 @@ namespace mongo {
                 fetch->children.push_back(solution);
                 return fetch;
             }
+        }
+
+        if (!inArrayOperator) {
+            delete root;
         }
 
         return NULL;
@@ -864,7 +1209,6 @@ namespace mongo {
 
         // If it's find({}) remove the no-op root.
         if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
-            // XXX wasteful fix
             delete filter;
             solnRoot = isn;
         }
@@ -881,25 +1225,23 @@ namespace mongo {
     }
 
     // static
-
-    void QueryPlannerAccess::_addFilterToSolutionNode(QuerySolutionNode* node,
-                                                      MatchExpression* match,
-                                                      MatchExpression::MatchType type) {
+    void QueryPlannerAccess::addFilterToSolutionNode(QuerySolutionNode* node,
+                                                     MatchExpression* match,
+                                                     MatchExpression::MatchType type) {
         if (NULL == node->filter) {
             node->filter.reset(match);
         }
-        // The 'node' already has either an AND or OR filter that matches
-        // 'type'. Add 'match' as another branch of the filter.
         else if (type == node->filter->matchType()) {
+            // The 'node' already has either an AND or OR filter that matches 'type'. Add 'match' as
+            // another branch of the filter.
             ListOfMatchExpression* listFilter =
                 static_cast<ListOfMatchExpression*>(node->filter.get());
             listFilter->add(match);
         }
-        // The 'node' already has a filter that does not match
-        // 'type'. If 'type' is AND, then combine 'match' with
-        // the existing filter by adding an AND. If 'type' is OR,
-        // combine by adding an OR node.
         else {
+            // The 'node' already has a filter that does not match 'type'. If 'type' is AND, then
+            // combine 'match' with the existing filter by adding an AND. If 'type' is OR, combine
+            // by adding an OR node.
             ListOfMatchExpression* listFilter;
             if (MatchExpression::AND == type) {
                 listFilter = new AndMatchExpression();
@@ -912,6 +1254,81 @@ namespace mongo {
             listFilter->add(oldFilter);
             listFilter->add(match);
             node->filter.reset(listFilter);
+        }
+    }
+
+    // static
+    void QueryPlannerAccess::handleFilter(ScanBuildingState* scanState) {
+        if (MatchExpression::OR == scanState->root->matchType()) {
+            handleFilterOr(scanState);
+        }
+        else if (MatchExpression::AND == scanState->root->matchType()) {
+            handleFilterAnd(scanState);
+        }
+        else {
+            // We must be building leaves for either and AND or an OR.
+            invariant(0);
+        }
+    }
+
+    // static
+    void QueryPlannerAccess::handleFilterOr(ScanBuildingState* scanState) {
+        MatchExpression* root = scanState->root;
+        MatchExpression* child = root->getChild(scanState->curChild);
+
+        if (scanState->inArrayOperator) {
+            // We're inside an array operator. The entire array operator expression
+            // should always be affixed as a filter. We keep 'curChild' in the $and
+            // for affixing later.
+            ++scanState->curChild;
+        }
+        else {
+            if (scanState->tightness < scanState->loosestBounds) {
+                scanState->loosestBounds = scanState->tightness;
+            }
+
+            // Detach 'child' and add it to 'curOr'.
+            root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
+            scanState->curOr->getChildVector()->push_back(child);
+        }
+    }
+
+    // static
+    void QueryPlannerAccess::handleFilterAnd(ScanBuildingState* scanState) {
+        MatchExpression* root = scanState->root;
+        MatchExpression* child = root->getChild(scanState->curChild);
+        const IndexEntry& index = scanState->indices[scanState->currentIndexNumber];
+
+        if (scanState->inArrayOperator) {
+            // We're inside an array operator. The entire array operator expression
+            // should always be affixed as a filter. We keep 'curChild' in the $and
+            // for affixing later.
+            ++scanState->curChild;
+        }
+        else if (scanState->tightness == IndexBoundsBuilder::EXACT) {
+            root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
+            delete child;
+        }
+        else if (scanState->tightness == IndexBoundsBuilder::INEXACT_COVERED
+                 && (INDEX_TEXT == index.type || !index.multikey)) {
+            // The bounds are not exact, but the information needed to
+            // evaluate the predicate is in the index key. Remove the
+            // MatchExpression from its parent and attach it to the filter
+            // of the index scan we're building.
+            //
+            // We can only use this optimization if the index is NOT multikey.
+            // Suppose that we had the multikey index {x: 1} and a document
+            // {x: ["a", "b"]}. Now if we query for {x: /b/} the filter might
+            // ever only be applied to the index key "a". We'd incorrectly
+            // conclude that the document does not match the query :( so we
+            // gotta stick to non-multikey indices.
+            root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
+
+            addFilterToSolutionNode(scanState->currentScan.get(), child, root->matchType());
+        }
+        else {
+            // We keep curChild in the AND for affixing later.
+            ++scanState->curChild;
         }
     }
 
@@ -938,7 +1355,6 @@ namespace mongo {
 
         // If it's find({}) remove the no-op root.
         if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
-            // XXX wasteful fix
             delete filter;
             solnRoot = isn;
         }

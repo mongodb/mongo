@@ -28,7 +28,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/shard.h"
 
@@ -49,10 +49,14 @@
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
 #include "mongo/s/request.h"
+#include "mongo/s/scc_fast_query_handler.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/s/version_manager.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     static bool initWireVersion( DBClientBase* conn, std::string* errMsg ) {
         BSONObj response;
@@ -312,7 +316,7 @@ namespace mongo {
     public:
         CmdGetShardMap() : Command( "getShardMap" ){}
         virtual void help( stringstream &help ) const { help<<"internal"; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual void addRequiredPrivileges(const std::string& dbname,
@@ -322,7 +326,7 @@ namespace mongo {
             actions.addAction(ActionType::getShardMap);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(const string&, mongo::BSONObj&, int, std::string& errmsg , mongo::BSONObjBuilder& result, bool) {
+        virtual bool run(OperationContext* txn, const string&, mongo::BSONObj&, int, std::string& errmsg , mongo::BSONObjBuilder& result, bool) {
             return staticShardInfo.getShardMap( result , errmsg );
         }
     } cmdGetShardMap;
@@ -490,13 +494,22 @@ namespace mongo {
             // For every DBClient created by mongos, add a hook that will capture the response from
             // commands, so that we can target the correct node when subsequent getLastError calls
             // are made by mongos.
-            conn->setPostRunCommandHook(boost::bind(&saveGLEStats, _1, _2));
+            conn->setPostRunCommandHook(stdx::bind(&saveGLEStats, stdx::placeholders::_1, stdx::placeholders::_2));
         }
 
         // For every DBClient created by mongos, add a hook that will append impersonated users
         // to the end of every runCommand.  mongod uses this information to produce auditing
         // records attributed to the proper authenticated user(s).
-        conn->setRunCommandHook(boost::bind(&audit::appendImpersonatedUsers, _1));
+        conn->setRunCommandHook(stdx::bind(&audit::appendImpersonatedUsers, stdx::placeholders::_1));
+
+        // For every SCC created, add a hook that will allow fastest-config-first config reads if
+        // the appropriate server options are set.
+        if ( conn->type() == ConnectionString::SYNC ) {
+            SyncClusterConnection* scc = dynamic_cast<SyncClusterConnection*>( conn );
+            if ( scc ) {
+                scc->attachQueryHandler( new SCCFastQueryHandler );
+            }
+        }
     }
 
     void ShardingConnectionHook::onDestroy( DBClientBase * conn ) {
@@ -505,5 +518,11 @@ namespace mongo {
             versionManager.resetShardVersionCB( conn );
         }
 
+    }
+
+    void ShardingConnectionHook::onRelease(DBClientBase* conn) {
+        // This is currently for making the replica set connections release
+        // secondary connections to the pool.
+        conn->reset();
     }
 }

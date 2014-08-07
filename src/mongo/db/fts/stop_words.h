@@ -52,7 +52,7 @@ namespace mongo {
 
             size_t numStopWords() const { return _words.size(); }
 
-            static const StopWords* getStopWords( const FTSLanguage& langauge );
+            static const StopWords* getStopWords( const FTSLanguage& language );
         private:
             ~StopWords(){}
             unordered_set<std::string> _words;

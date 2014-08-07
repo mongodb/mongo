@@ -26,21 +26,27 @@
  *    it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 #include "mongo/base/counter.h"
 #include "mongo/db/stats/timer_stats.h"
 
 namespace mongo {
-namespace replset {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
+namespace repl {
 
     int SleepToAllowBatchingMillis = 2;
     const int BatchIsSmallish = 40000; // bytes
@@ -91,9 +97,7 @@ namespace replset {
                                        _pause(true),
                                        _appliedBuffer(true),
                                        _assumingPrimary(false),
-                                       _currentSyncTarget(NULL),
-                                       _oplogMarkerTarget(NULL),
-                                       _consumedOpTime(0, 0) {
+                                       _currentSyncTarget(NULL) {
     }
 
     BackgroundSync* BackgroundSync::get() {
@@ -109,17 +113,10 @@ namespace replset {
     }
 
     void BackgroundSync::notify() {
-        {
-            boost::unique_lock<boost::mutex> lock(s_mutex);
-            if (s_instance == NULL) {
-                return;
-            }
-        }
+        OperationContextImpl txn;
 
-        {
-            boost::unique_lock<boost::mutex> opLock(s_instance->_lastOpMutex);
-            s_instance->_lastOpCond.notify_all();
-        }
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        replCoord->setLastOptime(&txn, replCoord->getMyRID(&txn), theReplSet->lastOpTimeWritten);
 
         {
             boost::unique_lock<boost::mutex> lock(s_instance->_mutex);
@@ -130,142 +127,6 @@ namespace replset {
                 s_instance->_condvar.notify_all();
             }
         }
-    }
-
-    void BackgroundSync::notifierThread() {
-        Client::initThread("rsSyncNotifier");
-        bool meEnsured = false;
-        while (!inShutdown() && !meEnsured) {
-            try {
-                theReplSet->syncSourceFeedback.ensureMe();
-                meEnsured = true;
-            }
-            catch (const DBException& e) {
-                warning() << "failed to initiate notifier thread: " << e.what()
-                          << " trying again in one second";
-                sleepsecs(1);
-            }
-        }
-        replLocalAuth();
-
-        // This makes the initial connection to our sync source for oplog position notification.
-        // It also sets the supportsUpdater flag so we know which method to use.
-        // If this function fails, we ignore that situation because it will be taken care of
-        // the first time markOplog() is called in the loop below.
-        connectOplogNotifier();
-        theReplSet->syncSourceFeedback.go();
-
-        while (!inShutdown()) {
-            bool clearTarget = false;
-
-            if (!theReplSet) {
-                sleepsecs(5);
-                continue;
-            }
-
-            MemberState state = theReplSet->state();
-            if (state.primary() || state.fatal() || state.startup()) {
-                sleepsecs(5);
-                continue;
-            }
-
-            try {
-                {
-                    boost::unique_lock<boost::mutex> lock(_lastOpMutex);
-                    while (_consumedOpTime == theReplSet->lastOpTimeWritten) {
-                        _lastOpCond.wait(lock);
-                    }
-                }
-
-                markOplog();
-            }
-            catch (DBException &e) {
-                clearTarget = true;
-                log() << "replset tracking exception: " << e.getInfo() << rsLog;
-                sleepsecs(1);
-            }
-            catch (std::exception &e2) {
-                clearTarget = true;
-                log() << "replset tracking error" << e2.what() << rsLog;
-                sleepsecs(1);
-            }
-
-            if (clearTarget) {
-                boost::unique_lock<boost::mutex> lock(_mutex);
-                _oplogMarkerTarget = NULL;
-            }
-        }
-
-        cc().shutdown();
-    }
-
-    void BackgroundSync::markOplog() {
-        LOG(3) << "replset markOplog: " << _consumedOpTime << " "
-               << theReplSet->lastOpTimeWritten << rsLog;
-
-        if (theReplSet->syncSourceFeedback.supportsUpdater()) {
-            _consumedOpTime = theReplSet->lastOpTimeWritten;
-            theReplSet->syncSourceFeedback.updateSelfInMap(theReplSet->lastOpTimeWritten);
-        }
-        else {
-            if (!hasCursor()) {
-                sleepmillis(500);
-                return;
-            }
-
-            if (!theReplSet->syncSourceFeedback.moreInCurrentBatch()) {
-                theReplSet->syncSourceFeedback.more();
-            }
-
-            if (!theReplSet->syncSourceFeedback.more()) {
-                theReplSet->syncSourceFeedback.tailCheck();
-                return;
-            }
-
-            // if this member has written the op at optime T
-            // we want to nextSafe up to and including T
-            while (_consumedOpTime < theReplSet->lastOpTimeWritten
-                   && theReplSet->syncSourceFeedback.more()) {
-                BSONObj temp = theReplSet->syncSourceFeedback.nextSafe();
-                _consumedOpTime = temp["ts"]._opTime();
-            }
-
-            // call more() to signal the sync target that we've synced T
-            theReplSet->syncSourceFeedback.more();
-        }
-    }
-
-    bool BackgroundSync::connectOplogNotifier() {
-        boost::unique_lock<boost::mutex> lock(_mutex);
-
-        if (!_oplogMarkerTarget || _currentSyncTarget != _oplogMarkerTarget) {
-            if (!_currentSyncTarget) {
-                return false;
-            }
-
-            log() << "replset setting oplog notifier to "
-                  << _currentSyncTarget->fullName() << rsLog;
-            _oplogMarkerTarget = _currentSyncTarget;
-
-            if (!theReplSet->syncSourceFeedback.connect(_oplogMarkerTarget)) {
-                _oplogMarkerTarget = NULL;
-                return false;
-            }
-        }
-        return true;
-    }
-
-    bool BackgroundSync::hasCursor() {
-        if (!connectOplogNotifier()) {
-            return false;
-        }
-        if (!theReplSet->syncSourceFeedback.haveCursor()) {
-            BSONObj fields = BSON("ts" << 1);
-            theReplSet->syncSourceFeedback.tailingQueryGTE(rsoplog,
-                                                theReplSet->lastOpTimeWritten, &fields);
-        }
-
-        return theReplSet->syncSourceFeedback.haveCursor();
     }
 
     void BackgroundSync::producerThread() {
@@ -295,6 +156,8 @@ namespace replset {
     }
 
     void BackgroundSync::_producerThread() {
+        OperationContextImpl txn;
+
         MemberState state = theReplSet->state();
 
         // we want to pause when the state changes to primary
@@ -322,16 +185,16 @@ namespace replset {
             start();
         }
 
-        produce();
+        produce(&txn);
     }
 
-    void BackgroundSync::produce() {
+    void BackgroundSync::produce(OperationContext* txn) {
         // this oplog reader does not do a handshake because we don't want the server it's syncing
         // from to track how far it has synced
         OplogReader r;
         OpTime lastOpTimeFetched;
         // find a target to sync from the last op time written
-        getOplogReader(r);
+        getOplogReader(txn, r);
 
         // no server found
         {
@@ -356,7 +219,7 @@ namespace replset {
 
         uassert(1000, "replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?", r.awaitCapable() );
 
-        if (isRollbackRequired(r)) {
+        if (isRollbackRequired(txn, r)) {
             stop();
             return;
         }
@@ -377,7 +240,6 @@ namespace replset {
                     // the inference here is basically if the batch is really small, we are 
                     // "caught up".
                     //
-                    dassert( !Lock::isLocked() );
                     sleepmillis(SleepToAllowBatchingMillis);
                 }
   
@@ -450,6 +312,8 @@ namespace replset {
                 boost::unique_lock<boost::mutex> lock(_mutex);
                 _lastH = o["h"].numberLong();
                 _lastOpTimeFetched = o["ts"]._opTime();
+                LOG(3) << "replSet lastOpTimeFetched: "
+                       << _lastOpTimeFetched.toStringPretty() << rsLog;
             }
         }
     }
@@ -469,14 +333,6 @@ namespace replset {
 
 
     bool BackgroundSync::peek(BSONObj* op) {
-        {
-            boost::unique_lock<boost::mutex> lock(_mutex);
-
-            if (_currentSyncTarget != _oplogMarkerTarget &&
-                _currentSyncTarget != NULL) {
-                _oplogMarkerTarget = NULL;
-            }
-        }
         return _buffer.peek(*op);
     }
 
@@ -502,8 +358,6 @@ namespace replset {
             log() << "replSet remoteOldestOp:    " << remoteTs.toStringLong() << rsLog;
             log() << "replSet lastOpTimeFetched: " << _lastOpTimeFetched.toStringLong() << rsLog;
         }
-        LOG(3) << "replSet remoteOldestOp: " << remoteTs.toStringLong() << rsLog;
-        LOG(3) << "replSet lastOpTimeFetched: " << _lastOpTimeFetched.toStringLong() << rsLog;
 
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
@@ -516,7 +370,7 @@ namespace replset {
         return true;
     }
 
-    void BackgroundSync::getOplogReader(OplogReader& r) {
+    void BackgroundSync::getOplogReader(OperationContext* txn, OplogReader& r) {
         const Member *target = NULL, *stale = NULL;
         BSONObj oldest;
 
@@ -561,16 +415,16 @@ namespace replset {
             // if we made it here, the target is up and not stale
             {
                 boost::unique_lock<boost::mutex> lock(_mutex);
+                // this will trigger the syncSourceFeedback
                 _currentSyncTarget = target;
             }
-            theReplSet->syncSourceFeedback.connect(target);
 
             return;
         }
 
         // the only viable sync target was stale
         if (stale) {
-            theReplSet->goStale(stale, oldest);
+            theReplSet->goStale(txn, stale, oldest);
             sleepsecs(120);
         }
 
@@ -580,7 +434,7 @@ namespace replset {
         }
     }
 
-    bool BackgroundSync::isRollbackRequired(OplogReader& r) {
+    bool BackgroundSync::isRollbackRequired(OperationContext* txn, OplogReader& r) {
         string hn = r.conn()->getServerAddress();
 
         if (!r.more()) {
@@ -595,7 +449,7 @@ namespace replset {
                 if (theirTS < _lastOpTimeFetched) {
                     log() << "replSet we are ahead of the sync source, will try to roll back"
                           << rsLog;
-                    theReplSet->syncRollback(r);
+                    theReplSet->syncRollback(txn, r);
                     return true;
                 }
                 /* we're not ahead?  maybe our new query got fresher data.  best to come back and try again */
@@ -615,7 +469,7 @@ namespace replset {
         if( ts != _lastOpTimeFetched || h != _lastH ) {
             log() << "replSet our last op time fetched: " << _lastOpTimeFetched.toStringPretty() << rsLog;
             log() << "replset source's GTE: " << ts.toStringPretty() << rsLog;
-            theReplSet->syncRollback(r);
+            theReplSet->syncRollback(txn, r);
             return true;
         }
 
@@ -670,5 +524,5 @@ namespace replset {
         _assumingPrimary = false;
     }
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

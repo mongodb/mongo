@@ -1,7 +1,7 @@
 // group.cpp
 
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2012-2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -41,7 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/scripting/engine.h"
 
@@ -50,7 +50,7 @@ namespace mongo {
     class GroupCommand : public Command {
     public:
         GroupCommand() : Command("group") {}
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return false; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual void help( stringstream &help ) const {
@@ -87,7 +87,8 @@ namespace mongo {
             return obj.extractFields( keyPattern , true ).getOwned();
         }
 
-        bool group( const std::string& realdbname,
+        bool group( OperationContext* txn,
+                    Database* db,
                     const std::string& ns,
                     const BSONObj& query,
                     BSONObj keyPattern,
@@ -101,7 +102,8 @@ namespace mongo {
 
             const string userToken = ClientBasic::getCurrent()->getAuthorizationSession()
                                                               ->getAuthenticatedUserNamesToken();
-            auto_ptr<Scope> s = globalScriptEngine->getPooledScope(realdbname, "group" + userToken);
+            auto_ptr<Scope> s = globalScriptEngine->getPooledScope(
+                                                        txn, db->name(), "group" + userToken);
 
             if ( reduceScope )
                 s->init( reduceScope );
@@ -131,31 +133,32 @@ namespace mongo {
             double keysize = keyPattern.objsize() * 3;
             double keynum = 1;
 
-            Collection* collection = cc().database()->getCollection( ns );
+            Collection* collection = db->getCollection( txn, ns );
+
+            const WhereCallbackReal whereCallback(txn, StringData(db->name()));
 
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
 
             if (collection) {
                 CanonicalQuery* cq;
-                if (!CanonicalQuery::canonicalize(ns, query, &cq).isOK()) {
+                if (!CanonicalQuery::canonicalize(ns, query, &cq, whereCallback).isOK()) {
                     uasserted(17212, "Can't canonicalize query " + query.toString());
                     return 0;
                 }
 
-                Runner* rawRunner;
-                if (!getRunner(cq, &rawRunner).isOK()) {
-                    uasserted(17213, "Can't get runner for query " + query.toString());
+                PlanExecutor* rawExec;
+                if (!getExecutor(txn,collection, cq, &rawExec).isOK()) {
+                    uasserted(17213, "Can't get executor for query " + query.toString());
                     return 0;
                 }
 
-                auto_ptr<Runner> runner(rawRunner);
-                const ScopedRunnerRegistration safety(runner.get());
-                runner->setYieldPolicy(Runner::YIELD_AUTO);
+                auto_ptr<PlanExecutor> exec(rawExec);
+                const ScopedExecutorRegistration safety(exec.get());
 
                 BSONObj obj;
-                Runner::RunnerState state;
-                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+                PlanExecutor::ExecState state;
+                while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
                     BSONObj key = getKey(obj , keyPattern , keyFunction , keysize / keynum,
                                          s.get() );
                     keysize += key.objsize();
@@ -201,7 +204,7 @@ namespace mongo {
             return true;
         }
 
-        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
             if ( !globalScriptEngine ) {
                 errmsg = "server-side JavaScript execution is disabled";
@@ -218,8 +221,6 @@ namespace mongo {
                 q = p["condition"].embeddedObject();
             else
                 q = getQuery( p );
-
-            string ns = parseNs(dbname, jsobj);
 
             BSONObj key;
             string keyf;
@@ -254,7 +255,10 @@ namespace mongo {
             if (p["finalize"].type())
                 finalize = p["finalize"]._asCode();
 
-            return group( dbname , ns , q ,
+            const string ns = parseNs(dbname, jsobj);
+            Client::ReadContext ctx(txn, ns);
+
+            return group( txn, ctx.ctx().db() , ns , q ,
                           key , keyf , reduce._asCode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeDataUnsafe() ,
                           initial.embeddedObject() , finalize ,
                           errmsg , result );

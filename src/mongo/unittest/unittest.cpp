@@ -316,24 +316,35 @@ namespace mongo {
 
         void Suite::setupTests() {}
 
-        TestAssertionFailureDetails::TestAssertionFailureDetails(
-                const std::string& theFile,
-                unsigned theLine,
-                const std::string& theMessage )
-            : file( theFile ), line( theLine ), message( theMessage ) {
-        }
-
         TestAssertionFailureException::TestAssertionFailureException(
                 const std::string& theFile,
                 unsigned theLine,
                 const std::string& theFailingExpression )
-            : _details( new TestAssertionFailureDetails( theFile, theLine, theFailingExpression ) ) {
-        }
+            : _file(theFile), _line(theLine), _message(theFailingExpression) {}
 
         std::string TestAssertionFailureException::toString() const {
             std::ostringstream os;
             os << getMessage() << " @" << getFile() << ":" << getLine();
             return os.str();
+        }
+
+        TestAssertionFailure::TestAssertionFailure(const std::string& file,
+                                                   unsigned line,
+                                                   const std::string& message)
+            : _exception(file, line, message) {}
+
+        TestAssertionFailure::~TestAssertionFailure()
+#if __cplusplus >= 201103
+        noexcept(false)
+#endif
+        {
+            if (!_stream.str().empty())
+                _exception.setMessage(_exception.getMessage() + " " + _stream.str());
+            throw _exception;
+        }
+
+        std::ostream& TestAssertionFailure::stream() {
+            return _stream;
         }
 
         TestAssertion::TestAssertion( const char* file, unsigned line )

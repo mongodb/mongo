@@ -1,8 +1,8 @@
-// javajstests.cpp
+// jstests.cpp
 //
 
 /**
- *    Copyright (C) 2009 10gen Inc.
+ *    Copyright (C) 2009-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -29,20 +29,20 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <limits>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/timer.h"
 
-namespace mongo {
-    bool dbEval(const string& dbName , BSONObj& cmd, BSONObjBuilder& result, string& errmsg);
-} // namespace mongo
+using std::string;
 
 namespace JSTests {
 
@@ -146,19 +146,17 @@ namespace JSTests {
         }
     };
 
-    /** Installs a tee for auditing log messages, including those logged with MONGO_TLOG(0)(). */
+    /** Installs a tee for auditing log messages in the same thread. */
     class LogRecordingScope {
     public:
         LogRecordingScope() :
-            _oldTLogLevel(tlogLevel),
             _logged(false),
+            _threadName(mongo::getThreadName()),
             _handle(mongo::logger::globalLogDomain()->attachAppender(
                             mongo::logger::MessageLogDomain::AppenderAutoPtr(new Tee(this)))) {
-            tlogLevel = 0;
         }
         ~LogRecordingScope() {
             mongo::logger::globalLogDomain()->detachAppender(_handle);
-            tlogLevel = _oldTLogLevel;
         }
         /** @return most recent log entry. */
         bool logged() const { return _logged; }
@@ -168,14 +166,17 @@ namespace JSTests {
             Tee(LogRecordingScope* scope) : _scope(scope) {}
             virtual ~Tee() {}
             virtual Status append(const logger::MessageEventEphemeral& event) {
-                _scope->_logged = true;
+                // Don't want to consider logging by background threads.
+                if (mongo::getThreadName() == _scope->_threadName) {
+                    _scope->_logged = true;
+                }
                 return Status::OK();
             }
         private:
             LogRecordingScope* _scope;
         };
-        int _oldTLogLevel;
         bool _logged;
+        const string _threadName;
         mongo::logger::MessageLogDomain::AppenderHandle _handle;
     };
 
@@ -644,7 +645,6 @@ namespace JSTests {
     public:
         void run() {
             auto_ptr<Scope> s( globalScriptEngine->newScope() );
-            s->localConnect( "blah" );
             BSONObjBuilder b;
             long long val = (long long)( 0xbabadeadbeefbaddULL );
             b.append( "a", val );
@@ -705,7 +705,6 @@ namespace JSTests {
     public:
         void run() {
             auto_ptr<Scope> s( globalScriptEngine->newScope() );
-            s->localConnect( "blah" );
 
             BSONObj in;
             {
@@ -733,7 +732,7 @@ namespace JSTests {
     public:
         void run() {
             auto_ptr<Scope> s( globalScriptEngine->newScope() );
-            s->localConnect( "blah" );
+
             BSONObjBuilder b;
             // limit is 2^53
             long long val = (long long)( 9007199254740991ULL );
@@ -779,7 +778,6 @@ namespace JSTests {
     public:
         void run() {
             auto_ptr<Scope> s( globalScriptEngine->newScope() );
-            s->localConnect( "blah" );
 
             // Timestamp 't' component cannot exceed max for int32_t.
             // Use appendTimestamp(field, Date) to bypass OpTime construction.
@@ -809,8 +807,6 @@ namespace JSTests {
         void run() {
             Scope * s = globalScriptEngine->newScope();
 
-            s->localConnect( "blah" );
-
             for ( int i=5; i<100 ; i += 10 ) {
                 s->setObject( "a" , build(i) , false );
                 s->invokeSafe( "tojson( a )" , 0, 0 );
@@ -830,8 +826,8 @@ namespace JSTests {
     public:
         void run() {
             scoped_ptr<Scope> scope(globalScriptEngine->newScope());
-            scope->localConnect("ExecTimeoutDB");
-            // assert timeout occured
+
+            // assert timeout occurred
             ASSERT(!scope->exec("var a = 1; while (true) { ; }",
                                 "ExecTimeout", false, true, false, 1));
         }
@@ -844,8 +840,8 @@ namespace JSTests {
     public:
         void run() {
             scoped_ptr<Scope> scope(globalScriptEngine->newScope());
-            scope->localConnect("ExecNoTimeoutDB");
-            // assert no timeout occured
+
+            // assert no timeout occurred
             ASSERT(scope->exec("var a = function() { return 1; }",
                                "ExecNoTimeout", false, true, false, 5 * 60 * 1000));
         }
@@ -858,7 +854,6 @@ namespace JSTests {
     public:
         void run() {
             scoped_ptr<Scope> scope(globalScriptEngine->newScope());
-            scope->localConnect("InvokeTimeoutDB");
 
             // scope timeout after 500ms
             bool caught = false;
@@ -881,7 +876,6 @@ namespace JSTests {
     public:
         void run() {
             scoped_ptr<Scope> scope(globalScriptEngine->newScope());
-            scope->localConnect("InvokeTimeoutDB");
 
             // invoke completes before timeout
             scope->invokeSafe("function() { "
@@ -891,16 +885,6 @@ namespace JSTests {
         }
     };
 
-
-    void dummy_function_to_force_dbeval_cpp_linking() {
-        BSONObj cmd;
-        BSONObjBuilder result;
-        string errmsg;
-        dbEval( "test", cmd, result, errmsg);
-        verify(0);
-    }
-
-    DBDirectClient client;
 
     class Utf8Check {
     public:
@@ -913,6 +897,10 @@ namespace JSTests {
             }
             string utf8ObjSpec = "{'_id':'\\u0001\\u007f\\u07ff\\uffff'}";
             BSONObj utf8Obj = fromjson( utf8ObjSpec );
+
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
             client.insert( ns(), utf8Obj );
             client.eval( "unittest", "v = db.jstests.utf8check.findOne(); db.jstests.utf8check.remove( {} ); db.jstests.utf8check.insert( v );" );
             check( utf8Obj, client.findOne( ns(), BSONObj() ) );
@@ -924,9 +912,14 @@ namespace JSTests {
                 FAIL( fail.c_str() );
             }
         }
+
         void reset() {
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
             client.dropCollection( ns() );
         }
+
         static const char *ns() { return "unittest.jstests.utf8check"; }
     };
 
@@ -937,12 +930,20 @@ namespace JSTests {
         void run() {
             if( !globalScriptEngine->utf8Ok() )
                 return;
+
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
             client.eval( "unittest", "db.jstests.longutf8string.save( {_id:'\\uffff\\uffff\\uffff\\uffff'} )" );
         }
     private:
         void reset() {
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
             client.dropCollection( ns() );
         }
+
         static const char *ns() { return "unittest.jstests.longutf8string"; }
     };
 
@@ -1014,10 +1015,12 @@ namespace JSTests {
         public:
             virtual ~TestRoundTrip() {}
             void run() {
-
                 // Insert in Javascript -> Find using DBDirectClient
 
                 // Drop the collection
+                OperationContextImpl txn;
+                DBDirectClient client(&txn);
+
                 client.dropCollection( "unittest.testroundtrip" );
 
                 // Insert in Javascript
@@ -1056,10 +1059,12 @@ namespace JSTests {
             // This can be overriden if a different meaning of equality besides woCompare is needed
             virtual void bsonEquals( const BSONObj &expected, const BSONObj &actual ) {
                 if ( expected.woCompare( actual ) ) {
-                    out() << "want:" << expected.jsonString() << " size: " << expected.objsize() << endl;
-                    out() << "got :" << actual.jsonString() << " size: " << actual.objsize() << endl;
-                    out() << expected.hexDump() << endl;
-                    out() << actual.hexDump() << endl;
+                    ::mongo::log() << "want:" << expected.jsonString()
+                                   << " size: " << expected.objsize() << endl;
+                    ::mongo::log() << "got :" << actual.jsonString()
+                                   << " size: " << actual.objsize() << endl;
+                    ::mongo::log() << expected.hexDump() << endl;
+                    ::mongo::log() << actual.hexDump() << endl;
                 }
                 ASSERT( !expected.woCompare( actual ) );
             }
@@ -1843,7 +1848,7 @@ namespace JSTests {
 
         void run() {
             Scope * s = globalScriptEngine->newScope();
-            s->localConnect( "asd" );
+
             const char * foo = "asdas\0asdasd";
             const char * base64 = "YXNkYXMAYXNkYXNk";
 
@@ -1981,6 +1986,9 @@ namespace JSTests {
             BSONObjBuilder update;
             update.append( "_id" , "invalidstoredjs1" );
             update.appendCode( "value" , "function () { db.test.find().forEach(function(obj) { continue; }); }" );
+
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
             client.update( "test.system.js" , query.obj() , update.obj() , true /* upsert */ );
 
             scoped_ptr<Scope> s( globalScriptEngine->newScope() );

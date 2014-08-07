@@ -30,6 +30,8 @@
 
 #include "mongo/db/matcher/expression_leaf.h"
 
+#include <pcrecpp.h>
+
 #include "mongo/bson/bsonobjiterator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
@@ -118,9 +120,25 @@ namespace mongo {
             return false;
         }
 
-        if ( _rhs.type() == Array ) {
-            if ( matchType() != EQ ) {
+        // Special case handling for NaN. NaN is equal to NaN but
+        // otherwise always compares to false.
+        if (isNaN(e.numberDouble()) || isNaN(_rhs.numberDouble())) {
+            bool bothNaN = isNaN(e.numberDouble()) && isNaN(_rhs.numberDouble());
+            switch ( matchType() ) {
+            case LT:
                 return false;
+            case LTE:
+                return bothNaN;
+            case EQ:
+                return bothNaN;
+            case GT:
+                return false;
+            case GTE:
+                return bothNaN;
+            default:
+                // This is a comparison match expression, so it must be either
+                // a $lt, $lte, $gt, $gte, or equality expression.
+                fassertFailed( 17448 );
             }
         }
 
@@ -140,6 +158,8 @@ namespace mongo {
         case GTE:
             return x >= 0;
         default:
+            // This is a comparison match expression, so it must be either
+            // a $lt, $lte, $gt, $gte, or equality expression.
             fassertFailed( 16828 );
         }
     }
@@ -166,6 +186,20 @@ namespace mongo {
         debug << "\n";
     }
 
+    void ComparisonMatchExpression::toBSON(BSONObjBuilder* out) const {
+        string opString = "";
+        switch ( matchType() ) {
+        case LT: opString = "$lt"; break;
+        case LTE: opString = "$lte"; break;
+        case EQ: opString = "$eq"; break;
+        case GT: opString = "$gt"; break;
+        case GTE: opString = "$gte"; break;
+        default: opString = " UNKNOWN - should be impossible"; break;
+        }
+
+        out->append(path(), BSON(opString << _rhs));
+    }
+
     // ---------------
 
     // TODO: move
@@ -185,6 +219,11 @@ namespace mongo {
         }
         return options;
     }
+
+    RegexMatchExpression::RegexMatchExpression()
+        : LeafMatchExpression( REGEX ) {}
+
+    RegexMatchExpression::~RegexMatchExpression() {}
 
     bool RegexMatchExpression::equivalent( const MatchExpression* other ) const {
         if ( matchType() != other->matchType() )
@@ -246,6 +285,14 @@ namespace mongo {
         debug << "\n";
     }
 
+    void RegexMatchExpression::toBSON(BSONObjBuilder* out) const {
+        out->appendRegex(path(), _regex, _flags);
+    }
+
+    void RegexMatchExpression::shortDebugString( StringBuilder& debug ) const {
+        debug << "/" << _regex << "/" << _flags;
+    }
+
     // ---------
 
     Status ModMatchExpression::init( const StringData& path, int divisor, int remainder ) {
@@ -271,6 +318,10 @@ namespace mongo {
             td->debugString(&debug);
         }
         debug << "\n";
+    }
+
+    void ModMatchExpression::toBSON(BSONObjBuilder* out) const {
+        out->append(path(), BSON("$mod" << BSON_ARRAY(_divisor << _remainder)));
     }
 
     bool ModMatchExpression::equivalent( const MatchExpression* other ) const {
@@ -304,6 +355,10 @@ namespace mongo {
             td->debugString(&debug);
         }
         debug << "\n";
+    }
+
+    void ExistsMatchExpression::toBSON(BSONObjBuilder* out) const {
+        out->append(path(), BSON("$exists" << true));
     }
 
     bool ExistsMatchExpression::equivalent( const MatchExpression* other ) const {
@@ -370,6 +425,9 @@ namespace mongo {
         debug << "\n";
     }
 
+    void TypeMatchExpression::toBSON(BSONObjBuilder* out) const {
+        out->append(path(), BSON("$type" << _type));
+    }
 
     bool TypeMatchExpression::equivalent( const MatchExpression* other ) const {
         if ( matchType() != other->matchType() )
@@ -439,6 +497,31 @@ namespace mongo {
             toFillIn._regexes.push_back( static_cast<RegexMatchExpression*>(_regexes[i]->shallowClone()) );
     }
 
+    void ArrayFilterEntries::debugString( StringBuilder& debug ) const {
+        debug << "[ ";
+        for (BSONElementSet::const_iterator it = _equalities.begin();
+                it != _equalities.end(); ++it) {
+            debug << it->toString( false ) << " ";
+        }
+        for (size_t i = 0; i < _regexes.size(); ++i) {
+            _regexes[i]->shortDebugString( debug );
+            debug << " ";
+        }
+        debug << "]";
+    }
+
+    void ArrayFilterEntries::toBSON(BSONArrayBuilder* out) const {
+        for (BSONElementSet::const_iterator it = _equalities.begin();
+                it != _equalities.end(); ++it) {
+            out->append(*it);
+        }
+        for (size_t i = 0; i < _regexes.size(); ++i) {
+            BSONObjBuilder regexBob;
+            _regexes[i]->toBSON(&regexBob);
+            out->append(regexBob.obj().firstElement());
+        }
+        out->doneFast();
+    }
 
     // -----------
 
@@ -481,13 +564,21 @@ namespace mongo {
 
     void InMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << path() << ";$in: TODO ";
+        debug << path() << " $in ";
+        _arrayEntries.debugString(debug);
         MatchExpression::TagData* td = getTag();
         if (NULL != td) {
             debug << " ";
             td->debugString(&debug);
         }
         debug << "\n";
+    }
+
+    void InMatchExpression::toBSON(BSONObjBuilder* out) const {
+        BSONObjBuilder inBob(out->subobjStart(path()));
+        BSONArrayBuilder arrBob(inBob.subarrayStart("$in"));
+        _arrayEntries.toBSON(&arrBob);
+        inBob.doneFast();
     }
 
     bool InMatchExpression::equivalent( const MatchExpression* other ) const {

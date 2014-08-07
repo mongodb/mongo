@@ -28,15 +28,11 @@
 *    it in the license file.
 */
 
-
-#include "mongo/pch.h"
-
 #include "mongo/db/lockstate.h"
 
-#include "mongo/db/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/client.h"
 #include "mongo/util/mongoutils/str.h"
+
 
 namespace mongo {
 
@@ -66,11 +62,7 @@ namespace mongo {
         return _threadState == 'r' || _threadState == 'R';
     }
 
-    bool LockState::hasAnyWriteLock() const { 
-        return _threadState == 'w' || _threadState == 'W';
-    }
-
-    bool LockState::isLocked( const StringData& ns ) {
+    bool LockState::isLocked( const StringData& ns ) const {
         char db[MaxDatabaseNameLen];
         nsToDatabase(ns, db);
         
@@ -86,6 +78,55 @@ namespace mongo {
         }
 
         return false;
+    }
+
+    bool LockState::isLocked() const {
+        return threadState() != 0;
+    }
+
+    bool LockState::isWriteLocked() const {
+        return (threadState() == 'W' || threadState() == 'w');
+    }
+
+    bool LockState::isWriteLocked(const StringData& ns) const {
+        if (isWriteLocked()) {
+            return true;
+        }
+
+        return isLocked(ns);
+    }
+
+    bool LockState::isAtLeastReadLocked(const StringData& ns) const {
+        if (threadState() == 'R' || threadState() == 'W')
+            return true; // global
+        if (threadState() == 0)
+            return false;
+        return isLocked(ns);
+    }
+
+    bool LockState::isLockedForCommitting() const {
+        return threadState() == 'R' || threadState() == 'W';
+    }
+
+    bool LockState::isRecursive() const {
+        return recursiveCount() > 1;
+    }
+
+    void LockState::assertWriteLocked(const StringData& ns) const {
+        if (!isWriteLocked(ns)) {
+            dump();
+            msgasserted(
+                16105, mongoutils::str::stream() << "expected to be write locked for " << ns);
+        }
+    }
+
+    void LockState::assertAtLeastReadLocked(const StringData& ns) const {
+        if (!isAtLeastReadLocked(ns)) {
+            log() << "error expected " << ns << " to be locked " << endl;
+            dump();
+            msgasserted(
+                16104, mongoutils::str::stream() << "expected to be read locked for " << ns);
+        }
     }
 
     void LockState::lockedStart( char newState ) {
@@ -110,7 +151,8 @@ namespace mongo {
 
     BSONObj LockState::reportState() {
         BSONObjBuilder b;
-        reportState( b );
+        reportState(&b);
+
         return b.obj();
     }
     
@@ -118,7 +160,7 @@ namespace mongo {
               thread. So be careful about thread safety here. For example reading 
               this->otherName would not be safe as-is!
     */
-    void LockState::reportState(BSONObjBuilder& res) {
+    void LockState::reportState(BSONObjBuilder* res) {
         BSONObjBuilder b;
         if( _threadState ) {
             char buf[2];
@@ -143,15 +185,13 @@ namespace mongo {
             }
         }
         BSONObj o = b.obj();
-        if( !o.isEmpty() ) 
-            res.append("locks", o);
-        res.append( "waitingForLock" , _lockPending );
+        if (!o.isEmpty()) {
+            res->append("locks", o);
+        }
+        res->append("waitingForLock", _lockPending);
     }
 
-    void LockState::Dump() {
-        cc().lockState().dump();
-    }
-    void LockState::dump() {
+    void LockState::dump() const {
         char s = _threadState;
         stringstream ss;
         ss << "lock status: ";
@@ -235,7 +275,7 @@ namespace mongo {
             return Lock::nestableLockStat( _whichNestable );
 
         if ( _otherCount && _otherLock )
-            return &_otherLock->stats;
+            return &_otherLock->getStats();
         
         if ( isRW() ) 
             return Lock::globalLockStat();

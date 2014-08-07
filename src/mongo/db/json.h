@@ -42,7 +42,7 @@ namespace mongo {
      * extensions extensions described here
      * <http://dochub.mongodb.org/core/mongodbextendedjson>, this function
      * accepts unquoted field names and allows single quotes to optionally be
-     * used when specifying field names and string values instead of double
+     * used when specifying field names and std::string values instead of double
      * quotes.  JSON unicode escape sequences (of the form \uXXXX) are
      * converted to utf8.
      *
@@ -55,13 +55,55 @@ namespace mongo {
     MONGO_CLIENT_API BSONObj fromjson(const char* str, int* len=NULL);
 
     /**
+     * Tests whether the JSON string is an Array.
+     *
+     * Useful for assigning the result of fromjson to the right object type. Either:
+     *  BSONObj
+     *  BSONArray
+     *
+     * @example Using the method to select the proper type.
+     *  If this method returns true, the user could store the result of fromjson
+     *  inside a BSONArray, rather than a BSONObj, in order to have it print as an
+     *  array when passed to tojson.
+     *
+     * @param obj The JSON string to test.
+     */
+    MONGO_CLIENT_API bool isArray(const StringData& str);
+
+    /**
+     * Convert a BSONArray to a JSON string.
+     *
+     * @param arr The BSON Array.
+     * @param format The JSON format (JS, TenGen, Strict).
+     * @param pretty Enables pretty output.
+     */
+    MONGO_CLIENT_API std::string tojson(
+        const BSONArray& arr,
+        JsonStringFormat format = Strict,
+        bool pretty = false
+    );
+
+    /**
+     * Convert a BSONObj to a JSON string.
+     *
+     * @param obj The BSON Object.
+     * @param format The JSON format (JS, TenGen, Strict).
+     * @param pretty Enables pretty output.
+     */
+    MONGO_CLIENT_API std::string tojson(
+        const BSONObj& obj,
+        JsonStringFormat format = Strict,
+        bool pretty = false
+    );
+
+    /**
      * Parser class.  A BSONObj is constructed incrementally by passing a
      * BSONObjBuilder to the recursive parsing methods.  The grammar for the
      * element parsed is described before each function.
      */
     class JParse {
         public:
-            explicit JParse(const char*);
+            explicit JParse(const StringData& str);
 
             /*
              * Notation: All-uppercase symbols denote non-terminals; all other
@@ -119,10 +161,14 @@ namespace mongo {
              *   | REFOBJECT
              *   | UNDEFINEDOBJECT
              *   | NUMBERLONGOBJECT
+             *   | MINKEYOBJECT
+             *   | MAXKEYOBJECT
              *
              */
         public:
             Status object(const StringData& fieldName, BSONObjBuilder&, bool subObj=true);
+            Status parse(BSONObjBuilder& builder);
+            bool isArray();
 
         private:
             /* The following functions are called with the '{' and the first
@@ -130,13 +176,13 @@ namespace mongo {
              * context. */
             /*
              * OIDOBJECT :
-             *     { FIELD("$oid") : <24 character hex string> }
+             *     { FIELD("$oid") : <24 character hex std::string> }
              */
             Status objectIdObject(const StringData& fieldName, BSONObjBuilder&);
 
             /*
              * BINARYOBJECT :
-             *     { FIELD("$binary") : <base64 representation of a binary string>,
+             *     { FIELD("$binary") : <base64 representation of a binary std::string>,
              *          FIELD("$type") : <hexadecimal representation of a single byte
              *              indicating the data type> }
              */
@@ -169,9 +215,9 @@ namespace mongo {
             /*
              * REFOBJECT :
              *     { FIELD("$ref") : <string representing collection name>,
-             *          FIELD("$id") : <24 character hex string> }
-             *   | { FIELD("$ref") : STRING , FIELD("$id") : OBJECTID }
-             *   | { FIELD("$ref") : STRING , FIELD("$id") : OIDOBJECT }
+             *          FIELD("$id") : <24 character hex std::string> }
+             *   | { FIELD("$ref") : std::string , FIELD("$id") : OBJECTID }
+             *   | { FIELD("$ref") : std::string , FIELD("$id") : OIDOBJECT }
              */
             Status dbRefObject(const StringData& fieldName, BSONObjBuilder&);
 
@@ -188,6 +234,18 @@ namespace mongo {
             Status numberLongObject(const StringData& fieldName, BSONObjBuilder&);
 
             /*
+             * MINKEYOBJECT :
+             *     { FIELD("$minKey") : 1 }
+             */
+            Status minKeyObject(const StringData& fieldName, BSONObjBuilder& builder);
+
+            /*
+             * MAXKEYOBJECT :
+             *     { FIELD("$maxKey") : 1 }
+             */
+            Status maxKeyObject(const StringData& fieldName, BSONObjBuilder& builder);
+
+            /*
              * ARRAY :
              *     []
              *   | [ ELEMENTS ]
@@ -196,7 +254,7 @@ namespace mongo {
              *     VALUE
              *   | VALUE , ELEMENTS
              */
-            Status array(const StringData& fieldName, BSONObjBuilder&);
+            Status array(const StringData& fieldName, BSONObjBuilder&, bool subObj=true);
 
             /*
              * NOTE: Currently only Date can be preceded by the "new" keyword
@@ -222,7 +280,7 @@ namespace mongo {
 
             /*
              * OBJECTID :
-             *     ObjectId( <24 character hex string> )
+             *     ObjectId( <24 character hex std::string> )
              */
             Status objectId(const StringData& fieldName, BSONObjBuilder&);
 
@@ -240,7 +298,7 @@ namespace mongo {
 
             /*
              * DBREF :
-             *     Dbref( <namespace string> , <24 character hex string> )
+             *     Dbref( <namespace std::string> , <24 character hex std::string> )
              */
             Status dbRef(const StringData& fieldName, BSONObjBuilder&);
 
@@ -304,7 +362,7 @@ namespace mongo {
             Status field(std::string* result);
 
             /*
-             * STRING :
+             * std::string :
              *     " "
              *   | ' '
              *   | " CHARS "
@@ -317,7 +375,7 @@ namespace mongo {
              *     CHAR
              *   | CHAR CHARS
              *
-             * Note: " or ' may be allowed depending on whether the string is
+             * Note: " or ' may be allowed depending on whether the std::string is
              * double or single quoted
              *
              * CHAR :
@@ -350,7 +408,7 @@ namespace mongo {
 
             /**
              * Converts the two byte Unicode code point to its UTF8 character
-             * encoding representation.  This function returns a string because
+             * encoding representation.  This function returns a std::string because
              * UTF8 encodings for code points from 0x0000 to 0xFFFF can range
              * from one to three characters.
              */
@@ -393,12 +451,12 @@ namespace mongo {
             bool match(char matchChar, const char* matchSet) const;
 
             /**
-             * @return true if every character in the string is a hex digit
+             * @return true if every character in the std::string is a hex digit
              */
             bool isHexString(const StringData&) const;
 
             /**
-             * @return true if every character in the string is a valid base64
+             * @return true if every character in the std::string is a valid base64
              * character
              */
             bool isBase64String(const StringData&) const;
@@ -417,7 +475,7 @@ namespace mongo {
              * _input - cursor we advance in our input buffer
              * _input_end - sentinel for the end of our input buffer
              *
-             * _buf is the null terminated buffer containing the JSON string we
+             * _buf is the null terminated buffer containing the JSON std::string we
              * are parsing.  _input_end points to the null byte at the end of
              * the buffer.  strtoll, strtol, and strtod will access the null
              * byte at the end of the buffer because they are assuming a c-style

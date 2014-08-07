@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    struct WriteConcernOptions;
+
     /**
      * The balancer is a background task that tries to keep the number of chunks across all servers of the cluster even. Although
      * every mongos will have one balancer running, only one of them will be active at the any given point in time. The balancer
@@ -56,14 +58,14 @@ namespace mongo {
 
         virtual void run();
 
-        virtual string name() const { return "Balancer"; }
+        virtual std::string name() const { return "Balancer"; }
 
     private:
         typedef MigrateInfo CandidateChunk;
         typedef shared_ptr<CandidateChunk> CandidateChunkPtr;
 
         // hostname:port of my mongos
-        string _myid;
+        std::string _myid;
 
         // time the Balancer started running
         time_t _started;
@@ -90,18 +92,18 @@ namespace mongo {
          * @param conn is the connection with the config server(s)
          * @param candidateChunks (IN/OUT) filled with candidate chunks, one per collection, that could possibly be moved
          */
-        void _doBalanceRound( DBClientBase& conn, vector<CandidateChunkPtr>* candidateChunks );
+        void _doBalanceRound( DBClientBase& conn, std::vector<CandidateChunkPtr>* candidateChunks );
 
         /**
          * Issues chunk migration request, one at a time.
          *
          * @param candidateChunks possible chunks to move
-         * @param secondaryThrottle wait for secondaries to catch up before pushing more deletes
+         * @param writeConcern detailed write concern. NULL means the default write concern.
          * @param waitForDelete wait for deletes to complete after each chunk move
          * @return number of chunks effectively moved
          */
-        int _moveChunks(const vector<CandidateChunkPtr>* candidateChunks,
-                        bool secondaryThrottle,
+        int _moveChunks(const std::vector<CandidateChunkPtr>* candidateChunks,
+                        const WriteConcernOptions* writeConcern,
                         bool waitForDelete);
 
         /**

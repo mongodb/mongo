@@ -14,6 +14,7 @@ env.Library(
         "planner_access.cpp",
         "planner_analysis.cpp",
         "planner_ixselect.cpp",
+        "query_knobs.cpp",
         "query_planner.cpp",
         "query_solution.cpp",
     ],
@@ -22,36 +23,34 @@ env.Library(
         "lite_parsed_query",
         "$BUILD_DIR/mongo/bson",
         "$BUILD_DIR/mongo/expressions",
+        "$BUILD_DIR/mongo/index_names",
+        "$BUILD_DIR/mongo/server_parameters",
     ],
 )
 
 env.Library(
     target='query',
     source=[
-        "cached_plan_runner.cpp",
-        "eof_runner.cpp",
+        "explain.cpp",
         "explain_plan.cpp",
-        "get_runner.cpp",
-        "idhack_runner.cpp",
-        "internal_runner.cpp",
-        "multi_plan_runner.cpp",
+        "get_executor.cpp",
         "new_find.cpp",
         "plan_executor.cpp",
         "plan_ranker.cpp",
-        "single_solution_runner.cpp",
         "stage_builder.cpp",
         "type_explain.cpp",
     ],
     LIBDEPS=[
         "query_planner",
+        "query_planner_test_lib",
         "$BUILD_DIR/mongo/db/exec/exec"
     ],
 )
 
 env.CppUnitTest(
-    target="get_runner_test",
+    target="get_executor_test",
     source=[
-        "get_runner_test.cpp"
+        "get_executor_test.cpp"
     ],
     LIBDEPS=[
         "query",
@@ -66,6 +65,8 @@ env.CppUnitTest(
 env.Library(
     target="index_bounds",
     source=[
+        "expression_index.cpp",
+        "expression_index_knobs.cpp",
         "index_bounds.cpp",
         "index_bounds_builder.cpp",
         "interval.cpp",
@@ -74,7 +75,9 @@ env.Library(
         "query_logger",
         "$BUILD_DIR/mongo/bson",
         "$BUILD_DIR/mongo/expressions_geo",
+        "$BUILD_DIR/mongo/index_names",
         "$BUILD_DIR/mongo/mongohasher",
+        "$BUILD_DIR/mongo/server_parameters",
     ],
 )
 
@@ -206,4 +209,21 @@ env.CppUnitTest(
     LIBDEPS=[
         "query_planner_test_lib",
     ],
+)
+
+# $text pulls in a lot of stuff so we test it here.
+env.CppUnitTest(
+    target="query_planner_text_test",
+    source=[
+        "query_planner_text_test.cpp"
+    ],
+    LIBDEPS=[
+        "query",
+        "query_planner_test_lib",
+        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/mocklib",
+    ],
+    NO_CRUTCH = True,
 )

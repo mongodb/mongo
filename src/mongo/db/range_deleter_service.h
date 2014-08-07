@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/range_deleter.h"
-#include "mongo/db/range_deleter_stats.h"
 
 namespace mongo {
 

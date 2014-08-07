@@ -1,3 +1,5 @@
+// TODO: move back to sharding suite after SERVER-13402 is fixed
+
 /**
  * This tests using DB commands with authentication enabled when sharded.
  */
@@ -12,13 +14,6 @@ var adminDB = mongos.getDB( 'admin' );
 var configDB = mongos.getDB( 'config' );
 var testDB = mongos.getDB( 'test' );
 
-// Secondaries should be up here, since we awaitReplication in the ShardingTest, but we *don't*
-// wait for the mongos to explicitly detect them.
-ReplSetTest.awaitRSClientHosts( mongos, st.rs0.getSecondaries(), { ok : true, secondary : true });
-ReplSetTest.awaitRSClientHosts( mongos, st.rs1.getSecondaries(), { ok : true, secondary : true });
-
-st.printShardingStatus();
-
 jsTestLog('Setting up initial users');
 var rwUser = 'rwUser';
 var roUser = 'roUser';
@@ -27,6 +22,12 @@ var password = 'password';
 adminDB.createUser({user: rwUser, pwd: password, roles: jsTest.adminUserRoles});
 
 assert( adminDB.auth( rwUser, password ) );
+
+// Secondaries should be up here, since we awaitReplication in the ShardingTest, but we *don't*
+// wait for the mongos to explicitly detect them.
+ReplSetTest.awaitRSClientHosts( mongos, st.rs0.getSecondaries(), { ok : true, secondary : true });
+ReplSetTest.awaitRSClientHosts( mongos, st.rs1.getSecondaries(), { ok : true, secondary : true });
+
 testDB.createUser({user: rwUser, pwd: password, roles: jsTest.basicUserRoles});
 testDB.createUser({user: roUser, pwd: password, roles: jsTest.readOnlyUserRoles});
 

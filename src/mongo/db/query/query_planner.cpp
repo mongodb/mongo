@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/query/query_planner.h"
 
 #include <vector>
@@ -42,8 +44,11 @@
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
     // Copied verbatim from db/index.h
     static bool isIdIndex( const BSONObj &pattern ) {
@@ -86,8 +91,15 @@ namespace mongo {
             ss << "INCLUDE_SHARD_FILTER ";
         }
         if (options & QueryPlannerParams::NO_BLOCKING_SORT) {
-            ss << "NO_BLOCKING_SORT";
+            ss << "NO_BLOCKING_SORT ";
         }
+        if (options & QueryPlannerParams::INDEX_INTERSECTION) {
+            ss << "INDEX_INTERSECTION ";
+        }
+        if (options & QueryPlannerParams::KEEP_MUTATIONS) {
+            ss << "KEEP_MUTATIONS";
+        }
+
         return ss;
     }
 
@@ -161,6 +173,9 @@ namespace mongo {
         return !sortIt.more();
     }
 
+    // static
+    const int QueryPlanner::kPlannerVersion = 1;
+
     Status QueryPlanner::cacheDataFromTaggedTree(const MatchExpression* const taggedTree,
                                                  const vector<IndexEntry>& relevantIndices,
                                                  PlanCacheIndexTree** out) {
@@ -188,7 +203,7 @@ namespace mongo {
             // check that the index is OK with the predicate. The only thing we have to do
             // this for is 2d.  For now it's easier to move ahead if we don't cache 2d.
             //
-            // XXX: revisit with a post-cached-index-assignment compatibility check
+            // TODO: revisit with a post-cached-index-assignment compatibility check
             if (is2DIndex(relevantIndices[itag->index].keyPattern)) {
                 return Status(ErrorCodes::BadValue, "can't cache '2d' index");
             }
@@ -264,7 +279,9 @@ namespace mongo {
         if (SolutionCacheData::WHOLE_IXSCAN_SOLN == cacheData.solnType) {
             // The solution can be constructed by a scan over the entire index.
             QuerySolution* soln = buildWholeIXSoln(*cacheData.tree->entry,
-                query, params, cacheData.wholeIXSolnDir);
+                                                   query,
+                                                   params,
+                                                   cacheData.wholeIXSolnDir);
             if (soln == NULL) {
                 return Status(ErrorCodes::BadValue,
                               "plan cache error: soln that uses index to provide sort");
@@ -324,9 +341,11 @@ namespace mongo {
 
         if (NULL != solnRoot) {
             // Takes ownership of 'solnRoot'.
-            QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
+            QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query,
+                                                                          params,
+                                                                          solnRoot);
             if (NULL != soln) {
-                QLOG() << "Planner: adding cached solution:\n" << soln->toString() << endl;
+                QLOG() << "Planner: solution constructed from the cache:\n" << soln->toString() << endl;
                 *out = soln;
                 return Status::OK();
             }
@@ -362,7 +381,8 @@ namespace mongo {
 
         if (cachedSoln.backupSoln) {
             SolutionCacheData* backupCacheData = cachedSoln.plannerData[*cachedSoln.backupSoln];
-            Status backupStatus = planFromCache(query, params, *backupCacheData, backupOut);
+            Status backupStatus = planFromCache(query, params,
+                                                *backupCacheData, backupOut);
             if (!backupStatus.isOK()) {
                 return backupStatus;
             }
@@ -376,14 +396,14 @@ namespace mongo {
                               const QueryPlannerParams& params,
                               std::vector<QuerySolution*>* out) {
 
-        QLOG() << "=============================\n"
-               << "Beginning planning, options = " << optionString(params.options) << endl
-               << "Canonical query:\n" << query.toString() << endl
-               << "============================="
-               << endl;
+        QLOG() << "Beginning planning..." << endl
+               << "=============================" << endl
+               << "Options = " << optionString(params.options) << endl
+               << "Canonical query:" << endl << query.toString()
+               << "=============================" << endl;
 
         for (size_t i = 0; i < params.indices.size(); ++i) {
-            QLOG() << "idx " << i << " is " << params.indices[i].toString() << endl;
+            QLOG() << "Index " << i << " is " << params.indices[i].toString() << endl;
         }
 
         bool canTableScan = !(params.options & QueryPlannerParams::NO_TABLE_SCAN);
@@ -403,12 +423,19 @@ namespace mongo {
             return Status::OK();
         }
 
-        // The hint can be $natural: 1.  If this happens, output a collscan.  It's a weird way of
-        // saying "table scan for two, please."
-        if (!query.getParsed().getHint().isEmpty()) {
-            BSONElement natural = query.getParsed().getHint().getFieldDotted("$natural");
-            if (!natural.eoo()) {
-                QLOG() << "forcing a table scan due to hinted $natural\n";
+        // The hint or sort can be $natural: 1.  If this happens, output a collscan. If both
+        // a $natural hint and a $natural sort are specified, then the direction of the collscan
+        // is determined by the sign of the sort (not the sign of the hint).
+        if (!query.getParsed().getHint().isEmpty() || !query.getParsed().getSort().isEmpty()) {
+            BSONObj hintObj = query.getParsed().getHint();
+            BSONObj sortObj = query.getParsed().getSort();
+            BSONElement naturalHint = hintObj.getFieldDotted("$natural");
+            BSONElement naturalSort = sortObj.getFieldDotted("$natural");
+
+            // A hint overrides a $natural sort. This means that we don't force a table
+            // scan if there is a $natural sort with a non-$natural hint.
+            if (!naturalHint.eoo() || (!naturalSort.eoo() && hintObj.isEmpty())) {
+                QLOG() << "Forcing a table scan due to hinted $natural\n";
                 // min/max are incompatible with $natural.
                 if (canTableScan && query.getParsed().getMin().isEmpty()
                                  && query.getParsed().getMax().isEmpty()) {
@@ -426,7 +453,7 @@ namespace mongo {
         QueryPlannerIXSelect::getFields(query.root(), "", &fields);
 
         for (unordered_set<string>::const_iterator it = fields.begin(); it != fields.end(); ++it) {
-            QLOG() << "predicate over field " << *it << endl;
+            QLOG() << "Predicate over field '" << *it << "'" << endl;
         }
 
         // Filter our indices so we only look at indices that are over our predicates.
@@ -465,8 +492,8 @@ namespace mongo {
                 string hintName = firstHintElt.String();
                 for (size_t i = 0; i < params.indices.size(); ++i) {
                     if (params.indices[i].name == hintName) {
-                        QLOG() << "hint by name specified, restricting indices to "
-                             << params.indices[i].keyPattern.toString() << endl;
+                        QLOG() << "Hint by name specified, restricting indices to "
+                               << params.indices[i].keyPattern.toString() << endl;
                         relevantIndices.clear();
                         relevantIndices.push_back(params.indices[i]);
                         hintIndexNumber = i;
@@ -480,8 +507,8 @@ namespace mongo {
                     if (0 == params.indices[i].keyPattern.woCompare(hintIndex)) {
                         relevantIndices.clear();
                         relevantIndices.push_back(params.indices[i]);
-                        QLOG() << "hint specified, restricting indices to " << hintIndex.toString()
-                             << endl;
+                        QLOG() << "Hint specified, restricting indices to " << hintIndex.toString()
+                               << endl;
                         hintIndexNumber = i;
                         break;
                     }
@@ -505,13 +532,13 @@ namespace mongo {
             // If there's an index hinted we need to be able to use it.
             if (!hintIndex.isEmpty()) {
                 if (!minObj.isEmpty() && !indexCompatibleMaxMin(minObj, hintIndex)) {
-                    QLOG() << "minobj doesnt work w hint";
+                    QLOG() << "Minobj doesn't work with hint";
                     return Status(ErrorCodes::BadValue,
                                   "hint provided does not work with min query");
                 }
 
                 if (!maxObj.isEmpty() && !indexCompatibleMaxMin(maxObj, hintIndex)) {
-                    QLOG() << "maxobj doesnt work w hint";
+                    QLOG() << "Maxobj doesn't work with hint";
                     return Status(ErrorCodes::BadValue,
                                   "hint provided does not work with max query");
                 }
@@ -531,7 +558,7 @@ namespace mongo {
                     }
                 }
             }
-            
+
             if (idxNo == numeric_limits<size_t>::max()) {
                 QLOG() << "Can't find relevant index to use for max/min query";
                 // Can't find an index to use, bail out.
@@ -556,7 +583,7 @@ namespace mongo {
                 maxObj = stripFieldNames(maxObj);
             }
 
-            QLOG() << "max/min query using index " << params.indices[idxNo].toString() << endl;
+            QLOG() << "Max/min query using index " << params.indices[idxNo].toString() << endl;
 
             // Make our scan and output.
             QuerySolutionNode* solnRoot = QueryPlannerAccess::makeIndexScan(params.indices[idxNo],
@@ -574,100 +601,66 @@ namespace mongo {
         }
 
         for (size_t i = 0; i < relevantIndices.size(); ++i) {
-            QLOG() << "relevant idx " << i << " is " << relevantIndices[i].toString() << endl;
+            QLOG() << "Relevant index " << i << " is " << relevantIndices[i].toString() << endl;
+            LOG(2) << "Relevant index " << i << " is " << relevantIndices[i].toString() << endl;
         }
 
         // Figure out how useful each index is to each predicate.
-        // query.root() is now annotated with RelevantTag(s).
         QueryPlannerIXSelect::rateIndices(query.root(), "", relevantIndices);
+        QueryPlannerIXSelect::stripInvalidAssignments(query.root(), relevantIndices);
 
-        QLOG() << "rated tree" << endl;
-        QLOG() << query.root()->toString() << endl;
+        // query.root() is now annotated with RelevantTag(s).
+        QLOG() << "Rated tree:" << endl << query.root()->toString();
 
         // If there is a GEO_NEAR it must have an index it can use directly.
-        // XXX: move into data access?
         MatchExpression* gnNode = NULL;
         if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR, &gnNode)) {
             // No index for GEO_NEAR?  No query.
             RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
             if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
-                QLOG() << "unable to find index for $geoNear query" << endl;
+                QLOG() << "Unable to find index for $geoNear query." << endl;
+                // Don't leave tags on query tree.
+                query.root()->resetTag();
                 return Status(ErrorCodes::BadValue, "unable to find index for $geoNear query");
             }
 
-            GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(gnNode);
-
-            vector<size_t> newFirst;
-
-            // 2d + GEO_NEAR is annoying.  Because 2d's GEO_NEAR isn't streaming we have to embed
-            // the full query tree inside it as a matcher.
-            for (size_t i = 0; i < tag->first.size(); ++i) {
-                // GEO_NEAR has a non-2d index it can use.  We can deal w/that in normal planning.
-                if (!is2DIndex(relevantIndices[tag->first[i]].keyPattern)) {
-                    newFirst.push_back(i);
-                    continue;
-                }
-
-                // If we're here, GEO_NEAR has a 2d index.  We create a 2dgeonear plan with the
-                // entire tree as a filter, if possible.
-
-                GeoNear2DNode* solnRoot = new GeoNear2DNode();
-                solnRoot->nq = gnme->getData();
-                if (NULL != query.getProj()) {
-                    solnRoot->addPointMeta = query.getProj()->wantGeoNearPoint();
-                    solnRoot->addDistMeta = query.getProj()->wantGeoNearDistance();
-                }
-
-                if (MatchExpression::GEO_NEAR != query.root()->matchType()) {
-                    // root is an AND, clone and delete the GEO_NEAR child.
-                    MatchExpression* filterTree = query.root()->shallowClone();
-                    verify(MatchExpression::AND == filterTree->matchType());
-
-                    bool foundChild = false;
-                    for (size_t i = 0; i < filterTree->numChildren(); ++i) {
-                        if (MatchExpression::GEO_NEAR == filterTree->getChild(i)->matchType()) {
-                            foundChild = true;
-                            filterTree->getChildVector()->erase(filterTree->getChildVector()->begin() + i);
-                            break;
-                        }
-                    }
-                    verify(foundChild);
-                    solnRoot->filter.reset(filterTree);
-                }
-
-                solnRoot->numWanted = query.getParsed().getNumToReturn();
-                if (0 == solnRoot->numWanted) {
-                    solnRoot->numWanted = 100;
-                }
-                solnRoot->indexKeyPattern = relevantIndices[tag->first[i]].keyPattern;
-
-                // Remove the 2d index.  2d can only be the first field, and we know there is
-                // only one GEO_NEAR, so we don't care if anyone else was assigned it; it'll
-                // only be first for gnNode.
-                tag->first.erase(tag->first.begin() + i);
-
-                QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
-
-                if (NULL != soln) {
-                    out->push_back(soln);
-                }
-            }
-
-            // Continue planning w/non-2d indices tagged for this pred.
-            tag->first.swap(newFirst);
-
-            if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
-                return Status::OK();
-            }
+            QLOG() << "Rated tree after geonear processing:" << query.root()->toString();
         }
 
         // Likewise, if there is a TEXT it must have an index it can use directly.
-        MatchExpression* textNode;
+        MatchExpression* textNode = NULL;
         if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT, &textNode)) {
             RelevantTag* tag = static_cast<RelevantTag*>(textNode->getTag());
-            if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
-                return Status::OK();
+
+            // Exactly one text index required for TEXT.  We need to check this explicitly because
+            // the text stage can't be built if no text index exists or there is an ambiguity as to
+            // which one to use.
+            size_t textIndexCount = 0;
+            for (size_t i = 0; i < params.indices.size(); i++) {
+                if (INDEX_TEXT == params.indices[i].type) {
+                    textIndexCount++;
+                }
             }
+            if (textIndexCount != 1) {
+                // Don't leave tags on query tree.
+                query.root()->resetTag();
+                return Status(ErrorCodes::BadValue, "need exactly one text index for $text query");
+            }
+
+            // Error if the text node is tagged with zero indices.
+            if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
+                // Don't leave tags on query tree.
+                query.root()->resetTag();
+                return Status(ErrorCodes::BadValue,
+                              "failed to use text index to satisfy $text query (if text index is "
+                              "compound, are equality predicates given for all prefix fields?)");
+            }
+
+            // At this point, we know that there is only one text index and that the TEXT node is
+            // assigned to it.
+            invariant(1 == tag->first.size() + tag->notFirst.size());
+
+            QLOG() << "Rated tree after text processing:" << query.root()->toString();
         }
 
         // If we have any relevant indices, we try to create indexed plans.
@@ -682,11 +675,9 @@ namespace mongo {
             isp.init();
 
             MatchExpression* rawTree;
-            // XXX: have limit on # of indexed solns we'll consider.  We could have a perverse
-            // query and index that could make n^2 very unpleasant.
-            while (isp.getNext(&rawTree)) {
-                QLOG() << "about to build solntree from tagged tree:\n" << rawTree->toString()
-                       << endl;
+            while (isp.getNext(&rawTree) && (out->size() < params.maxIndexedSolutions)) {
+                QLOG() << "About to build solntree from tagged tree:" << endl
+                       << rawTree->toString();
 
                 // The tagged tree produced by the plan enumerator is not guaranteed
                 // to be canonically sorted. In order to be compatible with the cached
@@ -707,9 +698,11 @@ namespace mongo {
 
                 if (NULL == solnRoot) { continue; }
 
-                QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
+                QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query,
+                                                                              params,
+                                                                              solnRoot);
                 if (NULL != soln) {
-                    QLOG() << "Planner: adding solution:\n" << soln->toString() << endl;
+                    QLOG() << "Planner: adding solution:" << endl << soln->toString();
                     if (indexTreeStatus.isOK()) {
                         SolutionCacheData* scd = new SolutionCacheData();
                         scd->tree.reset(autoData.release());
@@ -720,14 +713,32 @@ namespace mongo {
             }
         }
 
+        // Don't leave tags on query tree.
+        query.root()->resetTag();
+
         QLOG() << "Planner: outputted " << out->size() << " indexed solutions.\n";
+
+        // Produce legible error message for failed OR planning with a TEXT child.
+        // TODO: support collection scan for non-TEXT children of OR.
+        if (out->size() == 0 && textNode != NULL &&
+            MatchExpression::OR == query.root()->matchType()) {
+            MatchExpression* root = query.root();
+            for (size_t i = 0; i < root->numChildren(); ++i) {
+                if (textNode == root->getChild(i)) {
+                    return Status(ErrorCodes::BadValue,
+                                  "Failed to produce a solution for TEXT under OR - "
+                                  "other non-TEXT clauses under OR have to be indexed as well.");
+                }
+            }
+        }
 
         // An index was hinted.  If there are any solutions, they use the hinted index.  If not, we
         // scan the entire index to provide results and output that as our plan.  This is the
         // desired behavior when an index is hinted that is not relevant to the query.
         if (!hintIndex.isEmpty()) {
             if (0 == out->size()) {
-                QuerySolution* soln = buildWholeIXSoln(params.indices[hintIndexNumber], query, params);
+                QuerySolution* soln = buildWholeIXSoln(params.indices[hintIndexNumber],
+                                                       query, params);
                 verify(NULL != soln);
                 QLOG() << "Planner: outputting soln that uses hinted index as scan." << endl;
                 out->push_back(soln);
@@ -743,10 +754,11 @@ namespace mongo {
             && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
 
             // See if we have a sort provided from an index already.
+            // This is implied by the presence of a non-blocking solution.
             bool usingIndexToSort = false;
             for (size_t i = 0; i < out->size(); ++i) {
                 QuerySolution* soln = (*out)[i];
-                if (!soln->hasSortStage) {
+                if (!soln->hasBlockingStage) {
                     usingIndexToSort = true;
                     break;
                 }
@@ -755,14 +767,33 @@ namespace mongo {
             if (!usingIndexToSort) {
                 for (size_t i = 0; i < params.indices.size(); ++i) {
                     const IndexEntry& index = params.indices[i];
+                    // Only regular (non-plugin) indexes can be used to provide a sort.
+                    if (index.type != INDEX_BTREE) {
+                        continue;
+                    }
+                    // Only non-sparse indexes can be used to provide a sort.
                     if (index.sparse) {
                         continue;
                     }
+
+                    // TODO: Sparse indexes can't normally provide a sort, because non-indexed
+                    // documents could potentially be missing from the result set.  However, if the
+                    // query predicate can be used to guarantee that all documents to be returned
+                    // are indexed, then the index should be able to provide the sort.
+                    //
+                    // For example:
+                    // - Sparse index {a: 1, b: 1} should be able to provide a sort for
+                    //   find({b: 1}).sort({a: 1}).  SERVER-13908.
+                    // - Index {a: 1, b: "2dsphere"} (which is "geo-sparse", if
+                    //   2dsphereIndexVersion=2) should be able to provide a sort for
+                    //   find({b: GEO}).sort({a:1}).  SERVER-10801.
+
                     const BSONObj kp = LiteParsedQuery::normalizeSortOrder(index.keyPattern);
                     if (providesSort(query, kp)) {
                         QLOG() << "Planner: outputting soln that uses index to provide sort."
                                << endl;
-                        QuerySolution* soln = buildWholeIXSoln(params.indices[i], query, params);
+                        QuerySolution* soln = buildWholeIXSoln(params.indices[i],
+                                                               query, params);
                         if (NULL != soln) {
                             PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
                             indexTree->setIndexEntry(params.indices[i]);
@@ -779,7 +810,8 @@ namespace mongo {
                     if (providesSort(query, QueryPlannerCommon::reverseSortObj(kp))) {
                         QLOG() << "Planner: outputting soln that uses (reverse) index "
                                << "to provide sort." << endl;
-                        QuerySolution* soln = buildWholeIXSoln(params.indices[i], query, params, -1);
+                        QuerySolution* soln = buildWholeIXSoln(params.indices[i], query,
+                                                               params, -1);
                         if (NULL != soln) {
                             PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
                             indexTree->setIndexEntry(params.indices[i]);
@@ -797,21 +829,27 @@ namespace mongo {
             }
         }
 
-        // TODO: Do we always want to offer a collscan solution?
-        // XXX: currently disabling the always-use-a-collscan in order to find more planner bugs.
-        if (    !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
-             && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)
-             && hintIndex.isEmpty()
-             && ((params.options & QueryPlannerParams::INCLUDE_COLLSCAN) || (0 == out->size() && canTableScan)))
-        {
+        // geoNear and text queries *require* an index.
+        // Also, if a hint is specified it indicates that we MUST use it.
+        bool possibleToCollscan = !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
+                               && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)
+                               && hintIndex.isEmpty();
+
+        // The caller can explicitly ask for a collscan.
+        bool collscanRequested = (params.options & QueryPlannerParams::INCLUDE_COLLSCAN);
+
+        // No indexed plans?  We must provide a collscan if possible or else we can't run the query.
+        bool collscanNeeded = (0 == out->size() && canTableScan);
+
+        if (possibleToCollscan && (collscanRequested || collscanNeeded)) {
             QuerySolution* collscan = buildCollscanSoln(query, false, params);
             if (NULL != collscan) {
                 SolutionCacheData* scd = new SolutionCacheData();
                 scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
                 collscan->cacheData.reset(scd);
                 out->push_back(collscan);
-                QLOG() << "Planner: outputting a collscan:\n";
-                QLOG() << collscan->toString() << endl;
+                QLOG() << "Planner: outputting a collscan:" << endl
+                       << collscan->toString();
             }
         }
 

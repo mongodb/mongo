@@ -1,16 +1,28 @@
 /* Copyright 2013 10gen Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/util/options_parser/options_parser.h"
@@ -63,8 +75,110 @@ namespace optionenvironment {
         //         b. A function to iterate a variables_map, convert the boost::any elements to
         //            Values, and add them to our Environment (addBoostVariablesToEnvironment)
 
+        // Attempts to convert a string to a value of the given type.
+        Status stringToValue(const std::string& stringVal,
+                             const OptionType& type,
+                             const Key& key, Value* value) {
+
+            Status ret = Status::OK();
+            switch (type) {
+                double doubleVal;
+                int intVal;
+                long longVal;
+                unsigned long long unsignedLongLongVal;
+                unsigned unsignedVal;
+                case Switch:
+                    if (stringVal == "true") {
+                        *value = Value(true);
+                        return Status::OK();
+                    }
+                    else if (stringVal == "false") {
+                        *value = Value(false);
+                        return Status::OK();
+                    }
+                    else {
+                        StringBuilder sb;
+                        sb << "Expected boolean switch but found string: " << stringVal
+                           << " for option: " << key;
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                case Bool:
+                    if (stringVal == "true") {
+                        *value = Value(true);
+                        return Status::OK();
+                    }
+                    else if (stringVal == "false") {
+                        *value = Value(false);
+                        return Status::OK();
+                    }
+                    else {
+                        StringBuilder sb;
+                        sb << "Expected boolean but found string: " << stringVal
+                           << " for option: " << key;
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                case Double:
+                    ret = parseNumberFromString(stringVal, &doubleVal);
+                    if (!ret.isOK()) {
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as double in: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    *value = Value(doubleVal);
+                    return Status::OK();
+                case Int:
+                    ret = parseNumberFromString(stringVal, &intVal);
+                    if (!ret.isOK()) {
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as int: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    *value = Value(intVal);
+                    return Status::OK();
+                case Long:
+                    ret = parseNumberFromString(stringVal, &longVal);
+                    if (!ret.isOK()) {
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as long: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    *value = Value(longVal);
+                    return Status::OK();
+                case String:
+                    *value = Value(stringVal);
+                    return Status::OK();
+                case UnsignedLongLong:
+                    ret = parseNumberFromString(stringVal, &unsignedLongLongVal);
+                    if (!ret.isOK()) {
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as unsigned long long: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    *value = Value(unsignedLongLongVal);
+                    return Status::OK();
+                case Unsigned:
+                    ret = parseNumberFromString(stringVal, &unsignedVal);
+                    if (!ret.isOK()) {
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as unsigned int: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    *value = Value(unsignedVal);
+                    return Status::OK();
+                default: /* XXX: should not get here */
+                    return Status(ErrorCodes::InternalError, "Unrecognized option type");
+            }
+        }
+
         // Convert a boost::any to a Value.  See comments at the beginning of this section.
-        Status boostAnyToValue(const boost::any& anyValue, Value* value) {
+        Status boostAnyToValue(const boost::any& anyValue,
+                               const OptionType& type,
+                               const Key& key, Value* value) {
             try {
                 if (anyValue.type() == typeid(StringVector_t)) {
                     *value = Value(boost::any_cast<StringVector_t>(anyValue));
@@ -72,23 +186,19 @@ namespace optionenvironment {
                 else if (anyValue.type() == typeid(bool)) {
                     *value = Value(boost::any_cast<bool>(anyValue));
                 }
-                else if (anyValue.type() == typeid(double)) {
-                    *value = Value(boost::any_cast<double>(anyValue));
-                }
-                else if (anyValue.type() == typeid(int)) {
-                    *value = Value(boost::any_cast<int>(anyValue));
-                }
-                else if (anyValue.type() == typeid(long)) {
-                    *value = Value(boost::any_cast<long>(anyValue));
-                }
                 else if (anyValue.type() == typeid(std::string)) {
-                    *value = Value(boost::any_cast<std::string>(anyValue));
+                    return stringToValue(boost::any_cast<std::string>(anyValue), type, key, value);
                 }
-                else if (anyValue.type() == typeid(unsigned long long)) {
-                    *value = Value(boost::any_cast<unsigned long long>(anyValue));
-                }
-                else if (anyValue.type() == typeid(unsigned)) {
-                    *value = Value(boost::any_cast<unsigned>(anyValue));
+                // We should not be telling boost about numerical type information.  Instead, for
+                // any numerical type we tell boost to read a string value and parse it manually,
+                // since boost's parsing is not consistent with ours.  See SERVER-14110.
+                else if (anyValue.type() == typeid(double) || anyValue.type() == typeid(int) ||
+                         anyValue.type() == typeid(long) || anyValue.type() == typeid(unsigned) ||
+                         anyValue.type() == typeid(unsigned long long)) {
+                    StringBuilder sb;
+                    sb << "Found int type: " << anyValue.type().name() <<
+                        " in any to Value conversion, which is not supported";
+                    return Status(ErrorCodes::InternalError, sb.str());
                 }
                 else {
                     StringBuilder sb;
@@ -207,88 +317,9 @@ namespace optionenvironment {
                 return Status::OK();
             }
 
-            Status ret = Status::OK();
+            // Our YAML parser reads everything as a string, so we need to parse it ourselves.
             std::string stringVal = YAMLNode.Scalar();
-            switch (type) {
-                double doubleVal;
-                int intVal;
-                long longVal;
-                unsigned long long unsignedLongLongVal;
-                unsigned unsignedVal;
-                case Switch:
-                    if (stringVal == "true") {
-                        *value = Value(true);
-                        return Status::OK();
-                    }
-                    else if (stringVal == "false") {
-                        // XXX: Don't set switches that are false, to maintain backwards
-                        // compatibility with the old behavior since some code depends on this
-                        // behavior
-                        *value = Value();
-                        return Status::OK();
-                    }
-                    else {
-                        StringBuilder sb;
-                        sb << "Expected boolean switch but found string: " << stringVal
-                           << " for option: " << key;
-                        return Status(ErrorCodes::BadValue, sb.str());
-                    }
-                case Bool:
-                    if (stringVal == "true") {
-                        *value = Value(true);
-                        return Status::OK();
-                    }
-                    else if (stringVal == "false") {
-                        *value = Value(false);
-                        return Status::OK();
-                    }
-                    else {
-                        StringBuilder sb;
-                        sb << "Expected boolean but found string: " << stringVal
-                           << " for option: " << key;
-                        return Status(ErrorCodes::BadValue, sb.str());
-                    }
-                case Double:
-                    ret = parseNumberFromString(stringVal, &doubleVal);
-                    if (!ret.isOK()) {
-                        return ret;
-                    }
-                    *value = Value(doubleVal);
-                    return Status::OK();
-                case Int:
-                    ret = parseNumberFromString(stringVal, &intVal);
-                    if (!ret.isOK()) {
-                        return ret;
-                    }
-                    *value = Value(intVal);
-                    return Status::OK();
-                case Long:
-                    ret = parseNumberFromString(stringVal, &longVal);
-                    if (!ret.isOK()) {
-                        return ret;
-                    }
-                    *value = Value(longVal);
-                    return Status::OK();
-                case String:
-                    *value = Value(stringVal);
-                    return Status::OK();
-                case UnsignedLongLong:
-                    ret = parseNumberFromString(stringVal, &unsignedLongLongVal);
-                    if (!ret.isOK()) {
-                        return ret;
-                    }
-                    *value = Value(unsignedLongLongVal);
-                    return Status::OK();
-                case Unsigned:
-                    ret = parseNumberFromString(stringVal, &unsignedVal);
-                    if (!ret.isOK()) {
-                        return ret;
-                    }
-                    *value = Value(unsignedVal);
-                    return Status::OK();
-                default: /* XXX: should not get here */
-                    return Status(ErrorCodes::InternalError, "Unrecognized option type");
-            }
+            return stringToValue(stringVal, type, key, value);
         }
 
         // Add all the values in the given variables_map to our environment.  See comments at the
@@ -325,22 +356,10 @@ namespace optionenvironment {
 
                 if (vm.count(long_name)) {
                     Value optionValue;
-                    Status ret = boostAnyToValue(vm[long_name].value(), &optionValue);
+                    Status ret = boostAnyToValue(vm[long_name].value(), iterator->_type, long_name,
+                                                 &optionValue);
                     if (!ret.isOK()) {
                         return ret;
-                    }
-
-                    // XXX: Don't set switches that are false, to maintain backwards compatibility
-                    // with the old behavior during the transition to the new parser
-                    if (iterator->_type == Switch) {
-                        bool value;
-                        ret = optionValue.get(&value);
-                        if (!ret.isOK()) {
-                            return ret;
-                        }
-                        if (!value) {
-                            continue;
-                        }
                     }
 
                     // If this is really a StringMap, try to split on "key=value" for each element
@@ -428,7 +447,11 @@ namespace optionenvironment {
                 }
 
                 if (YAMLNode.IsMap() && !OptionIsStringMap(options_vector, dottedName)) {
-                    addYAMLNodesToEnvironment(YAMLNode, options, dottedName, environment);
+                    Status ret = addYAMLNodesToEnvironment(YAMLNode, options, dottedName,
+                                                           environment);
+                    if (!ret.isOK()) {
+                        return ret;
+                    }
                 }
                 else {
                     Value optionValue;
@@ -576,6 +599,45 @@ namespace optionenvironment {
             return Status::OK();
         }
 
+        /**
+         *  Remove any options of type "Switch" that are set to false.  This is needed because boost
+         *  defaults switches to false, and we need to be able to tell the difference between
+         *  whether an option is set explicitly to false in config files or not present at all.
+         */
+        Status removeFalseSwitches(const OptionSection& options, Environment* environment) {
+            std::vector<OptionDescription> options_vector;
+            Status ret = options.getAllOptions(&options_vector);
+            if (!ret.isOK()) {
+                return ret;
+            }
+
+            for (std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
+                 iterator != options_vector.end(); iterator++) {
+
+                if (iterator->_type == Switch) {
+                    bool switchValue;
+                    Status ret = environment->get(iterator->_dottedName, &switchValue);
+                    if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
+                        StringBuilder sb;
+                        sb << "Error getting switch value for option: " << iterator->_dottedName
+                           << " from source: " << ret.toString();
+                        return Status(ErrorCodes::InternalError, sb.str());
+                    }
+                    else if (ret.isOK() && switchValue == false) {
+                        Status ret = environment->remove(iterator->_dottedName);
+                        if (!ret.isOK()) {
+                            StringBuilder sb;
+                            sb << "Error removing false flag: " << iterator->_dottedName << ": "
+                               << ret.toString();
+                            return Status(ErrorCodes::InternalError, sb.str());
+                        }
+                    }
+                }
+            }
+
+            return Status::OK();
+        }
+
     } // namespace
 
     /**
@@ -654,6 +716,14 @@ namespace optionenvironment {
             sb << "Error parsing command line: " << e.what();
             return Status(ErrorCodes::BadValue, sb.str());
         }
+
+        // This is needed because "switches" default to false in boost, and we don't want to
+        // erroneously think that they were present but set to false in a config file.
+        ret = removeFalseSwitches(options, environment);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
         return Status::OK();
     }
 

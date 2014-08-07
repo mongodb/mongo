@@ -32,18 +32,24 @@
 #include <deque>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/synchronization.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
     struct RangeDeleterEnv;
-    class RangeDeleterStats;
+    class OperationContext;
+    struct RangeDeleteEntry;
+    struct DeleteJobStats;
 
     /**
      * Class for deleting documents for a given namespace and range.  It contains a queue of
@@ -63,7 +69,7 @@ namespace mongo {
      *   RangeDeleter* deleter = new RangeDeleter(new ...);
      *   deleter->startWorkers();
      *   ...
-     *   killCurrentOp.killAll(); // stop all deletes
+     *   getGlobalEnvironment()->killAllOperations(); // stop all deletes
      *   deleter->stopWorkers();
      *   delete deleter;
      */
@@ -133,7 +139,7 @@ namespace mongo {
                          const BSONObj& min,
                          const BSONObj& max,
                          const BSONObj& shardKeyPattern,
-                         bool secondaryThrottle,
+                         const WriteConcernOptions& writeConcern,
                          Notification* notifyDone,
                          std::string* errMsg);
 
@@ -144,11 +150,12 @@ namespace mongo {
          * Returns true if the deletion was performed. False if the range is blacklisted,
          * was already queued, or stopWorkers() was called.
          */
-        bool deleteNow(const std::string& ns,
+        bool deleteNow(OperationContext* txn,
+                       const std::string& ns,
                        const BSONObj& min,
                        const BSONObj& max,
                        const BSONObj& shardKeyPattern,
-                       bool secondaryThrottle,
+                       const WriteConcernOptions& writeConcern,
                        std::string* errMsg);
 
         /**
@@ -178,7 +185,12 @@ namespace mongo {
         // Introspection methods
         //
 
-        const RangeDeleterStats* getStats() const;
+        // Note: original contents of stats will be cleared. Caller owns the returned stats.
+        void getStatsHistory(std::vector<DeleteJobStats*>* stats) const;
+
+        size_t getTotalDeletes() const;
+        size_t getPendingDeletes() const;
+        size_t getDeletesInProgress() const;
 
         //
         // Methods meant to be only used for testing. Should be treated like private
@@ -189,7 +201,10 @@ namespace mongo {
         BSONObj toBSON() const;
 
     private:
-        struct RangeDeleteEntry;
+        // Ownership is transferred to here.
+        void recordDelStats(DeleteJobStats* newStat);
+
+
         struct NSMinMax;
 
         struct NSMinMaxCmp {
@@ -264,8 +279,69 @@ namespace mongo {
         // deleteNow life cycle: deleteNow stack variable
         NSMinMaxSet _blackList;
 
-        // Keeps track of counters regarding each of the queues.
-        scoped_ptr<RangeDeleterStats> _stats;
+        // Keeps track of number of tasks that are in progress, including the inline deletes.
+        size_t _deletesInProgress;
+
+        // Protects _statsHistory
+        mutable mutex _statsHistoryMutex;
+        std::deque<DeleteJobStats*> _statsHistory;
+    };
+
+
+    /**
+     * Simple class for storing statistics for the RangeDeleter.
+     */
+    struct DeleteJobStats {
+        Date_t queueStartTS;
+        Date_t queueEndTS;
+        Date_t deleteStartTS;
+        Date_t deleteEndTS;
+        Date_t waitForReplStartTS;
+        Date_t waitForReplEndTS;
+
+        long long int deletedDocCount;
+
+        DeleteJobStats(): deletedDocCount(0) {
+        }
+    };
+
+    struct RangeDeleteEntry {
+        RangeDeleteEntry(const std::string& ns,
+                         const BSONObj& min,
+                         const BSONObj& max,
+                         const BSONObj& shardKey,
+                         const WriteConcernOptions& writeConcern);
+
+        const std::string ns;
+
+        // Inclusive lower range.
+        const BSONObj min;
+
+        // Exclusive upper range.
+        const BSONObj max;
+
+        // The key pattern of the index the range refers to.
+        // This is relevant especially with special indexes types
+        // like hash indexes.
+        const BSONObj shardKeyPattern;
+
+        const WriteConcernOptions writeConcern;
+
+        // Sets of cursors to wait to close until this can be ready
+        // for deletion.
+        std::set<CursorId> cursorsToWait;
+
+        // Not owned here.
+        // Important invariant: Can only be set and used by one thread.
+        Notification* notifyDone;
+
+        // Time since the last time we reported this object.
+        Date_t timeSinceLastLog;
+
+        DeleteJobStats stats;
+
+        // For debugging only
+        BSONObj toBSON() const;
     };
 
     /**
@@ -284,11 +360,9 @@ namespace mongo {
          * Must be a synchronous call. Docs should be deleted after call ends.
          * Must not throw Exceptions.
          */
-        virtual bool deleteRange(const StringData& ns,
-                                 const BSONObj& inclusiveLower,
-                                 const BSONObj& exclusiveUpper,
-                                 const BSONObj& shardKeyPattern,
-                                 bool secondaryThrottle,
+        virtual bool deleteRange(OperationContext* txn,
+                                 const RangeDeleteEntry& taskDetails,
+                                 long long int* deletedDocs,
                                  std::string* errMsg) = 0;
 
         /**
@@ -299,7 +373,9 @@ namespace mongo {
          * Must be a synchronous call. CursorIds should be populated after call.
          * Must not throw exception.
          */
-        virtual void getCursorIds(const StringData& ns, set<CursorId>* openCursors) = 0;
+        virtual void getCursorIds(OperationContext* txn,
+                                  const StringData& ns,
+                                  std::set<CursorId>* openCursors) = 0;
     };
 
 } // namespace mongo

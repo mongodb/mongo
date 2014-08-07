@@ -58,10 +58,23 @@ namespace mongo {
         // These don't really mean anything here.
         // Some day we could count the # of calls to the yield functions to check that other stages
         // have correct yielding behavior.
-        virtual void prepareToYield() { }
-        virtual void recoverFromYield() { }
+        virtual void saveState() { }
+        virtual void restoreState(OperationContext* opCtx) { }
         virtual void invalidate(const DiskLoc& dl, InvalidationType type) { }
+
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_MOCK; }
+
+        //
+        // Exec stats -- do not call for the mock stage.
+        //
+
         virtual PlanStageStats* getStats() { return NULL; }
+
+        virtual const CommonStats* getCommonStats() { return NULL; }
+
+        virtual const SpecificStats* getSpecificStats() { return NULL; }
 
         /**
          * Add a result to the back of the queue.  work() goes through the queue.

@@ -30,20 +30,16 @@
 
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/repl/health.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+namespace repl {
 
-    extern void fillRsLog(std::stringstream&);
-
-namespace {
-
-    using namespace bson;
-    using namespace mongoutils;
-    using namespace mongoutils::html;
+    using namespace html;
 
     class ReplSetHandler : public DbWebHandler {
     public:
@@ -53,15 +49,20 @@ namespace {
             return startsWith( url , "/_replSet" );
         }
 
-        virtual void handle( const char *rq, const std::string& url, BSONObj params,
-                             string& responseMsg, int& responseCode,
-                             vector<string>& headers,  const SockAddr &from ) {
+        virtual void handle( OperationContext* txn,
+                             const char *rq, 
+                             const std::string& url, 
+                             BSONObj params,
+                             string& responseMsg, 
+                             int& responseCode,
+                             vector<string>& headers,  
+                             const SockAddr &from ) {
 
             if( url == "/_replSetOplog" ) {
                 responseMsg = _replSetOplog(params);
             }
             else
-                responseMsg = _replSet();
+                responseMsg = _replSet(txn);
             responseCode = 200;
         }
 
@@ -74,7 +75,7 @@ namespace {
             s << p(t);
 
             if( theReplSet == 0 ) {
-                if (replSettings.replSet.empty())
+                if (getGlobalReplicationCoordinator()->getSettings().replSet.empty())
                     s << p("Not using --replSet");
                 else  {
                     s << p("Still starting up, or else set is not yet " + a("http://dochub.mongodb.org/core/replicasetconfiguration#ReplicaSetConfiguration-InitialSetup", "", "initiated")
@@ -95,7 +96,7 @@ namespace {
         }
 
         /* /_replSet show replica set status in html format */
-        string _replSet() {
+        string _replSet(OperationContext* txn) {
             stringstream s;
             s << start("Replica Set Status " + prettyHostName());
             s << p( a("/", "back", "Home") + " | " +
@@ -105,7 +106,7 @@ namespace {
                   );
 
             if( theReplSet == 0 ) {
-                if (replSettings.replSet.empty())
+                if (getGlobalReplicationCoordinator()->getSettings().replSet.empty())
                     s << p("Not using --replSet");
                 else  {
                     s << p("Still starting up, or else set is not yet " + a("http://dochub.mongodb.org/core/replicasetconfiguration#ReplicaSetConfiguration-InitialSetup", "", "initiated")
@@ -114,7 +115,7 @@ namespace {
             }
             else {
                 try {
-                    theReplSet->summarizeAsHtml(s);
+                    theReplSet->summarizeAsHtml(txn, s);
                 }
                 catch(...) { s << "error summarizing replset status\n"; }
             }
@@ -128,5 +129,5 @@ namespace {
 
     } replSetHandler;
 
-}  // namespace
-}  // namespace mongo
+} // namespace repl
+} // namespace mongo

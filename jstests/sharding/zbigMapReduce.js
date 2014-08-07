@@ -4,8 +4,9 @@ s = new ShardingTest( { shards : 2,
                         other: { rs: true, 
                                  numReplicas: 2, 
                                  chunksize : 1,
-                                 rsOptions: { oplogSize : 50 } } } 
-                       );
+                                 rsOptions: { oplogSize : 50 },
+                                 enableBalancer : 1
+                             } } );
 
 // reduce chunk size to split
 var config = s.getDB("config");
@@ -31,11 +32,14 @@ else {
     for (var i = 0; i < 4*1024; i++) str += "a";
 }
 
-for (j=0; j<100; j++) for (i=0; i<512; i++){ db.foo.save({ i : idInc++, val: valInc++, y:str})}
-
+var bulk = db.foo.initializeUnorderedBulkOp();
+for (j=0; j<100; j++) {
+    for (i=0; i<512; i++){
+        bulk.insert({ i: idInc++, val: valInc++, y:str });
+    }
+}
+assert.writeOK(bulk.execute());
 jsTest.log( "Documents inserted, waiting for error..." )
-
-db.getLastError();
 
 jsTest.log( "Doing double-checks of insert..." )
 
@@ -118,17 +122,15 @@ jsTest.log( )
 valInc = 0;
 for (j=0; j<100; j++){ 
     print( "Inserted document: " + (j * 100) );
-    for (i=0; i<512; i++){ db.foo.save({ i : idInc++, val: valInc++, y:str}) }
+    bulk = db.foo.initializeUnorderedBulkOp();
+    for (i=0; i<512; i++){
+        bulk.insert({ i : idInc++, val: valInc++, y: str });
+    }
     // wait for replication to catch up
-    db.runCommand({getLastError:1, w:2, wtimeout:10000});
+    assert.writeOK(bulk.execute({ w: 2 }));
 }
 
-jsTest.log( "Waiting for errors..." )
-
-assert.eq( null, db.getLastError() )
-
-jsTest.log( "No errors..." )
-
+jsTest.log( "No errors..." );
 
 map2 = function() { emit(this.val, 1); }
 reduce2 = function(key, values) { return Array.sum(values); }
@@ -194,7 +196,10 @@ jsTestLog( "Test G" )
 // verify that data is also on secondary
 var primary = s._rs[0].test.liveNodes.master
 var secondaries = s._rs[0].test.liveNodes.slaves
-s._rs[0].test.awaitReplication( 300 * 1000 ); // this can take a while since chunks are moving
+// Stop the balancer to prevent new writes from happening and make sure
+// that replication can keep up even on slow machines.
+s.stopBalancer();
+s._rs[0].test.awaitReplication(300 * 1000);
 assert.eq( 51200 , primary.getDB("test")[outcol].count() , "Wrong count" );
 for (var i = 0; i < secondaries.length; ++i) {
 	assert.eq( 51200 , secondaries[i].getDB("test")[outcol].count() , "Wrong count" );

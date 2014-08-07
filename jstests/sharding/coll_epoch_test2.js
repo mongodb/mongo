@@ -34,8 +34,7 @@ jsTest.log( "Enabling sharding for the first time..." )
 admin.runCommand({ enableSharding : coll.getDB() + "" })
 admin.runCommand({ shardCollection : coll  + "", key : { _id : 1 } })
     
-coll.insert({ hello : "world" }) 
-assert.eq( null, coll.getDB().getLastError() )
+assert.writeOK(coll.insert({ hello : "world" }));
 
 jsTest.log( "Sharding collection across multiple shards..." )
     
@@ -81,8 +80,9 @@ assert(droppedCollDoc.lastmodEpoch.equals(new ObjectId("000000000000000000000000
 admin.runCommand({ enableSharding : coll.getDB() + "" })
 admin.runCommand({ shardCollection : coll  + "", key : { _id : 1 } })
 
-for( var i = 0; i < 100; i++ ) coll.insert({ _id : i })
-assert.eq( null, coll.getDB().getLastError() )
+var bulk = coll.initializeUnorderedBulkOp();
+for( var i = 0; i < 100; i++ ) bulk.insert({ _id : i });
+assert.writeOK(bulk.execute());
 
 printjson( admin.runCommand({ split : coll + "", middle : { _id : 200 } }) )
 printjson( admin.runCommand({ moveChunk : coll + "", find : { _id : 200 },
@@ -100,20 +100,18 @@ assert.neq( null, readMongos.getCollection( coll + "" ).findOne({ _id : 1 }) )
 
 jsTest.log( "Checking update...")
 // Ensure that updating an element finds the right location
-updateMongos.getCollection( coll + "" ).update({ _id : 1 }, { $set : { updated : true } })
-assert.eq( null, updateMongos.getDB( coll.getDB() + "" ).getLastError() )
+assert.writeOK(updateMongos.getCollection( coll + "" ).update({ _id : 1 },
+                                                              { $set : { updated : true } }));
 assert.neq( null, coll.findOne({ updated : true }) )
 
 jsTest.log( "Checking insert..." )
 // Ensure that inserting an element finds the right shard
-insertMongos.getCollection( coll + "" ).insert({ _id : 101 })
-assert.eq( null, insertMongos.getDB( coll.getDB() + "" ).getLastError() )
+assert.writeOK(insertMongos.getCollection( coll + "" ).insert({ _id : 101 }));
 assert.neq( null, coll.findOne({ _id : 101 }) )
 
 jsTest.log( "Checking remove..." )
 // Ensure that removing an element finds the right shard, verified by the mongos doing the sharding
-removeMongos.getCollection( coll + "" ).remove({ _id : 2 })
-assert.eq( null, removeMongos.getDB( coll.getDB() + "" ).getLastError() )
+assert.writeOK(removeMongos.getCollection( coll + "" ).remove({ _id : 2 }));
 assert.eq( null, coll.findOne({ _id : 2 }) )
 
 coll.drop()

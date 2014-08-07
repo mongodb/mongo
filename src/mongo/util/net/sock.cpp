@@ -2,20 +2,32 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/net/sock.h"
 
@@ -33,15 +45,20 @@
 # endif
 #endif
 
+#include "mongo/db/server_options.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/value.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/socket_poll.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
+
     MONGO_FP_DECLARE(throwSockExcep);
 
     static bool ipv6 = false;
@@ -248,7 +265,8 @@ namespace mongo {
         }
             
         case AF_UNIX:  
-            return (addressSize > 2 ? as<sockaddr_un>().sun_path : "anonymous unix socket");
+            return (as<sockaddr_un>().sun_path[0] != '\0' ? as<sockaddr_un>().sun_path :
+                "anonymous unix socket");
         case AF_UNSPEC: 
             return "(NONE)";
         default: 
@@ -519,9 +537,10 @@ namespace mongo {
             setTimeout( _timeout );
         }
 
+        static const unsigned int connectTimeoutMillis = 5000;
         ConnectBG bg(_fd, remote);
         bg.go();
-        if ( bg.wait(5000) ) {
+        if ( bg.wait(connectTimeoutMillis) ) {
             if ( bg.inError() ) {
                 warning() << "Failed to connect to "
                           << _remote.getAddr() << ":" << _remote.getPort()
@@ -534,6 +553,9 @@ namespace mongo {
             // time out the connect
             close();
             bg.wait(); // so bg stays in scope until bg thread terminates
+            warning() << "Failed to connect to "
+                      << _remote.getAddr() << ":" << _remote.getPort()
+                      << " after " << connectTimeoutMillis << " milliseconds, giving up." << endl;
             return false;
         }
 
@@ -874,7 +896,7 @@ namespace mongo {
                         << " remote host " << remoteString() << ")" << endl;
                 DEV {
                     std::string hex = hexdump(testBuf, recvd);
-                    error() << "Hex Dump of stale log data: " << hex << endl;
+                    error() << "Hex dump of stale log data: " << hex << endl;
                 }
                 dassert( false );
             }
@@ -922,8 +944,7 @@ namespace mongo {
         WinsockInit() {
             WSADATA d;
             if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
-                out() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
-                problem() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
+                log() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
                 _exit(EXIT_NTSERVICE_ERROR);
             }
         }

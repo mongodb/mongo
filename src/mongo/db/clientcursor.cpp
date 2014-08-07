@@ -26,8 +26,6 @@
  *    it in the license file.
  */
 
-#include "mongo/pch.h"
-
 #include "mongo/db/clientcursor.h"
 
 #include <string>
@@ -43,16 +41,13 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/db.h"
-#include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/kill_current_op.h"
-#include "mongo/db/pagefault.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
-#include "mongo/platform/random.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -74,16 +69,16 @@ namespace mongo {
         return cursorStatsOpen.get();
     }
 
-    ClientCursor::ClientCursor(const Collection* collection, Runner* runner,
+    ClientCursor::ClientCursor(const Collection* collection, PlanExecutor* exec,
                                int qopts, const BSONObj query)
         : _collection( collection ),
           _countedYet( false ) {
-        _runner.reset(runner);
-        _ns = runner->ns();
+        _exec.reset(exec);
+        _ns = exec->ns();
         _query = query;
         _queryOptions = qopts;
-        if ( runner->collection() ) {
-            invariant( collection == runner->collection() );
+        if ( exec->collection() ) {
+            invariant( collection == exec->collection() );
         }
         init();
     }
@@ -105,8 +100,6 @@ namespace mongo {
         _leftoverMaxTimeMicros = 0;
         _pinValue = 0;
         _pos = 0;
-
-        Lock::assertAtLeastReadLocked(_ns);
 
         if (_queryOptions & QueryOption_NoCursorTimeout) {
             // cursors normally timeout after an inactivity period to prevent excess memory use
@@ -148,116 +141,38 @@ namespace mongo {
     }
 
     void ClientCursor::kill() {
-        if ( _runner.get() )
-            _runner->kill();
+        if ( _exec.get() )
+            _exec->kill();
 
         _collection = NULL;
-    }
-
-    void yieldOrSleepFor1Microsecond() {
-#ifdef _WIN32
-        SwitchToThread();
-#elif defined(__linux__)
-        pthread_yield();
-#else
-        sleepmicros(1);
-#endif
-    }
-
-    void ClientCursor::staticYield(int micros, const StringData& ns, const Record* rec) {
-        bool haveReadLock = Lock::isReadLocked();
-
-        killCurrentOp.checkForInterrupt( false );
-        {
-            auto_ptr<LockMongoFilesShared> lk;
-            if ( rec ) {
-                // need to lock this else rec->touch won't be safe file could disappear
-                lk.reset( new LockMongoFilesShared() );
-            }
-
-            dbtempreleasecond unlock;
-            if ( unlock.unlocked() ) {
-                if ( haveReadLock ) {
-                    // This sleep helps reader threads yield to writer threads.
-                    // Without this, the underlying reader/writer lock implementations
-                    // are not sufficiently writer-greedy.
-#ifdef _WIN32
-                    SwitchToThread();
-#else
-                    if ( micros == 0 ) {
-                        yieldOrSleepFor1Microsecond();
-                    }
-                    else {
-                        sleepmicros(1);
-                    }
-#endif
-                }
-                else {
-                    if ( micros == -1 ) {
-                        sleepmicros(Client::recommendedYieldMicros());
-                    }
-                    else if ( micros == 0 ) {
-                        yieldOrSleepFor1Microsecond();
-                    }
-                    else if ( micros > 0 ) {
-                        sleepmicros( micros );
-                    }
-                }
-
-            }
-            else if ( Listener::getTimeTracker() == 0 ) {
-                // we aren't running a server, so likely a repair, so don't complain
-            }
-            else {
-                CurOp * c = cc().curop();
-                while ( c->parent() )
-                    c = c->parent();
-                warning() << "ClientCursor::staticYield can't unlock b/c of recursive lock"
-                          << " ns: " << ns 
-                          << " top: " << c->info()
-                          << endl;
-            }
-
-            if ( rec )
-                rec->touch();
-
-            lk.reset(0); // need to release this before dbtempreleasecond
-        }
     }
 
     //
     // Timing and timeouts
     //
 
-    bool ClientCursor::shouldTimeout(unsigned millis) {
+    bool ClientCursor::shouldTimeout(int millis) {
         _idleAgeMillis += millis;
         return _idleAgeMillis > 600000 && _pinValue == 0;
     }
 
-    void ClientCursor::setIdleTime( unsigned millis ) {
+    void ClientCursor::setIdleTime( int millis ) {
         _idleAgeMillis = millis;
     }
 
-    void ClientCursor::updateSlaveLocation( CurOp& curop ) {
-        if ( _slaveReadTill.isNull() )
+    void ClientCursor::updateSlaveLocation(OperationContext* txn, CurOp& curop) {
+        if (_slaveReadTill.isNull())
             return;
-        mongo::updateSlaveLocation( curop , _ns.c_str() , _slaveReadTill );
-    }
 
-    int ClientCursor::suggestYieldMicros() {
-        int writers = 0;
-        int readers = 0;
+        verify(str::startsWith(_ns.c_str(), "local.oplog."));
 
-        int micros = Client::recommendedYieldMicros( &writers , &readers );
+        Client* c = curop.getClient();
+        verify(c);
+        OID rid = c->getRemoteID();
+        if (!rid.isSet())
+            return;
 
-        if ( micros > 0 && writers == 0 && Lock::isR() ) {
-            // we have a read lock, and only reads are coming on, so why bother unlocking
-            return 0;
-        }
-
-        wassert( micros < 10000000 );
-        dassert( micros <  1000001 );
-        return micros;
+        repl::getGlobalReplicationCoordinator()->setLastOptime(txn, rid, _slaveReadTill);
     }
 
     //
@@ -269,13 +184,7 @@ namespace mongo {
     ClientCursorPin::ClientCursorPin( const Collection* collection, long long cursorid )
         : _cursor( NULL ) {
         cursorStatsOpenPinned.increment();
-        _cursor = collection->cursorCache()->find( cursorid );
-        if ( _cursor ) {
-            uassert( 12051,
-                     "clientcursor already in use? driver problem?",
-                     _cursor->_pinValue < 100 );
-            _cursor->_pinValue += 100;
-        }
+        _cursor = collection->cursorCache()->find( cursorid, true );
     }
 
     ClientCursorPin::~ClientCursorPin() {
@@ -287,14 +196,16 @@ namespace mongo {
         if ( !_cursor )
             return;
 
-        invariant( _cursor->_pinValue >= 100 );
-        _cursor->_pinValue -= 100;
+        invariant( _cursor->pinValue() >= 100 );
 
         if ( _cursor->collection() == NULL ) {
             // the ClientCursor was killed while we had it
             // therefore its our responsibility to kill it
             delete _cursor;
             _cursor = NULL; // defensive
+        }
+        else {
+            _cursor->collection()->cursorCache()->unpin( _cursor );
         }
     }
 
@@ -311,90 +222,31 @@ namespace mongo {
     // ClientCursorMonitor
     //
 
-    // Used by sayMemoryStatus below.
-    struct Mem { 
-        Mem() { res = virt = mapped = 0; }
-        long long res;
-        long long virt;
-        long long mapped;
-        bool grew(const Mem& r) { 
-            return (r.res && (((double)res)/r.res)>1.1 ) ||
-              (r.virt && (((double)virt)/r.virt)>1.1 ) ||
-              (r.mapped && (((double)mapped)/r.mapped)>1.1 );
-        }
-    };
-
-    /**
-     * called once a minute from killcursors thread
-     */
-    void sayMemoryStatus() { 
-        static time_t last;
-        static Mem mlast;
-        try {
-            ProcessInfo p;
-            if (!serverGlobalParams.quiet && p.supported()) {
-                Mem m;
-                m.res = p.getResidentSize();
-                m.virt = p.getVirtualMemorySize();
-                m.mapped = MemoryMappedFile::totalMappedLength() / (1024 * 1024);
-                time_t now = time(0);
-                if( now - last >= 300 || m.grew(mlast) ) { 
-                    log() << "mem (MB) res:" << m.res << " virt:" << m.virt;
-                    long long totalMapped = m.mapped;
-                    if (storageGlobalParams.dur) {
-                        totalMapped *= 2;
-                        log() << " mapped (incl journal view):" << totalMapped;
-                    }
-                    else {
-                        log() << " mapped:" << totalMapped;
-                    }
-                    log() << " connections:" << Listener::globalTicketHolder.used();
-                    if (theReplSet) {
-                        log() << " replication threads:" << 
-                            ReplSetImpl::replWriterThreadCount + 
-                            ReplSetImpl::replPrefetcherThreadCount;
-                    }
-                    last = now;
-                    mlast = m;
-                }
-            }
-        }
-        catch(const std::exception&) {
-            log() << "ProcessInfo exception" << endl;
-        }
-    }
-
     void ClientCursorMonitor::run() {
         Client::initThread("clientcursormon");
         Client& client = cc();
         Timer t;
         const int Secs = 4;
-        unsigned n = 0;
-        while ( ! inShutdown() ) {
-            cursorStatsTimedOut.increment( CollectionCursorCache::timeoutCursorsGlobal( t.millisReset() ) );
+        while (!inShutdown()) {
+            OperationContextImpl txn;
+            cursorStatsTimedOut.increment(
+                        CollectionCursorCache::timeoutCursorsGlobal(&txn, t.millisReset()));
             sleepsecs(Secs);
-            if( ++n % (60/Secs) == 0 /*once a minute*/ ) {
-                sayMemoryStatus();
-            }
         }
         client.shutdown();
     }
 
-    ClientCursorMonitor clientCursorMonitor;
-
-    //
-    // cursorInfo command.
-    //
-
-    void _appendCursorStats( BSONObjBuilder& b ) {
-        b.append( "note" , "deprecated, use server status metrics" );
-
-        b.appendNumber("clientCursors_size", cursorStatsOpen.get() );
-        b.appendNumber("totalOpen", cursorStatsOpen.get() );
-        b.appendNumber("pinned", cursorStatsOpenPinned.get() );
-        b.appendNumber("totalNoTimeout", cursorStatsOpenNoTimeout.get() );
-
-        b.appendNumber("timedOut" , cursorStatsTimedOut.get());
+    namespace {
+        ClientCursorMonitor clientCursorMonitor;
+        
+        void _appendCursorStats( BSONObjBuilder& b ) {
+            b.append( "note" , "deprecated, use server status metrics" );
+            b.appendNumber("clientCursors_size", cursorStatsOpen.get() );
+            b.appendNumber("totalOpen", cursorStatsOpen.get() );
+            b.appendNumber("pinned", cursorStatsOpenPinned.get() );
+            b.appendNumber("totalNoTimeout", cursorStatsOpenNoTimeout.get() );
+            b.appendNumber("timedOut" , cursorStatsTimedOut.get());
+        }
     }
 
     // QUESTION: Restrict to the namespace from which this command was issued?
@@ -407,7 +259,7 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << " example: { cursorInfo : 1 }, deprecated";
         }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -415,7 +267,7 @@ namespace mongo {
             actions.addAction(ActionType::cursorInfo);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result,
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result,
                  bool fromRepl ) {
             _appendCursorStats( result );
             return true;

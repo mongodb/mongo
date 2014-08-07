@@ -26,6 +26,8 @@
 *    then also delete it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/startup_warnings.h"
 
 #include <boost/filesystem/operations.hpp>
@@ -37,6 +39,8 @@
 #include "mongo/util/version.h"
 
 namespace mongo {
+
+    extern bool useExperimentalDocLocking;
 
     //
     // system warnings
@@ -69,6 +73,32 @@ namespace mongo {
             log() << "**       See http://dochub.mongodb.org/core/32bit" << startupWarningsLog;
             warned = true;
         }
+
+        if (useExperimentalDocLocking) {
+            log() << "** WARNING: Experimental (and untested) document-level locking for in-place"
+                  << startupWarningsLog;
+            log() << "            updates, which do not modify indexed values, has been enabled."
+                  << startupWarningsLog;
+            log() << "            This should absolutely not be used on production systems and is"
+                  << startupWarningsLog;
+            log() << "            for demonstration purposes only."
+                  << startupWarningsLog;
+            warned = true;
+        }
+
+#if defined(_WIN32) && !defined(_WIN64)
+        // Warn user that they are running a 32-bit app on 64-bit Windows
+        BOOL wow64Process;
+        BOOL retWow64 = IsWow64Process(GetCurrentProcess(), &wow64Process);
+        if (retWow64 && wow64Process) {
+            log() << "** NOTE: This is a 32-bit MongoDB binary running on a 64-bit operating"
+                    << startupWarningsLog;
+            log() << "**      system. Switch to a 64-bit build of MongoDB to"
+                    << startupWarningsLog;
+            log() << "**      support larger databases." << startupWarningsLog;
+            warned = true;
+        }
+#endif
 
         if (!ProcessInfo::blockCheckSupported()) {
             log() << startupWarningsLog;
@@ -171,6 +201,58 @@ namespace mongo {
                       << startupWarningsLog;
             }
         }
+
+        // Transparent Hugepages checks
+        bool hasHugePages = false;
+        try {
+            hasHugePages = boost::filesystem::exists("/sys/kernel/mm/transparent_hugepage/enabled");
+
+            if (hasHugePages) {
+                std::ifstream f1("/sys/kernel/mm/transparent_hugepage/enabled");
+                std::string line;
+                if (!std::getline(f1, line)) {
+                    warning() << "failed to read from /sys/kernel/mm/transparent_hugepage/enabled: "
+                              << ((f1.eof()) ? "EOF" : errnoWithDescription())
+                              << startupWarningsLog;
+                    warned = true;
+                }
+                else {
+                    std::string::size_type pos_begin = line.find("[");
+                    std::string::size_type pos_end = line.find("]");
+                    if (pos_begin == string::npos || pos_end == string::npos ||
+                        pos_begin >= pos_end) {
+                        warning() << "cannot parse line: '" << line << "'"
+                              << startupWarningsLog;
+                        warned = true;
+                    }
+
+                    std::string op_mode = line.substr(pos_begin + 1, pos_end - pos_begin - 1);
+                    if (op_mode == "always") {
+                        log() << startupWarningsLog;
+                        log() <<
+                            "** WARNING: /sys/kernel/mm/transparent_hugepage/enabled is 'always'."
+                            << startupWarningsLog;
+                        log() << "**        We suggest setting it to 'never'"
+                              << startupWarningsLog;
+                        warned = true;
+                    }
+                    else if (op_mode != "madvise" && op_mode != "never") {
+                        log() << startupWarningsLog;
+                        log() << "** WARNING: unrecognized transparent HugePages mode of operation '"
+                              << op_mode << "'"
+                              << startupWarningsLog;
+                    }
+                }
+            }
+        }
+        catch (const boost::filesystem::filesystem_error& err) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: Cannot detect if transparent HugePages feature is enabled. "
+                    << "Failed to probe \"" << err.path1().string() << "\": "
+                    << err.code().message()
+                    << startupWarningsLog;
+        }
+
 #endif
 
 #if defined(RLIMIT_NPROC) && defined(RLIMIT_NOFILE)

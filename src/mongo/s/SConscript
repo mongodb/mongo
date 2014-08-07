@@ -8,7 +8,6 @@ Import("env")
 
 env.Library('base', ['mongo_version_range.cpp',
                      'range_arithmetic.cpp',
-                     'shard_key_pattern.cpp',
                      'type_changelog.cpp',
                      'type_chunk.cpp',
                      'type_collection.cpp',
@@ -207,18 +206,25 @@ env.CppUnitTest(
     ]
 )
 
-# Cluster write op state and execution
+#
+# State and execution of operations across multiple hosts
+#
+# This functionality is self-contained and independent of any network or system-level
+# code.
+#
 env.Library(
-    target='cluster_write_ops',
+    target='cluster_ops',
     source=[
         'write_ops/write_op.cpp',
         'write_ops/batch_write_op.cpp',
         'write_ops/batch_write_exec.cpp',
         'write_ops/config_coordinator.cpp',
+        'multi_host_query.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
         'batch_write_types',
+        '$BUILD_DIR/mongo/synchronization'
     ],
 )
 
@@ -229,7 +235,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'base',
-        'cluster_write_ops',
+        'cluster_ops',
         '$BUILD_DIR/mongo/db/common',
     ]
 )
@@ -241,7 +247,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'base',
-        'cluster_write_ops',
+        'cluster_ops',
         '$BUILD_DIR/mongo/db/common',
     ]
 )
@@ -253,7 +259,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'base',
-        'cluster_write_ops',
+        'cluster_ops',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/clientdriver',
     ],
@@ -266,7 +272,20 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'base',
-        'cluster_write_ops',
+        'cluster_ops',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/clientdriver',
+    ],
+)
+
+env.CppUnitTest(
+    target='multi_host_query_test',
+    source=[
+        'multi_host_query_test.cpp',
+    ],
+    LIBDEPS=[
+        'base',
+        'cluster_ops',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/clientdriver',
     ],
@@ -281,7 +300,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
-        'cluster_write_ops',
+        'cluster_ops',
         '$BUILD_DIR/mongo/db/common', # for Message
     ],
 )
@@ -292,10 +311,11 @@ env.CppUnitTest(
         'write_ops/batch_upconvert_test.cpp',
     ],
     LIBDEPS=[
-        'cluster_write_ops',
+        'cluster_ops',
         'cluster_write_op_conversion',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/server_options', # DbMessage needs server options
+        "$BUILD_DIR/mongo/clientdriver",
     ]
 )
 
@@ -305,30 +325,49 @@ env.CppUnitTest(
         'write_ops/batch_downconvert_test.cpp',
     ],
     LIBDEPS=[
-        'cluster_write_ops',
+        'cluster_ops',
         'cluster_write_op_conversion',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/server_options', # DbMessage needs server options
+        "$BUILD_DIR/mongo/clientdriver",
     ]
 )
 
+#
 # Implementations of components to perform cluster operations in mongos
+#
+# This is the glue code implementing the interfaces required by cluster ops
+# in particular environments.
+#
 env.Library(
-    target='cluster_op_impl',
+    target='cluster_ops_impl',
     source=[
         'chunk_manager_targeter.cpp',
         'cluster_write.cpp',
         'dbclient_multi_command.cpp',
         'dbclient_shard_resolver.cpp',
-        'write_ops/dbclient_safe_writer.cpp'
+        'scc_fast_query_handler.cpp',
+        'write_ops/dbclient_safe_writer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
         'batch_write_types',
-        'cluster_write_ops',
+        'cluster_ops',
         'cluster_write_op_conversion',
     ],
 )
 
-
+env.CppUnitTest(
+    target='chunk_manager_targeter_test',
+    source=[
+        'chunk_manager_targeter_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/coredb',
+        '$BUILD_DIR/mongo/coreserver',
+        '$BUILD_DIR/mongo/coreshard',
+        '$BUILD_DIR/mongo/mongocommon',
+        '$BUILD_DIR/mongo/mongoscore',
+    ]
+)
 

@@ -53,7 +53,7 @@ namespace mongo {
      */
     class AndSortedStage : public PlanStage {
     public:
-        AndSortedStage(WorkingSet* ws, const MatchExpression* filter);
+        AndSortedStage(WorkingSet* ws, const MatchExpression* filter, const Collection* collection);
         virtual ~AndSortedStage();
 
         void addChild(PlanStage* child);
@@ -61,11 +61,21 @@ namespace mongo {
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
 
-        virtual void prepareToYield();
-        virtual void recoverFromYield();
+        virtual void saveState();
+        virtual void restoreState(OperationContext* opCtx);
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_AND_SORTED; }
+
         virtual PlanStageStats* getStats();
+
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
+        static const char* kStageType;
 
     private:
         // Find a node to AND against.
@@ -76,13 +86,16 @@ namespace mongo {
         PlanStage::StageState moveTowardTargetLoc(WorkingSetID* out);
 
         // Not owned by us.
+        const Collection* _collection;
+
+        // Not owned by us.
         WorkingSet* _ws;
 
         // Not owned by us.
         const MatchExpression* _filter;
 
         // Owned by us.
-        vector<PlanStage*> _children;
+        std::vector<PlanStage*> _children;
 
         // The current node we're AND-ing against.
         size_t _targetNode;

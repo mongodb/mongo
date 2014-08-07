@@ -36,6 +36,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
@@ -62,21 +63,31 @@ namespace mongo {
      * any WorkingSetMember(s) for any of the data, instead returning ADVANCED to indicate to the
      * caller that another result should be counted.
      *
-     * Only created through the getRunnerCount path, as count is the only operation that doesn't
+     * Only created through the getExecutorCount path, as count is the only operation that doesn't
      * care about its data.
      */
     class Count : public PlanStage {
     public:
-        Count(const CountParams& params, WorkingSet* workingSet);
+        Count(OperationContext* txn, const CountParams& params, WorkingSet* workingSet);
         virtual ~Count() { }
 
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
-        virtual void prepareToYield();
-        virtual void recoverFromYield();
+        virtual void saveState();
+        virtual void restoreState(OperationContext* opCtx);
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_COUNT; }
+
         virtual PlanStageStats* getStats();
+
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
+        static const char* kStageType;
 
     private:
         /**
@@ -88,6 +99,9 @@ namespace mongo {
          * See if we've hit the end yet.
          */
         void checkEnd();
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
 
         // The WorkingSet we annotate with results.  Not owned by us.
         WorkingSet* _workingSet;
@@ -105,15 +119,14 @@ namespace mongo {
         // Could our index have duplicates?  If so, we use _returned to dedup.
         unordered_set<DiskLoc, DiskLoc::Hasher> _returned;
 
-        // XXX: take ptr to soln?
         CountParams _params;
 
         bool _hitEnd;
 
         bool _shouldDedup;
 
-        // Stats
         CommonStats _commonStats;
+        CountStats _specificStats;
     };
 
 }  // namespace mongo

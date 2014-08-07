@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2008-2013 10gen Inc.
+ *    Copyright (C) 2008-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -38,8 +38,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/structure/catalog/namespace_details-inl.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
 
@@ -57,7 +55,7 @@ namespace mongo {
     public:
         GeoHaystackSearchCommand() : Command("geoSearch") {}
 
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         bool slaveOk() const { return true; }
         bool slaveOverrideOk() const { return true; }
 
@@ -69,17 +67,18 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        bool run(const string& dbname, BSONObj& cmdObj, int,
+        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int,
                  string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string ns = dbname + "." + cmdObj.firstElement().valuestr();
+            const string ns = dbname + "." + cmdObj.firstElement().valuestr();
+            Client::ReadContext ctx(txn, ns);
 
-            Database* db = cc().database();
+            Database* db = ctx.ctx().db();
             if ( !db ) {
                 errmsg = "can't find ns";
                 return false;
             }
 
-            Collection* collection = db->getCollection( ns );
+            Collection* collection = db->getCollection( txn, ns );
             if ( !collection ) {
                 errmsg = "can't find ns";
                 return false;
@@ -111,7 +110,7 @@ namespace mongo {
             IndexDescriptor* desc = idxs[0];
             HaystackAccessMethod* ham =
                 static_cast<HaystackAccessMethod*>( collection->getIndexCatalog()->getIndex(desc) );
-            ham->searchCommand(nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
+            ham->searchCommand(txn, collection, nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
                                &result, limit);
             return 1;
         }

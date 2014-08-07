@@ -41,9 +41,8 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_registry.h"
@@ -53,15 +52,17 @@ namespace QueryStageKeep {
 
     class QueryStageKeepBase {
     public:
-        QueryStageKeepBase() { }
+        QueryStageKeepBase() : _client(&_txn) {
+        
+        }
 
         virtual ~QueryStageKeepBase() {
             _client.dropCollection(ns());
         }
 
         void getLocs(set<DiskLoc>* out, Collection* coll) {
-            CollectionIterator* it = coll->getIterator(DiskLoc(), false,
-                                                       CollectionScanParams::FORWARD);
+            RecordIterator* it = coll->getIterator(&_txn, DiskLoc(), false,
+                                                   CollectionScanParams::FORWARD);
             while (!it->isEOF()) {
                 DiskLoc nextLoc = it->getNext();
                 out->insert(nextLoc);
@@ -81,7 +82,7 @@ namespace QueryStageKeep {
 
         WorkingSetID getNextResult(PlanStage* stage) {
             while (!stage->isEOF()) {
-                WorkingSetID id;
+                WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = stage->work(&id);
                 if (PlanStage::ADVANCED == status) {
                     return id;
@@ -90,11 +91,11 @@ namespace QueryStageKeep {
             return WorkingSet::INVALID_ID;
         }
 
-    private:
-        static DBDirectClient _client;
+    protected:
+        OperationContextImpl _txn;
+        DBDirectClient _client;
     };
 
-    DBDirectClient QueryStageKeepBase::_client;
 
     // Test that we actually merge flagged results.
 
@@ -104,11 +105,12 @@ namespace QueryStageKeep {
     class KeepStageBasic : public QueryStageKeepBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
+
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(ns());
+            Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&_txn, ns());
             }
             WorkingSet ws;
 
@@ -125,14 +127,15 @@ namespace QueryStageKeep {
                 member->obj = BSON("x" << 2);
                 ws.flagForReview(id);
             }
+            ctx.commit();
 
             // Create a collscan to provide the 10 objects in the collection.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = coll;
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
             params.start = DiskLoc();
-            CollectionScan* cs = new CollectionScan(params, &ws, NULL);
+            CollectionScan* cs = new CollectionScan(&_txn, params, &ws, NULL);
 
             // Create a KeepMutations stage to merge in the 10 flagged objects.
             // Takes ownership of 'cs'

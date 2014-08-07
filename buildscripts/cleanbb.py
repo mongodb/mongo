@@ -5,7 +5,6 @@ import sys
 import os, os.path
 import utils
 import time
-import exceptions
 from optparse import OptionParser
 
 def shouldKill( c, root=None ):
@@ -61,6 +60,22 @@ def killprocs( signal="", root=None ):
     return killed
 
 
+def tryToRemove(path):
+    for _ in range(60):
+        try:
+            os.remove(path)
+            return True
+        except OSError, e:
+            errno = getattr(e, 'winerror', None)
+            # check for the access denied and file in use WindowsErrors
+            if errno in (5, 32):
+                print("os.remove(%s) failed, retrying in one second." % path)
+                time.sleep(1)
+            else:
+                raise e
+    return False
+
+
 def cleanup( root , nokill ):
     if nokill:
         print "nokill requested, not killing anybody"
@@ -74,16 +89,9 @@ def cleanup( root , nokill ):
     for ( dirpath , dirnames , filenames ) in os.walk( root , topdown=False ):
         for x in filenames:
             foo = dirpath + "/" + x
-            print( "removing: " + foo )
-            try:
-                os.remove(foo)
-            except exceptions.OSError, e:
-                # SERVER-10462 compensate for Windows file locking race
-                # We want to catch WindowsError but can't use that name on other platforms
-                print(repr(e))
-                print("os.remove(%s) failed, retrying once." % foo)
-                time.sleep(1)
-                os.remove(foo)
+            if os.path.exists(foo):
+                if not tryToRemove(foo):
+                    raise Exception("Couldn't remove file '%s' after 60 seconds" % foo)
 
 if __name__ == "__main__":
     parser = OptionParser(usage="read the script")

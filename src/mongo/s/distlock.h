@@ -2,17 +2,29 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
@@ -42,9 +54,9 @@ namespace mongo {
      */
     class MONGO_CLIENT_API LockException : public DBException {
     public:
-    	LockException( const char * msg , int code ) : DBException( msg, code ) {}
-    	LockException( const string& msg, int code ) : DBException( msg, code ) {}
-    	virtual ~LockException() throw() { }
+        LockException( const char * msg , int code ) : DBException( msg, code ) {}
+        LockException( const std::string& msg, int code ) : DBException( msg, code ) {}
+        virtual ~LockException() throw() { }
     };
 
     /**
@@ -53,17 +65,37 @@ namespace mongo {
     class MONGO_CLIENT_API TimeNotFoundException : public LockException {
     public:
         TimeNotFoundException( const char * msg , int code ) : LockException( msg, code ) {}
-        TimeNotFoundException( const string& msg, int code ) : LockException( msg, code ) {}
+        TimeNotFoundException( const std::string& msg, int code ) : LockException( msg, code ) {}
         virtual ~TimeNotFoundException() throw() { }
     };
 
     /**
-     * The distributed lock is a configdb backed way of synchronizing system-wide tasks. A task must be identified by a
-     * unique name across the system (e.g., "balancer"). A lock is taken by writing a document in the configdb's locks
-     * collection with that name.
+     * The distributed lock is a configdb backed way of synchronizing system-wide tasks. A task
+     * must be identified by a unique name across the system (e.g., "balancer"). A lock is taken
+     * by writing a document in the configdb's locks collection with that name.
      *
-     * To be maintained, each taken lock needs to be revalidated ("pinged") within a pre-established amount of time. This
-     * class does this maintenance automatically once a DistributedLock object was constructed.
+     * To be maintained, each taken lock needs to be revalidated ("pinged") within a
+     * pre-established amount of time. This class does this maintenance automatically once a
+     * DistributedLock object was constructed. The ping procedure records the local time to
+     * the ping document, but that time is untrusted and is only used as a point of reference
+     * of whether the ping was refreshed or not. Ultimately, the clock a configdb is the source
+     * of truth when determining whether a ping is still fresh or not. This is achieved by
+     * (1) remembering the ping document time along with config server time when unable to
+     * take a lock, and (2) ensuring all config servers report similar times and have similar
+     * time rates (the difference in times must start and stay small).
+     *
+     * Lock states include:
+     * 0: unlocked
+     * 1: about to be locked
+     * 2: locked
+     *
+     * Valid state transitions:
+     * 0 -> 1
+     * 1 -> 2
+     * 2 -> 0
+     *
+     * Note that at any point in time, a lock can be force unlocked if the ping for the lock
+     * becomes too stale.
      */
     class MONGO_CLIENT_API DistributedLock {
     public:
@@ -72,7 +104,7 @@ namespace mongo {
 
         struct PingData {
 
-            PingData( const string& _id , Date_t _lastPing , Date_t _remote , OID _ts )
+            PingData( const std::string& _id , Date_t _lastPing , Date_t _remote , OID _ts )
                 : id(_id), lastPing(_lastPing), remote(_remote), ts(_ts){
             }
 
@@ -80,23 +112,23 @@ namespace mongo {
                 : id(""), lastPing(0), remote(0), ts(){
             }
 
-            string id;
+            std::string id;
             Date_t lastPing;
             Date_t remote;
             OID ts;
         };
 
-    	class LastPings {
-    	public:
-    	    LastPings() : _mutex( "DistributedLock::LastPings" ) {}
-    	    ~LastPings(){}
+        class LastPings {
+        public:
+            LastPings() : _mutex( "DistributedLock::LastPings" ) {}
+            ~LastPings(){}
 
-    	    PingData getLastPing( const ConnectionString& conn, const string& lockName );
-    	    void setLastPing( const ConnectionString& conn, const string& lockName, const PingData& pd );
+            PingData getLastPing( const ConnectionString& conn, const std::string& lockName );
+            void setLastPing( const ConnectionString& conn, const std::string& lockName, const PingData& pd );
 
-    	    mongo::mutex _mutex;
-    	    map< std::pair<string, string>, PingData > _lastPings;
-    	};
+            mongo::mutex _mutex;
+            std::map< std::pair<std::string, std::string>, PingData > _lastPings;
+        };
 
     	static LastPings lastPings;
 
@@ -111,7 +143,7 @@ namespace mongo {
          * @param legacy use legacy logic
          *
          */
-        DistributedLock( const ConnectionString& conn , const string& name , unsigned long long lockTimeout = 0, bool asProcess = false );
+        DistributedLock( const ConnectionString& conn , const std::string& name , unsigned long long lockTimeout = 0, bool asProcess = false );
         ~DistributedLock(){};
 
         /**
@@ -124,7 +156,7 @@ namespace mongo {
          * details if not
          * @return true if it managed to grab the lock
          */
-        bool lock_try( const string& why , bool reenter = false, BSONObj * other = 0, double timeout = 0.0 );
+        bool lock_try( const std::string& why , bool reenter = false, BSONObj * other = 0, double timeout = 0.0 );
 
         /**
          * Returns true if we currently believe we hold this lock and it was possible to
@@ -132,7 +164,7 @@ namespace mongo {
          * lock is not held or if we failed to contact the config servers within the timeout,
          * returns false.
          */
-        bool isLockHeld( double timeout, string* errMsg );
+        bool isLockHeld( double timeout, std::string* errMsg );
 
         /**
          * Releases a previously taken lock.
@@ -143,14 +175,18 @@ namespace mongo {
 
         bool isRemoteTimeSkewed();
 
-        const string& getProcessId();
+        const std::string& getProcessId();
 
         const ConnectionString& getRemoteConnection();
 
         /**
-         * Check the skew between a cluster of servers
+         * Checks the skew among a cluster of servers and returns true if the min and max clock
+         * times among the servers are within maxClockSkew.
          */
-        static bool checkSkew( const ConnectionString& cluster, unsigned skewChecks = NUM_LOCK_SKEW_CHECKS, unsigned long long maxClockSkew = MAX_LOCK_CLOCK_SKEW, unsigned long long maxNetSkew = MAX_LOCK_NET_SKEW );
+        static bool checkSkew( const ConnectionString& cluster,
+                               unsigned skewChecks = NUM_LOCK_SKEW_CHECKS,
+                               unsigned long long maxClockSkew = MAX_LOCK_CLOCK_SKEW,
+                               unsigned long long maxNetSkew = MAX_LOCK_NET_SKEW );
 
         /**
          * Get the remote time from a server or cluster
@@ -162,16 +198,16 @@ namespace mongo {
         /**
          * Namespace for lock pings
          */
-        static const string lockPingNS;
+        static const std::string lockPingNS;
 
         /**
          * Namespace for locks
          */
-        static const string locksNS;
+        static const std::string locksNS;
 
         const ConnectionString _conn;
-        const string _name;
-        const string _processId;
+        const std::string _name;
+        const std::string _processId;
 
         // Timeout for lock, usually LOCK_TIMEOUT
         const unsigned long long _lockTimeout;
@@ -187,7 +223,7 @@ namespace mongo {
 
         // May or may not exist, depending on startup
         mongo::mutex _mutex;
-        string _threadId;
+        std::string _threadId;
 
     };
 
@@ -248,7 +284,7 @@ namespace mongo {
          * Returns false if the lock is known _not_ to be held, otherwise asks the underlying
          * lock to issue a 'isLockHeld' call and returns whatever that calls does.
          */
-        bool isLockHeld( double timeout, string* errMsg) {
+        bool isLockHeld( double timeout, std::string* errMsg) {
             if ( !_lock ) {
                 *errMsg = "Lock is not currently set up";
                 return false;
@@ -270,7 +306,7 @@ namespace mongo {
         DistributedLock * _lock;
         bool _got;
         BSONObj _other;
-        string _why;
+        std::string _why;
     };
 
     /**
@@ -281,7 +317,7 @@ namespace mongo {
     class MONGO_CLIENT_API ScopedDistributedLock {
     public:
 
-        ScopedDistributedLock(const ConnectionString& conn, const string& name);
+        ScopedDistributedLock(const ConnectionString& conn, const std::string& name);
 
         virtual ~ScopedDistributedLock();
 
@@ -293,7 +329,7 @@ namespace mongo {
          *
          * @return if the lock was successfully acquired
          */
-        virtual bool tryAcquire(string* errMsg);
+        virtual bool tryAcquire(std::string* errMsg);
 
         /**
          * Tries to unlock the lock if acquired.  Cannot report an error or block indefinitely
@@ -312,7 +348,7 @@ namespace mongo {
          * waitForMillis = -1 indicates we should retry indefinitely.
          * @return true if the lock was acquired
          */
-        bool acquire(long long waitForMillis, string* errMsg);
+        bool acquire(long long waitForMillis, std::string* errMsg);
 
         bool isAcquired() const {
             return _acquired;
@@ -330,17 +366,17 @@ namespace mongo {
             return _lockTryIntervalMillis;
         }
 
-        void setLockMessage(const string& why) {
+        void setLockMessage(const std::string& why) {
             _why = why;
         }
 
-        string getLockMessage() const {
+        std::string getLockMessage() const {
             return _why;
         }
 
     private:
         DistributedLock _lock;
-        string _why;
+        std::string _why;
         long long _lockTryIntervalMillis;
 
         bool _acquired;

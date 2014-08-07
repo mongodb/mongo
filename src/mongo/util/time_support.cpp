@@ -1,16 +1,28 @@
 /*    Copyright 2010 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/platform/basic.h"
@@ -40,7 +52,23 @@
 #define snprintf _snprintf
 #endif
 
+#ifdef __sunos__
+// Some versions of Solaris do not have timegm defined, so fall back to our implementation when
+// building on Solaris.  See SERVER-13446.
+extern "C" time_t
+timegm(struct tm *const tmp);
+#endif
+
 namespace mongo {
+
+    bool Date_t::isFormatable() const {
+        if (sizeof(time_t) == sizeof(int32_t)) {
+            return millis < 2147483647000ULL; // "2038-01-19T03:14:07Z"
+        }
+        else {
+            return millis < 32535215999000ULL; // "3000-12-31T23:59:59Z"
+        }
+    }
 
     // jsTime_virtual_skew is just for testing. a test command manipulates it.
     long long jsTime_virtual_skew = 0;
@@ -110,21 +138,30 @@ namespace mongo {
         return buf;
     }
 
-    static inline std::string _dateToISOString(Date_t date, bool local) {
-        const int bufSize = 32;
-        char buf[bufSize];
+namespace {
+    struct DateStringBuffer {
+        static const int dataCapacity = 64;
+        char data[dataCapacity];
+        int size;
+    };
+
+    void _dateToISOString(Date_t date, bool local, DateStringBuffer* result) {
+        invariant(date.isFormatable());
+        static const int bufSize = DateStringBuffer::dataCapacity;
+        char* const buf = result->data;
         struct tm t;
         time_t_to_Struct(date.toTimeT(), &t, local);
         int pos = strftime(buf, bufSize, MONGO_ISO_DATE_FMT_NO_TZ, &t);
-        fassert(16981, 0 < pos);
+        dassert(0 < pos);
         char* cur = buf + pos;
         int bufRemaining = bufSize - pos;
         pos = snprintf(cur, bufRemaining, ".%03d", static_cast<int32_t>(date.asInt64() % 1000));
-        fassert(16982, bufRemaining > pos && pos > 0);
+        dassert(bufRemaining > pos && pos > 0);
         cur += pos;
         bufRemaining -= pos;
         if (local) {
-            fassert(16983, bufRemaining >= 6);
+            static const int localTzSubstrLen = 5;
+            dassert(bufRemaining >= localTzSubstrLen + 1);
 #ifdef _WIN32
             // NOTE(schwerin): The value stored by _get_timezone is the value one adds to local time
             // to get UTC.  This is opposite of the ISO-8601 meaning of the timezone offset.
@@ -138,29 +175,74 @@ namespace mongo {
             const long tzOffsetSeconds = msTimeZone* (tzIsWestOfUTC ? 1 : -1);
             const long tzOffsetHoursPart = tzOffsetSeconds / 3600;
             const long tzOffsetMinutesPart = (tzOffsetSeconds / 60) % 60;
-            snprintf(cur, 6, "%c%02ld%02ld",
+            snprintf(cur, localTzSubstrLen + 1, "%c%02ld%02ld",
                      tzIsWestOfUTC ? '-' : '+',
                      tzOffsetHoursPart,
                      tzOffsetMinutesPart);
 #else
             strftime(cur, bufRemaining, "%z", &t);
 #endif
+            cur += localTzSubstrLen;
         }
         else {
-            fassert(16984, bufRemaining >= 2);
+            dassert(bufRemaining >= 2);
             *cur = 'Z';
             ++cur;
-            *cur = '\0';
         }
-        return buf;
+        result->size = cur - buf;
+        dassert(result->size < DateStringBuffer::dataCapacity);
     }
 
+    void _dateToCtimeString(Date_t date, DateStringBuffer* result) {
+        static const size_t ctimeSubstrLen = 19;
+        static const size_t millisSubstrLen = 4;
+        time_t t = date.toTimeT();
+#if defined(_WIN32)
+        ctime_s(result->data, sizeof(result->data), &t);
+#else
+        ctime_r(&t, result->data);
+#endif
+        char* milliSecStr = result->data + ctimeSubstrLen;
+        snprintf(milliSecStr, millisSubstrLen + 1, ".%03d", static_cast<int32_t>(date.asInt64() % 1000));
+        result->size = ctimeSubstrLen + millisSubstrLen;
+    }
+}  // namespace
+
     std::string dateToISOStringUTC(Date_t date) {
-        return _dateToISOString(date, false);
+        DateStringBuffer buf;
+        _dateToISOString(date, false, &buf);
+        return std::string(buf.data, buf.size);
     }
 
     std::string dateToISOStringLocal(Date_t date) {
-        return _dateToISOString(date, true);
+        DateStringBuffer buf;
+        _dateToISOString(date, true, &buf);
+        return std::string(buf.data, buf.size);
+    }
+
+    std::string dateToCtimeString(Date_t date) {
+        DateStringBuffer buf;
+        _dateToCtimeString(date, &buf);
+        return std::string(buf.data, buf.size);
+    }
+
+    void outputDateAsISOStringUTC(std::ostream& os, Date_t date) {
+        DateStringBuffer buf;
+        _dateToISOString(date, false, &buf);
+        os << StringData(buf.data, buf.size);
+    }
+
+    void outputDateAsISOStringLocal(std::ostream& os, Date_t date) {
+        DateStringBuffer buf;
+        _dateToISOString(date, true, &buf);
+        os << StringData(buf.data, buf.size);
+
+    }
+
+    void outputDateAsCtime(std::ostream& os, Date_t date) {
+        DateStringBuffer buf;
+        _dateToCtimeString(date, &buf);
+        os << StringData(buf.data, buf.size);
     }
 
 namespace {
@@ -629,19 +711,6 @@ namespace {
         return millis / 1000;
     }
 
-    std::string dateToCtimeString(Date_t date) {
-        time_t t = date.toTimeT();
-        char buf[64];
-#if defined(_WIN32)
-        ctime_s(buf, sizeof(buf), &t);
-#else
-        ctime_r(&t, buf);
-#endif
-        char* milliSecStr = buf + 19;
-        snprintf(milliSecStr, 5, ".%03d", static_cast<int32_t>(date.asInt64() % 1000));
-        return buf;
-    }
-
     boost::gregorian::date currentDate() {
         boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
         return now.date();
@@ -672,37 +741,6 @@ namespace {
     void sleepmillis(long long s) {
         fassert(16228, s <= 0xffffffff );
         Sleep((DWORD) s);
-    }
-    void sleepmicros(long long s) {
-        if ( s <= 0 )
-            return;
-        boost::xtime xt;
-        boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
-        xt.sec += (int)( s / 1000000 );
-        xt.nsec += (int)(( s % 1000000 ) * 1000);
-        if ( xt.nsec >= 1000000000 ) {
-            xt.nsec -= 1000000000;
-            xt.sec++;
-        }
-        boost::thread::sleep(xt);
-    }
-#elif defined(__sunos__)
-    void sleepsecs(int s) {
-        boost::xtime xt;
-        boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
-        xt.sec += s;
-        boost::thread::sleep(xt);
-    }
-    void sleepmillis(long long s) {
-        boost::xtime xt;
-        boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
-        xt.sec += (int)( s / 1000 );
-        xt.nsec += (int)(( s % 1000 ) * 1000000);
-        if ( xt.nsec >= 1000000000 ) {
-            xt.nsec -= 1000000000;
-            xt.sec++;
-        }
-        boost::thread::sleep(xt);
     }
     void sleepmicros(long long s) {
         if ( s <= 0 )

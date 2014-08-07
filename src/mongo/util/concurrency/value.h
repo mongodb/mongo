@@ -1,5 +1,5 @@
 /* @file value.h
-   concurrency helpers DiagStr, Guarded
+   concurrency helpers DiagStr
 */
 
 /**
@@ -36,43 +36,22 @@
 
 namespace mongo {
 
-    /** declare that a variable that is "guarded" by a mutex.
-
-        The decl documents the rule.  For example "counta and countb are guarded by xyzMutex":
-
-          Guarded<int, xyzMutex> counta;
-          Guarded<int, xyzMutex> countb;
-
-        Upon use, specify the scoped_lock object.  This makes it hard for someone 
-        later to forget to be in the lock.  Check is made that it is the right lock in _DEBUG
-        builds at runtime.
-    */
-    template <typename T, SimpleMutex& BY>
-    class Guarded {
-        T _val;
-    public:
-        T& ref(const SimpleMutex::scoped_lock& lk) {
-            dassert( &lk.m() == &BY );
-            return _val;
-        }
-    };
-
     // todo: rename this to ThreadSafeString or something
     /** there is now one mutex per DiagStr.  If you have hundreds or millions of
         DiagStrs you'll need to do something different.
     */
     class DiagStr {
         mutable SpinLock m;
-        string _s;
+        std::string _s;
     public:
         DiagStr(const DiagStr& r) : _s(r.get()) { }
-        DiagStr(const string& r) : _s(r) { }
+        DiagStr(const std::string& r) : _s(r) { }
         DiagStr() { }
         bool empty() const { 
             scoped_spinlock lk(m);
             return _s.empty();
         }
-        string get() const { 
+        std::string get() const {
             scoped_spinlock lk(m);
             return _s;
         }
@@ -80,18 +59,18 @@ namespace mongo {
             scoped_spinlock lk(m);
             _s = s;
         }
-        void set(const string& s) { 
+        void set(const std::string& s) {
             scoped_spinlock lk(m);
             _s = s;
         }
-        operator string() const { return get(); }
-        void operator=(const string& s) { set(s); }
+        operator std::string() const { return get(); }
+        void operator=(const std::string& s) { set(s); }
         void operator=(const DiagStr& rhs) { 
             set( rhs.get() );
         }
 
         // == is not defined.  use get() == ... instead.  done this way so one thinks about if composing multiple operations
-        bool operator==(const string& s) const; 
+        bool operator==(const std::string& s) const;
     };
 
 }

@@ -28,28 +28,34 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/algorithm/string.hpp>
 
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/connections.h"
+#include "mongo/db/repl/heartbeat.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/text.h"
 
-using namespace bson;
-
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
+
+namespace repl {
 
     mongo::mutex ReplSetConfig::groupMx("RS tag group");
     const int ReplSetConfig::DEFAULT_HB_TIMEOUT = 10;
 
-    static AtomicUInt _warnedAboutVotes = 0;
-    void logOpInitiate(const bo&);
+namespace {
+    AtomicUInt32 _warnedAboutVotes;
 
     void assertOnlyHas(BSONObj o, const set<string>& fields) {
         BSONObj::iterator i(o);
@@ -60,18 +66,20 @@ namespace mongo {
             }
         }
     }
+} // namespace
 
     list<HostAndPort> ReplSetConfig::otherMemberHostnames() const {
         list<HostAndPort> L;
-        for( vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); i++ ) {
-            if( !i->h.isSelf() )
+        for (vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); i++) {
+            if (!isSelf(i->h)) {
                 L.push_back(i->h);
+            }
         }
         return L;
     }
 
     /* comment MUST only be set when initiating the set by the initiator */
-    void ReplSetConfig::saveConfigLocally(bo comment) {
+    void ReplSetConfig::saveConfigLocally(OperationContext* txn, bo comment) {
         checkRsConfig();
 
         BSONObj newConfigBSON = asBson();
@@ -79,15 +87,17 @@ namespace mongo {
         log() << "replSet info saving a newer config version to local.system.replset: "
               << newConfigBSON << rsLog;
         {
-            Client::WriteContext cx( rsConfigNs );
+            Client::WriteContext cx(txn, rsConfigNs);
 
             //theReplSet->lastOpTimeWritten = ??;
             //rather than above, do a logOp()? probably
-            Helpers::putSingletonGod(rsConfigNs.c_str(),
+            Helpers::putSingletonGod(txn,
+                                     rsConfigNs.c_str(),
                                      newConfigBSON,
                                      false/*logOp=false; local db so would work regardless...*/);
             if( !comment.isEmpty() && (!theReplSet || theReplSet->isPrimary()) )
-                logOpInitiate(comment);
+                logOpInitiate(txn, comment);
+            cx.commit();
         }
         log() << "replSet saveConfigLocally done" << rsLog;
     }
@@ -183,38 +193,8 @@ namespace mongo {
         uassert(13438, "bad slaveDelay value", slaveDelay >= 0 && slaveDelay <= 3600 * 24 * 366);
         uassert(13439, "priority must be 0 when hidden=true", priority == 0 || !hidden);
         uassert(13477, "priority must be 0 when buildIndexes=false", buildIndexes || priority == 0);
+        uassert(17492, "arbiter must vote (cannot have 0 votes)", !arbiterOnly || votes > 0);
     }
-/*
-    string ReplSetConfig::TagSubgroup::toString() const {
-        bool first = true;
-        string result = "\""+name+"\": [";
-        for (set<const MemberCfg*>::const_iterator i = m.begin(); i != m.end(); i++) {
-            if (!first) {
-                result += ", ";
-            }
-            first = false;
-            result += (*i)->h.toString();
-        }
-        return result+"]";
-    }
-    */
-    string ReplSetConfig::TagClause::toString() const {
-        string result = name+": {";
-        for (map<string,TagSubgroup*>::const_iterator i = subgroups.begin(); i != subgroups.end(); i++) {
-//TEMP?            result += (*i).second->toString()+", ";
-        }
-        result += "TagClause toString TEMPORARILY DISABLED";
-        return result + "}";
-    }
-
-    string ReplSetConfig::TagRule::toString() const {
-        string result = "{";
-        for (vector<TagClause*>::const_iterator it = clauses.begin(); it < clauses.end(); it++) {
-            result += ((TagClause*)(*it))->toString()+",";
-        }
-        return result+"}";
-    }
-
     void ReplSetConfig::TagSubgroup::updateLast(const OpTime& op) {
         RACECHECK
         if (last < op) {
@@ -266,21 +246,20 @@ namespace mongo {
         @param n new config
         */
     /*static*/
-    bool ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n, string& errmsg) {
+    Status ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n) {
         verify( theReplSet );
 
         if( o._id != n._id ) {
-            errmsg = "set name may not change";
-            return false;
+            return Status(ErrorCodes::InvalidReplicaSetConfig, "set name may not change");
         }
         /* TODO : wonder if we need to allow o.version < n.version only, which is more lenient.
                   if someone had some intermediate config this node doesnt have, that could be
                   necessary.  but then how did we become primary?  so perhaps we are fine as-is.
                   */
         if( o.version >= n.version ) {
-            errmsg = str::stream() << "version number must increase, old: "
-                                   << o.version << " new: " << n.version;
-            return false;
+            return Status(ErrorCodes::InvalidReplicaSetConfig,
+                          str::stream() << "version number must increase, old: "
+                                   << o.version << " new: " << n.version);
         }
 
         map<HostAndPort,const ReplSetConfig::MemberCfg*> old;
@@ -316,13 +295,14 @@ namespace mongo {
                     uasserted(13510, "arbiterOnly may not change for members");
                 }
             }
-            if( m.h.isSelf() )
+            if (isSelf(m.h)) {
                 me++;
+            }
         }
 
         uassert(13433, "can't find self in new replset config", me == 1);
 
-        return true;
+        return Status::OK();
     }
 
     void ReplSetConfig::clear() {
@@ -351,6 +331,7 @@ namespace mongo {
     }
 
     void ReplSetConfig::checkRsConfig() const {
+        const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         uassert(13132,
                 str::stream() << "nonmatching repl set name in _id field: " << _id << " vs. "
                               << replSettings.ourSetName(),
@@ -358,6 +339,11 @@ namespace mongo {
         uassert(13308, "replSet bad config version #", version > 0);
         uassert(13133, "replSet bad config no members", members.size() >= 1);
         uassert(13309, "replSet bad config maximum number of members is 12", members.size() <= 12);
+        if (!getLastErrorDefaults.isEmpty() && getLastErrorDefaults.hasField("w")
+                && getLastErrorDefaults["w"].isNumber()) {
+            uassert(17505, "replSet illegal config: getLastErrorDefaults w:0",
+                    getLastErrorDefaults["w"].safeNumberLong() != 0);
+        }
         {
             unsigned voters = 0;
             for( vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); ++i ) {
@@ -451,7 +437,7 @@ namespace mongo {
                          cfg != (*sgs).second->m.end(); 
                          cfg++) 
                     {
-                        if ((*cfg)->h.isSelf()) {
+                        if (isSelf((*cfg)->h)) {
                             node->actualTarget--;
                             foundMe = true;
                         }
@@ -481,7 +467,6 @@ namespace mongo {
             }
 
             // if we got here, this is a valid rule
-            LOG(1) << "replSet new rule " << rule.fieldName() << ": " << r->toString() << rsLog;
             rules[rule.fieldName()] = r;
         }
     }
@@ -491,7 +476,6 @@ namespace mongo {
         static const set<string> legals(legal, legal + 4);
         assertOnlyHas(o, legals);
 
-        md5 = o.md5();
         _id = o["_id"].String();
         if( o["version"].ok() ) {
             version = o["version"].numberInt();
@@ -520,24 +504,23 @@ namespace mongo {
                 static const set<string> legals(legal, legal + 10);
                 assertOnlyHas(mobj, legals);
 
-                try {
-                    m._id = (int) mobj["_id"].Number();
-                }
-                catch(...) {
-                    /* TODO: use of string exceptions may be problematic for reconfig case! */
-                    throw "_id must be numeric";
-                }
+                uassert(18519, "_id must be numeric", mobj["_id"].isNumber());
+                m._id = mobj["_id"].numberInt();
+
                 try {
                     string s = mobj["host"].String();
                     boost::trim(s);
                     m.h = HostAndPort(s);
                     if ( !m.h.hasPort() ) {
                         // make port explicit even if default 
-                        m.h.setPort(m.h.port());
+                        m.h = HostAndPort(m.h.host(), m.h.port());
                     }
                 }
-                catch(...) {
-                    throw string("bad or missing host field? ") + mobj.toString();
+                catch (const DBException& e) {
+                    uasserted(18520,
+                              mongoutils::str::stream() <<
+                                      "bad or missing host field in member config object " <<
+                                      mobj.toString() << causedBy(e));
                 }
                 if( m.h.isLocalHost() )
                     localhosts++;
@@ -551,7 +534,7 @@ namespace mongo {
                     m.priority = mobj["priority"].Number();
                 if( mobj.hasElement("votes") )
                     m.votes = (unsigned) mobj["votes"].Number();
-                if (m.votes > 1 && !_warnedAboutVotes) {
+                if (m.votes > 1 && (_warnedAboutVotes.load() == 0)) {
                     log() << "\t\tWARNING: Having more than 1 vote on a single replicaset member is"
                           << startupWarningsLog;
                     log() << "\t\tdeprecated, as it causes issues with majority write concern. For"
@@ -559,7 +542,7 @@ namespace mongo {
                     log() << "\t\tmore information, see "
                           << "http://dochub.mongodb.org/core/replica-set-votes-deprecated"
                           << startupWarningsLog;
-                    _warnedAboutVotes.set(1);
+                    _warnedAboutVotes.store(1);
                 }
                 if( mobj.hasElement("tags") ) {
                     const BSONObj &t = mobj["tags"].Obj();
@@ -598,7 +581,6 @@ namespace mongo {
             if( settings["getLastErrorModes"].ok() ) {
                 parseRules(settings["getLastErrorModes"].Obj());
             }
-            ho.check();
             try { getLastErrorDefaults = settings["getLastErrorDefaults"].Obj().copy(); }
             catch(...) { }
 
@@ -627,10 +609,6 @@ namespace mongo {
         return _heartbeatTimeout;
     }
 
-    static inline void configAssert(bool expr) {
-        uassert(13122, "bad repl set config?", expr);
-    }
-
     ReplSetConfig::ReplSetConfig() :
         version(EMPTYCONFIG),
         _chainingAllowed(true),
@@ -646,17 +624,15 @@ namespace mongo {
     }
 
     void ReplSetConfig::init(BSONObj cfg, bool force) {
-        _constructed = false;
         clear();
         from(cfg);
         if( force ) {
             version += rand() % 100000 + 10000;
         }
-        configAssert( version < 0 /*unspecified*/ || (version >= 1) );
+        uassert(13122, "bad repl set config?", version < 0 /*unspecified*/ || (version >= 1) );
         if( version < 1 )
             version = 1;
         _ok = true;
-        _constructed = true;
     }
 
     ReplSetConfig* ReplSetConfig::make(const HostAndPort& h) {
@@ -680,7 +656,6 @@ namespace mongo {
     void ReplSetConfig::init(const HostAndPort& h) {
         LOG(2) << "ReplSetConfig load " << h.toString() << rsLog;
 
-        _constructed = false;
         clear();
         int level = 2;
         DEV level = 0;
@@ -688,12 +663,12 @@ namespace mongo {
         BSONObj cfg;
         int v = -5;
         try {
-            if( h.isSelf() ) {
+            if (isSelf(h)) {
                 ;
             }
             else {
                 /* first, make sure other node is configured to be a replset. just to be safe. */
-                string setname = replSettings.ourSetName();
+                string setname = getGlobalReplicationCoordinator()->getSettings().ourSetName();
                 BSONObj cmd = BSON( "replSetHeartbeat" << setname );
                 int theirVersion;
                 BSONObj info;
@@ -727,7 +702,7 @@ namespace mongo {
                 count = conn.count(rsConfigNs);
             }
             catch ( DBException& ) {
-                if ( !h.isSelf() ) {
+                if (!isSelf(h)) {
                     throw;
                 }
 
@@ -755,8 +730,8 @@ namespace mongo {
         from(cfg);
         checkRsConfig();
         _ok = true;
-        LOG(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
-        _constructed = true;
+        LOG(level) << "replSet load config ok from " << (isSelf(h) ? "self" : h.toString()) << rsLog;
     }
 
-}
+} // namespace repl
+} // namespace mongo

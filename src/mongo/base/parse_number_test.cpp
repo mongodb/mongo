@@ -300,6 +300,7 @@ namespace {
 #if !(defined(_WIN32) || defined(__sunos__))
         // Parse hexadecimal representations of a double.  Hex literals not supported by MSVC, and
         // not parseable by the Windows SDK libc or the Solaris libc in the mode we build.
+        // See SERVER-14131.
 
         ASSERT_PARSES(double, "0xff", 0xff);
         ASSERT_PARSES(double, "-0xff", -0xff);

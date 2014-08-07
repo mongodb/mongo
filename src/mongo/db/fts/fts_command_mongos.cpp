@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include <map>
 #include <string>
 #include <vector>
@@ -36,10 +38,14 @@
 
 #include "mongo/db/fts/fts_command.h"
 #include "mongo/s/strategy.h"
+#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
+
     namespace fts {
 
         struct Scored {
@@ -54,11 +60,8 @@ namespace mongo {
             double score;
         };
 
-
-        // all grid commands are designed not to lock
-        Command::LockType FTSCommand::locktype() const { return NONE; }
-
-        bool FTSCommand::_run(const string& dbName,
+        bool FTSCommand::_run(OperationContext* txn,
+                              const string& dbName,
                               BSONObj& cmdObj,
                               int cmdOptions,
                               const string& ns,

@@ -516,6 +516,10 @@ function IndexDataGenerator(options) {
             else {
             }
         }
+        // The region specified in a 2d index must be positive
+        if (attributes["min"] >= attributes["max"]) {
+            attributes["max"] = attributes["min"] + attributes["max"];
+        }
         return attributes;
     }
 
@@ -524,6 +528,24 @@ function IndexDataGenerator(options) {
         // When using a haystack index, the following additional index properties are required:
         // { "bucketSize" : <bucket value> }
         attributes["bucketSize"] = (seed * 10000) % 100 + 10;
+        return attributes;
+    }
+
+    function GenTextIndexOptions(seed) {
+        var attributes = GenIndexOptions(seed);
+        // When using a text index, the following additional index properties are required when
+        // downgrading from 2.6:
+        // { "textIndexVersion" : 1 }
+        attributes["textIndexVersion"] = 1
+        return attributes;
+    }
+
+    function Gen2dSphereIndexOptions(seed) {
+        var attributes = GenIndexOptions(seed);
+        // When using a 2dsphere index, the following additional index properties are required when
+        // downgrading from 2.6:
+        // { "2dsphereIndexVersion" : 1 }
+        attributes["2dsphereIndexVersion"] = 1
         return attributes;
     }
 
@@ -551,15 +573,14 @@ function IndexDataGenerator(options) {
 
         // Geospatial Indexes
         //   2dsphere
-        { "spec" : Gen2dsphereIndex(7), "options" : GenIndexOptions(12) },
+        { "spec" : Gen2dsphereIndex(7), "options" : Gen2dSphereIndexOptions(12) },
         //   2d
         { "spec" : Gen2dIndex(8), "options" : Gen2dIndexOptions(13) },
         //   Haystack
         { "spec" : GenHaystackIndex(9), "options" : GenHaystackIndexOptions(13) },
 
         // Text Indexes
-        // XXX: This doesn't when dumping from 2.4.  See SERVER-12092
-        // { "spec" : GenTextIndex(10), "options" : GenIndexOptions(14) },
+        { "spec" : GenTextIndex(10), "options" : GenTextIndexOptions(14) },
 
         // Hashed Index
         { "spec" : GenHashedIndex(10), "options" : GenIndexOptions(14) },
@@ -607,12 +628,12 @@ function CollectionMetadataGenerator(options) {
         if (options.hasOwnProperty(option)) {
             if (option === 'capped') {
                 if (typeof(options['capped']) !== 'boolean') {
-                    throw "\"capped\" options must be boolean in CollectionMetadataGenerator";
+                    throw Error("\"capped\" options must be boolean in CollectionMetadataGenerator");
                 }
                 capped = options['capped'];
             }
             else {
-                throw "Unsupported key in options passed to CollectionMetadataGenerator: " + option;
+                throw Error("Unsupported key in options passed to CollectionMetadataGenerator: " + option);
             }
         }
     }

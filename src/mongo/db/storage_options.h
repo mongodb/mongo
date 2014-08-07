@@ -42,18 +42,16 @@ namespace mongo {
     struct StorageGlobalParams {
 
         StorageGlobalParams() :
-#ifdef _WIN32
-            dbpath("\\data\\db\\"),
-#else
-            dbpath("/data/db/"),
-#endif
+            engine("mmapv1"),
+            dbpath(kDefaultDbPath),
             directoryperdb(false),
+            upgrade(false),
+            repair(false),
             lenForNewNsFiles(16 * 1024 * 1024),
             preallocj(true),
             journalCommitInterval(0), // 0 means use default
             quota(false), quotaFiles(8),
-            syncdelay(60),
-            useHints(true)
+            syncdelay(60)
         {
             repairpath = dbpath;
             dur = false;
@@ -67,8 +65,14 @@ namespace mongo {
 #endif
         }
 
+        std::string engine;
         std::string dbpath;
+        static const char* kDefaultDbPath;
+        static const char* kDefaultConfigDbPath;
+
         bool directoryperdb;
+        bool upgrade;
+        bool repair;
         std::string repairpath;
         unsigned lenForNewNsFiles;
 
@@ -100,15 +104,11 @@ namespace mongo {
         int quotaFiles;        // --quotaFiles
 
         double syncdelay;      // seconds between fsyncs
-
-        bool useHints;         // only off if --nohints
     };
 
     extern StorageGlobalParams storageGlobalParams;
 
     bool isJournalingEnabled();
-    void setJournalCommitInterval(unsigned newValue);
-    unsigned getJournalCommitInterval();
 
     // This is not really related to persistence, but mongos and the other executables share code
     // and we use this function to determine at runtime which executable we are in.

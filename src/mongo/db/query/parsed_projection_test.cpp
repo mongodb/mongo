@@ -45,17 +45,24 @@ namespace {
     // creation function
     //
 
-    ParsedProjection* createParsedProjection(const char* queryStr, const char* projStr) {
-        BSONObj query = fromjson(queryStr);
-        BSONObj projObj = fromjson(projStr);
+    ParsedProjection* createParsedProjection(const BSONObj& query, const BSONObj& projObj) {
         StatusWithMatchExpression swme = MatchExpressionParser::parse(query);
         ASSERT(swme.isOK());
         MatchExpression* queryMatchExpr = swme.getValue();
         ParsedProjection* out = NULL;
         Status status = ParsedProjection::make(projObj, queryMatchExpr, &out);
-        ASSERT(status.isOK());
+        if (!status.isOK()) {
+            FAIL(mongoutils::str::stream() << "failed to parse projection " << projObj
+                                           << " (query: " << query << "): " << status.toString());
+        }
         ASSERT(out);
         return out;
+    }
+
+    ParsedProjection* createParsedProjection(const char* queryStr, const char* projStr) {
+        BSONObj query = fromjson(queryStr);
+        BSONObj projObj = fromjson(projStr);
+        return createParsedProjection(query, projObj);
     }
 
     //
@@ -101,6 +108,14 @@ namespace {
         const vector<string>& fields = parsedProj->getRequiredFields();
         ASSERT_EQUALS(fields.size(), 1U);
         ASSERT_EQUALS(fields[0], "a");
+    }
+
+    TEST(ParsedProjectionTest, MakeSingleFieldIDCovered) {
+        auto_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: 1}"));
+        ASSERT(!parsedProj->requiresDocument());
+        const vector<string>& fields = parsedProj->getRequiredFields();
+        ASSERT_EQUALS(fields.size(), 1U);
+        ASSERT_EQUALS(fields[0], "_id");
     }
 
     // boolean support is undocumented
@@ -175,4 +190,25 @@ namespace {
         ASSERT(!status.isOK());
     }
 
+    //
+    // DBRef projections
+    //
+
+    TEST(ParsedProjectionTest, DBRefProjections) {
+        // non-dotted
+        createParsedProjection(BSONObj(), BSON( "$ref" <<  1));
+        createParsedProjection(BSONObj(), BSON( "$id" <<  1));
+        createParsedProjection(BSONObj(), BSON( "$ref" <<  1));
+        // dotted before
+        createParsedProjection("{}", "{'a.$ref': 1}");
+        createParsedProjection("{}", "{'a.$id': 1}");
+        createParsedProjection("{}", "{'a.$db': 1}");
+        // dotted after
+        createParsedProjection("{}", "{'$id.a': 1}");
+        // position operator on $id
+        // $ref and $db hold the collection and database names respectively,
+        // so these fields cannot be arrays.
+        createParsedProjection("{'a.$id': {$elemMatch: {x: 1}}}", "{'a.$id.$': 1}");
+
+    }
 } // unnamed namespace

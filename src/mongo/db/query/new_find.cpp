@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/query/new_find.h"
 
 #include "mongo/client/dbclientinterface.h"
@@ -33,16 +35,15 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/oplogstart.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/kill_current_op.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_constants.h"
-#include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/single_solution_runner.h"
-#include "mongo/db/query/type_explain.h"
-#include "mongo/db/repl/repl_reads_ok.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
@@ -50,6 +51,8 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -90,14 +93,39 @@ namespace {
         return n >= pq.getNumToReturn();
     }
 
+    /**
+     * Returns true if 'me' is a GTE or GE predicate over the "ts" field.
+     * Such predicates can be used for the oplog start hack.
+     */
+    bool isOplogTsPred(const mongo::MatchExpression* me) {
+        if (mongo::MatchExpression::GT != me->matchType()
+            && mongo::MatchExpression::GTE != me->matchType()) {
+            return false;
+        }
+
+        return mongoutils::str::equals(me->path().rawData(), "ts");
+    }
+
 }  // namespace
 
 namespace mongo {
 
-    // XXX clean up
-    static bool runCommands(const char *ns, BSONObj& jsobj, CurOp& curop, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
+
+    // Failpoint for checking whether we've received a getmore.
+    MONGO_FP_DECLARE(failReceivedGetmore);
+
+    // TODO: Move this and the other command stuff in newRunQuery outta here and up a level.
+    static bool runCommands(OperationContext* txn,
+                            const char *ns,
+                            BSONObj& jsobj,
+                            CurOp& curop,
+                            BufBuilder &b,
+                            BSONObjBuilder& anObjBuilder,
+                            bool fromRepl,
+                            int queryOptions) {
         try {
-            return _runCommands(ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
+            return _runCommands(txn, ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
         }
         catch( SendStaleConfigException& ){
             throw;
@@ -115,27 +143,43 @@ namespace mongo {
 
     /**
      * Also called by db/ops/query.cpp.  This is the new getMore entry point.
+     *
+     * pass - when QueryOption_AwaitData is in use, the caller will make repeated calls 
+     *        when this method returns an empty result, incrementing pass on each call.  
+     *        Thus, pass == 0 indicates this is the first "attempt" before any 'awaiting'.
      */
-    QueryResult* newGetMore(const char* ns, int ntoreturn, long long cursorid, CurOp& curop,
-                            int pass, bool& exhaust, bool* isCursorAuthorized) {
-        exhaust = false;
-        int bufSize = 512 + sizeof(QueryResult) + MaxBytesToReturnToClientAtOnce;
+    QueryResult* newGetMore(OperationContext* txn,
+                            const char* ns,
+                            int ntoreturn,
+                            long long cursorid,
+                            CurOp& curop,
+                            int pass,
+                            bool& exhaust,
+                            bool* isCursorAuthorized) {
 
-        BufBuilder bb(bufSize);
-        bb.skip(sizeof(QueryResult));
+        // For testing, we may want to fail if we receive a getmore.
+        if (MONGO_FAIL_POINT(failReceivedGetmore)) {
+            invariant(0);
+        }
+
+        exhaust = false;
 
         // This is a read lock.
-        scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(ns));
-        Collection* collection = ctx->ctx().db()->getCollection(ns);
+        scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(txn, ns));
+        Collection* collection = ctx->ctx().db()->getCollection(txn, ns);
         uassert( 17356, "collection dropped between getMore calls", collection );
 
-        QLOG() << "running getMore in new system, cursorid " << cursorid << endl;
+        QLOG() << "Running getMore, cursorid: " << cursorid << endl;
 
         // This checks to make sure the operation is allowed on a replicated node.  Since we are not
         // passing in a query object (necessary to check SlaveOK query option), the only state where
         // reads are allowed is PRIMARY (or master in master/slave).  This function uasserts if
         // reads are not okay.
-        replVerifyReadsOk();
+        Status status = repl::getGlobalReplicationCoordinator()->canServeReadsFor(
+                txn,
+                NamespaceString(ns),
+                true);
+        uassertStatusOK(status);
 
         // A pin performs a CC lookup and if there is a CC, increments the CC's pin value so it
         // doesn't time out.  Also informs ClientCursor that there is somebody actively holding the
@@ -148,6 +192,10 @@ namespace mongo {
 
         int numResults = 0;
         int startingResult = 0;
+
+        const int InitialBufSize = 512 + sizeof(QueryResult) + MaxBytesToReturnToClientAtOnce;
+        BufBuilder bb(InitialBufSize);
+        bb.skip(sizeof(QueryResult));
 
         if (NULL == cc) {
             cursorid = 0;
@@ -167,12 +215,11 @@ namespace mongo {
             // If the operation that spawned this cursor had a time limit set, apply leftover
             // time to this getmore.
             curop.setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
-            killCurrentOp.checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
+            txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
-            // XXX: what should we set for the curop.debug() etc. here?
-
-            // TODO: What is pass?
-            if (0 == pass) { cc->updateSlaveLocation(curop); }
+            if (0 == pass) { 
+                cc->updateSlaveLocation(txn, curop); 
+            }
 
             if (cc->isAggCursor) {
                 // Agg cursors handle their own locking internally.
@@ -188,15 +235,15 @@ namespace mongo {
             startingResult = cc->pos();
 
             // What gives us results.
-            Runner* runner = cc->getRunner();
+            PlanExecutor* exec = cc->getExecutor();
             const int queryOptions = cc->queryOptions();
 
-            // Get results out of the runner.
-            runner->restoreState();
+            // Get results out of the executor.
+            exec->restoreState(txn);
 
             BSONObj obj;
-            Runner::RunnerState state;
-            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+            PlanExecutor::ExecState state;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
                 // Add result to output buffer.
                 bb.appendBuf((void*)obj.objdata(), obj.objsize());
 
@@ -217,9 +264,7 @@ namespace mongo {
                 }
             }
 
-            // XXX: should we update the execution stats in curop.debug() here?
-
-            if (Runner::RUNNER_EOF == state && 0 == numResults
+            if (PlanExecutor::IS_EOF == state && 0 == numResults
                 && (queryOptions & QueryOption_CursorTailable)
                 && (queryOptions & QueryOption_AwaitData) && (pass < 1000)) {
                 // If the cursor is tailable we don't kill it if it's eof.  We let it try to get
@@ -227,45 +272,64 @@ namespace mongo {
                 return 0;
             }
 
+            // We save the client cursor when there might be more results, and hence we may receive
+            // another getmore. If we receive a EOF or an error, or 'exec' is dead, then we know
+            // that we will not be producing more results. We indicate that the cursor is closed by
+            // sending a cursorId of 0 back to the client.
+            //
+            // On the other hand, if we retrieve all results necessary for this batch, then
+            // 'saveClientCursor' is true and we send a valid cursorId back to the client. In
+            // this case, there may or may not actually be more results (for example, the next call
+            // to getNext(...) might just return EOF).
             bool saveClientCursor = false;
 
-            if (Runner::RUNNER_DEAD == state || Runner::RUNNER_ERROR == state) {
+            if (PlanExecutor::DEAD == state || PlanExecutor::EXEC_ERROR == state) {
+                // Propagate this error to caller.
+                if (PlanExecutor::EXEC_ERROR == state) {
+                    scoped_ptr<PlanStageStats> stats(exec->getStats());
+                    error() << "Plan executor error, stats: "
+                            << Explain::statsToBSON(*stats);
+                    uasserted(17406, "getMore executor error: " +
+                              WorkingSetCommon::toStatusString(obj));
+                }
+
                 // If we're dead there's no way to get more results.
                 saveClientCursor = false;
+
                 // In the old system tailable capped cursors would be killed off at the
                 // cursorid level.  If a tailable capped cursor is nuked the cursorid
                 // would vanish.
-                // 
+                //
                 // In the new system they die and are cleaned up later (or time out).
                 // So this is where we get to remove the cursorid.
                 if (0 == numResults) {
                     resultFlags = ResultFlag_CursorNotFound;
                 }
             }
-            else if (Runner::RUNNER_EOF == state) {
+            else if (PlanExecutor::IS_EOF == state) {
                 // EOF is also end of the line unless it's tailable.
                 saveClientCursor = queryOptions & QueryOption_CursorTailable;
             }
             else {
-                verify(Runner::RUNNER_ADVANCED == state);
+                verify(PlanExecutor::ADVANCED == state);
                 saveClientCursor = true;
             }
 
             if (!saveClientCursor) {
                 ccPin.deleteUnderlying();
-                // cc is now invalid, as is the runner
+                // cc is now invalid, as is the executor
                 cursorid = 0;
                 cc = NULL;
-                QLOG() << "getMore NOT saving client cursor, ended w/state "
-                       << Runner::statestr(state)
+                QLOG() << "getMore NOT saving client cursor, ended with state "
+                       << PlanExecutor::statestr(state)
                        << endl;
             }
             else {
                 // Continue caching the ClientCursor.
                 cc->incPos(numResults);
-                runner->saveState();
-                QLOG() << "getMore saving client cursor ended w/state "
-                       << Runner::statestr(state)
+                exec->saveState();
+                QLOG() << "getMore saving client cursor ended with state "
+                       << PlanExecutor::statestr(state)
                        << endl;
 
                 // Possibly note slave's position in the oplog.
@@ -293,28 +357,62 @@ namespace mongo {
         return qr;
     }
 
-    Status getOplogStartHack(Collection* collection, CanonicalQuery* cq, Runner** runnerOut) {
+    Status getOplogStartHack(OperationContext* txn,
+                             Collection* collection,
+                             CanonicalQuery* cq,
+                             PlanExecutor** execOut) {
+        invariant(cq);
+        auto_ptr<CanonicalQuery> autoCq(cq);
+
         if ( collection == NULL )
             return Status(ErrorCodes::InternalError,
                           "getOplogStartHack called with a NULL collection" );
 
+        // A query can only do oplog start finding if it has a top-level $gt or $gte predicate over
+        // the "ts" field (the operation's timestamp). Find that predicate and pass it to
+        // the OplogStart stage.
+        MatchExpression* tsExpr = NULL;
+        if (MatchExpression::AND == cq->root()->matchType()) {
+            // The query has an AND at the top-level. See if any of the children
+            // of the AND are $gt or $gte predicates over 'ts'.
+            for (size_t i = 0; i < cq->root()->numChildren(); ++i) {
+                MatchExpression* me = cq->root()->getChild(i);
+                if (isOplogTsPred(me)) {
+                    tsExpr = me;
+                    break;
+                }
+            }
+        }
+        else if (isOplogTsPred(cq->root())) {
+            // The root of the tree is a $gt or $gte predicate over 'ts'.
+            tsExpr = cq->root();
+        }
+
+        if (NULL == tsExpr) {
+            return Status(ErrorCodes::OplogOperationUnsupported,
+                          "OplogReplay query does not contain top-level "
+                          "$gt or $gte over the 'ts' field.");
+        }
+
         // Make an oplog start finding stage.
         WorkingSet* oplogws = new WorkingSet();
-        OplogStart* stage = new OplogStart(cq->ns(), cq->root(), oplogws);
+        OplogStart* stage = new OplogStart(txn, collection, tsExpr, oplogws);
 
         // Takes ownership of ws and stage.
-        auto_ptr<InternalRunner> runner(new InternalRunner(collection, stage, oplogws));
-        runner->setYieldPolicy(Runner::YIELD_AUTO);
+        auto_ptr<PlanExecutor> exec(new PlanExecutor(oplogws, stage, collection));
+        exec->registerExecInternalPlan();
 
         // The stage returns a DiskLoc of where to start.
         DiskLoc startLoc;
-        Runner::RunnerState state = runner->getNext(NULL, &startLoc);
+        PlanExecutor::ExecState state = exec->getNext(NULL, &startLoc);
 
         // This is normal.  The start of the oplog is the beginning of the collection.
-        if (Runner::RUNNER_EOF == state) { return getRunner(cq, runnerOut); }
+        if (PlanExecutor::IS_EOF == state) {
+            return getExecutor(txn, collection, autoCq.release(), execOut);
+        }
 
         // This is not normal.  An error was encountered.
-        if (Runner::RUNNER_ADVANCED != state) {
+        if (PlanExecutor::ADVANCED != state) {
             return Status(ErrorCodes::InternalError,
                           "quick oplog start location had error...?");
         }
@@ -323,19 +421,23 @@ namespace mongo {
 
         // Build our collection scan...
         CollectionScanParams params;
-        params.ns = cq->ns();
+        params.collection = collection;
         params.start = startLoc;
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = cq->getParsed().hasOption(QueryOption_CursorTailable);
 
         WorkingSet* ws = new WorkingSet();
-        CollectionScan* cs = new CollectionScan(params, ws, cq->root());
-        // Takes ownership of cq, cs, ws.
-        *runnerOut = new SingleSolutionRunner(collection, cq, NULL, cs, ws);
+        CollectionScan* cs = new CollectionScan(txn, params, ws, cq->root());
+        // Takes ownership of 'ws', 'cs', and 'cq'.
+        *execOut = new PlanExecutor(ws, cs, autoCq.release(), collection);
         return Status::OK();
     }
 
-    std::string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
+    std::string newRunQuery(OperationContext* txn,
+                            Message& m,
+                            QueryMessage& q,
+                            CurOp& curop,
+                            Message &result) {
         // Validate the namespace.
         const char *ns = q.ns;
         uassert(16332, "can't have an empty ns", ns[0]);
@@ -362,7 +464,7 @@ namespace mongo {
             bb.skip(sizeof(QueryResult));
 
             BSONObjBuilder cmdResBuf;
-            if (!runCommands(ns, q.query, curop, bb, cmdResBuf, false, q.queryOptions)) {
+            if (!runCommands(txn, ns, q.query, curop, bb, cmdResBuf, false, q.queryOptions)) {
                 uasserted(13530, "bad or malformed command request?");
             }
 
@@ -386,71 +488,136 @@ namespace mongo {
         // This is a read lock.  We require this because if we're parsing a $where, the
         // where-specific parsing code assumes we have a lock and creates execution machinery that
         // requires it.
-        Client::ReadContext ctx(q.ns);
-        Collection* collection = ctx.ctx().db()->getCollection( ns );
+        Client::ReadContext ctx(txn, q.ns);
+        Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
 
         // Parse the qm into a CanonicalQuery.
         CanonicalQuery* cq;
-        Status canonStatus = CanonicalQuery::canonicalize(q, &cq);
+        Status canonStatus = CanonicalQuery::canonicalize(
+                            q, &cq, WhereCallbackReal(txn, StringData(ctx.ctx().db()->name())));
         if (!canonStatus.isOK()) {
             uasserted(17287, str::stream() << "Can't canonicalize query: " << canonStatus.toString());
         }
         verify(cq);
 
-        QLOG() << "Running query on new system: " << cq->toString();
+        QLOG() << "Running query:\n" << cq->toString();
+        LOG(2) << "Running query: " << cq->toStringShort();
 
-        // Parse, canonicalize, plan, transcribe, and get a runner.
-        Runner* rawRunner = NULL;
+        // Parse, canonicalize, plan, transcribe, and get a plan executor.
+        PlanExecutor* rawExec = NULL;
 
         // We use this a lot below.
         const LiteParsedQuery& pq = cq->getParsed();
 
-        // We'll now try to get the query runner that will execute this query for us. There
-        // are a few cases in which we know upfront which runner we should get and, therefore,
-        // we shortcut the selection process here.
+        // set this outside loop. we will need to use this both within loop and when deciding
+        // to fill in explain information
+        const bool isExplain = pq.isExplain();
+
+        // New-style explains get diverted through a separate path which calls back into the
+        // query planner and query execution mechanisms.
         //
-        // (a) If the query is over a collection that doesn't exist, we get a special runner
-        // that's is so (a runner) which doesn't return results, the EOFRunner.
-        //
-        // (b) if the query is a replication's initial sync one, we get a SingleSolutinRunner
-        // that uses a specifically designed stage that skips extents faster (see details in
-        // exec/oplogstart.h)
-        //
-        // Otherwise we go through the selection of which runner is most suited to the
-        // query + run-time context at hand.
-        Status status = Status::OK();
-        if (collection == NULL) {
-            rawRunner = new EOFRunner(cq, cq->ns());
-        }
-        else if (pq.hasOption(QueryOption_OplogReplay)) {
-            status = getOplogStartHack(collection, cq, &rawRunner);
-        }
-        else {
-            // Takes ownership of cq.
+        // TODO temporary until find() becomes a real command.
+        if (isExplain && enableNewExplain) {
             size_t options = QueryPlannerParams::DEFAULT;
             if (shardingState.needCollectionMetadata(pq.ns())) {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
             }
-            status = getRunner(cq, &rawRunner, options);
+
+            BufBuilder bb;
+            bb.skip(sizeof(QueryResult));
+
+            PlanExecutor* rawExec;
+            // Takes ownership of 'cq'.
+            Status execStatus = getExecutor(txn, collection, cq, &rawExec, options);
+            if (!execStatus.isOK()) {
+                uasserted(17510, "Explain error: " + execStatus.reason());
+            }
+
+            scoped_ptr<PlanExecutor> exec(rawExec);
+            BSONObjBuilder explainBob;
+            Status explainStatus = Explain::explainStages(exec.get(), Explain::EXEC_ALL_PLANS,
+                                                          &explainBob);
+            if (!explainStatus.isOK()) {
+                uasserted(18521, "Explain error: " + explainStatus.reason());
+            }
+
+            // Add the resulting object to the return buffer.
+            BSONObj explainObj = explainBob.obj();
+            bb.appendBuf((void*)explainObj.objdata(), explainObj.objsize());
+
+            curop.debug().iscommand = true;
+            // TODO: Does this get overwritten/do we really need to set this twice?
+            curop.debug().query = q.query;
+
+            // Set query result fields.
+            QueryResult* qr = reinterpret_cast<QueryResult*>(bb.buf());
+            bb.decouple();
+            qr->setResultFlagsToOk();
+            qr->len = bb.len();
+            curop.debug().responseLength = bb.len();
+            qr->setOperation(opReply);
+            qr->cursorId = 0;
+            qr->startingFrom = 0;
+            qr->nReturned = 1;
+            result.setData(qr, true);
+            return "";
+        }
+
+        // We'll now try to get the query executor that will execute this query for us. There
+        // are a few cases in which we know upfront which executor we should get and, therefore,
+        // we shortcut the selection process here.
+        //
+        // (a) If the query is over a collection that doesn't exist, we use an EOFStage.
+        //
+        // (b) if the query is a replication's initial sync one, we use a specifically designed
+        // stage that skips extents faster (see details in exec/oplogstart.h).
+        //
+        // Otherwise we go through the selection of which executor is most suited to the
+        // query + run-time context at hand.
+        Status status = Status::OK();
+        if (collection == NULL) {
+            LOG(2) << "Collection " << ns << " does not exist."
+                   << " Using EOF stage: " << cq->toStringShort();
+            EOFStage* eofStage = new EOFStage();
+            WorkingSet* ws = new WorkingSet();
+            // Takes ownership of 'cq'.
+            rawExec = new PlanExecutor(ws, eofStage, cq, NULL);
+        }
+        else if (pq.hasOption(QueryOption_OplogReplay)) {
+            // Takes ownership of 'cq'.
+            status = getOplogStartHack(txn, collection, cq, &rawExec);
+        }
+        else {
+            size_t options = QueryPlannerParams::DEFAULT;
+            if (shardingState.needCollectionMetadata(pq.ns())) {
+                options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+            }
+            // Takes ownership of 'cq'.
+            status = getExecutor(txn, collection, cq, &rawExec, options);
         }
 
         if (!status.isOK()) {
-            // NOTE: Do not access cq as getRunner has deleted it.
+            // NOTE: Do not access cq as getExecutor has deleted it.
             uasserted(17007, "Unable to execute query: " + status.reason());
         }
 
-        verify(NULL != rawRunner);
-        auto_ptr<Runner> runner(rawRunner);
+        verify(NULL != rawExec);
+        auto_ptr<PlanExecutor> exec(rawExec);
 
         // We freak out later if this changes before we're done with the query.
         const ChunkVersion shardingVersionAtStart = shardingState.getVersion(cq->ns());
 
         // Handle query option $maxTimeMS (not used with commands).
         curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
-        killCurrentOp.checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
+        txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
-        replVerifyReadsOk(&pq);
+        bool slaveOK = pq.hasOption(QueryOption_SlaveOk) || pq.hasReadPref();
+        status = repl::getGlobalReplicationCoordinator()->canServeReadsFor(
+                txn,
+                NamespaceString(cq->ns()),
+                slaveOK);
+        uassertStatusOK(status);
 
         // If this exists, the collection is sharded.
         // If it doesn't exist, we can assume we're not sharded.
@@ -471,41 +638,28 @@ namespace mongo {
         BufBuilder bb(32768);
         bb.skip(sizeof(QueryResult));
 
-        // How many results have we obtained from the runner?
+        // How many results have we obtained from the executor?
         int numResults = 0;
 
         // If we're replaying the oplog, we save the last time that we read.
         OpTime slaveReadTill;
 
-        // Do we save the Runner in a ClientCursor for getMore calls later?
+        // Do we save the PlanExecutor in a ClientCursor for getMore calls later?
         bool saveClientCursor = false;
 
-        // We turn on auto-yielding for the runner here.  The runner registers itself with the
-        // active runners list in ClientCursor.
-        auto_ptr<ScopedRunnerRegistration> safety(new ScopedRunnerRegistration(runner.get()));
-        runner->setYieldPolicy(Runner::YIELD_AUTO);
+        // The executor registers itself with the active executors list in ClientCursor.
+        auto_ptr<ScopedExecutorRegistration> safety(new ScopedExecutorRegistration(exec.get()));
 
         BSONObj obj;
-        Runner::RunnerState state;
+        PlanExecutor::ExecState state;
         // uint64_t numMisplacedDocs = 0;
 
-        // set this outside loop. we will need to use this both within loop and when deciding
-        // to fill in explain information
-        const bool isExplain = pq.isExplain();
+        // Get summary info about which plan the executor is using.
+        PlanSummaryStats stats;
+        Explain::getSummaryStats(exec.get(), &stats);
+        curop.debug().planSummary = stats.summaryStr.c_str();
 
-        // Try to get information about the plan which the runner
-        // will use to execute the query.
-        bool gotPlanInfo = false;
-        PlanInfo* rawInfo;
-        boost::scoped_ptr<PlanInfo> planInfo;
-        Status infoStatus = runner->getInfo(NULL, &rawInfo);
-        if (infoStatus.isOK()) {
-            gotPlanInfo = true;
-            planInfo.reset(rawInfo);
-            curop.debug().planSummary = planInfo->planSummary;
-        }
-
-        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
             // Add result to output buffer. This is unnecessary if explain info is requested
             if (!isExplain) {
                 bb.appendBuf((void*)obj.objdata(), obj.objsize());
@@ -513,22 +667,6 @@ namespace mongo {
 
             // Count the result.
             ++numResults;
-
-            // In the case of the multi plan runner, we may not be able to
-            // successfully retrieve plan info until after the query starts
-            // to run. This is because the multi plan runner doesn't know what
-            // plan it will end up using until it runs candidates and selects
-            // the best.
-            //
-            // TODO: Do we ever want to output what the MPR is comparing?
-            if (!gotPlanInfo) {
-                infoStatus = runner->getInfo(NULL, &rawInfo);
-                if (infoStatus.isOK()) {
-                    gotPlanInfo = true;
-                    planInfo.reset(rawInfo);
-                    curop.debug().planSummary = planInfo->planSummary;
-                }
-            }
 
             // Possibly note slave's position in the oplog.
             if (pq.hasOption(QueryOption_OplogReplay)) {
@@ -557,36 +695,38 @@ namespace mongo {
                        << endl;
                 // If only one result requested assume it's a findOne() and don't save the cursor.
                 if (pq.wantMore() && 1 != pq.getNumToReturn()) {
-                    QLOG() << " runner EOF=" << runner->isEOF() << endl;
-                    saveClientCursor = !runner->isEOF();
+                    QLOG() << " executor EOF=" << exec->isEOF() << endl;
+                    saveClientCursor = !exec->isEOF();
                 }
                 break;
             }
         }
 
-        // If we cache the runner later, we want to deregister it as it receives notifications
+        // If we cache the executor later, we want to deregister it as it receives notifications
         // anyway by virtue of being cached.
         //
-        // If we don't cache the runner later, we are deleting it, so it must be deregistered.
+        // If we don't cache the executor later, we are deleting it, so it must be deregistered.
         //
-        // So, no matter what, deregister the runner.
+        // So, no matter what, deregister the executor.
         safety.reset();
 
-        // Caller expects exceptions thrown in certain cases:
-        // * in-memory sort using too much RAM.
-        if (Runner::RUNNER_ERROR == state) {
-            uasserted(17144, "Runner error, memory limit for sort probably exceeded");
+        // Caller expects exceptions thrown in certain cases.
+        if (PlanExecutor::EXEC_ERROR == state) {
+            scoped_ptr<PlanStageStats> stats(exec->getStats());
+            error() << "Plan executor error, stats: "
+                    << Explain::statsToBSON(*stats);
+            uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
         }
 
-        // Why save a dead runner?
-        if (Runner::RUNNER_DEAD == state) {
+        // Why save a dead executor?
+        if (PlanExecutor::DEAD == state) {
             saveClientCursor = false;
         }
         else if (pq.hasOption(QueryOption_CursorTailable)) {
             // If we're tailing a capped collection, we don't bother saving the cursor if the
             // collection is empty. Otherwise, the semantics of the tailable cursor is that the
             // client will keep trying to read from it. So we'll keep it around.
-            Collection* collection = ctx.ctx().db()->getCollection(cq->ns());
+            Collection* collection = ctx.ctx().db()->getCollection(txn, cq->ns());
             if (collection && collection->numRecords() != 0 && pq.getNumToReturn() != 1) {
                 saveClientCursor = true;
             }
@@ -601,13 +741,22 @@ namespace mongo {
                                            shardingState.getVersion(pq.ns()));
         }
 
-        // Get explain information if it is needed by either the profiler
-        // or by an explain() query.
+        // Used to fill in explain and to determine if the query is slow enough to be logged.
+        int elapsedMillis = curop.elapsedMillis();
+
+        // Get explain information if:
+        // 1) it is needed by an explain query;
+        // 2) profiling is enabled; or
+        // 3) profiling is disabled but we still need explain details to log a "slow" query.
+        // Producing explain information is expensive and should be done only if we are certain
+        // the information will be used.
         boost::scoped_ptr<TypeExplain> explain(NULL);
-        if (isExplain || ctx.ctx().db()->getProfilingLevel() > 0) {
-            // Ask the runner to produce explain information.
+        if (isExplain ||
+            ctx.ctx().db()->getProfilingLevel() > 0 ||
+            elapsedMillis > serverGlobalParams.slowMS) {
+            // Ask the executor to produce explain information.
             TypeExplain* bareExplain;
-            Status res = runner->getInfo(&bareExplain, NULL);
+            Status res = Explain::legacyExplain(exec.get(), &bareExplain);
             if (res.isOK()) {
                 explain.reset(bareExplain);
             }
@@ -636,7 +785,7 @@ namespace mongo {
             explain->setN(numResults);
 
             // Clock the whole operation.
-            explain->setMillis(curop.elapsedMillis());
+            explain->setMillis(elapsedMillis);
 
             BSONObj explainObj = explain->toBSON();
             bb.appendBuf((void*)explainObj.objdata(), explainObj.objsize());
@@ -647,21 +796,21 @@ namespace mongo {
 
         long long ccId = 0;
         if (saveClientCursor) {
-            // We won't use the runner until it's getMore'd.
-            runner->saveState();
+            // We won't use the executor until it's getMore'd.
+            exec->saveState();
 
             // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
             // inserted into a global map by its ctor.
-            ClientCursor* cc = new ClientCursor(collection, runner.get(),
+            ClientCursor* cc = new ClientCursor(collection, exec.get(),
                                                 cq->getParsed().getOptions(),
                                                 cq->getParsed().getFilter());
             ccId = cc->cursorid();
 
-            QLOG() << "caching runner with cursorid " << ccId
+            QLOG() << "caching executor with cursorid " << ccId
                    << " after returning " << numResults << " results" << endl;
 
-            // ClientCursor takes ownership of runner.  Release to make sure it's not deleted.
-            runner.release();
+            // ClientCursor takes ownership of executor.  Release to make sure it's not deleted.
+            exec.release();
 
             // TODO document
             if (pq.hasOption(QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
@@ -682,7 +831,7 @@ namespace mongo {
             cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
         }
         else {
-            QLOG() << "not caching runner but returning " << numResults << " results\n";
+            QLOG() << "Not caching executor but returning " << numResults << " results.\n";
         }
 
         // Add the results from the query into the output buffer.
@@ -713,12 +862,26 @@ namespace mongo {
                 curop.debug().nscanned = explain->getNScanned();
             }
 
+            if (explain->isNScannedObjectsSet()) {
+                curop.debug().nscannedObjects = explain->getNScannedObjects();
+            }
+
             if (explain->isIDHackSet()) {
                 curop.debug().idhack = explain->getIDHack();
             }
 
             if (!explain->stats.isEmpty()) {
-                curop.debug().execStats = explain->stats;
+                // execStats is a CachedBSONObj because it lives in the race-prone
+                // curop.
+                curop.debug().execStats.set(explain->stats);
+
+                // Replace exec stats with plan summary if stats cannot fit into CachedBSONObj.
+                if (curop.debug().execStats.tooBig() && !curop.debug().planSummary.empty()) {
+                    BSONObjBuilder bob;
+                    bob.append("summary", curop.debug().planSummary.toString());
+                    curop.debug().execStats.set(bob.done());
+                }
+
             }
         }
 

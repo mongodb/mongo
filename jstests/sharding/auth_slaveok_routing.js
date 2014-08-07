@@ -54,11 +54,11 @@ coll.setSlaveOk( true );
 ReplSetTest.awaitRSClientHosts( mongos, replTest.getSecondaries(),
    { ok : true, secondary : true });
 
+var bulk = coll.initializeUnorderedBulkOp();
 for ( var x = 0; x < 20; x++ ) {
-    coll.insert({ v: x, k: 10 });
+    bulk.insert({ v: x, k: 10 });
 }
-
-coll.runCommand({ getLastError: 1, w: nodeCount });
+assert.writeOK(bulk.execute({ w: nodeCount }));
 
 /* Although mongos never caches query results, try to do a different query
  * everytime just to be sure.

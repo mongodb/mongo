@@ -4,22 +4,26 @@
 var x509_options = {sslMode : "requireSSL",
                     sslPEMKeyFile : "jstests/libs/server.pem",
                     sslCAFile: "jstests/libs/ca.pem",
-                    sslClusterFile: "jstests/libs/cluster-cert.pem",
+                    sslClusterFile: "jstests/libs/cluster_cert.pem",
                     clusterAuthMode: "x509"};
 
+// Start ShardingTest with enableBalancer because ShardingTest attempts to turn
+// off the balancer otherwise, which it will not be authorized to do. Once SERVER-14017
+// is fixed the "enableBalancer" line could be removed.
 var st = new ShardingTest({ name : "sharding_with_x509" ,
                             shards : 2,
                             mongos : 1,
-                            keyFile : "jstests/libs/key1",
                             other: {
+                                enableBalancer: true,
                                 configOptions : x509_options,
                                 mongosOptions : x509_options,
                                 rsOptions : x509_options,
                                 shardOptions : x509_options
                             }});
 
-var mongos = new Mongo( "localhost:" + st.s0.port )
-var coll = mongos.getCollection( "test.foo" )
+st.s.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
+st.s.getDB('admin').auth('admin', 'pwd');
+var coll = st.s.getCollection( "test.foo" )
 
 st.shardColl( coll, { _id : 1 }, false )
 
@@ -29,33 +33,33 @@ coll.ensureIndex({ insert : 1 })
 print( "starting insertion phase" )
 
 // Insert a bunch of data
-var toInsert = 2000
+var toInsert = 2000;
+var bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < toInsert; i++ ){
-    coll.insert({ my : "test", data : "to", insert : i })
+    bulk.insert({ my: "test", data: "to", insert: i });
 }
-
-assert.eq( coll.getDB().getLastError(), null )
+assert.writeOK(bulk.execute());
 
 print( "starting updating phase" )
 
 // Update a bunch of data
-var toUpdate = toInsert
+var toUpdate = toInsert;
+bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < toUpdate; i++ ){
-    var id = coll.findOne({ insert : i })._id
-    coll.update({ insert : i, _id : id }, { $inc : { counter : 1 } })
+    var id = coll.findOne({ insert : i })._id;
+    bulk.find({ insert : i, _id : id }).update({ $inc : { counter : 1 } });
 }
-
-assert.eq( coll.getDB().getLastError(), null )
+assert.writeOK(bulk.execute());
 
 print( "starting deletion" )
 
 // Remove a bunch of data
-var toDelete = toInsert / 2
+var toDelete = toInsert / 2;
+bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < toDelete; i++ ){
-    coll.remove({ insert : i })
+    bulk.find({ insert : i }).remove();
 }
-
-assert.eq( coll.getDB().getLastError(), null )
+assert.writeOK(bulk.execute());
 
 // Make sure the right amount of data is there
 assert.eq( coll.find().count(), toInsert / 2 )

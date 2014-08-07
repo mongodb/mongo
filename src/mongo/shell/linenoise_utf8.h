@@ -2,17 +2,29 @@
 /*
  *    Copyright 2012 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include <boost/smart_ptr/scoped_array.hpp>
@@ -32,8 +44,8 @@ enum BadUTF8 {
 };
 
 /**
- * Convert a null terminated UTF-8 string from UTF-8 and store it in a UChar32 destination buffer
- * Always null terminates the destination string if at least one character position is available
+ * Convert a null terminated UTF-8 std::string from UTF-8 and store it in a UChar32 destination buffer
+ * Always null terminates the destination std::string if at least one character position is available
  * Errors in the UTF-8 encoding will be handled in two ways: the erroneous characters will be
  * converted to the Unicode error character U+FFFD and flag bits will be set in the conversionErrorCode
  * int.
@@ -52,8 +64,8 @@ void copyString8to32(
         int & conversionErrorCode );
 
 /**
- * Copy a null terminated UChar32 string to a UChar32 destination buffer
- * Always null terminates the destination string if at least one character position is available
+ * Copy a null terminated UChar32 std::string to a UChar32 destination buffer
+ * Always null terminates the destination std::string if at least one character position is available
  * 
  * @param dest32                    Destination UChar32 buffer
  * @param source32                  Source UChar32 string
@@ -62,9 +74,9 @@ void copyString8to32(
 void copyString32( UChar32* dest32, const UChar32* source32, size_t destLengthInCharacters );
 
 /**
- * Convert a specified number of UChar32 characters from a possibly null terminated UChar32 string to UTF-8
+ * Convert a specified number of UChar32 characters from a possibly null terminated UChar32 std::string to UTF-8
  * and store it in a UChar8 destination buffer
- * Always null terminates the destination string if at least one character position is available
+ * Always null terminates the destination std::string if at least one character position is available
  * 
  * @param dest8                     Destination UChar8 buffer
  * @param source32                  Source UChar32 string
@@ -75,8 +87,8 @@ void copyString32( UChar32* dest32, const UChar32* source32, size_t destLengthIn
 size_t copyString32to8counted( UChar8* dest8, const UChar32* source32, size_t outputBufferSizeInBytes, size_t charCount );
 
 /**
- * Convert a null terminated UChar32 string to UTF-8 and store it in a UChar8 destination buffer
- * Always null terminates the destination string if at least one character position is available
+ * Convert a null terminated UChar32 std::string to UTF-8 and store it in a UChar8 destination buffer
+ * Always null terminates the destination std::string if at least one character position is available
  * 
  * @param dest8                     Destination UChar8 buffer
  * @param source32                  Source UChar32 string
@@ -89,15 +101,15 @@ size_t copyString32to8( UChar8* dest8, const UChar32* source32, size_t outputBuf
  * Count characters (i.e. Unicode code points, array elements) in a null terminated UChar32 string
  * 
  * @param str32     Source UChar32 string
- * @return          String length in characters
+ * @return          std::string length in characters
  */
 size_t strlen32( const UChar32* str32 );
 
 /**
  * Compare two UChar32 null-terminated strings with length parameter
  *
- * @param first32   First string to compare
- * @param second32  Second string to compare
+ * @param first32   First std::string to compare
+ * @param second32  Second std::string to compare
  * @param length    Maximum number of characters to compare
  * @return          Negative if first < second, positive if first > second, zero if equal
  */

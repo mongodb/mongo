@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/ttl.h"
 
@@ -37,15 +37,19 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/background.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
 
     Counter64 ttlPasses;
     Counter64 ttlDeletedDocuments;
@@ -64,9 +68,12 @@ namespace mongo {
         
         static string secondsExpireField;
         
-        void doTTLForDB( const string& dbName ) {
+        void doTTLForDB( OperationContext* txn, const string& dbName ) {
 
-            bool isMaster = isMasterNs( dbName.c_str() );
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName))
+                return;
+
+            DBDirectClient db(txn);
             vector<BSONObj> indexes;
             {
                 auto_ptr<DBClientCursor> cursor =
@@ -110,23 +117,20 @@ namespace mongo {
 
                 long long n = 0;
                 {
-                    string ns = idx["ns"].String();
-                    Client::WriteContext ctx( ns );
-                    Collection* collection = ctx.ctx().db()->getCollection( ns );
+                    const string ns = idx["ns"].String();
+
+                    Client::WriteContext ctx(txn,  ns );
+                    Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
                     if ( !collection ) {
                         // collection was dropped
                         continue;
                     }
 
-                    NamespaceDetails* nsd = collection->details();
-                    if ( nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) ) {
-                        // TODO: wish there was a cleaner way to do this
-                        nsd->syncUserFlags( ns );
-                    }
-
-                    // only do deletes if on master
-                    if ( ! isMaster ) {
-                        continue;
+                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                            collection->ns().db())) {
+                        // we've stepped down since we started this function,
+                        // so we should stop working as we only do deletes on the primary
+                        break;
                     }
 
                     if ( collection->getIndexCatalog()->findIndexByKeyPattern( key ) == NULL ) {
@@ -135,8 +139,9 @@ namespace mongo {
                         continue;
                     }
 
-                    n = deleteObjects( ns , query , false , true );
+                    n = deleteObjects(txn, ctx.ctx().db(), ns, query, false, true);
                     ttlDeletedDocuments.increment( n );
+                    ctx.commit();
                 }
 
                 LOG(1) << "\tTTL deleted: " << n << endl;
@@ -159,6 +164,8 @@ namespace mongo {
                    continue;
                 }
                 
+                OperationContextImpl txn;
+
                 if ( lockedForWriting() ) {
                     // note: this is not perfect as you can go into fsync+lock between 
                     // this and actually doing the delete later
@@ -167,12 +174,14 @@ namespace mongo {
                 }
 
                 // if part of replSet but not in a readable state (e.g. during initial sync), skip.
-                if ( theReplSet && !theReplSet->state().readable() )
+                if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                        repl::ReplicationCoordinator::modeReplSet &&
+                        !repl::getGlobalReplicationCoordinator()->getCurrentMemberState().readable())
                     continue;
 
                 set<string> dbs;
                 {
-                    Lock::DBRead lk( "local" );
+                    Lock::DBRead lk(txn.lockState(), "local");
                     dbHolder().getAllShortNames( dbs );
                 }
                 
@@ -181,7 +190,7 @@ namespace mongo {
                 for ( set<string>::const_iterator i=dbs.begin(); i!=dbs.end(); ++i ) {
                     string db = *i;
                     try {
-                        doTTLForDB( db );
+                        doTTLForDB( &txn, db );
                     }
                     catch ( DBException& e ) {
                         error() << "error processing ttl for db: " << db << " " << e << endl;
@@ -190,8 +199,6 @@ namespace mongo {
 
             }
         }
-
-        DBDirectClient db;
     };
 
     void startTTLBackgroundJob() {

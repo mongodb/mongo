@@ -20,6 +20,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/operation_context_impl.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -30,32 +31,40 @@ namespace IndexCatalogTests {
     class IndexIteratorTests {
     public:
         IndexIteratorTests() {
-            Client::WriteContext ctx(_ns);
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, _ns);
+
             _db = ctx.ctx().db();
-            _coll = _db->createCollection(_ns);
+            _coll = _db->createCollection(&txn, _ns);
             _catalog = _coll->getIndexCatalog();
+            ctx.commit();
         }
 
         ~IndexIteratorTests() {
-            Client::WriteContext ctx(_ns);
-            _db->dropCollection(_ns);
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, _ns);
+
+            _db->dropCollection(&txn, _ns);
+            ctx.commit();
         }
 
         void run() {
-            Client::WriteContext ctx(_ns);
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, _ns);
+
             int numFinishedIndexesStart = _catalog->numIndexesReady();
 
             BSONObjBuilder b1;
             b1.append("key", BSON("x" << 1));
             b1.append("ns", _ns);
             b1.append("name", "_x_0");
-            _catalog->createIndex(b1.obj(), true);
+            _catalog->createIndex(&txn, b1.obj(), true);
 
             BSONObjBuilder b2;
             b2.append("key", BSON("y" << 1));
             b2.append("ns", _ns);
             b2.append("name", "_y_0");
-            _catalog->createIndex(b2.obj(), true);
+            _catalog->createIndex(&txn, b2.obj(), true);
 
             ASSERT_TRUE(_catalog->numIndexesReady() == numFinishedIndexesStart+2);
 
@@ -76,6 +85,7 @@ namespace IndexCatalogTests {
                 }
             }
 
+            ctx.commit();
             ASSERT_TRUE(indexesIterated == _catalog->numIndexesReady());
             ASSERT_TRUE(foundIndex);
         }

@@ -75,20 +75,30 @@ namespace mongo {
      * for that field, so there is no point in examining all keys with the same value for that
      * field.
      *
-     * Only created through the getDistinctRunner path.  See db/query/get_runner.cpp
+     * Only created through the getExecutorDistinct path.  See db/query/get_executor.cpp
      */
     class DistinctScan : public PlanStage {
     public:
-        DistinctScan(const DistinctParams& params, WorkingSet* workingSet);
+        DistinctScan(OperationContext* txn, const DistinctParams& params, WorkingSet* workingSet);
         virtual ~DistinctScan() { }
 
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
-        virtual void prepareToYield();
-        virtual void recoverFromYield();
+        virtual void saveState();
+        virtual void restoreState(OperationContext* opCtx);
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
+        virtual std::vector<PlanStage*> getChildren() const;
+
+        virtual StageType stageType() const { return STAGE_DISTINCT; }
+
         virtual PlanStageStats* getStats();
+
+        virtual const CommonStats* getCommonStats();
+
+        virtual const SpecificStats* getSpecificStats();
+
+        static const char* kStageType;
 
     private:
         /**
@@ -98,6 +108,9 @@ namespace mongo {
 
         /** See if the cursor is pointing at or past _endKey, if _endKey is non-empty. */
         void checkEnd();
+
+        // transactional context for read locks. Not owned by us
+        OperationContext* _txn;
 
         // The WorkingSet we annotate with results.  Not owned by us.
         WorkingSet* _workingSet;
@@ -112,9 +125,6 @@ namespace mongo {
         // Have we hit the end of the index scan?
         bool _hitEnd;
 
-        // Could our index have duplicates?  If so, we use _returned to dedup.
-        unordered_set<DiskLoc, DiskLoc::Hasher> _returned;
-
         // For yielding.
         BSONObj _savedKey;
         DiskLoc _savedLoc;
@@ -125,8 +135,8 @@ namespace mongo {
         boost::scoped_ptr<IndexBoundsChecker> _checker;
         int _keyEltsToUse;
         bool _movePastKeyElts;
-        vector<const BSONElement*> _keyElts;
-        vector<bool> _keyEltsInc;
+        std::vector<const BSONElement*> _keyElts;
+        std::vector<bool> _keyEltsInc;
 
         // Stats
         CommonStats _commonStats;

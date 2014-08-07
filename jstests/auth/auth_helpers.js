@@ -4,6 +4,10 @@ var conn = MongoRunner.runMongod({ smallfiles: "", auth: "" });
 
 var mechanisms, hasMongoCR, hasCramMd5;
 
+var admin = conn.getDB('admin');
+admin.createUser({user:'andy', pwd: 'a', roles: jsTest.adminUserRoles});
+admin.auth({user: 'andy', pwd: 'a'});
+
 // Find out if this build supports the authenticationMechanisms startup parameter.  If it does,
 // restart with MONGODB-CR and CRAM-MD5 mechanisms enabled.
 var cmdOut = conn.getDB('admin').runCommand({getParameter: 1, authenticationMechanisms: 1})
@@ -23,11 +27,8 @@ else {
     print("test info: Using only default authentication mechanism, MONGODB-CR.");
 }
 
-var admin = conn.getDB('admin');
-
+admin = conn.getDB('admin');
 var testedSomething = false;
-
-admin.createUser({user:'andy', pwd: 'a', roles: jsTest.adminUserRoles});
 
 // If the server supports them MONGODB-CR, try all the ways to call db.auth that use MONGODB-CR.
 if (hasMongoCR) {

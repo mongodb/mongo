@@ -5,10 +5,15 @@
 var coll = db.getCollection( "batch_write_insert" );
 coll.drop();
 
+assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands")
+
 jsTest.log("Starting insert tests...");
 
 var request;
 var result;
+var batch;
+
+var maxWriteBatchSize = 1000;
 
 function resultOK( result ) {
     return result.ok &&
@@ -93,6 +98,39 @@ assert.eq(1, result.n);
 assert.eq(coll.count(), 1);
 
 //
+// Large batch under the size threshold should insert successfully
+coll.remove({});
+batch = [];
+for (var i = 0; i < maxWriteBatchSize; ++i) {
+    batch.push({});
+}
+printjson( request = {insert : coll.getName(), documents: batch, writeConcern:{w:1}, ordered:false} );
+printjson( result = coll.runCommand(request) );
+assert(resultOK(result));
+assert.eq(batch.length, result.n);
+assert.eq(coll.count(), batch.length);
+
+//
+// Large batch above the size threshold should fail to insert
+coll.remove({});
+batch = [];
+for (var i = 0; i < maxWriteBatchSize + 1; ++i) {
+    batch.push({});
+}
+printjson( request = {insert : coll.getName(), documents: batch, writeConcern:{w:1}, ordered:false} );
+printjson( result = coll.runCommand(request) );
+assert(resultNOK(result));
+assert.eq(coll.count(), 0);
+
+//
+// Batch of size zero should fail to insert
+coll.remove({});
+printjson( request = {insert : coll.getName(),
+                      documents: [] } );
+printjson( result = coll.runCommand(request) );
+assert(resultNOK(result));
+
+//
 //
 // Unique index tests
 coll.remove({});
@@ -146,17 +184,121 @@ assert.eq('string', typeof result.writeErrors[0].errmsg);
 
 assert.eq(coll.count(), 1);
 
+//
+// Ensure _id is the first field in all documents
 coll.remove({});
-printjson( request = {insert : coll.getName(), documents: [{a:1}, {a:2,_id:2}] } );
-printjson( result = coll.runCommand(request) );
-assert.eq(2, coll.count() );
-coll.find().forEach(
-    function(z) {
-        var firstKey;
-        for ( var key in z ) {
-            firstKey = key;
-            break;
-        }
-        assert.eq( "_id", firstKey, tojson(z) );
+printjson(request = {insert : coll.getName(), documents : [{a : 1}, {a : 2, _id : 2}]});
+printjson(result = coll.runCommand(request));
+assert.eq(2, coll.count());
+coll.find().forEach(function(doc) {
+    var firstKey = null;
+    for ( var key in doc) {
+        firstKey = key;
+        break;
     }
-);
+    assert.eq("_id", firstKey, tojson(doc));
+});
+
+//
+//
+// Index insertion tests - currently supported via bulk write commands
+
+//
+// Successful index creation
+coll.drop();
+printjson(request = {insert : "system.indexes",
+                     documents : [{ns : coll.toString(), key : {x : 1}, name : "x_1"}]});
+printjson( result = coll.runCommand(request) );
+assert(result.ok);
+assert.eq(1, result.n);
+assert.eq(coll.getIndexes().length, 2);
+
+//
+// Duplicate index insertion gives n = 0
+coll.drop();
+coll.ensureIndex({x : 1}, {unique : true});
+printjson(request = {insert : "system.indexes",
+                     documents : [{ns : coll.toString(),
+                                   key : {x : 1}, name : "x_1", unique : true}]});
+printjson(result = coll.runCommand(request));
+assert(result.ok);
+assert.eq(0, result.n);
+assert(!('writeErrors' in result));
+assert.eq(coll.getIndexes().length, 2);
+
+//
+// Invalid index insertion with mismatched collection db
+coll.drop();
+printjson(request = {insert : "system.indexes",
+                     documents : [{ns : "invalid." + coll.getName(),
+                                   key : {x : 1}, name : "x_1", unique : true}]});
+printjson(result = coll.runCommand(request));
+assert(!result.ok);
+assert.eq(coll.getIndexes().length, 0);
+
+//
+// Empty index insertion
+coll.drop();
+printjson(request = {insert : "system.indexes", documents : [{}]});
+printjson(result = coll.runCommand(request));
+assert(!result.ok);
+assert.eq(coll.getIndexes().length, 0);
+
+//
+// Invalid index desc
+coll.drop();
+printjson(request = {insert : "system.indexes", documents : [{ns : coll.toString()}]});
+printjson(result = coll.runCommand(request));
+assert(result.ok);
+assert.eq(0, result.n);
+assert.eq(0, result.writeErrors[0].index);
+assert.eq(coll.getIndexes().length, 1);
+
+//
+// Invalid index desc
+coll.drop();
+printjson(request = {insert : "system.indexes",
+                     documents : [{ns : coll.toString(), key : {x : 1}}]});
+printjson(result = coll.runCommand(request));
+assert(result.ok);
+assert.eq(0, result.n);
+assert.eq(0, result.writeErrors[0].index);
+assert.eq(coll.getIndexes().length, 1);
+
+//
+// Invalid index desc
+coll.drop();
+printjson(request = {insert : "system.indexes",
+                     documents : [{ns : coll.toString(), name : "x_1"}]});
+printjson(result = coll.runCommand(request));
+assert(result.ok);
+assert.eq(0, result.n);
+assert.eq(0, result.writeErrors[0].index);
+assert.eq(coll.getIndexes().length, 1);
+
+//
+// Cannot insert more than one index at a time through the batch writes
+coll.drop();
+printjson(request = {insert : "system.indexes",
+                     documents : [{ns : coll.toString(), key : {x : 1}, name : "x_1"},
+                                  {ns : coll.toString(), key : {y : 1}, name : "y_1"}]});
+printjson(result = coll.runCommand(request));
+assert(!result.ok);
+assert.eq(coll.getIndexes().length, 0);
+
+//
+// Background index creation
+// Note: due to SERVER-13304 this test is at the end of this file, and we don't drop
+// the collection afterwards.
+coll.drop();
+coll.insert({ x : 1 });
+printjson(request = {insert : "system.indexes",
+                     documents : [{ns : coll.toString(),
+                                   key : {x : 1},
+                                   name : "x_1",
+                                   background : true}]});
+printjson( result = coll.runCommand(request) );
+assert(result.ok);
+assert.eq(1, result.n);
+assert.eq(coll.getIndexes().length, 2);
+

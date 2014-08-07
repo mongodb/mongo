@@ -118,7 +118,7 @@ namespace mongo {
             return StringData(start, len);
         }
 
-        void readStr(string& s) {
+        void readStr(std::string& s) {
             s = readCStr().toString();
         }
 

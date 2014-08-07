@@ -2,8 +2,6 @@ var st = new ShardingTest({ keyFile : 'jstests/libs/key1', shards : 2, chunksize
                             other : { nopreallocj : 1, verbose : 2, useHostname : true,
                                       configOptions : { verbose : 2 }}});
 
-st.printShardingStatus();
-
 var mongos = st.s;
 var adminDB = mongos.getDB('admin');
 var db = mongos.getDB('test')

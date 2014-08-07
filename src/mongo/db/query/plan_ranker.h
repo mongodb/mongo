@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -53,15 +53,12 @@ namespace mongo {
          * Caller owns pointers in 'why'.
          * 'candidateOrder' holds indices into candidates ordered by score (winner in first element).
          */
-        static size_t pickBestPlan(const vector<CandidatePlan>& candidates,
+        static size_t pickBestPlan(const std::vector<CandidatePlan>& candidates,
                                    PlanRankingDecision* why);
 
         /**
          * Assign the stats tree a 'goodness' score. The higher the score, the better
          * the plan. The exact value isn't meaningful except for imposing a ranking.
-         *
-         * XXX: consider moving out of PlanRanker so that the plan
-         * cache can use directly.
          */
         static double scoreTree(const PlanStageStats* stats);
     };
@@ -86,9 +83,12 @@ namespace mongo {
 
     /**
      * Information about why a plan was picked to be the best.  Data here is placed into the cache
-     * and used by the CachedPlanRunner to compare expected performance with actual.
+     * and used to compare expected performance with actual.
      */
     struct PlanRankingDecision {
+
+        PlanRankingDecision() : tieForBest(false) { }
+
         /**
          * Make a deep copy.
          */
@@ -101,6 +101,7 @@ namespace mongo {
             }
             decision->scores = scores;
             decision->candidateOrder = candidateOrder;
+            decision->tieForBest = tieForBest;
             return decision;
         }
 
@@ -119,6 +120,13 @@ namespace mongo {
         // candidates[candidateOrder[1]] followed by
         // candidates[candidateOrder[2]], ...
         std::vector<size_t> candidateOrder;
+
+        // Did two plans tie for best?
+        //
+        // NOTE: Reading this is the only reliable way to determine if there was a tie,
+        // because the scores kept inside the PlanRankingDecision do not incorporate
+        // the EOF bonus.
+        bool tieForBest;
     };
 
 }  // namespace mongo

@@ -31,12 +31,17 @@
 
 #include "mongo/pch.h"
 
+#include <set>
+
 #include "mongo/db/fts/fts_index_format.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
     namespace fts {
+
+        using std::string;
 
         TEST( FTSIndexFormat, Simple1 ) {
             FTSSpec spec( FTSSpec::fixSpec( BSON( "key" << BSON( "data" << "text" ) ) ) );
@@ -115,6 +120,84 @@ namespace mongo {
             ASSERT_EQUALS( 1U, keys2.size() );
         }
 
+        /**
+         * Helper function to compare keys returned in getKeys() result
+         * with expected values.
+         */
+        void assertEqualsIndexKeys( std::set<std::string>& expectedKeys, const BSONObjSet& keys ) {
+            ASSERT_EQUALS( expectedKeys.size(), keys.size() );
+            for ( BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
+                BSONObj key = *i;
+                ASSERT_EQUALS( 2, key.nFields() );
+                ASSERT_EQUALS( String, key.firstElement().type() );
+                string s = key.firstElement().String();
+                std::set<string>::const_iterator j = expectedKeys.find(s);
+                if (j == expectedKeys.end()) {
+                    mongoutils::str::stream ss;
+                    ss << "unexpected key " << s << " in FTSIndexFormat::getKeys result. "
+                       << "expected keys:";
+                    for (std::set<string>::const_iterator k = expectedKeys.begin();
+                         k != expectedKeys.end(); ++k) {
+                        ss << "\n    " << *k;
+                    }
+                    FAIL(ss);
+                }
+            }
+        }
+
+        /**
+         * Tests keys for long terms using text index version 1.
+         * Terms that are too long are not truncated in version 1.
+         */
+        TEST( FTSIndexFormat, LongWordsTextIndexVersion1 ) {
+            FTSSpec spec( FTSSpec::fixSpec( BSON( "key" << BSON( "data" << "text" ) <<
+                                                  "textIndexVersion" << 1 ) ) );
+            BSONObjSet keys;
+            string longPrefix( 1024U, 'a' );
+            // "aaa...aaacat"
+            string longWordCat = longPrefix + "cat";
+            // "aaa...aaasat"
+            string longWordSat = longPrefix + "sat";
+            string text = mongoutils::str::stream() << longWordCat << " " << longWordSat;
+            FTSIndexFormat::getKeys( spec, BSON( "data" << text  ), &keys );
+
+            // Hard-coded expected computed keys for future-proofing.
+            std::set<string> expectedKeys;
+            // cat
+            expectedKeys.insert( longWordCat );
+            // sat
+            expectedKeys.insert( longWordSat );
+
+            assertEqualsIndexKeys( expectedKeys, keys);
+        }
+
+        /**
+         * Tests keys for long terms using text index version 2.
+         * In version 2, long terms (longer than 32 characters)
+         * are hashed with murmur3 and appended to the first 32
+         * characters of the term to form the index key.
+         */
+        TEST( FTSIndexFormat, LongWordTextIndexVersion2 ) {
+            FTSSpec spec( FTSSpec::fixSpec( BSON( "key" << BSON( "data" << "text" ) <<
+                                                  "textIndexVersion" << 2 ) ) );
+            BSONObjSet keys;
+            string longPrefix( 1024U, 'a' );
+            // "aaa...aaacat"
+            string longWordCat = longPrefix + "cat";
+            // "aaa...aaasat"
+            string longWordSat = longPrefix + "sat";
+            string text = mongoutils::str::stream() << longWordCat << " " << longWordSat;
+            FTSIndexFormat::getKeys( spec, BSON( "data" << text  ), &keys );
+
+            // Hard-coded expected computed keys for future-proofing.
+            std::set<string> expectedKeys;
+            // cat
+            expectedKeys.insert( "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab8e78455d827ebb87cbe87f392bf45f6" );
+            // sat
+            expectedKeys.insert( "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaf2d6f58bb3b81b97e611ae7ccac6dea7" );
+
+            assertEqualsIndexKeys( expectedKeys, keys);
+        }
 
     }
 }

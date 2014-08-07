@@ -100,6 +100,11 @@ namespace mongo {
         ~WriteOp();
 
         /**
+         * Returns the write item for this operation
+         */
+        const BatchItemRef& getWriteItem() const;
+
+        /**
          * Returns the op's current state.
          */
         WriteOpState getWriteState() const;
@@ -123,6 +128,11 @@ namespace mongo {
          */
         Status targetWrites( const NSTargeter& targeter,
                              std::vector<TargetedWrite*>* targetedWrites );
+
+        /**
+         * Returns the number of child writes that were last targeted.
+         */
+        size_t getNumTargeted();
 
         /**
          * Resets the state of this write op to _Ready and stops waiting for any outstanding
@@ -207,7 +217,7 @@ namespace mongo {
     };
 
     // First value is write item index in the batch, second value is child write op index
-    typedef pair<int, int> WriteOpRef;
+    typedef std::pair<int, int> WriteOpRef;
 
     /**
      * A write with A) a request targeted at a particular shard endpoint, and B) a response targeted

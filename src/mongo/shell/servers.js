@@ -8,7 +8,7 @@ _parsePath = function() {
             dbpath = arguments[ i + 1 ];
 
     if ( dbpath == "" )
-        throw "No dbpath specified";
+        throw Error("No dbpath specified");
 
     return dbpath;
 }
@@ -20,7 +20,7 @@ _parsePort = function() {
             port = arguments[ i + 1 ];
 
     if ( port == "" )
-        throw "No port specified";
+        throw Error("No port specified");
     return port;
 }
 
@@ -111,12 +111,13 @@ MongoRunner.VersionSub = function(regex, version) {
 // These patterns allow substituting the binary versions used for each
 // version string to support the dev/stable MongoDB release cycle.
 MongoRunner.binVersionSubs = [ new MongoRunner.VersionSub(/^latest$/, ""),
-                               new MongoRunner.VersionSub(/^last-stable$/, "2.4"),
                                new MongoRunner.VersionSub(/^oldest-supported$/, "1.8"),
+                               // To-be-updated when 2.8 becomes available
+                               new MongoRunner.VersionSub(/^last-stable$/, "2.6"),
                                // Latest unstable and next stable are effectively the
                                // same release
-                               new MongoRunner.VersionSub(/^2\.5(\..*){0,1}/, ""),
-                               new MongoRunner.VersionSub(/^2\.6(\..*){0,1}/, "") ];
+                               new MongoRunner.VersionSub(/^2\.7(\..*){0,1}/, ""),
+                               new MongoRunner.VersionSub(/^2\.8(\..*){0,1}/, "") ];
 
 MongoRunner.getBinVersionFor = function(version) {
  
@@ -276,6 +277,8 @@ MongoRunner.arrOptions = function( binaryName , args ){
 
     var fullArgs = [ "" ]
 
+    // isObject returns true even if "args" is an array, so the else branch of this statement is
+    // dead code.  See SERVER-14220.
     if ( isObject( args ) || ( args.length == 1 && isObject( args[0] ) ) ){
 
         var o = isObject( args ) ? args : args[0]
@@ -422,8 +425,12 @@ MongoRunner.mongoOptions = function( opts ){
         if (!opts.sslMode) opts.sslMode = "requireSSL";
         if (!opts.sslPEMKeyFile) opts.sslPEMKeyFile = "jstests/libs/server.pem";
         if (!opts.sslCAFile) opts.sslCAFile = "jstests/libs/ca.pem";
+
+        // Needed for jstest/ssl/upgrade_to_ssl.js
         opts.sslWeakCertificateValidation = "";
-        opts.sslAllowInvalidCertificates = "";
+
+        // Needed for jstest/ssl/ssl_hostname_validation.js
+        opts.sslAllowInvalidHostnames = "";
     }
 
     if ( jsTestOptions().useX509 && !opts.clusterAuthMode ) {
@@ -487,8 +494,12 @@ MongoRunner.mongodOptions = function( opts ){
         if (!opts.sslMode) opts.sslMode = "requireSSL";
         if (!opts.sslPEMKeyFile) opts.sslPEMKeyFile = "jstests/libs/server.pem";
         if (!opts.sslCAFile) opts.sslCAFile = "jstests/libs/ca.pem";
+
+        // Needed for jstest/ssl/upgrade_to_ssl.js
         opts.sslWeakCertificateValidation = "";
-        opts.sslAllowInvalidCertificates = "";
+
+        // Needed for jstest/ssl/ssl_hostname_validation.js
+        opts.sslAllowInvalidHostnames = "";
     }
 
     if ( jsTestOptions().useX509 && !opts.clusterAuthMode ) {
@@ -717,64 +728,6 @@ MongoRunner.getAndPrepareDumpDirectory = function(testName) {
     return dir;
 }
 
-startMongodTest = function (port, dirname, restart, extraOptions ) {
-    if (!port)
-        port = MongoRunner.nextOpenPort();
-    var f = startMongodEmpty;
-    if (restart)
-        f = startMongodNoReset;
-    if (!dirname)
-        dirname = "" + port; // e.g., data/db/27000
-
-    var useHostname = false;
-    if (extraOptions) {
-         useHostname = extraOptions.useHostname;
-         delete extraOptions.useHostname;
-    }
-    
-    var options = 
-        {
-            port: port,
-            dbpath: MongoRunner.dataPath + dirname,
-            noprealloc: "",
-            smallfiles: "",
-            oplogSize: "40",
-            nohttpinterface: ""
-        };
-
-    if( jsTestOptions().noJournal ) options["nojournal"] = ""
-    if( jsTestOptions().noJournalPrealloc ) options["nopreallocj"] = ""
-    if( jsTestOptions().auth ) options["auth"] = ""
-    if( jsTestOptions().keyFile && (!extraOptions || !extraOptions['keyFile']) ) options['keyFile'] = jsTestOptions().keyFile
-
-    if( jsTestOptions().useSSL ) {
-        if (!options["sslMode"]) options["sslMode"] = "requireSSL";
-        if (!options["sslPEMKeyFile"]) options["sslPEMKeyFile"] = "jstests/libs/server.pem";
-        if (!options["sslCAFile"]) options["sslCAFile"] = "jstests/libs/ca.pem";
-        options["sslWeakCertificateValidation"] = "";
-        options["sslAllowInvalidCertificates"] = "";
-    }
-
-    if ( jsTestOptions().useX509 && !options["clusterAuthMode"] ) {
-        options["clusterAuthMode"] = "x509";
-    }
-
-    if ( extraOptions )
-        Object.extend( options , extraOptions );
-    
-    var conn = f.apply(null, [ options ] );
-
-    conn.name = (useHostname ? getHostName() : "localhost") + ":" + port;
-
-    if (jsTestOptions().auth || jsTestOptions().keyFile || jsTestOptions().useX509) {
-        if (!this.shardsvr && !options.replSet && !options.hasOwnProperty("slave") && !restart) {
-            jsTest.addAuth(conn);
-        }
-        jsTest.authenticate(conn);
-    }
-    return conn;
-}
-
 // Start a mongod instance and return a 'Mongo' object connected to it.
 // This function's arguments are passed as command line arguments to mongod.
 // The specified 'dbpath' is cleared if it exists, created if not.
@@ -823,6 +776,9 @@ function appendSetParameterArgs(argArray) {
                                     ['--setParameter',
                                      "authenticationMechanisms=" + jsTest.options().authMechanism]);
             }
+        }
+        if (jsTest.options().auth) {
+            argArray.push.apply(argArray, ['--setParameter', "enableLocalhostAuthBypass=false"]);
         }
 
         // mongos only options
@@ -933,8 +889,8 @@ runMongoProgram = function() {
     if ( jsTestOptions().auth ) {
         args = args.slice(1);
         args.unshift( progName,
-                      '-u', jsTestOptions().adminUser,
-                      '-p', jsTestOptions().adminPassword,
+                      '-u', jsTestOptions().authUser,
+                      '-p', jsTestOptions().authPassword,
                       '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                       '--authenticationDatabase=admin'
                     );
@@ -959,8 +915,8 @@ startMongoProgramNoConnect = function() {
     if ( jsTestOptions().auth ) {
         args = args.slice(1);
         args.unshift(progName,
-                     '-u', jsTestOptions().adminUser,
-                     '-p', jsTestOptions().adminPassword,
+                     '-u', jsTestOptions().authUser,
+                     '-p', jsTestOptions().authPassword,
                      '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                      '--authenticationDatabase=admin');
     }

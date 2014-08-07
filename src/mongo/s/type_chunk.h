@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/chunk_version.h"
 
@@ -51,7 +52,7 @@ namespace mongo {
      *
      *     // Process the response.
      *     ChunkType exampleType;
-     *     string errMsg;
+     *     std::string errMsg;
      *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
      *         // Can't use 'exampleType'. Take action.
      *     }
@@ -115,7 +116,7 @@ namespace mongo {
         void cloneTo(ChunkType* other) const;
 
         /**
-         * Returns a string representation of the current internal state.
+         * Returns a std::string representation of the current internal state.
          */
         std::string toString() const;
 

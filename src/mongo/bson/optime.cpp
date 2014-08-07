@@ -1,16 +1,28 @@
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/bson/optime.h"
@@ -20,86 +32,14 @@
 #include <ctime>
 
 #include "mongo/bson/inline_decls.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/startup_test.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
-
-    OpTime OpTime::last(0, 0);
-    boost::condition OpTime::notifier;
-    mongo::mutex OpTime::m("optime");
-
-    NOINLINE_DECL OpTime OpTime::skewed() {
-        bool toLog = false;
-        ONCE toLog = true;
-        RARELY toLog = true;
-        last.i++;
-        if ( last.i & 0x80000000 )
-            toLog = true;
-        if ( toLog ) {
-            log() << "clock skew detected  prev: " << last.secs << " now: " << (unsigned) time(0) 
-                  << std::endl;
-        }
-        if ( last.i & 0x80000000 ) {
-            log() << "error large clock skew detected, shutting down" << std::endl;
-            throw ClockSkewException();
-        }
-        return last;
-    }
-
-    /*static*/ OpTime OpTime::_now() {
-        OpTime result;
-        unsigned t = (unsigned) time(0);
-        if ( last.secs == t ) {
-            last.i++;
-            result = last;
-        }
-        else if ( t < last.secs ) {
-            result = skewed(); // separate function to keep out of the hot code path
-        }
-        else { 
-            last = OpTime(t, 1);
-            result = last;
-        }
-        notifier.notify_all();
-        return last;
-    }
-
-    OpTime OpTime::now(const mongo::mutex::scoped_lock&) {
-        return _now();
-    }
-
-    OpTime OpTime::getLast(const mongo::mutex::scoped_lock&) {
-        return last;
-    }
 
     OpTime OpTime::max() {
         unsigned int t = static_cast<unsigned int>(std::numeric_limits<int32_t>::max());
         unsigned int i = std::numeric_limits<uint32_t>::max();
         return OpTime(t, i);
     }
-
-    void OpTime::waitForDifferent(unsigned millis){
-        mutex::scoped_lock lk(m);
-        while (*this == last) {
-            if (!notifier.timed_wait(lk.boost(), boost::posix_time::milliseconds(millis)))
-                return; // timed out
-        }
-    }
-
-    struct TestOpTime : public StartupTest {
-        void run() {
-            OpTime t;
-            for ( int i = 0; i < 10; i++ ) {
-                OpTime s = OpTime::_now();
-                verify( s != t );
-                t = s;
-            }
-            OpTime q = t;
-            verify( q == t );
-            verify( !(q != t) );
-        }
-    } testoptime;
 
 }

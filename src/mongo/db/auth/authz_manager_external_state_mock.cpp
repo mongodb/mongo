@@ -47,7 +47,7 @@ namespace mongo {
 namespace {
     void addRoleNameToObjectElement(mutablebson::Element object, const RoleName& role) {
         fassert(17175, object.appendString(AuthorizationManager::ROLE_NAME_FIELD_NAME, role.getRole()));
-        fassert(17176, object.appendString(AuthorizationManager::ROLE_SOURCE_FIELD_NAME, role.getDB()));
+        fassert(17176, object.appendString(AuthorizationManager::ROLE_DB_FIELD_NAME, role.getDB()));
     }
 
     void addRoleNameObjectsToArrayElement(mutablebson::Element array, RoleNameIterator roles) {
@@ -97,10 +97,11 @@ namespace {
                           BSONObj()));
     }
 
-    Status AuthzManagerExternalStateMock::_getUserDocument(const UserName& userName,
+    Status AuthzManagerExternalStateMock::_getUserDocument(OperationContext* txn,
+                                                           const UserName& userName,
                                                            BSONObj* userDoc) {
         int authzVersion;
-        Status status = getStoredAuthorizationVersion(&authzVersion);
+        Status status = getStoredAuthorizationVersion(txn, &authzVersion);
         if (!status.isOK())
             return status;
 
@@ -115,6 +116,7 @@ namespace {
         }
 
         status = findOne(
+                txn,
                 (authzVersion == AuthorizationManager::schemaVersion26Final ?
                  AuthorizationManager::usersCollectionNamespace :
                  AuthorizationManager::usersAltCollectionNamespace),
@@ -129,6 +131,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMock::getAllDatabaseNames(
+            OperationContext* txn,
             std::vector<std::string>* dbnames) {
         unordered_set<std::string> dbnameSet;
         NamespaceDocumentMap::const_iterator it;
@@ -139,18 +142,8 @@ namespace {
         return Status::OK();
     }
 
-    Status AuthzManagerExternalStateMock::_findUser(
-            const std::string& usersNamespace,
-            const BSONObj& query,
-            BSONObj* result) {
-        if (!findOne(NamespaceString(usersNamespace), query, result).isOK()) {
-            return Status(ErrorCodes::UserNotFound,
-                          "No matching user for query " + query.toString());
-        }
-        return Status::OK();
-    }
-
     Status AuthzManagerExternalStateMock::findOne(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             BSONObj* result) {
@@ -163,10 +156,11 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMock::query(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj&,
-            const boost::function<void(const BSONObj&)>& resultProcessor) {
+            const stdx::function<void(const BSONObj&)>& resultProcessor) {
         std::vector<BSONObjCollection::iterator> iterVector;
         Status status = _queryVector(collectionName, query, &iterVector);
         if (!status.isOK()) {
@@ -219,7 +213,6 @@ namespace {
 
         namespace mmb = mutablebson;
         UpdateDriver::Options updateOptions;
-        updateOptions.upsert = upsert;
         UpdateDriver driver(updateOptions);
         Status status = driver.parse(updatePattern);
         if (!status.isOK())
@@ -272,7 +265,7 @@ namespace {
                                                  bool upsert,
                                                  bool multi,
                                                  const BSONObj& writeConcern,
-                                                 int* numUpdated) {
+                                                 int* nMatched) {
         return Status(ErrorCodes::InternalError,
                       "AuthzManagerExternalStateMock::update not implemented in mock.");
     }
@@ -347,7 +340,8 @@ namespace {
             const BSONObj& query,
             std::vector<BSONObjCollection::iterator>* result) {
 
-        StatusWithMatchExpression parseResult = MatchExpressionParser::parse(query);
+        StatusWithMatchExpression parseResult = 
+                MatchExpressionParser::parse(query, MatchExpressionParser::WhereCallback());
         if (!parseResult.isOK()) {
             return parseResult.getStatus();
         }

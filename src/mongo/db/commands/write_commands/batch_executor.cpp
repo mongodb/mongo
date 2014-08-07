@@ -26,44 +26,81 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/commands/write_commands/batch_executor.h"
 
 #include <memory>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/ops/delete.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/delete_executor.h"
+#include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
-#include "mongo/db/pagefault.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
+#include "mongo/s/write_ops/write_error_detail.h"
+#include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
+
+    namespace {
+
+        /**
+         * Data structure to safely hold and clean up results of single write operations.
+         */
+        class WriteOpResult {
+            MONGO_DISALLOW_COPYING(WriteOpResult);
+        public:
+            WriteOpResult() {}
+
+            WriteOpStats& getStats() { return _stats; }
+
+            WriteErrorDetail* getError() { return _error.get(); }
+            WriteErrorDetail* releaseError() { return _error.release(); }
+            void setError(WriteErrorDetail* error) { _error.reset(error); }
+
+        private:
+            WriteOpStats _stats;
+            std::auto_ptr<WriteErrorDetail> _error;
+        };
+
+    }  // namespace
 
     // TODO: Determine queueing behavior we want here
     MONGO_EXPORT_SERVER_PARAMETER( queueForMigrationCommit, bool, true );
 
     using mongoutils::str::stream;
 
-    WriteBatchExecutor::WriteBatchExecutor( const BSONObj& wc,
+    WriteBatchExecutor::WriteBatchExecutor( OperationContext* txn,
+                                            const BSONObj& wc,
                                             Client* client,
                                             OpCounters* opCounters,
                                             LastError* le ) :
+        _txn(txn),
         _defaultWriteConcern( wc ),
         _client( client ),
         _opCounters( opCounters ),
@@ -95,6 +132,14 @@ namespace mongo {
         return error;
     }
 
+    static void toBatchError( const Status& status, BatchedCommandResponse* response ) {
+        response->clear();
+        response->setErrCode( status.code() );
+        response->setErrMessage( status.reason() );
+        response->setOk( false );
+        dassert( response->isValid(NULL) );
+    }
+
     static void noteInCriticalSection( WriteErrorDetail* staleError ) {
         BSONObjBuilder builder;
         if ( staleError->isErrInfoSet() )
@@ -106,27 +151,85 @@ namespace mongo {
     void WriteBatchExecutor::executeBatch( const BatchedCommandRequest& request,
                                            BatchedCommandResponse* response ) {
 
-        // TODO: Lift write concern parsing out of this entirely.
-        WriteConcernOptions writeConcern;
-        Status status = Status::OK();
-        if ( request.isWriteConcernSet() ) {
-            status = writeConcern.parse( request.getWriteConcern() );
-        }
-        else {
-            status = writeConcern.parse( _defaultWriteConcern );
-        }
-
-        if ( status.isOK() ) {
-            status = validateWriteConcern( writeConcern );
-        }
-
-        if ( !status.isOK() ) {
-            response->setErrCode( status.code() );
-            response->setErrMessage( status.reason() );
-            response->setOk( false );
-            dassert( response->isValid(NULL) );
+        // Validate namespace
+        const NamespaceString nss = NamespaceString( request.getNS() );
+        if ( !nss.isValid() ) {
+            toBatchError( Status( ErrorCodes::InvalidNamespace,
+                                  nss.ns() + " is not a valid namespace" ),
+                          response );
             return;
         }
+
+        // Make sure we can write to the namespace
+        Status allowedStatus = userAllowedWriteNS( nss );
+        if ( !allowedStatus.isOK() ) {
+            toBatchError( allowedStatus, response );
+            return;
+        }
+
+        // Validate insert index requests
+        // TODO: Push insert index requests through createIndex once all upgrade paths support it
+        string errMsg;
+        if ( request.isInsertIndexRequest() && !request.isValidIndexRequest( &errMsg ) ) {
+            toBatchError( Status( ErrorCodes::InvalidOptions, errMsg ), response );
+            return;
+        }
+
+        // Validate write concern
+        // TODO: Lift write concern parsing out of this entirely
+        WriteConcernOptions writeConcern;
+
+        BSONObj wcDoc;
+        if ( request.isWriteConcernSet() ) {
+            wcDoc = request.getWriteConcern();
+        }
+
+        Status wcStatus = Status::OK();
+        if ( wcDoc.isEmpty() ) {
+
+            // The default write concern if empty is w : 1
+            // Specifying w : 0 is/was allowed, but is interpreted identically to w : 1
+
+            wcStatus = writeConcern.parse(
+                _defaultWriteConcern.isEmpty() ?
+                    WriteConcernOptions::Acknowledged : _defaultWriteConcern );
+
+            if ( writeConcern.wNumNodes == 0 && writeConcern.wMode.empty() ) {
+                writeConcern.wNumNodes = 1;
+            }
+        }
+        else {
+            wcStatus = writeConcern.parse( wcDoc );
+        }
+
+        if ( wcStatus.isOK() ) {
+            wcStatus = validateWriteConcern( writeConcern );
+        }
+
+        if ( !wcStatus.isOK() ) {
+            toBatchError( wcStatus, response );
+            return;
+        }
+
+        if ( request.sizeWriteOps() == 0u ) {
+            toBatchError( Status( ErrorCodes::InvalidLength,
+                                  "no write ops were included in the batch" ),
+                          response );
+            return;
+        }
+
+        // Validate batch size
+        if ( request.sizeWriteOps() > BatchedCommandRequest::kMaxWriteBatchSize ) {
+            toBatchError( Status( ErrorCodes::InvalidLength,
+                                  stream() << "exceeded maximum write batch size of "
+                                           << BatchedCommandRequest::kMaxWriteBatchSize ),
+                          response );
+            return;
+        }
+
+        //
+        // End validation
+        //
 
         bool silentWC = writeConcern.wMode.empty() && writeConcern.wNumNodes == 0
                         && writeConcern.syncMode == WriteConcernOptions::NONE;
@@ -161,7 +264,7 @@ namespace mongo {
             _client->curop()->setMessage( "waiting for write concern" );
 
             WriteConcernResult res;
-            status = waitForWriteConcern( writeConcern, _client->getLastOp(), &res );
+            Status status = waitForWriteConcern( _txn, writeConcern, _client->getLastOp(), &res );
 
             if ( !status.isOK() ) {
                 wcError.reset( toWriteConcernError( status, res ) );
@@ -188,7 +291,8 @@ namespace mongo {
                 //
 
                 ChunkVersion latestShardVersion;
-                shardingState.refreshMetadataIfNeeded( request.getTargetingNS(),
+                shardingState.refreshMetadataIfNeeded( _txn,
+                                                       request.getTargetingNS(),
                                                        requestMetadata->getShardVersion(),
                                                        &latestShardVersion );
 
@@ -246,27 +350,27 @@ namespace mongo {
 
             if ( upserted.size() ) {
                 response->setUpsertDetails( upserted );
-                upserted.clear();
             }
 
             if ( writeErrors.size() ) {
                 response->setErrDetails( writeErrors );
-                writeErrors.clear();
             }
 
             if ( wcError.get() ) {
                 response->setWriteConcernError( wcError.release() );
             }
 
-            if ( anyReplEnabled() ) {
+            repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+            const repl::ReplicationCoordinator::Mode replMode = replCoord->getReplicationMode();
+            if (replMode != repl::ReplicationCoordinator::modeNone) {
                 response->setLastOp( _client->getLastOp() );
-                if (theReplSet) {
-                    response->setElectionId( theReplSet->getElectionId() );
+                if (replMode == repl::ReplicationCoordinator::modeReplSet) {
+                    response->setElectionId(replCoord->getElectionId());
                 }
             }
 
             // Set the stats for the response
-            response->setN( _stats->numInserted + _stats->numUpserted + _stats->numUpdated
+            response->setN( _stats->numInserted + _stats->numUpserted + _stats->numMatched
                             + _stats->numDeleted );
             if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update )
                 response->setNModified( _stats->numModified );
@@ -307,12 +411,13 @@ namespace mongo {
         error->setErrMessage( errMsg );
     }
 
-    static bool checkShardVersion( ShardingState* shardingState,
-                                   const BatchedCommandRequest& request,
-                                   WriteErrorDetail** error ) {
+    static bool checkShardVersion(OperationContext* txn,
+                                  ShardingState* shardingState,
+                                  const BatchedCommandRequest& request,
+                                  WriteOpResult* result) {
 
         const NamespaceString nss( request.getTargetingNS() );
-        Lock::assertWriteLocked( nss.ns() );
+        txn->lockState()->assertWriteLocked( nss.ns() );
 
         ChunkVersion requestShardVersion =
             request.isMetadataSet() && request.getMetadata()->isShardVersionSet() ?
@@ -328,13 +433,25 @@ namespace mongo {
                     metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
                 if ( !requestShardVersion.isWriteCompatibleWith( shardVersion ) ) {
-                    *error = new WriteErrorDetail;
-                    buildStaleError( requestShardVersion, shardVersion, *error );
+                    result->setError(new WriteErrorDetail);
+                    buildStaleError(requestShardVersion, shardVersion, result->getError());
                     return false;
                 }
             }
         }
 
+        return true;
+    }
+
+    static bool checkIsMasterForDatabase(const std::string& ns, WriteOpResult* result) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                NamespaceString(ns).db())) {
+            WriteErrorDetail* errorDetail = new WriteErrorDetail;
+            result->setError(errorDetail);
+            errorDetail->setErrCode(ErrorCodes::NotMaster);
+            errorDetail->setErrMessage("Not primary while writing to " + ns);
+            return false;
+        }
         return true;
     }
 
@@ -347,12 +464,13 @@ namespace mongo {
         error->setErrMessage( errMsg );
     }
 
-    static bool checkIndexConstraints( ShardingState* shardingState,
-                                       const BatchedCommandRequest& request,
-                                       WriteErrorDetail** error ) {
+    static bool checkIndexConstraints(OperationContext* txn,
+                                      ShardingState* shardingState,
+                                      const BatchedCommandRequest& request,
+                                      WriteOpResult* result) {
 
         const NamespaceString nss( request.getTargetingNS() );
-        Lock::assertWriteLocked( nss.ns() );
+        txn->lockState()->assertWriteLocked( nss.ns() );
 
         if ( !request.isUniqueIndexRequest() )
             return true;
@@ -365,10 +483,10 @@ namespace mongo {
                 if ( !isUniqueIndexCompatible( metadata->getKeyPattern(),
                                                request.getIndexKeyPattern() ) ) {
 
-                    *error = new WriteErrorDetail;
-                    buildUniqueIndexError( metadata->getKeyPattern(),
-                                           request.getIndexKeyPattern(),
-                                           *error );
+                    result->setError(new WriteErrorDetail);
+                    buildUniqueIndexError(metadata->getKeyPattern(),
+                                          request.getIndexKeyPattern(),
+                                          result->getError());
 
                     return false;
                 }
@@ -396,21 +514,25 @@ namespace mongo {
         currentOp->ensureStarted();
         currentOp->setNS( currWrite.getRequest()->getNS() );
 
-        currentOp->debug().ns = currentOp->getNS();
+        currentOp->debug().ns = currentOp->getNS().c_str();
         currentOp->debug().op = currentOp->getOp();
 
         if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Insert ) {
-            // No-op for insert, we don't update query or updateobj
+            currentOp->setQuery( currWrite.getDocument() );
+            currentOp->debug().query = currWrite.getDocument();
+            currentOp->debug().ninserted = 0;
         }
         else if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Update ) {
             currentOp->setQuery( currWrite.getUpdate()->getQuery() );
             currentOp->debug().query = currWrite.getUpdate()->getQuery();
             currentOp->debug().updateobj = currWrite.getUpdate()->getUpdateExpr();
+            // Note: debug().nMatched, nModified and nmoved are set internally in update
         }
         else {
             dassert( currWrite.getOpType() == BatchedCommandRequest::BatchType_Delete );
             currentOp->setQuery( currWrite.getDelete()->getQuery() );
             currentOp->debug().query = currWrite.getDelete()->getQuery();
+            currentOp->debug().ndeleted = 0;
         }
 
         return currentOp.release();
@@ -419,7 +541,7 @@ namespace mongo {
     void WriteBatchExecutor::incOpStats( const BatchItemRef& currWrite ) {
 
         if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Insert ) {
-            // No-op, for inserts we increment not on the op but once for each write
+            _opCounters->gotInsert();
         }
         else if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Update ) {
             _opCounters->gotUpdate();
@@ -436,15 +558,13 @@ namespace mongo {
                                             CurOp* currentOp ) {
 
         if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Insert ) {
-            // We increment batch inserts like individual inserts
-            _opCounters->gotInsert();
             _stats->numInserted += stats.n;
             _le->nObjects = stats.n;
             currentOp->debug().ninserted += stats.n;
         }
         else if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Update ) {
             if ( stats.upsertedID.isEmpty() ) {
-                _stats->numUpdated += stats.n;
+                _stats->numMatched += stats.n;
                 _stats->numModified += stats.nModified;
             }
             else {
@@ -466,11 +586,15 @@ namespace mongo {
             currentOp->debug().ndeleted += stats.n;
         }
 
-        // Errors reported in LastError are handled internally in write ops for now
-        // TODO: Move error reporting out of write op internals?
+        if (error && !_le->disabled) {
+            _le->raiseError(error->getErrCode(), error->getErrMessage().c_str());
+        }
     }
 
-    static void finishCurrentOp( Client* client, CurOp* currentOp, WriteErrorDetail* opError ) {
+    static void finishCurrentOp( OperationContext* txn,
+                                 Client* client,
+                                 CurOp* currentOp,
+                                 WriteErrorDetail* opError ) {
 
         currentOp->done();
         int executionTime = currentOp->debug().executionTime = currentOp->totalTimeMillis();
@@ -480,8 +604,8 @@ namespace mongo {
             currentOp->debug().exceptionInfo = ExceptionInfo( opError->getErrMessage(),
                                                               opError->getErrCode() );
 
-            MONGO_TLOG(3) << " Caught Assertion in " << opToString( currentOp->getOp() )
-                          << ", continuing " << causedBy( opError->getErrMessage() ) << endl;
+            LOG(3) << " Caught Assertion in " << opToString( currentOp->getOp() )
+                   << ", continuing " << causedBy( opError->getErrMessage() ) << endl;
         }
 
         bool logAll = logger::globalLogDomain()->shouldLog( logger::LogSeverity::Debug( 1 ) );
@@ -489,11 +613,11 @@ namespace mongo {
                        > ( serverGlobalParams.slowMS + currentOp->getExpectedLatencyMs() );
 
         if ( logAll || logSlow ) {
-            MONGO_TLOG(1) << currentOp->debug().report( *currentOp ) << endl;
+            LOG(0) << currentOp->debug().report( *currentOp ) << endl;
         }
 
         if ( currentOp->shouldDBProfile( executionTime ) ) {
-            profile( *client, currentOp->getOp(), *currentOp );
+            profile( txn, *client, currentOp->getOp(), *currentOp );
         }
     }
 
@@ -506,69 +630,101 @@ namespace mongo {
     // - error
     //
 
-    namespace {
-
-        /**
-         * Data structure to safely hold and clean up results of single write operations.
-         */
-        struct WriteOpResult {
-
-            WriteOpResult() :
-                fault( NULL ), error( NULL ) {
-            }
-
-            ~WriteOpResult() {
-                dassert( !( fault && error ) );
-                reset();
-            }
-
-            WriteErrorDetail* releaseError() {
-                WriteErrorDetail* released = error;
-                error = NULL;
-                return released;
-            }
-
-            void reset() {
-                if ( fault )
-                    delete fault;
-                if ( error )
-                    delete error;
-
-                fault = NULL;
-                error = NULL;
-
-                stats.reset();
-            }
-
-            WriteOpStats stats;
-
-            // Only one of these may be set at once
-            PageFaultException* fault;
-            WriteErrorDetail* error;
-        };
-
-    }
-
-    static void singleInsert( const BatchItemRef& insertItem,
-                              const BSONObj& normalInsert,
+    static void singleInsert( OperationContext* txn,
+                              const BSONObj& docToInsert,
                               Collection* collection,
                               WriteOpResult* result );
 
-    static void singleCreateIndex( const BatchItemRef& insertItem,
-                                   const BSONObj& normalInsert,
+    static void singleCreateIndex( OperationContext* txn,
+                                   const BSONObj& indexDesc,
                                    Collection* collection,
                                    WriteOpResult* result );
 
-    static void multiUpdate( const BatchItemRef& updateItem, WriteOpResult* result );
+    static void multiUpdate( OperationContext* txn,
+                             const BatchItemRef& updateItem,
+                             WriteOpResult* result );
 
-    static void multiRemove( const BatchItemRef& removeItem, WriteOpResult* result );
+    static void multiRemove( OperationContext* txn,
+                             const BatchItemRef& removeItem,
+                             WriteOpResult* result );
 
     //
     // WRITE EXECUTION
-    // In general, the execXXX operations manage db lock state and stats before dispatching to the
+    // In general, the exec* operations manage db lock state and stats before dispatching to the
     // core write operations, which are *only* responsible for performing a write and reporting
     // success or failure.
     //
+
+    /**
+     * Representation of the execution state of execInserts.  Used by a single
+     * execution of execInserts in a single thread.
+     */
+    class WriteBatchExecutor::ExecInsertsState {
+        MONGO_DISALLOW_COPYING(ExecInsertsState);
+    public:
+        /**
+         * Constructs a new instance, for performing inserts described in "aRequest".
+         */
+        explicit ExecInsertsState(OperationContext* txn,
+                                  const BatchedCommandRequest* aRequest);
+
+        /**
+         * Acquires the write lock and client context needed to perform the current write operation.
+         * Returns true on success, after which it is safe to use the "context" and "collection"
+         * members.  It is safe to call this function if this instance already holds the write lock.
+         *
+         * On failure, writeLock, context and collection will be NULL/clear.
+         */
+        bool lockAndCheck(WriteOpResult* result);
+
+        /**
+         * Releases the client context and write lock acquired by lockAndCheck.  Safe to call
+         * regardless of whether or not this state object currently owns the lock.
+         */
+        void unlock();
+
+        /**
+         * Returns true if this executor has the lock on the target database.
+         */
+        bool hasLock() { return _writeLock.get(); }
+
+        /**
+         * Gets the lock-holding object.  Only valid if hasLock().
+         */
+        Lock::DBWrite& getLock() { return *_writeLock; }
+
+        /**
+         * Gets the target collection for the batch operation.  Value is undefined
+         * unless hasLock() is true.
+         */
+        Collection* getCollection() { return _collection; }
+
+        OperationContext* txn;
+
+        // Request object describing the inserts.
+        const BatchedCommandRequest* request;
+
+        // Index of the current insert operation to perform.
+        size_t currIndex;
+
+        // Translation of insert documents in "request" into insert-ready forms.  This vector has a
+        // correspondence with elements of the "request", and "currIndex" is used to
+        // index both.
+        std::vector<StatusWith<BSONObj> > normalizedInserts;
+
+    private:
+        bool _lockAndCheckImpl(WriteOpResult* result);
+
+        // Guard object for the write lock on the target database.
+        scoped_ptr<Lock::DBWrite> _writeLock;
+
+        // Context object on the target database.  Must appear after writeLock, so that it is
+        // destroyed in proper order.
+        scoped_ptr<Client::Context> _context;
+
+        // Target collection.
+        Collection* _collection;
+    };
 
     void WriteBatchExecutor::bulkExecute( const BatchedCommandRequest& request,
                                           std::vector<BatchedUpsertDetail*>* upsertedIds,
@@ -628,33 +784,15 @@ namespace mongo {
         }
     }
 
-    // Does preprocessing of inserts, special casing for indexes
-    // TODO: Simplify this when indexes aren't here anymore
-    static StatusWith<BSONObj> normalizeInsert( const BatchItemRef& insertItem ) {
-
-        if ( insertItem.getRequest()->isInsertIndexRequest() ) {
-
-            StatusWith<BSONObj> normalInsert = fixDocumentForInsert( insertItem.getDocument() );
-            if ( normalInsert.isOK() && insertItem.getDocument()["ns"].type() != String ) {
-                return StatusWith<BSONObj>( ErrorCodes::BadValue, "tried to create an index "
-                                            "without specifying namespace" );
-            }
-            else {
-                return normalInsert;
-            }
-        }
-        else {
-            return fixDocumentForInsert( insertItem.getDocument() );
-        }
-    }
-
     // Goes over the request and preprocesses normalized versions of all the inserts in the request
     static void normalizeInserts( const BatchedCommandRequest& request,
-                                  vector<StatusWith<BSONObj> >* normalInserts ) {
+                                  vector<StatusWith<BSONObj> >* normalizedInserts ) {
 
+        normalizedInserts->reserve(request.sizeWriteOps());
         for ( size_t i = 0; i < request.sizeWriteOps(); ++i ) {
-            StatusWith<BSONObj> normalInsert = normalizeInsert( BatchItemRef( &request, i ) );
-            normalInserts->push_back( normalInsert );
+            BSONObj insertDoc = request.getInsertRequest()->getDocumentsAt( i );
+            StatusWith<BSONObj> normalInsert = fixDocumentForInsert( insertDoc );
+            normalizedInserts->push_back( normalInsert );
             if ( request.getOrdered() && !normalInsert.isOK() )
                 break;
         }
@@ -663,182 +801,55 @@ namespace mongo {
     void WriteBatchExecutor::execInserts( const BatchedCommandRequest& request,
                                           std::vector<WriteErrorDetail*>* errors ) {
 
-        // Bulk insert is a bit different from other bulk operations in that multiple request docs
-        // can be processed at once inside the write lock.
-
-        const NamespaceString nss( request.getTargetingNS() );
-        scoped_ptr<BatchItemRef> currInsertItem( new BatchItemRef( &request, 0 ) );
-
+        // Theory of operation:
         //
-        // BEGIN CURRENT OP
+        // Instantiates an ExecInsertsState, which represents all of the state involved in the batch
+        // insert execution algorithm.  Most importantly, encapsulates the lock state.
         //
+        // Every iteration of the loop in execInserts() processes one document insertion, by calling
+        // insertOne() exactly once for a given value of state.currIndex.
+        //
+        // If the ExecInsertsState indicates that the requisite write locks are not held, insertOne
+        // acquires them and performs lock-acquisition-time checks.  However, on non-error
+        // execution, it does not release the locks.  Therefore, the yielding logic in the while
+        // loop in execInserts() is solely responsible for lock release in the non-error case.
+        //
+        // Internally, insertOne loops performing the single insert until it completes without a
+        // PageFaultException, or until it fails with some kind of error.  Errors are mostly
+        // propagated via the request->error field, but DBExceptions or std::exceptions may escape,
+        // particularly on operation interruption.  These kinds of errors necessarily prevent
+        // further insertOne calls, and stop the batch.  As a result, the only expected source of
+        // such exceptions are interruptions.
+        ExecInsertsState state(_txn, &request);
+        normalizeInserts(request, &state.normalizedInserts);
 
-        scoped_ptr<CurOp> currentOp( beginCurrentOp( _client, *currInsertItem ) );
-        incOpStats( *currInsertItem );
+        ElapsedTracker elapsedTracker(128, 10); // 128 hits or 10 ms, matching RunnerYieldPolicy's
 
-        // Go through our request and do some preprocessing on insert documents outside the lock to
-        // validate and put them in a normalized form - i.e. put _id in front and fill in
-        // timestamps.  The insert document may also be invalid.
-        // TODO:  Might be more efficient to do in batches.
-        vector<StatusWith<BSONObj> > normalInserts;
-        normalizeInserts( request, &normalInserts );
+        for (state.currIndex = 0;
+             state.currIndex < state.request->sizeWriteOps();
+             ++state.currIndex) {
 
-        WriteErrorDetail* lastOpError = NULL;
+            if (elapsedTracker.intervalHasElapsed()) {
+                // Consider yielding between inserts.
 
-        while ( currInsertItem->getItemIndex() < static_cast<int>( request.sizeWriteOps() ) ) {
-
-            WriteOpResult currResult;
-
-            {
-                PageFaultRetryableSection pFaultSection;
-
-                ////////////////////////////////////
-                Lock::DBWrite writeLock( nss.ns() );
-                ////////////////////////////////////
-
-                // Check version inside of write lock
-
-                if ( checkShardVersion( &shardingState, request, &currResult.error )
-                     && checkIndexConstraints( &shardingState, request, &currResult.error ) ) {
-
-                    //
-                    // Get the collection for the insert
-                    //
-
-                    scoped_ptr<Client::Context> writeContext;
-                    Collection* collection = NULL;
-
-                    try {
-                        // Context once we're locked, to set more details in currentOp()
-                        // TODO: better constructor?
-                        writeContext.reset( new Client::Context( request.getNS(),
-                                                                 storageGlobalParams.dbpath,
-                                                                 false /* don't check version */) );
-
-                        Database* database = writeContext->db();
-                        dassert( database );
-                        collection = database->getCollection( nss.ns() );
-
-                        if ( !collection ) {
-                            // Implicitly create if it doesn't exist
-                            collection = database->createCollection( nss.ns() );
-                            if ( !collection ) {
-                                currResult.error =
-                                    toWriteError( Status( ErrorCodes::InternalError,
-                                                          "could not create collection" ) );
-                            }
-                        }
-                    }
-                    catch ( const DBException& ex ) {
-                        currResult.error = toWriteError( ex.toStatus() );
-                    }
-
-                    //
-                    // Perform writes inside write lock
-                    //
-
-                    while ( collection
-                            && currInsertItem->getItemIndex()
-                               < static_cast<int>( request.sizeWriteOps() ) ) {
-
-                        // Get the actual document we want to write, assuming it's valid
-                        const StatusWith<BSONObj>& normalInsert = //
-                            normalInserts[currInsertItem->getItemIndex()];
-
-                        const BSONObj& normalInsertDoc =
-                            normalInsert.getValue().isEmpty() ?
-                                currInsertItem->getDocument() : normalInsert.getValue();
-
-                        if ( !normalInsert.isOK() ) {
-                            // This insert failed on preprocessing
-                            currResult.error = toWriteError( normalInsert.getStatus() );
-                        }
-                        else if ( !request.isInsertIndexRequest() ) {
-                            // Try the insert
-                            singleInsert( *currInsertItem,
-                                          normalInsertDoc,
-                                          collection,
-                                          &currResult );
-                        }
-                        else {
-                            // Try the create index
-                            singleCreateIndex( *currInsertItem,
-                                               normalInsertDoc,
-                                               collection,
-                                               &currResult );
-                        }
-
-                        // Faults release the write lock
-                        if ( currResult.fault )
-                            break;
-
-                        // In general, we might have stats and errors
-                        incWriteStats( *currInsertItem,
-                                       currResult.stats,
-                                       currResult.error,
-                                       currentOp.get() );
-
-                        // Errors release the write lock
-                        if ( currResult.error )
-                            break;
-
-                        // Increment in the write lock and reset the stats for next time
-                        currInsertItem.reset( new BatchItemRef( &request,
-                                                                currInsertItem->getItemIndex()
-                                                                + 1 ) );
-                        currResult.reset();
-                    }
-                }
-
-            } // END WRITE LOCK
-
-            //
-            // Store the current error if it exists
-            //
-
-            lastOpError = currResult.error;
-
-            if ( currResult.error ) {
-
-                errors->push_back( currResult.releaseError() );
-                errors->back()->setIndex( currInsertItem->getItemIndex() );
-
-                // Break early for ordered batches
-                if ( request.getOrdered() )
-                    break;
+                _txn->checkForInterrupt();
+                elapsedTracker.resetLastTime();
             }
 
-            //
-            // Fault or increment
-            //
-
-            if ( currResult.fault ) {
-                dassert( !lastOpError );
-                // Check page fault out of lock
-                currResult.fault->touch();
-            }
-            else {
-                // Increment if not a fault
-                currInsertItem.reset( new BatchItemRef( &request,
-                                                        currInsertItem->getItemIndex() + 1 ) );
+            WriteErrorDetail* error = NULL;
+            execOneInsert(&state, &error);
+            if (error) {
+                errors->push_back(error);
+                error->setIndex(state.currIndex);
+                if (request.getOrdered())
+                    return;
             }
         }
-
-        //
-        // END CURRENT OP
-        //
-
-        finishCurrentOp( _client, currentOp.get(), lastOpError );
     }
 
     void WriteBatchExecutor::execUpdate( const BatchItemRef& updateItem,
                                          BSONObj* upsertedId,
                                          WriteErrorDetail** error ) {
-
-        // Updates currently do a lot of the lock management internally
-
-        const BatchedCommandRequest& request = *updateItem.getRequest();
-        const NamespaceString nss( updateItem.getRequest()->getNS() );
 
         // BEGIN CURRENT OP
         scoped_ptr<CurOp> currentOp( beginCurrentOp( _client, updateItem ) );
@@ -846,36 +857,17 @@ namespace mongo {
 
         WriteOpResult result;
 
-        {
-            ///////////////////////////////////////////
-            Lock::DBWrite writeLock( nss.ns() );
-            ///////////////////////////////////////////
+        multiUpdate( _txn, updateItem, &result );
 
-            // Check version once we're locked
-
-            if ( checkShardVersion( &shardingState, request, &result.error ) ) {
-
-                // Context once we're locked, to set more details in currentOp()
-                // TODO: better constructor?
-                Client::Context writeContext( nss.ns(),
-                                              storageGlobalParams.dbpath,
-                                              false /* don't check version */);
-
-                multiUpdate( updateItem, &result );
-
-                incWriteStats( updateItem, result.stats, result.error, currentOp.get() );
-
-                if ( !result.stats.upsertedID.isEmpty() ) {
-                    *upsertedId = result.stats.upsertedID.getOwned();
-                }
-            }
+        if ( !result.getStats().upsertedID.isEmpty() ) {
+            *upsertedId = result.getStats().upsertedID;
         }
-
         // END CURRENT OP
-        finishCurrentOp( _client, currentOp.get(), result.error );
+        incWriteStats( updateItem, result.getStats(), result.getError(), currentOp.get() );
+        finishCurrentOp( _txn, _client, currentOp.get(), result.getError() );
 
-        if ( result.error ) {
-            result.error->setIndex( updateItem.getItemIndex() );
+        if ( result.getError() ) {
+            result.getError()->setIndex( updateItem.getItemIndex() );
             *error = result.releaseError();
         }
     }
@@ -885,60 +877,20 @@ namespace mongo {
 
         // Removes are similar to updates, but page faults are handled externally
 
-        const BatchedCommandRequest& request = *removeItem.getRequest();
-        const NamespaceString nss( removeItem.getRequest()->getNS() );
-
         // BEGIN CURRENT OP
         scoped_ptr<CurOp> currentOp( beginCurrentOp( _client, removeItem ) );
         incOpStats( removeItem );
 
         WriteOpResult result;
 
-        while ( true ) {
-
-            {
-                // NOTE: Deletes will not fault outside the lock once any data has been written
-                PageFaultRetryableSection pFaultSection;
-
-                ///////////////////////////////////////////
-                Lock::DBWrite writeLock( nss.ns() );
-                ///////////////////////////////////////////
-
-                // Check version once we're locked
-
-                if ( !checkShardVersion( &shardingState, request, &result.error ) ) {
-                    // Version error
-                    break;
-                }
-
-                // Context once we're locked, to set more details in currentOp()
-                // TODO: better constructor?
-                Client::Context writeContext( nss.ns(),
-                                              storageGlobalParams.dbpath,
-                                              false /* don't check version */);
-
-                multiRemove( removeItem, &result );
-
-                if ( !result.fault ) {
-                    incWriteStats( removeItem, result.stats, result.error, currentOp.get() );
-                    break;
-                }
-            }
-
-            //
-            // Check page fault out of lock
-            //
-
-            dassert( result.fault );
-            result.fault->touch();
-            result.reset();
-        }
+        multiRemove( _txn, removeItem, &result );
 
         // END CURRENT OP
-        finishCurrentOp( _client, currentOp.get(), result.error );
+        incWriteStats( removeItem, result.getStats(), result.getError(), currentOp.get() );
+        finishCurrentOp( _txn, _client, currentOp.get(), result.getError() );
 
-        if ( result.error ) {
-            result.error->setIndex( removeItem.getItemIndex() );
+        if ( result.getError() ) {
+            result.getError()->setIndex( removeItem.getItemIndex() );
             *error = result.releaseError();
         }
     }
@@ -947,43 +899,157 @@ namespace mongo {
     // IN-DB-LOCK CORE OPERATIONS
     //
 
+    WriteBatchExecutor::ExecInsertsState::ExecInsertsState(OperationContext* txn,
+                                                           const BatchedCommandRequest* aRequest) :
+        txn(txn),
+        request(aRequest),
+        currIndex(0),
+        _collection(NULL) {
+    }
+
+    bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* result) {
+        if (hasLock()) {
+            txn->getCurOp()->enter(_context.get());
+            return true;
+        }
+
+        invariant(!_context.get());
+        _writeLock.reset(new Lock::DBWrite(txn->lockState(), request->getNS()));
+        if (!checkIsMasterForDatabase(request->getNS(), result)) {
+            return false;
+        }
+        if (!checkShardVersion(txn, &shardingState, *request, result)) {
+            return false;
+        }
+        if (!checkIndexConstraints(txn, &shardingState, *request, result)) {
+            return false;
+        }
+
+        _context.reset(new Client::Context(txn, request->getNS(), false));
+
+        Database* database = _context->db();
+        dassert(database);
+        _collection = database->getCollection(txn, request->getTargetingNS());
+        if (!_collection) {
+            WriteUnitOfWork wunit (txn->recoveryUnit());
+            // Implicitly create if it doesn't exist
+            _collection = database->createCollection(txn, request->getTargetingNS());
+            if (!_collection) {
+                result->setError(
+                        toWriteError(Status(ErrorCodes::InternalError,
+                                            "could not create collection " +
+                                            request->getTargetingNS())));
+                return false;
+            }
+            wunit.commit();
+        }
+        return true;
+    }
+
+    bool WriteBatchExecutor::ExecInsertsState::lockAndCheck(WriteOpResult* result) {
+        if (_lockAndCheckImpl(result))
+            return true;
+        unlock();
+        return false;
+    }
+
+    void WriteBatchExecutor::ExecInsertsState::unlock() {
+        _collection = NULL;
+        _context.reset();
+        _writeLock.reset();
+    }
+
+    static void insertOne(WriteBatchExecutor::ExecInsertsState* state, WriteOpResult* result) {
+        invariant(state->currIndex < state->normalizedInserts.size());
+        const StatusWith<BSONObj>& normalizedInsert(state->normalizedInserts[state->currIndex]);
+
+        if (!normalizedInsert.isOK()) {
+            result->setError(toWriteError(normalizedInsert.getStatus()));
+            return;
+        }
+
+        const BSONObj& insertDoc = normalizedInsert.getValue().isEmpty() ?
+            state->request->getInsertRequest()->getDocumentsAt( state->currIndex ) :
+            normalizedInsert.getValue();
+
+        try {
+            if (state->lockAndCheck(result)) {
+                WriteUnitOfWork wunit (state->txn->recoveryUnit());
+                if (!state->request->isInsertIndexRequest()) {
+                    singleInsert(state->txn, insertDoc, state->getCollection(), result);
+                }
+                else {
+                    singleCreateIndex(state->txn, insertDoc, state->getCollection(), result);
+                }
+                wunit.commit();
+            }
+        }
+        catch (const DBException& ex) {
+            Status status(ex.toStatus());
+            if (ErrorCodes::isInterruption(status.code()))
+                throw;
+            result->setError(toWriteError(status));
+        }
+
+        // Errors release the write lock, as a matter of policy.
+        if (result->getError())
+            state->unlock();
+    }
+
+    void WriteBatchExecutor::execOneInsert(ExecInsertsState* state, WriteErrorDetail** error) {
+        BatchItemRef currInsertItem(state->request, state->currIndex);
+        scoped_ptr<CurOp> currentOp(beginCurrentOp(_client, currInsertItem));
+        incOpStats(currInsertItem);
+
+        WriteOpResult result;
+        insertOne(state, &result);
+
+        if (state->hasLock()) {
+            // Normally, unlocking records lock time stats on the active CurOp.  However,
+            // insertOne() may not release the lock. In that case, record time by hand.
+            state->getLock().recordTime();
+            // If we deschedule here, there could be substantial unaccounted locked time.
+            // Any time from here will be attributed to the next insert in the batch, or
+            // not attributed to any operation if this is the last op in the batch.
+            state->getLock().resetTime();
+        }
+
+        incWriteStats(currInsertItem,
+                      result.getStats(),
+                      result.getError(),
+                      currentOp.get());
+        finishCurrentOp(_txn, _client, currentOp.get(), result.getError());
+
+        if (result.getError()) {
+            *error = result.releaseError();
+        }
+    }
+
     /**
      * Perform a single insert into a collection.  Requires the insert be preprocessed and the
      * collection already has been created.
      *
      * Might fault or error, otherwise populates the result.
      */
-    static void singleInsert( const BatchItemRef& insertItem,
-                              const BSONObj& normalInsert,
+    static void singleInsert( OperationContext* txn,
+                              const BSONObj& docToInsert,
                               Collection* collection,
                               WriteOpResult* result ) {
 
-        const string& insertNS = insertItem.getRequest()->getNS();
+        const string& insertNS = collection->ns().ns();
 
-        Lock::assertWriteLocked( insertNS );
+        txn->lockState()->assertWriteLocked( insertNS );
 
-        try {
+        StatusWith<DiskLoc> status = collection->insertDocument( txn, docToInsert, true );
 
-            // XXX - are we 100% sure that all !OK statuses do not write a document?
-            StatusWith<DiskLoc> status = collection->insertDocument( normalInsert, true );
-
-            if ( !status.isOK() ) {
-                result->error = toWriteError( status.getStatus() );
-            }
-            else {
-                logOp( "i", insertNS.c_str(), normalInsert );
-                getDur().commitIfNeeded();
-                result->stats.n = 1;
-            }
+        if ( !status.isOK() ) {
+            result->setError(toWriteError(status.getStatus()));
         }
-        catch ( const PageFaultException& ex ) {
-            // TODO: An actual data structure that's not an exception for this
-            result->fault = new PageFaultException( ex );
+        else {
+            repl::logOp( txn, "i", insertNS.c_str(), docToInsert );
+            txn->recoveryUnit()->commitIfNeeded();
+            result->getStats().n = 1;
         }
-        catch ( const DBException& ex ) {
-            result->error = toWriteError( ex.toStatus() );
-        }
-
     }
 
     /**
@@ -992,90 +1058,79 @@ namespace mongo {
      *
      * Might fault or error, otherwise populates the result.
      */
-    static void singleCreateIndex( const BatchItemRef& insertItem,
-                                   const BSONObj& normalIndexDesc,
+    static void singleCreateIndex( OperationContext* txn,
+                                   const BSONObj& indexDesc,
                                    Collection* collection,
                                    WriteOpResult* result ) {
 
-        const string& indexNS = insertItem.getRequest()->getNS();
+        const string indexNS = collection->ns().getSystemIndexesCollection();
 
-        Lock::assertWriteLocked( indexNS );
+        txn->lockState()->assertWriteLocked( indexNS );
 
-        try {
+        Status status = collection->getIndexCatalog()->createIndex(txn, indexDesc, true);
 
-            Status status = collection->getIndexCatalog()->createIndex( normalIndexDesc, true );
-
-            if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
-                result->stats.n = 0;
-            }
-            else if ( !status.isOK() ) {
-                result->error = toWriteError( status );
-            }
-            else {
-                logOp( "i", indexNS.c_str(), normalIndexDesc );
-                result->stats.n = 1;
-            }
+        if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
+            result->getStats().n = 0;
         }
-        catch ( const PageFaultException& ex ) {
-            // TODO: An actual data structure that's not an exception for this
-            result->fault = new PageFaultException( ex );
+        else if ( !status.isOK() ) {
+            result->setError(toWriteError(status));
         }
-        catch ( const DBException& ex ) {
-            result->error = toWriteError( ex.toStatus() );
+        else {
+            repl::logOp( txn, "i", indexNS.c_str(), indexDesc );
+            result->getStats().n = 1;
         }
     }
 
-    /**
-     * Perform an update operation, which might update multiple documents in the lock.  Dispatches
-     * to update code currently to do most of this.
-     *
-     * Might error, otherwise populates the result.
-     */
-    static void multiUpdate( const BatchItemRef& updateItem,
+    static void multiUpdate( OperationContext* txn,
+                             const BatchItemRef& updateItem,
                              WriteOpResult* result ) {
 
-        Lock::assertWriteLocked( updateItem.getRequest()->getNS() );
+        const NamespaceString nsString(updateItem.getRequest()->getNS());
+        UpdateRequest request(txn, nsString);
+        request.setQuery(updateItem.getUpdate()->getQuery());
+        request.setUpdates(updateItem.getUpdate()->getUpdateExpr());
+        request.setMulti(updateItem.getUpdate()->getMulti());
+        request.setUpsert(updateItem.getUpdate()->getUpsert());
+        request.setUpdateOpLog(true);
+        UpdateLifecycleImpl updateLifecycle(true, request.getNamespaceString());
+        request.setLifecycle(&updateLifecycle);
 
-        BSONObj queryObj = updateItem.getUpdate()->getQuery();
-        BSONObj updateObj = updateItem.getUpdate()->getUpdateExpr();
-        bool multi = updateItem.getUpdate()->getMulti();
-        bool upsert = updateItem.getUpdate()->getUpsert();
+        UpdateExecutor executor(&request, &txn->getCurOp()->debug());
+        Status status = executor.prepare();
+        if (!status.isOK()) {
+            result->setError(toWriteError(status));
+            return;
+        }
 
-        bool didInsert = false;
-        long long numMatched = 0;
-        long long numDocsModified = 0;
-        BSONObj resUpsertedID;
+        ///////////////////////////////////////////
+        Lock::DBWrite writeLock(txn->lockState(), nsString.ns(), useExperimentalDocLocking);
+        ///////////////////////////////////////////
+
+        if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
+            return;
+
+        Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
 
         try {
+            UpdateResult res = executor.execute(ctx.db());
 
-            const NamespaceString requestNs( updateItem.getRequest()->getNS() );
-            UpdateRequest request( requestNs );
-
-            request.setQuery( queryObj );
-            request.setUpdates( updateObj );
-            request.setUpsert( upsert );
-            request.setMulti( multi );
-            request.setUpdateOpLog();
-            // TODO(greg) We need to send if we are ignoring the shard version below,
-            // but for now yes
-            UpdateLifecycleImpl updateLifecycle( true, requestNs );
-            request.setLifecycle( &updateLifecycle );
-
-            UpdateResult res = update( request, &cc().curop()->debug() );
-
-            numDocsModified = res.numDocsModified;
-            numMatched = res.numMatched;
-            resUpsertedID = res.upserted;
+            const long long numDocsModified = res.numDocsModified;
+            const long long numMatched = res.numMatched;
+            const BSONObj resUpsertedID = res.upserted;
 
             // We have an _id from an insert
-            didInsert = !resUpsertedID.isEmpty();
+            const bool didInsert = !resUpsertedID.isEmpty();
 
-            result->stats.nModified = didInsert ? 0 : numDocsModified;
-            result->stats.n = didInsert ? 1 : numMatched;
-            result->stats.upsertedID = resUpsertedID;
+            result->getStats().nModified = didInsert ? 0 : numDocsModified;
+            result->getStats().n = didInsert ? 1 : numMatched;
+            result->getStats().upsertedID = resUpsertedID;
         }
-        catch ( const DBException& ex ) {
-            result->error = toWriteError( ex.toStatus() );
+        catch (const DBException& ex) {
+            status = ex.toStatus();
+            if (ErrorCodes::isInterruption(status.code())) {
+                throw;
+            }
+            result->setError(toWriteError(status));
         }
     }
 
@@ -1085,27 +1140,47 @@ namespace mongo {
      *
      * Might fault or error, otherwise populates the result.
      */
-    static void multiRemove( const BatchItemRef& removeItem,
+    static void multiRemove( OperationContext* txn,
+                             const BatchItemRef& removeItem,
                              WriteOpResult* result ) {
 
-        Lock::assertWriteLocked( removeItem.getRequest()->getNS() );
+        const NamespaceString nss( removeItem.getRequest()->getNS() );
+        DeleteRequest request(txn, nss);
+        request.setQuery( removeItem.getDelete()->getQuery() );
+        request.setMulti( removeItem.getDelete()->getLimit() != 1 );
+        request.setUpdateOpLog(true);
+        request.setGod( false );
+        DeleteExecutor executor( &request );
+        Status status = executor.prepare();
+        if ( !status.isOK() ) {
+            result->setError(toWriteError(status));
+            return;
+        }
+
+        ///////////////////////////////////////////
+        Lock::DBWrite writeLock(txn->lockState(), nss.ns());
+        ///////////////////////////////////////////
+
+        // Check version once we're locked
+
+        if (!checkShardVersion(txn, &shardingState, *removeItem.getRequest(), result)) {
+            // Version error
+            return;
+        }
+
+        // Context once we're locked, to set more details in currentOp()
+        // TODO: better constructor?
+        Client::Context ctx(txn, nss.ns(), false /* don't check version */);
 
         try {
-            long long n = deleteObjects( removeItem.getRequest()->getNS(),
-                                         removeItem.getDelete()->getQuery(),
-                                         removeItem.getDelete()->getLimit() == 1, // justOne
-                                         true, // logOp
-                                         false // god
-                                         );
-
-            result->stats.n = n;
-        }
-        catch ( const PageFaultException& ex ) {
-            // TODO: An actual data structure that's not an exception for this
-            result->fault = new PageFaultException( ex );
+            result->getStats().n = executor.execute(ctx.db());
         }
         catch ( const DBException& ex ) {
-            result->error = toWriteError( ex.toStatus() );
+            status = ex.toStatus();
+            if (ErrorCodes::isInterruption(status.code())) {
+                throw;
+            }
+            result->setError(toWriteError(status));
         }
     }
 

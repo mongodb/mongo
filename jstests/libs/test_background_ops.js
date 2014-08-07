@@ -205,8 +205,8 @@ startParallelOps = function( mongo, proc, args, context ){
                            
         assert.neq( result, null )                 
                            
-        if( result.err ) throw "Error in parallel ops " + procName + " : " 
-                                                        + tojson( result.err )
+        if( result.err ) throw Error("Error in parallel ops " + procName + " : "
+                                                        + tojson( result.err ) )
                                                         
         else return result.result
     }

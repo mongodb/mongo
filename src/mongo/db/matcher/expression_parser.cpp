@@ -34,18 +34,41 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsonobjiterator.h"
-#include "mongo/bson/bson-inl.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
+
+namespace {
+
+    using namespace mongo;
+
+    /**
+     * Returns true if subtree contains MatchExpression 'type'.
+     */
+    bool hasNode(const MatchExpression* root, MatchExpression::MatchType type) {
+        if (type == root->matchType()) {
+            return true;
+        }
+        for (size_t i = 0; i < root->numChildren(); ++i) {
+            if (hasNode(root->getChild(i), type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+} // namespace
+
 namespace mongo {
 
     StatusWithMatchExpression MatchExpressionParser::_parseComparison( const char* name,
                                                                        ComparisonMatchExpression* cmp,
                                                                        const BSONElement& e ) {
+        std::auto_ptr<ComparisonMatchExpression> temp(cmp);
+
         // Non-equality comparison match expressions cannot have
         // a regular expression as the argument (e.g. {a: {$gt: /b/}} is illegal).
         if (MatchExpression::EQ != cmp->matchType() && RegEx == e.type()) {
@@ -53,8 +76,6 @@ namespace mongo {
             ss << "Can't have RegEx as arg to predicate over field '" << name << "'.";
             return StatusWithMatchExpression(Status(ErrorCodes::BadValue, ss.str()));
         }
-
-        std::auto_ptr<ComparisonMatchExpression> temp( cmp );
 
         Status s = temp->init( name, e );
         if ( !s.isOK() )
@@ -66,7 +87,8 @@ namespace mongo {
     StatusWithMatchExpression MatchExpressionParser::_parseSubField( const BSONObj& context,
                                                                      const AndMatchExpression* andSoFar,
                                                                      const char* name,
-                                                                     const BSONElement& e ) {
+                                                                     const BSONElement& e,
+                                                                     int level ) {
 
         // TODO: these should move to getGtLtOp, or its replacement
 
@@ -74,12 +96,18 @@ namespace mongo {
             return _parseComparison( name, new EqualityMatchExpression(), e );
 
         if ( mongoutils::str::equals( "$not", e.fieldName() ) ) {
-            return _parseNot( name, e );
+            return _parseNot( name, e, level );
         }
 
         int x = e.getGtLtOp(-1);
         switch ( x ) {
         case -1:
+            // $where cannot be a sub-expression because it works on top-level documents only.
+            if ( mongoutils::str::equals( "$where", e.fieldName() ) ) {
+                return StatusWithMatchExpression( ErrorCodes::BadValue,
+                    "$where cannot be applied to a field" );
+            }
+
             return StatusWithMatchExpression( ErrorCodes::BadValue,
                                               mongoutils::str::stream() << "unknown operator: "
                                               << e.fieldName() );
@@ -231,10 +259,10 @@ namespace mongo {
         }
 
         case BSONObj::opELEM_MATCH:
-            return _parseElemMatch( name, e );
+            return _parseElemMatch( name, e, level );
 
         case BSONObj::opALL:
-            return _parseAll( name, e );
+            return _parseAll( name, e, level );
 
         case BSONObj::opWITHIN:
         case BSONObj::opGEO_INTERSECTS:
@@ -245,9 +273,18 @@ namespace mongo {
                                           mongoutils::str::stream() << "not handled: " << e.fieldName() );
     }
 
-    StatusWithMatchExpression MatchExpressionParser::_parse( const BSONObj& obj, bool topLevel ) {
+    StatusWithMatchExpression MatchExpressionParser::_parse( const BSONObj& obj, int level ) {
+        if (level > kMaximumTreeDepth) {
+            mongoutils::str::stream ss;
+            ss << "exceeded maximum query tree depth of " << kMaximumTreeDepth
+               << " at " << obj.toString();
+            return StatusWithMatchExpression( ErrorCodes::BadValue, ss );
+        }
 
         std::auto_ptr<AndMatchExpression> root( new AndMatchExpression() );
+
+        bool topLevel = (level == 0);
+        level++;
 
         BSONObjIterator i( obj );
         while ( i.more() ){
@@ -262,7 +299,7 @@ namespace mongo {
                         return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                      "$or needs an array" );
                     std::auto_ptr<OrMatchExpression> temp( new OrMatchExpression() );
-                    Status s = _parseTreeList( e.Obj(), temp.get() );
+                    Status s = _parseTreeList( e.Obj(), temp.get(), level );
                     if ( !s.isOK() )
                         return StatusWithMatchExpression( s );
                     root->add( temp.release() );
@@ -272,7 +309,7 @@ namespace mongo {
                         return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                      "and needs an array" );
                     std::auto_ptr<AndMatchExpression> temp( new AndMatchExpression() );
-                    Status s = _parseTreeList( e.Obj(), temp.get() );
+                    Status s = _parseTreeList( e.Obj(), temp.get(), level );
                     if ( !s.isOK() )
                         return StatusWithMatchExpression( s );
                     root->add( temp.release() );
@@ -282,7 +319,7 @@ namespace mongo {
                         return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                      "and needs an array" );
                     std::auto_ptr<NorMatchExpression> temp( new NorMatchExpression() );
-                    Status s = _parseTreeList( e.Obj(), temp.get() );
+                    Status s = _parseTreeList( e.Obj(), temp.get(), level );
                     if ( !s.isOK() )
                         return StatusWithMatchExpression( s );
                     root->add( temp.release() );
@@ -296,12 +333,7 @@ namespace mongo {
                         root->add( new AtomicMatchExpression() );
                 }
                 else if ( mongoutils::str::equals( "where", rest ) ) {
-                    /*
-                    if ( !topLevel )
-                        return StatusWithMatchExpression( ErrorCodes::BadValue,
-                                                          "$where has to be at the top level" );
-                    */
-                    StatusWithMatchExpression s = expressionParserWhereCallback( e );
+                    StatusWithMatchExpression s = _whereCallback->parseWhere(e);
                     if ( !s.isOK() )
                         return s;
                     root->add( s.getValue() );
@@ -319,6 +351,17 @@ namespace mongo {
                 }
                 else if ( mongoutils::str::equals( "comment", rest ) ) {
                 }
+                else if ( mongoutils::str::equals( "ref", rest ) ||
+                          mongoutils::str::equals( "id", rest ) ||
+                          mongoutils::str::equals( "db", rest ) ) {
+                    // DBRef fields.
+                    std::auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+                    Status s = eq->init( e.fieldName(), e );
+                    if ( !s.isOK() )
+                        return StatusWithMatchExpression( s );
+
+                    root->add( eq.release() );
+                }
                 else {
                     return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                  mongoutils::str::stream()
@@ -329,8 +372,8 @@ namespace mongo {
                 continue;
             }
 
-            if ( _isExpressionDocument( e ) ) {
-                Status s = _parseSub( e.fieldName(), e.Obj(), root.get() );
+            if ( _isExpressionDocument( e, false ) ) {
+                Status s = _parseSub( e.fieldName(), e.Obj(), root.get(), level );
                 if ( !s.isOK() )
                     return StatusWithMatchExpression( s );
                 continue;
@@ -363,12 +406,22 @@ namespace mongo {
 
     Status MatchExpressionParser::_parseSub( const char* name,
                                              const BSONObj& sub,
-                                             AndMatchExpression* root ) {
+                                             AndMatchExpression* root,
+                                             int level ) {
         // The one exception to {field : {fully contained argument} } is, of course, geo.  Example:
         // sub == { field : {$near[Sphere]: [0,0], $maxDistance: 1000, $minDistance: 10 } }
         // We peek inside of 'sub' to see if it's possibly a $near.  If so, we can't iterate over
         // its subfields and parse them one at a time (there is no $maxDistance without $near), so
         // we hand the entire object over to the geo parsing routines.
+
+        if (level > kMaximumTreeDepth) {
+            mongoutils::str::stream ss;
+            ss << "exceeded maximum query tree depth of " << kMaximumTreeDepth
+               << " at " << sub.toString();
+            return Status( ErrorCodes::BadValue, ss );
+        }
+
+        level++;
 
         BSONObjIterator geoIt(sub);
         if (geoIt.more()) {
@@ -388,8 +441,10 @@ namespace mongo {
                                                                               sub);
                     if (s.isOK()) {
                         root->add(s.getValue());
-                        return Status::OK();
                     }
+
+                    // Propagate geo parsing result to caller.
+                    return s.getStatus();
                 }
             }
         }
@@ -398,7 +453,7 @@ namespace mongo {
         while ( j.more() ) {
             BSONElement deep = j.next();
 
-            StatusWithMatchExpression s = _parseSubField( sub, root, name, deep );
+            StatusWithMatchExpression s = _parseSubField( sub, root, name, deep, level );
             if ( !s.isOK() )
                 return s.getStatus();
 
@@ -409,7 +464,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool MatchExpressionParser::_isExpressionDocument( const BSONElement& e ) {
+    bool MatchExpressionParser::_isExpressionDocument( const BSONElement& e,
+                                                       bool allowIncompleteDBRef ) {
         if ( e.type() != Object )
             return false;
 
@@ -421,7 +477,7 @@ namespace mongo {
         if ( name[0] != '$' )
             return false;
 
-        if ( _isDBRefDocument( o ) ) {
+        if ( _isDBRefDocument( o, allowIncompleteDBRef ) ) {
             return false;
         }
 
@@ -429,55 +485,44 @@ namespace mongo {
     }
 
     /**
-     * DBRef fields are ordered
-     * Required fields: $ref and $id (in that order)
-     * Optional field: $db
+     * DBRef fields are ordered in the collection.
+     * In the query, we consider an embedded object a query on
+     * a DBRef as long as it contains $ref and $id.
+     * Required fields: $ref and $id (if incomplete DBRefs are not allowed)
+     *
+     * If incomplete DBRefs are allowed, we accept the BSON object as long as it
+     * contains $ref, $id or $db.
+     *
      * Field names are checked but not field types.
      */
-    bool MatchExpressionParser::_isDBRefDocument( const BSONObj& obj ) {
+    bool MatchExpressionParser::_isDBRefDocument( const BSONObj& obj, bool allowIncompleteDBRef ) {
+        bool hasRef = false;
+        bool hasID = false;
+        bool hasDB = false;
+
         BSONObjIterator i( obj );
-        BSONElement element;
-        const char* fieldName;
-
-        // $ref
-        if ( !i.more() ) {
-            return false;
-        }
-        element = i.next();
-        fieldName = element.fieldName();
-        if ( !mongoutils::str::equals( "$ref", fieldName ) ) {
-            return false;
-        }
-
-        // $id
-        if ( !i.more() ) {
-            return false;
-        }
-        element = i.next();
-        fieldName = element.fieldName();
-        if ( !mongoutils::str::equals( "$id", fieldName ) ) {
-            return false;
+        while ( i.more() && !( hasRef && hasID ) ) {
+            BSONElement element = i.next();
+            const char *fieldName = element.fieldName();
+            // $ref
+            if ( !hasRef && mongoutils::str::equals( "$ref", fieldName ) ) {
+                hasRef = true;
+            }
+            // $id
+            else if ( !hasID && mongoutils::str::equals( "$id", fieldName ) ) {
+                hasID = true;
+            }
+            // $db
+            else if ( !hasDB && mongoutils::str::equals( "$db", fieldName ) ) {
+                hasDB = true;
+            }
         }
 
-        // $db
-        if ( !i.more() ) {
-            // $db is optional
-            return true;
-        }
-        element = i.next();
-        fieldName = element.fieldName();
-        if ( !mongoutils::str::equals( "$db", fieldName ) ) {
-            return false;
+        if (allowIncompleteDBRef) {
+            return hasRef || hasID || hasDB;
         }
 
-        // Additional fields encountered beyond $db
-        // should invalidate the DBRef
-        if ( !i.more() ) {
-            return true;
-        }
-
-        // Document has more than 3 fields - invalid DBRef
-        return false;
+        return hasRef && hasID;
     }
 
     StatusWithMatchExpression MatchExpressionParser::_parseMOD( const char* name,
@@ -573,7 +618,7 @@ namespace mongo {
             BSONElement e = i.next();
 
             // allow DBRefs but reject all fields with names starting wiht $
-            if ( _isExpressionDocument( e ) ) {
+            if ( _isExpressionDocument( e, false ) ) {
                 return Status( ErrorCodes::BadValue, "cannot nest $ under $in" );
             }
 
@@ -597,16 +642,38 @@ namespace mongo {
     }
 
     StatusWithMatchExpression MatchExpressionParser::_parseElemMatch( const char* name,
-                                                            const BSONElement& e ) {
+                                                                      const BSONElement& e,
+                                                                      int level ) {
         if ( e.type() != Object )
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$elemMatch needs an Object" );
 
         BSONObj obj = e.Obj();
-        if ( _isExpressionDocument( e ) ) {
+
+        // $elemMatch value case applies when the children all
+        // work on the field 'name'.
+        // This is the case when:
+        //     1) the argument is an expression document; and
+        //     2) expression is not a AND/NOR/OR logical operator. Children of
+        //        these logical operators are initialized with field names.
+        //     3) expression is not a WHERE operator. WHERE works on objects instead
+        //        of specific field.
+        bool isElemMatchValue = false;
+        if ( _isExpressionDocument( e, true ) ) {
+            BSONObj o = e.Obj();
+            BSONElement elt = o.firstElement();
+            invariant( !elt.eoo() );
+
+            isElemMatchValue = !mongoutils::str::equals( "$and", elt.fieldName() ) &&
+                               !mongoutils::str::equals( "$nor", elt.fieldName() ) &&
+                               !mongoutils::str::equals( "$or", elt.fieldName() ) &&
+                               !mongoutils::str::equals( "$where", elt.fieldName() );
+        }
+
+        if ( isElemMatchValue ) {
             // value case
 
             AndMatchExpression theAnd;
-            Status s = _parseSub( "", obj, &theAnd );
+            Status s = _parseSub( "", obj, &theAnd, level );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
 
@@ -624,32 +691,21 @@ namespace mongo {
         }
 
         // DBRef value case
-        // A DBRef document under a $elemMatch should be treated as a value case
-        // with an implied $eq.
-
-        if ( _isDBRefDocument( obj ) ) {
-
-            std::auto_ptr<EqualityMatchExpression> eq( new EqualityMatchExpression() );
-            Status s = eq->init( "", e );
-            if ( !s.isOK() ) {
-                return StatusWithMatchExpression( s );
-            }
-
-            std::auto_ptr<ElemMatchValueMatchExpression> temp( new ElemMatchValueMatchExpression() );
-            s = temp->init( name );
-            if ( !s.isOK() )
-                return StatusWithMatchExpression( s );
-
-            temp->add( eq.release() );
-
-            return StatusWithMatchExpression( temp.release() );
-        }
+        // A DBRef document under a $elemMatch should be treated as an object case
+        // because it may contain non-DBRef fields in addition to $ref, $id and $db.
 
         // object case
 
-        StatusWithMatchExpression sub = _parse( obj, false );
+        StatusWithMatchExpression sub = _parse( obj, level );
         if ( !sub.isOK() )
             return sub;
+
+        // $where is not supported under $elemMatch because $where
+        // applies to top-level document, not array elements in a field.
+        if ( hasNode( sub.getValue(), MatchExpression::WHERE ) ) {
+            return StatusWithMatchExpression( ErrorCodes::BadValue,
+                "$elemMatch cannot contain $where expression" );
+        }
 
         std::auto_ptr<ElemMatchObjectMatchExpression> temp( new ElemMatchObjectMatchExpression() );
         Status status = temp->init( name, sub.getValue() );
@@ -660,7 +716,8 @@ namespace mongo {
     }
 
     StatusWithMatchExpression MatchExpressionParser::_parseAll( const char* name,
-                                                      const BSONElement& e ) {
+                                                                const BSONElement& e,
+                                                                int level ) {
         if ( e.type() != Array )
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$all needs an array" );
 
@@ -693,7 +750,8 @@ namespace mongo {
                                                  "$all/$elemMatch has to be consistent" );
                 }
 
-                StatusWithMatchExpression inner = _parseElemMatch( "", hopefullyElemMatchObj.firstElement() );
+                StatusWithMatchExpression inner =
+                    _parseElemMatch( "", hopefullyElemMatchObj.firstElement(), level );
                 if ( !inner.isOK() )
                     return inner;
                 temp->add( static_cast<ArrayMatchingMatchExpression*>( inner.getValue() ) );
@@ -733,6 +791,12 @@ namespace mongo {
         return StatusWithMatchExpression( myAnd.release() );
     }
 
+    StatusWithMatchExpression MatchExpressionParser::WhereCallback::parseWhere(
+                                                        const BSONElement& where) const {
+        return StatusWithMatchExpression(ErrorCodes::NoWhereParseContext,
+                                         "no context for parsing $where");
+    }
+
     // Geo
     StatusWithMatchExpression expressionParserGeoCallbackDefault( const char* name,
                                                                   int type,
@@ -742,14 +806,6 @@ namespace mongo {
 
     MatchExpressionParserGeoCallback expressionParserGeoCallback =
         expressionParserGeoCallbackDefault;
-
-    // Where
-    StatusWithMatchExpression expressionParserWhereCallbackDefault(const BSONElement& where) {
-        return StatusWithMatchExpression( ErrorCodes::BadValue, "$where not linked in" );
-    }
-
-    MatchExpressionParserWhereCallback expressionParserWhereCallback =
-        expressionParserWhereCallbackDefault;
 
     // Text
     StatusWithMatchExpression expressionParserTextCallbackDefault( const BSONObj& queryObj ) {

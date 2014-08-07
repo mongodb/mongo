@@ -275,7 +275,6 @@ namespace {
 
         ASSERT_OK(mod.apply());
         ASSERT_EQUALS(fromjson("{a: {b: 3}}}"), doc);
-        ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());

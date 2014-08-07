@@ -73,7 +73,9 @@ namespace mongo {
         Status targetDelete( const BatchedDeleteDocument& deleteDoc,
                              std::vector<ShardEndpoint*>* endpoints ) const;
 
-        Status targetAll( std::vector<ShardEndpoint*>* endpoints ) const;
+        Status targetCollection( std::vector<ShardEndpoint*>* endpoints ) const;
+
+        Status targetAllShards( std::vector<ShardEndpoint*>* endpoints ) const;
 
         void noteStaleResponse( const ShardEndpoint& endpoint, const BSONObj& staleInfo );
 
@@ -119,6 +121,11 @@ namespace mongo {
          * Returns !OK with message if query could not be targeted.
          */
         Status targetQuery( const BSONObj& query, std::vector<ShardEndpoint*>* endpoints ) const;
+
+        /**
+         * Returns a ShardEndpoint for an exact shard key query.
+         */
+        Status targetShardKey( const BSONObj& doc, ShardEndpoint** endpoint ) const;
 
         NamespaceString _nss;
 

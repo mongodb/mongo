@@ -35,6 +35,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -45,37 +46,31 @@ namespace DirectClientTests {
         // NOTE: Not bothering to backup the old error record.
         ClientBase() {  mongo::lastError.reset( new LastError() );  }
         virtual ~ClientBase() { }
-    protected:
-        static bool error() {
-            return !_client.getPrevError().getField( "err" ).isNull();
-        }
-        DBDirectClient &client() const { return _client; }
-    private:
-        static DBDirectClient _client;
     };
-    DBDirectClient ClientBase::_client;
 
     const char *ns = "a.b";
 
     class Capped : public ClientBase {
     public:
         virtual void run() {
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
             for( int pass=0; pass < 3; pass++ ) {
-                client().createCollection(ns, 1024 * 1024, true, 999);
+                client.createCollection(ns, 1024 * 1024, true, 999);
                 for( int j =0; j < pass*3; j++ )
-                    client().insert(ns, BSON("x" << j));
+                    client.insert(ns, BSON("x" << j));
 
                 // test truncation of a capped collection
                 if( pass ) {
                     BSONObj info;
                     BSONObj cmd = BSON( "captrunc" << "b" << "n" << 1 << "inc" << true );
                     //cout << cmd.toString() << endl;
-                    bool ok = client().runCommand("a", cmd, info);
+                    bool ok = client.runCommand("a", cmd, info);
                     //cout << info.toString() << endl;
                     verify(ok);
                 }
 
-                verify( client().dropCollection(ns) );
+                verify( client.dropCollection(ns) );
             }
         }
     };
@@ -83,21 +78,24 @@ namespace DirectClientTests {
     class InsertMany : ClientBase {
     public:
         virtual void run(){
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
             vector<BSONObj> objs;
             objs.push_back(BSON("_id" << 1));
             objs.push_back(BSON("_id" << 1));
             objs.push_back(BSON("_id" << 2));
 
 
-            client().dropCollection(ns);
-            client().insert(ns, objs);
-            ASSERT_EQUALS(client().getLastErrorDetailed()["code"].numberInt(), 11000);
-            ASSERT_EQUALS((int)client().count(ns), 1);
+            client.dropCollection(ns);
+            client.insert(ns, objs);
+            ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(), 11000);
+            ASSERT_EQUALS((int)client.count(ns), 1);
 
-            client().dropCollection(ns);
-            client().insert(ns, objs, InsertOption_ContinueOnError);
-            ASSERT_EQUALS(client().getLastErrorDetailed()["code"].numberInt(), 11000);
-            ASSERT_EQUALS((int)client().count(ns), 2);
+            client.dropCollection(ns);
+            client.insert(ns, objs, InsertOption_ContinueOnError);
+            ASSERT_EQUALS(client.getLastErrorDetailed()["code"].numberInt(), 11000);
+            ASSERT_EQUALS((int)client.count(ns), 2);
         }
 
     };
@@ -105,16 +103,22 @@ namespace DirectClientTests {
     class BadNSCmd : ClientBase {
     public:
         virtual void run(){
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
             BSONObj result;
             BSONObj cmdObj = BSON( "count" << "" );
-            ASSERT_THROWS( client().runCommand( "", cmdObj, result ), UserException );
+            ASSERT_THROWS( client.runCommand( "", cmdObj, result ), UserException );
         }
     };
 
     class BadNSQuery : ClientBase {
     public:
         virtual void run(){
-            auto_ptr<DBClientCursor> cursor = client().query( "", Query(), 1 );
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
+            auto_ptr<DBClientCursor> cursor = client.query( "", Query(), 1 );
             ASSERT(cursor->more());
             BSONObj result = cursor->next().getOwned();
             ASSERT( result.hasField( "$err" ));
@@ -125,7 +129,10 @@ namespace DirectClientTests {
     class BadNSGetMore : ClientBase {
     public:
         virtual void run(){
-            auto_ptr<DBClientCursor> cursor = client().getMore("", 1, 1);
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
+            auto_ptr<DBClientCursor> cursor = client.getMore("", 1, 1);
             ASSERT(cursor->more());
             BSONObj result = cursor->next().getOwned();
             ASSERT(result.hasField("$err"));
@@ -136,24 +143,33 @@ namespace DirectClientTests {
     class BadNSInsert : ClientBase {
     public:
         virtual void run(){
-            client().insert( "", BSONObj(), 0 );
-            ASSERT( !client().getLastError().empty() );
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
+            client.insert( "", BSONObj(), 0 );
+            ASSERT( !client.getLastError().empty() );
         }
     };
 
     class BadNSUpdate : ClientBase {
     public:
         virtual void run(){
-            client().update( "", Query(), BSON( "$set" << BSON( "x" << 1 )) );
-            ASSERT( !client().getLastError().empty() );
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
+            client.update( "", Query(), BSON( "$set" << BSON( "x" << 1 )) );
+            ASSERT( !client.getLastError().empty() );
         }
     };
     
     class BadNSRemove : ClientBase {
     public:
         virtual void run(){
-            client().remove( "", Query() );
-            ASSERT( !client().getLastError().empty() );
+            OperationContextImpl txn;
+            DBDirectClient client(&txn);
+
+            client.remove( "", Query() );
+            ASSERT( !client.getLastError().empty() );
         }
     };
 

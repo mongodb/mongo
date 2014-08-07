@@ -26,19 +26,21 @@
  *    it in the license file.
  */
 
-#include <boost/bind.hpp>
 #include <boost/thread.hpp>
 #include <string>
 
 #include "mongo/db/field_parser.h"
 #include "mongo/db/range_deleter.h"
 #include "mongo/db/range_deleter_mock_env.h"
-#include "mongo/db/range_deleter_stats.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_coordinator_mock.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
-    using boost::bind;
     using std::string;
 
     using mongo::BSONObj;
@@ -48,13 +50,20 @@ namespace {
     using mongo::Notification;
     using mongo::RangeDeleter;
     using mongo::RangeDeleterMockEnv;
-    using mongo::RangeDeleterStats;
+    using mongo::OperationContext;
+
+    OperationContext* const noTxn = NULL; // MockEnv doesn't need txn XXX SERVER-13931
 
     // Capped sleep interval is 640 mSec, Nyquist frequency is 1280 mSec => round up to 2 sec.
     const int MAX_IMMEDIATE_DELETE_WAIT_SECS = 2;
 
+    const mongo::repl::ReplSettings replSettings;
+    const mongo::WriteConcernOptions dummyWriteConcern;
+
     // Should not be able to queue deletes if deleter workers were not started.
     TEST(QueueDelete, CantAfterStop) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
 
@@ -66,7 +75,7 @@ namespace {
                                          BSON("x" << 120),
                                          BSON("x" << 200),
                                          BSON("x" << 1),
-                                         true,
+                                         dummyWriteConcern,
                                          NULL /* notifier not needed */,
                                          &errMsg));
         ASSERT_FALSE(errMsg.empty());
@@ -76,6 +85,8 @@ namespace {
     // Should not start delete if the set of cursors that were open when the
     // delete was queued is still open.
     TEST(QueuedDelete, ShouldWaitCursor) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         const string ns("test.user");
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
@@ -84,16 +95,17 @@ namespace {
         env->addCursorId(ns, 345);
 
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1),
-                                        true, &notifyDone, NULL /* errMsg not needed */));
+        ASSERT_TRUE(deleter.queueDelete(ns,
+                                        BSON("x" << 0),
+                                        BSON("x" << 10),
+                                        BSON("x" << 1),
+                                        dummyWriteConcern,
+                                        &notifyDone,
+                                        NULL /* errMsg not needed */));
 
         env->waitForNthGetCursor(1u);
 
-        const BSONObj stats(deleter.getStats()->toBSON());
-        int pendingCount = 0;
-        ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::PendingDeletesField,
-                                         &pendingCount, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(1, pendingCount);
+        ASSERT_EQUALS(1U, deleter.getPendingDeletes());
         ASSERT_FALSE(env->deleteOccured());
 
         // Set the open cursors to a totally different sets of cursorIDs.
@@ -114,6 +126,8 @@ namespace {
 
     // Should terminate when stop is requested.
     TEST(QueuedDelete, StopWhileWaitingCursor) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         const string ns("test.user");
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
@@ -122,8 +136,13 @@ namespace {
         env->addCursorId(ns, 345);
 
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10),  BSON("x" << 1),
-                                        true, &notifyDone, NULL /* errMsg not needed */));
+        ASSERT_TRUE(deleter.queueDelete(ns,
+                                        BSON("x" << 0),
+                                        BSON("x" << 10),
+                                        BSON("x" << 1),
+                                        dummyWriteConcern,
+                                        &notifyDone,
+                                        NULL /* errMsg not needed */));
 
 
         env->waitForNthGetCursor(1u);
@@ -132,9 +151,22 @@ namespace {
         ASSERT_FALSE(env->deleteOccured());
     }
 
+    static void rangeDeleterDeleteNow(RangeDeleter* deleter,
+                                      OperationContext* txn,
+                                      const std::string& ns,
+                                      const BSONObj& min,
+                                      const BSONObj& max,
+                                      const BSONObj& shardKeyPattern,
+                                      const mongo::WriteConcernOptions& secondaryThrottle,
+                                      std::string* errMsg) {
+        deleter->deleteNow(txn,ns, min, max, shardKeyPattern, secondaryThrottle, errMsg);
+    }
+
     // Should not start delete if the set of cursors that were open when the
     // deleteNow method is called is still open.
     TEST(ImmediateDelete, ShouldWaitCursor) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         const string ns("test.user");
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
@@ -143,24 +175,22 @@ namespace {
         env->addCursorId(ns, 345);
 
         string errMsg;
-        boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
-                                                                &deleter,
-                                                                ns,
-                                                                BSON("x" << 0),
-                                                                BSON("x" << 10),
-                                                                BSON("x" << 1),
-                                                                true,
-                                                                &errMsg));
+        boost::thread deleterThread = boost::thread(mongo::stdx::bind(
+                                                            rangeDeleterDeleteNow,
+                                                            &deleter,
+                                                            noTxn,
+                                                            ns,
+                                                            BSON("x" << 0),
+                                                            BSON("x" << 10),
+                                                            BSON("x" << 1),
+                                                            dummyWriteConcern,
+                                                            &errMsg));
 
         env->waitForNthGetCursor(1u);
 
         // Note: immediate deletes has no pending state, it goes directly to inProgress
         // even while waiting for cursors.
-        const BSONObj stats(deleter.getStats()->toBSON());
-        int inProgCount = 0;
-        ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::InProgressDeletesField,
-                                         &inProgCount, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(1, inProgCount);
+        ASSERT_EQUALS(1U, deleter.getDeletesInProgress());
 
         ASSERT_FALSE(env->deleteOccured());
 
@@ -184,6 +214,8 @@ namespace {
 
     // Should terminate when stop is requested.
     TEST(ImmediateDelete, StopWhileWaitingCursor) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         const string ns("test.user");
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
@@ -192,24 +224,22 @@ namespace {
         env->addCursorId(ns, 345);
 
         string errMsg;
-        boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
-                                                                &deleter,
-                                                                ns,
-                                                                BSON("x" << 0),
-                                                                BSON("x" << 10),
-                                                                BSON("x" << 1),
-                                                                true,
-                                                                &errMsg));
+        boost::thread deleterThread = boost::thread(mongo::stdx::bind(
+                                                            rangeDeleterDeleteNow,
+                                                            &deleter,
+                                                            noTxn,
+                                                            ns,
+                                                            BSON("x" << 0),
+                                                            BSON("x" << 10),
+                                                            BSON("x" << 1),
+                                                            dummyWriteConcern,
+                                                            &errMsg));
 
         env->waitForNthGetCursor(1u);
 
         // Note: immediate deletes has no pending state, it goes directly to inProgress
         // even while waiting for cursors.
-        const BSONObj stats(deleter.getStats()->toBSON());
-        int inProgCount = 0;
-        ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::InProgressDeletesField,
-                                         &inProgCount, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(1, inProgCount);
+        ASSERT_EQUALS(1U, deleter.getDeletesInProgress());
 
         ASSERT_FALSE(env->deleteOccured());
 
@@ -227,6 +257,8 @@ namespace {
     // other one is waiting for an open cursor. The test then makes sure that the
     // deletes are performed in the right order.
     TEST(MixedDeletes, MultipleDeletes) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         const string blockedNS("foo.bar");
         const string ns("test.user");
 
@@ -242,25 +274,21 @@ namespace {
                                         BSON("x" << 10),
                                         BSON("x" << 20),
                                         BSON("x" << 1),
-                                        true,
+                                        dummyWriteConcern,
                                         &notifyDone1,
                                         NULL /* don't care errMsg */));
 
         env->waitForNthPausedDelete(1u);
 
         // Make sure that the delete is already in progress before proceeding.
-        const BSONObj stats(deleter.getStats()->toBSON());
-        int inProgressCount = 0;
-        ASSERT_TRUE(FieldParser::extract(stats, RangeDeleterStats::InProgressDeletesField,
-                                         &inProgressCount, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(1, inProgressCount);
+        ASSERT_EQUALS(1U, deleter.getDeletesInProgress());
 
         Notification notifyDone2;
         ASSERT_TRUE(deleter.queueDelete(blockedNS,
                                         BSON("x" << 20),
                                         BSON("x" << 30),
                                         BSON("x" << 1),
-                                        true,
+                                        dummyWriteConcern,
                                         &notifyDone2,
                                         NULL /* don't care errMsg */));
 
@@ -269,7 +297,7 @@ namespace {
                                         BSON("x" << 30),
                                         BSON("x" << 40),
                                         BSON("x" << 1),
-                                        true,
+                                        dummyWriteConcern,
                                         &notifyDone3,
                                         NULL /* don't care errMsg */));
 
@@ -279,21 +307,9 @@ namespace {
         // { x: 30 } => { x: 40 } waiting to be picked up by worker.
 
         // Make sure that the current state matches the setup.
-        const BSONObj stats2(deleter.getStats()->toBSON());
-        int totalCount = 0;
-        ASSERT_TRUE(FieldParser::extract(stats2, RangeDeleterStats::TotalDeletesField,
-                                         &totalCount, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(3, totalCount);
-
-        int pendingCount = 0;
-        ASSERT_TRUE(FieldParser::extract(stats2, RangeDeleterStats::PendingDeletesField,
-                                         &pendingCount, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(2, pendingCount);
-
-        int inProgressCount2 = 0;
-        ASSERT_TRUE(FieldParser::extract(stats2, RangeDeleterStats::InProgressDeletesField,
-                                         &inProgressCount2, NULL /* don't care errMsg */));
-        ASSERT_EQUALS(1, inProgressCount2);
+        ASSERT_EQUALS(3U, deleter.getTotalDeletes());
+        ASSERT_EQUALS(2U, deleter.getPendingDeletes());
+        ASSERT_EQUALS(1U, deleter.getDeletesInProgress());
 
         // Let the first delete proceed.
         env->resumeOneDelete();
@@ -341,6 +357,8 @@ namespace {
 
     // Should not be able to delete ranges that overlaps with a black listed range.
     TEST(BlackList, CantDeleteBlackListed) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
         deleter.startWorkers();
@@ -352,13 +370,23 @@ namespace {
         ASSERT_TRUE(errMsg.empty());
 
         errMsg.clear();
-        ASSERT_FALSE(deleter.queueDelete(ns, BSON("x" << 120), BSON("x" << 140),  BSON("x" << 1),
-                                         false, NULL /* notifier not needed */, &errMsg));
+        ASSERT_FALSE(deleter.queueDelete(ns,
+                                         BSON("x" << 120),
+                                         BSON("x" << 140),
+                                         BSON("x" << 1),
+                                         dummyWriteConcern,
+                                         NULL /* notifier not needed */,
+                                         &errMsg));
         ASSERT_FALSE(errMsg.empty());
 
         errMsg.clear();
-        ASSERT_FALSE(deleter.deleteNow(ns, BSON("x" << 120), BSON("x" << 140),
-                                       BSON("x" << 1), false, &errMsg));
+        ASSERT_FALSE(deleter.deleteNow(noTxn,
+                                       ns,
+                                       BSON("x" << 120),
+                                       BSON("x" << 140),
+                                       BSON("x" << 1),
+                                       dummyWriteConcern,
+                                       &errMsg));
         ASSERT_FALSE(errMsg.empty());
 
         ASSERT_FALSE(env->deleteOccured());
@@ -369,6 +397,8 @@ namespace {
     // Should not be able to black list a range that overlaps with a range that is
     // already blacklisted.
     TEST(BlackList, CantDoubleBlackList) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
         const string ns("test.user");
@@ -391,6 +421,8 @@ namespace {
     // Should not be able to black list a range that overlaps with a range that is already
     // queued for deletion.
     TEST(BlackList, CantBlackListQueued) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
         const string ns("test.user");
@@ -400,8 +432,13 @@ namespace {
         env->addCursorId(ns, 58);
 
         Notification notifyDone;
-        deleter.queueDelete(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1),
-                            false, &notifyDone, NULL /* errMsg not needed */);
+        deleter.queueDelete(ns,
+                            BSON("x" << 0),
+                            BSON("x" << 10),
+                            BSON("x" << 1),
+                            dummyWriteConcern,
+                            &notifyDone,
+                            NULL /* errMsg not needed */);
 
         string errMsg;
         ASSERT_FALSE(deleter.addToBlackList(ns, BSON("x" << 5), BSON("x" << 15), &errMsg));
@@ -421,6 +458,8 @@ namespace {
     // Should not be able to black list a range that overlaps the range of an
     // immediate delete that is currently in progress.
     TEST(BlackList, CantBlackListImmediateInProgress) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
         const string ns("test.user");
@@ -428,14 +467,16 @@ namespace {
         env->pauseDeletes();
 
         string delErrMsg;
-        boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
-                                                                &deleter,
-                                                                ns,
-                                                                BSON("x" << 64),
-                                                                BSON("x" << 70),
-                                                                BSON("x" << 1),
-                                                                true,
-                                                                &delErrMsg));
+        boost::thread deleterThread = boost::thread(mongo::stdx::bind(
+                                                            rangeDeleterDeleteNow,
+                                                            &deleter,
+                                                            noTxn,
+                                                            ns,
+                                                            BSON("x" << 64),
+                                                            BSON("x" << 70),
+                                                            BSON("x" << 1),
+                                                            dummyWriteConcern,
+                                                            &delErrMsg));
 
         env->waitForNthPausedDelete(1u);
 
@@ -458,6 +499,8 @@ namespace {
     // Undo black list should only work if the range given exactly match with an
     // existing black listed range.
     TEST(BlackList, UndoShouldBeExact) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
         const string ns("test.user");
@@ -468,14 +511,21 @@ namespace {
         ASSERT_FALSE(deleter.removeFromBlackList(ns, BSON("x" << 1234), BSON("x" << 9000)));
 
         // Range should still be blacklisted
-        ASSERT_FALSE(deleter.deleteNow(ns, BSON("x" << 2000), BSON("x" << 4000), BSON("x" << 1),
-                                       false, NULL /* errMsg not needed */));
+        ASSERT_FALSE(deleter.deleteNow(noTxn,
+                                       ns,
+                                       BSON("x" << 2000),
+                                       BSON("x" << 4000),
+                                       BSON("x" << 1),
+                                       dummyWriteConcern,
+                                       NULL /* errMsg not needed */));
 
         deleter.stopWorkers();
     }
 
     // Should be able to delete the range again once the black list has been undone.
     TEST(BlackList, UndoBlackList) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
         const string ns("test.user");
@@ -485,15 +535,25 @@ namespace {
         ASSERT_TRUE(errMsg.empty());
 
         errMsg.clear();
-        ASSERT_FALSE(deleter.deleteNow(ns, BSON("x" << 600), BSON("x" << 700),
-                                       BSON("x" << 1), false, &errMsg));
+        ASSERT_FALSE(deleter.deleteNow(noTxn,
+                                       ns,
+                                       BSON("x" << 600),
+                                       BSON("x" << 700),
+                                       BSON("x" << 1),
+                                       dummyWriteConcern,
+                                       &errMsg));
         ASSERT_FALSE(errMsg.empty());
 
         ASSERT_TRUE(deleter.removeFromBlackList(ns, BSON("x" << 500), BSON("x" << 801)));
 
         errMsg.clear();
-        ASSERT_TRUE(deleter.deleteNow(ns, BSON("x" << 600), BSON("x" << 700),
-                                      BSON("x" << 1), false, &errMsg));
+        ASSERT_TRUE(deleter.deleteNow(noTxn,
+                                      ns,
+                                      BSON("x" << 600),
+                                      BSON("x" << 700),
+                                      BSON("x" << 1),
+                                      dummyWriteConcern,
+                                      &errMsg));
         ASSERT_TRUE(errMsg.empty());
 
         deleter.stopWorkers();
@@ -501,14 +561,21 @@ namespace {
 
     // Black listing should only affect the specified namespace.
     TEST(BlackList, NSIsolation) {
+        mongo::repl::setGlobalReplicationCoordinator(
+                new mongo::repl::ReplicationCoordinatorMock(replSettings));
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
         RangeDeleter deleter(env);
 
         deleter.addToBlackList("foo.bar", BSON("x" << 100), BSON("x" << 200),
                                NULL /* errMsg not needed */);
 
-        ASSERT_TRUE(deleter.deleteNow("test.user", BSON("x" << 120), BSON("x" << 140),
-                                      BSON("x" << 1), true, NULL /* errMsg not needed */));
+        ASSERT_TRUE(deleter.deleteNow(noTxn,
+                                      "test.user",
+                                      BSON("x" << 120),
+                                      BSON("x" << 140),
+                                      BSON("x" << 1),
+                                      dummyWriteConcern,
+                                      NULL /* errMsg not needed */));
 
         deleter.stopWorkers();
     }

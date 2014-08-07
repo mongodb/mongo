@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -31,12 +31,14 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
-#include "mongo/db/query/eof_runner.h"
-#include "mongo/db/query/internal_runner.h"
+#include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
+
+    class OperationContext;
 
     /**
      * The internal planner is a one-stop shop for "off-the-shelf" plans.  Most internal procedures
@@ -62,14 +64,22 @@ namespace mongo {
         /**
          * Return a collection scan.  Caller owns pointer.
          */
-        static Runner* collectionScan(const StringData& ns, // TODO: make this a Collection*
-                                      const Direction direction = FORWARD,
-                                      const DiskLoc startLoc = DiskLoc()) {
-            Collection* collection = cc().database()->getCollection(ns);
-            if (NULL == collection) { return new EOFRunner(NULL, ns.toString()); }
+        static PlanExecutor* collectionScan(OperationContext* txn,
+                                            const StringData& ns,
+                                            Collection* collection,
+                                            const Direction direction = FORWARD,
+                                            const DiskLoc startLoc = DiskLoc()) {
+            WorkingSet* ws = new WorkingSet();
+
+            if (NULL == collection) {
+                EOFStage* eof = new EOFStage();
+                return new PlanExecutor(ws, eof, ns.toString());
+            }
+
+            dassert( ns == collection->ns().ns() );
 
             CollectionScanParams params;
-            params.ns = ns.toString();
+            params.collection = collection;
             params.start = startLoc;
 
             if (FORWARD == direction) {
@@ -79,19 +89,22 @@ namespace mongo {
                 params.direction = CollectionScanParams::BACKWARD;
             }
 
-            WorkingSet* ws = new WorkingSet();
-            CollectionScan* cs = new CollectionScan(params, ws, NULL);
-            return new InternalRunner(collection, cs, ws);
+            CollectionScan* cs = new CollectionScan(txn, params, ws, NULL);
+            PlanExecutor* exec = new PlanExecutor(ws, cs, collection);
+            // 'exec' will be registered until it is destroyed.
+            exec->registerExecInternalPlan();
+            return exec;
         }
 
         /**
          * Return an index scan.  Caller owns returned pointer.
          */
-        static Runner* indexScan(const Collection* collection,
-                                 const IndexDescriptor* descriptor,
-                                 const BSONObj& startKey, const BSONObj& endKey,
-                                 bool endKeyInclusive, Direction direction = FORWARD,
-                                 int options = 0) {
+        static PlanExecutor* indexScan(OperationContext* txn,
+                                       const Collection* collection,
+                                       const IndexDescriptor* descriptor,
+                                       const BSONObj& startKey, const BSONObj& endKey,
+                                       bool endKeyInclusive, Direction direction = FORWARD,
+                                       int options = 0) {
             invariant(collection);
             invariant(descriptor);
 
@@ -104,14 +117,18 @@ namespace mongo {
             params.bounds.endKeyInclusive = endKeyInclusive;
 
             WorkingSet* ws = new WorkingSet();
-            IndexScan* ix = new IndexScan(params, ws, NULL);
+            IndexScan* ix = new IndexScan(txn, params, ws, NULL);
+
+            PlanStage* root = ix;
 
             if (IXSCAN_FETCH & options) {
-                return new InternalRunner(collection, new FetchStage(ws, ix, NULL), ws);
+                root = new FetchStage(ws, root, NULL, collection);
             }
-            else {
-                return new InternalRunner(collection, ix, ws);
-            }
+
+            PlanExecutor* exec = new PlanExecutor(ws, root, collection);
+            // 'exec' will be registered until it is destroyed.
+            exec->registerExecInternalPlan();
+            return exec;
         }
     };
 

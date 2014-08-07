@@ -43,7 +43,7 @@ namespace mongo {
         protected:
             virtual void setUp();  // Override to perform any do-once work for the task.
             virtual void doWork() = 0;                  // implement the task here.
-            virtual string name() const = 0;            // name the thread
+            virtual std::string name() const = 0;            // name the thread
         public:
             Task();
 
@@ -76,7 +76,7 @@ namespace mongo {
             };
             shared_ptr<Sample> q( new Sample() );
             fork(q);
-            cout << q->result << endl; // could print 1234 or 0.
+            cout << q->result << std::endl; // could print 1234 or 0.
         }
         */
 

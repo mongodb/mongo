@@ -36,7 +36,8 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/query/runner.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/startup_test.h"
 
@@ -98,11 +99,11 @@ namespace mongo {
         /**
          * works globally
          */
-        bool eraseCursor( CursorId id, bool checkAuth );
+        bool eraseCursor(OperationContext* txn, CursorId id, bool checkAuth);
 
         void appendStats( BSONObjBuilder& builder );
 
-        std::size_t timeoutCursors( unsigned millisSinceLastCall );
+        std::size_t timeoutCursors(OperationContext* txn, int millisSinceLastCall);
 
         int64_t nextSeed();
 
@@ -159,7 +160,7 @@ namespace mongo {
         _idToNS.erase( id );
     }
 
-    bool GlobalCursorIdCache::eraseCursor(CursorId id, bool checkAuth) {
+    bool GlobalCursorIdCache::eraseCursor(OperationContext* txn, CursorId id, bool checkAuth) {
         string ns;
         {
             SimpleMutex::scoped_lock lk( _mutex );
@@ -175,8 +176,8 @@ namespace mongo {
 
         if ( checkAuth ) {
             AuthorizationSession* as = cc().getAuthorizationSession();
-            bool isAuthorized = as->isAuthorizedForActionsOnNamespace(nss,
-                                                                      ActionType::killCursors);
+            bool isAuthorized = as->isAuthorizedForActionsOnNamespace(
+                                                nss, ActionType::killCursors);
             if ( !isAuthorized ) {
                 audit::logKillCursorsAuthzCheck( currentClient.get(),
                                                  nss,
@@ -186,18 +187,13 @@ namespace mongo {
             }
         }
 
-        Lock::DBRead lock( ns );
-        Database* db = dbHolder().get( ns, storageGlobalParams.dbpath );
+        Lock::DBRead lock(txn->lockState(), ns);
+        Database* db = dbHolder().get(txn, ns);
         if ( !db )
             return false;
-        Client::Context context( ns, db );
-        Collection* collection = db->getCollection( ns );
-        ClientCursor* cursor = NULL;
-        if ( collection ) {
-            cursor = collection->cursorCache()->find( id );
-        }
-
-        if ( !cursor ) {
+        Client::Context context(txn, ns, db );
+        Collection* collection = db->getCollection( txn, ns );
+        if ( !collection ) {
             if ( checkAuth )
                 audit::logKillCursorsAuthzCheck( currentClient.get(),
                                                  nss,
@@ -205,24 +201,11 @@ namespace mongo {
                                                  ErrorCodes::CursorNotFound );
             return false;
         }
-        
-        if ( checkAuth )
-            audit::logKillCursorsAuthzCheck( currentClient.get(),
-                                             nss,
-                                             id,
-                                             ErrorCodes::OK );
 
-        massert( 16089,
-                 str::stream() << "Cannot kill active cursor " << id,
-                 cursor->pinValue() < 100 );
-
-        cursor->kill();
-        collection->cursorCache()->deregisterCursor( cursor );
-        delete cursor;
-        return true;
+        return collection->cursorCache()->eraseCursor( id, checkAuth );
     }
 
-    std::size_t GlobalCursorIdCache::timeoutCursors( unsigned millisSinceLastCall ) {
+    std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* txn, int millisSinceLastCall) {
         vector<string> todo;
         {
             SimpleMutex::scoped_lock lk( _mutex );
@@ -234,12 +217,12 @@ namespace mongo {
 
         for ( unsigned i = 0; i < todo.size(); i++ ) {
             const string& ns = todo[i];
-            Lock::DBRead lock( ns );
-            Database* db = dbHolder().get( ns, storageGlobalParams.dbpath );
+            Lock::DBRead lock(txn->lockState(), ns);
+            Database* db = dbHolder().get(txn, ns);
             if ( !db )
                 continue;
-            Client::Context context( ns, db );
-            Collection* collection = db->getCollection( ns );
+            Client::Context context(txn,  ns, db );
+            Collection* collection = db->getCollection( txn, ns );
             if ( collection == NULL ) {
                 continue;
             }
@@ -253,25 +236,27 @@ namespace mongo {
 
     // ---
 
-    std::size_t CollectionCursorCache::timeoutCursorsGlobal( unsigned millisSinceLastCall ) {
-        return _globalCursorIdCache.timeoutCursors( millisSinceLastCall );
+    std::size_t CollectionCursorCache::timeoutCursorsGlobal(OperationContext* txn, 
+        int millisSinceLastCall) {;
+    return _globalCursorIdCache.timeoutCursors(txn, millisSinceLastCall);
     }
 
-    int CollectionCursorCache::eraseCursorGlobalIfAuthorized(int n, long long* ids) {
+    int CollectionCursorCache::eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, 
+        const long long* ids) {
         int numDeleted = 0;
         for ( int i = 0; i < n; i++ ) {
-            if ( eraseCursorGlobalIfAuthorized( ids[i] ) )
+            if ( eraseCursorGlobalIfAuthorized(txn, ids[i] ) )
                 numDeleted++;
             if ( inShutdown() )
                 break;
         }
         return numDeleted;
     }
-    bool CollectionCursorCache::eraseCursorGlobalIfAuthorized(CursorId id) {
-        return _globalCursorIdCache.eraseCursor( id, true );
+    bool CollectionCursorCache::eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id) {
+        return _globalCursorIdCache.eraseCursor(txn, id, true);
     }
-    bool CollectionCursorCache::eraseCursorGlobal( CursorId id ) {
-        return _globalCursorIdCache.eraseCursor( id, false );
+    bool CollectionCursorCache::eraseCursorGlobal(OperationContext* txn, CursorId id) {
+        return _globalCursorIdCache.eraseCursor(txn, id, false );
     }
 
 
@@ -279,30 +264,30 @@ namespace mongo {
 
 
     CollectionCursorCache::CollectionCursorCache( const StringData& ns )
-        : _ns( ns.toString() ),
+        : _nss( ns ),
           _mutex( "CollectionCursorCache" ) {
-        _collectionCacheRuntimeId = _globalCursorIdCache.created( _ns );
+        _collectionCacheRuntimeId = _globalCursorIdCache.created( _nss.ns() );
         _random.reset( new PseudoRandom( _globalCursorIdCache.nextSeed() ) );
     }
 
     CollectionCursorCache::~CollectionCursorCache() {
         invalidateAll( true );
-        _globalCursorIdCache.destroyed( _collectionCacheRuntimeId, _ns );
+        _globalCursorIdCache.destroyed( _collectionCacheRuntimeId, _nss.ns() );
     }
 
     void CollectionCursorCache::invalidateAll( bool collectionGoingAway ) {
         SimpleMutex::scoped_lock lk( _mutex );
 
-        for ( RunnerSet::iterator it = _nonCachedRunners.begin();
-              it != _nonCachedRunners.end();
+        for ( ExecSet::iterator it = _nonCachedExecutors.begin();
+              it != _nonCachedExecutors.end();
               ++it ) {
 
-            // we kill the runner, but it deletes itself
-            Runner* runner = *it;
-            runner->kill();
-            invariant( runner->collection() == NULL );
+            // we kill the executor, but it deletes itself
+            PlanExecutor* exec = *it;
+            exec->kill();
+            invariant( exec->collection() == NULL );
         }
-        _nonCachedRunners.clear();
+        _nonCachedExecutors.clear();
 
         if ( collectionGoingAway ) {
             // we're going to wipe out the world
@@ -311,7 +296,7 @@ namespace mongo {
 
                 cc->kill();
 
-                invariant( cc->getRunner() == NULL || cc->getRunner()->collection() == NULL );
+                invariant( cc->getExecutor() == NULL || cc->getExecutor()->collection() == NULL );
 
                 // If there is a pinValue >= 100, somebody is actively using the CC and we do
                 // not delete it.  Instead we notify the holder that we killed it.  The holder
@@ -327,7 +312,7 @@ namespace mongo {
         else {
             CursorMap newMap;
 
-            // collection will still be around, just all Runners are invalid
+            // collection will still be around, just all PlanExecutors are invalid
             for ( CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i ) {
                 ClientCursor* cc = i->second;
 
@@ -337,10 +322,10 @@ namespace mongo {
                     continue;
                 }
 
-                // Note that a valid ClientCursor state is "no cursor no runner."  This is because
+                // Note that a valid ClientCursor state is "no cursor no executor."  This is because
                 // the set of active cursor IDs in ClientCursor is used as representation of query
                 // state.  See sharding_block.h.  TODO(greg,hk): Move this out.
-                if (NULL == cc->getRunner() ) {
+                if (NULL == cc->getExecutor() ) {
                     newMap.insert( *i );
                     continue;
                 }
@@ -351,9 +336,9 @@ namespace mongo {
                 }
                 else {
                     // this is pinned, so still alive, so we leave around
-                    // we kill the Runner to signal
-                    if ( cc->getRunner() )
-                        cc->getRunner()->kill();
+                    // we kill the PlanExecutor to signal
+                    if ( cc->getExecutor() )
+                        cc->getExecutor()->kill();
                     newMap.insert( *i );
                 }
 
@@ -367,23 +352,23 @@ namespace mongo {
                                                     InvalidationType type ) {
         SimpleMutex::scoped_lock lk( _mutex );
 
-        for ( RunnerSet::iterator it = _nonCachedRunners.begin();
-              it != _nonCachedRunners.end();
+        for ( ExecSet::iterator it = _nonCachedExecutors.begin();
+              it != _nonCachedExecutors.end();
               ++it ) {
 
-            Runner* runner = *it;
-            runner->invalidate(dl, type);
+            PlanExecutor* exec = *it;
+            exec->invalidate(dl, type);
         }
 
         for ( CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i ) {
-            Runner* runner = i->second->getRunner();
-            if ( runner ) {
-                runner->invalidate(dl, type);
+            PlanExecutor* exec = i->second->getExecutor();
+            if ( exec ) {
+                exec->invalidate(dl, type);
             }
         }
     }
 
-    std::size_t CollectionCursorCache::timeoutCursors( unsigned millisSinceLastCall ) {
+    std::size_t CollectionCursorCache::timeoutCursors( int millisSinceLastCall ) {
         SimpleMutex::scoped_lock lk( _mutex );
 
         vector<ClientCursor*> toDelete;
@@ -394,7 +379,8 @@ namespace mongo {
                 toDelete.push_back( cc );
         }
 
-        for ( vector<ClientCursor*>::const_iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
+        for ( vector<ClientCursor*>::const_iterator i = toDelete.begin();
+                i != toDelete.end(); ++i ) {
             ClientCursor* cc = *i;
             _deregisterCursor_inlock( cc );
             cc->kill();
@@ -404,23 +390,43 @@ namespace mongo {
         return toDelete.size();
     }
 
-    void CollectionCursorCache::registerRunner( Runner* runner ) {
-        SimpleMutex::scoped_lock lk( _mutex );
-        const std::pair<RunnerSet::iterator, bool> result = _nonCachedRunners.insert(runner);
-        invariant(result.second); // make sure this was inserted
+    void CollectionCursorCache::registerExecutor( PlanExecutor* exec ) {
+        if (!useExperimentalDocLocking) {
+            SimpleMutex::scoped_lock lk(_mutex);
+            const std::pair<ExecSet::iterator, bool> result = _nonCachedExecutors.insert(exec);
+            invariant(result.second); // make sure this was inserted
+        }
     }
 
-    void CollectionCursorCache::deregisterRunner( Runner* runner ) {
-        SimpleMutex::scoped_lock lk( _mutex );
-        _nonCachedRunners.erase( runner );
+    void CollectionCursorCache::deregisterExecutor( PlanExecutor* exec ) {
+        if (!useExperimentalDocLocking) {
+            SimpleMutex::scoped_lock lk(_mutex);
+            _nonCachedExecutors.erase(exec);
+        }
     }
 
-    ClientCursor* CollectionCursorCache::find( CursorId id ) {
+    ClientCursor* CollectionCursorCache::find( CursorId id, bool pin ) {
         SimpleMutex::scoped_lock lk( _mutex );
         CursorMap::const_iterator it = _cursors.find( id );
         if ( it == _cursors.end() )
             return NULL;
-        return it->second;
+
+        ClientCursor* cursor = it->second;
+        if ( pin ) {
+            uassert( 12051,
+                     "clientcursor already in use? driver problem?",
+                     cursor->_pinValue < 100 );
+            cursor->_pinValue += 100;
+        }
+
+        return cursor;
+    }
+
+    void CollectionCursorCache::unpin( ClientCursor* cursor ) {
+        SimpleMutex::scoped_lock lk( _mutex );
+
+        invariant( cursor->_pinValue >= 100 );
+        cursor->_pinValue -= 100;
     }
 
     void CollectionCursorCache::getCursorIds( std::set<CursorId>* openCursors ) {
@@ -458,6 +464,38 @@ namespace mongo {
     void CollectionCursorCache::deregisterCursor( ClientCursor* cc ) {
         SimpleMutex::scoped_lock lk( _mutex );
         _deregisterCursor_inlock( cc );
+    }
+
+    bool CollectionCursorCache::eraseCursor( CursorId id, bool checkAuth ) {
+
+        SimpleMutex::scoped_lock lk( _mutex );
+
+        CursorMap::iterator it = _cursors.find( id );
+        if ( it == _cursors.end() ) {
+            if ( checkAuth )
+                audit::logKillCursorsAuthzCheck( currentClient.get(),
+                                                 _nss,
+                                                 id,
+                                                 ErrorCodes::CursorNotFound );
+            return false;
+        }
+
+        ClientCursor* cursor = it->second;
+
+        if ( checkAuth )
+            audit::logKillCursorsAuthzCheck( currentClient.get(),
+                                             _nss,
+                                             id,
+                                             ErrorCodes::OK );
+
+        massert( 16089,
+                 str::stream() << "Cannot kill active cursor " << id,
+                 cursor->pinValue() < 100 );
+
+        cursor->kill();
+        _deregisterCursor_inlock( cursor );
+        delete cursor;
+        return true;
     }
 
     void CollectionCursorCache::_deregisterCursor_inlock( ClientCursor* cc ) {

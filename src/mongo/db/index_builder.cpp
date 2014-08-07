@@ -26,22 +26,29 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/index_builder.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/kill_current_op.h"
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/d_concurrency.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    AtomicUInt IndexBuilder::_indexBuildCount = 0;
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
+
+    AtomicUInt32 IndexBuilder::_indexBuildCount;
 
     IndexBuilder::IndexBuilder(const BSONObj& index) :
         BackgroundJob(true /* self-delete */), _index(index.getOwned()),
-        _name(str::stream() << "repl index builder " << (_indexBuildCount++).get()) {
+        _name(str::stream() << "repl index builder " << _indexBuildCount.addAndFetch(1)) {
     }
 
     IndexBuilder::~IndexBuilder() {}
@@ -53,30 +60,42 @@ namespace mongo {
     void IndexBuilder::run() {
         LOG(2) << "IndexBuilder building index " << _index;
 
+        OperationContextImpl txn;
+
         Client::initThread(name().c_str());
-        replLocalAuth();
+        Lock::ParallelBatchWriterMode::iAmABatchParticipant(txn.lockState());
+
+        repl::replLocalAuth();
 
         cc().curop()->reset(HostAndPort(), dbInsert);
         NamespaceString ns(_index["ns"].String());
-        Client::WriteContext ctx(ns.getSystemIndexesCollection());
+        Client::WriteContext ctx(&txn, ns.getSystemIndexesCollection());
 
-        Status status = build( ctx.ctx() );
+        Database* db = dbHolder().get(&txn, ns.db().toString());
+
+        Status status = build(&txn, db);
         if ( !status.isOK() ) {
             log() << "IndexBuilder could not build index: " << status.toString();
         }
+        ctx.commit();
 
         cc().shutdown();
     }
 
-    Status IndexBuilder::build( Client::Context& context ) const {
-        string ns = _index["ns"].String();
-        Database* db = context.db();
-        Collection* c = db->getCollection( ns );
+    Status IndexBuilder::build(OperationContext* txn, Database* db) const {
+        const string ns = _index["ns"].String();
+
+        Collection* c = db->getCollection( txn, ns );
         if ( !c ) {
-            c = db->getOrCreateCollection( ns );
+            c = db->getOrCreateCollection( txn, ns );
             verify(c);
         }
-        Status status = c->getIndexCatalog()->createIndex( _index, 
+
+        // Show which index we're building in the curop display.
+        txn->getCurOp()->setQuery(_index);
+
+        Status status = c->getIndexCatalog()->createIndex( txn,
+                                                           _index, 
                                                            true, 
                                                            IndexCatalog::SHUTDOWN_LEAVE_DIRTY );
         if ( status.code() == ErrorCodes::IndexAlreadyExists )
@@ -84,20 +103,11 @@ namespace mongo {
         return status;
     }
 
-    std::vector<BSONObj> IndexBuilder::killMatchingIndexBuilds(const BSONObj& criteria) {
-        verify(Lock::somethingWriteLocked());
-        std::vector<BSONObj> indexes;
-        CurOp* op = NULL;
-        while ((op = CurOp::getOp(criteria)) != NULL) {
-            BSONObj index = op->query();
-            killCurrentOp.kill(op->opNum());
-            indexes.push_back(index);
-            log() << "halting index build: " << index;
-        }
-        if (indexes.size() > 0) {
-            log() << "halted " << indexes.size() << " index build(s)" << endl;
-        }
-        return indexes;
+    std::vector<BSONObj> 
+    IndexBuilder::killMatchingIndexBuilds(Collection* collection,
+                                          const IndexCatalog::IndexKillCriteria& criteria) {
+        invariant(collection);
+        return collection->getIndexCatalog()->killMatchingIndexBuilds(criteria);
     }
 
     void IndexBuilder::restoreIndexes(const std::vector<BSONObj>& indexes) {

@@ -66,9 +66,7 @@ namespace mongo {
             return true;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual bool adminOnly() const {
             return true;
@@ -83,7 +81,7 @@ namespace mongo {
             h << "modifies the settings of a fail point";
         }
 
-        bool run(const string& dbname,
+        bool run(OperationContext* txn, const string& dbname,
                 BSONObj& cmdObj,
                 int,
                 string& errmsg,

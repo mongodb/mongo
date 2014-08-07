@@ -248,13 +248,6 @@ namespace mongo {
             }
             return filterMatches(filter.Obj(), trueSoln);
         }
-        else if (STAGE_GEO_2D == trueSoln->getType()) {
-            const Geo2DNode* node = static_cast<const Geo2DNode*>(trueSoln);
-            BSONElement el = testSoln["geo2d"];
-            if (el.eoo() || !el.isABSONObj()) { return false; }
-            BSONObj geoObj = el.Obj();
-            return geoObj == node->indexKeyPattern;
-        }
         else if (STAGE_GEO_NEAR_2D == trueSoln->getType()) {
             const GeoNear2DNode* node = static_cast<const GeoNear2DNode*>(trueSoln);
             BSONElement el = testSoln["geoNear2d"];
@@ -268,6 +261,53 @@ namespace mongo {
             if (el.eoo() || !el.isABSONObj()) { return false; }
             BSONObj geoObj = el.Obj();
             return geoObj == node->indexKeyPattern;
+        }
+        else if (STAGE_TEXT == trueSoln->getType()) {
+            // {text: {search: "somestr", language: "something", filter: {blah: 1}}}
+            const TextNode* node = static_cast<const TextNode*>(trueSoln);
+            BSONElement el = testSoln["text"];
+            if (el.eoo() || !el.isABSONObj()) { return false; }
+            BSONObj textObj = el.Obj();
+
+            BSONElement searchElt = textObj["search"];
+            if (!searchElt.eoo()) {
+                if (searchElt.String() != node->query) {
+                    return false;
+                }
+            }
+
+            BSONElement languageElt = textObj["language"];
+            if (!languageElt.eoo()) {
+                if (languageElt.String() != node->language) {
+                    return false;
+                }
+            }
+
+            BSONElement indexPrefix = textObj["prefix"];
+            if (!indexPrefix.eoo()) {
+                if (!indexPrefix.isABSONObj()) {
+                    return false;
+                }
+
+                if (0 != indexPrefix.Obj().woCompare(node->indexPrefix)) {
+                    return false;
+                }
+            }
+
+            BSONElement filter = textObj["filter"];
+            if (!filter.eoo()) {
+                if (filter.isNull()) {
+                    if (NULL != node->filter) { return false; }
+                }
+                else if (!filter.isABSONObj()) {
+                    return false;
+                }
+                else if (!filterMatches(filter.Obj(), trueSoln)) {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         //
@@ -309,7 +349,20 @@ namespace mongo {
             BSONElement el = testSoln["andHash"];
             if (el.eoo() || !el.isABSONObj()) { return false; }
             BSONObj andHashObj = el.Obj();
-            // XXX: andHashObj can have filter
+
+            BSONElement filter = andHashObj["filter"];
+            if (!filter.eoo()) {
+                if (filter.isNull()) {
+                    if (NULL != ahn->filter) { return false; }
+                }
+                else if (!filter.isABSONObj()) {
+                    return false;
+                }
+                else if (!filterMatches(filter.Obj(), trueSoln)) {
+                    return false;
+                }
+            }
+
             return childrenMatch(andHashObj, ahn);
         }
         else if (STAGE_AND_SORTED == trueSoln->getType()) {
@@ -317,7 +370,20 @@ namespace mongo {
             BSONElement el = testSoln["andSorted"];
             if (el.eoo() || !el.isABSONObj()) { return false; }
             BSONObj andSortedObj = el.Obj();
-            // XXX: anSortedObj can have filter too
+
+            BSONElement filter = andSortedObj["filter"];
+            if (!filter.eoo()) {
+                if (filter.isNull()) {
+                    if (NULL != asn->filter) { return false; }
+                }
+                else if (!filter.isABSONObj()) {
+                    return false;
+                }
+                else if (!filterMatches(filter.Obj(), trueSoln)) {
+                    return false;
+                }
+            }
+
             return childrenMatch(andSortedObj, asn);
         }
         else if (STAGE_PROJECTION == trueSoln->getType()) {
@@ -348,8 +414,9 @@ namespace mongo {
             BSONElement child = sortObj["node"];
             if (child.eoo() || !child.isABSONObj()) { return false; }
 
+            size_t expectedLimit = limitEl.numberInt();
             return (patternEl.Obj() == sn->pattern)
-                   && (limitEl.numberInt() == sn->limit)
+                   && (expectedLimit == sn->limit)
                    && solutionMatches(child.Obj(), sn->children[0]);
         }
         else if (STAGE_SORT_MERGE == trueSoln->getType()) {

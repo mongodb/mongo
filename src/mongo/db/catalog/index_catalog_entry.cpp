@@ -28,21 +28,50 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/catalog/index_catalog_entry.h"
 
+#include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/file_allocator.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
-    IndexCatalogEntry::IndexCatalogEntry( Collection* collection,
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
+
+    class HeadManagerImpl : public HeadManager {
+    public:
+        HeadManagerImpl(IndexCatalogEntry* ice) : _catalogEntry(ice) { }
+        virtual ~HeadManagerImpl() { }
+
+        const DiskLoc getHead() const {
+            return _catalogEntry->head();
+        }
+
+        void setHead(OperationContext* txn, const DiskLoc newHead) {
+            _catalogEntry->setHead(txn, newHead);
+        }
+
+    private:
+        // Not owned here.
+        IndexCatalogEntry* _catalogEntry;
+    };
+
+    IndexCatalogEntry::IndexCatalogEntry( const StringData& ns,
+                                          CollectionCatalogEntry* collection,
                                           IndexDescriptor* descriptor,
-                                          RecordStore* recordstore )
-        : _collection( collection ),
+                                          CollectionInfoCache* infoCache )
+        : _ns( ns.toString() ),
+          _collection( collection ),
           _descriptor( descriptor ),
-          _recordStore( recordstore ),
+          _infoCache( infoCache ),
           _accessMethod( NULL ),
-          _forcedBtreeIndex( NULL ),
+          _headManager(new HeadManagerImpl(this)),
           _ordering( Ordering::make( descriptor->keyPattern() ) ),
           _isReady( false ) {
         _descriptor->_cachedEntry = this;
@@ -51,11 +80,8 @@ namespace mongo {
     IndexCatalogEntry::~IndexCatalogEntry() {
         _descriptor->_cachedEntry = NULL; // defensive
 
-        delete _forcedBtreeIndex;
+        delete _headManager;
         delete _accessMethod;
-
-        delete _recordStore;
-
         delete _descriptor;
     }
 
@@ -90,23 +116,24 @@ namespace mongo {
         verify( isReady() == newIsReady );
     }
 
-    void IndexCatalogEntry::setHead( DiskLoc newHead ) {
-        NamespaceDetails* nsd = _collection->details();
-        int idxNo = _indexNo();
-        IndexDetails& id = nsd->idx( idxNo );
-        id.head.writing() = newHead;
+    void IndexCatalogEntry::setHead( OperationContext* txn, DiskLoc newHead ) {
+        _collection->setIndexHead( txn,
+                                   _descriptor->indexName(),
+                                   newHead );
         _head = newHead;
     }
 
-    void IndexCatalogEntry::setMultikey() {
+    void IndexCatalogEntry::setMultikey( OperationContext* txn ) {
         if ( isMultikey() )
             return;
-        NamespaceDetails* nsd = _collection->details();
-        int idxNo = _indexNo();
-        if ( nsd->setIndexIsMultikey( idxNo, true ) ) {
-            LOG(1) << _collection->ns().ns() << ": clearing plan cache - index "
-                   << _descriptor->keyPattern() << " set to multi key.";
-            _collection->infoCache()->clearQueryCache();
+        if ( _collection->setIndexIsMultikey( txn,
+                                              _descriptor->indexName(),
+                                              true ) ) {
+            if ( _infoCache ) {
+                LOG(1) << _ns << ": clearing plan cache - index "
+                       << _descriptor->keyPattern() << " set to multi key.";
+                _infoCache->clearQueryCache();
+            }
         }
         _isMultikey = true;
     }
@@ -114,28 +141,16 @@ namespace mongo {
     // ----
 
     bool IndexCatalogEntry::_catalogIsReady() const {
-        return _indexNo() < _collection->getIndexCatalog()->numIndexesReady();
+        return _collection->isIndexReady( _descriptor->indexName() );
     }
 
     DiskLoc IndexCatalogEntry::_catalogHead() const {
-        NamespaceDetails* nsd = _collection->details();
-        int idxNo = _indexNo();
-        return nsd->idx( idxNo ).head;
+        return _collection->getIndexHead( _descriptor->indexName() );
     }
 
     bool IndexCatalogEntry::_catalogIsMultikey() const {
-        NamespaceDetails* nsd = _collection->details();
-        int idxNo = _indexNo();
-        return nsd->isMultikey( idxNo );
+        return _collection->isIndexMultikey( _descriptor->indexName() );
     }
-
-    int IndexCatalogEntry::_indexNo() const {
-        int idxNo = _collection->details()->_catalogFindIndexByName( _descriptor->indexName(),
-                                                                     true );
-        fassert( 17341, idxNo >= 0 );
-        return idxNo;
-    }
-
 
     // ------------------
 
@@ -180,9 +195,10 @@ namespace mongo {
             if ( e->descriptor() != desc )
                 continue;
             _entries.mutableVector().erase( i );
+            delete e;
             return true;
         }
         return false;
     }
 
-}
+}  // namespace mongo

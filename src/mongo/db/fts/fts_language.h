@@ -71,13 +71,13 @@ namespace mongo {
             FTSLanguage();
 
             /**
-             * Returns the language as a string in canonical form (lowercased English name).  It is
+             * Returns the language as a std::string in canonical form (lowercased English name).  It is
              * an error to call str() on an uninitialized language.
              */
             const std::string& str() const;
 
             /**
-             * Register string 'languageName' as a new language with text index version
+             * Register std::string 'languageName' as a new language with text index version
              * 'textIndexVersion'.  Saves the resulting language to out-argument 'languageOut'.
              * Subsequent calls to FTSLanguage::make() will recognize the newly-registered language
              * string.
@@ -97,7 +97,7 @@ namespace mongo {
 
             /**
              * Return the FTSLanguage associated with the given language string.  Returns an error
-             * Status if an invalid language string is passed.
+             * Status if an invalid language std::string is passed.
              * 
              * For textIndexVersion=TEXT_INDEX_VERSION_2, language strings are
              * case-insensitive, and need to be in one of the two following forms:
@@ -114,7 +114,7 @@ namespace mongo {
                                                         TextIndexVersion textIndexVersion );
 
         private:
-            // String representation of language in canonical form.
+            // std::string representation of language in canonical form.
             std::string _canonicalName;
         };
 

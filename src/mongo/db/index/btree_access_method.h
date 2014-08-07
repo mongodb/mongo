@@ -31,15 +31,13 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/db/structure/btree/btree.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index/btree_based_access_method.h"
+#include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
-    class BtreeInterface;
     class IndexCursor;
     class IndexDescriptor;
 
@@ -52,9 +50,9 @@ namespace mongo {
         // Every Btree-based index needs these.  We put them in the BtreeBasedAccessMethod
         // superclass and subclasses (like this) can use them.
         using BtreeBasedAccessMethod::_descriptor;
-        using BtreeBasedAccessMethod::_interface;
 
-        BtreeAccessMethod(IndexCatalogEntry* btreeState );
+        BtreeAccessMethod(IndexCatalogEntry* btreeState,
+                          SortedDataInterface* btree );
         virtual ~BtreeAccessMethod() { }
 
     private:

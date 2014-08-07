@@ -56,7 +56,7 @@ namespace mongo {
     }
 
     BatchWriteStats::BatchWriteStats() :
-        numInserted( 0 ), numUpserted( 0 ), numUpdated( 0 ), numModified( 0 ), numDeleted( 0 ) {
+        numInserted( 0 ), numUpserted( 0 ), numMatched( 0 ), numModified( 0 ), numDeleted( 0 ) {
     }
 
     BatchWriteOp::BatchWriteOp() :
@@ -75,11 +75,6 @@ namespace mongo {
         }
 
         _clientRequest = clientRequest;
-    }
-
-    static void buildTargetError( const Status& errStatus, WriteErrorDetail* details ) {
-        details->setErrCode( errStatus.code() );
-        details->setErrMessage( errStatus.reason() );
     }
 
     // Arbitrary endpoint ordering, needed for grouping by endpoint
@@ -110,21 +105,105 @@ namespace mongo {
         };
 
         typedef std::map<const ShardEndpoint*, TargetedWriteBatch*, EndpointComp> TargetedBatchMap;
+
+        //
+        // Types for tracking batch sizes
+        //
+
+        struct BatchSize {
+
+            BatchSize() :
+                numOps(0), sizeBytes(0) {
+            }
+
+            int numOps;
+            int sizeBytes;
+        };
+
+        typedef std::map<const ShardEndpoint*, BatchSize, EndpointComp> TargetedBatchSizeMap;
     }
 
-    // Helper function to cancel all the write ops of targeted batch.
-    static void cancelBatch( const TargetedWriteBatch& targetedBatch,
-                             WriteOp* writeOps,
-                             const WriteErrorDetail& why ) {
-        const vector<TargetedWrite*>& writes = targetedBatch.getWrites();
+    static void buildTargetError( const Status& errStatus, WriteErrorDetail* details ) {
+        details->setErrCode( errStatus.code() );
+        details->setErrMessage( errStatus.reason() );
+    }
 
-        for ( vector<TargetedWrite*>::const_iterator writeIt = writes.begin();
-            writeIt != writes.end(); ++writeIt ) {
+    // Helper to determine whether a number of targeted writes require a new targeted batch
+    static bool isNewBatchRequired( const vector<TargetedWrite*>& writes,
+                                    const TargetedBatchMap& batchMap ) {
 
-            TargetedWrite* write = *writeIt;
-            // NOTE: We may repeatedly cancel a write op here, but that's fast.
-            writeOps[write->writeOpRef.first].cancelWrites( &why );
+        for ( vector<TargetedWrite*>::const_iterator it = writes.begin(); it != writes.end();
+            ++it ) {
+
+            TargetedWrite* write = *it;
+            if ( batchMap.find( &write->endpoint ) == batchMap.end() ) {
+                return true;
+            }
         }
+
+        return false;
+    }
+
+    // MAGIC NUMBERS
+    // Before serializing updates/deletes, we don't know how big their fields would be, but we break
+    // batches before serializing.
+    // TODO: Revisit when we revisit command limits in general
+    static const int kEstUpdateOverheadBytes = (BSONObjMaxInternalSize - BSONObjMaxUserSize) / 100;
+    static const int kEstDeleteOverheadBytes = (BSONObjMaxInternalSize - BSONObjMaxUserSize) / 100;
+
+    static int getWriteSizeBytes(const WriteOp& writeOp) {
+
+        const BatchItemRef& item = writeOp.getWriteItem();
+        BatchedCommandRequest::BatchType batchType = item.getOpType();
+
+        if (batchType == BatchedCommandRequest::BatchType_Insert) {
+            return item.getDocument().objsize();
+        }
+        else if (batchType == BatchedCommandRequest::BatchType_Update) {
+            // Note: Be conservative here - it's okay if we send slightly too many batches
+            int estSize = item.getUpdate()->getQuery().objsize()
+                          + item.getUpdate()->getUpdateExpr().objsize() + kEstUpdateOverheadBytes;
+            dassert(estSize >= item.getUpdate()->toBSON().objsize());
+            return estSize;
+        }
+        else {
+            dassert( batchType == BatchedCommandRequest::BatchType_Delete );
+            // Note: Be conservative here - it's okay if we send slightly too many batches
+            int estSize = item.getDelete()->getQuery().objsize() + kEstDeleteOverheadBytes;
+            dassert(estSize >= item.getDelete()->toBSON().objsize());
+            return estSize;
+        }
+    }
+
+    // Helper to determine whether a number of targeted writes require a new targeted batch
+    static bool wouldMakeBatchesTooBig(const vector<TargetedWrite*>& writes,
+                                       int writeSizeBytes,
+                                       const TargetedBatchSizeMap& batchSizes) {
+
+        for (vector<TargetedWrite*>::const_iterator it = writes.begin(); it != writes.end(); ++it) {
+
+            const TargetedWrite* write = *it;
+            TargetedBatchSizeMap::const_iterator seenIt = batchSizes.find(&write->endpoint);
+
+            if (seenIt == batchSizes.end()) {
+                // If this is the first item in the batch, it can't be too big
+                continue;
+            }
+
+            const BatchSize& batchSize = seenIt->second;
+
+            if (batchSize.numOps >= static_cast<int>(BatchedCommandRequest::kMaxWriteBatchSize)) {
+                // Too many items in batch
+                return true;
+            }
+
+            if (batchSize.sizeBytes + writeSizeBytes > BSONObjMaxUserSize) {
+                // Batch would be too big
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Helper function to cancel all the write ops of targeted batches in a map
@@ -163,15 +242,48 @@ namespace mongo {
                                       bool recordTargetErrors,
                                       vector<TargetedWriteBatch*>* targetedBatches ) {
 
+        //
+        // Targeting of unordered batches is fairly simple - each remaining write op is targeted,
+        // and each of those targeted writes are grouped into a batch for a particular shard
+        // endpoint.
+        //
+        // Targeting of ordered batches is a bit more complex - to respect the ordering of the
+        // batch, we can only send:
+        // A) a single targeted batch to one shard endpoint
+        // B) multiple targeted batches, but only containing targeted writes for a single write op
+        //
+        // This means that any multi-shard write operation must be targeted and sent one-by-one.
+        // Subsequent single-shard write operations can be batched together if they go to the same
+        // place.
+        //
+        // Ex: ShardA : { skey : a->k }, ShardB : { skey : k->z }
+        //
+        // Ordered insert batch of: [{ skey : a }, { skey : b }, { skey : x }]
+        // broken into: 
+        //  [{ skey : a }, { skey : b }],
+        //  [{ skey : x }]
+        //
+        // Ordered update Batch of :
+        //  [{ skey : a }{ $push }, 
+        //   { skey : b }{ $push }, 
+        //   { skey : [c, x] }{ $push },
+        //   { skey : y }{ $push },
+        //   { skey : z }{ $push }]
+        // broken into: 
+        //  [{ skey : a }, { skey : b }],
+        //  [{ skey : [c,x] }], 
+        //  [{ skey : y }, { skey : z }]
+        //
+
+        const bool ordered = _clientRequest->getOrdered();
+
         TargetedBatchMap batchMap;
+        TargetedBatchSizeMap batchSizes;
+
         int numTargetErrors = 0;
 
         size_t numWriteOps = _clientRequest->sizeWriteOps();
         for ( size_t i = 0; i < numWriteOps; ++i ) {
-
-            // Only do one-at-a-time ops if COE is false (and break at first target error)
-            if ( _clientRequest->getOrdered() && ( !batchMap.empty() || numTargetErrors != 0 ) )
-                break;
 
             WriteOp& writeOp = _writeOps[i];
 
@@ -190,25 +302,64 @@ namespace mongo {
 
             if ( !targetStatus.isOK() ) {
 
-                //
-                // We're not sure how to target here, so either record the error or cancel the
-                // current batches.
-                //
-
                 WriteErrorDetail targetError;
                 buildTargetError( targetStatus, &targetError );
 
-                if ( recordTargetErrors ) {
-                    writeOp.setOpError( targetError );
-                    ++numTargetErrors;
-                    continue;
-                }
-                else {
+                if ( !recordTargetErrors ) {
+
                     // Cancel current batch state with an error
+
                     cancelBatches( targetError, _writeOps, &batchMap );
                     dassert( batchMap.empty() );
                     return targetStatus;
                 }
+                else if ( !ordered || batchMap.empty() ) {
+
+                    // Record an error for this batch
+
+                    writeOp.setOpError( targetError );
+                    ++numTargetErrors;
+
+                    if ( ordered )
+                        return Status::OK();
+
+                    continue;
+                }
+                else {
+                    dassert( ordered && !batchMap.empty() );
+
+                    // Send out what we have, but don't record an error yet, since there may be an
+                    // error in the writes before this point.
+
+                    writeOp.cancelWrites( &targetError );
+                    break;
+                }
+            }
+
+            //
+            // If ordered and we have a previous endpoint, make sure we don't need to send these
+            // targeted writes to any other endpoints.
+            //
+
+            if ( ordered && !batchMap.empty() ) {
+
+                dassert( batchMap.size() == 1u );
+                if ( isNewBatchRequired( writes, batchMap ) ) {
+
+                    writeOp.cancelWrites( NULL );
+                    break;
+                }
+            }
+
+            //
+            // If this write will push us over some sort of size limit, stop targeting
+            //
+
+            int writeSizeBytes = getWriteSizeBytes(writeOp);
+            if (wouldMakeBatchesTooBig(writes, writeSizeBytes, batchSizes)) {
+                invariant(!batchMap.empty());
+                writeOp.cancelWrites(NULL);
+                break;
             }
 
             //
@@ -219,19 +370,35 @@ namespace mongo {
 
                 TargetedWrite* write = *it;
 
-                TargetedBatchMap::iterator seenIt = batchMap.find( &write->endpoint );
-                if ( seenIt == batchMap.end() ) {
+                TargetedBatchMap::iterator batchIt = batchMap.find( &write->endpoint );
+                TargetedBatchSizeMap::iterator batchSizeIt = batchSizes.find( &write->endpoint );
+
+                if ( batchIt == batchMap.end() ) {
                     TargetedWriteBatch* newBatch = new TargetedWriteBatch( write->endpoint );
-                    seenIt = batchMap.insert( make_pair( &newBatch->getEndpoint(), //
-                                                         newBatch ) ).first;
+                    batchIt = batchMap.insert( make_pair( &newBatch->getEndpoint(),
+                                                          newBatch ) ).first;
+                    batchSizeIt = batchSizes.insert(make_pair(&newBatch->getEndpoint(),
+                                                              BatchSize())).first;
                 }
 
-                TargetedWriteBatch* batch = seenIt->second;
+                TargetedWriteBatch* batch = batchIt->second;
+                BatchSize& batchSize = batchSizeIt->second;
+
+                ++batchSize.numOps;
+                batchSize.sizeBytes += writeSizeBytes;
                 batch->addWrite( write );
             }
 
             // Relinquish ownership of TargetedWrites, now the TargetedBatches own them
             writesOwned.mutableVector().clear();
+
+            //
+            // Break if we're ordered and we have more than one endpoint - later writes cannot be
+            // enforced as ordered across multiple shard endpoints.
+            //
+
+            if ( ordered && batchMap.size() > 1u )
+                break;
         }
 
         //
@@ -241,6 +408,9 @@ namespace mongo {
         for ( TargetedBatchMap::iterator it = batchMap.begin(); it != batchMap.end(); ++it ) {
 
             TargetedWriteBatch* batch = it->second;
+
+            if ( batch->getWrites().empty() )
+                continue;
 
             // Remember targeted batch for reporting
             _targeted.insert( batch );
@@ -328,16 +498,10 @@ namespace mongo {
         };
     }
 
-    static void cloneBatchErrorTo( const BatchedCommandResponse& batchResp,
-                                   WriteErrorDetail* details ) {
+    static void cloneCommandErrorTo( const BatchedCommandResponse& batchResp,
+                                     WriteErrorDetail* details ) {
         details->setErrCode( batchResp.getErrCode() );
         details->setErrMessage( batchResp.getErrMessage() );
-    }
-
-    static void cloneBatchErrorFrom( const WriteErrorDetail& details,
-                                     BatchedCommandResponse* response ) {
-        response->setErrCode( details.getErrCode() );
-        response->setErrMessage( details.getErrMessage() );
     }
 
     // Given *either* a batch error or an array of per-item errors, copies errors we're interested
@@ -368,8 +532,14 @@ namespace mongo {
             if( response.isUpsertDetailsSet() ) {
                 numUpserted = response.sizeUpsertDetails();
             }
-            stats->numUpdated += ( response.getN() - numUpserted );
-            stats->numModified += response.getNModified();
+            stats->numMatched += ( response.getN() - numUpserted );
+            long long numModified = response.getNModified();
+
+            if (numModified >= 0)
+                stats->numModified += numModified;
+            else
+                stats->numModified = -1; // sentinel used to indicate we omit the field downstream
+
             stats->numUpserted += numUpserted;
         }
         else {
@@ -382,26 +552,29 @@ namespace mongo {
                                           const BatchedCommandResponse& response,
                                           TrackedErrors* trackedErrors ) {
 
-        // Increment stats for this batch
-        incBatchStats( _clientRequest->getBatchType(), response, _stats.get() );
+        if ( !response.getOk() ) {
+
+            WriteErrorDetail error;
+            cloneCommandErrorTo( response, &error );
+
+            // Treat command errors exactly like other failures of the batch
+            // Note that no errors will be tracked from these failures - as-designed
+            noteBatchError( targetedBatch, error );
+            return;
+        }
+
+        dassert( response.getOk() );
 
         // Stop tracking targeted batch
         _targeted.erase( &targetedBatch );
 
-        //
-        // Organize errors based on error code.
-        // We may have *either* a batch error or errors per-item.
-        // (Write Concern errors are stored and handled later.)
-        //
+        // Increment stats for this batch
+        incBatchStats( _clientRequest->getBatchType(), response, _stats.get() );
 
-        if ( !response.getOk() ) {
-            WriteErrorDetail batchError;
-            cloneBatchErrorTo( response, &batchError );
-            _batchError.reset( new ShardError( targetedBatch.getEndpoint(),
-                                                      batchError ));
-            cancelBatch( targetedBatch, _writeOps, batchError );
-            return;
-        }
+        //
+        // Assign errors to particular items.
+        // Write Concern errors are stored and handled later.
+        //
 
         // Special handling for write concern errors, save for later
         if ( response.isWriteConcernErrorSet() ) {
@@ -428,9 +601,14 @@ namespace mongo {
         // Go through all pending responses of the op and sorted remote reponses, populate errors
         // This will either set all errors to the batch error or apply per-item errors as-needed
         //
+        // If the batch is ordered, cancel all writes after the first error for retargeting.
+        //
+
+        bool ordered = _clientRequest->getOrdered();
 
         vector<WriteErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
         int index = 0;
+        WriteErrorDetail* lastError = NULL;
         for ( vector<TargetedWrite*>::const_iterator it = targetedBatch.getWrites().begin();
             it != targetedBatch.getWrites().end(); ++it, ++index ) {
 
@@ -450,10 +628,18 @@ namespace mongo {
 
             // Finish the response (with error, if needed)
             if ( NULL == writeError ) {
-                writeOp.noteWriteComplete( *write );
+                if ( !ordered || !lastError ){
+                    writeOp.noteWriteComplete( *write );
+                }
+                else {
+                    // We didn't actually apply this write - cancel so we can retarget
+                    dassert( writeOp.getNumTargeted() == 1u );
+                    writeOp.cancelWrites( lastError );
+                }
             }
             else {
                 writeOp.noteWriteError( *write, *writeError );
+                lastError = writeError;
             }
         }
 
@@ -485,22 +671,64 @@ namespace mongo {
         }
     }
 
-    void BatchWriteOp::noteBatchError( const TargetedWriteBatch& targetedBatch,
-                                       const WriteErrorDetail& error ) {
-        BatchedCommandResponse response;
-        response.setOk( false );
-        response.setN( 0 );
-        cloneBatchErrorFrom( error, &response );
-        dassert( response.isValid( NULL ) );
-        noteBatchResponse( targetedBatch, response, NULL );
+    static void toWriteErrorResponse( const WriteErrorDetail& error,
+                                      bool ordered,
+                                      int numWrites,
+                                      BatchedCommandResponse* writeErrResponse ) {
+
+        writeErrResponse->setOk( true );
+        writeErrResponse->setN( 0 );
+
+        int numErrors = ordered ? 1 : numWrites;
+        for ( int i = 0; i < numErrors; i++ ) {
+            auto_ptr<WriteErrorDetail> errorClone( new WriteErrorDetail );
+            error.cloneTo( errorClone.get() );
+            errorClone->setIndex( i );
+            writeErrResponse->addToErrDetails( errorClone.release() );
+        }
+
+        dassert( writeErrResponse->isValid( NULL ) );
     }
 
-    void BatchWriteOp::setBatchError( const WriteErrorDetail& error ) {
-        _batchError.reset( new ShardError( ShardEndpoint(), error ) );
+    void BatchWriteOp::noteBatchError( const TargetedWriteBatch& targetedBatch,
+                                       const WriteErrorDetail& error ) {
+
+        // Treat errors to get a batch response as failures of the contained writes
+        BatchedCommandResponse emulatedResponse;
+        toWriteErrorResponse( error,
+                              _clientRequest->getOrdered(),
+                              targetedBatch.getWrites().size(),
+                              &emulatedResponse );
+
+        noteBatchResponse( targetedBatch, emulatedResponse, NULL );
+    }
+
+    void BatchWriteOp::abortBatch( const WriteErrorDetail& error ) {
+
+        dassert( !isFinished() );
+        dassert( numWriteOpsIn( WriteOpState_Pending ) == 0 );
+
+        size_t numWriteOps = _clientRequest->sizeWriteOps();
+        bool orderedOps = _clientRequest->getOrdered();
+        for ( size_t i = 0; i < numWriteOps; ++i ) {
+
+            WriteOp& writeOp = _writeOps[i];
+            // Can only be called with no outstanding batches
+            dassert( writeOp.getWriteState() != WriteOpState_Pending );
+
+            if ( writeOp.getWriteState() < WriteOpState_Completed ) {
+
+                writeOp.setOpError( error );
+
+                // Only one error if we're ordered
+                if ( orderedOps ) break;
+            }
+        }
+
+        dassert( isFinished() );
     }
 
     bool BatchWriteOp::isFinished() {
-        if ( _batchError.get() ) return true;
 
         size_t numWriteOps = _clientRequest->sizeWriteOps();
         bool orderedOps = _clientRequest->getOrdered();
@@ -520,22 +748,6 @@ namespace mongo {
     void BatchWriteOp::buildClientResponse( BatchedCommandResponse* batchResp ) {
 
         dassert( isFinished() );
-
-        if ( _batchError.get() ) {
-
-            batchResp->setOk( false );
-            batchResp->setErrCode( _batchError->error.getErrCode() );
-
-            stringstream msg;
-            msg << _batchError->error.getErrMessage();
-            if ( !_batchError->endpoint.shardName.empty() ) {
-                msg << " at " << _batchError->endpoint.shardName;
-            }
-
-            batchResp->setErrMessage( msg.str() );
-            dassert( batchResp->isValid( NULL ) );
-            return;
-        }
 
         // Result is OK
         batchResp->setOk( true );
@@ -615,11 +827,13 @@ namespace mongo {
         }
 
         // Stats
-        int nValue = _stats->numInserted + _stats->numUpserted + _stats->numUpdated
+        int nValue = _stats->numInserted + _stats->numUpserted + _stats->numMatched
                      + _stats->numDeleted;
         batchResp->setN( nValue );
-        if ( _clientRequest->getBatchType() == BatchedCommandRequest::BatchType_Update )
-            batchResp->setNModified( _stats->numModified );
+        if ( _clientRequest->getBatchType() == BatchedCommandRequest::BatchType_Update &&
+             _stats->numModified >= 0) {
+                batchResp->setNModified( _stats->numModified );
+        }
 
         dassert( batchResp->isValid( NULL ) );
     }

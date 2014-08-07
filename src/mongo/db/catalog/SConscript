@@ -1,0 +1,8 @@
+# -*- mode: python; -*-
+
+Import("env")
+
+env.Library('collection_options', ['collection_options.cpp'], LIBDEPS=['$BUILD_DIR/mongo/bson'])
+
+env.CppUnitTest('collection_options_test', ['collection_options_test.cpp'],
+                LIBDEPS=['collection_options'])

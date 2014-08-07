@@ -20,8 +20,6 @@ for (var x = 0; x < 200; x++) {
     testDB2.user.insert({ x: x });
 }
 
-testDB2.runCommand({ getLastError: 1 });
-
 var cursor = testDB1.user.find({ x: 30 }).readPref('primary');
 assert(cursor.hasNext());
 assert.eq(30, cursor.next().x);

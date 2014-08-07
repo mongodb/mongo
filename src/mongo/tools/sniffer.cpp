@@ -338,9 +338,7 @@ void processMessage( Connection& c , Message& m ) {
             break;
         }
         case mongo::dbKillCursors: {
-            int *x = (int *) m.singleData()->_data;
-            x++; // reserved
-            int n = *x;
+            int n = d.pullInt();
             out() << "\tkillCursors n: " << n << endl;
             break;
         }
@@ -366,7 +364,7 @@ void processMessage( Connection& c , Message& m ) {
                 if ( m.operation() == mongo::dbGetMore ) {
                     DbMessage d( m );
                     d.pullInt();
-                    long long &cId = d.pullInt64();
+                    long long cId = d.pullInt64();
                     cId = mapCursor[ c ][ cId ];
                 }
                 Message response;
@@ -434,7 +432,8 @@ void processDiagLog( const char * file ) {
 
 void usage() {
     cout <<
-         "Usage: mongosniff [--help] [--forward host:port] [--source (NET <interface> | (FILE | DIAGLOG) <filename>)] [<port0> <port1> ... ]\n"
+         "Usage: mongosniff [--help] [--forward host:port] [--objcheck] [--source (NET <interface> | (FILE | DIAGLOG) <filename>)] [<port0> <port1> ... ]\n"
+         "--help          Print this help message.\n"
          "--forward       Forward all parsed request messages to mongod instance at \n"
          "                specified host:port\n"
          "--source        Source of traffic to sniff, either a network interface or a\n"
@@ -442,12 +441,11 @@ void usage() {
          "                or a file containing output from mongod's --diaglog option.\n"
          "                If no source is specified, mongosniff will attempt to sniff\n"
          "                from one of the machine's network interfaces.\n"
-         "--objcheck      Log hex representation of invalid BSON objects and nothing\n"
-         "                else.  Spurious messages about invalid objects may result\n"
+         "--objcheck      Log hex representation of invalid BSON documents and nothing\n"
+         "                else.  Spurious messages about invalid documents may result\n"
          "                when there are dropped tcp packets.\n"
          "<port0>...      These parameters are used to filter sniffing.  By default, \n"
          "                only port 27017 is sniffed.\n"
-         "--help          Print this help message.\n"
          << endl;
 }
 

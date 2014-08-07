@@ -26,14 +26,15 @@
  *    it in the license file.
  */
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/pdfile.h"
 
 namespace mongo {
 
     // static
-    bool WorkingSetCommon::fetchAndInvalidateLoc(WorkingSetMember* member) {
+    bool WorkingSetCommon::fetchAndInvalidateLoc(
+                WorkingSetMember* member, const Collection* collection) {
         // Already in our desired state.
         if (member->state == WorkingSetMember::OWNED_OBJ) { return true; }
 
@@ -41,7 +42,7 @@ namespace mongo {
         if (!member->hasLoc()) { return false; }
 
         // Do the fetch, invalidate the DL.
-        member->obj = member->loc.obj().getOwned();
+        member->obj = collection->docFor(member->loc).getOwned();
 
         member->state = WorkingSetMember::OWNED_OBJ;
         member->loc = DiskLoc();
@@ -62,6 +63,80 @@ namespace mongo {
                 dest->addComputed(src.getComputed(i)->clone());
             }
         }
+    }
+
+    // static
+    BSONObj WorkingSetCommon::buildMemberStatusObject(const Status& status) {
+        BSONObjBuilder bob;
+        bob.append("ok", status.isOK() ? 1.0 : 0.0);
+        bob.append("code", status.code());
+        bob.append("errmsg", status.reason());
+
+        return bob.obj();
+    }
+
+    // static
+    WorkingSetID WorkingSetCommon::allocateStatusMember(WorkingSet* ws, const Status& status) {
+        invariant(ws);
+
+        WorkingSetID wsid = ws->allocate();
+        WorkingSetMember* member = ws->get(wsid);
+        member->state = WorkingSetMember::OWNED_OBJ;
+        member->obj = buildMemberStatusObject(status);
+
+        return wsid;
+    }
+
+    // static
+    bool WorkingSetCommon::isValidStatusMemberObject(const BSONObj& obj) {
+        return obj.nFields() == 3 &&
+               obj.hasField("ok") &&
+               obj.hasField("code") &&
+               obj.hasField("errmsg");
+    }
+
+    // static
+    void WorkingSetCommon::getStatusMemberObject(const WorkingSet& ws, WorkingSetID wsid,
+                                                 BSONObj* objOut) {
+        invariant(objOut);
+
+        // Validate ID and working set member.
+        if (WorkingSet::INVALID_ID == wsid) {
+            return;
+        }
+        WorkingSetMember* member = ws.get(wsid);
+        if (!member->hasOwnedObj()) {
+            return;
+        }
+        BSONObj obj = member->obj;
+        if (!isValidStatusMemberObject(obj)) {
+            return;
+        }
+        *objOut = member->obj;
+    }
+
+    // static
+    Status WorkingSetCommon::getMemberObjectStatus(const BSONObj& memberObj) {
+        invariant(WorkingSetCommon::isValidStatusMemberObject(memberObj));
+        return Status(static_cast<ErrorCodes::Error>(memberObj["code"].numberInt()),
+                      memberObj["errMsg"]);
+    }
+
+    // static
+    Status WorkingSetCommon::getMemberStatus(const WorkingSetMember& member) {
+        invariant(member.hasObj());
+        return getMemberObjectStatus(member.obj);
+    }
+
+    // static
+    std::string WorkingSetCommon::toStatusString(const BSONObj& obj) {
+        if (!isValidStatusMemberObject(obj)) {
+            Status unknownStatus(ErrorCodes::UnknownError, "no details available");
+            return unknownStatus.toString();
+        }
+        Status status(ErrorCodes::fromInt(obj.getIntField("code")),
+                      obj.getStringField("errmsg"));
+        return status.toString();
     }
 
 }  // namespace mongo

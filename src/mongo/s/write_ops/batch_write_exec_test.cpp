@@ -135,9 +135,12 @@ namespace {
 
         BatchedCommandResponse response;
         backend.exec->executeBatch( request, &response );
-        ASSERT( !response.getOk() );
-        ASSERT_EQUALS( response.getErrCode(), errResponse.getErrCode() );
-        ASSERT( response.getErrMessage().find( errResponse.getErrMessage() ) != string::npos );
+        ASSERT( response.getOk() );
+        ASSERT_EQUALS( response.getN(), 0 );
+        ASSERT( response.isErrDetailsSet() );
+        ASSERT_EQUALS( response.getErrDetailsAt( 0 )->getErrCode(), errResponse.getErrCode() );
+        ASSERT( response.getErrDetailsAt( 0 )->getErrMessage().find( errResponse.getErrMessage() )
+                != string::npos );
 
         const BatchWriteExecStats& stats = backend.exec->getStats();
         ASSERT_EQUALS( stats.numRounds, 1 );
@@ -224,6 +227,7 @@ namespace {
         //
         // Retry op in exec too many times (without refresh) b/c of stale config
         // (The mock targeter doesn't report progress on refresh)
+        // We should report a no progress error for everything in the batch
         //
 
         NamespaceString nss( "foo.bar" );
@@ -233,8 +237,9 @@ namespace {
         request.setNS( nss.ns() );
         request.setOrdered( false );
         request.setWriteConcern( BSONObj() );
-        // Do single-target, single doc batch write op
+        // Do single-target, single doc batch write ops
         request.getInsertRequest()->addToDocuments( BSON( "x" << 1 ) );
+        request.getInsertRequest()->addToDocuments( BSON( "x" << 2 ) );
 
         MockSingleShardBackend backend( nss );
 
@@ -243,7 +248,9 @@ namespace {
         error.setErrCode( ErrorCodes::StaleShardVersion );
         error.setErrMessage( "mock stale error" );
         for ( int i = 0; i < 10; i++ ) {
-            mockResults.push_back( new MockWriteResult( backend.shardHost, error ) );
+            mockResults.push_back( new MockWriteResult( backend.shardHost,
+                                                        error,
+                                                        request.sizeWriteOps() ) );
         }
 
         backend.setMockResults( mockResults );
@@ -251,8 +258,11 @@ namespace {
         // Execute request
         BatchedCommandResponse response;
         backend.exec->executeBatch( request, &response );
-        ASSERT( !response.getOk() );
-        ASSERT_EQUALS( response.getErrCode(), ErrorCodes::NoProgressMade );
+        ASSERT( response.getOk() );
+        ASSERT_EQUALS( response.getN(), 0 );
+        ASSERT( response.isErrDetailsSet() );
+        ASSERT_EQUALS( response.getErrDetailsAt( 0 )->getErrCode(), ErrorCodes::NoProgressMade );
+        ASSERT_EQUALS( response.getErrDetailsAt( 1 )->getErrCode(), ErrorCodes::NoProgressMade );
     }
 
     TEST(BatchWriteExecTests, ManyStaleOpWithMigration) {

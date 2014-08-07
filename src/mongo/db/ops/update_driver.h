@@ -35,11 +35,11 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/field_ref_set.h"
-#include "mongo/db/index_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/modifier_interface.h"
 #include "mongo/db/ops/modifier_table.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/update_index_data.h"
 
 namespace mongo {
 
@@ -55,7 +55,7 @@ namespace mongo {
          * Returns OK and fills in '_mods' if 'updateExpr' is correct. Otherwise returns an
          * error status with a corresponding description.
          */
-        Status parse(const BSONObj& updateExpr);
+        Status parse(const BSONObj& updateExpr, const bool multi = false);
 
         /**
          * Fills in document with any fields in the query which are valid.
@@ -107,13 +107,7 @@ namespace mongo {
         bool isDocReplacement() const;
 
         bool modsAffectIndices() const;
-        void refreshIndexKeys(const IndexPathSet* indexedFields);
-
-        bool multi() const;
-        void setMulti(bool multi);
-
-        bool upsert() const;
-        void setUpsert(bool upsert);
+        void refreshIndexKeys(const UpdateIndexData* indexedFields);
 
         bool logOp() const;
         void setLogOp(bool logOp);
@@ -153,23 +147,17 @@ namespace mongo {
         bool _replacementMode;
 
         // Collection of update mod instances. Owned here.
-        vector<ModifierInterface*> _mods;
+        std::vector<ModifierInterface*> _mods;
 
         // What are the list of fields in the collection over which the update is going to be
         // applied that participate in indices?
         //
         // NOTE: Owned by the collection's info cache!.
-        const IndexPathSet* _indexedFields;
+        const UpdateIndexData* _indexedFields;
 
         //
         // mutable properties after parsing
         //
-
-        // May this driver apply updates to several documents?
-        bool _multi;
-
-        // May this driver construct a new object if an update for a non-existing one is sent?
-        bool _upsert;
 
         // Should this driver generate an oplog record when it applies the update?
         bool _logOp;
@@ -195,12 +183,10 @@ namespace mongo {
     };
 
     struct UpdateDriver::Options {
-        bool multi;
-        bool upsert;
         bool logOp;
         ModifierInterface::Options modOptions;
 
-        Options() : multi(false), upsert(false), logOp(false), modOptions() {}
+        Options() : logOp(false), modOptions() {}
     };
 
 } // namespace mongo

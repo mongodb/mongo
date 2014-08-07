@@ -32,6 +32,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 
@@ -86,11 +87,17 @@ namespace mongo {
 
              see unit test for more examples
          */
-        bool hasShardKey( const BSONObj& obj ) const;
+        bool hasShardKey( const BSONObj& doc ) const;
+
+        /**
+         * Same as the above, but disallow certain shard key values which are interpreted for
+         * targeting as a multi-shard query (i.e. RegExes)
+         */
+        bool hasTargetableShardKey( const BSONObj& doc ) const;
 
         BSONObj key() const { return pattern.toBSON(); }
 
-        string toString() const;
+        std::string toString() const;
 
         BSONObj extractKey(const BSONObj& from) const;
 
@@ -139,30 +146,18 @@ namespace mongo {
          */
         BSONObj moveToFront(const BSONObj& obj) const;
 
-        /**@param queryConstraints a FieldRangeSet formed from parsing a query
-         * @return an ordered list of bounds generated using this KeyPattern
-         * and the constraints from the FieldRangeSet
-         *
-         * The value of frsp->matchPossibleForSingleKeyFRS(fromQuery) should be true,
-         * otherwise this function could throw.
-         *
-         */
-        BoundList keyBounds( const FieldRangeSet& queryConstraints ) const{
-            return pattern.keyBounds( queryConstraints );
-        }
-
     private:
         KeyPattern pattern;
         BSONObj gMin;
         BSONObj gMax;
 
         /* question: better to have patternfields precomputed or not?  depends on if we use copy constructor often. */
-        set<string> patternfields;
+        std::set<std::string> patternfields;
     };
 
     inline BSONObj ShardKeyPattern::extractKey(const BSONObj& from) const {
         BSONObj k = pattern.extractSingleKey( from );
-        uassert(13334, "Shard Key must be less than 512 bytes", k.objsize() < 512);
+        uassert(13334, "Shard Key must be less than 512 bytes", k.objsize() < kMaxShardKeySize);
         return k;
     }
 

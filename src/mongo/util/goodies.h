@@ -3,17 +3,29 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #pragma once
@@ -26,16 +38,17 @@
 #include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/utility.hpp>
 
 #include "mongo/bson/util/misc.h"
 
 namespace mongo {
 
     /* @return a dump of the buffer as hex byte ascii output */
-    string hexdump(const char *data, unsigned len);
+    std::string hexdump(const char *data, unsigned len);
 
     template<class T>
-    inline string ToString(const T& t) {
+    inline std::string ToString(const T& t) {
         std::stringstream s;
         s << t;
         return s.str();
@@ -137,18 +150,12 @@ namespace mongo {
             memset( _buf , 0 , _size );
         }
 
-        ThreadSafeString( const ThreadSafeString& other )
-            : _size( other._size ) , _buf( new char[_size] ) {
-            strncpy( _buf , other._buf , _size );
-        }
-
         ~ThreadSafeString() {
             delete[] _buf;
-            _buf = 0;
         }
 
-        string toString() const {
-            string s = _buf;
+        std::string toString() const {
+            std::string s = _buf;
             return s;
         }
 
@@ -161,16 +168,8 @@ namespace mongo {
             return *this;
         }
 
-        bool operator==( const ThreadSafeString& other ) const {
-            return strcmp( _buf , other._buf ) == 0;
-        }
-
-        bool operator==( const char * str ) const {
-            return strcmp( _buf , str ) == 0;
-        }
-
-        bool operator!=( const char * str ) const {
-            return strcmp( _buf , str ) != 0;
+        ThreadSafeString& operator=(const string& str) {
+            return (*this = str.c_str());
         }
 
         bool empty() const {
@@ -178,8 +177,8 @@ namespace mongo {
         }
 
     private:
-        size_t _size;
-        char * _buf;
+        const size_t _size;
+        char *const _buf;
     };
 
     std::ostream& operator<<(std::ostream &s, const ThreadSafeString &o);
@@ -201,7 +200,7 @@ namespace mongo {
         template<typename U> ptr(const ptr<U>& p) : _p(p) {}
         template<typename U> ptr(const boost::shared_ptr<U>& p) : _p(p.get()) {}
         template<typename U> ptr(const boost::scoped_ptr<U>& p) : _p(p.get()) {}
-        //template<typename U> ptr(const auto_ptr<U>& p) : _p(p.get()) {}
+        //template<typename U> ptr(const std::auto_ptr<U>& p) : _p(p.get()) {}
 
         // assign to ptr<T>
         ptr& operator= (T* p) { _p = p; return *this; } // needed for NULL
@@ -209,7 +208,7 @@ namespace mongo {
         template<typename U> ptr& operator= (const ptr<U>& p) { _p = p; return *this; }
         template<typename U> ptr& operator= (const boost::shared_ptr<U>& p) { _p = p.get(); return *this; }
         template<typename U> ptr& operator= (const boost::scoped_ptr<U>& p) { _p = p.get(); return *this; }
-        //template<typename U> ptr& operator= (const auto_ptr<U>& p) { _p = p.get(); return *this; }
+        //template<typename U> ptr& operator= (const std::auto_ptr<U>& p) { _p = p.get(); return *this; }
 
         // use
         T* operator->() const { return _p; }

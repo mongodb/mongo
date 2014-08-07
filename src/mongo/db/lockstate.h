@@ -42,10 +42,10 @@ namespace mongo {
     public:
         LockState();
 
-        void dump();
-        static void Dump(); 
+        void dump() const;
+
         BSONObj reportState();
-        void reportState(BSONObjBuilder& b);
+        void reportState(BSONObjBuilder* b);
         
         unsigned recursiveCount() const { return _recursive; }
 
@@ -57,9 +57,17 @@ namespace mongo {
         bool isRW() const; // RW
         bool isW() const; // W
         bool hasAnyReadLock() const; // explicitly rR
-        bool hasAnyWriteLock() const; // wWX
         
-        bool isLocked( const StringData& ns ); // rwRW
+        bool isLocked(const StringData& ns) const; // rwRW
+        bool isLocked() const;
+        bool isWriteLocked() const;
+        bool isWriteLocked(const StringData& ns) const;
+        bool isAtLeastReadLocked(const StringData& ns) const;
+        bool isLockedForCommitting() const;
+        bool isRecursive() const;
+
+        void assertWriteLocked(const StringData& ns) const;
+        void assertAtLeastReadLocked(const StringData& ns) const;
 
         /** pending means we are currently trying to get a lock */
         bool hasLockPending() const { return _lockPending || _lockPendingParallelWriter; }
@@ -80,7 +88,7 @@ namespace mongo {
         int nestableCount() const { return _nestableCount; }
         
         int otherCount() const { return _otherCount; }
-        const string& otherName() const { return _otherName; }
+        const std::string& otherName() const { return _otherName; }
         WrapperForRWLock* otherLock() const { return _otherLock; }
         
         void enterScopedLock( Lock::ScopedLock* lock );
@@ -108,7 +116,7 @@ namespace mongo {
         int _nestableCount;            // recursive lock count on local or admin db XXX - change name
         
         int _otherCount;               //   >0 means write lock, <0 read lock - XXX change name
-        string _otherName;             // which database are we locking and working with (besides local/admin) 
+        std::string _otherName;             // which database are we locking and working with (besides local/admin)
         WrapperForRWLock* _otherLock;  // so we don't have to check the map too often (the map has a mutex)
 
         // for temprelease
@@ -127,9 +135,11 @@ namespace mongo {
         SimpleRWLock rw;
         SimpleMutex m;
         bool sharedLatching;
-    public:
-        string name() const { return rw.name; }
         LockStat stats;
+    public:
+        std::string name() const { return rw.name; }
+        LockStat& getStats() { return stats; }
+
         WrapperForRWLock(const StringData& name)
             : rw(name), m(name) {
             // For the local datbase, all operations are short,

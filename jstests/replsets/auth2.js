@@ -28,11 +28,7 @@ var setupReplSet = function() {
 var checkNoAuth = function() {
     print("without an admin user, things should work");
 
-    master.getDB("foo").bar.insert({x:1});
-    var result = master.getDB("admin").runCommand({getLastError:1});
-
-    printjson(result);
-    assert.eq(result.err, null);
+    assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 }
 
 var checkInvalidAuthStates = function() {

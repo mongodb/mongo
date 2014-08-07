@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/auth/authz_manager_external_state_d.h"
 
 #include <boost/thread/mutex.hpp>
@@ -37,22 +39,29 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
+    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kAccessControl);
+
     AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() {}
     AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() {}
 
-    Status AuthzManagerExternalStateMongod::_getUserDocument(const UserName& userName,
-                                                             BSONObj* userDoc) {
+    Status AuthzManagerExternalStateMongod::_getUserDocument(
+                OperationContext* txn, const UserName& userName, BSONObj* userDoc) {
 
-        Client::ReadContext ctx("admin");
+        Client::ReadContext ctx(txn, "admin");
+
         int authzVersion;
-        Status status = getStoredAuthorizationVersion(&authzVersion);
+        Status status = getStoredAuthorizationVersion(txn, &authzVersion);
         if (!status.isOK())
             return status;
 
@@ -67,6 +76,7 @@ namespace mongo {
         }
 
         status = findOne(
+                txn,
                 (authzVersion == AuthorizationManager::schemaVersion26Final ?
                  AuthorizationManager::usersCollectionNamespace :
                  AuthorizationManager::usersAltCollectionNamespace),
@@ -81,12 +91,13 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongod::query(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj& projection,
-            const boost::function<void(const BSONObj&)>& resultProcessor) {
+            const stdx::function<void(const BSONObj&)>& resultProcessor) {
         try {
-            DBDirectClient client;
+            DBDirectClient client(txn);
             client.query(resultProcessor, collectionName.ns(), query, &projection);
             return Status::OK();
         } catch (const DBException& e) {
@@ -95,20 +106,23 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongod::getAllDatabaseNames(
-            std::vector<std::string>* dbnames) {
-        Lock::GlobalRead lk;
-        getDatabaseNames(*dbnames);
+                OperationContext* txn, std::vector<std::string>* dbnames) {
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases(dbnames);
         return Status::OK();
     }
 
     Status AuthzManagerExternalStateMongod::findOne(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             BSONObj* result) {
 
-        Client::ReadContext ctx(collectionName.ns());
+        Client::ReadContext ctx(txn, collectionName.ns());
+
         BSONObj found;
-        if (Helpers::findOne(collectionName.ns(),
+        if (Helpers::findOne(txn,
+                             ctx.ctx().db()->getCollection(txn, collectionName),
                              query,
                              found)) {
             *result = found.getOwned();
@@ -151,7 +165,7 @@ namespace mongo {
                                                    bool upsert,
                                                    bool multi,
                                                    const BSONObj& writeConcern,
-                                                   int* numUpdated) {
+                                                   int* nMatched) {
         try {
             DBDirectClient client;
             client.update(collectionName, query, updatePattern, upsert, multi);
@@ -167,7 +181,7 @@ namespace mongo {
                 return Status(ErrorCodes::UnknownError, err);
             }
 
-            *numUpdated = res["n"].numberInt();
+            *nMatched = res["n"].numberInt();
             return Status::OK();
         } catch (const DBException& e) {
             return e.toStatus();

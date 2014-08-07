@@ -25,7 +25,7 @@ function check( note ){
         sleep( 200 );
     }
     lastOpLogEntry = m.getDB("local").oplog.$main.find({op:{$ne:"n"}}).sort({$natural:-1}).limit(-1).next();
-    note = note + tojson(am.a.find().toArray()) + " != " + tojson(as.a.find().toArray())  
+    note = note + tojson(am.a.find().toArray()) + " != " + tojson(as.a.find().toArray())
                 + "last oplog:" + tojson(lastOpLogEntry);
     assert.eq( x.md5 , y.md5 , note );
 }
@@ -44,9 +44,8 @@ check( "C" );
 // -----   check features -------
 
 // map/reduce
-am.mr.insert( { tags : [ "a" ] } )
-am.mr.insert( { tags : [ "a" , "b" ] } )
-am.getLastError();
+assert.writeOK(am.mr.insert({ tags: [ "a" ]}));
+assert.writeOK(am.mr.insert({ tags: [ "a", "b" ]}));
 check( "mr setup" );
 
 m = function(){
@@ -87,22 +86,19 @@ block();
 
 checkNumCollections( "MR4" );
 
-
-t = am.rpos;
-t.insert( { _id : 1 , a : [ { n : "a" , c : 1 } , { n : "b" , c : 1 } , { n : "c" , c : 1 } ] , b : [ 1 , 2 , 3 ] } )
-block();
+var t = am.rpos;
+var writeOption = { writeConcern: { w: 2, wtimeout: 3000 }};
+t.insert({ _id: 1, a: [{ n: "a", c: 1 }, { n: "b", c: 1 }, { n: "c", c: 1 }], b: [ 1, 2, 3 ]},
+         writeOption);
 check( "after pos 1 " );
 
-t.update( { "a.n" : "b" } , { $inc : { "a.$.c" : 1 } } )
-block();
+t.update({ "a.n": "b" }, { $inc: { "a.$.c": 1 }}, writeOption);
 check( "after pos 2 " );
 
-t.update( { "b" : 2 } , { $inc : { "b.$" : 1 } } )
-block();
+t.update({ b: 2 }, { $inc: { "b.$": 1 }}, writeOption);
 check( "after pos 3 " );
 
-t.update( { "b" : 3} , { $set : { "b.$" : 17 } } )
-block();
+t.update({ b: 3 }, { $set: { "b.$": 17 }}, writeOption);
 check( "after pos 4 " );
 
 
@@ -112,22 +108,16 @@ printjson( as.rpos.findOne() )
 //am.getSisterDB( "local" ).getCollection( "oplog.$main" ).find().limit(10).sort( { $natural : -1 } ).forEach( printjson )
 
 t = am.b;
-t.update( { "_id" : "fun"}, { $inc : {"a.b.c.x" : 6743} } , true, false)
-block()
+var updateOption = { upsert: true, multi: false, writeConcern: { w: 2, wtimeout: 3000 }};
+t.update({ _id: "fun" }, { $inc: { "a.b.c.x": 6743 }}, updateOption);
 check( "b 1" );
 
-t.update( { "_id" : "fun"}, { $inc : {"a.b.c.x" : 5} } , true, false)
-block()
+t.update({ _id: "fun" }, { $inc: { "a.b.c.x": 5 }}, updateOption);
 check( "b 2" );
 
-t.update( { "_id" : "fun"}, { $inc : {"a.b.c.x" : 100, "a.b.c.y" : 911} } , true, false)
-block()
+t.update({ _id: "fun" }, { $inc: { "a.b.c.x": 100, "a.b.c.y": 911 }}, updateOption);
 assert.eq( { _id : "fun" , a : { b : { c : { x : 6848 , y : 911 } } } } , as.b.findOne() , "b 3" );
-//printjson( t.findOne() )
-//printjson( as.b.findOne() )
-//am.getSisterDB( "local" ).getCollection( "oplog.$main" ).find().sort( { $natural : -1 } ).limit(3).forEach( printjson )
 check( "b 4" );
-
 
 // lots of indexes
 
@@ -136,9 +126,7 @@ for ( i=0; i<200; i++ ){
     var idx = {}
     idx["x"+i] = 1;
     am.lotOfIndexes.ensureIndex( idx );
-    am.getLastError()
 }
-
 
 assert.soon( function(){ return am.lotOfIndexes.getIndexes().length == as.lotOfIndexes.getIndexes().length; } , "lots of indexes a" )
 
@@ -154,9 +142,8 @@ assert.soon( function(){ z = as.mu1.findOne(); printjson( z ); return friendlyEq
 // profiling - this sould be last
 
 am.setProfilingLevel( 2 )
-am.foo.insert( { x : 1 } )
+am.foo.insert({ x: 1 }, writeOption);
 am.foo.findOne()
-block();
 assert.eq( 2 , am.system.profile.count() , "P1" )
 assert.eq( 0 , as.system.profile.count() , "P2" )
 

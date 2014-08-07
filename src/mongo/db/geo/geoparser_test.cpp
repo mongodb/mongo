@@ -168,6 +168,16 @@ namespace {
             &polygonD);
         // Also removed in the loop.
         ASSERT_FALSE(polygonD.polygon.Contains(point.point));
+
+        //
+        // Bad polygon examples
+        //
+
+        // Polygon with not enough points, because some are duplicated
+        PolygonWithCRS polygonBad;
+        ASSERT_FALSE(GeoParser::parsePolygon(
+            fromjson("{'type':'Polygon', 'coordinates':[[ [0,0], [0,0], [5,5], [5,5], [0,0] ]]}"),
+            &polygonBad));
     }
 
     TEST(GeoParser, legacyPoint) {
