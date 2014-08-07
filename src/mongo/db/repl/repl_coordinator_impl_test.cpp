@@ -663,7 +663,7 @@ namespace {
         ASSERT_EQUALS(MemberState::RS_PRIMARY, selfStatus["state"].Int());
         ASSERT_EQUALS(MemberState(MemberState::RS_PRIMARY).toString(),
                       selfStatus["stateStr"].String());
-        ASSERT_EQUALS(1, selfStatus["uptime"].Int());
+        ASSERT_LESS_THAN_OR_EQUALS(1, selfStatus["uptime"].Int());
         ASSERT_EQUALS(oplogProgress, OpTime(selfStatus["optime"].timestampValue()));
         ASSERT_EQUALS(oplogProgress.asDate(), selfStatus["optimeDate"].Date().millis);
 
