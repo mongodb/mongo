@@ -59,21 +59,21 @@ namespace mongo {
 
 namespace repl {
 namespace {
-    
+
     const Seconds zeroSecs(0);
 
     class ReplCoordTest : public mongo::unittest::Test {
     public:
-        ReplCoordTest() : _topo(new TopologyCoordinatorImpl(zeroSecs)),
-                          _net(new NetworkInterfaceMock()),
-                          _callShutdown(false) {
-        }
-        virtual ~ReplCoordTest() {
-            shutdown();
-        }
+        ReplCoordTest() : _callShutdown(false) {}
 
         virtual void setUp() {
             _settings.replSet = "mySet/node1:12345,node2:54321";
+        }
+
+        virtual void tearDown() {
+            if (_callShutdown) {
+                shutdown();
+            }
         }
 
     protected:
@@ -93,15 +93,12 @@ namespace {
         }
 
         void init() {
-            if (_repl) {
-                shutdown();
-                _topo = new TopologyCoordinatorImpl(zeroSecs);
-                _net = new NetworkInterfaceMock();
-            }
-
-            _repl.reset(new ReplicationCoordinatorImpl(
-                                        _settings,
-                                       new ReplicationCoordinatorExternalStateMock()));
+            invariant(!_repl);
+            invariant(!_callShutdown);
+            _topo = new TopologyCoordinatorImpl(zeroSecs);
+            _net = new NetworkInterfaceMock;
+            _externalState = new ReplicationCoordinatorExternalStateMock;
+            _repl.reset(new ReplicationCoordinatorImpl(_settings, _externalState));
         }
 
         void init(ReplSettings settings) {
@@ -115,6 +112,7 @@ namespace {
         }
 
         void start() {
+            invariant(!_callShutdown);
             // if we haven't initialized yet, do that first.
             if (!_repl) {
                 init();
@@ -125,10 +123,9 @@ namespace {
         }
 
         void shutdown() {
-            if (_callShutdown) {
-                _repl->shutdown();
-                _callShutdown = false;
-            }
+            invariant(_callShutdown);
+            _repl->shutdown();
+            _callShutdown = false;
         }
 
     private:
@@ -137,6 +134,8 @@ namespace {
         TopologyCoordinatorImpl* _topo;
         // Owned by ReplicationCoordinatorImpl
         NetworkInterfaceMock* _net;
+        // Owned by ReplicationCoordinatorImpl
+        ReplicationCoordinatorExternalStateMock* _externalState;
         ReplSettings _settings;
         bool _callShutdown;
     };
