@@ -2588,6 +2588,7 @@ namespace mongo {
                                          false,
                                          str::stream() << "no such cmd: " << commandName);
             anObjBuilder.append("code", ErrorCodes::CommandNotFound);
+            Command::unknownCommands.increment();
             return;
         }
         ClientInfo *client = ClientInfo::get();

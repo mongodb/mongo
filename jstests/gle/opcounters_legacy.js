@@ -150,25 +150,44 @@ t.drop();
 t.insert({_id:0})
 
 // Command, recognized, no error.
-opCounters = db.serverStatus().opcounters;
+serverStatus = db.serverStatus();
+opCounters = serverStatus.opcounters
+metricsObj = serverStatus.metrics.commands
 assert.eq(opCounters.command + 1, db.serverStatus().opcounters.command); // "serverStatus" counted
+// Count this and the last run of "serverStatus"
+assert.eq( metricsObj.serverStatus.total + 2,   
+    db.serverStatus().metrics.commands.serverStatus.total,
+    "total ServerStatus command counter did not increment" )
+assert.eq( metricsObj.serverStatus.failed,
+    db.serverStatus().metrics.commands.serverStatus.failed,
+    "failed ServerStatus command counter incremented!" )
 
 // Command, recognized, with error.
-opCounters = db.serverStatus().opcounters;
+serverStatus = db.serverStatus();
+opCounters = serverStatus.opcounters
+metricsObj = serverStatus.metrics.commands
+var countVal = { "total" : 0, "failed" : 0 };
+if (metricsObj.count != null){
+    countVal = metricsObj.count
+}
 res = t.runCommand("count", {query:{$invalidOp:1}});
 assert.eq(0, res.ok);
 assert.eq(opCounters.command + 2,
           db.serverStatus().opcounters.command); // "serverStatus", "count" counted
 
+assert.eq( countVal.total +1,
+    db.serverStatus().metrics.commands.count.total,
+    "total count command counter did not incremented" )
+assert.eq( countVal.failed + 1,
+    db.serverStatus().metrics.commands.count.failed,
+    "failed count command counter did not increment" )
+
 // Command, unrecognized.
-opCounters = db.serverStatus().opcounters;
-res = t.runCommand("command that doesn't exist");
+serverStatus = db.serverStatus();
+opCounters = serverStatus.opcounters
+metricsObj = serverStatus.metrics.commands
+res = t.runCommand("invalid");
 assert.eq(0, res.ok);
-//assert.eq(opCounters.command + 1, db.serverStatus().opcounters.command); // "serverStatus" counted
-// TODO Replace below with above when SERVER-9038 is resolved (mongos counts unrecognized commands)
-assert.eq(opCounters.command + (isMongos ? 2 : 1), db.serverStatus().opcounters.command);
-
-// Command, recognized, counting suppressed (TODO implement when SERVER-9038 is resolved).
-
-// Restore 'db' var
-db = lastDB;
+assert.eq(opCounters.command + 1, db.serverStatus().opcounters.command); // "serverStatus" counted
+assert.eq(null, db.serverStatus().metrics.commands.invalid);
+assert.eq(metricsObj['<UNKNOWN>'] +1, db.serverStatus().metrics.commands['<UNKNOWN>']);

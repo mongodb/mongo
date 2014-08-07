@@ -62,6 +62,10 @@ namespace mongo {
 
     int Command::testCommandsEnabled = 0;
 
+    Counter64 Command::unknownCommands;
+    static ServerStatusMetricField<Counter64> displayUnknownCommands( "commands.<UNKNOWN>",
+        &Command::unknownCommands );
+
     namespace {
         ExportedServerParameter<int> testCommandsParameter(ServerParameterSet::getGlobal(),
                                                            "enableTestCommands",
@@ -176,7 +180,10 @@ namespace mongo {
         ss << "</tr>\n";
     }
 
-    Command::Command(StringData _name, bool web, StringData oldName) : name(_name.toString()) {
+    Command::Command(StringData _name, bool web, StringData oldName) :
+        name(_name.toString()),
+        _commandsExecutedMetric("commands."+ _name.toString()+".total", &_commandsExecuted),
+        _commandsFailedMetric("commands."+ _name.toString()+".failed", &_commandsFailed) {
         // register ourself.
         if ( _commands == 0 )
             _commands = new map<string,Command*>;
