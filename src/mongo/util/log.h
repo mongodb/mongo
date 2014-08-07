@@ -27,7 +27,21 @@
  *    then also delete it in the license file.
  */
 
-#pragma once
+// #pragma once is not used in this header.
+// This header attempts to enforce the rule that no logging should be done in
+// an inline function defined in a header.
+// To enforce this "no logging in header" rule, we use #include guards with a validating #else
+// clause.
+// Also, this header relies on a preprocessor macro to determine the default component for the
+// unconditional logging functions severe(), error(), warning() and log(). Disallowing multiple
+// inclusion of log.h will ensure that the default component will be set correctly.
+
+#if defined(MONGO_UTIL_LOG_H_)
+#error "mongo/util/log.h cannot be included multiple times. " \
+       "This may occur when log.h is included in a header. " \
+       "Please check your #include's."
+#else  // MONGO_UTIL_LOG_H_
+#define MONGO_UTIL_LOG_H_
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
@@ -194,3 +208,4 @@ namespace {
 
 } // namespace mongo
 
+#endif  // MONGO_UTIL_LOG_H_
