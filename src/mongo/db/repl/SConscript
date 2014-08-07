@@ -76,7 +76,8 @@ env.CppUnitTest('check_quorum_for_config_change_test',
 
 env.Library('repl_coordinator_interface',
             ['repl_coordinator.cpp',
-             'repl_coordinator_external_state.cpp',],
+             'repl_coordinator_external_state.cpp',
+             'repl_set_seed_list.cpp'],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/hostandport',
             ])

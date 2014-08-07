@@ -41,6 +41,7 @@
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
+#include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
@@ -81,7 +82,9 @@ namespace repl {
                 log() << "***" << endl;
             }
 
-            ReplSetSeedList *replSetSeedList = new ReplSetSeedList(_settings.replSet);
+            ReplicationCoordinatorExternalStateImpl externalState;
+            ReplSetSeedList *replSetSeedList = new ReplSetSeedList(&externalState,
+                                                                   _settings.replSet);
             boost::thread t(stdx::bind(&startReplSets, replSetSeedList));
         } else {
             startMasterSlave();
@@ -760,10 +763,12 @@ namespace {
                 log() << "replSet info initiate : no configuration specified.  "
                         "Using a default configuration for the set" << rsLog;
 
+                ReplicationCoordinatorExternalStateImpl externalState;
                 string name;
                 vector<HostAndPort> seeds;
                 set<HostAndPort> seedSet;
-                parseReplSetSeedList(_settings.replSet, name, seeds, seedSet); // may throw...
+                parseReplSetSeedList(
+                        &externalState, _settings.replSet, name, seeds, seedSet); // may throw...
 
                 BSONObjBuilder b;
                 b.append("_id", name);
