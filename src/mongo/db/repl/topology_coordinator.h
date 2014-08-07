@@ -33,6 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -47,17 +48,7 @@ namespace repl {
     class MemberHeartbeatData;
     struct MemberState;
     class ReplicaSetConfig;
-    class ReplSetHeartbeatResponse;
     class TagSubgroup;
-
-    /**
-     * Actions taken based on heartbeat responses
-     */
-    enum HeartbeatResultAction {
-        StepDown,
-        StartElection,
-        None
-    };
 
     /**
      * Replication Topology Coordinator interface.
@@ -122,10 +113,11 @@ namespace repl {
                                               Status* result) = 0;
 
         // update internal state with heartbeat response corresponding to 'id'
-        virtual HeartbeatResultAction updateHeartbeatData(Date_t now,
-                                                          const MemberHeartbeatData& newInfo,
-                                                          int id,
-                                                          const OpTime& lastOpApplied) = 0;
+        virtual ReplSetHeartbeatResponse::HeartbeatResultAction 
+            updateHeartbeatData(Date_t now,
+                                const MemberHeartbeatData& newInfo,
+                                int id,
+                                const OpTime& lastOpApplied) = 0;
 
         // produce a reply to a status request
         virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,

@@ -30,6 +30,8 @@
 
 #include "mongo/db/repl/topology_coordinator_impl.h"
 
+#include <limits>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -44,6 +46,16 @@ namespace mongo {
     MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
 
 namespace repl {
+
+    PingStats::PingStats() : count(0), value(std::numeric_limits<unsigned int>::max()) {
+    }
+
+    void PingStats::hit(int millis) {
+        ++count;
+        value = value == std::numeric_limits<unsigned int>::max() ? millis :
+            static_cast<unsigned long>((value * .8) + (millis * .2));
+    }
+
 
     TopologyCoordinatorImpl::TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs) :
         _currentPrimaryIndex(-1),
@@ -89,8 +101,8 @@ namespace repl {
             return;
         }
 
-        // wait for 2N pings before choosing a sync target
-        int needMorePings = _hbdata.size()*2 - _getTotalPings();
+        // wait for 2N pings (not counting ourselves) before choosing a sync target
+        int needMorePings = (_hbdata.size() - 1) * 2 - _getTotalPings();
 
         if (needMorePings > 0) {
             OCCASIONALLY log() << "waiting for " << needMorePings 
@@ -105,7 +117,7 @@ namespace repl {
             return;
         }
 
-        // find the member with the lowest ping time that has more data than me
+        // find the member with the lowest ping time that is ahead of me
 
         // Find primary's oplog time. Reject sync candidates that are more than
         // maxSyncSourceLagSecs seconds behind.
@@ -128,8 +140,8 @@ namespace repl {
         int closestIndex = -1;
 
         // Make two attempts.  The first attempt, we ignore those nodes with
-        // slave delay higher than our own.  The second attempt includes such
-        // nodes, in case those are the only ones we can reach.
+        // slave delay higher than our own, hidden nodes, and nodes that are excessively lagged.
+        // The second attempt includes such nodes, in case those are the only ones we can reach.
         // This loop attempts to set 'closestIndex'.
         for (int attempts = 0; attempts < 2; ++attempts) {
             for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); 
@@ -204,6 +216,8 @@ namespace repl {
         }
 
         if (closestIndex == -1) {
+            // Did not find any members to sync from
+            _syncSourceIndex = -1;
             return;
         }
         std::string msg(str::stream() << "syncing to: " << 
@@ -551,7 +565,7 @@ namespace repl {
     }
 
     // update internal state with heartbeat response, and run topology checks
-    HeartbeatResultAction TopologyCoordinatorImpl::updateHeartbeatData(
+    ReplSetHeartbeatResponse::HeartbeatResultAction TopologyCoordinatorImpl::updateHeartbeatData(
         Date_t now, const MemberHeartbeatData& newInfo, int id, const OpTime& lastOpApplied) {
         // Fill in the new heartbeat data for the appropriate member
         for (std::vector<MemberHeartbeatData>::iterator it = _hbdata.begin(); 
@@ -564,7 +578,7 @@ namespace repl {
         }
 
         // Don't bother to make any changes if we are an election candidate
-        if (_busyWithElectSelf) return None;
+        if (_busyWithElectSelf) return ReplSetHeartbeatResponse::NoAction;
 
         // ex-checkelectableset begins here
         unsigned int latestOp = _latestKnownOpTime().getSecs();
@@ -632,7 +646,7 @@ namespace repl {
                     }
                   
 */
-                    return StepDown;
+                    return ReplSetHeartbeatResponse::StepDown;
                 
             }
         }
@@ -667,7 +681,7 @@ namespace repl {
                     // XXX Eric: schedule relinquish
                     //rs->relinquish();
 
-                    return StepDown;
+                    return ReplSetHeartbeatResponse::StepDown;
                 }
 
                 _blockSync = true;
@@ -704,7 +718,7 @@ namespace repl {
                         // two other nodes think they are primary (asynchronously polled) 
                         // -- wait for things to settle down.
                         log() << "replSet info two primaries (transiently)";
-                        return None;
+                        return ReplSetHeartbeatResponse::NoAction;
                     }
                     remotePrimaryIndex = it->getConfigIndex();
                 }
@@ -713,7 +727,7 @@ namespace repl {
             if (remotePrimaryIndex != -1) {
                 // If it's the same as last time, don't do anything further.
                 if (_currentPrimaryIndex == remotePrimaryIndex) {
-                    return None;
+                    return ReplSetHeartbeatResponse::NoAction;
                 }
                 // Clear last heartbeat message on ourselves (why?)
                 _sethbmsg("");
@@ -721,7 +735,7 @@ namespace repl {
                 // insanity: this is what actually puts arbiters into ARBITER state
                 if (_selfConfig().isArbiter()) {
                     _changeMemberState(MemberState::RS_ARBITER);
-                    return None;
+                    return ReplSetHeartbeatResponse::NoAction;
                 }
 
                 // If we are also primary, this is a problem.  Determine who should step down.
@@ -735,18 +749,18 @@ namespace repl {
                         // XXX Eric: schedule a relinquish
                         //rs->relinquish();
                         // after completion, set currentprimary to remotePrimaryIndex.
-                        return StepDown;
+                        return ReplSetHeartbeatResponse::StepDown;
                     }
                     else {
                         // else, stick around
                         log() << "another PRIMARY detected but it should step down"
                             " since it was elected earlier than me";
-                        return None;
+                        return ReplSetHeartbeatResponse::NoAction;
                     }
                 }
 
                 _currentPrimaryIndex = remotePrimaryIndex;
-                return None;
+                return ReplSetHeartbeatResponse::NoAction;
             }
             /* didn't find anyone who is currently primary */
         }
@@ -761,11 +775,11 @@ namespace repl {
                 log() << "can't see a majority of the set, relinquishing primary";
                 // XXX Eric: schedule a relinquish
                 //rs->relinquish();
-                return StepDown;
+                return ReplSetHeartbeatResponse::StepDown;
 
             }
 
-            return None;
+            return ReplSetHeartbeatResponse::NoAction;
         }
 
         // At this point, there is no primary anywhere.  Check to see if we should become an
@@ -776,7 +790,7 @@ namespace repl {
             && (_stepDownUntil <= now)        // stepDown timer has expired
             && (_memberState == MemberState::RS_SECONDARY)) {
             OCCASIONALLY log() << "replSet I don't see a primary and I can't elect myself";
-            return None;
+            return ReplSetHeartbeatResponse::NoAction;
         }
 
         // If we can't see a majority, can't become a candidate.
@@ -788,21 +802,21 @@ namespace repl {
             if( last + 60 > now ) ll++;
             LOG(ll) << "replSet can't see a majority, will not try to elect self";
             last = now;
-            return None;
+            return ReplSetHeartbeatResponse::NoAction;
         }
 
         // If we can't elect ourselves due to the current electable set;
         // we are in the set if we are within 10 seconds of the latest known op (via heartbeats)
         if (!(_electableSet.find(_selfConfig().getId()) != _electableSet.end())) {
             // we are too far behind to become primary
-            return None;
+            return ReplSetHeartbeatResponse::NoAction;
         }
 
         // All checks passed, become a candidate and start election proceedings.
 
         // don't try to do further elections & such while we are already working on one.
         _busyWithElectSelf = true; 
-        return StartElection;
+        return ReplSetHeartbeatResponse::StartElection;
 
     // XXX: schedule an election
 /*
@@ -821,7 +835,7 @@ namespace repl {
 
 */
         _busyWithElectSelf = false;
-        return None;
+        return ReplSetHeartbeatResponse::NoAction;
     }
 
     bool TopologyCoordinatorImpl::_shouldRelinquish() const {
