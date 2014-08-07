@@ -32,20 +32,29 @@
 #pragma once
 
 #include <list>
+#include <map>
 #include <string>
 
+#include <boost/optional.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
+#include <rocksdb/status.h>
+
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/string_map.h"
 
 namespace rocksdb {
     class ColumnFamilyHandle;
+    struct ColumnFamilyDescriptor;
     struct ColumnFamilyOptions;
     class DB;
+    class Comparator;
+    struct Options;
+    struct ReadOptions;
 }
 
 namespace mongo {
@@ -82,10 +91,16 @@ namespace mongo {
                                        bool preserveClonedFilesOnFailure = false,
                                        bool backupOriginalFiles = false );
 
+        virtual void cleanShutdown(OperationContext* txn);
+
+        virtual Status closeDatabase( OperationContext* txn, const StringData& db );
+
+        virtual Status dropDatabase( OperationContext* txn, const StringData& db );
+
         // rocks specific api
 
-        rocksdb::DB* getDB() { return _db; }
-        const rocksdb::DB* getDB() const { return _db; }
+        rocksdb::DB* getDB() { return _db.get(); }
+        const rocksdb::DB* getDB() const { return _db.get(); }
 
         void getCollectionNamespaces( const StringData& dbName, std::list<std::string>* out ) const;
 
@@ -93,35 +108,101 @@ namespace mongo {
                                  const StringData& ns,
                                  const CollectionOptions& options );
 
-        Status dropCollection( OperationContext* opCtx,
-                               const StringData& ns );
+        Status dropCollection( OperationContext* opCtx, const StringData& ns );
 
-        // will create if doesn't exist
-        // collection has to exist first though
-        rocksdb::ColumnFamilyHandle* getIndexColumnFamily( const StringData& ns,
-                                                           const StringData& indexName );
+        /**
+         * Will create if doesn't exist. The collection has to exist first, though.
+         * The ordering argument is only used if the column family does not exist. If the
+         * column family does not exist, then ordering must be a non-empty optional, containing
+         * the Ordering for the index.
+         */
+        rocksdb::ColumnFamilyHandle* getIndexColumnFamily(
+                              const StringData& ns,
+                              const StringData& indexName,
+                              const boost::optional<Ordering> order = boost::none );
+        /**
+         * Completely removes a column family. Input pointer is invalid after calling
+         */
+        void removeColumnFamily( rocksdb::ColumnFamilyHandle** cfh,
+                                 const StringData& indexName,
+                                 const StringData& ns );
+
+        /**
+         * Returns a ReadOptions object that uses the snapshot contained in opCtx
+         */
+        static rocksdb::ReadOptions readOptionsWithSnapshot( OperationContext* opCtx );
 
         struct Entry {
             boost::scoped_ptr<rocksdb::ColumnFamilyHandle> cfHandle;
+            boost::scoped_ptr<rocksdb::ColumnFamilyHandle> metaCfHandle;
             boost::scoped_ptr<RocksCollectionCatalogEntry> collectionEntry;
             boost::scoped_ptr<RocksRecordStore> recordStore;
-            StringMap< boost::shared_ptr<rocksdb::ColumnFamilyHandle> > indexNameToCF;
+            // These ColumnFamilyHandles must be deleted by removeIndex
+            StringMap<boost::shared_ptr<rocksdb::ColumnFamilyHandle>> indexNameToCF;
+            StringMap<boost::shared_ptr<const rocksdb::Comparator>> indexNameToComparator;
         };
 
         Entry* getEntry( const StringData& ns );
         const Entry* getEntry( const StringData& ns ) const;
 
-    private:
+        typedef std::vector<rocksdb::ColumnFamilyDescriptor> CfdVector;
 
+        static rocksdb::Options dbOptions();
+
+    private:
         rocksdb::ColumnFamilyOptions _collectionOptions() const;
         rocksdb::ColumnFamilyOptions _indexOptions() const;
 
         std::string _path;
-        rocksdb::DB* _db;
+        boost::scoped_ptr<rocksdb::DB> _db;
+        boost::scoped_ptr<rocksdb::Comparator> _collectionComparator;
 
-        typedef StringMap< boost::shared_ptr<Entry> > Map;
-        mutable boost::mutex _mapLock;
-        Map _map;
+        typedef StringMap< boost::shared_ptr<Entry> > EntryMap;
+        mutable boost::mutex _entryMapMutex;
+        EntryMap _entryMap;
 
+        // private methods that should usually only be called from the RocksEngine constructor
+
+        // RocksDB necessitates opening a default column family. This method exists to identify
+        // that column family so that it can be ignored.
+        bool _isDefaultFamily( const string& name );
+
+        // See larger comment in .cpp for why this is necessary
+        void _createNonIndexCatalogEntries( const std::vector<std::string>& families );
+
+        /**
+         * Return a vector containing the name of every column family in the database
+         */
+        std::vector<std::string> _listFamilyNames( std::string filepath );
+
+        /**
+         * @param namespaces a vector containing all the namespaces in this database.
+         * @param metaDataCfds a vector of the column family descriptors for every column family
+         * in the database representing metadata.
+         */
+        std::map<std::string, Ordering> _createIndexOrderings(
+                const std::vector<string>& namespaces,
+                const std::string& filepath );
+
+        /**
+         * @param namespaces a vector containing all the namespaces in this database
+         */
+        CfdVector _createCfds ( const std::vector<std::string>& namespaces,
+                                const std::map<std::string, Ordering>& indexOrderings );
+
+        /**
+         * Create a complete Entry object in _entryMap for every ColumnFamilyDescriptor. Assumes
+         * that if the collectionEntry field should be initialized, that is already has been prior
+         * to this function call.
+         *
+         * @param families A vector of column family descriptors for every column family in the
+         * database
+         * @param handles A vector of column family handles for every column family in the
+         * database
+         */
+        void _createEntries( const CfdVector& families,
+                             const std::vector<rocksdb::ColumnFamilyHandle*> handles );
     };
+
+    Status toMongoStatus( rocksdb::Status s );
 }

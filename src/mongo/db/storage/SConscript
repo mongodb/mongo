@@ -1,0 +1,9 @@
+Import("env")
+
+env.Library(
+    target='index_entry_comparison',
+    source=[
+        'index_entry_comparison.cpp',
+        ],
+    LIBDEPS=[]
+    )
