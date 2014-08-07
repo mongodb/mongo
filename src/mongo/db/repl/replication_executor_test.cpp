@@ -445,6 +445,9 @@ namespace {
                                                                     cbHandle1);
         ASSERT_TRUE(cbs.end() != foundHandle);
         ASSERT_TRUE(cbHandle1 == *foundHandle);
+        boost::thread executorThread(stdx::bind(&ReplicationExecutor::run, &executor));
+        executor.shutdown();
+        executorThread.join();
     }
 }  // namespace
 }  // namespace repl

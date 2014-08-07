@@ -49,12 +49,14 @@ namespace {
         _networkInterface(netInterface),
         _totalEventWaiters(0),
         _inShutdown(false),
+        _networkWorkers(threadpool::ThreadPool::DoNotStartThreadsTag()),
         _nextId(0) {
     }
 
     ReplicationExecutor::~ReplicationExecutor() {}
 
     void ReplicationExecutor::run() {
+        _networkWorkers.startThreads();
         std::pair<WorkItem, CallbackHandle> work;
         while ((work = getWork()).first.callback) {
             {
