@@ -6,9 +6,12 @@ N = 1000;
 
 function pop(){
     t.drop();
+    var arr = [];
     for ( var i=0; i<N; i++ ){
-        t.save( { x : 1 , tags : [ "a" , "b" , "c" ] } );
+        arr.push( { x : 1 , tags : [ "a" , "b" , "c" ] } );
     }
+    t.insert( arr );
+    assert.eq( t.count(), N );
 }
 
 function del(){
