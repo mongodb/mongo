@@ -80,7 +80,7 @@ A visualization tool to see the performance over the course of the
 \c wtperf run can be found in \c tools/wtperf_stats.py.
 
 The following example shows how to run the \c large-lsm.wtperf
-configuration to a subdirectory of \c build_posix called \c WT_TEST with
+configuration to a subdirectory of \c build_posix called \c WTPERF_RUN with
 monitoring enabled, and then generate a graph.  This example assumes you
 have all the necessary tools already installed to build WiredTiger,
 Python and python-nvd3.
@@ -88,7 +88,7 @@ Python and python-nvd3.
 @code
 cd $WIREDTIGER_SOURCE
 ./configure && make
-mkdir WTPERF_RUN && ./bench/wtperf/wtperf -h WTPERF_SAMPLE -O ./bench/wtperf/runners/large-lsm.wtperf
+mkdir WTPERF_RUN && ./bench/wtperf/wtperf -h WTPERF_RUN -O ./bench/wtperf/runners/large-lsm.wtperf
 cd WTPERF_RUN; python ../tools/wtperf_stats.py monitor
 @endcode
 
