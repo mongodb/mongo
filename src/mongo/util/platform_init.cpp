@@ -26,7 +26,10 @@
 *    then also delete it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #ifdef _WIN32
+#include <mmsystem.h>
 #include <crtdbg.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -37,7 +40,6 @@
 #include "mongo/util/stacktrace.h"
 
 #ifdef _WIN32
-#include <mmsystem.h>
 
 namespace mongo {
 
