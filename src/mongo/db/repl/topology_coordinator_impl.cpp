@@ -1018,7 +1018,7 @@ namespace repl {
         sort(membersOut.begin(), membersOut.end());
 
         response->append("set", _currentConfig.getReplSetName());
-        response->appendTimeT("date", now);
+        response->append("date", now);
         response->append("myState", myState.s);
 
         // Add sync source info
