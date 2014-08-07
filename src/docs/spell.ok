@@ -72,6 +72,7 @@ WiredTigerCheckpoint
 WiredTigerTestCase
 Za
 aR
+abstime
 ack'ed
 alloc
 allocator

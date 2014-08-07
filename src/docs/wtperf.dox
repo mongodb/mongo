@@ -60,6 +60,27 @@ threads=((count=2,inserts=1),(count=2,inserts=1,reads=1,updates=1))
 Example \c wtperf configuration files can be found in the
 \c bench/wtperf/runners/ directory.
 
+There are also a number of command line arguments that can be passed
+to \c wtperf:
+@par <code>-C config</code>
+Specify configuration strings for the ::wiredtiger_open function.
+This argument is additive to the \c conn_config parameter in the
+configuration file.
+@par <code>-h directory</code>
+Specify a database home directory.  The default is \c ./WT_TEST.
+@par <code>-m monitor_directory</code>
+Specify a directory for all monitoring related files.
+The default is the database home directory.
+@par <code>-O config_file</code>
+Specify the configuration file to run.
+@par <code>-o config</code>
+Specify configuration strings for the \c wtperf program.
+This argument will override settings in the configuration file.
+@par <code>-T config</code>
+Specify configuration strings for the WT_SESSION::create function.
+This argument is additive to the \c table_config parameter in the
+configuration file.
+
 @section monitor Monitoring wtperf performance
 
 In addition to testing a particular configuration, \c wtperf can monitor
@@ -93,7 +114,17 @@ cd WTPERF_RUN; python ../tools/wtperf_stats.py monitor
 @endcode
 
 The python tool creates a file named \c wtperf_stats.html in the current
-working directory.  For example, the file will have content like this:
+working directory.  You can open the generated HTML document in your browser
+and see the generated statistics. The keys in the graph are clickable,
+including the graph included on this page.  Double clicking on one
+of the keys will show only that item.  Single clicking will
+enable or disable a particular item.
+
+The script as a few optional arguments.  For example, <code> -o file </code>
+or <code> --output file </code> to redirect the HTML output to another filename,
+and \c --abstime to display time on the X-axis in absolute time.
+
+For example, the file will have content like this:
 
 \htmlinclude wtperf-sample.html
 
