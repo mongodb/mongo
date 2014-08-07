@@ -738,25 +738,9 @@ namespace {
     void sleepsecs(int s) {
         Sleep(s*1000);
     }
-
-    extern "C" unsigned int __stdcall timeBeginPeriod( unsigned int ms );
-    extern "C" unsigned int __stdcall timeEndPeriod( unsigned int ms );
-    // Notice bellow the arbitrary nature of 50ms set as the "minimum" timer resolution
-    // There seems to be no complete agreement on what *is* the default timer resolution in Windows.
-    // To be on the "safe side" let's use 50ms
-    static int isBelowWindowsMinResolution(long long s) {
-        return (s > 0 && s < 50);
-    }
-    
     void sleepmillis(long long s) {
         fassert(16228, s <= 0xffffffff );
-        // When our waiting period falls below Windows min resolution, let's set resolution
-        // to s ms. Note that this change may affect all kernel scheduler thread operations.
-        // Apparently this changes the Windows kernel "quantum" length
-        // see http://msdn.microsoft.com/en-us/library/windows/desktop/dd757624(v=vs.85).aspx
-        if(isBelowWindowsMinResolution(s)) timeBeginPeriod(s);
         Sleep((DWORD) s);
-        if(isBelowWindowsMinResolution(s)) timeEndPeriod(s);
     }
     void sleepmicros(long long s) {
         if ( s <= 0 )
