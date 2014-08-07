@@ -43,8 +43,6 @@ namespace mongo {
           _workingSet(workingSet),
           _collection(collection),
           _searchState(SearchState_Buffering),
-          _limit(-1),
-          _totalReturned(0),
           _stats(stats) {
 
         // Ensure we have specific distance search stats unless a child class specified their
@@ -67,10 +65,6 @@ namespace mongo {
         minDistance(minDistance),
         maxDistance(maxDistance),
         inclusiveMax(inclusiveMax) {
-    }
-
-    void NearStage::setLimit(int limit) {
-        _limit = limit;
     }
 
     PlanStage::StageState NearStage::work(WorkingSetID* out) {
@@ -253,15 +247,6 @@ namespace mongo {
 
     PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
 
-        if (_limit >= 0 && _totalReturned >= _limit) {
-
-            getNearStats()->intervalStats.push_back(*_nextIntervalStats);
-            _nextIntervalStats.reset();
-
-            _searchState = SearchState_Finished;
-            return PlanStage::IS_EOF;
-        }
-
         if (_resultBuffer.empty()) {
 
             getNearStats()->intervalStats.push_back(*_nextIntervalStats);
@@ -273,7 +258,6 @@ namespace mongo {
 
         *toReturn = _resultBuffer.top().resultID;
         _resultBuffer.pop();
-        ++_totalReturned;
         return PlanStage::ADVANCED;
     }
 

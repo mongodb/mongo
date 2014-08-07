@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/background.h"
 
 /**
@@ -76,7 +77,7 @@ namespace mongo {
     private:
         const BSONObj _index;
         std::string _name; // name of this builder, not related to the index
-        static AtomicUInt _indexBuildCount;
+        static AtomicUInt32 _indexBuildCount;
     };
 
 }

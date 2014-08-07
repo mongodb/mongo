@@ -70,6 +70,10 @@ namespace mongo {
         return getCurOp()->getNS();
     }
 
+    bool OperationContextImpl::isGod() const {
+        return cc().isGod();
+    }
+
     Client* OperationContextImpl::getClient() const {
         return &cc();
     }
@@ -142,7 +146,7 @@ namespace mongo {
         MONGO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
             if (opShouldFail(c, scopedFailPoint.getData())) {
                 log() << "set pending kill on " << (c.curop()->parent() ? "nested" : "top-level")
-                      << " op " << c.curop()->opNum().get() << ", for checkForInterruptFail";
+                      << " op " << c.curop()->opNum() << ", for checkForInterruptFail";
                 c.curop()->kill();
             }
         }
@@ -167,7 +171,7 @@ namespace mongo {
         MONGO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
             if (opShouldFail(c, scopedFailPoint.getData())) {
                 log() << "set pending kill on " << (c.curop()->parent() ? "nested" : "top-level")
-                      << " op " << c.curop()->opNum().get() << ", for checkForInterruptFail";
+                      << " op " << c.curop()->opNum() << ", for checkForInterruptFail";
                 c.curop()->kill();
             }
         }

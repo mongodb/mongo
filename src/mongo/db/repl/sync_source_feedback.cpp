@@ -94,11 +94,14 @@ namespace repl {
     }
 
     bool SyncSourceFeedback::replHandshake(OperationContext* txn) {
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        if (replCoord->getCurrentMemberState().primary()) {
+            // primary has no one to handshake to
+            return true;
+        }
         // construct a vector of handshake obj for us as well as all chained members
         std::vector<BSONObj> handshakeObjs;
-        getGlobalReplicationCoordinator()->prepareReplSetUpdatePositionCommandHandshakes(
-                txn,
-                &handshakeObjs);
+        replCoord->prepareReplSetUpdatePositionCommandHandshakes(txn, &handshakeObjs);
         LOG(1) << "handshaking upstream updater";
         for (std::vector<BSONObj>::iterator it = handshakeObjs.begin();
                 it != handshakeObjs.end();

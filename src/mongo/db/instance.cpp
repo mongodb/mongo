@@ -34,7 +34,6 @@
 #include <fstream>
 
 #include "mongo/base/status.h"
-#include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -70,6 +69,7 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
@@ -334,7 +334,7 @@ namespace mongo {
         DbMessage dbmsg(m);
 
         Client& c = cc();
-        if (!c.isGod()) {
+        if (!txn->isGod()) {
             c.getAuthorizationSession()->startRequest(txn);
 
             // We should not be holding any locks at this point
@@ -543,30 +543,6 @@ namespace mongo {
             LOG( found == n ? 1 : 0 ) << "killcursors: found " << found << " of " << n << endl;
         }
 
-    }
-
-    /*static*/ 
-    void Database::closeDatabase(OperationContext* txn, const StringData& db) {
-        // XXX? - Do we need to close database under global lock or just DB-lock is sufficient ?
-        invariant(txn->lockState()->isW());
-
-        Database* database = dbHolder().get(txn, db);
-        if ( !database )
-            return;
-
-        repl::oplogCheckCloseDatabase(txn, database); // oplog caches some things, dirty its caches
-
-        if( BackgroundOperation::inProgForDb(db) ) {
-            log() << "warning: bg op in prog during close db? " << db << endl;
-        }
-
-        // Before the files are closed, flush any potentially outstanding changes, which might
-        // reference this database. Otherwise we will assert when subsequent commit if needed
-        // is called and it happens to have write intents for the removed files.
-        txn->recoveryUnit()->commitIfNeeded(true);
-
-        dbHolder().erase(txn, db);
-        delete database; // closes files
     }
 
     void receivedUpdate(OperationContext* txn, Message& m, CurOp& op) {

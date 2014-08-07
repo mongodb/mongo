@@ -31,8 +31,8 @@
 
 #pragma once
 
-#include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/client.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/progress_meter.h"
@@ -212,7 +212,7 @@ namespace mongo {
             return _dbprofile >= 2 || ms >= serverGlobalParams.slowMS;
         }
 
-        AtomicUInt opNum() const { return _opNum; }
+        unsigned int opNum() const { return _opNum; }
 
         /** if this op is running */
         bool active() const { return _active; }
@@ -325,7 +325,7 @@ namespace mongo {
         friend class Client;
         void _reset();
 
-        static AtomicUInt _nextOpNum;
+        static AtomicUInt32 _nextOpNum;
         Client * _client;
         CurOp * _wrapped;
         Command * _command;
@@ -336,7 +336,7 @@ namespace mongo {
         int _op;
         bool _isCommand;
         int _dbprofile;                  // 0=off, 1=slow, 2=all
-        AtomicUInt _opNum;               // todo: simple being "unsigned" may make more sense here
+        unsigned int _opNum;
         ThreadSafeString _ns;
         HostAndPort _remote;             // CAREFUL here with thread safety
         CachedBSONObj<512> _query;       // CachedBSONObj is thread safe

@@ -55,7 +55,7 @@ namespace repl {
     const int ReplSetConfig::DEFAULT_HB_TIMEOUT = 10;
 
 namespace {
-    AtomicUInt _warnedAboutVotes = 0;
+    AtomicUInt32 _warnedAboutVotes;
 
     void assertOnlyHas(BSONObj o, const set<string>& fields) {
         BSONObj::iterator i(o);
@@ -534,7 +534,7 @@ namespace {
                     m.priority = mobj["priority"].Number();
                 if( mobj.hasElement("votes") )
                     m.votes = (unsigned) mobj["votes"].Number();
-                if (m.votes > 1 && !_warnedAboutVotes) {
+                if (m.votes > 1 && (_warnedAboutVotes.load() == 0)) {
                     log() << "\t\tWARNING: Having more than 1 vote on a single replicaset member is"
                           << startupWarningsLog;
                     log() << "\t\tdeprecated, as it causes issues with majority write concern. For"
@@ -542,7 +542,7 @@ namespace {
                     log() << "\t\tmore information, see "
                           << "http://dochub.mongodb.org/core/replica-set-votes-deprecated"
                           << startupWarningsLog;
-                    _warnedAboutVotes.set(1);
+                    _warnedAboutVotes.store(1);
                 }
                 if( mobj.hasElement("tags") ) {
                     const BSONObj &t = mobj["tags"].Obj();

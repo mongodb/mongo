@@ -154,16 +154,10 @@ namespace repl {
                                            BSONObjBuilder* resultObj);
 
         virtual Status processReplSetUpdatePosition(OperationContext* txn,
-                                                    const BSONArray& updates,
-                                                    BSONObjBuilder* resultObj);
-
-        virtual Status processReplSetUpdatePositionHandshake(const OperationContext* txn,
-                                                             const BSONObj& handshake,
-                                                             BSONObjBuilder* resultObj);
+                                                    const UpdatePositionArgs& updates);
 
         virtual Status processHandshake(const OperationContext* txn,
-                                        const OID& remoteID,
-                                        const BSONObj& handshake);
+                                        const HandshakeArgs& handshake);
 
         virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
 
@@ -205,6 +199,11 @@ namespace repl {
 
         // Struct that holds information about clients waiting for replication.
         struct WaiterInfo;
+
+        /*
+         * Returns the OpTime of the last applied operation on this node.
+         */
+        OpTime _getLastOpApplied();
 
         /*
          * Returns true if the given writeConcern is satisfied up to "optime".
@@ -264,6 +263,9 @@ namespace repl {
 
         // Set to true when we are in the process of shutting down replication.
         bool _inShutdown;
+
+        // Election ID of the last election that resulted in this node becoming primary.
+        OID _electionID;
 
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
         boost::scoped_ptr<TopologyCoordinator> _topCoord;

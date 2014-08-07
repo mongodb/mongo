@@ -754,7 +754,6 @@ mongosLibraryFiles = [
     "s/s_only.cpp",
     "s/balance.cpp",
     "s/balancer_policy.cpp",
-    "s/writeback_listener.cpp",
     "s/version_manager.cpp",
     "s/version_mongos.cpp",
     "s/mongos_persistence_stubs.cpp",
@@ -939,8 +938,14 @@ serveronlyEnv.Library("serveronly", serverOnlyFiles,
 
 env.Library("message_server_port", "util/net/message_server_port.cpp")
 
-env.Library("signal_handlers", "util/signal_handlers.cpp",
+env.Library("signal_handlers_synchronous",
+            ['util/signal_handlers_synchronous.cpp',],
             LIBDEPS=["stacktrace", "foundation"]
+            )
+
+env.Library("signal_handlers",
+            ["util/signal_handlers.cpp",],
+            LIBDEPS=["foundation", "signal_handlers_synchronous"]
             )
 
 # These files go into mongos and mongod only, not into the shell or any tools.

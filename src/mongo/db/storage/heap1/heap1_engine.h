@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <set>
 #include <string>
 #include <map>
 
@@ -44,7 +43,7 @@ namespace mongo {
 
     class Heap1Engine : public StorageEngine {
     public:
-        virtual ~Heap1Engine() {}
+        virtual ~Heap1Engine();
 
         virtual RecoveryUnit* newRecoveryUnit( OperationContext* opCtx );
 
@@ -52,6 +51,10 @@ namespace mongo {
 
         virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                const StringData& db );
+
+        virtual Status closeDatabase(OperationContext* txn, const StringData& db );
+
+        virtual Status dropDatabase(OperationContext* txn, const StringData& db );
 
         /**
          * @return number of files flushed
@@ -65,7 +68,7 @@ namespace mongo {
 
     private:
         mutable boost::mutex _dbLock;
-        typedef std::set<std::string> DBMap;
+        typedef std::map<std::string,Heap1DatabaseCatalogEntry*> DBMap;
         DBMap _dbs;
     };
 

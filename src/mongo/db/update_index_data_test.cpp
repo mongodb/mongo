@@ -43,12 +43,17 @@ namespace mongo {
 
         ASSERT_FALSE( a.mightBeIndexed( "b" ) );
         ASSERT_FALSE( a.mightBeIndexed( "a.c" ) );
+
+        a.clear();
+        ASSERT_FALSE( a.mightBeIndexed( "a.b" ) );
     }
 
     TEST( UpdateIndexDataTest, Simple2 ) {
         UpdateIndexData a;
         a.addPath( "ab" );
         ASSERT_FALSE( a.mightBeIndexed( "a" ) );
+        a.clear();
+        ASSERT_FALSE( a.mightBeIndexed( "ab" ) );
     }
 
     TEST( UpdateIndexDataTest, Component1 ) {
@@ -61,9 +66,19 @@ namespace mongo {
         ASSERT_TRUE( a.mightBeIndexed( "b.a.c" ) );
         ASSERT_FALSE( a.mightBeIndexed( "b.c" ) );
         ASSERT_FALSE( a.mightBeIndexed( "ab" ) );
+        a.clear();
+        ASSERT_FALSE( a.mightBeIndexed( "a" ) );
     }
 
     TEST( UpdateIndexDataTest, AllPathsIndexed1 ) {
+        UpdateIndexData a;
+        a.allPathsIndexed();
+        ASSERT_TRUE( a.mightBeIndexed( "a" ) );
+        a.clear();
+        ASSERT_FALSE( a.mightBeIndexed( "a" ) );
+    }
+
+    TEST( UpdateIndexDataTest, AllPathsIndexed2 ) {
         UpdateIndexData a;
         a.allPathsIndexed();
         ASSERT_TRUE( a.mightBeIndexed( "a" ) );
@@ -71,6 +86,8 @@ namespace mongo {
         a.addPathComponent( "a" );
         ASSERT_TRUE( a.mightBeIndexed( "a" ) );
         ASSERT_TRUE( a.mightBeIndexed( "b" ) );
+        a.clear();
+        ASSERT_FALSE( a.mightBeIndexed( "a" ) );
     }
 
     TEST( UpdateIndexDataTest, getCanonicalIndexField1 ) {

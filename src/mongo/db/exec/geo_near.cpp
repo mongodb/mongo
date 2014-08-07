@@ -634,24 +634,11 @@ namespace mongo {
         // IndexScanWithMatch owns the matcher
         IndexScan* scan = new IndexScanWithMatch(txn, scanParams, workingSet, keyMatcher);
         
-        MatchExpression* docMatcher = 
-            _nearParams.fullFilter ? _nearParams.fullFilter->shallowClone() : NULL;
+        MatchExpression* docMatcher = NULL;
         
         // FLAT searches need to add an additional annulus $within matcher, see above
         if (FLAT == queryCRS) {
-
-            MatchExpression* withinMatcher =
-                new TwoDPtInAnnulusExpression(_fullBounds, twoDFieldName);
-            
-            if (docMatcher) {
-                AndMatchExpression* andMatcher = new AndMatchExpression();
-                andMatcher->add(docMatcher);
-                andMatcher->add(withinMatcher);
-                docMatcher = andMatcher;
-            }
-            else {
-                docMatcher = withinMatcher;
-            }
+            docMatcher = new TwoDPtInAnnulusExpression(_fullBounds, twoDFieldName);
         }
         
         // FetchStage owns index scan

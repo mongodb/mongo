@@ -51,12 +51,16 @@ namespace mongo {
         s << ot.toString();
         return s;
     }
-    StringBuilder& operator<< (StringBuilder& s, const OpTime& ot) {
-        return (s << ot.toString());
+    // So that you can ASSERT_EQUALS two Date_ts
+    std::ostream& operator<<( std::ostream &s, const Date_t &t ) {
+        s << t.toString();
+        return s;
     }
 
 namespace repl {
 namespace {
+    
+    const Seconds zeroSecs(0);
 
     TEST(ReplicationCoordinator, StartupShutdown) {
         ReplSettings settings;
@@ -70,7 +74,8 @@ namespace {
                                 "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
                                                              "_id" << 0 )))));
         coordinator.setCurrentReplicaSetConfig(config, 0);
-        coordinator.startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
+        coordinator.startReplication(new TopologyCoordinatorImpl(zeroSecs), 
+                                     new NetworkInterfaceMock);
         coordinator.shutdown();
     }
 
@@ -325,7 +330,8 @@ namespace {
                                 "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
                                                              "_id" << 0 )))));
         coordinator.setCurrentReplicaSetConfig(config, 0);
-        coordinator.startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
+        coordinator.startReplication(new TopologyCoordinatorImpl(zeroSecs), 
+                                     new NetworkInterfaceMock);
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(&coordinator, &txn);
 
@@ -424,25 +430,29 @@ namespace {
         ASSERT_OK(rsConfig.initialize(configObj));
         coordinator.reset(new ReplicationCoordinatorImpl(
                 settings, new ReplicationCoordinatorExternalStateMock));
-        coordinator->startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
+        coordinator->startReplication(new TopologyCoordinatorImpl(zeroSecs), 
+                                      new NetworkInterfaceMock);
         coordinator->setCurrentReplicaSetConfig(rsConfig, 1);
 
         OID rid1 = OID::gen();
         OID rid2 = OID::gen();
         OID rid3 = OID::gen();
-        BSONObj handshake1 = BSON("handshake" << rid1 <<
-                                  "member" << 0 <<
-                                  "config" << BSON("_id" << 0 << "host" << "test1:1234"));
-        BSONObj handshake2 = BSON("handshake" << rid2 <<
-                                  "member" << 1 <<
-                                  "config" << BSON("_id" << 1 << "host" << "test2:1234"));
-        BSONObj handshake3 = BSON("handshake" << rid3 <<
-                                  "member" << 2 <<
-                                  "config" << BSON("_id" << 2 << "host" << "test3:1234"));
+        HandshakeArgs handshake1;
+        handshake1.initialize(BSON("handshake" << rid1 <<
+                                   "member" << 0 <<
+                                   "config" << BSON("_id" << 0 << "host" << "test1:1234")));
+        HandshakeArgs handshake2;
+        handshake2.initialize(BSON("handshake" << rid2 <<
+                                   "member" << 1 <<
+                                   "config" << BSON("_id" << 1 << "host" << "test2:1234")));
+        HandshakeArgs handshake3;
+        handshake3.initialize(BSON("handshake" << rid3 <<
+                                   "member" << 2 <<
+                                   "config" << BSON("_id" << 2 << "host" << "test3:1234")));
         OperationContextNoop txn;
-        ASSERT_OK(coordinator->processHandshake(&txn, rid1, handshake1));
-        ASSERT_OK(coordinator->processHandshake(&txn, rid2, handshake2));
-        ASSERT_OK(coordinator->processHandshake(&txn, rid3, handshake3));
+        ASSERT_OK(coordinator->processHandshake(&txn, handshake1));
+        ASSERT_OK(coordinator->processHandshake(&txn, handshake2));
+        ASSERT_OK(coordinator->processHandshake(&txn, handshake3));
         OpTime optime1(1, 1);
         OpTime optime2(1, 2);
         OpTime optime3(2, 1);
@@ -488,7 +498,8 @@ namespace {
         ASSERT_OK(rsConfig.initialize(configObj));
         coordinator.reset(new ReplicationCoordinatorImpl(
                 settings, new ReplicationCoordinatorExternalStateMock));
-        coordinator->startReplication(new TopologyCoordinatorImpl(0), new NetworkInterfaceMock);
+        coordinator->startReplication(new TopologyCoordinatorImpl(zeroSecs), 
+                                      new NetworkInterfaceMock);
         coordinator->setCurrentReplicaSetConfig(rsConfig, 1);
 
         // Test generating basic handshake with no chaining
@@ -507,14 +518,16 @@ namespace {
         // Have other nodes handshake us and make sure we process it right.
         OID slave1RID = OID::gen();
         OID slave2RID = OID::gen();
-        BSONObj slave1Handshake = BSON("handshake" << slave1RID <<
-                                       "member" << 0 <<
-                                       "config" << BSON("_id" << 0 << "host" << "test1:1234"));
-        BSONObj slave2Handshake = BSON("handshake" << slave2RID <<
-                                       "member" << 2 <<
-                                       "config" << BSON("_id" << 2 << "host" << "test2:1234"));
-        ASSERT_OK(coordinator->processHandshake(&txn, slave1RID, slave1Handshake));
-        ASSERT_OK(coordinator->processHandshake(&txn, slave2RID, slave2Handshake));
+        HandshakeArgs slave1Handshake;
+        slave1Handshake.initialize(BSON("handshake" << slave1RID <<
+                                        "member" << 0 <<
+                                        "config" << BSON("_id" << 0 << "host" << "test1:1234")));
+        HandshakeArgs slave2Handshake;
+        slave2Handshake.initialize(BSON("handshake" << slave2RID <<
+                                        "member" << 2 <<
+                                        "config" << BSON("_id" << 2 << "host" << "test2:1234")));
+        ASSERT_OK(coordinator->processHandshake(&txn, slave1Handshake));
+        ASSERT_OK(coordinator->processHandshake(&txn, slave2Handshake));
 
         coordinator->prepareReplSetUpdatePositionCommandHandshakes(&txn, &handshakes);
         ASSERT_EQUALS(3U, handshakes.size());
@@ -540,7 +553,137 @@ namespace {
         ASSERT_EQUALS(3U, rids.size()); // Make sure we saw all 3 nodes
     }
 
-    // TODO(spencer): Unit test processReplSetGetStatus
+    TEST_F(ReplicationCoordinatorTestWithShutdown, TestReplSetGetStatus) {
+        // This test starts by configuring a ReplicationCoordinator as a member of a 4 node replica
+        // set, with each node in a different state.
+        // The first node is DOWN, as if we tried heartbeating them and it failed in some way.
+        // The second node is in state SECONDARY, as if we've received a valid heartbeat from them.
+        // The third node is in state UNKNOWN, as if we've not yet had any heartbeating activity
+        // with them yet.  The fourth node is PRIMARY and corresponds to ourself, which gets its
+        // information for replSetGetStatus from a different source than the nodes that aren't
+        // ourself.  After this setup, we call replSetGetStatus and make sure that the fields
+        // returned for each member match our expectations.
+        ReplSettings settings;
+        settings.replSet = "mySet:/test1:1234,test2:1234,test3:1234";
+        BSONObj configObj =
+                BSON("_id" << "mySet" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test0:1234") <<
+                                             BSON("_id" << 1 << "host" << "test1:1234") <<
+                                             BSON("_id" << 2 << "host" << "test2:1234") <<
+                                             BSON("_id" << 3 << "host" << "test3:1234")));
+        ReplicaSetConfig rsConfig;
+        ASSERT_OK(rsConfig.initialize(configObj));
+        coordinator.reset(new ReplicationCoordinatorImpl(
+                settings, new ReplicationCoordinatorExternalStateMock));
+        TopologyCoordinatorImpl* topCoord = new TopologyCoordinatorImpl(zeroSecs);
+        coordinator->startReplication(topCoord, new NetworkInterfaceMock);
+        Date_t startupTime(curTimeMillis64());
+        OpTime electionTime(1, 2);
+        OpTime oplogProgress(3, 4);
+        ReplicationExecutor::CallbackData cbd(NULL,
+                                              ReplicationExecutor::CallbackHandle(),
+                                              Status::OK());
+        topCoord->updateConfig(cbd, rsConfig, 3, startupTime, oplogProgress);
+
+        // Now that the replica set is setup, put the members into the states we want them in.
+        MemberHeartbeatData member1hb(0);
+        member1hb.setDownValues(startupTime, "");
+        topCoord->updateHeartbeatData(startupTime, member1hb, 0, oplogProgress);
+        MemberHeartbeatData member2hb(1);
+        member2hb.setUpValues(
+                startupTime, MemberState::RS_SECONDARY, electionTime, oplogProgress, "", "READY");
+        topCoord->updateHeartbeatData(startupTime, member2hb, 1, oplogProgress);
+        sleepsecs(1); // so uptime will be non-zero
+
+        topCoord->_changeMemberState(MemberState::RS_PRIMARY);
+        OperationContextNoop txn;
+        coordinator->setLastOptime(&txn, coordinator->getMyRID(&txn), oplogProgress);
+
+        // Now node 0 is down, node 1 is up, and for node 2 we have no heartbeat data yet.
+        BSONObjBuilder statusBuilder;
+        ASSERT_OK(coordinator->processReplSetGetStatus(&statusBuilder));
+        BSONObj rsStatus = statusBuilder.obj();
+
+        // Test results for all non-self members
+        ASSERT_EQUALS("mySet", rsStatus["set"].String());
+        ASSERT_LESS_THAN(startupTime.asInt64(), rsStatus["date"].Date().asInt64());
+        std::vector<BSONElement> memberArray = rsStatus["members"].Array();
+        ASSERT_EQUALS(4U, memberArray.size());
+        BSONObj member0Status = memberArray[0].Obj();
+        BSONObj member1Status = memberArray[1].Obj();
+        BSONObj member2Status = memberArray[2].Obj();
+
+        // Test member 0, the node that's DOWN
+        ASSERT_EQUALS(0, member0Status["_id"].Int());
+        ASSERT_EQUALS("test0:1234", member0Status["name"].String());
+        ASSERT_EQUALS(0, member0Status["health"].Double());
+        ASSERT_EQUALS(MemberState::RS_DOWN, member0Status["state"].Int());
+        ASSERT_EQUALS("(not reachable/healthy)", member0Status["stateStr"].String());
+        ASSERT_EQUALS(0, member0Status["uptime"].Int());
+        ASSERT_EQUALS(OpTime(), OpTime(member0Status["optime"].timestampValue()));
+        ASSERT_EQUALS(OpTime().asDate(), member0Status["optimeDate"].Date().millis);
+        ASSERT_EQUALS(startupTime, member0Status["lastHeartbeat"].Date());
+        ASSERT_EQUALS(Date_t(), member0Status["lastHeartbeatRecv"].Date());
+
+        // Test member 1, the node that's SECONDARY
+        ASSERT_EQUALS(1, member1Status["_id"].Int());
+        ASSERT_EQUALS("test1:1234", member1Status["name"].String());
+        ASSERT_EQUALS(1, member1Status["health"].Double());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, member1Status["state"].Int());
+        ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
+                      member1Status["stateStr"].String());
+        ASSERT_LESS_THAN_OR_EQUALS(1, member1Status["uptime"].Int());
+        ASSERT_EQUALS(oplogProgress, OpTime(member1Status["optime"].timestampValue()));
+        ASSERT_EQUALS(oplogProgress.asDate(), member1Status["optimeDate"].Date().millis);
+        ASSERT_EQUALS(startupTime, member1Status["lastHeartbeat"].Date());
+        ASSERT_EQUALS(Date_t(), member1Status["lastHeartbeatRecv"].Date());
+        ASSERT_EQUALS("READY", member1Status["lastHeartbeatMessage"].String());
+
+        // Test member 2, the node that's UNKNOWN
+        ASSERT_EQUALS(2, member2Status["_id"].Int());
+        ASSERT_EQUALS("test2:1234", member2Status["name"].String());
+        ASSERT_EQUALS(-1, member2Status["health"].Double());
+        ASSERT_EQUALS(MemberState::RS_UNKNOWN, member2Status["state"].Int());
+        ASSERT_EQUALS(MemberState(MemberState::RS_UNKNOWN).toString(),
+                      member2Status["stateStr"].String());
+        ASSERT_FALSE(member2Status.hasField("uptime"));
+        ASSERT_FALSE(member2Status.hasField("optime"));
+        ASSERT_FALSE(member2Status.hasField("optimeDate"));
+        ASSERT_FALSE(member2Status.hasField("lastHearbeat"));
+        ASSERT_FALSE(member2Status.hasField("lastHearbeatRecv"));
+
+        // Now test results for ourself, the PRIMARY
+        ASSERT_EQUALS(MemberState::RS_PRIMARY, rsStatus["myState"].Int());
+        BSONObj selfStatus = memberArray[3].Obj();
+        ASSERT_TRUE(selfStatus["self"].Bool());
+        ASSERT_EQUALS(3, selfStatus["_id"].Int());
+        ASSERT_EQUALS("test3:1234", selfStatus["name"].String());
+        ASSERT_EQUALS(1, selfStatus["health"].Double());
+        ASSERT_EQUALS(MemberState::RS_PRIMARY, selfStatus["state"].Int());
+        ASSERT_EQUALS(MemberState(MemberState::RS_PRIMARY).toString(),
+                      selfStatus["stateStr"].String());
+        ASSERT_EQUALS(1, selfStatus["uptime"].Int());
+        ASSERT_EQUALS(oplogProgress, OpTime(selfStatus["optime"].timestampValue()));
+        ASSERT_EQUALS(oplogProgress.asDate(), selfStatus["optimeDate"].Date().millis);
+
+        // TODO(spencer): Test electionTime and pingMs are set properly
+    }
+
+    TEST_F(ReplicationCoordinatorTestWithShutdown, TestGetElectionId) {
+        ReplSettings settings;
+        settings.replSet = "mySet:/test1:1234,test2:1234,test3:1234";
+        coordinator.reset(new ReplicationCoordinatorImpl(
+                settings, new ReplicationCoordinatorExternalStateMock));
+        TopologyCoordinatorImpl* topCoord = new TopologyCoordinatorImpl(zeroSecs);
+        coordinator->startReplication(topCoord, new NetworkInterfaceMock);
+
+        OID electionID1 = coordinator->getElectionId();
+        topCoord->_changeMemberState(MemberState::RS_PRIMARY);
+        OID electionID2 = coordinator->getElectionId();
+        ASSERT_NOT_EQUALS(electionID1, electionID2);
+    }
+
     // TODO(spencer): Unit test replSetFreeze
 
 }  // namespace

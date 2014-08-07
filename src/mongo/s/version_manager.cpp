@@ -38,7 +38,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
-#include "mongo/s/writeback_listener.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -117,8 +116,6 @@ namespace mongo {
     extern OID serverID;
 
     bool VersionManager::initShardVersionCB( DBClientBase * conn_in, BSONObj& result ){
-
-        WriteBackListener::init( *conn_in );
 
         bool ok;
         DBClientBase* conn = NULL;
@@ -204,8 +201,6 @@ namespace mongo {
      */
     bool checkShardVersion( DBClientBase * conn_in , const string& ns , ChunkManagerPtr refManager, bool authoritative , int tryNumber ) {
         // TODO: cache, optimize, etc...
-
-        WriteBackListener::init( *conn_in );
 
         DBConfigPtr conf = grid.getDBConfig( ns );
         if ( ! conf )

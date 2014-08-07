@@ -207,11 +207,7 @@ namespace mongo {
                 return NULL;
             }
 
-            int numToReturn = node->numToReturn;
-            params.fullFilter = node->fullFilterExcludingNear.get();
-
             GeoNear2DStage* nearStage = new GeoNear2DStage(params, txn, ws, collection, twoDIndex);
-            nearStage->setLimit(numToReturn);
 
             return nearStage;
         }

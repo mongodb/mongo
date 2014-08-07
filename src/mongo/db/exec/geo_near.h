@@ -44,7 +44,7 @@ namespace mongo {
     struct GeoNearParams {
 
         GeoNearParams() :
-            filter(NULL), addPointMeta(false), addDistMeta(false), fullFilter(NULL) {
+            filter(NULL), addPointMeta(false), addDistMeta(false) {
         }
 
         // MatchExpression to apply to the index keys and fetched documents
@@ -55,9 +55,6 @@ namespace mongo {
         NearQuery nearQuery;
         bool addPointMeta;
         bool addDistMeta;
-
-        // More exclusive MatchExpression to apply to the fetched documents, if set
-        MatchExpression* fullFilter;
     };
 
     /**

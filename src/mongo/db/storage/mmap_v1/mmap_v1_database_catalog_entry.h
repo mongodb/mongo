@@ -133,12 +133,6 @@ namespace mongo {
                                        const StringData& toNS,
                                        bool stayTemp );
 
-        /**
-         * @throws DatabaseDifferCaseCode if the name is a duplicate based on
-         * case insensitive matching.
-         */
-        void _checkDuplicateUncasedNames() const;
-
         void _ensureSystemCollection_inlock( OperationContext* txn,
                                              const StringData& ns );
         void _lazyInit( OperationContext* txn );

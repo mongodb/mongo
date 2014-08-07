@@ -279,7 +279,7 @@ namespace mongo {
 
         logStartup();
         repl::getGlobalReplicationCoordinator()->startReplication(
-            new repl::TopologyCoordinatorImpl(repl::maxSyncSourceLagSecs), 
+            new repl::TopologyCoordinatorImpl(Seconds(repl::maxSyncSourceLagSecs)), 
             new repl::NetworkInterfaceImpl());
         if (serverGlobalParams.isHttpInterfaceEnabled)
             boost::thread web(stdx::bind(&webServerThread,
@@ -409,7 +409,7 @@ namespace mongo {
                     warning() << "Internal error while reading collection " << systemIndexes;
                 }
 
-                Database::closeDatabase(&txn, dbName.c_str());
+                dbHolder().close( &txn, dbName );
             }
         }
         wunit.commit();

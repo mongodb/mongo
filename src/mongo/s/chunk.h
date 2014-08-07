@@ -31,7 +31,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/util/atomic_int.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/shard.h"
@@ -137,7 +137,7 @@ namespace mongo {
          *
          * @throws UserException
          */
-        Status split( bool atMedian, size_t* resultingSplits ) const;
+        Status split(bool atMedian, size_t* resultingSplits, BSONObj* res) const;
 
         /**
          * Splits this chunk at the given key (or keys)
@@ -147,7 +147,7 @@ namespace mongo {
          *
          * @throws UserException
          */
-        Status multiSplit( const std::vector<BSONObj>& splitPoints ) const;
+        Status multiSplit(const std::vector<BSONObj>& splitPoints, BSONObj* res) const;
 
         /**
          * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
@@ -574,7 +574,7 @@ namespace mongo {
 
         friend class Chunk;
         friend class ChunkRangeManager; // only needed for CRM::assertValid()
-        static AtomicUInt NextSequenceNumber;
+        static AtomicUInt32 NextSequenceNumber;
         
         /** Just for testing */
         friend class TestableChunkManager;

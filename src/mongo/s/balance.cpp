@@ -119,7 +119,7 @@ namespace mongo {
 
                     log() << "forcing a split because migrate failed for size reasons" << endl;
 
-                    Status status = c->split( true /* atMedian */, NULL );
+                    Status status = c->split(true /* atMedian */, NULL, NULL);
                     log() << "forced split results: " << status << endl;
 
                     if ( !status.isOK() ) {
@@ -370,7 +370,7 @@ namespace mongo {
                 vector<BSONObj> splitPoints;
                 splitPoints.push_back( min );
 
-                Status status = c->multiSplit( splitPoints );
+                Status status = c->multiSplit(splitPoints, NULL);
                 if ( !status.isOK() ) {
                     error() << "split failed: " << status << endl;
                 }

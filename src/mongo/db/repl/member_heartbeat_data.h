@@ -46,9 +46,9 @@ namespace repl {
         int getConfigIndex() const { return _configIndex; }
         const MemberState& getState() const { return _state; }
         int getHealth() const { return _health; }
-        time_t getUpSince() const { return _upSince; }
-        time_t getLastHeartbeat() const { return _lastHeartbeat; }
-        time_t getLastHeartbeatRecv() const { return _lastHeartbeatRecv; }
+        Date_t getUpSince() const { return _upSince; }
+        Date_t getLastHeartbeat() const { return _lastHeartbeat; }
+        Date_t getLastHeartbeatRecv() const { return _lastHeartbeatRecv; }
         void setLastHeartbeatRecv(time_t newHeartbeatRecvTime) {
             _lastHeartbeatRecv = newHeartbeatRecvTime;
         }
@@ -80,7 +80,7 @@ namespace repl {
          * Sets values in this object from the results of a successful heartbeat command.
          * _authIssues is set to false, _health is set to 1, other values are set as specified.
          */
-        void setUpValues(time_t now,
+        void setUpValues(Date_t now,
                          MemberState state,
                          OpTime electionTime,
                          OpTime optime,
@@ -93,7 +93,7 @@ namespace repl {
          * _authIssues is set to false, _health is set to 0, _state is set to RS_DOWN, and
          * other values are set as specified.
          */
-        void setDownValues(time_t now, const std::string& heartbeatMessage);
+        void setDownValues(Date_t now, const std::string& heartbeatMessage);
 
     private:
         // This member's index into the ReplicaSetConfig
@@ -106,11 +106,11 @@ namespace repl {
         int _health;
 
         // Time of first successful heartbeat, if currently still up
-        time_t _upSince;
+        Date_t _upSince;
         // This is the last time we got a response from a heartbeat request to a given member.
-        time_t _lastHeartbeat;
+        Date_t _lastHeartbeat;
         // This is the last time we got a heartbeat request from a given member.
-        time_t _lastHeartbeatRecv;
+        Date_t _lastHeartbeatRecv;
 
         // This is the custom message corresponding to the disposition of the member
         std::string _lastHeartbeatMsg;

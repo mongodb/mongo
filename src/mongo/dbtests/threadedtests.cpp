@@ -33,7 +33,6 @@
 
 #include <boost/thread.hpp>
 
-#include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
@@ -300,36 +299,6 @@ namespace ThreadedTests {
                 LockState ls;
                 Lock::GlobalRead r(&ls);
             }
-        }
-    };
-
-    // Tested with up to 30k threads
-    class IsAtomicUIntAtomic : public ThreadedTest<> {
-        static const int iterations = 1000000;
-        AtomicUInt target;
-
-        void subthread(int) {
-            for(int i=0; i < iterations; i++) {
-                //target.x++; // verified to fail with this version
-                target++;
-            }
-        }
-        void validate() {
-            ASSERT_EQUALS(target.x , unsigned(nthreads * iterations));
-
-            AtomicUInt u;
-            ASSERT_EQUALS(0u, u);
-            ASSERT_EQUALS(0u, u++);
-            ASSERT_EQUALS(2u, ++u);
-            ASSERT_EQUALS(2u, u--);
-            ASSERT_EQUALS(0u, --u);
-            ASSERT_EQUALS(0u, u);
-            
-            u++;
-            ASSERT( u > 0 );
-
-            u--;
-            ASSERT( ! ( u > 0 ) );
         }
     };
 
@@ -1034,7 +1003,6 @@ namespace ThreadedTests {
             add< List1Test >();
             add< List1Test2 >();
 
-            add< IsAtomicUIntAtomic >();
             add< IsAtomicWordAtomic<AtomicUInt32> >();
             add< IsAtomicWordAtomic<AtomicUInt64> >();
             add< MVarTest >();

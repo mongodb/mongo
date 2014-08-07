@@ -30,10 +30,9 @@
 
 
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/heap1/heap1_database_catalog_entry.h"
 #include "mongo/db/storage/heap1/heap1_recovery_unit.h"
-#include "mongo/db/structure/record_store.h"
 
 #include "mongo/unittest/unittest.h"
 
@@ -41,59 +40,10 @@ using namespace mongo;
 
 namespace {
 
-    class MyOperationContext : public OperationContext {
+    class MyOperationContext : public OperationContextNoop {
     public:
-        MyOperationContext() {
-            _recoveryUnit.reset( new Heap1RecoveryUnit() );
+        MyOperationContext() : OperationContextNoop( new Heap1RecoveryUnit() ) {
         }
-
-        virtual ~MyOperationContext() { }
-
-        Client* getClient() const {
-            invariant(false);
-            return NULL;
-        }
-
-        CurOp* getCurOp() const {
-            invariant(false);
-            return NULL;
-        }
-
-        virtual RecoveryUnit* recoveryUnit() const {
-            return _recoveryUnit.get();
-        }
-
-        virtual LockState* lockState() const {
-            // TODO: Eventually, this should return an actual LockState object. For now,
-            //       LockState depends on the whole world and is not necessary for testing.
-            return NULL;
-        }
-
-        virtual ProgressMeter* setMessage( const char * msg,
-                                           const std::string &name,
-                                           unsigned long long progressMeterTotal,
-                                           int secondsBetween ) {
-            invariant(false);
-            return NULL;
-        }
-
-        virtual void checkForInterrupt( bool heedMutex ) const { }
-
-        virtual Status checkForInterruptNoAssert() const {
-            return Status::OK();
-        }
-
-        virtual bool isPrimaryFor( const StringData& ns ) {
-            return true;
-        }
-
-        virtual const char* getNS() const {
-            return NULL;
-        };
-
-    private:
-        boost::scoped_ptr<Heap1RecoveryUnit> _recoveryUnit;
-
     };
 
     TEST(Heap1Simple, CreateDestroy) {
@@ -131,7 +81,7 @@ namespace {
             StatusWith<DiskLoc> loc = rs->insertRecord( &op, "abc", 4, -1 );
             ASSERT_OK( loc.getStatus() );
             ASSERT_EQUALS( 1, rs->numRecords() );
-            ASSERT_EQUALS( std::string( "abc" ), rs->dataFor( loc.getValue() )->data() );
+            ASSERT_EQUALS( std::string( "abc" ), rs->dataFor( loc.getValue() ).data() );
         }
 
     }

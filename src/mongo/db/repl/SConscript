@@ -35,6 +35,7 @@ env.Library('topology_coordinator_impl',
 
 env.Library('repl_coordinator_impl',
             [
+                'check_quorum_for_config_change.cpp',
                 'repl_coordinator_impl.cpp',
                 'replica_set_config_checks.cpp',
             ],
@@ -60,6 +61,14 @@ env.CppUnitTest('replica_set_config_checks_test',
                     'replmocks'
                 ])
 
+env.CppUnitTest('check_quorum_for_config_change_test',
+                'check_quorum_for_config_change_test.cpp',
+                LIBDEPS=[
+                    'repl_coordinator_impl',
+                    'replication_executor',
+                    'replmocks',
+                ])
+
 env.Library('repl_coordinator_interface',
             ['repl_coordinator.cpp',
              'repl_coordinator_external_state.cpp',],
@@ -82,11 +91,13 @@ env.Library('replmocks',
 
 env.Library('replica_set_messages',
             [
+                'handshake_args.cpp',
                 'member_config.cpp',
                 'repl_set_heartbeat_args.cpp',
                 'repl_set_heartbeat_response.cpp',
                 'replica_set_config.cpp',
                 'replica_set_tag.cpp',
+                'update_position_args.cpp',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/bson',

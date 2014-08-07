@@ -8,8 +8,11 @@ env.Library("unittest", ['unittest.cpp', 'temp_dir.cpp'],
             ])
 
 env.Library("unittest_main", ['unittest_main.cpp'],
-            LIBDEPS=['unittest',
-                     '$BUILD_DIR/mongo/base/base'])
+            LIBDEPS=[
+                'unittest',
+                '$BUILD_DIR/mongo/base/base',
+                '$BUILD_DIR/mongo/signal_handlers_synchronous',
+                 ])
 
 env.Library("unittest_crutch", ['crutch.cpp'])
 

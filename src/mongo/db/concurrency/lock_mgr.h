@@ -36,10 +36,11 @@
 #include <string>
 #include <vector>
 
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/timer.h"
-#include "mongo/bson/util/atomic_int.h"
+
 
 /*
  * LockManager controls access to resources through two functions: acquire and release
@@ -620,14 +621,18 @@ namespace mongo {
         // support functions for changing policy to/from read/write only
 
         void _incStatsForMode(const LockMode& mode) {
-            kShared==mode ? _numCurrentActiveReadRequests++ : _numCurrentActiveWriteRequests++;
+            kShared==mode ?
+                _numCurrentActiveReadRequests.fetchAndAdd(1) :
+                _numCurrentActiveWriteRequests.fetchAndAdd(1);
         }
         void _decStatsForMode(const LockMode& mode) {
-            kShared==mode ? _numCurrentActiveReadRequests-- : _numCurrentActiveWriteRequests--;
+            kShared==mode ?
+                _numCurrentActiveReadRequests.fetchAndSubtract(1) :
+                _numCurrentActiveWriteRequests.fetchAndSubtract(1);
         }
 
-        unsigned _numActiveReads() const { return _numCurrentActiveReadRequests; }
-        unsigned _numActiveWrites() const { return _numCurrentActiveWriteRequests; }
+        unsigned _numActiveReads() const { return _numCurrentActiveReadRequests.loadRelaxed(); }
+        unsigned _numActiveWrites() const { return _numCurrentActiveWriteRequests.loadRelaxed(); }
 
 
     private:
@@ -685,8 +690,8 @@ namespace mongo {
         LockStats _stats[kNumResourcePartitions];
 
         // used when changing policy to/from Readers/Writers Only
-        AtomicUInt _numCurrentActiveReadRequests;
-        AtomicUInt _numCurrentActiveWriteRequests;
+        AtomicUInt32 _numCurrentActiveReadRequests;
+        AtomicUInt32 _numCurrentActiveWriteRequests;
     };
 
     /**

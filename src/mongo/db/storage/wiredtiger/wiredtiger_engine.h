@@ -53,6 +53,10 @@ namespace mongo {
 
         virtual void listDatabases( std::vector<std::string>* out ) const;
 
+	virtual Status closeDatabase(OperationContext*, const StringData&);
+
+	virtual Status dropDatabase(OperationContext*, const StringData&);
+
         virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                const StringData& db );
 

@@ -46,6 +46,16 @@ namespace mongo {
         }
     }
 
+    Status WiredTigerEngine::closeDatabase(OperationContext*, const StringData&) {
+	invariant("not supported" == 0);
+	return Status::OK();
+    }
+
+    Status WiredTigerEngine::dropDatabase(OperationContext*, const StringData&) {
+	invariant("not supported" == 0);
+	return Status::OK();
+    }
+
     DatabaseCatalogEntry* WiredTigerEngine::getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                 const StringData& dbName ) {
         boost::mutex::scoped_lock lk( _dbLock );

@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/config.h"
@@ -1630,7 +1631,7 @@ namespace mongo {
          */
         class MRCmd : public PublicGridCommand {
         public:
-            AtomicUInt JOB_NUMBER;
+            AtomicUInt32 JOB_NUMBER;
 
             MRCmd() : PublicGridCommand( "mapReduce", "mapreduce" ) {}
 
@@ -1642,7 +1643,7 @@ namespace mongo {
 
             string getTmpName( const string& coll ) {
                 stringstream ss;
-                ss << "tmp.mrs." << coll << "_" << time(0) << "_" << JOB_NUMBER++;
+                ss << "tmp.mrs." << coll << "_" << time(0) << "_" << JOB_NUMBER.fetchAndAdd(1);
                 return ss.str();
             }
 

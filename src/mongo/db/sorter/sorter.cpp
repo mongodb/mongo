@@ -51,9 +51,9 @@
 #include <snappy.h>
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/goodies.h"
@@ -765,8 +765,8 @@ namespace mongo {
 
         inline unsigned nextFileNumber() {
             // This is unified across all Sorter types and instances.
-            static AtomicUInt fileCounter;
-            return fileCounter++;
+            static AtomicUInt32 fileCounter;
+            return fileCounter.fetchAndAdd(1);
         }
     } // namespace sorter
 

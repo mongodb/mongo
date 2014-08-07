@@ -55,6 +55,7 @@
 #include "mongo/s/write_ops/batch_upconvert.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/timer.h"
 
 // error codes 8010-8040
 

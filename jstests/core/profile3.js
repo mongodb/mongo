@@ -42,7 +42,7 @@ try {
     assert.eq(profileCursor({nMatched: {$exists:1}}).count(), 3)
     assert.eq(profileCursor({nMatched: 1}).count(), 2)
     assert.eq(profileCursor({nMatched: 0}).count(), 1)
-    if ( db.serverStatus().storageEngine.name == "mmap_v1" ) {
+    if ( db.serverStatus().storageEngine.name == "mmapv1" ) {
         assert.eq(profileCursor({nmoved: 1}).count(), 1 );
     }
 

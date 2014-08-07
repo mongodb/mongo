@@ -62,7 +62,7 @@ namespace mongo {
         _active = false;
         _reset();
         _op = 0;
-        _opNum = _nextOpNum++;
+        _opNum = _nextOpNum.fetchAndAdd(1);
         _command = NULL;
     }
 
@@ -84,7 +84,7 @@ namespace mongo {
     void CurOp::reset() {
         _reset();
         _start = 0;
-        _opNum = _nextOpNum++;
+        _opNum = _nextOpNum.fetchAndAdd(1);
         _debug.reset();
         _query.reset();
         _active = true; // this should be last for ui clarity
@@ -258,7 +258,7 @@ namespace mongo {
         return _maxTimeTracker.getRemainingMicros();
     }
 
-    AtomicUInt CurOp::_nextOpNum;
+    AtomicUInt32 CurOp::_nextOpNum;
 
     static Counter64 returnedCounter;
     static Counter64 insertedCounter;

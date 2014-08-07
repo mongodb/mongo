@@ -55,6 +55,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage_options.h"
@@ -331,11 +332,17 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            OID rid =  cmdObj["handshake"].OID();
-            txn->getClient()->setRemoteID(rid);
-            Status status = repl::getGlobalReplicationCoordinator()->processHandshake(txn,
-                                                                                      rid,
-                                                                                      cmdObj);
+            repl::HandshakeArgs handshake;
+            Status status = handshake.initialize(cmdObj);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+
+            // TODO(dannenberg) move this into actual processing for both version
+            txn->getClient()->setRemoteID(handshake.getRid());
+
+            status = repl::getGlobalReplicationCoordinator()->processHandshake(txn,
+                                                                               handshake);
             return appendCommandStatus(result, status);
         }
 

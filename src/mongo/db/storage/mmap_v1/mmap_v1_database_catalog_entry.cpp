@@ -32,7 +32,6 @@
 
 #include <utility>
 
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
@@ -115,9 +114,6 @@ namespace mongo {
           _namespaceIndex( _path, name.toString() ) {
 
         try {
-            if ( !transient )
-                _checkDuplicateUncasedNames();
-
             Status s = _extentManager.init(txn);
             if ( !s.isOK() ) {
                 msgasserted( 16966, str::stream() << "_extentManager.init failed: " << s.toString() );
@@ -469,16 +465,6 @@ namespace mongo {
 
     void MMAPV1DatabaseCatalogEntry::getCollectionNamespaces( std::list<std::string>* tofill ) const {
         _namespaceIndex.getCollectionNamespaces( tofill );
-    }
-
-    void MMAPV1DatabaseCatalogEntry::_checkDuplicateUncasedNames() const {
-        string duplicate = Database::duplicateUncasedName(name());
-        if ( !duplicate.empty() ) {
-            stringstream ss;
-            ss << "db already exists with different case already have: [" << duplicate
-               << "] trying to create [" << name() << "]";
-            uasserted( DatabaseDifferCaseCode , ss.str() );
-        }
     }
 
     namespace {

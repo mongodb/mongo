@@ -34,7 +34,7 @@ namespace mongo {
     public:
         StorageEngine* getGlobalStorageEngine();
 
-        bool killOperation(AtomicUInt opId);
+        bool killOperation(unsigned int opId);
 
         void setKillAllOperations();
 

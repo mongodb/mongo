@@ -63,7 +63,7 @@ namespace repl {
         _electionTime = newInfo.getElectionTime();
     }
 
-    void MemberHeartbeatData::setUpValues(time_t now,
+    void MemberHeartbeatData::setUpValues(Date_t now,
                                           MemberState state,
                                           OpTime electionTime,
                                           OpTime optime,
@@ -73,6 +73,7 @@ namespace repl {
         _health = 1;
 
         _lastHeartbeat = now;
+        _upSince = now;
         _state = state;
         _electionTime = electionTime;
         _opTime = optime;
@@ -80,7 +81,7 @@ namespace repl {
         _lastHeartbeatMsg = heartbeatMessage;
     }
 
-    void MemberHeartbeatData::setDownValues(time_t now,
+    void MemberHeartbeatData::setDownValues(Date_t now,
                                             const std::string& heartbeatMessage) {
         _authIssue = false;
         _health = 0;

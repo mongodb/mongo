@@ -44,7 +44,7 @@ namespace mongo {
         return false;
     }
 
-    bool GlobalEnvironmentNoop::killOperation(AtomicUInt opId) {
+    bool GlobalEnvironmentNoop::killOperation(unsigned int opId) {
         return false;
     }
 

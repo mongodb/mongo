@@ -34,12 +34,14 @@
 #include <boost/thread.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
@@ -173,6 +175,12 @@ namespace repl {
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_settings.usingReplSets());
         _currentState = newState;
+        if (newState.primary()) {
+            _electionID = OID::gen();
+        }
+        else {
+            _electionID.clear();
+        }
     }
 
     MemberState ReplicationCoordinatorImpl::getCurrentMemberState() const {
@@ -214,6 +222,11 @@ namespace repl {
         return Status::OK();
     }
 
+    OpTime ReplicationCoordinatorImpl::_getLastOpApplied() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        OperationContextNoop txn;
+        return _slaveInfoMap[getMyRID(&txn)].opTime;
+    }
 
     bool ReplicationCoordinatorImpl::_opReplicatedEnough_inlock(
             const OpTime& opId, const WriteConcernOptions& writeConcern) {
@@ -378,7 +391,7 @@ namespace repl {
     Status ReplicationCoordinatorImpl::canServeReadsFor(OperationContext* txn,
                                                         const NamespaceString& ns,
                                                         bool slaveOk) {
-        if (_externalState->isGod(txn)) {
+        if (txn->isGod()) {
             return Status::OK();
         }
         if (canAcceptWritesForDatabase(ns.db())) {
@@ -434,10 +447,9 @@ namespace repl {
     }
 
     OID ReplicationCoordinatorImpl::getElectionId() {
-        // TODO
-        return OID();
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        return _electionID;
     }
-
 
     OID ReplicationCoordinatorImpl::getMyRID(OperationContext* txn) {
         return _myRID;
@@ -514,6 +526,7 @@ namespace repl {
                        stdx::placeholders::_1,
                        Date_t(curTimeMillis64()),
                        time(0) - serverGlobalParams.started,
+                       _getLastOpApplied(),
                        response,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -575,6 +588,7 @@ namespace repl {
                        Date_t(curTimeMillis64()),
                        args,
                        _settings.ourSetName(),
+                       _getLastOpApplied(),
                        response,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -640,14 +654,14 @@ namespace repl {
 
     }
 
-    Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(OperationContext* txn,
-                                                                    const BSONArray& updates,
-                                                                    BSONObjBuilder* resultObj) {
-        BSONForEach(elem, updates) {
-            BSONObj entry = elem.Obj();
-            OID id = entry["_id"].OID();
-            OpTime ot = entry["optime"]._opTime();
-            Status status = setLastOptime(txn, id, ot);
+    Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
+            OperationContext* txn,
+            const UpdatePositionArgs& updates) {
+
+        for (UpdatePositionArgs::UpdateIterator update = updates.updatesBegin();
+                update != updates.updatesEnd();
+                ++update) {
+            Status status = setLastOptime(txn, update->rid, update->ts);
             if (!status.isOK()) {
                 return status;
             }
@@ -655,33 +669,14 @@ namespace repl {
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorImpl::processReplSetUpdatePositionHandshake(
-            const OperationContext* txn,
-            const BSONObj& cmdObj,
-            BSONObjBuilder* resultObj) {
-        OID rid = cmdObj["handshake"].OID();
-        Status status = processHandshake(txn, rid, cmdObj);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        return Status::OK();
-    }
-
     Status ReplicationCoordinatorImpl::processHandshake(const OperationContext* txn,
-                                                        const OID& remoteID,
-                                                        const BSONObj& handshake) {
-        LOG(2) << "Received handshake " << handshake << " from node with RID " << remoteID;
+                                                        const HandshakeArgs& handshake) {
+        LOG(2) << "Received handshake " << handshake.toBSON();
 
         boost::lock_guard<boost::mutex> lock(_mutex);
-        SlaveInfo& slaveInfo = _slaveInfoMap[remoteID];
+        SlaveInfo& slaveInfo = _slaveInfoMap[handshake.getRid()];
         if (_getReplicationMode_inlock() == modeReplSet) {
-            if (!handshake.hasField("member")) {
-                return Status(ErrorCodes::ProtocolError,
-                              str::stream() << "Handshake object did not contain \"member\" field. "
-                                      "Handshake: " << handshake);
-            }
-            int memberID = handshake["member"].Int();
+            int memberID = handshake.getMemberId();
             const MemberConfig* member = _rsConfig.findMemberByID(memberID);
             if (!member) {
                 return Status(ErrorCodes::NodeNotFound,

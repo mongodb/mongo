@@ -59,16 +59,13 @@ namespace mongo {
         // you probably need to be in dbHolderMutex when constructing this
         Database(OperationContext* txn,
                  const StringData& name,
-                 DatabaseCatalogEntry* dbEntry );
+                 DatabaseCatalogEntry* dbEntry ); // not owner here
 
-        /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
-           thus the destructor is private.  this could be cleaned up one day...
-        */
-        static void closeDatabase(OperationContext* txn,
-                                  const StringData& db);
+        // must call close first
+        ~Database();
 
-        // do not use!
-        ~Database(); // closes files and other cleanup see below.
+        // closes files and other cleanup see below.
+        void close( OperationContext* txn );
 
         const std::string& name() const { return _name; }
 
@@ -147,7 +144,7 @@ namespace mongo {
 
         const std::string _name; // "alleyinsider"
 
-        boost::scoped_ptr<DatabaseCatalogEntry> _dbEntry;
+        DatabaseCatalogEntry* _dbEntry; // not owned here
 
         const std::string _profileName; // "alleyinsider.system.profile"
         const std::string _indexesName; // "alleyinsider.system.indexes"

@@ -44,11 +44,11 @@ namespace mongo {
 
     MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
 
-    AtomicUInt IndexBuilder::_indexBuildCount = 0;
+    AtomicUInt32 IndexBuilder::_indexBuildCount;
 
     IndexBuilder::IndexBuilder(const BSONObj& index) :
         BackgroundJob(true /* self-delete */), _index(index.getOwned()),
-        _name(str::stream() << "repl index builder " << (_indexBuildCount++).get()) {
+        _name(str::stream() << "repl index builder " << _indexBuildCount.addAndFetch(1)) {
     }
 
     IndexBuilder::~IndexBuilder() {}

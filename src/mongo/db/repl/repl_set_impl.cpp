@@ -558,7 +558,7 @@ namespace {
                 }
             }
             if (me == 0) { // we're not in the config -- we must have been removed
-                if (state().shunned()) {
+                if (state().removed()) {
                     // already took note of our ejection from the set
                     // so just sit tight and poll again
                     return false;
@@ -573,7 +573,7 @@ namespace {
                 MessagingPort::closeAllSockets(0);
 
                 // take note of our ejection
-                changeState(MemberState::RS_SHUNNED);
+                changeState(MemberState::RS_REMOVED);
 
                 // go into holding pattern
                 log() << "replSet info self not present in the repl set configuration:" << rsLog;

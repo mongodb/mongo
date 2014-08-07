@@ -120,6 +120,7 @@ namespace mongo {
 
     MONGO_FP_DECLARE(failMigrationCommit);
     MONGO_FP_DECLARE(failMigrationConfigWritePrepare);
+    MONGO_FP_DECLARE(failMigrationApplyOps);
 
     Tee* migrateLog = RamLog::get("migrate");
 
@@ -1447,6 +1448,12 @@ namespace mongo {
 
                     ScopedDbConnection conn(shardingState.getConfigServer(), 10.0);
                     ok = conn->runCommand( "config" , cmd , cmdResult );
+
+                    if (MONGO_FAIL_POINT(failMigrationApplyOps)) {
+                        throw SocketException(SocketException::RECV_ERROR,
+                                              shardingState.getConfigServer());
+                    }
+
                     conn.done();
                 }
                 catch ( DBException& e ) {
@@ -1505,9 +1512,8 @@ namespace mongo {
                                                     Query(BSON(ChunkType::ns(ns)))
                                                         .sort(BSON(ChunkType::DEPRECATED_lastmod() << -1)));
 
-                        ChunkVersion checkVersion =
-                            ChunkVersion::fromBSON(doc[ChunkType::DEPRECATED_lastmod()]);
 
+                        ChunkVersion checkVersion(ChunkVersion::fromBSON(doc));
                         if ( checkVersion.equals( nextVersion ) ) {
                             log() << "moveChunk commit confirmed" << migrateLog;
                             errmsg.clear();

@@ -50,7 +50,7 @@ namespace repl {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         if (replCoord->getSettings().usingReplSets()) {
             if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet
-                    || replCoord->getCurrentMemberState().shunned()) {
+                    || replCoord->getCurrentMemberState().removed()) {
                 result.append("ismaster", false);
                 result.append("secondary", false);
                 result.append("info", ReplSet::startupStatusMsg.get());

@@ -46,6 +46,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/sync_tail.h"
