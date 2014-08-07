@@ -27,6 +27,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/logger/log_test.h"
+
 #include <sstream>
 #include <string>
 #include <vector>
@@ -49,48 +51,6 @@ using namespace mongo::logger;
 
 namespace mongo {
 namespace {
-
-    // TODO(schwerin): Have logger write to a different log from the global log, so that tests can
-    // redirect their global log output for examination.
-    template <typename MessageEventEncoder>
-    class LogTest : public unittest::Test {
-        friend class LogTestAppender;
-    public:
-        LogTest() : _severityOld(globalLogDomain()->getMinimumLogSeverity()) {
-            globalLogDomain()->clearAppenders();
-            _appenderHandle = globalLogDomain()->attachAppender(
-                    MessageLogDomain::AppenderAutoPtr(new LogTestAppender(this)));
-        }
-
-        virtual ~LogTest() {
-            globalLogDomain()->detachAppender(_appenderHandle);
-            globalLogDomain()->setMinimumLoggedSeverity(_severityOld);
-        }
-
-    protected:
-        std::vector<std::string> _logLines;
-        LogSeverity _severityOld;
-
-    private:
-        class LogTestAppender : public MessageLogDomain::EventAppender {
-        public:
-            explicit LogTestAppender(LogTest* ltest) : _ltest(ltest) {}
-            virtual ~LogTestAppender() {}
-            virtual Status append(const MessageLogDomain::Event& event) {
-                std::ostringstream _os;
-                if (!_encoder.encode(event, _os))
-                    return Status(ErrorCodes::LogWriteFailed, "Failed to append to LogTestAppender.");
-                _ltest->_logLines.push_back(_os.str());
-                return Status::OK();
-            }
-
-        private:
-            LogTest *_ltest;
-            MessageEventEncoder _encoder;
-        };
-
-        MessageLogDomain::AppenderHandle _appenderHandle;
-    };
 
     typedef LogTest<MessageEventDetailsEncoder> LogTestDetailsEncoder;
     typedef LogTest<MessageEventUnadornedEncoder> LogTestUnadornedEncoder;
@@ -588,6 +548,70 @@ namespace {
                           std::string::npos);
         ASSERT_EQUALS(_logLines[0].find(componentB.getNameForLog().toString()), std::string::npos);
         ASSERT_EQUALS(_logLines[0].find(componentC.getNameForLog().toString()), std::string::npos);
+    }
+
+    // Tests pass through of log component:
+    //     unconditional log functions -> LogStreamBuilder -> MessageEventEphemeral
+    //                                 -> MessageEventDetailsEncoder
+    TEST_F(LogTestDetailsEncoder, LogFunctions) {
+        // severe() - no component specified.
+        severe() << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(
+                              str::stream() << " F " << componentDefault.getNameForLog()),
+                          std::string::npos);
+
+        // severe() - with component.
+        _logLines.clear();
+        severe(componentA) << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " F " << componentA.getNameForLog()),
+                          std::string::npos);
+
+        // error() - no component specified.
+        _logLines.clear();
+        error() << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(
+                              str::stream() << " E " << componentDefault.getNameForLog()),
+                          std::string::npos);
+
+        // error() - with component.
+        _logLines.clear();
+        error(componentA) << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " E " << componentA.getNameForLog()),
+                          std::string::npos);
+
+        // warning() - no component specified.
+        _logLines.clear();
+        warning() << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(
+                              str::stream() << " W " << componentDefault.getNameForLog()),
+                          std::string::npos);
+
+        // warning() - with component.
+        _logLines.clear();
+        warning(componentA) << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " W " << componentA.getNameForLog()),
+                          std::string::npos);
+
+        // log() - no component specified.
+        _logLines.clear();
+        log() << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(
+                              str::stream() << " I " << componentDefault.getNameForLog()),
+                          std::string::npos);
+
+        // log() - with component.
+        _logLines.clear();
+        log(componentA) << "This is logged";
+        ASSERT_EQUALS(1U, _logLines.size());
+        ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " I " << componentA.getNameForLog()),
+                          std::string::npos);
     }
 
 }  // namespace
