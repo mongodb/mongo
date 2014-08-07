@@ -157,56 +157,68 @@ namespace mongo {
                                                const BSONObj &sourceObject,
                                                S2Polygon *out) {
 
-        const vector<BSONElement>& exteriorRing = coordinates[0].Array();
-        vector<S2Point> exteriorVertices;
-        if (!parsePoints(exteriorRing, &exteriorVertices)) { return false; }
-        eraseDuplicatePoints(&exteriorVertices);
-        // The last point is duplicated.  We drop it, since S2Loop expects no
-        // duplicate points
-        exteriorVertices.resize(exteriorVertices.size() - 1);
-        // S2 Polygon loops must have 3 vertices
-        if (exteriorVertices.size() < 3) { return false; }
+        OwnedPointerVector<S2Loop> loops;
+        for (size_t i = 0; i < coordinates.size(); i++) {
+            const vector<BSONElement>& loopCoordinates = coordinates[i].Array();
+            vector<S2Point> points;
 
-        S2PolygonBuilderOptions polyOptions;
-        polyOptions.set_validate(true);
-        // Don't silently eliminate duplicate edges.
-        polyOptions.set_xor_edges(false);
-        S2PolygonBuilder polyBuilder(polyOptions);
-        S2Loop exteriorLoop(exteriorVertices);
-        exteriorLoop.Normalize();
-        if (exteriorLoop.is_hole()) {
-            exteriorLoop.Invert();
-        }
-        if (!exteriorLoop.IsValid()) { return false; }
-        polyBuilder.AddLoop(&exteriorLoop);
-
-        // Subsequent arrays of coordinates are interior rings/holes.
-        for (size_t i = 1; i < coordinates.size(); ++i) {
-            vector<S2Point> holePoints;
-            if (!parsePoints(coordinates[i].Array(), &holePoints)) { return false; }
-            eraseDuplicatePoints(&holePoints);
+            if (!parsePoints(loopCoordinates, &points)) { return false; }
+            eraseDuplicatePoints(&points);
             // Drop the duplicated last point.
-            holePoints.resize(holePoints.size() - 1);
-            // S2 Polygon loops must have 3 vertices
-            if (holePoints.size() < 3) { return false; }
-            // Interior rings are clockwise.
-            S2Loop holeLoop(holePoints);
-            holeLoop.Normalize();
-            if (!holeLoop.IsValid()) { return false; }
-            if (!holeLoop.is_hole()) {
-                if (!exteriorLoop.Contains(&holeLoop)) { return false; }
-                holeLoop.Invert();
-            } else {
-                // It's already clockwise; we need to invert once to check that it's contained in
-                // the shell, then invert again.
-                holeLoop.Invert();
-                if (!exteriorLoop.Contains(&holeLoop)) { return false; }
-                holeLoop.Invert();
+            points.resize(points.size() - 1);
+
+            S2Loop* loop = new S2Loop(points);
+            loops.push_back(loop);
+
+            // Check whether this loop is valid.
+            // 1. At least 3 vertices.
+            // 2. All vertices must be unit length. Guaranteed by parsePoints().
+            // 3. Loops are not allowed to have any duplicate vertices.
+            // 4. Non-adjacent edges are not allowed to intersect.
+            if (!loop->IsValid()) {
+                return false;
             }
-            polyBuilder.AddLoop(&holeLoop);
+
+            // If the loop is more than one hemisphere, invert it.
+            loop->Normalize();
+
+            // Check the first loop must be the exterior ring and any others must be
+            // interior rings or holes.
+            if (i > 0 && !loops[0]->Contains(loop)) return false;
         }
 
-        return polyBuilder.AssemblePolygon(out, NULL);
+        // Check if the given loops form a valid polygon.
+        // 1. If a loop contains an edge AB, then no other loop may contain AB or BA.
+        // 2. No loop covers more than half of the sphere.
+        // 3. No two loops cross.
+        if (!S2Polygon::IsValid(loops.vector())) return false;
+
+        // Given all loops are valid / normalized and S2Polygon::IsValid() above returns true.
+        // The polygon must be valid. See S2Polygon member function IsValid().
+
+        // Transfer ownership of the loops and clears loop vector.
+        out->Init(&loops.mutableVector());
+
+        // Check if every loop of this polygon shares at most one vertex with
+        // its parent loop.
+        if (!out->IsNormalized()) return false;
+
+        // S2Polygon contains more than one ring, which is allowed by S2, but not by GeoJSON.
+        //
+        // Loops are indexed according to a preorder traversal of the nesting hierarchy.
+        // GetLastDescendant() returns the index of the last loop that is contained within
+        // a given loop. We guarantee that the first loop is the exterior ring.
+        if (out->GetLastDescendant(0) < out->num_loops() - 1) return false;
+
+        // In GeoJSON, only one nesting is allowed.
+        // The depth of a loop is set by polygon according to the nesting hierarchy of polygon,
+        // so the exterior ring's depth is 0, a hole in it is 1, etc.
+        for (int i = 0; i < out->num_loops(); i++) {
+            if (out->loop(i)->depth() > 1) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static bool parseBigSimplePolygonCoordinates(const vector<BSONElement>& coordinates,
