@@ -292,6 +292,10 @@ def main():
     parser.add_option("-o", dest="outfile",
                       default="docs/errors.md",
                       help="Report file [default: %default]")
+    parser.add_option("--report", type="choice",
+                      choices=["none", "markdown"], default="none",
+                      help="What format report should be generated. " \
+                           "Possible options: [none, markdown]")
     (options, args) = parser.parse_args()
 
     (codes, errors) = readErrorCodes()
@@ -302,7 +306,9 @@ def main():
     print("next: %s" % next)
 
     if ok:
-        writeMarkdownReport(codes, options.outfile)
+        reportStyle = options.report
+        if reportStyle == "markdown":
+            writeMarkdownReport(codes, options.outfile)
     elif options.replace:
         replaceBadCodes(errors, next)
     else:
