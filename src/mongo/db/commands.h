@@ -32,10 +32,12 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/counter.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client_basic.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
 
@@ -217,6 +219,14 @@ namespace mutablebson {
         static std::map<std::string,Command*> * _commandsByBestName;
         static std::map<std::string,Command*> * _webCommands;
 
+        // Counters for how many times this command has been executed and failed
+        Counter64 _commandsExecuted;
+        Counter64 _commandsFailed;
+
+        // Pointers to hold the metrics tree references
+        ServerStatusMetricField<Counter64> _commandsExecutedMetric;
+        ServerStatusMetricField<Counter64> _commandsFailedMetric;
+
     public:
         // Stops all index builds required to run this command and returns index builds killed.
         virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
@@ -225,6 +235,10 @@ namespace mutablebson {
 
         static const std::map<std::string,Command*>* commandsByBestName() { return _commandsByBestName; }
         static const std::map<std::string,Command*>* webCommands() { return _webCommands; }
+
+        // Counter for unknown commands
+        static Counter64 unknownCommands;
+
         /** @return if command was found */
         static void runAgainstRegistered(const char *ns,
                                          BSONObj& jsobj,

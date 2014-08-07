@@ -2,15 +2,13 @@
 // Legacy write mode test also available at jstests/gle.
 
 var mongo = new Mongo(db.getMongo().host);
-mongo.forceWriteMode("commands");
+
 var newdb = mongo.getDB(db.toString());
 
 var t = newdb.opcounters;
 var isMongos = ("isdbgrid" == newdb.runCommand("ismaster").msg);
 var opCounters;
 var res;
-
-assert(t.getDB().getMongo().useWriteCommands(), "test is not running with write commands")
 
 //
 // Count ops attempted in write commands in mongod and mongos
@@ -40,25 +38,28 @@ res = t.insert([{_id:1},{_id:2}])
 assert.writeOK(res);
 assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
 
-// Single insert, with error.
-opCounters = newdb.serverStatus().opcounters;
-res = t.insert({_id:0})
-assert.writeError(res);
-assert.eq(opCounters.insert + 1, newdb.serverStatus().opcounters.insert);
 
-// Bulk insert, with error, ordered.
-opCounters = newdb.serverStatus().opcounters;
-res = t.insert([{_id:3},{_id:3},{_id:4}])
-assert.writeError(res);
-assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
+// Test is not run when in compatibility mode as errors are not counted
+if (t.getMongo().writeMode() != "compatibility"){
+    // Single insert, with error.
+    opCounters = newdb.serverStatus().opcounters;
+    res = t.insert({_id:0})
+    assert.writeError(res);
+    assert.eq(opCounters.insert + 1, newdb.serverStatus().opcounters.insert);
 
-// Bulk insert, with error, unordered.
-var continueOnErrorFlag = 1;
-opCounters = newdb.serverStatus().opcounters;
-res = t.insert([{_id:5},{_id:5},{_id:6}], continueOnErrorFlag)
-assert.writeError(res);
-assert.eq(opCounters.insert + 3, newdb.serverStatus().opcounters.insert);
+    // Bulk insert, with error, ordered.
+    opCounters = newdb.serverStatus().opcounters;
+    res = t.insert([{_id:3},{_id:3},{_id:4}])
+    assert.writeError(res);
+    assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
 
+    // Bulk insert, with error, unordered.
+    var continueOnErrorFlag = 1;
+    opCounters = newdb.serverStatus().opcounters;
+    res = t.insert([{_id:5},{_id:5},{_id:6}], continueOnErrorFlag)
+    assert.writeError(res);
+    assert.eq(opCounters.insert + 3, newdb.serverStatus().opcounters.insert);
+}
 //
 // 2. Update.
 //
@@ -146,22 +147,38 @@ t.drop();
 t.insert({_id:0})
 
 // Command, recognized, no error.
-opCounters = newdb.serverStatus().opcounters;
+serverStatus = newdb.serverStatus();
+opCounters = serverStatus.opcounters
+metricsObj = serverStatus.metrics.commands
 assert.eq(opCounters.command + 1, newdb.serverStatus().opcounters.command); // "serverStatus" counted
+// Count this and the last run of "serverStatus"
+assert.eq(metricsObj.serverStatus.total + 2,
+    newdb.serverStatus().metrics.commands.serverStatus.total, 
+    "total ServerStatus command counter did not increment"); // "serverStatus" counted
+assert.eq(metricsObj.serverStatus.failed, 
+    newdb.serverStatus().metrics.commands.serverStatus.failed, 
+   "failed ServerStatus command counter incremented!"); // "serverStatus" counted
 
 // Command, recognized, with error.
-opCounters = newdb.serverStatus().opcounters;
-res = t.runCommand("count", {query:{$invalidOp:1}});
+countVal = { "total" : 0, "failed" : 0 };
+if (metricsObj.count != null) {
+    countVal = metricsObj.count
+}
+res = t.runCommand("count", {query:{$invalidOp:1}}); // "count command" counted
 assert.eq(0, res.ok);
-assert.eq(opCounters.command + 2,
+assert.eq(opCounters.command + 5,
           newdb.serverStatus().opcounters.command); // "serverStatus", "count" counted
 
-// Command, unrecognized.
-opCounters = newdb.serverStatus().opcounters;
-res = t.runCommand("command that doesn't exist");
-assert.eq(0, res.ok);
-//assert.eq(opCounters.command + 1, newdb.serverStatus().opcounters.command); // "serverStatus" counted
-// TODO Replace below with above when SERVER-9038 is resolved (mongos counts unrecognized commands)
-assert.eq(opCounters.command + (isMongos ? 2 : 1), newdb.serverStatus().opcounters.command);
+assert.eq(countVal.total +1, 
+    newdb.serverStatus().metrics.commands.count.total, 
+    "total count command counter did not incremented"); // "serverStatus", "count" counted
+assert.eq(countVal.failed + 1, 
+    newdb.serverStatus().metrics.commands.count.failed, 
+    "failed count command counter did not increment"); // "serverStatus", "count" counted
 
-// Command, recognized, counting suppressed (TODO implement when SERVER-9038 is resolved).
+// Command, unrecognized.
+res = t.runCommand("invalid"); // "invalid" command only counted on MongoS
+assert.eq(0, res.ok);
+assert.eq(opCounters.command + (isMongos ? 9 : 8), newdb.serverStatus().opcounters.command); // "serverStatus" counted
+assert.eq(null, newdb.serverStatus().metrics.commands.invalid);
+assert.eq(metricsObj['<UNKNOWN>'] + 1, newdb.serverStatus().metrics.commands['<UNKNOWN>']);

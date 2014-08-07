@@ -1378,7 +1378,13 @@ namespace mongo {
 
         txn->getCurOp()->ensureStarted();
 
+        c->_commandsExecuted.increment();
+
         retval = _execCommand(txn, c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
+
+        if ( !retval ){
+            c->_commandsFailed.increment();
+        }
 
         appendCommandStatus(result, retval, errmsg);
         
@@ -1458,6 +1464,7 @@ namespace mongo {
                                          str::stream() << "no such cmd: " << e.fieldName());
             anObjBuilder.append("code", ErrorCodes::CommandNotFound);
             anObjBuilder.append("bad cmd" , _cmdobj );
+            Command::unknownCommands.increment();
         }
 
         BSONObj x = anObjBuilder.done();
