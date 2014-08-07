@@ -82,22 +82,6 @@ namespace mongo {
           _indexCatalog( this ),
           _cursorCache( fullNS ),
           _changeSubscribers() {
-        _details = details;
-        _database = database;
-
-        if ( details->isCapped() ) {
-            _recordStore.reset( new CappedRecordStoreV1( this,
-                                                         _ns.ns(),
-                                                         details,
-                                                         &database->getExtentManager(),
-                                                         _ns.coll() == "system.indexes" ) );
-        }
-        else {
-            _recordStore.reset( new SimpleRecordStoreV1( _ns.ns(),
-                                                         details,
-                                                         &database->getExtentManager(),
-                                                         _ns.coll() == "system.indexes" ) );
-        }
         _magic = 1357924;
         _indexCatalog.init(txn);
         if ( isCapped() )
