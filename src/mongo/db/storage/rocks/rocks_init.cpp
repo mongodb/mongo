@@ -46,9 +46,7 @@ namespace mongo {
         };
     } // namespace
 
-    MONGO_INITIALIZER_GENERAL(RocksEngineInit,
-                              MONGO_DEFAULT_PREREQUISITES,
-                              ("StorageEngineInit") )(InitializerContext* context ) {
+    MONGO_INITIALIZER(RocksEngineInit)(InitializerContext* context ) {
         StorageEngine::registerFactory( "rocksExperiment", new RocksFactory() );
         return Status::OK();
     }

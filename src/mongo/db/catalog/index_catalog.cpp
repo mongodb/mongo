@@ -690,25 +690,26 @@ namespace mongo {
 
         // verify state is sane post cleaning
 
-        long long numSystemIndexesEntries = _collection->getCatalogEntry()->getTotalIndexCount();
+        long long numIndexesInCollectionCatalogEntry =
+            _collection->getCatalogEntry()->getTotalIndexCount();
 
         if ( haveIdIndex ) {
             fassert( 17324, numIndexesTotal() == 1 );
             fassert( 17325, numIndexesReady() == 1 );
-            fassert( 17326, numSystemIndexesEntries == 1 );
+            fassert( 17326, numIndexesInCollectionCatalogEntry == 1 );
             fassert( 17336, _entries.size() == 1 );
         }
         else {
-            if ( numIndexesTotal() || numSystemIndexesEntries || _entries.size() ) {
+            if ( numIndexesTotal() || numIndexesInCollectionCatalogEntry || _entries.size() ) {
                 error() << "About to fassert - "
                         << " numIndexesTotal(): " << numIndexesTotal()
-                        << " numSystemIndexesEntries: " << numSystemIndexesEntries
+                        << " numSystemIndexesEntries: " << numIndexesInCollectionCatalogEntry
                         << " _entries.size(): " << _entries.size()
                         << " indexNamesToDrop: " << indexNamesToDrop.size()
                         << " haveIdIndex: " << haveIdIndex;
             }
             fassert( 17327, numIndexesTotal() == 0 );
-            fassert( 17328, numSystemIndexesEntries == 0 );
+            fassert( 17328, numIndexesInCollectionCatalogEntry == 0 );
             fassert( 17337, _entries.size() == 0 );
         }
 

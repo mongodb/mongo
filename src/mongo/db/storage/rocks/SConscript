@@ -6,17 +6,17 @@ if has_option("rocksdb"):
     env.Library(
         target= 'storage_rocks_base',
         source= [
-            'rocks_btree_impl.cpp',
             'rocks_collection_catalog_entry.cpp',
             'rocks_database_catalog_entry.cpp',
             'rocks_engine.cpp',
             'rocks_record_store.cpp',
             'rocks_recovery_unit.cpp',
+            'rocks_sorted_data_impl.cpp',
             ],
         LIBDEPS= [
             '$BUILD_DIR/mongo/bson',
             '$BUILD_DIR/mongo/db/catalog/collection_options',
-            '$BUILD_DIR/mongo/db/structure/record_store',
+            '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
             '$BUILD_DIR/mongo/foundation',
             '$BUILD_DIR/third_party/shim_snappy',
             ],
@@ -65,8 +65,8 @@ if has_option("rocksdb"):
         )
 
     env.CppUnitTest(
-        target='storage_rocks_btree_impl_test',
-        source=['rocks_btree_impl_test.cpp',
+        target='storage_rocks_sorted_data_impl_test',
+        source=['rocks_sorted_data_impl_test.cpp',
                 ],
         LIBDEPS=[
             'storage_rocks_fake'

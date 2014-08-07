@@ -32,6 +32,10 @@
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
 
+namespace rocksdb {
+    class DB;
+}
+
 namespace mongo {
 
     class RocksEngine;
@@ -89,12 +93,16 @@ namespace mongo {
 
         // ------ internal api
 
-        // called once when collection is created
+        BSONObj getIndexSpec( const StringData& idxName, rocksdb::DB* db ) const;
+
+        // called once when collection is created.
         void createMetaData();
 
         // when collection is dropped, call this
-        // all indexes have to be dropped first
+        // all indexes have to be dropped first.
         void dropMetaData();
+
+        const string metaDataKey() { return _metaDataKey; }
 
         struct IndexMetaData {
             IndexMetaData() {}
@@ -113,21 +121,33 @@ namespace mongo {
 
             int findIndexOffset( const StringData& name ) const;
 
+            /**
+             * Removes information about an index from the MetaData. Returns true if an index
+             * called name existed and was deleted, and false otherwise.
+             */
+            bool eraseIndex( const StringData& name );
+
             std::string ns;
             std::vector<IndexMetaData> indexes;
         };
 
     private:
-        bool _getMetaData( MetaData* out ) const;
-        bool _getMetaData_inlock( MetaData* out ) const;
+        MetaData _getMetaData() const;
+        MetaData _getMetaData( rocksdb::DB* db ) const;
+
+        MetaData _getMetaData_inlock() const;
+        MetaData _getMetaData_inlock( rocksdb::DB* db ) const;
 
         void _putMetaData_inlock( const MetaData& in );
 
-        RocksEngine* _engine;
-        string _metaDataKey;
+        RocksEngine* _engine; // not owned
 
-        mutable boost::mutex _metaDataLock;
+        // the name of the column family which holds the metadata.
+        const string _metaDataKey;
 
+        // lock which must be acquired before calling _getMetaData_inlock(). Protects the metadata
+        // stored in the metadata column family.
+        mutable boost::mutex _metaDataMutex;
     };
 
 }

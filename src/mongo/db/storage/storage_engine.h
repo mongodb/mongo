@@ -107,6 +107,7 @@ namespace mongo {
         /**
          * This method will be called before there is a clean shutdown.  Storage engines should
          * override this method if they have clean-up to do that is different from unclean shutdown.
+         * MongoDB will not call into the storage subsystem after calling this function.
          *
          * There is intentionally no uncleanShutdown().
          */

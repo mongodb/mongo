@@ -31,7 +31,11 @@
 
 #include <string>
 
-#include "mongo/db/structure/record_store.h"
+#include <rocksdb/options.h>
+
+#include "mongo/db/storage/capped_callback.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace rocksdb {
     class ColumnFamilyHandle;
@@ -48,24 +52,31 @@ namespace mongo {
     public:
         RocksRecordStore( const StringData& ns,
                           rocksdb::DB* db,
-                          rocksdb::ColumnFamilyHandle* columnFamily );
+                          rocksdb::ColumnFamilyHandle* columnFamily,
+                          rocksdb::ColumnFamilyHandle* metadataColumnFamily,
+                          bool isCapped = false,
+                          int64_t cappedMaxSize = -1,
+                          int64_t cappedMaxDocs = -1,
+                          CappedDocumentDeleteCallback* cappedDeleteCallback = NULL );
 
-        virtual ~RocksRecordStore();
+        virtual ~RocksRecordStore() { }
 
         // name of the RecordStore implementation
         virtual const char* name() const { return "rocks"; }
 
-        virtual long long dataSize() const;
+        virtual long long dataSize() const { return _dataSize; }
 
-        virtual long long numRecords() const;
+        virtual long long numRecords() const { return _numRecords; }
 
-        virtual bool isCapped() const;
+        virtual bool isCapped() const { return _isCapped; }
 
-        virtual int64_t storageSize( BSONObjBuilder* extraInfo = NULL, int infoLevel = 0 ) const;
+        virtual int64_t storageSize( OperationContext* txn,
+                                     BSONObjBuilder* extraInfo = NULL,
+                                     int infoLevel = 0 ) const;
 
         // CRUD related
 
-        virtual RecordData dataFor( const DiskLoc& loc) const;
+        virtual RecordData dataFor( const DiskLoc& loc ) const;
 
         virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl );
 
@@ -94,8 +105,7 @@ namespace mongo {
                                              const DiskLoc& start = DiskLoc(),
                                              bool tailable = false,
                                              const CollectionScanParams::Direction& dir =
-                                             CollectionScanParams::FORWARD
-                                             ) const;
+                                             CollectionScanParams::FORWARD ) const;
 
         virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;
 
@@ -103,7 +113,7 @@ namespace mongo {
 
         virtual Status truncate( OperationContext* txn );
 
-        virtual bool compactSupported() const { return false; }
+        virtual bool compactSupported() const { return true; }
 
         virtual Status compact( OperationContext* txn,
                                 RecordStoreCompactAdaptor* adaptor,
@@ -128,11 +138,21 @@ namespace mongo {
         virtual void temp_cappedTruncateAfter(OperationContext* txn,
                                               DiskLoc end,
                                               bool inclusive);
+
+        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
+          _cappedDeleteCallback = cb;
+        }
+        bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
+        bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
+
+        static rocksdb::Comparator* newRocksCollectionComparator();
     private:
 
         class Iterator : public RecordIterator {
         public:
-            Iterator( const RocksRecordStore* rs, const CollectionScanParams::Direction& dir );
+            Iterator( const RocksRecordStore* rs,
+                      const CollectionScanParams::Direction& dir,
+                      const DiskLoc& start );
 
             virtual bool isEOF();
             virtual DiskLoc curr();
@@ -151,14 +171,40 @@ namespace mongo {
             boost::scoped_ptr<rocksdb::Iterator> _iterator;
         };
 
-        RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx ) const;
+        /**
+         * Returns a new ReadOptions struct, containing the snapshot held in opCtx, if opCtx is not
+         * null
+         */
+        rocksdb::ReadOptions _readOptions( OperationContext* opCtx = NULL ) const;
+
+        static RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx );
+
+        static DiskLoc _makeDiskLoc( const rocksdb::Slice& slice );
 
         DiskLoc _nextId();
-        rocksdb::Slice _makeKey( const DiskLoc& loc ) const;
+        bool cappedAndNeedDelete() const;
+        void cappedDeleteAsNeeded(OperationContext* txn);
+
+        // The use of this function requires that the passed in DiskLoc outlives the returned Slice
+        // TODO possibly make this safer in the future
+        static rocksdb::Slice _makeKey( const DiskLoc& loc );
+        void _changeNumRecords(OperationContext* txn, bool insert);
+        void _increaseDataSize(OperationContext* txn, int amount);
 
         rocksdb::DB* _db; // not owned
         rocksdb::ColumnFamilyHandle* _columnFamily; // not owned
+        rocksdb::ColumnFamilyHandle* _metadataColumnFamily; // not owned
 
-        int _tempIncrement;
+        const bool _isCapped;
+        const int64_t _cappedMaxSize;
+        const int64_t _cappedMaxDocs;
+        CappedDocumentDeleteCallback* _cappedDeleteCallback;
+
+        AtomicUInt64 _nextIdNum;
+        long long _dataSize;
+        long long _numRecords;
+        rocksdb::ReadOptions _defaultReadOptions;
+        mutable boost::mutex _numRecordsLock;
+        mutable boost::mutex _dataSizeLock;
     };
 }

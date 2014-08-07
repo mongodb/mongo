@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    static const int _maxAllowedIndexes = 64; // for compatability for now, could be higher
+
     /**
      * bson schema
      * { ns: <name for sanity>,
@@ -49,27 +51,26 @@ namespace mongo {
 
     RocksCollectionCatalogEntry::RocksCollectionCatalogEntry( RocksEngine* engine,
                                                               const StringData& ns )
-        : CollectionCatalogEntry( ns ), _engine( engine ) {
-        _metaDataKey = string("metadata-") + ns.toString();
-    }
+        : CollectionCatalogEntry( ns ),
+        _engine( engine ),
+        _metaDataKey( string( "metadata-" ) + ns.toString() ) { }
 
-    CollectionOptions RocksCollectionCatalogEntry::getCollectionOptions( OperationContext* txn ) const {
-        // todo: put more options in here?
+    CollectionOptions RocksCollectionCatalogEntry::getCollectionOptions(
+            OperationContext* txn ) const {
+        // TODO: put more options in here?
         return CollectionOptions();
     }
 
     // ------- indexes ----------
 
     int RocksCollectionCatalogEntry::getTotalIndexCount() const {
-        MetaData md;
-        _getMetaData( &md );
+        MetaData md = _getMetaData();
 
         return static_cast<int>( md.indexes.size() );
     }
 
     int RocksCollectionCatalogEntry::getCompletedIndexCount() const {
-        MetaData md;
-        _getMetaData( &md );
+        MetaData md = _getMetaData();
 
         int num = 0;
         for ( unsigned i = 0; i < md.indexes.size(); i++ ) {
@@ -80,12 +81,11 @@ namespace mongo {
     }
 
     int RocksCollectionCatalogEntry::getMaxAllowedIndexes() const {
-        return 64; // for compatability for now, could be higher
+        return _maxAllowedIndexes;
     }
 
     void RocksCollectionCatalogEntry::getAllIndexes( std::vector<std::string>* names ) const {
-        MetaData md;
-        _getMetaData( &md );
+        MetaData md = _getMetaData();
 
         for ( unsigned i = 0; i < md.indexes.size(); i++ ) {
             names->push_back( md.indexes[i].spec["name"].String() );
@@ -93,32 +93,37 @@ namespace mongo {
     }
 
     BSONObj RocksCollectionCatalogEntry::getIndexSpec( const StringData& indexName ) const {
-        MetaData md;
-        _getMetaData( &md );
+        return getIndexSpec( indexName, _engine->getDB() );
+    }
+
+    BSONObj RocksCollectionCatalogEntry::getIndexSpec( const StringData& indexName,
+                                                       rocksdb::DB* db ) const {
+        MetaData md = _getMetaData( db );
+
         int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
         return md.indexes[offset].spec.getOwned();
     }
 
     bool RocksCollectionCatalogEntry::isIndexMultikey( const StringData& indexName) const {
-        MetaData md;
-        _getMetaData( &md );
+        MetaData md = _getMetaData();
+
         int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
         return md.indexes[offset].multikey;
     }
 
     DiskLoc RocksCollectionCatalogEntry::getIndexHead( const StringData& indexName ) const {
-        MetaData md;
-        _getMetaData( &md );
+        MetaData md = _getMetaData();
+
         int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
         return md.indexes[offset].head;
     }
 
     bool RocksCollectionCatalogEntry::isIndexReady( const StringData& indexName ) const {
-        MetaData md;
-        _getMetaData( &md );
+        MetaData md = _getMetaData();
+
         int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
         return md.indexes[offset].ready;
@@ -127,9 +132,9 @@ namespace mongo {
     bool RocksCollectionCatalogEntry::setIndexIsMultikey(OperationContext* txn,
                                                          const StringData& indexName,
                                                          bool multikey ) {
-        boost::mutex::scoped_lock lk( _metaDataLock );
-        MetaData md;
-        _getMetaData_inlock( &md );
+        boost::mutex::scoped_lock lk( _metaDataMutex );
+        MetaData md = _getMetaData_inlock();
+
         int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
         if ( md.indexes[offset].multikey == multikey )
@@ -142,9 +147,9 @@ namespace mongo {
     void RocksCollectionCatalogEntry::setIndexHead( OperationContext* txn,
                                                     const StringData& indexName,
                                                     const DiskLoc& newHead ) {
-        boost::mutex::scoped_lock lk( _metaDataLock );
-        MetaData md;
-        _getMetaData_inlock( &md );
+        boost::mutex::scoped_lock lk( _metaDataMutex );
+        MetaData md = _getMetaData_inlock();
+
         int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
         md.indexes[offset].head = newHead;
@@ -153,9 +158,9 @@ namespace mongo {
 
     void RocksCollectionCatalogEntry::indexBuildSuccess( OperationContext* txn,
                                                          const StringData& indexName ) {
-        boost::mutex::scoped_lock lk( _metaDataLock );
-        MetaData md;
-        _getMetaData_inlock( &md );
+        boost::mutex::scoped_lock lk( _metaDataMutex );
+        MetaData md = _getMetaData_inlock();
+
         int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
         md.indexes[offset].ready = true;
@@ -165,16 +170,29 @@ namespace mongo {
 
     Status RocksCollectionCatalogEntry::removeIndex( OperationContext* txn,
                                                      const StringData& indexName ) {
-        // remove column faily from Engine
+        boost::mutex::scoped_lock lk( _metaDataMutex );
+
+        MetaData md = _getMetaData_inlock();
+
         // remove info from meta data
-        invariant( !"can't remove index in rocks yet" );
+        invariant( md.eraseIndex( indexName ) );
+        _putMetaData_inlock( md );
+
+        // drop the actual index in rocksdb
+        rocksdb::ColumnFamilyHandle* cfh = _engine->getIndexColumnFamily( ns().ns(), indexName );
+
+        // Note: this invalidates cfh. Do not use after this call
+        _engine->removeColumnFamily( &cfh, indexName, ns().ns() );
+        invariant( cfh == nullptr );
+
+        return Status::OK();
     }
 
     Status RocksCollectionCatalogEntry::prepareForIndexBuild( OperationContext* txn,
                                                               const IndexDescriptor* spec ) {
-        boost::mutex::scoped_lock lk( _metaDataLock );
-        MetaData md;
-        _getMetaData_inlock( &md );
+        boost::mutex::scoped_lock lk( _metaDataMutex );
+        MetaData md = _getMetaData_inlock();
+
         md.indexes.push_back( IndexMetaData( spec->infoObj(), false, DiskLoc(), false ) );
         _putMetaData_inlock( md );
         return Status::OK();
@@ -192,6 +210,7 @@ namespace mongo {
 
     void RocksCollectionCatalogEntry::createMetaData() {
         string result;
+        // XXX not using a snapshot here
         rocksdb::Status status = _engine->getDB()->Get( rocksdb::ReadOptions(),
                                                         _metaDataKey,
                                                         &result );
@@ -214,25 +233,39 @@ namespace mongo {
         invariant( status.ok() );
     }
 
-    bool RocksCollectionCatalogEntry::_getMetaData( MetaData* out ) const {
-        boost::mutex::scoped_lock lk( _metaDataLock );
-        return _getMetaData_inlock( out );
+    RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData() const {
+        return _getMetaData( _engine->getDB() );
     }
 
-    bool RocksCollectionCatalogEntry::_getMetaData_inlock( MetaData* out ) const {
+    RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData(
+            rocksdb::DB* db ) const {
+        invariant( db );
+        boost::mutex::scoped_lock lk( _metaDataMutex );
+        return _getMetaData_inlock( db );
+    }
+
+    RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData_inlock() const {
+        return _getMetaData_inlock( _engine->getDB() );
+    }
+
+    // The metadata in a column family with a specific name. This method reads from that column
+    // family
+    RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData_inlock(
+            rocksdb::DB* db ) const {
         string result;
-        rocksdb::Status status = _engine->getDB()->Get( rocksdb::ReadOptions(),
-                                                        _metaDataKey,
-                                                        &result );
+        // XXX not using a snapshot here
+        rocksdb::Status status = db->Get( rocksdb::ReadOptions(), _metaDataKey, &result );
         invariant( !status.IsNotFound() );
         invariant( status.ok() );
-        BSONObj obj( result.c_str() );
-        out->parse( obj );
-        return true;
+
+        MetaData md;
+        md.parse( BSONObj( result.c_str() ) );
+        return md;
     }
 
     void RocksCollectionCatalogEntry::_putMetaData_inlock( const MetaData& in ) {
         // XXX: this should probably be done via the RocksRecoveryUnit.
+        // TODO move into recovery unit
         BSONObj obj = in.toBSON();
         rocksdb::Status status = _engine->getDB()->Put( rocksdb::WriteOptions(),
                                                         _metaDataKey,
@@ -246,6 +279,17 @@ namespace mongo {
             if ( indexes[i].spec["name"].String() == name )
                 return i;
         return -1;
+    }
+
+    bool RocksCollectionCatalogEntry::MetaData::eraseIndex( const StringData& name ) {
+        int indexOffset = findIndexOffset( name );
+
+        if ( indexOffset < 0 ) {
+            return false;
+        }
+
+        indexes.erase( indexes.begin() + indexOffset );
+        return true;
     }
 
     BSONObj RocksCollectionCatalogEntry::MetaData::toBSON() const {
@@ -276,7 +320,7 @@ namespace mongo {
             for ( unsigned i = 0; i < entries.size(); i++ ) {
                 BSONObj idx = entries[i].Obj();
                 IndexMetaData imd;
-                imd.spec = idx["spec"].Obj();
+                imd.spec = idx["spec"].Obj().getOwned();
                 imd.ready = idx["ready"].trueValue();
                 imd.head = DiskLoc( idx["head_a"].Int(),
                                     idx["head_b"].Int() );

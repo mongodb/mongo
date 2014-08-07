@@ -29,16 +29,21 @@
 *    it in the license file.
 */
 
+#include <memory>
+
 #include <boost/filesystem/operations.hpp>
 
+#include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
-#include <rocksdb/slice.h>
 #include <rocksdb/options.h>
+#include <rocksdb/slice.h>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -48,31 +53,48 @@ namespace mongo {
     class MyOperationContext : public OperationContextNoop {
     public:
         MyOperationContext( rocksdb::DB* db )
-            : OperationContextNoop( new RocksRecoveryUnit( db, false ) ) {
-        }
+            : OperationContextNoop( new RocksRecoveryUnit( db, false ) ) { }
     };
 
-    rocksdb::DB* getDB() {
-        string path = "/tmp/mongo-rocks-test";
+    // to be used in testing
+    static boost::scoped_ptr<rocksdb::Comparator> _rocksComparator(
+            RocksRecordStore::newRocksCollectionComparator() );
+
+    rocksdb::ColumnFamilyOptions getColumnFamilyOptions() {
+        rocksdb::ColumnFamilyOptions options;
+        options.comparator = _rocksComparator.get();
+        return options;
+    }
+
+    string _rocksRecordStoreTestDir = "mongo-rocks-test";
+
+    rocksdb::DB* getDB( string path) {
         boost::filesystem::remove_all( path );
 
-        rocksdb::Options options;
-        // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
-        options.IncreaseParallelism();
-        options.OptimizeLevelStyleCompaction();
-        // create the DB if it's not already present
-        options.create_if_missing = true;
+        rocksdb::Options options = RocksEngine::dbOptions();
 
         // open DB
         rocksdb::DB* db;
         rocksdb::Status s = rocksdb::DB::Open(options, path, &db);
-        ASSERT(s.ok());
+        ASSERT_OK( toMongoStatus( s ) );
+
+        return db;
+    }
+
+    rocksdb::DB* getDBPersist( string path ) {
+        rocksdb::Options options = RocksEngine::dbOptions();
+
+        // open DB
+        rocksdb::DB* db;
+        rocksdb::Status s = rocksdb::DB::Open(options, path, &db);
+        ASSERT_OK( toMongoStatus( s ) );
 
         return db;
     }
 
     TEST( RocksRecoveryUnitTest, Simple1 ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksRecordStoreTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         db->Put( rocksdb::WriteOptions(), "a", "b" );
 
@@ -98,7 +120,8 @@ namespace mongo {
     }
 
     TEST( RocksRecoveryUnitTest, SimpleAbort1 ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksRecordStoreTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         db->Put( rocksdb::WriteOptions(), "a", "b" );
 
@@ -125,11 +148,16 @@ namespace mongo {
 
 
     TEST( RocksRecordStoreTest, Insert1 ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksRecordStoreTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+        int size;
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(),
+                                 db->DefaultColumnFamily(),
+                                 db->DefaultColumnFamily() );
             string s = "eliot was here";
+            size = s.length() + 1;
 
             MyOperationContext opCtx( db.get() );
             DiskLoc loc;
@@ -142,13 +170,24 @@ namespace mongo {
 
             ASSERT_EQUALS( s, rs.dataFor( loc ).data() );
         }
+
+        {
+            RocksRecordStore rs( "foo.bar", db.get(),
+                                 db->DefaultColumnFamily(),
+                                 db->DefaultColumnFamily() );
+            ASSERT_EQUALS( 1, rs.numRecords() );
+            ASSERT_EQUALS( size, rs.dataSize() );
+        }
     }
 
     TEST( RocksRecordStoreTest, Delete1 ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksRecordStoreTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(),
+                                 db->DefaultColumnFamily(),
+                                 db->DefaultColumnFamily() );
             string s = "eliot was here";
 
             DiskLoc loc;
@@ -156,12 +195,17 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( opCtx.recoveryUnit() );
-                    StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
+                    StatusWith<DiskLoc> res = rs.insertRecord(&opCtx,
+                                                              s.c_str(),
+                                                              s.size() + 1,
+                                                              -1 );
                     ASSERT_OK( res.getStatus() );
                     loc = res.getValue();
                 }
 
                 ASSERT_EQUALS( s, rs.dataFor( loc ).data() );
+                ASSERT_EQUALS( 1, rs.numRecords() );
+                ASSERT_EQUALS( static_cast<long long> ( s.length() + 1 ), rs.dataSize() );
             }
 
             ASSERT( rs.dataFor( loc ).data() != NULL );
@@ -170,18 +214,21 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 WriteUnitOfWork uow( opCtx.recoveryUnit() );
                 rs.deleteRecord( &opCtx, loc );
+
+                ASSERT_EQUALS( 0, rs.numRecords() );
+                ASSERT_EQUALS( 0, rs.dataSize() );
             }
-
-            ASSERT( rs.dataFor( loc ).data() == NULL );
-
         }
     }
 
     TEST( RocksRecordStoreTest, Update1 ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksRecordStoreTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(),
+                                 db->DefaultColumnFamily(),
+                                 db->DefaultColumnFamily() );
             string s1 = "eliot1";
             string s2 = "eliot2 and more";
 
@@ -222,10 +269,13 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, UpdateInPlace1 ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksRecordStoreTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily() );
+            RocksRecordStore rs( "foo.bar", db.get(),
+                                 db->DefaultColumnFamily(),
+                                 db->DefaultColumnFamily() );
             string s1 = "aaa111bbb";
             string s2 = "aaa222bbb";
 
@@ -268,26 +318,34 @@ namespace mongo {
     }
 
     TEST( RocksRecordStoreTest, TwoCollections ) {
-        rocksdb::DB* db = getDB();
+        unittest::TempDir td( _rocksRecordStoreTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         rocksdb::ColumnFamilyHandle* cf1;
         rocksdb::ColumnFamilyHandle* cf2;
+        rocksdb::ColumnFamilyHandle* cf1_m;
+        rocksdb::ColumnFamilyHandle* cf2_m;
 
         rocksdb::Status status;
 
         status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1", &cf1 );
-        ASSERT( status.ok() );
+        ASSERT_OK( toMongoStatus( status ) );
         status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar2", &cf2 );
-        ASSERT( status.ok() );
+        ASSERT_OK( toMongoStatus( status ) );
 
-        RocksRecordStore rs1( "foo.bar1", db, cf1 );
-        RocksRecordStore rs2( "foo.bar2", db, cf2 );
+        status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
+        ASSERT_OK( toMongoStatus( status ) );
+        status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar2&", &cf2_m );
+        ASSERT_OK( toMongoStatus( status ) );
+
+        RocksRecordStore rs1( "foo.bar1", db.get(), cf1, cf1_m );
+        RocksRecordStore rs2( "foo.bar2", db.get(), cf2, cf2_m );
 
         DiskLoc a;
         DiskLoc b;
 
         {
-            MyOperationContext opCtx( db );
+            MyOperationContext opCtx( db.get() );
             WriteUnitOfWork uow( opCtx.recoveryUnit() );
 
             StatusWith<DiskLoc> result = rs1.insertRecord( &opCtx, "a", 2, -1 );
@@ -306,14 +364,15 @@ namespace mongo {
 
         delete cf2;
         delete cf1;
-
-        delete db;
     }
 
     TEST( RocksRecordStoreTest, Stats1 ) {
-        scoped_ptr<rocksdb::DB> db( getDB() );
+        unittest::TempDir td( _rocksRecordStoreTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
-        RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily() );
+        RocksRecordStore rs( "foo.bar", db.get(),
+                             db->DefaultColumnFamily(),
+                             db->DefaultColumnFamily() );
         string s = "eliot was here";
 
         {
@@ -338,4 +397,286 @@ namespace mongo {
         }
     }
 
+    TEST( RocksRecordStoreTest, Persistence1 ) {
+        DiskLoc loc;
+        string origStr = "eliot was here";
+        string newStr = "antonio was here";
+        unittest::TempDir td( _rocksRecordStoreTestDir );
+
+        {
+            scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(),
+                                                      db->DefaultColumnFamily() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, origStr.c_str(),
+                                                               origStr.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc = res.getValue();
+                }
+
+                ASSERT_EQUALS( origStr, rs.dataFor( loc ).data() );
+            }
+        }
+
+        {
+            scoped_ptr<rocksdb::DB> db( getDBPersist( td.path() ) );
+
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(),
+                                                      db->DefaultColumnFamily() );
+
+            ASSERT_EQUALS( static_cast<long long> ( origStr.size() + 1 ), rs.dataSize() );
+            ASSERT_EQUALS( 1, rs.numRecords() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    StatusWith<DiskLoc> res = rs.updateRecord( &opCtx, loc, newStr.c_str(),
+                                                               newStr.size() + 1, -1, NULL );
+                    ASSERT_OK( res.getStatus() );
+                }
+
+                ASSERT_EQUALS( newStr, rs.dataFor( loc ).data() );
+            }
+        }
+
+        {
+            scoped_ptr<rocksdb::DB> db( getDBPersist( td.path() ) );
+
+            RocksRecordStore rs( "foo.bar", db.get(), db->DefaultColumnFamily(),
+                                                      db->DefaultColumnFamily() );
+
+            ASSERT_EQUALS( static_cast<long long>( newStr.size() + 1 ), rs.dataSize() );
+            ASSERT_EQUALS( 1, rs.numRecords() );
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    rs.deleteRecord( &opCtx, loc );
+                }
+            }
+
+            ASSERT_EQUALS( 0, rs.dataSize() );
+            ASSERT_EQUALS( 0, rs.numRecords() );
+        }
+    }
+
+    TEST( RocksRecordStoreTest, ForwardIterator ) {
+        {
+            unittest::TempDir td( _rocksRecordStoreTestDir );
+            scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+
+            rocksdb::ColumnFamilyHandle* cf1;
+            rocksdb::ColumnFamilyHandle* cf1_m;
+
+            rocksdb::Status status;
+
+            status = db->CreateColumnFamily( getColumnFamilyOptions(), "foo.bar1", &cf1 );
+            ASSERT_OK( toMongoStatus( status ) );
+            status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
+            ASSERT_OK( toMongoStatus( status ) );
+
+            RocksRecordStore rs( "foo.bar", db.get(), cf1, cf1_m );
+            string s1 = "eliot was here";
+            string s2 = "antonio was here";
+            string s3 = "eliot and antonio were here";
+            DiskLoc loc1;
+            DiskLoc loc2;
+            DiskLoc loc3;
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s1.c_str(), s1.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc1 = res.getValue();
+                    res = rs.insertRecord( &opCtx, s2.c_str(), s2.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc2 = res.getValue();
+                    res = rs.insertRecord( &opCtx, s3.c_str(), s3.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc3 = res.getValue();
+                }
+            }
+
+            OperationContextNoop txn;
+
+            scoped_ptr<RecordIterator> iter( rs.getIterator( &txn ) );
+
+            ASSERT_EQUALS( false, iter->isEOF() );
+            ASSERT_EQUALS( loc1, iter->getNext() );
+            ASSERT_EQUALS( s1, iter->dataFor( loc1 ).data() );
+
+            ASSERT_EQUALS( false, iter->isEOF() );
+            ASSERT_EQUALS( loc2, iter->getNext() );
+            ASSERT_EQUALS( s2, iter->dataFor( loc2 ).data() );
+
+            ASSERT_EQUALS( false, iter->isEOF() );
+            ASSERT_EQUALS( loc3, iter->getNext() );
+            ASSERT_EQUALS( s3, iter->dataFor( loc3 ).data() );
+
+            ASSERT_EQUALS( true, iter->isEOF() );
+            ASSERT_EQUALS( DiskLoc(), iter->getNext() );
+        }
+    }
+
+    TEST( RocksRecordStoreTest, BackwardIterator ) {
+        {
+            unittest::TempDir td( _rocksRecordStoreTestDir );
+            scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+
+            rocksdb::ColumnFamilyHandle* cf1;
+            rocksdb::ColumnFamilyHandle* cf1_m;
+
+            rocksdb::Status status;
+
+            status = db->CreateColumnFamily( getColumnFamilyOptions(), "foo.bar1", &cf1 );
+            ASSERT_OK( toMongoStatus( status ) );
+            status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
+            ASSERT_OK( toMongoStatus( status ) );
+
+            RocksRecordStore rs( "foo.bar", db.get(), cf1, cf1_m );
+            string s1 = "eliot was here";
+            string s2 = "antonio was here";
+            string s3 = "eliot and antonio were here";
+            DiskLoc loc1;
+            DiskLoc loc2;
+            DiskLoc loc3;
+
+            {
+                MyOperationContext opCtx( db.get() );
+                {
+                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s1.c_str(), s1.size() +1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc1 = res.getValue();
+                    res = rs.insertRecord( &opCtx, s2.c_str(), s2.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc2 = res.getValue();
+                    res = rs.insertRecord( &opCtx, s3.c_str(), s3.size() + 1, -1 );
+                    ASSERT_OK( res.getStatus() );
+                    loc3 = res.getValue();
+                }
+            }
+
+            OperationContextNoop txn;
+            scoped_ptr<RecordIterator> iter( rs.getIterator( &txn, maxDiskLoc, false,
+                                             CollectionScanParams::BACKWARD ) );
+            ASSERT_EQUALS( false, iter->isEOF() );
+            ASSERT_EQUALS( loc3, iter->getNext() );
+            ASSERT_EQUALS( s3, iter->dataFor( loc3 ).data() );
+
+            ASSERT_EQUALS( false, iter->isEOF() );
+            ASSERT_EQUALS( loc2, iter->getNext() );
+            ASSERT_EQUALS( s2, iter->dataFor( loc2 ).data() );
+
+            ASSERT_EQUALS( false, iter->isEOF() );
+            ASSERT_EQUALS( loc1, iter->getNext() );
+            ASSERT_EQUALS( s1, iter->dataFor( loc1 ).data() );
+
+            ASSERT_EQUALS( true, iter->isEOF() );
+            ASSERT_EQUALS( DiskLoc(), iter->getNext() );
+        }
+    }
+
+    TEST( RocksRecordStoreTest, Truncate1 ) {
+        unittest::TempDir td( _rocksRecordStoreTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+
+        {
+            rocksdb::ColumnFamilyHandle* cf1;
+            rocksdb::ColumnFamilyHandle* cf1_m;
+
+            rocksdb::Status status;
+
+            status = db->CreateColumnFamily( getColumnFamilyOptions(), "foo.bar1", &cf1 );
+            ASSERT_OK( toMongoStatus( status ) );
+            status = db->CreateColumnFamily( rocksdb::ColumnFamilyOptions(), "foo.bar1&", &cf1_m );
+            ASSERT_OK( toMongoStatus( status ) );
+
+            RocksRecordStore rs( "foo.bar", db.get(), cf1, cf1_m );
+            string s = "antonio was here";
+
+            {
+                MyOperationContext opCtx( db.get() );
+                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
+                ASSERT_OK( res.getStatus() );
+                res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
+                ASSERT_OK( res.getStatus() );
+            }
+
+            {
+                MyOperationContext opCtx( db.get() );
+                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                Status stat = rs.truncate( &opCtx );
+                ASSERT_OK( stat );
+
+                ASSERT_EQUALS( 0, rs.numRecords() );
+                ASSERT_EQUALS( 0, rs.dataSize() );
+            }
+
+            // Test that truncate does not fail on an empty collection
+            {
+                MyOperationContext opCtx( db.get() );
+                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                Status stat = rs.truncate( &opCtx );
+                ASSERT_OK( stat );
+
+                ASSERT_EQUALS( 0, rs.numRecords() );
+                ASSERT_EQUALS( 0, rs.dataSize() );
+            }
+        }
+    }
+
+    TEST( RocksRecordStoreTest, Snapshots1 ) {
+        unittest::TempDir td( _rocksRecordStoreTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+
+        DiskLoc loc;
+        int size = -1;
+
+        {
+            RocksRecordStore rs( "foo.bar", db.get(),
+                                 db->DefaultColumnFamily(),
+                                 db->DefaultColumnFamily() );
+            string s = "test string";
+            size = s.length() + 1;
+
+            MyOperationContext opCtx( db.get() );
+            {
+                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
+                ASSERT_OK( res.getStatus() );
+                loc = res.getValue();
+            }
+        }
+
+        {
+            MyOperationContext opCtx( db.get() );
+            MyOperationContext opCtx2( db.get() );
+
+            RocksRecordStore rs( "foo.bar", db.get(),
+                                 db->DefaultColumnFamily(),
+                                 db->DefaultColumnFamily() );
+
+            rs.deleteRecord( &opCtx, loc );
+
+            RecordData recData = rs.dataFor( loc/*, &opCtx */ );
+            ASSERT( !recData.data() && recData.size() == 0 );
+
+            // XXX this test doesn't yet work, but there should be some notion of snapshots,
+            // and the op context that doesn't see the deletion shouldn't know that this data
+            // has been deleted
+            RecordData recData2 = rs.dataFor( loc/*, &opCtx2 */ );
+            ASSERT( recData.data() && recData.size() == size );
+        }
+    }
 }

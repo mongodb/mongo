@@ -1,4 +1,4 @@
-// rocks_btree_impl.h
+// rocks_sorted_data_impl.h
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -30,6 +30,10 @@
 
 #include "mongo/db/storage/sorted_data_interface.h"
 
+#include <rocksdb/db.h>
+
+#include "mongo/db/storage/index_entry_comparison.h"
+
 #pragma once
 
 namespace rocksdb {
@@ -41,32 +45,35 @@ namespace mongo {
 
     class RocksRecoveryUnit;
 
-    class RocksBtreeBuilderImpl : public BtreeBuilderInterface {
+    class RocksSortedDataBuilderImpl : public SortedDataBuilderInterface {
     public:
         virtual Status addKey(const BSONObj& key, const DiskLoc& loc) = 0;
         virtual unsigned long long commit(bool mayInterrupt) = 0;
     };
 
-    class RocksBtreeImpl : public SortedDataInterface {
+    /**
+     * Rocks implementation of the SortedDataInterface. Each index is stored as a single column
+     * family. Each mapping from a BSONObj to a DiskLoc is stored as the key of a key-value pair
+     * in the column family. Consequently, each value in the database is simply an empty string.
+     * This is done because RocksDB only supports unique keys, and because RocksDB can take a custom
+     * comparator to use when ordering keys. We use a custom comparator which orders keys based
+     * first upon the BSONObj in the key, and uses the DiskLoc as a tiebreaker.
+     */
+    class RocksSortedDataImpl : public SortedDataInterface {
+        MONGO_DISALLOW_COPYING( RocksSortedDataImpl );
     public:
-        RocksBtreeImpl( rocksdb::DB* db,
-                        rocksdb::ColumnFamilyHandle* cf );
+        RocksSortedDataImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf );
 
-        virtual BtreeBuilderInterface* getBulkBuilder(OperationContext* txn,
-                                                      bool dupsAllowed);
+        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
         virtual Status insert(OperationContext* txn,
                               const BSONObj& key,
                               const DiskLoc& loc,
                               bool dupsAllowed);
 
-        virtual bool unindex(OperationContext* txn,
-                             const BSONObj& key,
-                             const DiskLoc& loc);
+        virtual bool unindex(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
 
-        virtual Status dupKeyCheck(OperationContext* txn,
-                                   const BSONObj& key,
-                                   const DiskLoc& loc);
+        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
 
         virtual void fullValidate(OperationContext* txn, long long* numKeysOut);
 
@@ -74,15 +81,33 @@ namespace mongo {
 
         virtual Status touch(OperationContext* txn) const;
 
-        virtual Cursor* newCursor(OperationContext* int direction) const;
+        virtual Cursor* newCursor(OperationContext* txn, int direction) const;
 
         virtual Status initAsEmpty(OperationContext* txn);
 
+        virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
+
+        //rocks specific
+
+        // ownership passes to caller. Bare because we need to pass the bare pointer to the
+        // rocksdb::Options class
+        static rocksdb::Comparator* newRocksComparator( const Ordering& order );
+
     private:
+        typedef DiskLoc RecordId;
+
         RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx ) const;
 
-        rocksdb::DB* _db;
-        rocksdb::ColumnFamilyHandle* _columnFamily;
+        rocksdb::DB* _db; // not owned
 
+        // Each index is stored as a single column family, so this stores the handle to the
+        // relevant column family
+        rocksdb::ColumnFamilyHandle* _columnFamily; // not owned
+
+        /**
+         * Creates an error code message out of a key
+         */
+        std::string dupKeyError(const BSONObj& key) const;
     };
-}
+
+} // namespace mongo
