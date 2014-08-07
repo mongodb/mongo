@@ -278,7 +278,8 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	} else {
 		/* Fast path some common cases. */
 		fmt = cursor->key_format;
-		if (LF_ISSET(WT_CURSOR_RAW_OK) || WT_STREQ(fmt, "u")) {
+		if (LF_ISSET(WT_CURSOR_RAW_OK | WT_CURSTD_DUMP_JSON) ||
+		    WT_STREQ(fmt, "u")) {
 			item = va_arg(ap, WT_ITEM *);
 			sz = item->size;
 			cursor->key.data = item->data;
@@ -399,7 +400,8 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 
 	/* Fast path some common cases. */
 	fmt = cursor->value_format;
-	if (F_ISSET(cursor, WT_CURSOR_RAW_OK) || WT_STREQ(fmt, "u")) {
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK | WT_CURSTD_DUMP_JSON) ||
+	    WT_STREQ(fmt, "u")) {
 		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
 		cursor->value.data = item->data;

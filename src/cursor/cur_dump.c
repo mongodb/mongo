@@ -160,10 +160,6 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 	child = cdump->child;
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 
-	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
-		WT_ERR_MSG(session, EINVAL,
-		    "Setting keys for JSON cursors not permitted");
-
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW))
 		p = va_arg(ap, WT_ITEM *)->data;
@@ -176,8 +172,13 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 
 		child->set_key(child, recno);
 	} else {
-		WT_ERR(__dump_to_raw(session, p, &cursor->key,
-		    F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
+		if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
+			WT_ERR(__wt_json_to_item(session, p, cursor->key_format,
+			    (WT_CURSOR_JSON *)cursor->json_private, 1,
+			    &cursor->key));
+		else
+			WT_ERR(__dump_to_raw(session, p, &cursor->key,
+			    F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
 
 		child->set_key(child, &cursor->key);
 	}
@@ -255,10 +256,6 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 	child = cdump->child;
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
-	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
-		WT_ERR_MSG(session, EINVAL,
-		    "Setting values for JSON cursors not permitted");
-
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW))
 		p = va_arg(ap, WT_ITEM *)->data;
@@ -266,8 +263,12 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 		p = va_arg(ap, const char *);
 	va_end(ap);
 
-	WT_ERR(__dump_to_raw(session,
-	    p, &cursor->value, F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
+	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
+		WT_ERR(__wt_json_to_item(session, p, cursor->value_format,
+		    (WT_CURSOR_JSON *)cursor->json_private, 0, &cursor->value));
+	else
+		WT_ERR(__dump_to_raw(session, p, &cursor->value,
+		    F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
 
 	child->set_value(child, &cursor->value);
 

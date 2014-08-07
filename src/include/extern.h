@@ -706,6 +706,23 @@ extern int __wt_json_column_init(WT_CURSOR *cursor,
     const char *keyformat,
     const WT_CONFIG_ITEM *idxconf,
     const WT_CONFIG_ITEM *colconf);
+extern int __wt_json_token(WT_SESSION *wt_session,
+    const char *src,
+    int *toktype,
+    const char **tokstart,
+    size_t *toklen);
+extern const char *__wt_json_tokname(int toktype);
+extern int __wt_json_to_item(WT_SESSION_IMPL *session,
+    const char *jstr,
+    const char *format,
+    WT_CURSOR_JSON *json,
+    int iskey,
+    WT_ITEM *item);
+extern ssize_t __wt_json_strlen(const char *src, size_t srclen);
+extern int __wt_json_strncpy(char **pdst,
+    size_t dstlen,
+    const char *src,
+    size_t srclen);
 extern int __wt_curlog_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
@@ -1485,6 +1502,7 @@ extern int __wt_raw_to_esc_hex( WT_SESSION_IMPL *session,
     const uint8_t *from,
     size_t size,
     WT_ITEM *to);
+extern int __wt_hex2byte(const u_char *from, u_char *to);
 extern int __wt_hex_to_raw(WT_SESSION_IMPL *session,
     const char *from,
     WT_ITEM *to);
