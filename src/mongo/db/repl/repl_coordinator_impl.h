@@ -40,7 +40,6 @@
 #include "mongo/db/repl/repl_coordinator_external_state.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -48,21 +47,23 @@ namespace mongo {
 namespace repl {
 
     class SyncSourceFeedback;
+    class TopologyCoordinator;
 
     class ReplicationCoordinatorImpl : public ReplicationCoordinator {
         MONGO_DISALLOW_COPYING(ReplicationCoordinatorImpl);
 
     public:
 
-        // Takes ownership of the passed in ReplicationCoordinatorExternalState.
+        // Takes ownership of the "externalState", "topCoord" and "network" objects.
         ReplicationCoordinatorImpl(const ReplSettings& settings,
-                                   ReplicationCoordinatorExternalState* externalState);
+                                   ReplicationCoordinatorExternalState* externalState,
+                                   ReplicationExecutor::NetworkInterface* network,
+                                   TopologyCoordinator* topoCoord);
         virtual ~ReplicationCoordinatorImpl();
 
         // ================== Members of public ReplicationCoordinator API ===================
 
-        virtual void startReplication(TopologyCoordinator* topCoord,
-                                      ReplicationExecutor::NetworkInterface* network);
+        virtual void startReplication();
 
         virtual void shutdown();
 
@@ -273,8 +274,8 @@ namespace repl {
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
         boost::scoped_ptr<TopologyCoordinator> _topCoord;
 
-        // Pointer to the ReplicationExecutor owned by this ReplicationCoordinator.
-        boost::scoped_ptr<ReplicationExecutor> _replExecutor;
+        // Executor that drives the topology coordinator.
+        ReplicationExecutor _replExecutor;
 
         // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
         boost::scoped_ptr<ReplicationCoordinatorExternalState> _externalState;

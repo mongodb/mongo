@@ -30,7 +30,9 @@
 
 #include "mongo/db/repl/repl_coordinator_hybrid.h"
 
+#include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
+#include "mongo/db/repl/topology_coordinator_impl.h"
 
 namespace mongo {
 
@@ -39,14 +41,18 @@ namespace mongo {
 namespace repl {
 
     HybridReplicationCoordinator::HybridReplicationCoordinator(const ReplSettings& settings) :
-            _legacy(settings), _impl(settings, new ReplicationCoordinatorExternalStateImpl()) {}
+        _legacy(settings),
+        _impl(settings,
+              new ReplicationCoordinatorExternalStateImpl,
+              new NetworkInterfaceImpl,
+              new TopologyCoordinatorImpl(Seconds(maxSyncSourceLagSecs))) {
+    }
+
     HybridReplicationCoordinator::~HybridReplicationCoordinator() {}
 
-    void HybridReplicationCoordinator::startReplication(
-            TopologyCoordinator* topCoord,
-            ReplicationExecutor::NetworkInterface* network) {
-        _legacy.startReplication(topCoord, network);
-        _impl.startReplication(topCoord, network);
+    void HybridReplicationCoordinator::startReplication() {
+        _legacy.startReplication();
+        _impl.startReplication();
     }
 
     void HybridReplicationCoordinator::shutdown() {

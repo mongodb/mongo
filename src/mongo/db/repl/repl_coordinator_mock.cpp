@@ -40,9 +40,7 @@ namespace repl {
             _settings(settings) {}
     ReplicationCoordinatorMock::~ReplicationCoordinatorMock() {}
 
-    void ReplicationCoordinatorMock::startReplication(
-            TopologyCoordinator* topCoord,
-            ReplicationExecutor::NetworkInterface* network) {
+    void ReplicationCoordinatorMock::startReplication() {
         // TODO
     }
 

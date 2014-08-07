@@ -41,6 +41,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options.h"
@@ -85,25 +86,19 @@ namespace repl {
     };
 
     ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
-                                            const ReplSettings& settings,
-                                            ReplicationCoordinatorExternalState* externalState) :
-            _settings(settings),
-            _externalState(externalState),
-            _inShutdown(false),
-            _thisMembersConfigIndex(-1) {
+            const ReplSettings& settings,
+            ReplicationCoordinatorExternalState* externalState,
+            ReplicationExecutor::NetworkInterface* network,
+            TopologyCoordinator* topCoord) :
+        _settings(settings),
+        _replExecutor(network),
+        _externalState(externalState),
+        _inShutdown(false),
+        _thisMembersConfigIndex(-1) {
 
-    }
-
-    ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
-
-    void ReplicationCoordinatorImpl::startReplication(
-            TopologyCoordinator* topCoord,
-            ReplicationExecutor::NetworkInterface* network) {
         if (!isReplEnabled()) {
             return;
         }
-
-        _myRID = _externalState->ensureMe();
 
         _topCoord.reset(topCoord);
         _topCoord->registerConfigChangeCallback(
@@ -115,10 +110,23 @@ namespace repl {
                 stdx::bind(&ReplicationCoordinatorImpl::_onSelfStateChange,
                            this,
                            stdx::placeholders::_1));
+    }
 
-        _replExecutor.reset(new ReplicationExecutor(network));
+    ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
+
+    void ReplicationCoordinatorImpl::startReplication() {
+        if (!isReplEnabled()) {
+            return;
+        }
+
+        // Must set _myRID before any network traffic, because network traffic leads to concurrent
+        // access to _myRID, which is not mutex guarded.  This is OK because startReplication()
+        // executes before the server starts listening for connections, and replication starts no
+        // threads of its own until later in this function.
+        _myRID = _externalState->ensureMe();
+
         _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
-                                                                 _replExecutor.get())));
+                                                                 &_replExecutor)));
         _syncSourceFeedbackThread.reset(new boost::thread(
                 stdx::bind(&ReplicationCoordinatorExternalState::runSyncSourceFeedback,
                            _externalState.get())));
@@ -145,7 +153,7 @@ namespace repl {
             }
         }
 
-        _replExecutor->shutdown();
+        _replExecutor.shutdown();
         _topCoordDriverThread->join(); // must happen outside _mutex
         _externalState->shutdown();
         _syncSourceFeedbackThread->join();
@@ -525,7 +533,7 @@ namespace repl {
 
     Status ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* response) {
         Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
-        CBHStatus cbh = _replExecutor->scheduleWork(
+        CBHStatus cbh = _replExecutor.scheduleWork(
             stdx::bind(&TopologyCoordinator::prepareStatusResponse,
                        _topCoord.get(),
                        stdx::placeholders::_1,
@@ -538,7 +546,7 @@ namespace repl {
             return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
         }
         fassert(18640, cbh.getStatus());
-        _replExecutor->wait(cbh.getValue());
+        _replExecutor.wait(cbh.getValue());
         return result;
     }
 
@@ -567,7 +575,7 @@ namespace repl {
 
     Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
         Status result(ErrorCodes::InternalError, "didn't set status in prepareFreezeResponse");
-        CBHStatus cbh = _replExecutor->scheduleWork(
+        CBHStatus cbh = _replExecutor.scheduleWork(
             stdx::bind(&TopologyCoordinator::prepareFreezeResponse,
                        _topCoord.get(),
                        stdx::placeholders::_1,
@@ -579,14 +587,14 @@ namespace repl {
             return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
         }
         fassert(18641, cbh.getStatus());
-        _replExecutor->wait(cbh.getValue());
+        _replExecutor.wait(cbh.getValue());
         return result;
     }
 
     Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& args,
                                                         ReplSetHeartbeatResponse* response) {
         Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");
-        CBHStatus cbh = _replExecutor->scheduleWork(
+        CBHStatus cbh = _replExecutor.scheduleWork(
             stdx::bind(&TopologyCoordinator::prepareHeartbeatResponse,
                        _topCoord.get(),
                        stdx::placeholders::_1,
@@ -600,7 +608,7 @@ namespace repl {
             return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
         }
         fassert(18508, cbh.getStatus());
-        _replExecutor->wait(cbh.getValue());
+        _replExecutor.wait(cbh.getValue());
         return result;
     }
 
@@ -770,7 +778,7 @@ namespace repl {
                                                 this,
                                                 stdx::placeholders::_1,
                                                 hap);
-            CBHStatus status = _replExecutor->scheduleWorkAt(
+            CBHStatus status = _replExecutor.scheduleWorkAt(
                                         Date_t(curTimeMillis64() + heartbeatFrequencyMillis),
                                         restartCB);
             if (!status.isOK()) {
@@ -808,7 +816,7 @@ namespace repl {
                                        heartbeatRetries);
 
 
-        CBHStatus status = _replExecutor->scheduleRemoteCommand(request, callback);
+        CBHStatus status = _replExecutor.scheduleRemoteCommand(request, callback);
         if (!status.isOK()) {
             log() << "replset: aborting heartbeats for " << hap << " due to scheduling error"
                    << status;
@@ -851,7 +859,7 @@ namespace repl {
         HeartbeatHandles::const_iterator it = _heartbeatHandles.begin();
         const HeartbeatHandles::const_iterator end = _heartbeatHandles.end();
         for( ; it != end; ++it ) {
-            _replExecutor->cancel(*it);
+            _replExecutor.cancel(*it);
         }
 
         _heartbeatHandles.clear();
@@ -863,7 +871,7 @@ namespace repl {
 
         for(;it != end; it++) {
             HostAndPort host = it->getHostAndPort();
-            CBHStatus status = _replExecutor->scheduleWork(
+            CBHStatus status = _replExecutor.scheduleWork(
                                     stdx::bind(
                                             &ReplicationCoordinatorImpl::doMemberHeartbeat,
                                             this,
