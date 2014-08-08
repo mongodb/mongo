@@ -123,9 +123,7 @@ struct __wt_lsm_manager {
 	WT_SPINLOCK	manager_lock;	/* Lock for manager queue */
 	uint32_t	lsm_workers;	/* Current number of LSM workers */
 	uint32_t	lsm_workers_max;
-	pthread_t	*lsm_worker_tids;
-	WT_SESSION_IMPL	**lsm_worker_sessions;
-
+	WT_LSM_WORKER_ARGS *lsm_worker_cookies;
 };
 
 /*
@@ -226,6 +224,7 @@ struct __wt_lsm_worker_cookie {
  */
 struct __wt_lsm_worker_args {
 	WT_SESSION_IMPL *session;
+	pthread_t	tid;
 	u_int id;
 	uint32_t flags;
 };

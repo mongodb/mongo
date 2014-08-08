@@ -25,6 +25,7 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
+	WT_LSM_WORKER_ARGS *cookies;
 	WT_SESSION_IMPL *worker_session;
 	uint32_t i;
 
@@ -35,10 +36,8 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	 * worker.
 	 */
 	WT_ASSERT(session, manager->lsm_workers_max > 2);
-	WT_RET(__wt_calloc_def(session,
-	    manager->lsm_workers_max, &manager->lsm_worker_tids));
-	WT_ERR(__wt_calloc_def(session,
-	    manager->lsm_workers_max, &manager->lsm_worker_sessions));
+	WT_RET(__wt_calloc_def(session, manager->lsm_workers_max, &cookies));
+	manager->lsm_worker_cookies = cookies;
 
 	/*
 	 * Open sessions for all potential worker threads here - it's not
@@ -51,23 +50,22 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 		WT_ERR(__wt_open_internal_session(
 		    S2C(session), "lsm-worker", 1, 0, &worker_session));
 		worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
-		manager->lsm_worker_sessions[i] = worker_session;
+		cookies[i].session = worker_session;
 	}
 
 	/* Start the LSM manager thread. */
-	WT_ERR(__wt_thread_create(session, &manager->lsm_worker_tids[0],
-	    __lsm_worker_manager, manager->lsm_worker_sessions[0]));
+	WT_ERR(__wt_thread_create(
+	    session, &cookies[0].tid, __lsm_worker_manager, &cookies[0]));
 
 	F_SET(S2C(session), WT_CONN_SERVER_LSM);
 
 	if (0) {
 err:		for (i = 0;
-		    (worker_session = manager->lsm_worker_sessions[i]) != NULL;
+		    (worker_session = cookies[i].session) != NULL;
 		    i++)
 			WT_TRET((&worker_session->iface)->close(
 			    &worker_session->iface, NULL));
-		__wt_free(session, manager->lsm_worker_sessions);
-		__wt_free(session, manager->lsm_worker_tids);
+		__wt_free(session, cookies);
 	}
 	return (ret);
 }
@@ -106,7 +104,7 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	manager = &conn->lsm_manager;
 	removed = 0;
 
-	if (manager->lsm_worker_tids == NULL)
+	if (manager->lsm_worker_cookies == NULL)
 		return (0);
 
 	/* Wait for the server to notice and wrap up. */
@@ -116,8 +114,8 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	/* Clean up open LSM handles. */
 	ret = __wt_lsm_tree_close_all(conn->default_session);
 
-	WT_TRET(__wt_thread_join(session, manager->lsm_worker_tids[0]));
-	manager->lsm_worker_tids[0] = 0;
+	WT_TRET(__wt_thread_join(session, manager->lsm_worker_cookies[0].tid));
+	manager->lsm_worker_cookies[0].tid = 0;
 
 	/* Release memory from any operations left on the queue. */
 	for (current = TAILQ_FIRST(&manager->switchqh);
@@ -144,9 +142,8 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 
 	/* Close all LSM worker sessions. */
 	for (i = 0; i < manager->lsm_workers_max; i++) {
-		wt_session = &manager->lsm_worker_sessions[i]->iface;
+		wt_session = &manager->lsm_worker_cookies[i].session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
-		manager->lsm_worker_sessions[i] = NULL;
 	}
 
 	WT_STAT_FAST_CONN_INCRV(session, lsm_work_units_discarded, removed);
@@ -155,8 +152,7 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &manager->app_lock);
 	__wt_spin_destroy(session, &manager->manager_lock);
 
-	__wt_free(session, manager->lsm_worker_tids);
-	__wt_free(session, manager->lsm_worker_sessions);
+	__wt_free(session, manager->lsm_worker_cookies);
 
 	return (ret);
 }
@@ -217,14 +213,12 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	WT_RET(__wt_spin_init(
 	    session, &manager->switch_lock, "LSM switch queue lock"));
 
-	/* Freed by the worker thread when it shuts down */
-	WT_RET(__wt_calloc_def(session, 1, &worker_args));
-	worker_args->session = manager->lsm_worker_sessions[1];
+	worker_args = &manager->lsm_worker_cookies[1];
 	worker_args->id = manager->lsm_workers++;
 	worker_args->flags = WT_LSM_WORK_SWITCH;
 	/* Start the switch thread. */
-	WT_RET(__wt_thread_create(session, &manager->lsm_worker_tids[1],
-	    __lsm_worker, worker_args));
+	WT_RET(__wt_thread_create(
+	    session, &worker_args->tid, __lsm_worker, worker_args));
 
 	/*
 	 * Start the remaining worker threads.
@@ -235,9 +229,8 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	for (; manager->lsm_workers < manager->lsm_workers_max;
 	    manager->lsm_workers++) {
 		/* Freed by the worker thread when it shuts down */
-		WT_RET(__wt_calloc_def(session, 1, &worker_args));
-		worker_args->session =
-		    manager->lsm_worker_sessions[manager->lsm_workers];
+		worker_args =
+		    &manager->lsm_worker_cookies[manager->lsm_workers];
 		worker_args->id = manager->lsm_workers;
 		worker_args->flags =
 		    WT_LSM_WORK_BLOOM |
@@ -252,9 +245,8 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 		 */
 		if (manager->lsm_workers % 2 == 1)
 			F_SET(worker_args, WT_LSM_WORK_MERGE);
-		WT_RET(__wt_thread_create(session,
-		    &manager->lsm_worker_tids[manager->lsm_workers],
-		    __lsm_worker, worker_args));
+		WT_RET(__wt_thread_create(
+		    session, &worker_args->tid, __lsm_worker, worker_args));
 	}
 	return (0);
 }
@@ -277,11 +269,9 @@ __lsm_manager_worker_shutdown(WT_SESSION_IMPL *session)
 	 * one - since we (the manager) are at index 0.
 	 */
 	for (i = 1; i < manager->lsm_workers; i++) {
-		WT_ASSERT(session, manager->lsm_worker_tids[i] != 0);
-		WT_ASSERT(session, manager->lsm_worker_sessions[i] != NULL);
+		WT_ASSERT(session, manager->lsm_worker_cookies[i].tid != 0);
 		WT_TRET(__wt_thread_join(
-		    session, manager->lsm_worker_tids[i]));
-		manager->lsm_worker_tids[i] = 0;
+		    session, manager->lsm_worker_cookies[i].tid));
 	}
 	return (ret);
 }
@@ -364,9 +354,11 @@ static void *
 __lsm_worker_manager(void *arg)
 {
 	WT_DECL_RET;
+	WT_LSM_WORKER_ARGS *cookie;
 	WT_SESSION_IMPL *session;
 
-	session = (WT_SESSION_IMPL *)arg;
+	cookie = (WT_LSM_WORKER_ARGS *)arg;
+	session = cookie->session;
 
 	WT_ERR(__lsm_manager_worker_setup(session));
 	WT_ERR(__lsm_manager_run_server(session));
@@ -694,6 +686,5 @@ err:		__lsm_manager_free_work_unit(session, entry);
 		__wt_err(session, ret,
 		    "Error in LSM worker thread %d", cookie->id);
 	}
-	__wt_free(session, cookie);
 	return (NULL);
 }
