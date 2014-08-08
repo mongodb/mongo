@@ -191,14 +191,28 @@ namespace repl {
 
     private:
 
+        // Struct that holds information about clients waiting for replication.
+        struct WaiterInfo;
+
+        // Struct that holds information about nodes in this replication group, mainly used for
+        // tracking replication progress for write concern satisfaction.
+        struct SlaveInfo {
+            OpTime opTime; // Our last known OpTime that this slave has replicated to.
+            HostAndPort hostAndPort; // Client address of the slave.
+            int memberID; // ID of the node in the replica set config, or -1 if we're not a replSet.
+            SlaveInfo() : memberID(-1) {}
+        };
+
+        // Map of node RIDs to their SlaveInfo.
+        typedef unordered_map<OID, SlaveInfo, OID::Hasher> SlaveInfoMap;
+
+        typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
+
         // Called by the TopologyCoordinator whenever this node's replica set state transitions.
         void _onSelfStateChange(const MemberState& newState);
 
         // Called by the TopologyCoordinator whenever the replica set configuration is updated
         void _onReplicaSetConfigChange(const ReplicaSetConfig& newConfig, int myIndex);
-
-        // Struct that holds information about clients waiting for replication.
-        struct WaiterInfo;
 
         /*
          * Returns the OpTime of the last applied operation on this node.
@@ -238,8 +252,9 @@ namespace repl {
          */
         Mode _getReplicationMode_inlock() const;
 
-        // Handles to actively queued heartbeats
-        typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
+        // Handles to actively queued heartbeats.
+        // Only accessed serially in ReplicationExecutor callbacks, which makes it safe to access
+        // outside of _mutex.
         HeartbeatHandles _heartbeatHandles;
 
         // Parsed command line arguments related to replication.  Set once at startup and then
@@ -252,20 +267,8 @@ namespace repl {
         // Our RID, used to identify us to our sync source when sending replication progress
         // updates upstream.  Set once at startup and then never modified again, which makes it
         // safe to read outside of _mutex.
+        // TODO(spencer): put behind _mutex
         OID _myRID;
-
-        // Protects all member data of this ReplicationCoordinator except _settings and _myRID.
-        mutable boost::mutex _mutex;
-
-        // list of information about clients waiting on replication.  Does *not* own the
-        // WaiterInfos.
-        std::vector<WaiterInfo*> _replicationWaiterList;
-
-        // Set to true when we are in the process of shutting down replication.
-        bool _inShutdown;
-
-        // Election ID of the last election that resulted in this node becoming primary.
-        OID _electionID;
 
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
         boost::scoped_ptr<TopologyCoordinator> _topCoord;
@@ -282,15 +285,23 @@ namespace repl {
         // Thread that drives actions in the topology coordinator
         boost::scoped_ptr<boost::thread> _topCoordDriverThread;
 
-        struct SlaveInfo {
-            OpTime opTime; // Our last known OpTime that this slave has replicated to.
-            HostAndPort hostAndPort; // Client address of the slave.
-            int memberID; // ID of the node in the replica set config, or -1 if we're not a replSet.
-            SlaveInfo() : memberID(-1) {}
-        };
+        // Protects member data of this ReplicationCoordinator.
+        mutable boost::mutex _mutex;
+
+        /// ============= All members below this line are guarded by _mutex ==================== ///
+
+        // list of information about clients waiting on replication.  Does *not* own the
+        // WaiterInfos.
+        std::vector<WaiterInfo*> _replicationWaiterList;
+
+        // Set to true when we are in the process of shutting down replication.
+        bool _inShutdown;
+
+        // Election ID of the last election that resulted in this node becoming primary.
+        OID _electionID;
+
         // Maps nodes in this replication group to information known about it such as its
         // replication progress and its ID in the replica set config.
-        typedef unordered_map<OID, SlaveInfo, OID::Hasher> SlaveInfoMap;
         SlaveInfoMap _slaveInfoMap;
 
         // Current ReplicaSet state.

@@ -88,8 +88,8 @@ namespace repl {
                                             const ReplSettings& settings,
                                             ReplicationCoordinatorExternalState* externalState) :
             _settings(settings),
-            _inShutdown(false),
             _externalState(externalState),
+            _inShutdown(false),
             _thisMembersConfigIndex(-1) {
 
     }
