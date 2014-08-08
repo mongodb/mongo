@@ -26,6 +26,7 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
 	WT_SESSION_IMPL *worker_session;
+	uint32_t i;
 
 	manager = &S2C(session)->lsm_manager;
 
@@ -40,21 +41,33 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	    manager->lsm_workers_max, &manager->lsm_worker_sessions));
 
 	/*
+	 * Open sessions for all potential worker threads here - it's not
+	 * safe to have worker threads open/close sessions themselves.
 	 * All the LSM worker threads do their operations on read-only
 	 * files. Use read-uncommitted isolation to avoid keeping
 	 * updates in cache unnecessarily.
 	 */
-	WT_RET(__wt_open_internal_session(
-	    S2C(session), "lsm-worker-manager", 1, 0, &worker_session));
-	worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
-	manager->lsm_worker_sessions[0] = worker_session;
+	for (i = 0; i < manager->lsm_workers_max; i++) {
+		WT_ERR(__wt_open_internal_session(
+		    S2C(session), "lsm-worker", 1, 0, &worker_session));
+		worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
+		manager->lsm_worker_sessions[i] = worker_session;
+	}
+
+	/* Start the LSM manager thread. */
 	WT_ERR(__wt_thread_create(session, &manager->lsm_worker_tids[0],
-	    __lsm_worker_manager, worker_session));
+	    __lsm_worker_manager, manager->lsm_worker_sessions[0]));
 
 	F_SET(S2C(session), WT_CONN_SERVER_LSM);
 
 	if (0) {
-err:		__wt_free(session, manager->lsm_worker_tids);
+err:		for (i = 0;
+		    (worker_session = manager->lsm_worker_sessions[i]) != NULL;
+		    i++)
+			WT_TRET((&worker_session->iface)->close(
+			    &worker_session->iface, NULL));
+		__wt_free(session, manager->lsm_worker_sessions);
+		__wt_free(session, manager->lsm_worker_tids);
 	}
 	return (ret);
 }
@@ -86,6 +99,7 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	WT_LSM_WORK_UNIT *current, *next;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
+	uint32_t i;
 	uint64_t removed;
 
 	session = conn->default_session;
@@ -102,12 +116,8 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	/* Clean up open LSM handles. */
 	ret = __wt_lsm_tree_close_all(conn->default_session);
 
-	/* If the manager was never started, don't stop it. */
 	WT_TRET(__wt_thread_join(session, manager->lsm_worker_tids[0]));
 	manager->lsm_worker_tids[0] = 0;
-	wt_session = &manager->lsm_worker_sessions[0]->iface;
-	WT_TRET(wt_session->close(wt_session, NULL));
-	manager->lsm_worker_sessions[0] = NULL;
 
 	/* Release memory from any operations left on the queue. */
 	for (current = TAILQ_FIRST(&manager->switchqh);
@@ -130,6 +140,13 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 		TAILQ_REMOVE(&manager->managerqh, current, q);
 		++removed;
 		__lsm_manager_free_work_unit(session, current);
+	}
+
+	/* Close all LSM worker sessions. */
+	for (i = 0; i < manager->lsm_workers_max; i++) {
+		wt_session = &manager->lsm_worker_sessions[i]->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
+		manager->lsm_worker_sessions[i] = NULL;
 	}
 
 	WT_STAT_FAST_CONN_INCRV(session, lsm_work_units_discarded, removed);
@@ -186,7 +203,6 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORKER_ARGS *worker_args;
-	WT_SESSION_IMPL *worker_session;
 
 	conn = S2C(session);
 	manager = &conn->lsm_manager;
@@ -201,18 +217,9 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	WT_RET(__wt_spin_init(
 	    session, &manager->switch_lock, "LSM switch queue lock"));
 
-	/*
-	 * All the LSM worker threads do their operations on read-only files.
-	 * Use read-uncommitted isolation to avoid keeping updates in cache
-	 * unnecessarily.
-	 */
-	WT_RET(__wt_open_internal_session(
-	    conn, "lsm-worker-switch", 1, 0, &worker_session));
-	worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
-	manager->lsm_worker_sessions[1] = worker_session;
 	/* Freed by the worker thread when it shuts down */
 	WT_RET(__wt_calloc_def(session, 1, &worker_args));
-	worker_args->session = worker_session;
+	worker_args->session = manager->lsm_worker_sessions[1];
 	worker_args->id = manager->lsm_workers++;
 	worker_args->flags = WT_LSM_WORK_SWITCH;
 	/* Start the switch thread. */
@@ -227,14 +234,10 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	 */
 	for (; manager->lsm_workers < manager->lsm_workers_max;
 	    manager->lsm_workers++) {
-		WT_RET(__wt_open_internal_session(
-		    conn, "lsm-worker-1", 1, 0, &worker_session));
-		worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
-		manager->lsm_worker_sessions[manager->lsm_workers] =
-		    worker_session;
 		/* Freed by the worker thread when it shuts down */
 		WT_RET(__wt_calloc_def(session, 1, &worker_args));
-		worker_args->session = worker_session;
+		worker_args->session =
+		    manager->lsm_worker_sessions[manager->lsm_workers];
 		worker_args->id = manager->lsm_workers;
 		worker_args->flags =
 		    WT_LSM_WORK_BLOOM |
@@ -265,7 +268,6 @@ __lsm_manager_worker_shutdown(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
-	WT_SESSION *wt_session;
 	u_int i;
 
 	manager = &S2C(session)->lsm_manager;
@@ -275,18 +277,11 @@ __lsm_manager_worker_shutdown(WT_SESSION_IMPL *session)
 	 * one - since we (the manager) are at index 0.
 	 */
 	for (i = 1; i < manager->lsm_workers; i++) {
-		/*
-		 * Join any worker we're stopping.
-		 * After the thread is stopped, close its session.
-		 */
 		WT_ASSERT(session, manager->lsm_worker_tids[i] != 0);
 		WT_ASSERT(session, manager->lsm_worker_sessions[i] != NULL);
 		WT_TRET(__wt_thread_join(
 		    session, manager->lsm_worker_tids[i]));
 		manager->lsm_worker_tids[i] = 0;
-		wt_session = &manager->lsm_worker_sessions[i]->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
-		manager->lsm_worker_sessions[i] = NULL;
 	}
 	return (ret);
 }
