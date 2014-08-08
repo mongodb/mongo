@@ -176,7 +176,7 @@ namespace mongo {
                 scoped_lock lk(_mutex);
                 ShardMap::iterator iter = _lookup.find(ident);
 
-                if (iter == _rsLookup.end()) {
+                if (iter == _lookup.end()) {
                     return ShardPtr();
                 }
 
