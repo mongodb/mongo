@@ -7,8 +7,8 @@ the objects in the database, or a subset of the objects in the database.
 
 To perform a hot backup:
 
-1. Open a cursor on the backup data source, which begins the process of
-a hot backup.
+1. Open a cursor on the \c "backup:" data source, which begins the
+process of a hot backup.
 2. Copy each file returned by the WT_CURSOR::next method to the hot
 backup location, for example, a different directory.
 3. Close the cursor; the cursor must not be closed until all of the
@@ -52,6 +52,8 @@ checkpoint they want using the WT_SESSION::checkpoint method.  For
 example:
 
 @snippet ex_all.c Hot backup of a checkpoint
+
+@section hot_backup_util Hot backup from the command line
 
 The @ref util_backup command may also be used to create hot backups:
 

@@ -39,11 +39,4 @@ each of which is ordered by one or more columns.
 - @subpage custom_data_sources
 - @subpage helium
 
-<h2>Managing WiredTiger databases</h2>
-- @subpage home
-- @subpage database_config
-- @subpage hot_backup
-- @subpage filesystems
-- @subpage security
-
  */
