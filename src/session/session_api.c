@@ -829,9 +829,10 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		if (!session_ret->active)
 			break;
 	if (i == conn->session_size)
-		WT_ERR_MSG(session, WT_ERROR,
-		    "only configured to support %" PRIu32 " thread contexts",
-		    conn->session_size);
+		WT_ERR_MSG(session, ENOMEM,
+		    "only configured to support %" PRIu32 " sessions"
+		    " (including %" PRIu32 " internal)",
+		    conn->session_size, WT_NUM_INTERNAL_SESSIONS);
 
 	/*
 	 * If the active session count is increasing, update it.  We don't worry

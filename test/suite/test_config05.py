@@ -81,6 +81,18 @@ class test_config05(wttest.WiredTigerTestCase):
         self.populate(self.session)
         self.verify_entries(self.session)
 
+    def test_one_session(self):
+        self.conn = wiredtiger.wiredtiger_open('.', 'create,session_max=1')
+        self.session = self.conn.open_session(None)
+        self.populate(self.session)
+        self.verify_entries(self.session)
+
+    def test_too_many_sessions(self):
+        self.conn = wiredtiger.wiredtiger_open('.', 'create,session_max=1')
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+	    lambda: [self.conn.open_session(None) for i in range(100)],
+            '/configured to support/')
+
     def test_exclusive_create(self):
         self.conn = wiredtiger.wiredtiger_open('.', 'create,exclusive')
         self.conn.close()
