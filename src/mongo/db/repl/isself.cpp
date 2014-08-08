@@ -54,7 +54,7 @@
 #include <iphlpapi.h>
 #include <winsock2.h>
 #include <Ws2tcpip.h>
-#endif // defined(_WIN32)
+#endif  // defined(_WIN32)
 
 #if defined(_WIN32) || defined(__linux__)
 #define FASTPATH 1
@@ -144,9 +144,9 @@ namespace {
         return out;
     }
 
-} // namespace {
+}  // namespace
 
-#endif // ifdef FASTPATH
+#endif  // ifdef FASTPATH
 
 
     bool isSelf(const HostAndPort& hostAndPort) {
@@ -180,7 +180,7 @@ namespace {
             }
         }
 
-#endif // ifdef FASTPATH
+#endif  // ifdef FASTPATH
 
         if (!Listener::getTimeTracker()) {
             // this ensures we are actually running a server
@@ -265,7 +265,7 @@ namespace {
 
         for (int tries = 0; tries < 3; ++tries) {
             err = GetAdaptersAddresses(family,
-                                       GAA_FLAG_SKIP_ANYCAST | // only want unicast addrs
+                                       GAA_FLAG_SKIP_ANYCAST |  // only want unicast addrs
                                        GAA_FLAG_SKIP_MULTICAST |
                                        GAA_FLAG_SKIP_DNS_SERVER,
                                        NULL,
@@ -278,7 +278,7 @@ namespace {
                 adapters = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buf.get());
             }
             else {
-                break; // only retry for incorrectly sized buffer
+                break;  // only retry for incorrectly sized buffer
             }
         }
 
@@ -336,7 +336,7 @@ namespace {
             }
         }
 
-#endif // defined(_WIN32)
+#endif  // defined(_WIN32)
         if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
             LogstreamBuilder builder(logger::globalLogDomain(),
                                      getThreadName(),
@@ -348,12 +348,12 @@ namespace {
             builder << std::endl;
         }
         return out;
-#else // ifdef FASTPATH
+#else  // ifdef FASTPATH
         invariant(false);
 #endif
     }
 
 #undef FASTPATH
 
-} // namespace repl
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

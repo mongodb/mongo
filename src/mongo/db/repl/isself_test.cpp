@@ -78,7 +78,7 @@ namespace {
 #endif
     }
 
-} // namespace {
+}  // namespace
 
-} // namespace repl {
-} // namespace mongo {
+}  // namespace repl
+}  // namespace mongo
