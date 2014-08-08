@@ -14,7 +14,6 @@ ext/datasources/helium HAVE_HELIUM
 ext/test/kvs_bdb HAVE_BERKELEY_DB
 .
 api/leveldb LEVELDB
-bench/tcbench
 bench/wtperf
 examples/c
 lang/java JAVA
