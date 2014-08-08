@@ -311,7 +311,8 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			WT_RET(__lsm_manager_aggressive_update(
 			    session, lsm_tree));
 			WT_RET(__wt_epoch(session, &now));
-			pushms = WT_TIMEDIFF(
+			pushms = lsm_tree->work_push_ts.tv_sec == 0 ? 0 :
+			    WT_TIMEDIFF(
 			    now, lsm_tree->work_push_ts) / WT_MILLION;
 			fillms = 3 * lsm_tree->chunk_fill_ms;
 			if (fillms == 0)
@@ -334,19 +335,6 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			    lsm_tree->merge_aggressiveness > 3 ||
 			    (lsm_tree->queue_ref == 0 && lsm_tree->nchunks > 1) ||
 			    pushms > fillms) {
-#if 0
-		//This code triggers a problem with test/fops - if a switch is
-		//on the queue when a switch is pushed we can end up deadlocked
-		//waiting for the schema lock. It's possible without this change,
-		//but not likely in fops, since it doesn't trigger many switch
-		//operations.
-				fprintf(stderr, "Pushing work unit.");
-				fprintf(stderr, "nchunks: %d, ", lsm_tree->nchunks);
-				fprintf(stderr, "aggressive: %d\n\t ", lsm_tree->merge_aggressiveness);
-				fprintf(stderr, "modified: %d, ", lsm_tree->modified);
-				fprintf(stderr, "queue size: %d, ", lsm_tree->queue_ref);
-				fprintf(stderr, "pushms: %d, ", (int)pushms);
-				fprintf(stderr, "fillms: %d\n ", (int)fillms);
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_SWITCH, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
@@ -360,7 +348,6 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			    lsm_tree->nold_chunks != 0) {
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_DROP, lsm_tree));
-#endif
 			}
 		}
 	}
