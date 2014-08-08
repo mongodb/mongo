@@ -67,6 +67,10 @@ namespace mongo {
 #endif
         fd_type _fd;
         bool _direct; // are we using direct I/O
+
+        // Block size, in case of direct I/O we need to test alignment against the page size,
+        // which can be different than 4kB.
+        size_t _blkSize;
     };
 
 }
