@@ -176,7 +176,8 @@ namespace mongo {
                 continue;
             }
                 
-            uassert(15974, "$sort key ordering must be specified using a number or {$meta: 'text'}",
+            uassert(15974,
+                    "$sort key ordering must be specified using a number or {$meta: 'textScore'}",
                     keyField.isNumber());
 
             int sortOrder = keyField.numberInt();
