@@ -167,119 +167,6 @@ namespace {
         ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
     }
 
-    // Default log component declared at inner namespace scope (componentB).
-    // Component severity configuration:
-    //     LogComponent::kDefault: 1
-    //     componentB: 2
-    namespace scoped_default_log_component_test {
-
-        // Set MONGO_LOG's default component to componentB.
-        MONGO_LOG_DEFAULT_COMPONENT_FILE(componentB);
-
-        TEST_F(LogTestUnadornedEncoder, MongoLogMacroNamespaceScopeLogComponentDeclared) {
-            globalLogDomain()->setMinimumLoggedSeverity(LogSeverity::Debug(1));
-            globalLogDomain()->setMinimumLoggedSeverity(componentB,
-                                                        LogSeverity::Debug(2));
-
-            // LOG - uses log component (componentB) declared in MONGO_LOG_DEFAULT_COMPONENT_FILE.
-            LOG(2) << "This is logged";
-            LOG(3) << "This is not logged";
-            ASSERT_EQUALS(1U, _logLines.size());
-            ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-            globalLogDomain()->clearMinimumLoggedSeverity(componentB);
-        }
-
-    } // namespace scoped_default_log_component_test
-
-    // Default log component declared at function scope (componentA).
-    // Component severity configuration:
-    //     LogComponent::kDefault: 1
-    //     componentA: 2
-    TEST_F(LogTestUnadornedEncoder, MongoLogMacroFunctionScopeLogComponentDeclared) {
-        globalLogDomain()->setMinimumLoggedSeverity(LogSeverity::Debug(1));
-        globalLogDomain()->setMinimumLoggedSeverity(componentA, LogSeverity::Debug(2));
-
-        // Set MONGO_LOG's default component to componentA.
-        MONGO_LOG_DEFAULT_COMPONENT_LOCAL(componentA);
-
-        // LOG - uses log component (componentA) declared in MONGO_LOG_DEFAULT_COMPONENT.
-        LOG(2) << "This is logged";
-        LOG(3) << "This is not logged";
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-        // MONGO_LOG_COMPONENT - log message component matches function scope component.
-        _logLines.clear();
-        MONGO_LOG_COMPONENT(2, componentA) << "This is logged";
-        MONGO_LOG_COMPONENT(3, componentA) << "This is not logged";
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-        // MONGO_LOG_COMPONENT - log message component not configured - fall back on
-        // LogComponent::kDefault.
-        _logLines.clear();
-        MONGO_LOG_COMPONENT(1, componentB) << "This is logged";
-        MONGO_LOG_COMPONENT(2, componentB) << "This is not logged";
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-        // MONGO_LOG_COMPONENT2
-        _logLines.clear();
-        MONGO_LOG_COMPONENT2(2, componentA, componentB) << "This is logged";
-        MONGO_LOG_COMPONENT2(3, componentA, componentB) << "This is not logged";
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-        // MONGO_LOG_COMPONENT2 - reverse order.
-        _logLines.clear();
-        MONGO_LOG_COMPONENT2(2, componentB, componentA) << "This is logged";
-        MONGO_LOG_COMPONENT2(3, componentB, componentA) << "This is not logged";
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-        // MONGO_LOG_COMPONENT2 - none of the log message components configured - fall back on
-        // LogComponent::kDefault.
-        _logLines.clear();
-        MONGO_LOG_COMPONENT2(1, componentB, componentC) << "This is logged";
-        MONGO_LOG_COMPONENT2(2, componentB, componentC) << "This is not logged";
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-        // MONGO_LOG_COMPONENT3
-        _logLines.clear();
-        MONGO_LOG_COMPONENT3(2, componentA, componentB, componentC) << "This is logged";
-        MONGO_LOG_COMPONENT3(3, componentA, componentB, componentC) << "This is not logged";
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-        // MONGO_LOG_COMPONENT3 - configured component as 2nd component.
-        _logLines.clear();
-        MONGO_LOG_COMPONENT3(2, componentB, componentA, componentC) << "This is logged";
-        MONGO_LOG_COMPONENT3(3, componentB, componentA, componentC) << "This is not logged";
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-        // MONGO_LOG_COMPONENT3 - configured component as 3rd component.
-        _logLines.clear();
-        MONGO_LOG_COMPONENT3(2, componentB, componentC, componentA) << "This is logged";
-        MONGO_LOG_COMPONENT3(3, componentB, componentC, componentA) << "This is not logged";
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-        // MONGO_LOG_COMPONENT3 - none of the log message components configured - fall back on
-        // LogComponent::kDefault.
-        _logLines.clear();
-        MONGO_LOG_COMPONENT3(1, componentB, componentC, LogComponent::kIndexing)
-            << "This is logged";
-        MONGO_LOG_COMPONENT3(2, componentB, componentC, LogComponent::kIndexing)
-            << "This is not logged";
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
-
-        globalLogDomain()->clearMinimumLoggedSeverity(componentA);
-    }
-
     //
     // Component log level tests.
     // The global log manager holds the component log level configuration for the global log domain.
@@ -509,17 +396,7 @@ namespace {
     TEST_F(LogTestDetailsEncoder, ) {
         globalLogDomain()->setMinimumLoggedSeverity(LogSeverity::Log());
 
-        // Set MONGO_LOG's default component to componentA.
-        MONGO_LOG_DEFAULT_COMPONENT_LOCAL(componentA);
-
-        // LOG - MongoLogDefaultComponent (set to componentA) should appear in log line.
-        LOG(0) << "This is logged";
-        ASSERT_EQUALS(1U, _logLines.size());
-        ASSERT_NOT_EQUALS(_logLines[0].find(componentA.getNameForLog().toString()),
-                          std::string::npos);
-
         // Default log component short name should not appear in detailed log line.
-        _logLines.clear();
         MONGO_LOG_COMPONENT(0, componentDefault) << "This is logged";
         ASSERT_EQUALS(1U, _logLines.size());
         ASSERT_NOT_EQUALS(_logLines[0].find(componentDefault.getNameForLog().toString()),

@@ -37,22 +37,6 @@
 #include "mongo/logger/tee.h"
 #include "mongo/util/concurrency/thread_name.h"
 
-/**
- * Defines default log component for MONGO_LOG.
- * Use this macro inside an implementation namespace or code block where debug messages
- * are logged using MONGO_LOG().
- *
- * Note: Do not use more than once inside any namespace/code block.
- */
-#define MONGO_LOG_DEFAULT_COMPONENT_FILE(COMPONENT) \
-    static const ::mongo::logger::LogComponent MongoLogDefaultComponent_component = (COMPONENT);
-
-/**
- * MONGO_LOG_DEFAULT_COMPONENT for local code block.
- */
-#define MONGO_LOG_DEFAULT_COMPONENT_LOCAL(COMPONENT) \
-    const ::mongo::logger::LogComponent MongoLogDefaultComponent_component = (COMPONENT);
-
 // Provide log component in global scope so that MONGO_LOG will always have a valid component.
 // Global log component will be kDefault unless overridden by MONGO_LOG_DEFAULT_COMPONENT.
 #if defined(MONGO_LOG_DEFAULT_COMPONENT)

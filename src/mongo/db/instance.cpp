@@ -339,8 +339,6 @@ namespace mongo {
                            Message& m,
                            DbResponse& dbresponse,
                            const HostAndPort& remote ) {
-        MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kQuery);
-
         // before we lock...
         int op = m.operation();
         bool isCommand = false;
@@ -447,7 +445,7 @@ namespace mongo {
 
             int len = strlen(p);
             if ( len > 400 )
-                log() << curTimeMillis64() % 10000 <<
+                log(LogComponent::kQuery) << curTimeMillis64() % 10000 <<
                       " long msg received, len:" << len << endl;
 
             Message *resp = new Message();
@@ -470,7 +468,7 @@ namespace mongo {
                     receivedKillCursors(txn, m);
                 }
                 else if (op != dbInsert && op != dbUpdate && op != dbDelete) {
-                    mongo::log() << "    operation isn't supported: " << op << endl;
+                    log(LogComponent::kQuery) << "    operation isn't supported: " << op << endl;
                     currentOp.done();
                     shouldLog = true;
                 }
@@ -497,13 +495,15 @@ namespace mongo {
              }
             catch (const UserException& ue) {
                 setLastError(ue.getCode(), ue.getInfo().msg.c_str());
-                LOG(3) << " Caught Assertion in " << opToString(op) << ", continuing "
+                MONGO_LOG_COMPONENT(3, LogComponent::kQuery)
+                       << " Caught Assertion in " << opToString(op) << ", continuing "
                        << ue.toString() << endl;
                 debug.exceptionInfo = ue.getInfo();
             }
             catch (const AssertionException& e) {
                 setLastError(e.getCode(), e.getInfo().msg.c_str());
-                LOG(3) << " Caught Assertion in " << opToString(op) << ", continuing "
+                MONGO_LOG_COMPONENT(3, LogComponent::kQuery)
+                       << " Caught Assertion in " << opToString(op) << ", continuing "
                        << e.toString() << endl;
                 debug.exceptionInfo = e.getInfo();
                 shouldLog = true;
@@ -516,16 +516,19 @@ namespace mongo {
         logThreshold += currentOp.getExpectedLatencyMs();
 
         if ( shouldLog || debug.executionTime > logThreshold ) {
-            LOG(0) << debug.report( currentOp ) << endl;
+            MONGO_LOG_COMPONENT(0, LogComponent::kQuery)
+                    << debug.report( currentOp ) << endl;
         }
 
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
             // performance profiling is on
             if (txn->lockState()->hasAnyReadLock()) {
-                LOG(1) << "note: not profiling because recursive read lock" << endl;
+                MONGO_LOG_COMPONENT(1, LogComponent::kQuery)
+                        << "note: not profiling because recursive read lock" << endl;
             }
             else if ( lockedForWriting() ) {
-                LOG(1) << "note: not profiling because doing fsync+lock" << endl;
+                MONGO_LOG_COMPONENT(1, LogComponent::kQuery)
+                        << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
                 profile(txn, c, op, currentOp);

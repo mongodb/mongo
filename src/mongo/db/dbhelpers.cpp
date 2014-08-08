@@ -61,6 +61,8 @@
 
 namespace mongo {
 
+    using logger::LogComponent;
+
     const BSONObj reverseNaturalObj = BSON( "$natural" << -1 );
 
     void Helpers::ensureIndex(OperationContext* txn,
@@ -310,8 +312,6 @@ namespace mongo {
                                     bool fromMigrate,
                                     bool onlyRemoveOrphanedDocs )
     {
-        MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kSharding);
-
         Timer rangeRemoveTimer;
         const string& ns = range.ns;
 
@@ -323,7 +323,7 @@ namespace mongo {
                                         range.keyPattern,
                                         &indexKeyPatternDoc ) )
         {
-            warning() << "no index found to clean data over range of type "
+            warning(LogComponent::kSharding) << "no index found to clean data over range of type "
                       << range.keyPattern << " in " << ns << endl;
             return -1;
         }
@@ -341,7 +341,8 @@ namespace mongo {
         const BSONObj& max =
                 Helpers::toKeyFormat( indexKeyPattern.extendRangeBound(range.maxKey,maxInclusive));
 
-        LOG(1) << "begin removal of " << min << " to " << max << " in " << ns
+        MONGO_LOG_COMPONENT(1, LogComponent::kSharding)
+               << "begin removal of " << min << " to " << max << " in " << ns
                << " with write concern: " << writeConcern.toBSON() << endl;
 
         Client& c = cc();
@@ -376,14 +377,14 @@ namespace mongo {
                 if (PlanExecutor::IS_EOF == state) { break; }
 
                 if (PlanExecutor::DEAD == state) {
-                    warning() << "cursor died: aborting deletion for "
+                    warning(LogComponent::kSharding) << "cursor died: aborting deletion for "
                               << min << " to " << max << " in " << ns
                               << endl;
                     break;
                 }
 
                 if (PlanExecutor::EXEC_ERROR == state) {
-                    warning() << "cursor error while trying to delete "
+                    warning(LogComponent::kSharding) << "cursor error while trying to delete "
                               << min << " to " << max
                               << " in " << ns << ": "
                               << WorkingSetCommon::toStatusString(obj) << endl;
@@ -416,7 +417,8 @@ namespace mongo {
                     }
 
                     if ( !docIsOrphan ) {
-                        warning() << "aborting migration cleanup for chunk " << min << " to " << max
+                        warning(LogComponent::kSharding)
+                                  << "aborting migration cleanup for chunk " << min << " to " << max
                                   << ( metadataNow ? (string) " at document " + obj.toString() : "" )
                                   << ", collection " << ns << " has changed " << endl;
                         break;
@@ -442,7 +444,8 @@ namespace mongo {
                                                                                   c.getLastOp(),
                                                                                   writeConcern);
                 if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
-                    warning() << "replication to secondaries for removeRange at "
+                    warning(LogComponent::kSharding)
+                            << "replication to secondaries for removeRange at "
                                  "least 60 seconds behind";
                 }
                 else {
@@ -453,10 +456,12 @@ namespace mongo {
         }
         
         if (writeConcern.shouldWaitForOtherNodes())
-            log() << "Helpers::removeRangeUnlocked time spent waiting for replication: "  
+            log(LogComponent::kSharding)
+                  << "Helpers::removeRangeUnlocked time spent waiting for replication: "
                   << millisWaitingForReplication << "ms" << endl;
         
-        LOG(1) << "end removal of " << min << " to " << max << " in " << ns
+        MONGO_LOG_COMPONENT(1, LogComponent::kSharding)
+               << "end removal of " << min << " to " << max << " in " << ns
                << " (took " << rangeRemoveTimer.millis() << "ms)" << endl;
 
         return numDeleted;
