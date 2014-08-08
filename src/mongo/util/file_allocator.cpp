@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/file_allocator.h"
@@ -66,8 +68,6 @@ using namespace mongoutils;
 #endif
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     // unique number for temporary file names
     unsigned long long FileAllocator::_uniqueNumber = 0;

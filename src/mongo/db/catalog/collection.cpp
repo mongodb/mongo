@@ -28,6 +28,10 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/catalog/collection.h"
 
 #include "mongo/base/counter.h"
@@ -48,6 +52,8 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using logger::LogComponent;
 
     std::string CompactOptions::toString() const {
         std::stringstream ss;
@@ -526,7 +532,7 @@ namespace mongo {
                 IndexCatalog::IndexIterator i = _indexCatalog.getIndexIterator(false);
                 while( i.more() ) {
                     const IndexDescriptor* descriptor = i.next();
-                    log() << "validating index " << descriptor->indexNamespace() << endl;
+                    log(LogComponent::kIndexing) << "validating index " << descriptor->indexNamespace() << endl;
                     IndexAccessMethod* iam = _indexCatalog.getIndex( descriptor );
                     invariant( iam );
 

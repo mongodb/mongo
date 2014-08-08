@@ -69,6 +69,8 @@
    @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kJournaling
+
 #include "mongo/platform/basic.h"
 
 #include <boost/thread/thread.hpp>
@@ -93,9 +95,6 @@
 using namespace mongoutils;
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kJournaling);
-
     namespace dur {
 
         void PREPLOGBUFFER(JSectHeader& outParm, AlignedBuilder&);

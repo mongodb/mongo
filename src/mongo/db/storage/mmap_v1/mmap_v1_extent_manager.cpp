@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
@@ -44,8 +46,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     MmapV1ExtentManager::MmapV1ExtentManager( const StringData& dbname,
                                   const StringData& path,

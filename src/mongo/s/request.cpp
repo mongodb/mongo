@@ -28,6 +28,8 @@
 *    then also delete it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/request.h"
@@ -47,8 +49,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     Request::Request( Message& m, AbstractMessagingPort* p ) :
         _m(m) , _d( m ) , _p(p) , _didInit(false) {

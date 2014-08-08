@@ -28,6 +28,8 @@
 
 // strategy_sharded.cpp
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
@@ -60,8 +62,6 @@
 // error codes 8010-8040
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     static bool _isSystemIndexes( const char* ns ) {
         return nsToCollectionSubstring(ns) == "system.indexes";

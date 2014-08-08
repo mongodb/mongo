@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/distlock.h"
@@ -72,8 +74,6 @@
 #define number_field(obj, name, def) ( obj.hasField(name) ? obj[name].Number() : def )
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     class TestDistLockWithSync: public Command {
     public:

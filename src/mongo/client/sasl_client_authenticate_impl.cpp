@@ -32,6 +32,8 @@
  * The primary entry point at runtime is saslClientAuthenticateImpl().
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetworking
+
 #include "mongo/platform/basic.h"
 
 #include <boost/scoped_ptr.hpp>
@@ -51,8 +53,6 @@
 #include "mongo/util/password_digest.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
 
 namespace {
 

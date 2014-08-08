@@ -34,6 +34,8 @@
    mostly around shard management and checking
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/d_logic.h"
@@ -54,8 +56,6 @@
 using namespace std;
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     bool _handlePossibleShardedMessage( Message &m, DbResponse* dbresponse ) {
         DEV verify( shardingState.enabled() );

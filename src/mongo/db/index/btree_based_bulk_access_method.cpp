@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndexing
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/index/btree_based_bulk_access_method.h"
@@ -39,8 +41,6 @@
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
 
     //
     // Comparison for external sorter interface

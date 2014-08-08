@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/projection.h"
@@ -36,8 +38,6 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
     void Projection::init(const BSONObj& o,
                           const MatchExpressionParser::WhereCallback& whereCallback) {

@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndexing
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/index_rebuilder.h"
@@ -44,8 +46,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
 
     IndexRebuilder indexRebuilder;
 

@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include <boost/thread/thread.hpp>
 
 #include "mongo/bson/util/bson_extract.h"

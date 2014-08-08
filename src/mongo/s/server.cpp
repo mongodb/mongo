@@ -28,6 +28,8 @@
 *    then also delete it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/server.h"
@@ -90,7 +92,7 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+    using logger::LogComponent;
 
 #if defined(_WIN32)
     ntservice::NtServiceDefaultStrings defaultServiceStrings = {
@@ -235,12 +237,12 @@ static ExitCode runMongosServer( bool doUpgrade ) {
     }
 
     if (!configServer.init(mongosGlobalParams.configdbs)) {
-        log() << "couldn't resolve config db address" << endl;
+        mongo::log(LogComponent::kDefault) << "couldn't resolve config db address" << endl;
         return EXIT_SHARDING_ERROR;
     }
 
     if ( ! configServer.ok( true ) ) {
-        log() << "configServer connection startup check failed" << endl;
+        mongo::log(LogComponent::kDefault) << "configServer connection startup check failed" << endl;
         return EXIT_SHARDING_ERROR;
     }
 
@@ -252,7 +254,7 @@ static ExitCode runMongosServer( bool doUpgrade ) {
     string configServerURL = configServer.getPrimary().getConnString();
     ConnectionString configServerConnString = ConnectionString::parse(configServerURL, errMsg);
     if (!configServerConnString.isValid()) {
-        error() << "Invalid connection string for config servers: " << configServerURL << endl;
+        error(LogComponent::kDefault) << "Invalid connection string for config servers: " << configServerURL << endl;
         return EXIT_SHARDING_ERROR;
     }
     bool upgraded = checkAndUpgradeConfigVersion(configServerConnString,
@@ -262,13 +264,15 @@ static ExitCode runMongosServer( bool doUpgrade ) {
                                                  &errMsg);
 
     if (!upgraded) {
-        error() << "error upgrading config database to v" << CURRENT_CONFIG_VERSION
+        error(LogComponent::kDefault) << "error upgrading config database to v"
+                << CURRENT_CONFIG_VERSION
                 << causedBy(errMsg) << endl;
         return EXIT_SHARDING_ERROR;
     }
 
     if ( doUpgrade ) {
-        log() << "Config database is at version v" << CURRENT_CONFIG_VERSION;
+        mongo::log(LogComponent::kDefault) << "Config database is at version v"
+                << CURRENT_CONFIG_VERSION;
         return EXIT_CLEAN;
     }
 
@@ -288,7 +292,7 @@ static ExitCode runMongosServer( bool doUpgrade ) {
 
     Status status = getGlobalAuthorizationManager()->initialize(&txn);
     if (!status.isOK()) {
-        log() << "Initializing authorization data failed: " << status;
+        mongo::log(LogComponent::kDefault) << "Initializing authorization data failed: " << status;
         return EXIT_SHARDING_ERROR;
     }
 
@@ -342,13 +346,14 @@ static int _main() {
             }
 
             if ( configAddr.isLocalHost() != grid.allowLocalHost() ) {
-                log() << "cannot mix localhost and ip addresses in configdbs" << endl;
+                mongo::log(LogComponent::kDefault)
+                    << "cannot mix localhost and ip addresses in configdbs" << endl;
                 return 10;
             }
 
         }
         catch ( DBException& e) {
-            log() << "configdb: " << e.what() << endl;
+            mongo::log(LogComponent::kDefault) << "configdb: " << e.what() << endl;
             return 9;
         }
     }
@@ -421,7 +426,7 @@ int mongoSMain(int argc, char* argv[], char** envp) {
 
     Status status = mongo::runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {
-        severe() << "Failed global initialization: " << status;
+        severe(LogComponent::kDefault) << "Failed global initialization: " << status;
         ::_exit(EXIT_FAILURE);
     }
 

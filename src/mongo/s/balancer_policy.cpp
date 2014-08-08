@@ -27,6 +27,8 @@
 *    then also delete it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
@@ -41,8 +43,6 @@
 
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     string TagRange::toString() const {
         return str::stream() << min << " -->> " << max << "  on  " << tag;

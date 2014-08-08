@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include <boost/thread/thread.hpp>
@@ -111,7 +113,7 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
+    using logger::LogComponent;
 
     void (*snmpInit)() = NULL;
 
@@ -549,7 +551,7 @@ namespace mongo {
                 repl::getGlobalReplicationCoordinator()->getSettings();
         {
             ProcessId pid = ProcessId::getCurrent();
-            LogstreamBuilder l = log();
+            LogstreamBuilder l = log(LogComponent::kDefault);
             l << "MongoDB starting : pid=" << pid
               << " port=" << serverGlobalParams.port
               << " dbpath=" << storageGlobalParams.dbpath;
@@ -557,7 +559,7 @@ namespace mongo {
             if( replSettings.slave )  l << " slave=" << (int) replSettings.slave;
             l << ( is32bit ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << endl;
         }
-        DEV log() << "_DEBUG build (which is slower)" << endl;
+        DEV log(LogComponent::kDefault) << "_DEBUG build (which is slower)" << endl;
         logStartupWarnings();
 #if defined(_WIN32)
         printTargetMinOS();
@@ -901,7 +903,7 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
         unsigned x = 0x12345678;
         unsigned char& b = (unsigned char&) x;
         if ( b != 0x78 ) {
-            log() << "big endian cpus not yet supported" << endl;
+            mongo::log(LogComponent::kDefault) << "big endian cpus not yet supported" << endl;
             return 33;
         }
     }
@@ -911,7 +913,7 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
 
     Status status = mongo::runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {
-        severe() << "Failed global initialization: " << status;
+        severe(LogComponent::kDefault) << "Failed global initialization: " << status;
         ::_exit(EXIT_FAILURE);
     }
 

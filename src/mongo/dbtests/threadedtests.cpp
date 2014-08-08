@@ -29,6 +29,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommands
+
 #include "mongo/platform/basic.h"
 
 #include <boost/thread.hpp>
@@ -54,8 +56,6 @@ namespace mongo {
 }
 
 namespace ThreadedTests {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     template <int nthreads_param=10>
     class ThreadedTest {

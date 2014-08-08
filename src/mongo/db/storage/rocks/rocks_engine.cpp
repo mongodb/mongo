@@ -29,6 +29,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/rocks/rocks_engine.h"
 
 #include <boost/filesystem/operations.hpp>

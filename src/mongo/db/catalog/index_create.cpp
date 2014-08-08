@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndexing
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/index_create.h"
@@ -50,8 +52,6 @@
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
 
     /**
      * Add the provided (obj, dl) pair to the provided index.

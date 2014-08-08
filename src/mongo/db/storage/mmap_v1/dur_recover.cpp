@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kJournaling
+
 #include "mongo/pch.h"
 
 #include "mongo/db/storage/mmap_v1/dur_recover.h"

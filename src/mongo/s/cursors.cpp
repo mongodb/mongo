@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/cursors.h"
@@ -50,8 +52,6 @@
 #include "mongo/util/net/listen.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
     const int ShardedClientCursor::INIT_REPLY_BUFFER_SIZE = 32768;
 

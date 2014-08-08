@@ -34,6 +34,8 @@
    mostly around shard management and checking
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
@@ -115,8 +117,6 @@ namespace {
 }
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     MONGO_FP_DECLARE(failMigrationCommit);
     MONGO_FP_DECLARE(failMigrationConfigWritePrepare);

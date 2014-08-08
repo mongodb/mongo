@@ -71,6 +71,8 @@
 
 namespace mongo {
 
+    using logger::LogComponent;
+
     mongo::mutex& Client::clientsMutex = *(new mutex("clientsMutex"));
     set<Client*>& Client::clients = *(new set<Client*>); // always be in clientsMutex when manipulating this
 
@@ -204,11 +206,13 @@ namespace mongo {
 
         // we usually don't get here, so doesn't matter how fast this part is
         {
-            DEV log() << "_DEBUG ReadContext db wasn't open, will try to open " << ns << endl;
+            DEV log(LogComponent::kStorage)
+                << "_DEBUG ReadContext db wasn't open, will try to open " << ns << endl;
             if (txn->lockState()->isW()) {
                 // write locked already
                 WriteUnitOfWork wunit(txn->recoveryUnit());
-                DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
+                DEV RARELY log(LogComponent::kStorage)
+                    << "write locked on ReadContext construction " << ns << endl;
                 _c.reset(new Context(txn, ns, doVersion));
                 wunit.commit();
             }
