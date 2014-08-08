@@ -323,7 +323,8 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			 */
 			if ((!lsm_tree->modified && lsm_tree->nchunks > 1) ||
 			    lsm_tree->merge_aggressiveness > 3 ||
-			    (lsm_tree->queue_ref == 0 && lsm_tree->nchunks > 1) ||
+			    (lsm_tree->queue_ref == 0 &&
+			    lsm_tree->nchunks > 1) ||
 			    pushms > fillms) {
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_SWITCH, lsm_tree));

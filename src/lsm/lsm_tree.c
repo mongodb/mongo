@@ -466,7 +466,7 @@ __lsm_tree_open(
 	lsm_tree->queue_ref = 0;
 
 	/* Set a flush timestamp as a baseline. */
-	WT_RET(__wt_epoch(session, &lsm_tree->last_flush_ts));
+	WT_ERR(__wt_epoch(session, &lsm_tree->last_flush_ts));
 
 	/* Now the tree is setup, make it visible to others. */
 	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
@@ -1036,7 +1036,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		/*
 		 * The compacting flag is cleared when no merges can be done.
 		 * Ensure that we push through some aggressive merges before
-		 * stopping otherwise we might not do merges that would 
+		 * stopping otherwise we might not do merges that would
 		 * span chunks with different generations.
 		 */
 		if (!F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) {

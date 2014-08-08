@@ -1532,11 +1532,11 @@ struct __wt_connection {
 	 * @config{eviction_workers, additional threads to help evict pages from
 	 * cache., an integer between 0 and 20; default \c 0.}
 	 * @config{lsm_manager = (, configure database wide options for LSM tree
-	 * management.., a set of related configuration options defined below.}
+	 * management., a set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where
 	 * possible., a boolean flag; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;worker_thread_max, Configure a set of
-	 * threads to manage merging LSM trees in the database.., an integer
+	 * threads to manage merging LSM trees in the database., an integer
 	 * between 3 and 20; default \c 4.}
 	 * @config{ ),,}
 	 * @config{shared_cache = (, shared cache configuration options.  A
@@ -1882,11 +1882,11 @@ struct __wt_connection {
  * "".}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree
- * management.., a set of related configuration options defined below.}
+ * management., a set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where possible., a
  * boolean flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;worker_thread_max, Configure a set of threads
- * to manage merging LSM trees in the database.., an integer between 3 and 20;
+ * to manage merging LSM trees in the database., an integer between 3 and 20;
  * default \c 4.}
  * @config{ ),,}
  * @config{mmap, Use memory mapping to access files when possible., a boolean

@@ -344,7 +344,7 @@ connection_runtime_config = [
 	    additional threads to help evict pages from cache''',
 	    min=0, max=20),
 	Config('lsm_manager', '', r'''
-	    configure database wide options for LSM tree management.''',
+	    configure database wide options for LSM tree management''',
 	    type='category', subconfig=[
 	    Config('worker_thread_max', '4', r'''
 	        Configure a set of threads to manage merging LSM trees in
