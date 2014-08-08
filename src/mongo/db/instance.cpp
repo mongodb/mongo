@@ -1008,30 +1008,34 @@ namespace {
     void exitCleanly( ExitCode code ) {
         shutdownInProgress.store(1);
 
-        getGlobalEnvironment()->setKillAllOperations();
+        // Global storage engine may not be started in all cases before we exit
+        if (getGlobalEnvironment()->getGlobalStorageEngine() != NULL) {
 
-        repl::getGlobalReplicationCoordinator()->shutdown();
+            getGlobalEnvironment()->setKillAllOperations();
 
-        OperationContextImpl txn;
-        Lock::GlobalWrite lk(txn.lockState());
-        log() << "now exiting" << endl;
+            repl::getGlobalReplicationCoordinator()->shutdown();
 
-        // Execute the graceful shutdown tasks, such as flushing the outstanding journal and data 
-        // files, close sockets, etc.
-        try {
-            shutdownServer(&txn);
-        }
-        catch (const DBException& ex) {
-            severe() << "shutdown failed with DBException " << ex;
-            std::terminate();
-        }
-        catch (const std::exception& ex) {
-            severe() << "shutdown failed with std::exception: " << ex.what();
-            std::terminate();
-        }
-        catch (...) {
-            severe() << "shutdown failed with exception";
-            std::terminate();
+            OperationContextImpl txn;
+            Lock::GlobalWrite lk(txn.lockState());
+            log() << "now exiting" << endl;
+
+            // Execute the graceful shutdown tasks, such as flushing the outstanding journal 
+            // and data files, close sockets, etc.
+            try {
+                shutdownServer(&txn);
+            }
+            catch (const DBException& ex) {
+                severe() << "shutdown failed with DBException " << ex;
+                std::terminate();
+            }
+            catch (const std::exception& ex) {
+                severe() << "shutdown failed with std::exception: " << ex.what();
+                std::terminate();
+            }
+            catch (...) {
+                severe() << "shutdown failed with exception";
+                std::terminate();
+            }
         }
 
         dbexit( code );

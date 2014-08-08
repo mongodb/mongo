@@ -680,7 +680,7 @@ namespace mongo {
         try {
             _initAndListen(listenPort);
 
-            return EXIT_NET_ERROR;
+            return inShutdown() ? EXIT_CLEAN : EXIT_NET_ERROR;
         }
         catch ( DBException &e ) {
             log() << "exception in initAndListen: " << e.toString() << ", terminating" << endl;
@@ -704,11 +704,7 @@ namespace mongo {
     ExitCode initService() {
         ntservice::reportStatus( SERVICE_RUNNING );
         log() << "Service running" << endl;
-        ExitCode exitCode = initAndListen(serverGlobalParams.port);
-
-        // ignore EXIT_NET_ERROR on clean shutdown since we return this when the listening socket
-        // is closed
-        return (exitCode == EXIT_NET_ERROR && inShutdown()) ? EXIT_CLEAN : exitCode;
+        return initAndListen(serverGlobalParams.port);
     }
 #endif
 
