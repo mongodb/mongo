@@ -1293,7 +1293,7 @@ __clsm_put(WT_SESSION_IMPL *session,
 	/*
 	 * Update the record count.  It is in a shared structure, but it's only
 	 * approximate, so don't worry about protecting access.
-	*
+	 *
 	 * Throttle if necessary.  Every 100 update operations on each cursor,
 	 * check if throttling is required.  Don't rely only on the shared
 	 * counter because it can race, and because for some workloads, there
