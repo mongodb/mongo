@@ -1158,14 +1158,26 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
 }
 
-#define	WT_LEX_CMP(s, collator, k1, k2, cmp)				\
-	((collator) == NULL ?						\
-	(((cmp) = __wt_lex_compare((k1), (k2))), 0) :			\
-	(collator)->compare(collator, &(s)->iface, (k1), (k2), &(cmp)))
+/*
+ * __wt_lex_compare_collator --
+ *	The same as __wt_lex_compare, but using the application's collator
+ * function when configured.
+ */
+static inline int
+__wt_lex_compare_collator(WT_SESSION_IMPL *session, WT_COLLATOR *collator,
+    const WT_ITEM *user_item, const WT_ITEM *tree_item, int *cmpp)
+{
+	if (collator == NULL) {
+		*cmpp = __wt_lex_compare(user_item, tree_item);
+		return (0);
+	}
+	return (collator->compare(
+	    collator, &session->iface, user_item, tree_item, cmpp));
+}
 
 /*
  * __wt_lex_compare_skip --
- *	Lexicographic comparison routine, but skipping leading bytes.
+ *	Lexicographic comparison routine, skipping leading bytes.
  *
  * Returns:
  *	< 0 if user_item is lexicographically < tree_item
@@ -1197,7 +1209,20 @@ __wt_lex_compare_skip(
 	return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
 }
 
-#define	WT_LEX_CMP_SKIP(s, collator, k1, k2, cmp, matchp)		\
-	((collator) == NULL ?						\
-	(((cmp) = __wt_lex_compare_skip((k1), (k2), matchp)), 0) :	\
-	(collator)->compare(collator, &(s)->iface, (k1), (k2), &(cmp)))
+/*
+ * __wt_lex_compare_skip_collator --
+ *	The same as __wt_lex_compare_skip, but using the application's collator
+ * function when configured.
+ */
+static inline int
+__wt_lex_compare_skip_collator(WT_SESSION_IMPL *session, WT_COLLATOR *collator,
+    const WT_ITEM *user_item, const WT_ITEM *tree_item, int *cmpp,
+    size_t *matchp)
+{
+	if (collator == NULL) {
+		*cmpp = __wt_lex_compare_skip(user_item, tree_item, matchp);
+		return (0);
+	}
+	return (collator->compare(
+	    collator, &session->iface, user_item, tree_item, cmpp));
+}

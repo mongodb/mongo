@@ -1654,14 +1654,14 @@ __rec_split_row_promote(
 		}
 
 		/* Compare against the current key, it must be less. */
-		WT_ERR(WT_LEX_CMP(
-		    session, btree->collator, update, r->cur, cmp));
+		WT_ERR(__wt_lex_compare_collator(
+		    session, btree->collator, update, r->cur, &cmp));
 		if (cmp >= 0)
 			continue;
 
 		/* Compare against the last key, it must be greater. */
-		WT_ERR(WT_LEX_CMP(
-		    session, btree->collator, update, r->last, cmp));
+		WT_ERR(__wt_lex_compare_collator(
+		    session, btree->collator, update, r->last, &cmp));
 		if (cmp >= 0)
 			max = update;
 
@@ -2564,8 +2564,8 @@ __rec_split_write(WT_SESSION_IMPL *session,
 				key->data = WT_INSERT_KEY(skip->ins);
 				key->size = WT_INSERT_KEY_SIZE(skip->ins);
 			}
-			WT_ERR(WT_LEX_CMP(session,
-			    btree->collator, key, &(bnd + 1)->key, cmp));
+			WT_ERR(__wt_lex_compare_collator(session,
+			    btree->collator, key, &(bnd + 1)->key, &cmp));
 			if (cmp >= 0)
 				goto skip_check_complete;
 			break;

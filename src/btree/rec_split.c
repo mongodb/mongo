@@ -363,8 +363,8 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 				if (first)
 					first = 0;
 				else {
-					(void)WT_LEX_CMP(session,
-					    btree->collator, last, next, cmp);
+					(void)__wt_lex_compare_collator(session,
+					    btree->collator, last, next, &cmp);
 					WT_ASSERT(session, cmp < 0);
 				}
 			}
