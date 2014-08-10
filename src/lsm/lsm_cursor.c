@@ -752,7 +752,6 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_CURSOR_LSM *alsm;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int cmp;
 
 	/* There's no need to sync with the LSM tree, avoid WT_LSM_ENTER. */
 	alsm = (WT_CURSOR_LSM *)a;
@@ -770,8 +769,7 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_CURSOR_NEEDKEY(b);
 
 	WT_ERR(__wt_lex_compare_collator(
-	    session, alsm->lsm_tree->collator, &a->key, &b->key, &cmp));
-	*cmpp = cmp;
+	    session, alsm->lsm_tree->collator, &a->key, &b->key, cmpp));
 
 err:	API_END_RET(session, ret);
 }
