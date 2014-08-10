@@ -16,7 +16,6 @@ struct __wt_track; 		typedef struct __wt_track WT_TRACK;
  */
 struct __wt_stuff {
 	WT_SESSION_IMPL *session;		/* Salvage session */
-	WT_BTREE  *btree;			/* Enclosing Btree */
 
 	WT_TRACK **pages;			/* Pages */
 	uint32_t   pages_next;			/* Next empty slot */
@@ -151,7 +150,6 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	WT_CLEAR(stuff);
 	ss = &stuff;
 	ss->session = session;
-	ss->btree = btree;
 	ss->page_type = WT_PAGE_INVALID;
 
 	/* Allocate temporary buffers. */
@@ -2094,7 +2092,7 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
 static int
 __slvg_trk_compare_key(const void *a, const void *b)
 {
-	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
 	WT_TRACK *a_trk, *b_trk;
 	uint64_t a_gen, a_recno, b_gen, b_recno;
 	int cmp;
@@ -2120,15 +2118,15 @@ __slvg_trk_compare_key(const void *a, const void *b)
 			return (-1);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		btree = a_trk->ss->btree;
 		/*
 		 * XXX
 		 * __wt_lex_compare_collator can potentially fail, and we're
 		 * ignoring that error because this routine is called as an
 		 * underlying qsort routine.
 		 */
+		session = a_trk->ss->session;
 		(void)__wt_lex_compare_collator(
-		    a_trk->ss->session, btree->collator,
+		    session, S2BT(session)->collator,
 		    &a_trk->row_start, &b_trk->row_start, &cmp);
 		if (cmp != 0)
 			return (cmp);
