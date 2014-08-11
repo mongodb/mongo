@@ -360,6 +360,14 @@ namespace mongo {
             uasserted(12504, s);
         }
 
+        /* this is because we want key patterns like { _id : 1 } and { _id : -1 } to
+           all be treated as the same pattern.
+        */
+        if ( IndexDetails::isIdIndexPattern(key) ) {
+            key = id_obj;
+            name = "_id_";
+        }
+
         sourceCollection = nsdetails(sourceNS);
         if( sourceCollection == 0 ) {
             // try to create it
@@ -393,9 +401,6 @@ namespace mongo {
             uasserted(12505,s);
         }
 
-        /* this is because we want key patterns like { _id : 1 } and { _id : <someobjid> } to
-           all be treated as the same pattern.
-        */
         if ( IndexDetails::isIdIndexPattern(key) ) {
             //if( !god ) {
             //ensureHaveIdIndex( sourceNS.c_str(), mayInterrupt );
@@ -439,14 +444,8 @@ namespace mongo {
             }
             // idea is to put things we use a lot earlier
             b.append("v", v);
-            if ( IndexDetails::isIdIndexPattern(o["key"].Obj()) ) {
-                b.append("name", "_id_");
-                b.append("key", id_obj);
-            }
-            else {
-                b.append( o["name"] );
-                b.append(o["key"]);
-            }
+            b.append("name", name);
+            b.append("key", key);
             if( o["unique"].trueValue() )
                 b.appendBool("unique", true); // normalize to bool true in case was int 1 or something...
             b.append(o["ns"]);
