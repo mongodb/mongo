@@ -151,68 +151,23 @@ namespace mongo {
         return false;
     }
 
-namespace {
-    Document extractInfo(ptr<const TypeExplain> info) {
-        MutableDocument out;
-
-        if (info->isClausesSet()) {
-            vector<Value> clauses;
-            for (size_t i = 0; i < info->sizeClauses(); i++) {
-                clauses.push_back(Value(extractInfo(info->getClausesAt(i))));
-            }
-            out[TypeExplain::clauses()] = Value::consume(clauses);
-        }
-
-        if (info->isCursorSet())
-            out[TypeExplain::cursor()] = Value(info->getCursor());
-
-        if (info->isIsMultiKeySet())
-            out[TypeExplain::isMultiKey()] = Value(info->getIsMultiKey());
-
-        if (info->isScanAndOrderSet())
-            out[TypeExplain::scanAndOrder()] = Value(info->getScanAndOrder());
-
-#if 0 // Disabled pending SERVER-12015 since until then no aggs will be index only.
-        if (info->isIndexOnlySet())
-            out[TypeExplain::indexOnly()] = Value(info->getIndexOnly());
-#endif
-
-        if (info->isIndexBoundsSet())
-            out[TypeExplain::indexBounds()] = Value(info->getIndexBounds());
-
-        if (info->isAllPlansSet()) {
-            vector<Value> allPlans;
-            for (size_t i = 0; i < info->sizeAllPlans(); i++) {
-                allPlans.push_back(Value(extractInfo(info->getAllPlansAt(i))));
-            }
-            out[TypeExplain::allPlans()] = Value::consume(allPlans);
-        }
-
-        return out.freeze();
-    }
-} // namespace
-
     Value DocumentSourceCursor::serialize(bool explain) const {
         // we never parse a documentSourceCursor, so we only serialize for explain
         if (!explain)
             return Value();
 
+        // Get planner-level explain info from the underlying PlanExecutor.
+        BSONObjBuilder explainBuilder;
         Status explainStatus(ErrorCodes::InternalError, "");
-        scoped_ptr<TypeExplain> plan;
         {
             Lock::DBRead lk(pExpCtx->opCtx->lockState(), _ns);
             Client::Context ctx(pExpCtx->opCtx, _ns, /*doVersion=*/ false);
 
-            massert(17392, "No _exec. Were we disposed before explained?",
-                    _exec);
+            massert(17392, "No _exec. Were we disposed before explained?", _exec);
 
             _exec->restoreState(pExpCtx->opCtx);
-
-            TypeExplain* explainRaw;
-            explainStatus = Explain::legacyExplain(_exec.get(), &explainRaw);
-            if (explainStatus.isOK())
-                plan.reset(explainRaw);
-
+            explainStatus = Explain::explainStages(_exec.get(), Explain::QUERY_PLANNER,
+                                                   &explainBuilder);
             _exec->saveState();
         }
 
@@ -228,9 +183,13 @@ namespace {
         if (!_projection.isEmpty())
             out["fields"] = Value(_projection);
 
+        // Add explain results from the query system into the agg explain output.
         if (explainStatus.isOK()) {
-            out["plan"] = Value(extractInfo(plan));
-        } else {
+            BSONObj explainObj = explainBuilder.obj();
+            invariant(explainObj.hasField("queryPlanner"));
+            out["queryPlanner"] = Value(explainObj["queryPlanner"]);
+        }
+        else {
             out["planError"] = Value(explainStatus.toString());
         }
 
