@@ -42,6 +42,7 @@ env.Library('repl_coordinator_impl',
             [
                 'check_quorum_for_config_change.cpp',
                 'repl_coordinator_impl.cpp',
+                'repl_coordinator_impl_heartbeat.cpp',
                 'replica_set_config_checks.cpp',
             ],
             LIBDEPS=['$BUILD_DIR/mongo/db/common',
