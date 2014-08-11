@@ -395,17 +395,11 @@ namespace repl {
                           const BSONObj& obj,
                           BSONObj *o2,
                           bool *bb,
-                          bool fromMigrate ) = _logOpOld;
+                          bool fromMigrate ) = _logOpUninitialized;
     void newReplUp() {
-        getGlobalReplicationCoordinator()->getSettings().master = true;
         _logOp = _logOpRS;
     }
-    void newRepl() {
-        // TODO(spencer): We shouldn't be changing the ReplicationCoordinator's settings after
-        // startup
-        getGlobalReplicationCoordinator()->getSettings().master = true;
-        _logOp = _logOpUninitialized;
-    }
+
     void oldRepl() { _logOp = _logOpOld; }
 
     void logKeepalive(OperationContext* txn) {
@@ -433,7 +427,7 @@ namespace repl {
                bool* b,
                bool fromMigrate) {
         try {
-            if ( getGlobalReplicationCoordinator()->getSettings().master ) {
+            if ( getGlobalReplicationCoordinator()->isReplEnabled() ) {
                 _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
             }
 

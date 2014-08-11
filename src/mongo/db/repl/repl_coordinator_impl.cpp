@@ -107,12 +107,12 @@ namespace repl {
 
         _topCoord.reset(topCoord);
         _topCoord->registerConfigChangeCallback(
-                stdx::bind(&ReplicationCoordinatorImpl::setCurrentReplicaSetConfig,
+                stdx::bind(&ReplicationCoordinatorImpl::_onReplicaSetConfigChange,
                            this,
                            stdx::placeholders::_1,
                            stdx::placeholders::_2));
         _topCoord->registerStateChangeCallback(
-                stdx::bind(&ReplicationCoordinatorImpl::setCurrentMemberState,
+                stdx::bind(&ReplicationCoordinatorImpl::_onSelfStateChange,
                            this,
                            stdx::placeholders::_1));
 
@@ -170,7 +170,7 @@ namespace repl {
         return modeNone;
     }
 
-    void ReplicationCoordinatorImpl::setCurrentMemberState(const MemberState& newState) {
+    void ReplicationCoordinatorImpl::_onSelfStateChange(const MemberState& newState) {
         invariant(_settings.usingReplSets());
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_settings.usingReplSets());
@@ -473,7 +473,8 @@ namespace repl {
                 // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
                 // we need to keep sending it for 2.6 compatibility.
                 // TODO(spencer): Remove this after 2.8 is released.
-                const MemberConfig& memberConfig = _rsConfig.getMemberAt(info.memberID);
+                int memberID = rid == getMyRID(txn) ? _thisMembersConfigIndex : info.memberID;
+                const MemberConfig& memberConfig = _rsConfig.getMemberAt(memberID);
                 entry.append("config", memberConfig.toBSON(_rsConfig.getTagConfig()));
             }
         }
@@ -501,11 +502,15 @@ namespace repl {
         // handshake objs for all chained members
         for (SlaveInfoMap::const_iterator itr = _slaveInfoMap.begin();
              itr != _slaveInfoMap.end(); ++itr) {
+            const OID& oid = itr->first;
+            if (oid == getMyRID(txn)) { // Already generated handshake for ourself
+                continue;
+            }
             BSONObjBuilder cmd;
             cmd.append("replSetUpdatePosition", 1);
             {
                 BSONObjBuilder subCmd (cmd.subobjStart("handshake"));
-                subCmd.append("handshake", itr->first);
+                subCmd.append("handshake", oid);
                 int memberID = itr->second.memberID;
                 subCmd.append("member", memberID);
                 // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
@@ -632,7 +637,7 @@ namespace repl {
         return Status::OK();
     }
 
-    void ReplicationCoordinatorImpl::setCurrentReplicaSetConfig(const ReplicaSetConfig& newConfig,
+    void ReplicationCoordinatorImpl::_onReplicaSetConfigChange(const ReplicaSetConfig& newConfig,
                                                                 int myIndex) {
         invariant(_settings.usingReplSets());
         boost::lock_guard<boost::mutex> lk(_mutex);

@@ -30,16 +30,8 @@
 
 #include "mongo/db/repl/repl_set_seed_list.h"
 
-#include <boost/thread.hpp>
-#include <iostream>
-
-#include "mongo/db/repl/isself.h"
-#include "mongo/db/repl/master_slave.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/rs.h"
-#include "mongo/stdx/functional.h"
+#include "mongo/db/repl/repl_coordinator_external_state.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -49,7 +41,8 @@ namespace mongo {
 namespace repl {
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    void parseReplSetSeedList(const std::string& cfgString,
+    void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
+                              const std::string& cfgString,
                               std::string& setname,
                               std::vector<HostAndPort>& seeds,
                               std::set<HostAndPort>& seedSet) {
@@ -84,8 +77,8 @@ namespace repl {
                         seedSet.count(m) == 0);
                 seedSet.insert(m);
                 //uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
-                if (isSelf(m)) {
-                    LOG(1) << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
+                if (externalState->isSelf(m)) {
+                    LOG(1) << "replSet ignoring seed " << m.toString() << " (=self)";
                 }
                 else
                     seeds.push_back(m);

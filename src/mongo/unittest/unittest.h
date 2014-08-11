@@ -45,6 +45,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/logger/logstream_builder.h"
+#include "mongo/logger/message_log_domain.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -263,6 +264,29 @@ namespace mongo {
             class FixtureExceptionForTesting : public std::exception {
             };
 
+            /**
+             * Starts capturing messages logged by code under test.
+             *
+             * Log messages will still also go to their default destination; this
+             * code simply adds an additional sink for log messages.
+             *
+             * Clears any previously captured log lines.
+             */
+            void startCapturingLogMessages();
+
+            /**
+             * Stops capturing log messages logged by code under test.
+             */
+            void stopCapturingLogMessages();
+
+            /**
+             * Gets a vector of strings, one log line per string, captured since
+             * the last call to startCapturingLogMessages() in this test.
+             */
+            const std::vector<std::string>& getCapturedLogMessages() const {
+                return _capturedLogMessages;
+            }
+
         private:
             /**
              * Called on the test object before running the test.
@@ -278,6 +302,10 @@ namespace mongo {
              * The test itself.
              */
             virtual void _doTest() = 0;
+
+            bool _isCapturingLogMessages;
+            std::vector<std::string> _capturedLogMessages;
+            logger::MessageLogDomain::AppenderHandle _captureAppenderHandle;
         };
 
         /**

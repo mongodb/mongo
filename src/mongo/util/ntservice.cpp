@@ -58,7 +58,8 @@ namespace {
             const wstring& serviceDesc,
             const wstring& serviceUser,
             const wstring& servicePassword,
-            const std::vector<std::string>& argv);
+            const std::vector<std::string>& argv,
+            const bool reinstall);
 
     static void removeServiceOrDie(const wstring& serviceName);
 
@@ -97,38 +98,38 @@ namespace {
 
         if (params.count("install")) {
             if ( badOption != -1 ) {
-                log() << "--install cannot be used with --" << disallowedOptions[badOption] << endl;
+                log() << "--install cannot be used with --" << disallowedOptions[badOption];
                 ::_exit( EXIT_BADOPTIONS );
             }
             if ( !params.count("systemLog.destination") ||
                  params["systemLog.destination"].as<std::string>() != "file" ) {
-                log() << "--install has to be used with a log file for server output" << endl;
+                log() << "--install has to be used with a log file for server output";
                 ::_exit( EXIT_BADOPTIONS );
             }
             installService = true;
         }
         if (params.count("reinstall")) {
             if ( badOption != -1 ) {
-                log() << "--reinstall cannot be used with --" << disallowedOptions[badOption] << endl;
+                log() << "--reinstall cannot be used with --" << disallowedOptions[badOption];
                 ::_exit( EXIT_BADOPTIONS );
             }
             if ( !params.count("systemLog.destination") ||
                  params["systemLog.destination"].as<std::string>() != "file" ) {
-                log() << "--reinstall has to be used with a log file for server output" << endl;
+                log() << "--reinstall has to be used with a log file for server output";
                 ::_exit( EXIT_BADOPTIONS );
             }
             reinstallService = true;
         }
         if (params.count("remove")) {
             if ( badOption != -1 ) {
-                log() << "--remove cannot be used with --" << disallowedOptions[badOption] << endl;
+                log() << "--remove cannot be used with --" << disallowedOptions[badOption];
                 ::_exit( EXIT_BADOPTIONS );
             }
             removeService = true;
         }
         if (params.count("service")) {
             if ( badOption != -1 ) {
-                log() << "--service cannot be used with --" << disallowedOptions[badOption] << endl;
+                log() << "--service cannot be used with --" << disallowedOptions[badOption];
                 ::_exit( EXIT_BADOPTIONS );
             }
             _startService = true;
@@ -136,7 +137,7 @@ namespace {
 
         if (params.count("processManagement.windowsService.serviceName")) {
             if ( badOption != -1 ) {
-                log() << "--serviceName cannot be used with --" << disallowedOptions[badOption] << endl;
+                log() << "--serviceName cannot be used with --" << disallowedOptions[badOption];
                 ::_exit( EXIT_BADOPTIONS );
             }
             _serviceName = toWideString(
@@ -144,7 +145,7 @@ namespace {
         }
         if (params.count("processManagement.windowsService.displayName")) {
             if ( badOption != -1 ) {
-                log() << "--serviceDisplayName cannot be used with --" << disallowedOptions[badOption] << endl;
+                log() << "--serviceDisplayName cannot be used with --" << disallowedOptions[badOption];
                 ::_exit( EXIT_BADOPTIONS );
             }
             windowsServiceDisplayName = toWideString(
@@ -152,7 +153,7 @@ namespace {
         }
         if (params.count("processManagement.windowsService.description")) {
             if ( badOption != -1 ) {
-                log() << "--serviceDescription cannot be used with --" << disallowedOptions[badOption] << endl;
+                log() << "--serviceDescription cannot be used with --" << disallowedOptions[badOption];
                 ::_exit( EXIT_BADOPTIONS );
             }
             windowsServiceDescription = toWideString(
@@ -160,7 +161,7 @@ namespace {
         }
         if (params.count("processManagement.windowsService.serviceUser")) {
             if ( badOption != -1 ) {
-                log() << "--serviceUser cannot be used with --" << disallowedOptions[badOption] << endl;
+                log() << "--serviceUser cannot be used with --" << disallowedOptions[badOption];
                 ::_exit( EXIT_BADOPTIONS );
             }
             windowsServiceUser = toWideString(
@@ -168,7 +169,7 @@ namespace {
         }
         if (params.count("processManagement.windowsService.servicePassword")) {
             if ( badOption != -1 ) {
-                log() << "--servicePassword cannot be used with --" << disallowedOptions[badOption] << endl;
+                log() << "--servicePassword cannot be used with --" << disallowedOptions[badOption];
                 ::_exit( EXIT_BADOPTIONS );
             }
             windowsServicePassword = toWideString(
@@ -180,13 +181,15 @@ namespace {
             if ( reinstallService ) {
                 removeServiceOrDie(_serviceName);
             }
+
             installServiceOrDie(
                     _serviceName,
                     windowsServiceDisplayName,
                     windowsServiceDescription,
                     windowsServiceUser,
                     windowsServicePassword,
-                    argv);
+                    argv,
+                    reinstallService);
             ::_exit(EXIT_CLEAN);
         }
         else if ( removeService ) {
@@ -266,9 +269,10 @@ namespace {
             const wstring& serviceDesc,
             const wstring& serviceUser,
             const wstring& servicePassword,
-            const std::vector<std::string>& argv
+            const std::vector<std::string>& argv,
+            const bool reinstall
     ) {
-        log() << "Trying to install Windows service '" << toUtf8String(serviceName) << "'" << endl;
+        log() << "Trying to install Windows service '" << toUtf8String(serviceName) << "'";
 
         std::vector<std::string> serviceArgv = constructServiceArgv(argv);
 
@@ -281,19 +285,38 @@ namespace {
         SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
         if ( schSCManager == NULL ) {
             DWORD err = ::GetLastError();
-            log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err) << endl;
+            log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err);
             ::_exit(EXIT_NTSERVICE_ERROR);
         }
 
-        // Make sure service doesn't already exist.
-        // TODO: Check to see if service is in "Deleting" status, suggest the user close down Services MMC snap-ins.
-        SC_HANDLE schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
-        if ( schService != NULL ) {
-            log() << "There is already a service named '" << toUtf8String(serviceName) << "', aborting" << endl;
-            ::CloseServiceHandle( schService );
-            ::CloseServiceHandle( schSCManager );
-            ::_exit(EXIT_NTSERVICE_ERROR);
+        SC_HANDLE schService = NULL;
+        int retryCount = 10;
+
+        while (true) {
+
+            // Make sure service doesn't already exist.
+            // TODO: Check to see if service is in "Deleting" status, suggest the user close down Services MMC snap-ins.
+            schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
+            if ( schService != NULL) {
+                log() << "There is already a service named '" << toUtf8String(serviceName) << 
+                    (retryCount > 0 ? "', sleeping and retrying" : "', aborting");
+                ::CloseServiceHandle( schService );
+
+                // If we are reinstalling the service, but SCM thinks it is installed, then wait 
+                // and try again
+                if(--retryCount > 0 && reinstall) {
+                    sleepmillis(500);
+                    continue;
+                }
+
+                ::CloseServiceHandle( schSCManager );
+                ::_exit(EXIT_NTSERVICE_ERROR);
+            }
+            else {
+                break;
+            }
         }
+
         std::wstring commandLineWide = toWideString(commandLine.c_str());
 
         // create new service
@@ -313,17 +336,17 @@ namespace {
                 NULL );                         // user account password
         if ( schService == NULL ) {
             DWORD err = ::GetLastError();
-            log() << "Error creating service: " << GetWinErrMsg(err) << endl;
+            log() << "Error creating service: " << GetWinErrMsg(err);
             ::CloseServiceHandle( schSCManager );
             ::_exit( EXIT_NTSERVICE_ERROR );
         }
 
         log() << "Service '" << toUtf8String(serviceName) << "' (" << toUtf8String(displayName) <<
-                ") installed with command line '" << commandLine << "'" << endl;
+                ") installed with command line '" << commandLine << "'";
         string typeableName( ( serviceName.find(L' ') != wstring::npos ) ?
                              "\"" + toUtf8String(serviceName) + "\""     :
                              toUtf8String(serviceName) );
-        log() << "Service can be started from the command line with 'net start " << typeableName << "'" << endl;
+        log() << "Service can be started from the command line with 'net start " << typeableName << "'";
 
         bool serviceInstalled;
 
@@ -337,7 +360,7 @@ namespace {
                 actualServiceUser = serviceUser;
             }
 
-            log() << "Setting service login credentials for user: " << toUtf8String(actualServiceUser) << endl;
+            log() << "Setting service login credentials for user: " << toUtf8String(actualServiceUser);
             serviceInstalled = ::ChangeServiceConfig(
                     schService,                 // service handle
                     SERVICE_NO_CHANGE,          // service type
@@ -351,7 +374,7 @@ namespace {
                     servicePassword.c_str(),    // user account password
                     NULL );                     // service display name
             if ( !serviceInstalled ) {
-                log() << "Setting service login failed, service has 'LocalService' permissions" << endl;
+                log() << "Setting service login failed, service has 'LocalService' permissions";
             }
         }
 
@@ -386,7 +409,7 @@ namespace {
         }
         else {
 #endif
-            log() << "Could not set service description. Check the Windows Event Log for more details." << endl;
+            log() << "Could not set service description. Check the Windows Event Log for more details.";
         }
 
         ::CloseServiceHandle( schService );
@@ -397,18 +420,18 @@ namespace {
     }
 
     void removeServiceOrDie(const wstring& serviceName) {
-        log() << "Trying to remove Windows service '" << toUtf8String(serviceName) << "'" << endl;
+        log() << "Trying to remove Windows service '" << toUtf8String(serviceName) << "'";
 
         SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
         if ( schSCManager == NULL ) {
             DWORD err = ::GetLastError();
-            log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err) << endl;
+            log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err);
             ::_exit(EXIT_NTSERVICE_ERROR);
         }
 
         SC_HANDLE schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
         if ( schService == NULL ) {
-            log() << "Could not find a service named '" << toUtf8String(serviceName) << "' to remove" << endl;
+            log() << "Could not find a service named '" << toUtf8String(serviceName) << "' to remove";
             ::CloseServiceHandle( schSCManager );
             ::_exit(EXIT_NTSERVICE_ERROR);
         }
@@ -417,14 +440,14 @@ namespace {
 
         // stop service if its running
         if ( ::ControlService( schService, SERVICE_CONTROL_STOP, &serviceStatus ) ) {
-            log() << "Service " << toUtf8String(serviceName) << " is currently running, stopping service" << endl;
+            log() << "Service " << toUtf8String(serviceName) << " is currently running, stopping service";
             while ( ::QueryServiceStatus( schService, &serviceStatus ) ) {
                 if ( serviceStatus.dwCurrentState == SERVICE_STOP_PENDING ) {
                     Sleep( 1000 );
                 }
                 else { break; }
             }
-            log() << "Service '" << toUtf8String(serviceName) << "' stopped" << endl;
+            log() << "Service '" << toUtf8String(serviceName) << "' stopped";
         }
 
         bool serviceRemoved = ::DeleteService( schService );
@@ -433,17 +456,17 @@ namespace {
         ::CloseServiceHandle( schSCManager );
 
         if (serviceRemoved) {
-            log() << "Service '" << toUtf8String(serviceName) << "' removed" << endl;
+            log() << "Service '" << toUtf8String(serviceName) << "' removed";
         }
         else {
-            log() << "Failed to remove service '" << toUtf8String(serviceName) << "'" << endl;
+            log() << "Failed to remove service '" << toUtf8String(serviceName) << "'";
         }
 
         if (!serviceRemoved)
             ::_exit(EXIT_NTSERVICE_ERROR);
     }
 
-    bool reportStatus(DWORD reportState, DWORD waitHint) {
+    bool reportStatus(DWORD reportState, DWORD waitHint, DWORD exitCode) {
         if ( _statusHandle == NULL )
             return false;
 
@@ -464,12 +487,15 @@ namespace {
         }
 
         ssStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
-        ssStatus.dwServiceSpecificExitCode = 0;
+        ssStatus.dwServiceSpecificExitCode = exitCode;
         ssStatus.dwControlsAccepted = dwControlsAccepted;
         ssStatus.dwCurrentState = reportState;
-        ssStatus.dwWin32ExitCode = NO_ERROR;
+        ssStatus.dwWin32ExitCode = reportState == SERVICE_STOPPED 
+            ? ERROR_SERVICE_SPECIFIC_ERROR : NO_ERROR;
         ssStatus.dwWaitHint = waitHint;
-        ssStatus.dwCheckPoint = ( reportState == SERVICE_RUNNING || reportState == SERVICE_STOPPED ) ? 0 : checkPoint++;
+        ssStatus.dwCheckPoint = 
+            ( reportState == SERVICE_RUNNING || reportState == SERVICE_STOPPED ) ?
+            0 : checkPoint++;
 
         return SetServiceStatus( _statusHandle, &ssStatus );
     }
@@ -481,22 +507,36 @@ namespace {
 
         reportStatus( SERVICE_START_PENDING, 1000 );
 
-        _serviceCallback();
-        reportStatus( SERVICE_STOPPED );
-        ::_exit( EXIT_CLEAN );
-    }
+        ExitCode exitCode = _serviceCallback();
 
-    static void serviceShutdown( const char* controlCodeName ) {
-        Client::initThread( "serviceShutdown" );
-        log() << "got " << controlCodeName << " request from Windows Service Control Manager, " <<
-            ( inShutdown() ? "already in shutdown" : "will terminate after current cmd ends" ) << endl;
-        reportStatus( SERVICE_STOP_PENDING );
+        // Stop the process
+        // During clean shutdown, ie NT SCM signals us, _serviceCallback returns here
+        // as part of the listener loop terminating so we do not have to stop twice in this case
         if ( ! inShutdown() ) {
             // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
             // the "terminate process" functionality in exitCleanly.
             exitCleanly( EXIT_WINDOWS_SERVICE_STOP );
-            reportStatus( SERVICE_STOPPED );
         }
+
+        reportStatus(SERVICE_STOPPED, 0, exitCode);
+    }
+
+    static void serviceShutdown( const char* controlCodeName ) {
+        Client::initThread( "serviceShutdown" );
+
+        log() << "got " << controlCodeName << " request from Windows Service Control Manager, " <<
+            ( inShutdown() ? "already in shutdown" : "will terminate after current cmd ends" );
+
+        reportStatus( SERVICE_STOP_PENDING );
+
+        if ( ! inShutdown() ) {
+            // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
+            // the "terminate process" functionality in exitCleanly.
+            // Note: This triggers _serviceCallback to stop by setting inShutdown() == true
+            exitCleanly( EXIT_WINDOWS_SERVICE_STOP );
+        }
+
+        // Note: we will report exit status in initService
     }
 
     static void WINAPI serviceCtrl( DWORD ctrlCode ) {
@@ -519,7 +559,7 @@ namespace {
             { NULL, NULL }
         };
 
-        log() << "Trying to start Windows service '" << toUtf8String(_serviceName) << "'" << endl;
+        log() << "Trying to start Windows service '" << toUtf8String(_serviceName) << "'";
         if (StartServiceCtrlDispatcherW(dispTable)) {
             ::_exit(EXIT_CLEAN);
         }

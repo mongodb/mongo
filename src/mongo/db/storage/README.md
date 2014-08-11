@@ -5,14 +5,18 @@ This is a list of frequently asked questions relating to storage engines, nearly
 all of which come from the mongodb-dev Google group. Many of the categories
 overlap, so please do not pay too much attention to the section titles. 
 
+**Q**: If I have a question about the storage API, what's the best way to get an answer?
+**A**: Your best bet is to post on mongodb-dev.  Everybody involved in the storage API will read the
+email.
+
 Storage Engine API
 ------------------
 **Q**: On InnoDB, row locks are not released until log sync is done. Will that be a
 problem in the API?  
-**A**: It’s not a problem with the API. A storage engine
-implementation could log sync at the end of every unit of work. The exact
-behavior depends on the durability behavior of the storage engine
-implementation.
+**A**: It’s not a problem with the API. A storage engine implementation could log sync at the end of
+every unit of work. The exact behavior depends on the durability behavior of the storage engine
+implementation.  Row locks will be held by MongoDB until the end of a WriteUnitOfWork (eg an
+operation on one document).
 
 **Q**: As far as I can tell, the storage engine API allows storage engines to keep
 some context in the OperationContext's RecoveryUnit, but only for updates (there
@@ -25,11 +29,19 @@ current storage engine and isolation level don’t require this. Feel encouraged
 to suggest details.
 
 **Q**: Does the API expect committed changes from a transaction to be visible to
-others before log sync?  
-**A**: The API does not require that a commit of a unit of work implies log sync.
- Changes should only be visible to the operation making the changes until those
+others before log sync?
+**A**: The API does not require a log sync along with the commit of a unit of work.
+Changes should only be visible to the operation making the changes until those
 changes are committed, at which point the changes should be visible to all
 clients of the storage engine.
+
+**Q**: What is the difference between storageSize and dataSize in RecordStore?
+**A**: dataSize is the size of the data stored and storageSize is the (approximate) on-disk size of
+the data and metadata.  Indices are not counted in storageSize; they are counted separately.
+
+**Q**: Is RecordStore::numRecords called frequently? Does it need to be fast?
+**A**: Yes and yes. Our Rocks implementation caches numRecords and dataSize so accessing that data
+is O(1) instead of O(n)
 
 Operation Context
 -----------------
@@ -51,16 +63,24 @@ implementation would probably access the lock state and the recovery unit.
  Storage engines are free to do whatever they need to with the OperationContext
 in order to satisfy the storage APIs.
 
+**Q**: About OperationContext "txn", does it mean states in operation context are only used by the
+storage engines to ensure the consistency inside the storage engines, and storage engine needs to
+follow no synchronization guideline because of it? To be more precise, if the same "txn" is passed
+to RecordStore::getIterator() twice, does it mean the iterator should be built from the same
+snapshot?
+**A**: Yes.
+
+**Q**: What guarantees must a storage engine provide if a document is updateRecord()'d and then
+returned by a getIterator()?  That is, do storage engines read their own writes?
+**A**: Operations should read their own writes.
+
+
 Reading & Writing
 -----------------
-**Q**: Are write cursors expected to see their changes in progress? This could be an
-issue for InnoDB write batching as done by RocksDB (call multi-put on commit)
-doesn't have to be done. Where RocksDB engine adds to a write batch, InnoDB
-could immediately apply the change to an uncommitted transaction.  
-**A**: Yes, this is expected. There has been some discussion about removing this
-requirement. For now, however, we are not planning on doing so. Instead, a
-queryable and iterable WriteBatch class is being created to allow access to data
-which has not yet been committed.
+**Q**: Are write cursors expected to see their changes in progress?
+**A**: Yes, this is currently expected. There has been some discussion about removing this
+requirement. For now we are not planning on doing so. Instead, a queryable and iterable WriteBatch
+class is being created to allow access to data which has not yet been committed.
 
 **Q**: "Read-your-writes" consistency was mentioned in Mathias's MongoWorld
 presentation, but as far as I can see, the storage engine has no way to connect
@@ -71,7 +91,7 @@ and other problems.  (FYI, as an implementation side-effect, mmapv1
 automatically provides read-your-writes, which partially explains this
 oversight.)
 
-Q. Storage engines need to support a "read-your-own-update.”  In the storage
+**Q**: Storage engines need to support a "read-your-own-update.”  In the storage
 engine interface, which parameter/variable passes this transaction/session
 information?  
 **A**: The OperationContext “txn”, which is also called “opCtx” in some areas, has
@@ -90,6 +110,30 @@ Therefore, one possible solution would be to pass the OperationContext class to
 every method which needs a consistent view of the database. We will soon merge
 code which has comments mentioning every instance in rocks where this needs to
 be done.
+
+**Q**: The RocksDB implementation of insert, update, delete methods for RecordStore add something to
+a write batch. This is fast and unlikely to fail. The real work is delayed until commit. What is the
+expected behavior when writing the write batch on commit fails because of a disk write timeout, disk
+full or other odd error? The likely error would occur on insert or update when unique index
+maintenance is done, but that has yet to be implemented.
+**A**: We’re planning on implementing operation-level retry to avoid deadlocks that might otherwise
+occur while processing a document.  An operation could probably be similarly retried in the case of
+transient errors upon commit.
+
+**Q**: What kind of operations might occur between prepareToYield and recoverFromYield? DDL
+including drop collection? Or just other transactions? For an index scan does prepareToYield require
+me to save the last key seen so that recover knows where to restart?
+**A**: In 2.6, DDL could occur, as could other transactions.  These methods were introduced when
+operations were scheduled through “time-slicing” with voluntary lock yielding.  They’re changing
+meaning now that yielding is gone.  We’re still figuring out what state-saving behavior we need, in
+particular for operations that mutate the results of a query.  The getMore implementation currently
+uses them as well and will probably continue to do so.
+
+**Q**: Is there global locking for SortedDataInterface::isEmpty to prevent inserts from being done
+when the answer is being determined?
+**A**: Yes.  Any caller of isEmpty must have locks to ensure that it is still true by the time it
+acts on that information.
+
 
 RecoveryUnit
 ------------
@@ -180,6 +224,14 @@ working, but may benchmark this in the future.
 
 **Q**: How do I install RocksDB?  
 **A**: https://groups.google.com/forum/#!topic/mongodb-dev/ilcHAg6JgQI
+
+**Q**: I think RocksRecordStore::_nextId needs to be persistent. But I also think the API needs to
+support logical IDs as DiskLoc is physical today and using (int,int) for file number / offset
+implies that files are at most 2G. And I suspect that the conversion of it to a byte stream means
+that Rocks documents are not in PK order on little endian (see _makeKey).
+**A**: We're planning on pushing DiskLoc under the storage layer API (it’s really an mmapv1 data
+type) and replacing it with a 64-bit RecordID type that can be converted into whatever a storage
+engine requires.
 
 General
 =======

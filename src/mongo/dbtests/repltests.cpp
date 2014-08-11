@@ -39,6 +39,7 @@
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_coordinator_mock.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/catalog/collection.h"
@@ -65,11 +66,13 @@ namespace ReplTests {
         Base() : _wunit( _txn.recoveryUnit()),
                  _client(&_txn) {
 
-            oldRepl();
-            ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
-            replSettings.replSet = "";
+            ReplSettings replSettings;
             replSettings.oplogSize = 5 * 1024 * 1024;
             replSettings.master = true;
+            ReplicationCoordinatorMock* replCoord = new ReplicationCoordinatorMock(replSettings);
+            setGlobalReplicationCoordinator(replCoord);
+
+            oldRepl();
             createOplog(&_txn);
 
             Client::WriteContext ctx(&_txn, ns());
@@ -83,7 +86,10 @@ namespace ReplTests {
         }
         ~Base() {
             try {
-                getGlobalReplicationCoordinator()->getSettings().master = false;
+                ReplSettings replSettings;
+                replSettings.oplogSize = 10 * 1024 * 1024;
+                delete getGlobalReplicationCoordinator();
+                setGlobalReplicationCoordinator(new ReplicationCoordinatorMock(replSettings));
                 deleteAll( ns() );
                 deleteAll( cllNS() );
                 _wunit.commit();

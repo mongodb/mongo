@@ -57,10 +57,6 @@ namespace repl {
         OpTime getOpTime() const { return _opTime; }
         int getSkew() const { return _skew; }
         bool hasAuthIssue() const { return _authIssue; }
-        Milliseconds getPing() const { return _ping; }
-
-        // Global counter of number of pings received so far.
-        static unsigned int numPings;
 
         OpTime getElectionTime() const { return _electionTime; }
 
@@ -127,9 +123,6 @@ namespace repl {
 
         // Did the last heartbeat show a failure to authenticate?
         bool _authIssue;
-
-        // Number of milliseconds that it took to respond to the last heartbeat command
-        Milliseconds _ping;
 
         // Time node was elected primary
         OpTime _electionTime;

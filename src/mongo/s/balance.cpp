@@ -30,6 +30,7 @@
 
 #include "mongo/s/balance.h"
 
+#include "mongo/base/owned_pointer_map.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/write_concern.h"
@@ -47,12 +48,15 @@
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/s/type_tags.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
 
     MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+
+    MONGO_FP_DECLARE(skipBalanceRound);
 
     Balancer balancer;
 
@@ -258,17 +262,7 @@ namespace mongo {
         }
         
         ShardInfoMap shardInfo;
-        for ( vector<Shard>::const_iterator it = allShards.begin(); it != allShards.end(); ++it ) {
-            const Shard& s = *it;
-            ShardStatus status = s.getStatus();
-            shardInfo[ s.getName() ] = ShardInfo( s.getMaxSize(),
-                                                  status.mapped(),
-                                                  s.isDraining(),
-                                                  status.hasOpsQueued(),
-                                                  s.tags(),
-                                                  status.mongoVersion()
-                                                  );
-        }
+        DistributionStatus::populateShardInfoMap(allShards, &shardInfo);
 
         OCCASIONALLY warnOnMultiVersion( shardInfo );
 
@@ -279,21 +273,36 @@ namespace mongo {
         for (vector<string>::const_iterator it = collections.begin(); it != collections.end(); ++it ) {
             const string& ns = *it;
 
-            map< string,vector<BSONObj> > shardToChunksMap;
+            OwnedPointerMap<string, OwnedPointerVector<ChunkType> > shardToChunksMap;
             cursor = conn.query(ChunkType::ConfigNS,
                                 QUERY(ChunkType::ns(ns)).sort(ChunkType::min()));
 
             set<BSONObj> allChunkMinimums;
 
             while ( cursor->more() ) {
-                BSONObj chunk = cursor->nextSafe().getOwned();
-                vector<BSONObj>& chunks = shardToChunksMap[chunk[ChunkType::shard()].String()];
-                allChunkMinimums.insert( chunk[ChunkType::min()].Obj() );
-                chunks.push_back( chunk );
+                BSONObj chunkDoc = cursor->nextSafe().getOwned();
+
+                auto_ptr<ChunkType> chunk(new ChunkType());
+                string errmsg;
+                if (!chunk->parseBSON(chunkDoc, &errmsg)) {
+                    error() << "bad chunk format for " << chunkDoc
+                            << ": " << errmsg << endl;
+                    return;
+                }
+
+                allChunkMinimums.insert(chunk->getMin().getOwned());
+                OwnedPointerVector<ChunkType>*& chunkList =
+                        shardToChunksMap.mutableMap()[chunk->getShard()];
+
+                if (chunkList == NULL) {
+                    chunkList = new OwnedPointerVector<ChunkType>();
+                }
+
+                chunkList->mutableVector().push_back(chunk.release());
             }
             cursor.reset();
 
-            if (shardToChunksMap.empty()) {
+            if (shardToChunksMap.map().empty()) {
                 LOG(1) << "skipping empty collection (" << ns << ")";
                 continue;
             }
@@ -301,10 +310,15 @@ namespace mongo {
             for ( vector<Shard>::iterator i=allShards.begin(); i!=allShards.end(); ++i ) {
                 // this just makes sure there is an entry in shardToChunksMap for every shard
                 Shard s = *i;
-                shardToChunksMap[s.getName()].size();
+                OwnedPointerVector<ChunkType>*& chunkList =
+                        shardToChunksMap.mutableMap()[s.getName()];
+
+                if (chunkList == NULL) {
+                    chunkList = new OwnedPointerVector<ChunkType>();
+                }
             }
 
-            DistributionStatus status( shardInfo, shardToChunksMap );
+            DistributionStatus status(shardInfo, shardToChunksMap.map());
 
             // load tags
             Status result = clusterCreateIndex(TagsType::ConfigNS,
@@ -466,8 +480,9 @@ namespace mongo {
                 }
 
                 // now make sure we should even be running
-                if (balancerConfig.isKeySet() && // balancer config doc exists
-                        !grid.shouldBalance(balancerConfig)) {
+                if ((balancerConfig.isKeySet() && // balancer config doc exists
+                        !grid.shouldBalance(balancerConfig)) ||
+                        MONGO_FAIL_POINT(skipBalanceRound)) {
 
                     LOG(1) << "skipping balancing round because balancing is disabled" << endl;
 

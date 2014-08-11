@@ -42,7 +42,6 @@ namespace repl {
     // These functions redefine the function for logOp(),
     // for either master/slave or replica sets.
     void oldRepl();  // master-slave
-    void newRepl();  // replica set starting up 
     void newReplUp();// replica set after startup
 
     // Create a new capped collection for the oplog if it doesn't yet exist.

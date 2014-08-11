@@ -93,6 +93,7 @@ namespace mongo {
 
         /* report what the last operation was.  used by getlasterror */
         void appendLastOp( BSONObjBuilder& b ) const;
+        void reportState(BSONObjBuilder& builder);
 
         // TODO(spencer): SERVER-10228 SERVER-14779 Remove this/move it fully into OperationContext.
         bool isGod() const { return _god; } /* this is for map/reduce writes */
