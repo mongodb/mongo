@@ -36,7 +36,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -55,7 +54,6 @@ namespace repl {
     class ReplSetHeartbeatArgs;
     class ReplSetHeartbeatResponse;
     class UpdatePositionArgs;
-    class TopologyCoordinator;
 
     /**
      * Global variable that contains a std::string telling why master/slave halted
@@ -94,10 +92,8 @@ namespace repl {
          * Does any initial bookkeeping needed to start replication, and instructs the other
          * components of the replication system to start up whatever threads and do whatever
          * initialization they need.
-         * Takes ownership of the passed-in TopologyCoordinator and NetworkInterface.
          */
-        virtual void startReplication(TopologyCoordinator* topCoord,
-                                      ReplicationExecutor::NetworkInterface* network) = 0;
+        virtual void startReplication() = 0;
 
         /**
          * Does whatever cleanup is required to stop replication, including instructing the other

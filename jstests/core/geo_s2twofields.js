@@ -18,13 +18,17 @@ var miami = {type: "Point", coordinates: [-80.1303, 25.7903]};
 var maxPoints = 10000;
 var degrees = 5;
 
+var arr = [];
 for (var i = 0; i < maxPoints; ++i) {
     var fromCoord = randomCoord(nyc.coordinates, 0, degrees);
     var toCoord = randomCoord(miami.coordinates, 0, degrees);
-    var res = t.insert({ from: { type: "Point", coordinates: fromCoord },
-                         to: { type: "Point", coordinates: toCoord}});
-    assert.writeOK(res);
+
+    arr.push( { from: { type: "Point", coordinates: fromCoord },
+                to: { type: "Point", coordinates: toCoord}} );
 }
+res = t.insert( arr );
+assert.writeOK(res);
+assert.eq( t.count(), maxPoints );
 
 function semiRigorousTime(func) {
     var lowestTime = func();

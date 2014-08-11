@@ -72,10 +72,8 @@
 #include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_coordinator_hybrid.h"
-#include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/restapi.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/startup_warnings.h"
@@ -278,9 +276,7 @@ namespace mongo {
         server->setupSockets();
 
         logStartup();
-        repl::getGlobalReplicationCoordinator()->startReplication(
-            new repl::TopologyCoordinatorImpl(Seconds(repl::maxSyncSourceLagSecs)), 
-            new repl::NetworkInterfaceImpl());
+        repl::getGlobalReplicationCoordinator()->startReplication();
         if (serverGlobalParams.isHttpInterfaceEnabled)
             boost::thread web(stdx::bind(&webServerThread,
                                          new RestAdminAccess())); // takes ownership
@@ -680,7 +676,7 @@ namespace mongo {
         try {
             _initAndListen(listenPort);
 
-            return EXIT_NET_ERROR;
+            return inShutdown() ? EXIT_CLEAN : EXIT_NET_ERROR;
         }
         catch ( DBException &e ) {
             log() << "exception in initAndListen: " << e.toString() << ", terminating" << endl;
@@ -704,11 +700,7 @@ namespace mongo {
     ExitCode initService() {
         ntservice::reportStatus( SERVICE_RUNNING );
         log() << "Service running" << endl;
-        ExitCode exitCode = initAndListen(serverGlobalParams.port);
-
-        // ignore EXIT_NET_ERROR on clean shutdown since we return this when the listening socket
-        // is closed
-        return (exitCode == EXIT_NET_ERROR && inShutdown()) ? EXIT_CLEAN : exitCode;
+        return initAndListen(serverGlobalParams.port);
     }
 #endif
 

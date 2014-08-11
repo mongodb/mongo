@@ -96,20 +96,32 @@ namespace mongo {
         ThreadPool::ThreadPool(int nThreads)
             : _mutex("ThreadPool"), _tasksRemaining(0)
             , _nThreads(nThreads) {
+            startThreads();
+        }
+
+        ThreadPool::ThreadPool(const DoNotStartThreadsTag&, int nThreads)
+            : _mutex("ThreadPool"), _tasksRemaining(0)
+            , _nThreads(nThreads) {
+        }
+
+        void ThreadPool::startThreads() {
             scoped_lock lock(_mutex);
-            while (nThreads-- > 0) {
+            for (int i = 0; i < _nThreads; ++i) {
                 Worker* worker = new Worker(*this);
-                _freeWorkers.push_front(worker);
+                if (_tasks.empty()) {
+                    _freeWorkers.push_front(worker);
+                }
+                else {
+                    worker->set_task(_tasks.front());
+                    _tasks.pop_front();
+                }
             }
         }
 
         ThreadPool::~ThreadPool() {
             join();
 
-            verify(_tasks.empty());
-
-            // O(n) but n should be small
-            verify(_freeWorkers.size() == (unsigned)_nThreads);
+            verify(_tasksRemaining == 0);
 
             while(!_freeWorkers.empty()) {
                 delete _freeWorkers.front();

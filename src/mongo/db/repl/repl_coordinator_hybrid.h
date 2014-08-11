@@ -49,8 +49,7 @@ namespace repl {
         HybridReplicationCoordinator(const ReplSettings& settings);
         virtual ~HybridReplicationCoordinator();
 
-        virtual void startReplication(TopologyCoordinator* topCoord,
-                                      ReplicationExecutor::NetworkInterface* network);
+        virtual void startReplication();
 
         virtual void shutdown();
 

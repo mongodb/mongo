@@ -98,7 +98,10 @@ namespace {
             _topo = new TopologyCoordinatorImpl(zeroSecs);
             _net = new NetworkInterfaceMock;
             _externalState = new ReplicationCoordinatorExternalStateMock;
-            _repl.reset(new ReplicationCoordinatorImpl(_settings, _externalState));
+            _repl.reset(new ReplicationCoordinatorImpl(_settings,
+                                                       _externalState,
+                                                       _net,
+                                                       _topo));
         }
 
         void init(ReplSettings settings) {
@@ -118,7 +121,7 @@ namespace {
                 init();
             }
 
-            _repl->startReplication(_topo, _net);
+            _repl->startReplication();
             _callShutdown = true;
         }
 

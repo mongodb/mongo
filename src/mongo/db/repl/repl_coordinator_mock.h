@@ -46,8 +46,7 @@ namespace repl {
         ReplicationCoordinatorMock(const ReplSettings& settings);
         virtual ~ReplicationCoordinatorMock();
 
-        virtual void startReplication(TopologyCoordinator* topCoord,
-                                      ReplicationExecutor::NetworkInterface* network);
+        virtual void startReplication();
 
         virtual void shutdown();
 

@@ -46,11 +46,18 @@ namespace mongo {
         // exported to the mongo namespace
         class ThreadPool : boost::noncopyable {
         public:
+            struct DoNotStartThreadsTag {};
+
             explicit ThreadPool(int nThreads=8);
+            explicit ThreadPool(const DoNotStartThreadsTag&, int nThreads=8);
 
             // blocks until all tasks are complete (tasks_remaining() == 0)
             // You should not call schedule while in the destructor
             ~ThreadPool();
+
+            // Launches the worker threads; call exactly once, if and only if
+            // you used the DoNotStartThreadsTag form of the constructor.
+            void startThreads();
 
             // blocks until all tasks are complete (tasks_remaining() == 0)
             // does not prevent new tasks from being scheduled so could wait forever.

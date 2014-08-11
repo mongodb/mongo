@@ -40,7 +40,6 @@
 #include "mongo/db/repl/repl_coordinator_external_state.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -48,21 +47,23 @@ namespace mongo {
 namespace repl {
 
     class SyncSourceFeedback;
+    class TopologyCoordinator;
 
     class ReplicationCoordinatorImpl : public ReplicationCoordinator {
         MONGO_DISALLOW_COPYING(ReplicationCoordinatorImpl);
 
     public:
 
-        // Takes ownership of the passed in ReplicationCoordinatorExternalState.
+        // Takes ownership of the "externalState", "topCoord" and "network" objects.
         ReplicationCoordinatorImpl(const ReplSettings& settings,
-                                   ReplicationCoordinatorExternalState* externalState);
+                                   ReplicationCoordinatorExternalState* externalState,
+                                   ReplicationExecutor::NetworkInterface* network,
+                                   TopologyCoordinator* topoCoord);
         virtual ~ReplicationCoordinatorImpl();
 
         // ================== Members of public ReplicationCoordinator API ===================
 
-        virtual void startReplication(TopologyCoordinator* topCoord,
-                                      ReplicationExecutor::NetworkInterface* network);
+        virtual void startReplication();
 
         virtual void shutdown();
 
@@ -191,14 +192,28 @@ namespace repl {
 
     private:
 
+        // Struct that holds information about clients waiting for replication.
+        struct WaiterInfo;
+
+        // Struct that holds information about nodes in this replication group, mainly used for
+        // tracking replication progress for write concern satisfaction.
+        struct SlaveInfo {
+            OpTime opTime; // Our last known OpTime that this slave has replicated to.
+            HostAndPort hostAndPort; // Client address of the slave.
+            int memberID; // ID of the node in the replica set config, or -1 if we're not a replSet.
+            SlaveInfo() : memberID(-1) {}
+        };
+
+        // Map of node RIDs to their SlaveInfo.
+        typedef unordered_map<OID, SlaveInfo, OID::Hasher> SlaveInfoMap;
+
+        typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
+
         // Called by the TopologyCoordinator whenever this node's replica set state transitions.
         void _onSelfStateChange(const MemberState& newState);
 
         // Called by the TopologyCoordinator whenever the replica set configuration is updated
         void _onReplicaSetConfigChange(const ReplicaSetConfig& newConfig, int myIndex);
-
-        // Struct that holds information about clients waiting for replication.
-        struct WaiterInfo;
 
         /*
          * Returns the OpTime of the last applied operation on this node.
@@ -238,8 +253,9 @@ namespace repl {
          */
         Mode _getReplicationMode_inlock() const;
 
-        // Handles to actively queued heartbeats
-        typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
+        // Handles to actively queued heartbeats.
+        // Only accessed serially in ReplicationExecutor callbacks, which makes it safe to access
+        // outside of _mutex.
         HeartbeatHandles _heartbeatHandles;
 
         // Parsed command line arguments related to replication.  Set once at startup and then
@@ -252,10 +268,28 @@ namespace repl {
         // Our RID, used to identify us to our sync source when sending replication progress
         // updates upstream.  Set once at startup and then never modified again, which makes it
         // safe to read outside of _mutex.
+        // TODO(spencer): put behind _mutex
         OID _myRID;
 
-        // Protects all member data of this ReplicationCoordinator except _settings and _myRID.
+        // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
+        boost::scoped_ptr<TopologyCoordinator> _topCoord;
+
+        // Executor that drives the topology coordinator.
+        ReplicationExecutor _replExecutor;
+
+        // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
+        boost::scoped_ptr<ReplicationCoordinatorExternalState> _externalState;
+
+        // Thread that _syncSourceFeedback runs in to send replSetUpdatePosition commands upstream.
+        boost::scoped_ptr<boost::thread> _syncSourceFeedbackThread;
+
+        // Thread that drives actions in the topology coordinator
+        boost::scoped_ptr<boost::thread> _topCoordDriverThread;
+
+        // Protects member data of this ReplicationCoordinator.
         mutable boost::mutex _mutex;
+
+        /// ============= All members below this line are guarded by _mutex ==================== ///
 
         // list of information about clients waiting on replication.  Does *not* own the
         // WaiterInfos.
@@ -267,30 +301,8 @@ namespace repl {
         // Election ID of the last election that resulted in this node becoming primary.
         OID _electionID;
 
-        // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
-        boost::scoped_ptr<TopologyCoordinator> _topCoord;
-
-        // Pointer to the ReplicationExecutor owned by this ReplicationCoordinator.
-        boost::scoped_ptr<ReplicationExecutor> _replExecutor;
-
-        // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
-        boost::scoped_ptr<ReplicationCoordinatorExternalState> _externalState;
-
-        // Thread that _syncSourceFeedback runs in to send replSetUpdatePosition commands upstream.
-        boost::scoped_ptr<boost::thread> _syncSourceFeedbackThread;
-
-        // Thread that drives actions in the topology coordinator
-        boost::scoped_ptr<boost::thread> _topCoordDriverThread;
-
-        struct SlaveInfo {
-            OpTime opTime; // Our last known OpTime that this slave has replicated to.
-            HostAndPort hostAndPort; // Client address of the slave.
-            int memberID; // ID of the node in the replica set config, or -1 if we're not a replSet.
-            SlaveInfo() : memberID(-1) {}
-        };
         // Maps nodes in this replication group to information known about it such as its
         // replication progress and its ID in the replica set config.
-        typedef unordered_map<OID, SlaveInfo, OID::Hasher> SlaveInfoMap;
         SlaveInfoMap _slaveInfoMap;
 
         // Current ReplicaSet state.

@@ -54,8 +54,9 @@
 #define FATAL LogMessageFatal(__FILE__, __LINE__).stream()
 #define DFATAL LogMessageFatal(__FILE__, __LINE__).stream()
 
+// VLOG messages will be logged at debug level 5 with the S2 log component.
 #define S2LOG(x) x
-#define VLOG(x) if (x>0) {} else S2LOG(INFO)
+#define VLOG(x) MONGO_LOG_COMPONENT(::mongo::logger::LogSeverity::Debug(5), ::mongo::logger::LogComponent::kS2)
 
 class LogMessageFatal {
  public:

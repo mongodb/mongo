@@ -118,3 +118,14 @@ env.CppUnitTest('replica_set_config_test',
                     'replica_set_tag_test.cpp',
                 ],
                 LIBDEPS=['replica_set_messages'])
+
+env.CppUnitTest('isself_test',
+                [
+                    'isself_test.cpp',
+                ],
+                LIBDEPS=[
+                    '$BUILD_DIR/mongo/serveronly',
+                    '$BUILD_DIR/mongo/coreserver',
+                    '$BUILD_DIR/mongo/coredb',
+                ],
+                NO_CRUTCH = True)

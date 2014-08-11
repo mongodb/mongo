@@ -2,12 +2,17 @@
 t = db.geo2
 t.drop();
 
-n = 1
+n = 1;
+arr = [];
 for ( var x=-100; x<100; x+=2 ){
     for ( var y=-100; y<100; y+=2 ){
-        t.insert( { _id : n++ , loc : [ x , y ] } )
+        arr.push( { _id : n++ , loc : [ x , y ] } );
     }
 }
+t.insert( arr );
+assert.eq( t.count(), 100 * 100 );
+assert.eq( t.count(), n - 1 );
+
 
 t.ensureIndex( { loc : "2d" } )
 

@@ -71,11 +71,36 @@ namespace mongo {
             // considered "indexable" all children of the ELEM_MATCH_VALUE
             // must be "indexable" type expressions as well.
             for (size_t i = 0; i < me->numChildren(); i++) {
-                if (!isIndexOnOwnFieldTypeNode(me->getChild(i))) {
+                MatchExpression* child = me->getChild(i);
+
+                // Special case for NOT: If the child is a NOT, then it's the thing below
+                // the NOT that we care about.
+                if (MatchExpression::NOT == child->matchType()) {
+                    MatchExpression* notChild = child->getChild(0);
+
+                    if (MatchExpression::MOD == notChild->matchType() ||
+                        MatchExpression::REGEX == notChild->matchType() ||
+                        MatchExpression::TYPE_OPERATOR == notChild->matchType()) {
+                        // We can't index negations of this kind of expression node.
+                        return false;
+                    }
+
+                    // It's the child of the NOT that we check for indexability.
+                    if (!isIndexOnOwnFieldTypeNode(notChild)) {
+                        return false;
+                    }
+
+                    // Special handling for NOT has already been done; don't fall through.
+                    continue;
+                }
+
+                if (!isIndexOnOwnFieldTypeNode(child)) {
                     return false;
                 }
             }
 
+            // The entire ELEM_MATCH_VALUE is indexable since every one of its children
+            // is indexable.
             return true;
         }
 
