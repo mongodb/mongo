@@ -74,8 +74,8 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	if (conn->evict_workers_min > conn->evict_workers_max)
 		WT_RET_MSG(session, EINVAL,
-		    "eviction(threads_min) cannot be greater than "
-		    "eviction(threads_max)");
+		    "eviction=(threads_min) cannot be greater than "
+		    "eviction=(threads_max)");
 
 	return (0);
 }

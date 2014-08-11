@@ -6,9 +6,9 @@
 <dt>::wiredtiger_open eviction_workers configuration changed</dt>
 <dd>
 The \c eviction_workers configuration setting has been replaced by
-\c eviction(threads_min) and \c eviction(threads_max) settings. To
+\c eviction=(threads_min) and \c eviction=(threads_max) settings. To
 replicate the old default behavior set
-<code>eviction(threads_min=1,threads_max=1)</code>.
+<code>eviction=(threads_min=1,threads_max=1)</code>.
 
 There is also a semantic change \c eviction_workers used to configure
 additional threads whereas the new settings configure the total number
