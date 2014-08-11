@@ -85,7 +85,6 @@
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/server.h"
-#include "mongo/util/concurrency/race.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
@@ -810,8 +809,6 @@ namespace mongo {
             }
 
             while( !inShutdown() ) {
-                RACECHECK
-
                 unsigned ms = storageGlobalParams.journalCommitInterval;
                 if( ms == 0 ) { 
                     // use default

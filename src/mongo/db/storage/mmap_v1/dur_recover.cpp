@@ -52,7 +52,6 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
-#include "mongo/util/concurrency/race.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/startup_test.h"
 
@@ -369,7 +368,6 @@ namespace mongo {
         void RecoveryJob::processSection(const JSectHeader *h, const void *p, unsigned len, const JSectFooter *f) {
             LockMongoFilesShared lkFiles; // for RecoveryJob::Last
             scoped_lock lk(_mx);
-            RACECHECK
 
             /** todo: we should really verify the checksum to see that seqNumber is ok?
                       that is expensive maybe there is some sort of checksum of just the header 
