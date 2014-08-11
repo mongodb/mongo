@@ -169,9 +169,9 @@ __evict_server(void *arg)
 		 * number of eviction workers running, shut one down.
 		 */
 		if (conn->evict_workers > conn->evict_workers_min) {
-                        WT_TRET(__wt_verbose(session, WT_VERB_EVICTSERVER,
-                            "Stopping evict worker: %"PRIu32"\n",
-                            conn->evict_workers));
+			WT_TRET(__wt_verbose(session, WT_VERB_EVICTSERVER,
+			    "Stopping evict worker: %"PRIu32"\n",
+			    conn->evict_workers));
 			worker = &conn->evict_workctx[--conn->evict_workers];
 			F_CLR(worker, WT_EVICT_WORKER_RUN);
 			WT_TRET(__wt_cond_signal(
@@ -293,6 +293,10 @@ __wt_evict_destroy(WT_CONNECTION_IMPL *conn)
 	for (i = 0; i < conn->evict_workers; i++) {
 		WT_TRET(__wt_cond_signal(session, cache->evict_waiter_cond));
 		WT_TRET(__wt_thread_join(session, workers[i].tid));
+	}
+	for (i = 0; i < conn->evict_workers_max; i++) {
+		wt_session = &conn->evict_workctx[i].session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
 	}
 	__wt_free(session, conn->evict_workctx);
 
@@ -445,9 +449,9 @@ __evict_pass(WT_SESSION_IMPL *session)
 		/* Start a worker if we have capacity and the cache is full. */
 		if (bytes_inuse > conn->cache_size &&
 		    conn->evict_workers < conn->evict_workers_max) {
-                        WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
-                            "Starting evict worker: %"PRIu32"\n",
-                            conn->evict_workers));
+			WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
+			    "Starting evict worker: %"PRIu32"\n",
+			    conn->evict_workers));
 			worker = &conn->evict_workctx[conn->evict_workers++];
 			F_SET(worker, WT_EVICT_WORKER_RUN);
 			WT_RET(__wt_thread_create(session,
