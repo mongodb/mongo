@@ -105,8 +105,8 @@ namespace mongo {
         uassert( 10200 , "mongos: error calling db", ok );
 
         {
-            QueryResult *qr = (QueryResult *) response.singleData();
-            if ( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
+            QueryResult::View qr = response.singleData().view2ptr();
+            if ( qr.getResultFlags() & ResultFlag_ShardConfigStale ) {
                 dbcon.done();
                 // Version is zero b/c this is deprecated codepath
                 throw RecvStaleConfigException( r.getns(),
@@ -498,7 +498,7 @@ namespace mongo {
             bool ok = conn->callRead( r.m() , response);
             uassert( 10204 , "dbgrid: getmore: error calling db", ok);
 
-            bool hasMore = (response.singleData()->getCursor() != 0);
+            bool hasMore = (response.singleData().getCursor() != 0);
 
             if ( !hasMore ) {
                 cursorCache.removeRef( id );

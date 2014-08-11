@@ -30,6 +30,7 @@
 
 #include "mongo/db/catalog/collection_cursor_cache.h"
 
+#include "mongo/base/data_cursor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
@@ -242,10 +243,11 @@ namespace mongo {
     }
 
     int CollectionCursorCache::eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, 
-        const long long* ids) {
+        const char* _ids) {
+        ConstDataCursor ids(_ids);
         int numDeleted = 0;
         for ( int i = 0; i < n; i++ ) {
-            if ( eraseCursorGlobalIfAuthorized(txn, ids[i] ) )
+            if ( eraseCursorGlobalIfAuthorized(txn, ids.readLEAndAdvance<int64_t>()))
                 numDeleted++;
             if ( inShutdown() )
                 break;

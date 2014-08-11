@@ -150,7 +150,7 @@ namespace mongo {
                     << " for " << r.getns() << causedBy( ex ) << endl;
 
                 if ( r.expectResponse() ) {
-                    m.header()->id = r.id();
+                    m.header().setId(r.id());
                     replyToQuery( ResultFlag_ErrSet, p , m , buildErrReply( ex ) );
                 }
 
@@ -164,7 +164,7 @@ namespace mongo {
                       << " for " << r.getns() << causedBy( ex ) << endl;
 
                 if ( r.expectResponse() ) {
-                    m.header()->id = r.id();
+                    m.header().setId(r.id());
                     replyToQuery( ResultFlag_ErrSet, p , m , buildErrReply( ex ) );
                 }
 

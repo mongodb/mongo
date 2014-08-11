@@ -111,7 +111,7 @@ namespace mongo {
         // ----------------------
 
         static int eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, 
-            const long long* ids);
+            const char* ids);
         static bool eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id);
 
         static bool eraseCursorGlobal(OperationContext* txn, CursorId id);

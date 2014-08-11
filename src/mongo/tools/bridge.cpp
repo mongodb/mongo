@@ -80,7 +80,7 @@ public:
                 }
                 sleepmillis(mongoBridgeGlobalParams.delay);
 
-                int oldId = m.header()->id;
+                int oldId = m.header().getId();
                 if ( m.operation() == dbQuery || m.operation() == dbMsg || m.operation() == dbGetMore ) {
                     bool exhaust = false;
                     if ( m.operation() == dbQuery ) {
@@ -96,9 +96,9 @@ public:
 
                     mp_.reply( m, response, oldId );
                     while ( exhaust ) {
-                        MsgData *header = response.header();
-                        QueryResult *qr = (QueryResult *) header;
-                        if ( qr->cursorId ) {
+                        MsgData::View header = response.header();
+                        QueryResult::View qr = header.view2ptr();
+                        if ( qr.getCursorId() ) {
                             response.reset();
                             dest.port().recv( response );
                             mp_.reply( m, response ); // m argument is ignored anyway

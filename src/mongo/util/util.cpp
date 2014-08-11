@@ -86,9 +86,6 @@ namespace mongo {
 
             verify( endsWith("abcde", "de") );
             verify( !endsWith("abcde", "dasdfasdfashkfde") );
-
-            verify( swapEndian(0x01020304) == 0x04030201 );
-
         }
     } utilTest;
 

@@ -87,8 +87,17 @@ namespace mongo {
     MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     // for diaglog
-    inline void opread(Message& m) { if( _diaglog.getLevel() & 2 ) _diaglog.readop((char *) m.singleData(), m.header()->len); }
-    inline void opwrite(Message& m) { if( _diaglog.getLevel() & 1 ) _diaglog.writeop((char *) m.singleData(), m.header()->len); }
+    inline void opread(Message& m) {
+        if (_diaglog.getLevel() & 2) {
+            _diaglog.readop(m.singleData().view2ptr(), m.header().getLen());
+        }
+    }
+
+    inline void opwrite(Message& m) {
+        if (_diaglog.getLevel() & 1) {
+            _diaglog.writeop(m.singleData().view2ptr(), m.header().getLen());
+        }
+    }
 
     void receivedKillCursors(OperationContext* txn, Message& m);
     void receivedUpdate(OperationContext* txn, Message& m, CurOp& op);
@@ -229,7 +238,7 @@ namespace mongo {
 
     static bool receivedQuery(OperationContext* txn, Client& c, DbResponse& dbresponse, Message& m ) {
         bool ok = true;
-        MSGID responseTo = m.header()->id;
+        MSGID responseTo = m.header().getId();
 
         DbMessage d(m);
         QueryMessage q(d);
@@ -286,26 +295,26 @@ namespace mongo {
             }
 
             BufBuilder b;
-            b.skip(sizeof(QueryResult));
+            b.skip(sizeof(QueryResult::Value));
             b.appendBuf((void*) errObj.objdata(), errObj.objsize());
 
             // todo: call replyToQuery() from here instead of this!!! see dbmessage.h
-            QueryResult * msgdata = (QueryResult *) b.buf();
+            QueryResult::View msgdata = b.buf();
             b.decouple();
-            QueryResult *qr = msgdata;
-            qr->_resultFlags() = ResultFlag_ErrSet;
-            if( scex ) qr->_resultFlags() |= ResultFlag_ShardConfigStale;
-            qr->len = b.len();
-            qr->setOperation(opReply);
-            qr->cursorId = 0;
-            qr->startingFrom = 0;
-            qr->nReturned = 1;
+            QueryResult::View qr = msgdata;
+            qr.setResultFlags(ResultFlag_ErrSet);
+            if( scex ) qr.setResultFlags(qr.getResultFlags() | ResultFlag_ShardConfigStale);
+            qr.msgdata().setLen(b.len());
+            qr.msgdata().setOperation(opReply);
+            qr.setCursorId(0);
+            qr.setStartingFrom(0);
+            qr.setNReturned(1);
             resp.reset( new Message() );
-            resp->setData( msgdata, true );
+            resp->setData( msgdata.view2ptr(), true );
 
         }
 
-        op.debug().responseLength = resp->header()->dataLen();
+        op.debug().responseLength = resp->header().dataLen();
 
         dbresponse.response = resp.release();
         dbresponse.responseTo = responseTo;
@@ -445,7 +454,7 @@ namespace mongo {
                 resp->setData( opReply , "i am fine - dbMsg deprecated");
 
             dbresponse.response = resp;
-            dbresponse.responseTo = m.header()->id;
+            dbresponse.responseTo = m.header().getId();
         }
         else {
             try {
@@ -537,7 +546,7 @@ namespace mongo {
             verify( n < 30000 );
         }
 
-        const long long* cursorArray = dbmessage.getArray(n);
+        const char* cursorArray = dbmessage.getArray(n);
 
         int found = CollectionCursorCache::eraseCursorGlobalIfAuthorized(txn, n, cursorArray);
 
@@ -556,11 +565,11 @@ namespace mongo {
         BSONObj query = d.nextJsObj();
 
         verify( d.moreJSObjs() );
-        verify( query.objsize() < m.header()->dataLen() );
+        verify( query.objsize() < m.header().dataLen() );
         BSONObj toupdate = d.nextJsObj();
         uassert( 10055 , "update object too large", toupdate.objsize() <= BSONObjMaxUserSize);
-        verify( toupdate.objsize() < m.header()->dataLen() );
-        verify( query.objsize() + toupdate.objsize() < m.header()->dataLen() );
+        verify( toupdate.objsize() < m.header().dataLen() );
+        verify( query.objsize() + toupdate.objsize() < m.header().dataLen() );
         bool upsert = flags & UpdateOption_Upsert;
         bool multi = flags & UpdateOption_Multi;
         bool broadcast = flags & UpdateOption_Broadcast;
@@ -640,7 +649,7 @@ namespace mongo {
         op.debug().ndeleted = n;
     }
 
-    QueryResult* emptyMoreResult(long long);
+    QueryResult::View emptyMoreResult(long long);
 
     bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, CurOp& curop ) {
         bool ok = true;
@@ -659,7 +668,7 @@ namespace mongo {
         scoped_ptr<Timer> timer;
         int pass = 0;
         bool exhaust = false;
-        QueryResult* msgdata = 0;
+        QueryResult::View msgdata = 0;
         OpTime last;
         while( 1 ) {
             bool isCursorAuthorized = false;
@@ -709,7 +718,7 @@ namespace mongo {
                 break;
             }
             
-            if (msgdata == 0) {
+            if (msgdata.view2ptr() == 0) {
                 // this should only happen with QueryOption_AwaitData
                 exhaust = false;
                 massert(13073, "shutting down", !inShutdown() );
@@ -746,18 +755,18 @@ namespace mongo {
             curop.debug().exceptionInfo = ex->getInfo();
 
             replyToQuery(ResultFlag_ErrSet, m, dbresponse, errObj);
-            curop.debug().responseLength = dbresponse.response->header()->dataLen();
+            curop.debug().responseLength = dbresponse.response->header().dataLen();
             curop.debug().nreturned = 1;
             return ok;
         }
 
         Message *resp = new Message();
-        resp->setData(msgdata, true);
-        curop.debug().responseLength = resp->header()->dataLen();
-        curop.debug().nreturned = msgdata->nReturned;
+        resp->setData(msgdata.view2ptr(), true);
+        curop.debug().responseLength = resp->header().dataLen();
+        curop.debug().nreturned = msgdata.getNReturned();
 
         dbresponse.response = resp;
-        dbresponse.responseTo = m.header()->id;
+        dbresponse.responseTo = m.header().getId();
         
         if( exhaust ) {
             curop.debug().exhaust = true;

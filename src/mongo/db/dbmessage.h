@@ -91,30 +91,113 @@ namespace mongo {
    Note that the update field layout is very similar layout to Query.
 */
 
-
+    namespace QueryResult {
 #pragma pack(1)
-    struct QueryResult : public MsgData {
-        long long cursorId;
-        int startingFrom;
-        int nReturned;
-        const char *data() {
-            return (char *) (((int *)&nReturned)+1);
-        }
-        int resultFlags() {
-            return dataAsInt();
-        }
-        int& _resultFlags() {
-            return dataAsInt();
-        }
-        void setResultFlagsToOk() {
-            _resultFlags() = ResultFlag_AwaitCapable;
-        }
-        void initializeResultFlags() {
-            _resultFlags() = 0;   
-        }
-    };
-
+        /* see http://dochub.mongodb.org/core/mongowireprotocol
+        */
+        struct Layout {
+            MsgData::Layout msgdata;
+            int64_t cursorId;
+            int32_t startingFrom;
+            int32_t nReturned;
+        };
 #pragma pack()
+
+        class ConstView {
+        public:
+            ConstView(const char* storage) : _storage(storage) { }
+
+            const char* view2ptr() const {
+                return storage().view();
+            }
+
+            MsgData::ConstView msgdata() const {
+                return storage().view(offsetof(Layout, msgdata));
+            }
+
+            int64_t getCursorId() const {
+                return storage().readLE<int64_t>(offsetof(Layout, cursorId));
+            }
+
+            int32_t getStartingFrom() const {
+                return storage().readLE<int32_t>(offsetof(Layout, startingFrom));
+            }
+
+            int32_t getNReturned() const {
+                return storage().readLE<int32_t>(offsetof(Layout, nReturned));
+            }
+
+            const char* data() const {
+                return storage().view(sizeof(Layout));
+            }
+
+        protected:
+            const ConstDataView& storage() const {
+                return _storage;
+            }
+
+        private:
+            ConstDataView _storage;
+        };
+
+        class View : public ConstView {
+        public:
+            View(char* data) : ConstView(data) {}
+
+            using ConstView::view2ptr;
+            char* view2ptr() {
+                return storage().view();
+            }
+
+            using ConstView::msgdata;
+            MsgData::View msgdata() {
+                return storage().view(offsetof(Layout, msgdata));
+            }
+
+            void setCursorId(int64_t value) {
+                return storage().writeLE(value, offsetof(Layout, cursorId));
+            }
+
+            void setStartingFrom(int32_t value) {
+                return storage().writeLE(value, offsetof(Layout, startingFrom));
+            }
+
+            void setNReturned(int32_t value) {
+                return storage().writeLE(value, offsetof(Layout, nReturned));
+            }
+
+            int32_t getResultFlags() {
+                return DataView(msgdata().data()).readLE<int32_t>();
+            }
+
+            void setResultFlags(int32_t value) {
+                return DataView(msgdata().data()).writeLE(value);
+            }
+
+            void setResultFlagsToOk() {
+                setResultFlags(ResultFlag_AwaitCapable);
+            }
+
+            void initializeResultFlags() {
+                setResultFlags(0);
+            }
+
+        private:
+            DataView storage() const {
+                return const_cast<char*>(ConstView::view2ptr());
+            }
+        };
+
+        class Value : public EncodedValueStorage<Layout, ConstView, View> {
+        public:
+            Value() {
+                BOOST_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
+            }
+
+            Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}
+        };
+
+    } // namespace QueryResult
 
     /* For the database/server protocol, these objects and functions encapsulate
        the various messages transmitted over the connection.
@@ -147,7 +230,7 @@ namespace mongo {
 
         int pullInt();
         long long pullInt64();
-        const long long* getArray(size_t count) const;
+        const char* getArray(size_t count) const;
 
         /* for insert and update msgs */
         bool moreJSObjs() const {
@@ -215,7 +298,7 @@ namespace mongo {
             if ( d.moreJSObjs() ) {
                 fields = d.nextJsObj();
             }
-            queryOptions = d.msg().header()->dataAsInt();
+            queryOptions = DataView(d.msg().header().data()).readLE<int32_t>();
         }
     };
 

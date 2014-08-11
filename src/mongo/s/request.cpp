@@ -53,7 +53,7 @@ namespace mongo {
     Request::Request( Message& m, AbstractMessagingPort* p ) :
         _m(m) , _d( m ) , _p(p) , _didInit(false) {
 
-        _id = _m.header()->id;
+        _id = _m.header().getId();
 
         _txn.reset(new OperationContextNoop());
 
@@ -76,7 +76,7 @@ namespace mongo {
 
     // Deprecated, will move to the strategy itself
     void Request::reset() {
-        _m.header()->id = _id;
+        _m.header().setId(_id);
         _clientInfo->clearRequestInfo();
 
         if ( !_d.messageShouldHaveNs()) {
@@ -93,7 +93,7 @@ namespace mongo {
         int op = _m.operation();
         verify( op > dbMsg );
 
-        int msgId = (int)(_m.header()->id);
+        int msgId = (int)(_m.header().getId());
 
         Timer t;
         LOG(3) << "Request::process begin ns: " << getns()
@@ -146,7 +146,7 @@ namespace mongo {
 
     void Request::reply( Message & response , const string& fromServer ) {
         verify( _didInit );
-        long long cursor =response.header()->getCursor();
+        long long cursor = response.header().getCursor();
         if ( cursor ) {
             if ( fromServer.size() ) {
                 cursorCache.storeRef(fromServer, cursor, getns());

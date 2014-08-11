@@ -71,12 +71,10 @@
 
 using namespace std;
 using mongo::Message;
-using mongo::MsgData;
 using mongo::DbMessage;
 using mongo::BSONObj;
 using mongo::BufBuilder;
 using mongo::DBClientConnection;
-using mongo::QueryResult;
 using mongo::MemoryMappedFile;
 
 #define SNAP_LEN 65535
@@ -222,17 +220,17 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     Message m;
 
     if ( bytesRemainingInMessage[ c ] == 0 ) {
-        m.setData( (MsgData*)payload , false );
-        if ( !m.header()->valid() ) {
+        m.setData( const_cast<char *>(reinterpret_cast<const char *>(payload)) , false );
+        if ( !m.header().valid() ) {
             cerr << "Invalid message start, skipping packet." << endl;
             return;
         }
-        if ( size_payload > m.header()->len ) {
+        if ( size_payload > m.header().getLen() ) {
             cerr << "Multiple messages in packet, skipping packet." << endl;
             return;
         }
-        if ( size_payload < m.header()->len ) {
-            bytesRemainingInMessage[ c ] = m.header()->len - size_payload;
+        if ( size_payload < m.header().getLen() ) {
+            bytesRemainingInMessage[ c ] = m.header().getLen() - size_payload;
             messageBuilder[ c ].reset( new BufBuilder() );
             messageBuilder[ c ]->appendBuf( (void*)payload, size_payload );
             return;
@@ -249,7 +247,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
         }
         if ( bytesRemainingInMessage[ c ] > 0 )
             return;
-        m.setData( (MsgData*)messageBuilder[ c ]->buf(), true );
+        m.setData( messageBuilder[ c ]->buf(), true );
         messageBuilder[ c ]->decouple();
         messageBuilder[ c ].reset();
     }
@@ -260,8 +258,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
           << ( serverPorts.count( ntohs( tcp->th_dport ) ) ? "  -->> " : "  <<--  " )
           << inet_ntoa(ip->ip_dst) << ":" << ntohs( tcp->th_dport )
           << " " << d.getns()
-          << "  " << m.header()->len << " bytes "
-          << " id:" << hex << m.header()->id << dec << "\t" << m.header()->id;
+          << "  " << m.header().getLen() << " bytes "
+          << " id:" << hex << m.header().getId() << dec << "\t" << m.header().getId();
 
     processMessage( c , m );
 }
@@ -283,16 +281,21 @@ void processMessage( Connection& c , Message& m ) {
     AuditingDbMessage d(m);
 
     if ( m.operation() == mongo::opReply )
-        out() << " - " << (unsigned)m.header()->responseTo;
+        out() << " - " << (unsigned)m.header().getResponseTo();
     out() << '\n';
 
     try {
         switch( m.operation() ) {
         case mongo::opReply: {
-            mongo::QueryResult* r = (mongo::QueryResult*)m.singleData();
-            out() << "\treply" << " n:" << r->nReturned << " cursorId: " << r->cursorId << endl;
-            if ( r->nReturned ) {
-                mongo::BSONObj o( r->data() );
+            mongo::QueryResult::View r = m.singleData().view2ptr();
+
+            out() << "\treply"
+                  << " n:" << r.getNReturned()
+                  << " cursorId: " << r.getCursorId()
+                  << endl;
+
+            if ( r.getNReturned() ) {
+                mongo::BSONObj o( r.data() );
                 out() << "\t" << o << endl;
             }
             break;
@@ -369,10 +372,10 @@ void processMessage( Connection& c , Message& m ) {
                 }
                 Message response;
                 conn->port().call( m, response );
-                QueryResult *qr = (QueryResult *) response.singleData();
-                if ( !( qr->resultFlags() & mongo::ResultFlag_CursorNotFound ) ) {
-                    if ( qr->cursorId != 0 ) {
-                        lastCursor[ c ] = qr->cursorId;
+                mongo::QueryResult::View qr = response.singleData().view2ptr();
+                if ( !( qr.getResultFlags() & mongo::ResultFlag_CursorNotFound ) ) {
+                    if ( qr.getCursorId() != 0 ) {
+                        lastCursor[ c ] = qr.getCursorId();
                         return;
                     }
                 }
@@ -385,16 +388,16 @@ void processMessage( Connection& c , Message& m ) {
         else {
             Connection r = c.reverse();
             long long myCursor = lastCursor[ r ];
-            QueryResult *qr = (QueryResult *) m.singleData();
-            long long yourCursor = qr->cursorId;
-            if ( ( qr->resultFlags() & mongo::ResultFlag_CursorNotFound ) )
+            mongo::QueryResult::View qr = m.singleData().view2ptr();
+            long long yourCursor = qr.getCursorId();
+            if ( ( qr.getResultFlags() & mongo::ResultFlag_CursorNotFound ) )
                 yourCursor = 0;
             if ( myCursor && !yourCursor )
                 cerr << "Expected valid cursor in sniffed response, found none" << endl;
             if ( !myCursor && yourCursor )
                 cerr << "Sniffed valid cursor when none expected" << endl;
             if ( myCursor && yourCursor ) {
-                mapCursor[ r ][ qr->cursorId ] = lastCursor[ r ];
+                mapCursor[ r ][ qr.getCursorId() ] = lastCursor[ r ];
                 lastCursor[ r ] = 0;
             }
         }
@@ -417,7 +420,7 @@ void processDiagLog( const char * file ) {
     long read = 0;
     while ( read < length ) {
         Message m(pos,false);
-        int len = m.header()->len;
+        int len = m.header().getLen();
         DbMessage d(m);
         cout << len << " " << d.getns() << endl;
 

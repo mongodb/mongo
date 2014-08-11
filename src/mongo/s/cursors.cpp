@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/data_cursor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -346,11 +347,12 @@ namespace mongo {
                     m.dataSize() == 8 + ( 8 * n ) );
 
 
-        const long long* cursors = dbmessage.getArray(n);
+        ConstDataCursor cursors(dbmessage.getArray(n));
+
         ClientBasic* client = ClientBasic::getCurrent();
         AuthorizationSession* authSession = client->getAuthorizationSession();
         for ( int i=0; i<n; i++ ) {
-            long long id = cursors[i];
+            long long id = cursors.readLEAndAdvance<int64_t>();
             LOG(_myLogLevel) << "CursorCache::gotKillCursors id: " << id << endl;
 
             if ( ! id ) {
