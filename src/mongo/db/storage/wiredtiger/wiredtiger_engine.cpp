@@ -31,6 +31,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_database_catalog_entry.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -44,14 +45,24 @@ namespace mongo {
     }
 
     void WiredTigerEngine::listDatabases( std::vector<std::string>* out ) const {
-        boost::mutex::scoped_lock lk( _dbLock );
-        for ( DBMap::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i ) {
-            out->push_back( *i );
+        invariant(storageGlobalParams.directoryperdb);
+
+        boost::filesystem::path path( storageGlobalParams.dbpath );
+        for ( boost::filesystem::directory_iterator i( path );
+            i != boost::filesystem::directory_iterator();
+            ++i) {
+            boost::filesystem::path p = *i;
+            string dbName = p.leaf().string();
+            p /= "WiredTiger.wt";
+            if ( exists (p ) )
+                    out->push_back( dbName );
         }
     }
 
     Status WiredTigerEngine::closeDatabase(OperationContext*, const StringData& db ) {
         boost::mutex::scoped_lock lk( _dbLock );
+        WiredTigerDatabaseCatalogEntry *entry = _dbs[db.toString()];
+        delete entry;
         _dbs.erase( db.toString() );
         return Status::OK();
     }
@@ -75,15 +86,10 @@ namespace mongo {
                                                                 const StringData& dbName ) {
         boost::mutex::scoped_lock lk( _dbLock );
 
-        // THIS is temporary I think
-        _dbs.insert( dbName.toString() );
-        return new WiredTigerDatabaseCatalogEntry( dbName, *_db );
-        /*
         WiredTigerDatabaseCatalogEntry*& db = _dbs[dbName.toString()];
         if ( !db )
-            db = new WiredTigerDatabaseCatalogEntry( dbName );
+            db = new WiredTigerDatabaseCatalogEntry( dbName, *_db );
         return db;
-        */
     }
 
 }

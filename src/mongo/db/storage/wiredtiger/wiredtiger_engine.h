@@ -75,7 +75,7 @@ namespace mongo {
 	WiredTigerDatabase *_db;
 
         mutable boost::mutex _dbLock;
-        typedef std::set<std::string> DBMap;
+        typedef std::map<std::string, WiredTigerDatabaseCatalogEntry *> DBMap;
         DBMap _dbs;
     };
 
