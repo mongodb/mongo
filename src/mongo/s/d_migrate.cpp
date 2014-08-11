@@ -1554,6 +1554,16 @@ namespace mongo {
             // 6.
             // NOTE: It is important that the distributed collection lock be held for this step.
             RangeDeleter* deleter = getDeleter();
+            RangeDeleterOptions deleterOptions(KeyRange(ns,
+                                                        min.getOwned(),
+                                                        max.getOwned(),
+                                                        shardKeyPattern));
+            deleterOptions.writeConcern = writeConcern;
+            deleterOptions.waitForOpenCursors = true;
+            deleterOptions.fromMigrate = true;
+            deleterOptions.onlyRemoveOrphanedDocs = true;
+            deleterOptions.removeSaverReason = "post-cleanup";
+
             if (waitForDelete) {
                 log() << "doing delete inline for cleanup of chunk data" << migrateLog;
 
@@ -1561,11 +1571,7 @@ namespace mongo {
                 // This is an immediate delete, and as a consequence, there could be more
                 // deletes happening simultaneously than there are deleter worker threads.
                 if (!deleter->deleteNow(txn,
-                                        ns,
-                                        min.getOwned(),
-                                        max.getOwned(),
-                                        shardKeyPattern.getOwned(),
-                                        writeConcern,
+                                        deleterOptions,
                                         &errMsg)) {
                     log() << "Error occured while performing cleanup: " << errMsg << endl;
                 }
@@ -1574,11 +1580,7 @@ namespace mongo {
                 log() << "forking for cleanup of chunk data" << migrateLog;
 
                 string errMsg;
-                if (!deleter->queueDelete(ns,
-                                          min.getOwned(),
-                                          max.getOwned(),
-                                          shardKeyPattern.getOwned(),
-                                          writeConcern,
+                if (!deleter->queueDelete(deleterOptions,
                                           NULL, // Don't want to be notified.
                                           &errMsg)) {
                     log() << "could not queue migration cleanup: " << errMsg << endl;
@@ -1816,19 +1818,22 @@ namespace mongo {
 
             {
                 // 2. delete any data already in range
-                Helpers::RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
-                KeyRange range( ns, min, max, shardKeyPattern );
-                long long num = Helpers::removeRange( txn,
-                                                      range,
-                                                      false, /*maxInclusive*/
-                                                      writeConcern,
-                                                      /*callback*/
-                                                      serverGlobalParams.moveParanoia ? &rs : 0,
-                                                      true ); /* flag fromMigrate in oplog */
+                RangeDeleterOptions deleterOptions(KeyRange(ns,
+                                                            min.getOwned(),
+                                                            max.getOwned(),
+                                                            shardKeyPattern));
+                deleterOptions.writeConcern = writeConcern;
+                // No need to wait since all existing cursors will filter out this range when
+                // returning the results.
+                deleterOptions.waitForOpenCursors = false;
+                deleterOptions.fromMigrate = true;
+                deleterOptions.onlyRemoveOrphanedDocs = true;
+                deleterOptions.removeSaverReason = "preCleanup";
 
-                if (num < 0) {
-                    errmsg = "collection or index dropped during migrate";
-                    warning() << errmsg << endl;
+                string errMsg;
+
+                if (!getDeleter()->deleteNow(txn, deleterOptions, &errMsg)) {
+                    warning() << "Failed to queue delete for migrate abort: " << errMsg << endl;
                     setState(FAIL);
                     return;
                 }
@@ -1843,9 +1848,6 @@ namespace mongo {
                     }
                 }
 
-                if ( num )
-                    warning() << "moveChunkCmd deleted data already in chunk # objects: " << num << migrateLog;
-
                 timing.done(2);
                 MONGO_FP_PAUSE_WHILE(migrateThreadHangAtStep2);
             }
@@ -1853,8 +1855,18 @@ namespace mongo {
             State currentState = getState();
             if (currentState == FAIL || currentState == ABORT) {
                 string errMsg;
-                if (!getDeleter()->queueDelete(ns, min, max, shardKeyPattern, writeConcern,
-                                               NULL /* notifier */, &errMsg)) {
+                RangeDeleterOptions deleterOptions(KeyRange(ns,
+                                                            min.getOwned(),
+                                                            max.getOwned(),
+                                                            shardKeyPattern));
+                deleterOptions.writeConcern = writeConcern;
+                // No need to wait since all existing cursors will filter out this range when
+                // returning the results.
+                deleterOptions.waitForOpenCursors = false;
+                deleterOptions.fromMigrate = true;
+                deleterOptions.onlyRemoveOrphanedDocs = true;
+
+                if (!getDeleter()->queueDelete(deleterOptions, NULL /* notifier */, &errMsg)) {
                     warning() << "Failed to queue delete for migrate abort: " << errMsg << endl;
                 }
             }

@@ -174,6 +174,7 @@ namespace mongo {
          * }
          *
          * @param lookupKey passing a key that does not belong to this metadata is undefined.
+         * @param orphanRange the output range. Note that the NS is not set.
          */
         bool getNextOrphanRange( const BSONObj& lookupKey, KeyRange* orphanRange ) const;
 

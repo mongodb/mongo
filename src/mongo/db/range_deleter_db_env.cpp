@@ -64,11 +64,13 @@ namespace mongo {
                                         const RangeDeleteEntry& taskDetails,
                                         long long int* deletedDocs,
                                         std::string* errMsg) {
-        const string ns(taskDetails.ns);
-        const BSONObj inclusiveLower(taskDetails.min);
-        const BSONObj exclusiveUpper(taskDetails.max);
-        const BSONObj keyPattern(taskDetails.shardKeyPattern);
-        const WriteConcernOptions writeConcern(taskDetails.writeConcern);
+        const string ns(taskDetails.options.range.ns);
+        const BSONObj inclusiveLower(taskDetails.options.range.minKey);
+        const BSONObj exclusiveUpper(taskDetails.options.range.maxKey);
+        const BSONObj keyPattern(taskDetails.options.range.keyPattern);
+        const WriteConcernOptions writeConcern(taskDetails.options.writeConcern);
+        const bool fromMigrate = taskDetails.options.fromMigrate;
+        const bool onlyRemoveOrphans = taskDetails.options.onlyRemoveOrphanedDocs;
 
         const bool initiallyHaveClient = haveClient();
 
@@ -79,7 +81,14 @@ namespace mongo {
         *deletedDocs = 0;
         ShardForceVersionOkModeBlock forceVersion;
         {
-            Helpers::RemoveSaver removeSaver("moveChunk", ns, "post-cleanup");
+            Helpers::RemoveSaver removeSaver("moveChunk",
+                                             ns,
+                                             taskDetails.options.removeSaverReason);
+            Helpers::RemoveSaver* removeSaverPtr = NULL;
+            if (serverGlobalParams.moveParanoia &&
+                    !taskDetails.options.removeSaverReason.empty()) {
+                removeSaverPtr = &removeSaver;
+            }
 
             // log the opId so the user can use it to cancel the delete using killOp.
             unsigned int opId = txn->getCurOp()->opNum();
@@ -98,9 +107,9 @@ namespace mongo {
                                                       keyPattern),
                                              false, /*maxInclusive*/
                                              writeConcern,
-                                             serverGlobalParams.moveParanoia ? &removeSaver : NULL,
-                                             true, /*fromMigrate*/
-                                             true); /*onlyRemoveOrphans*/
+                                             removeSaverPtr,
+                                             fromMigrate,
+                                             onlyRemoveOrphans);
 
                 if (*deletedDocs < 0) {
                     *errMsg = "collection or index dropped before data could be cleaned";
