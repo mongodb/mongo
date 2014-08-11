@@ -205,6 +205,9 @@ add_option( "dynamic-windows", "dynamically link on Windows", 0, True)
 add_option( "64" , "whether to force 64 bit" , 0 , True , "force64" )
 add_option( "32" , "whether to force 32 bit" , 0 , True , "force32" )
 
+add_option( "endian" , "endianness of target platform" , 1 , False , "endian",
+            type="choice", choices=["big", "little", "auto"], default="auto" )
+
 add_option( "cxx", "compiler to use" , 1 , True )
 add_option( "cc", "compiler to use for c" , 1 , True )
 add_option( "cc-use-shell-environment", "use $CC from shell for C compiler" , 0 , False )
@@ -551,6 +554,16 @@ if has_option('mute'):
     env.Append( LINKCOMSTR = "Linking $TARGET" )
     env.Append( SHLINKCOMSTR = env["LINKCOMSTR"] )
     env.Append( ARCOMSTR = "Generating library $TARGET" )
+
+endian = get_option( "endian" )
+
+if endian == "auto":
+    endian = sys.byteorder
+
+if endian == "little":
+    env.Append( CPPDEFINES=[("MONGO_BYTE_ORDER", "1234")] )
+elif endian == "big":
+    env.Append( CPPDEFINES=[("MONGO_BYTE_ORDER", "4321")] )
 
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS'
 
