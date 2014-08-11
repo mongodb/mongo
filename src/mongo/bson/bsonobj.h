@@ -474,27 +474,6 @@ namespace mongo {
         /** add all elements of the object to the specified list */
         void elems(std::list<BSONElement> &) const;
 
-        /** add all values of the object to the specified vector.  If type mismatches, exception.
-            this is most useful when the BSONObj is an array, but can be used with non-arrays too in theory.
-
-            example:
-              bo sub = y["subobj"].Obj();
-              std::vector<int> myints;
-              sub.Vals(myints);
-        */
-        template <class T>
-        void Vals(std::vector<T> &) const;
-        /** add all values of the object to the specified list.  If type mismatches, exception. */
-        template <class T>
-        void Vals(std::list<T> &) const;
-
-        /** add all values of the object to the specified vector.  If type mismatches, skip. */
-        template <class T>
-        void vals(std::vector<T> &) const;
-        /** add all values of the object to the specified list.  If type mismatches, skip. */
-        template <class T>
-        void vals(std::list<T> &) const;
-
         friend class BSONObjIterator;
         typedef BSONObjIterator iterator;
 

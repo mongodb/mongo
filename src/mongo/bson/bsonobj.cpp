@@ -820,49 +820,4 @@ namespace mongo {
         return s;
     }
 
-    template <class T>
-    void BSONObj::Vals(std::vector<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            T t;
-            i.next().Val(t);
-            v.push_back(t);
-        }
-    }
-    template <class T>
-    void BSONObj::Vals(std::list<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            T t;
-            i.next().Val(t);
-            v.push_back(t);
-        }
-    }
-
-    template <class T>
-    void BSONObj::vals(std::vector<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            try {
-                T t;
-                i.next().Val(t);
-                v.push_back(t);
-            }
-            catch(...) { }
-        }
-    }
-    template <class T>
-    void BSONObj::vals(std::list<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            try {
-                T t;
-                i.next().Val(t);
-                v.push_back(t);
-            }
-            catch(...) { }
-        }
-    }
-
-
 } // namespace mongo
