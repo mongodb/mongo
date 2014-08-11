@@ -45,13 +45,22 @@
 #include "wiredtiger.h"
 
 #define WT_URI          "table:data"
-#define WT_CONN_CONFIG  "log=(enabled),checkpoint=(wait=180),checkpoint_sync=false,"		\
-    "session_max=8192,mmap=false,eviction_workers=4,"			\
-    "transaction_sync=(enabled=true,method=none),"
+#define WT_CONN_CONFIG  "log=(enabled),checkpoint=(wait=180),"		\
+    "checkpoint_sync=false,session_max=8192,eviction_workers=4,"	\
+    "mmap=false,transaction_sync=(enabled=true,method=none),"
 // Note: LSM doesn't split, build full pages from the start
-#define WT_TABLE_CONFIG "type=lsm,split_pct=100,leaf_item_max=1KB," \
+#define WT_TABLE_CONFIG "type=lsm,split_pct=100,leaf_item_max=1KB,"	\
     "lsm=(chunk_size=100MB,bloom_config=(leaf_page_max=8MB)),"
 #define	WT_TIMESTAMP_FORMAT "%d.%llu"
+// We're also only interested in operations to the user file.  Skip over 
+// any changes to the metadata.
+// XXX - Currently assume metadata fileid is 0.
+#define	WT_VALID_OPERATION(fileid, optype)				\
+	((fileid) != 0 &&						\
+	 ((optype) == WT_LOGOP_COL_PUT ||				\
+	  (optype) == WT_LOGOP_COL_REMOVE ||				\
+	  (optype) == WT_LOGOP_ROW_PUT ||				\
+	  (optype) == WT_LOGOP_ROW_REMOVE))
 
 using leveldb::Cache;
 using leveldb::FilterPolicy;

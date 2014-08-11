@@ -170,10 +170,7 @@ ReplayIteratorImpl::Next() {
 				break;
 			// Next() is only interested in modification operations.
 			// Continue for any other type of record.
-			if (optype == WT_LOGOP_COL_PUT ||
-			    optype == WT_LOGOP_COL_REMOVE ||
-			    optype == WT_LOGOP_ROW_PUT ||
-			    optype == WT_LOGOP_ROW_REMOVE) {
+			if (WT_VALID_OPERATION(fileid, optype)) {
 				valid_ = true;
 				break;
 			}
@@ -207,10 +204,7 @@ ReplayIteratorImpl::SkipToLast() {
 				break;
 			// We're only interested in modification operations.
 			// Continue for any other type of record.
-			if (optype == WT_LOGOP_COL_PUT ||
-			    optype == WT_LOGOP_COL_REMOVE ||
-			    optype == WT_LOGOP_ROW_PUT ||
-			    optype == WT_LOGOP_ROW_REMOVE) {
+			if (WT_VALID_OPERATION(fileid, optype)) {
 				valid_ = true;
 				last_lsn = lsn_;
 			}
@@ -230,6 +224,20 @@ ReplayIteratorImpl::SkipTo(const std::string& timestamp) {
 	WT_LSN target_lsn;
 	int ret = 0;
 
+	if (timestamp == "all") {
+		if (cursor_ != NULL) {
+			ret = cursor_->reset(cursor_);
+			status_ = WiredTigerErrorToStatus(ret);
+			if (ret != 0)
+				return;
+			Next();
+			return;
+		}
+	}
+	if (timestamp == "now") {
+		SkipToLast();
+		return;
+	}
 	sscanf(timestamp.c_str(), WT_TIMESTAMP_FORMAT,
 	    &target_lsn.file, &target_lsn.offset);
 	SkipTo(&target_lsn);
@@ -263,10 +271,7 @@ ReplayIteratorImpl::SkipTo(WT_LSN *target_lsn) {
 		valid_ = true;
 		// We're only interested in modification operations.
 		// Continue for any other type of record.
-		if (optype == WT_LOGOP_COL_PUT ||
-		    optype == WT_LOGOP_COL_REMOVE ||
-		    optype == WT_LOGOP_ROW_PUT ||
-		    optype == WT_LOGOP_ROW_REMOVE)
+		if (WT_VALID_OPERATION(fileid, optype))
 			Next();
 	}
 }
@@ -311,6 +316,7 @@ DbImpl::ValidateTimestamp(const std::string& timestamp)
 	OperationContext *context = GetContext();
 	ReplayIteratorImpl *iter = new ReplayIteratorImpl(context);
 
+	// The SkipTo function will handle "all" or "now".
 	iter->SkipTo(timestamp);
 	valid = iter->Valid();
 	ReleaseReplayIterator(iter);
@@ -326,6 +332,7 @@ DbImpl::CompareTimestamps(const std::string& lhs, const std::string& rhs)
 	ReplayIteratorImpl *rhiter = new ReplayIteratorImpl(context);
 	int cmp = 0;
 	
+	// The SkipTo function will handle "all" or "now".
 	lhiter->SkipTo(lhs);
 	rhiter->SkipTo(rhs);
 	if (lhiter->Valid() && rhiter->Valid())
