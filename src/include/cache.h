@@ -30,6 +30,19 @@ struct __wt_evict_entry {
 };
 
 /*
+ * WT_EVICT_WORKER --
+ *	Encapsulation of an eviction worker thread.
+ */
+
+struct __wt_evict_worker {
+	WT_SESSION_IMPL *session;
+	u_int id;
+	pthread_t tid;
+#define	WT_EVICT_WORKER_RUN	0x01
+	uint32_t flags;
+};
+
+/*
  * WiredTiger cache structure.
  */
 struct __wt_cache {
