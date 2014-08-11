@@ -94,8 +94,6 @@ __curbulk_insert_var(WT_CURSOR *cursor)
 	WT_STAT_FAST_DATA_INCR(session, cursor_insert_bulk);
 
 err:	API_END_RET(session, ret);
-
-	return (0);
 }
 
 /*
