@@ -79,7 +79,7 @@ namespace mongo {
     };
 
     class ParallelConnectionMetadata;
-    class FilteringClientCursor;
+    class DBClientCursorHolder;
 
     class MONGO_CLIENT_API CommandInfo {
     public:
@@ -262,7 +262,7 @@ namespace mongo {
         std::set<ServerAndQuery> _servers;
         BSONObj _sortKey;
 
-        FilteringClientCursor * _cursors;
+        DBClientCursorHolder * _cursors;
         int _needToSkip;
 
         /**
@@ -289,37 +289,35 @@ namespace mongo {
     };
 
 
-    // TODO:  We probably don't really need this as a separate class.
-    class MONGO_CLIENT_API FilteringClientCursor {
+    /**
+     * Helper class to manage ownership of opened cursors while merging results.
+     *
+     * TODO:  Choose one set of ownership semantics so that this isn't needed - merge sort via
+     * mapreduce is the main issue since it has no metadata and this holder owns the cursors.
+     */
+    class MONGO_CLIENT_API DBClientCursorHolder {
     public:
-        FilteringClientCursor();
-        ~FilteringClientCursor();
 
-        void reset( std::auto_ptr<DBClientCursor> cursor );
-        void reset( DBClientCursor* cursor, ParallelConnectionMetadata* _pcmData = NULL );
+        DBClientCursorHolder() {}
+        ~DBClientCursorHolder() {}
 
-        bool more();
-        BSONObj next();
+        void reset(DBClientCursor* cursor, ParallelConnectionMetadata* pcmData) {
+            _cursor.reset(cursor);
+            _pcmData.reset(pcmData);
+        }
 
-        BSONObj peek();
+        DBClientCursor* get() { return _cursor.get(); }
+        ParallelConnectionMetadata* getMData() { return _pcmData.get(); }
 
-        DBClientCursor* raw() { return _cursor.get(); }
-        ParallelConnectionMetadata* rawMData(){ return _pcmData; }
-
-        // Required for new PCursor
-        void release(){
+        void release() {
             _cursor.release();
-            _pcmData = NULL;
+            _pcmData.release();
         }
 
     private:
-        void _advance();
 
         std::auto_ptr<DBClientCursor> _cursor;
-        ParallelConnectionMetadata* _pcmData;
-
-        BSONObj _next;
-        bool _done;
+        std::auto_ptr<ParallelConnectionMetadata> _pcmData;
     };
 
     /**
