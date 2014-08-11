@@ -332,7 +332,7 @@ namespace mongo {
 
         OperationContextImpl txn;
         Lock::GlobalWrite lk(txn.lockState());
-        WriteUnitOfWork wunit(txn.recoveryUnit());
+        WriteUnitOfWork wunit(&txn);
 
         vector< string > dbNames;
 

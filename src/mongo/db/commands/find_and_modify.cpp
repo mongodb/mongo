@@ -137,7 +137,7 @@ namespace mongo {
                                       string& errmsg) {
 
             Lock::DBWrite lk(txn->lockState(), ns);
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             Client::Context cx(txn, ns);
             
             Collection* collection = cx.db()->getCollection( txn, ns );
@@ -335,7 +335,7 @@ namespace mongo {
             }
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, ns);
 
             BSONObj out = db.findOne(ns, q, fields);

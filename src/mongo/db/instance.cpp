@@ -795,7 +795,7 @@ namespace mongo {
             Collection* collection = ctx.db()->getCollection( txn, targetNS );
             if ( !collection ) {
                 // implicitly create
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
                 collection = ctx.db()->createCollection( txn, targetNS );
                 verify( collection );
                 wunit.commit();
@@ -820,7 +820,7 @@ namespace mongo {
             uassertStatusOK(status);
             uassertStatusOK(indexer.insertAllDocumentsInCollection());
 
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             indexer.commit();
             repl::logOp(txn, "i", ns, js);
             wunit.commit();
@@ -833,7 +833,7 @@ namespace mongo {
         if ( !fixed.getValue().isEmpty() )
             js = fixed.getValue();
 
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         Collection* collection = ctx.db()->getCollection( txn, ns );
         if ( !collection ) {
             collection = ctx.db()->createCollection( txn, ns );

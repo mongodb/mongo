@@ -111,7 +111,7 @@ namespace repl {
         }
 
         Client::Context ctx(txn, ns);
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         ctx.getClient()->curop()->reset();
         // For non-initial-sync, we convert updates to upserts
         // to suppress errors when replaying oplog entries.
@@ -488,7 +488,7 @@ namespace repl {
         {
             OperationContextImpl txn; // XXX?
             Lock::DBWrite lk(txn.lockState(), "local");
-            WriteUnitOfWork wunit(txn.recoveryUnit());
+            WriteUnitOfWork wunit(&txn);
 
             while (!ops->empty()) {
                 const BSONObj& op = ops->front();

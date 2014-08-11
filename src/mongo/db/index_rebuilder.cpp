@@ -83,7 +83,7 @@ namespace {
             MultiIndexBlock indexer(txn, collection);
 
             {
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
                 vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(txn);
 
                 // The indexes have now been removed from system.indexes, so the only record is
@@ -120,7 +120,7 @@ namespace {
             try {
                 uassertStatusOK(indexer.insertAllDocumentsInCollection());
 
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
                 indexer.commit();
                 wunit.commit();
             }

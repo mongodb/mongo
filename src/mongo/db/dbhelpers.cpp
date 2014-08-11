@@ -87,7 +87,7 @@ namespace mongo {
 
         uassertStatusOK(indexer.insertAllDocumentsInCollection());
 
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         indexer.commit();
         wunit.commit();
     }

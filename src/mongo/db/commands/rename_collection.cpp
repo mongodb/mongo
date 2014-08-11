@@ -95,7 +95,7 @@ namespace mongo {
         }
 
         static void dropCollection(OperationContext* txn, Database* db, StringData collName) {
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             if (db->dropCollection(txn, collName).isOK()) {
                 // ignoring failure case
                 wunit.commit();
@@ -181,7 +181,7 @@ namespace mongo {
             Database* const targetDB = dbHolder().getOrCreate(txn, nsToDatabase(target), unused);
 
             {
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
 
                 // Check if the target namespace exists and if dropTarget is true.
                 // If target exists and dropTarget is not true, return false.
@@ -235,7 +235,7 @@ namespace mongo {
                     options.cappedSize = sourceColl->getRecordStore()->storageSize(txn);
                 }
 
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
 
                 // No logOp necessary because the entire renameCollection command is one logOp.
                 targetColl = targetDB->createCollection(txn, target, options);
@@ -277,7 +277,7 @@ namespace mongo {
 
                 const BSONObj obj = sourceColl->docFor(sourceIt->getNext());
 
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
                 // No logOp necessary because the entire renameCollection command is one logOp.
                 Status status = targetColl->insertDocument(txn, obj, &indexer, true).getStatus();
                 if (!status.isOK())
@@ -292,7 +292,7 @@ namespace mongo {
             {
                 // Getting here means we successfully built the target copy. We now remove the
                 // source collection and finalize the rename.
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
 
                 Status status = sourceDB->dropCollection(txn, source);
                 if (!status.isOK())

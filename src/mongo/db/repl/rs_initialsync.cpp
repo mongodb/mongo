@@ -121,7 +121,7 @@ namespace repl {
 
             // Make database stable
             Lock::DBWrite dbWrite(txn->lockState(), db);
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
 
             if (!cloner.go(txn, db, master, options, NULL, err, &errCode)) {
                 sethbmsg(str::stream() << "initial sync: error while "

@@ -80,7 +80,7 @@ namespace mongo {
             return;
 
         try {
-            WriteUnitOfWork wunit(_txn->recoveryUnit());
+            WriteUnitOfWork wunit(_txn);
             // This cleans up all index builds. Because that may need to write, it is done inside
             // of a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
             for (size_t i = 0; i < _indexes.size(); i++) {
@@ -111,7 +111,7 @@ namespace mongo {
     }
 
     Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
-        WriteUnitOfWork wunit(_txn->recoveryUnit());
+        WriteUnitOfWork wunit(_txn);
         const string& ns = _collection->ns().ns();
 
         Status status = _collection->getIndexCatalog()->checkUnfinished();
@@ -209,7 +209,7 @@ namespace mongo {
         while (PlanExecutor::ADVANCED == exec->getNext(&objToIndex, &loc)) {
             {
                 bool shouldCommitWUnit = true;
-                WriteUnitOfWork wunit(_txn->recoveryUnit());
+                WriteUnitOfWork wunit(_txn);
                 Status ret = insert(objToIndex, loc);
                 if (!ret.isOK()) {
                     if (dupsOut && ret.code() == ErrorCodes::DuplicateKey) {

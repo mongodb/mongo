@@ -129,7 +129,7 @@ namespace repl {
             return false;
         }
         else {
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             Collection* collection = ctx.db()->getOrCreateCollection(txn, ns);
             invariant(collection != NULL); // should never happen
 

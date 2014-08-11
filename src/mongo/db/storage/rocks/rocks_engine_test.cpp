@@ -88,7 +88,7 @@ namespace mongo {
             MyOperationContext opCtx( &engine );
             DiskLoc loc;
             {
-                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                WriteUnitOfWork uow( &opCtx );
                 StatusWith<DiskLoc> res = rs->insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
@@ -252,7 +252,7 @@ namespace mongo {
 
             {
                 MyOperationContext opCtx( &engine );
-                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                WriteUnitOfWork uow( &opCtx );
                 Status status = engine.createCollection( &opCtx,
                                                      "test.foo",
                                                      CollectionOptions() );
@@ -266,7 +266,7 @@ namespace mongo {
                 MyOperationContext opCtx( &engine );
 
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     StatusWith<DiskLoc> res = rs->insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
                     ASSERT_OK( res.getStatus() );
                     loc = res.getValue();

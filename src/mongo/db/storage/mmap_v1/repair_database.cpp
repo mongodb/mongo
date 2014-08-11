@@ -373,7 +373,7 @@ namespace mongo {
                 Collection* tempCollection = NULL;
                 {
                     Client::Context tempContext(txn, ns, tempDatabase );
-                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    WriteUnitOfWork wunit(txn);
                     tempCollection = tempDatabase->createCollection(txn, ns, options, true, false);
                     wunit.commit();
                 }
@@ -412,7 +412,7 @@ namespace mongo {
 
                     Client::Context tempContext(txn, ns, tempDatabase);
                     
-                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    WriteUnitOfWork wunit(txn);
                     StatusWith<DiskLoc> result = tempCollection->insertDocument(txn,
                                                                                 doc,
                                                                                 &indexer,
@@ -430,7 +430,7 @@ namespace mongo {
 
                 {
                     Client::Context tempContext(txn, ns, tempDatabase);
-                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    WriteUnitOfWork wunit(txn);
                     indexer.commit();
                     wunit.commit();
                 }

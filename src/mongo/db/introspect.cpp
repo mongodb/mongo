@@ -140,7 +140,7 @@ namespace {
             Lock::DBWrite lk(txn->lockState(), currentOp.getNS() );
             if (dbHolder().get(txn, nsToDatabase(currentOp.getNS())) != NULL) {
                 // We are ok with the profiling happening in a different WUOW from the actual op.
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
                 Client::Context cx(txn, currentOp.getNS(), false);
                 _profile(txn, c, cx.db(), currentOp, profileBufBuilder);
                 wunit.commit();

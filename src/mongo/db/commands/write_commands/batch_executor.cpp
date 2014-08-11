@@ -932,7 +932,7 @@ namespace mongo {
         dassert(database);
         _collection = database->getCollection(txn, request->getTargetingNS());
         if (!_collection) {
-            WriteUnitOfWork wunit (txn->recoveryUnit());
+            WriteUnitOfWork wunit (txn);
             // Implicitly create if it doesn't exist
             _collection = database->createCollection(txn, request->getTargetingNS());
             if (!_collection) {
@@ -1039,7 +1039,7 @@ namespace mongo {
 
         txn->lockState()->assertWriteLocked( insertNS );
 
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         StatusWith<DiskLoc> status = collection->insertDocument( txn, docToInsert, true );
 
         if ( !status.isOK() ) {
@@ -1087,7 +1087,7 @@ namespace mongo {
             return;
         }
 
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         indexer.commit();
         repl::logOp( txn, "i", indexNS.c_str(), indexDesc );
         result->getStats().n = 1;

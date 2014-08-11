@@ -94,7 +94,7 @@ namespace mongo {
 
         Collection* c = db->getCollection( txn, ns );
         if ( !c ) {
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             c = db->getOrCreateCollection( txn, ns );
             verify(c);
             wunit.commit();
@@ -119,7 +119,7 @@ namespace mongo {
                 status = indexer.insertAllDocumentsInCollection();
 
             if (status.isOK()) {
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
                 indexer.commit();
                 wunit.commit();
             }

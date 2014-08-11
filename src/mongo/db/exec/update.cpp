@@ -488,7 +488,7 @@ namespace mongo {
             }
         }
 
-        WriteUnitOfWork wunit(request->getOpCtx()->recoveryUnit());
+        WriteUnitOfWork wunit(request->getOpCtx());
 
         // Save state before making changes
         saveState();
@@ -637,7 +637,7 @@ namespace mongo {
                 str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
                 newObj.objsize() <= BSONObjMaxUserSize);
 
-        WriteUnitOfWork wunit(request->getOpCtx()->recoveryUnit());
+        WriteUnitOfWork wunit(request->getOpCtx());
         // Only create the collection if the doc will be inserted.
         if (!_collection) {
             _collection = _db->getCollection(request->getOpCtx(),

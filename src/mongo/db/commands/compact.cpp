@@ -146,7 +146,7 @@ namespace mongo {
 
             Lock::DBWrite lk(txn->lockState(), ns.ns());
             //  SERVER-14085: The following will have to go as we push down WOUW
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
             Client::Context ctx(txn, ns);
 

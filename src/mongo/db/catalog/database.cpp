@@ -541,7 +541,7 @@ namespace mongo {
 
         for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
             if( *i != "local" ) {
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
                 Client::Context ctx(txn, *i);
                 dropDatabase(txn, ctx.db());
                 wunit.commit();

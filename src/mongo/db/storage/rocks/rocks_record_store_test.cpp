@@ -162,7 +162,7 @@ namespace mongo {
             MyOperationContext opCtx( db.get() );
             DiskLoc loc;
             {
-                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                WriteUnitOfWork uow( &opCtx );
                 StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
@@ -194,7 +194,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     StatusWith<DiskLoc> res = rs.insertRecord(&opCtx,
                                                               s.c_str(),
                                                               s.size() + 1,
@@ -212,7 +212,7 @@ namespace mongo {
 
             {
                 MyOperationContext opCtx( db.get() );
-                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                WriteUnitOfWork uow( &opCtx );
                 rs.deleteRecord( &opCtx, loc );
 
                 ASSERT_EQUALS( 0, rs.numRecords() );
@@ -236,7 +236,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     StatusWith<DiskLoc> res = rs.insertRecord( &opCtx,
                                                                s1.c_str(),
                                                                s1.size() + 1,
@@ -251,7 +251,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     StatusWith<DiskLoc> res = rs.updateRecord( &opCtx,
                                                                loc,
                                                                s2.c_str(),
@@ -283,7 +283,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     StatusWith<DiskLoc> res = rs.insertRecord( &opCtx,
                                                                s1.c_str(),
                                                                s1.size() + 1,
@@ -298,7 +298,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     const char* damageSource = "222";
                     mutablebson::DamageVector dv;
                     dv.push_back( mutablebson::DamageEvent() );
@@ -346,7 +346,7 @@ namespace mongo {
 
         {
             MyOperationContext opCtx( db.get() );
-            WriteUnitOfWork uow( opCtx.recoveryUnit() );
+            WriteUnitOfWork uow( &opCtx );
 
             StatusWith<DiskLoc> result = rs1.insertRecord( &opCtx, "a", 2, -1 );
             ASSERT_OK( result.getStatus() );
@@ -379,7 +379,7 @@ namespace mongo {
             MyOperationContext opCtx( db.get() );
             DiskLoc loc;
             {
-                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                WriteUnitOfWork uow( &opCtx );
                 StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
@@ -412,7 +412,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, origStr.c_str(),
                                                                origStr.size() + 1, -1 );
                     ASSERT_OK( res.getStatus() );
@@ -435,7 +435,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     StatusWith<DiskLoc> res = rs.updateRecord( &opCtx, loc, newStr.c_str(),
                                                                newStr.size() + 1, -1, NULL );
                     ASSERT_OK( res.getStatus() );
@@ -457,7 +457,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     rs.deleteRecord( &opCtx, loc );
                 }
             }
@@ -493,7 +493,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s1.c_str(), s1.size() + 1, -1 );
                     ASSERT_OK( res.getStatus() );
                     loc1 = res.getValue();
@@ -553,7 +553,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s1.c_str(), s1.size() +1, -1 );
                     ASSERT_OK( res.getStatus() );
                     loc1 = res.getValue();
@@ -606,7 +606,7 @@ namespace mongo {
 
             {
                 MyOperationContext opCtx( db.get() );
-                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                WriteUnitOfWork uow( &opCtx );
                 StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
                 ASSERT_OK( res.getStatus() );
                 res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
@@ -615,7 +615,7 @@ namespace mongo {
 
             {
                 MyOperationContext opCtx( db.get() );
-                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                WriteUnitOfWork uow( &opCtx );
                 Status stat = rs.truncate( &opCtx );
                 ASSERT_OK( stat );
 
@@ -626,7 +626,7 @@ namespace mongo {
             // Test that truncate does not fail on an empty collection
             {
                 MyOperationContext opCtx( db.get() );
-                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                WriteUnitOfWork uow( &opCtx );
                 Status stat = rs.truncate( &opCtx );
                 ASSERT_OK( stat );
 
@@ -652,7 +652,7 @@ namespace mongo {
 
             MyOperationContext opCtx( db.get() );
             {
-                WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                WriteUnitOfWork uow( &opCtx );
                 StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();

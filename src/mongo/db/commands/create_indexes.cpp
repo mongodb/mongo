@@ -141,7 +141,7 @@ namespace mongo {
             Collection* collection = db->getCollection( txn, ns.ns() );
             result.appendBool( "createdCollectionAutomatically", collection == NULL );
             if ( !collection ) {
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
                 collection = db->createCollection( txn, ns.ns() );
                 invariant( collection );
                 wunit.commit();
@@ -181,7 +181,7 @@ namespace mongo {
             uassertStatusOK(indexer.insertAllDocumentsInCollection());
 
             {
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
 
                 indexer.commit();
 

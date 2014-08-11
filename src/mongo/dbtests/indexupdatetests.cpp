@@ -101,7 +101,7 @@ namespace IndexUpdateTests {
 
                 uassertStatusOK(indexer.init(key));
                 uassertStatusOK(indexer.insertAllDocumentsInCollection());
-                WriteUnitOfWork wunit(_txn.recoveryUnit());
+                WriteUnitOfWork wunit(&_txn);
                 indexer.commit();
                 wunit.commit();
             }
@@ -360,7 +360,7 @@ namespace IndexUpdateTests {
             ASSERT_OK(indexer.init(spec));
             ASSERT_OK(indexer.insertAllDocumentsInCollection());
 
-            WriteUnitOfWork wunit(_txn.recoveryUnit());
+            WriteUnitOfWork wunit(&_txn);
             indexer.commit();
             wunit.commit();
         }
@@ -589,7 +589,7 @@ namespace IndexUpdateTests {
     class HelpersEnsureIndexInterruptDisallowed : public IndexBuildBase {
     public:
         void run() {
-            WriteUnitOfWork wunit (_txn.recoveryUnit());
+            WriteUnitOfWork wunit (&_txn);
             // Insert some documents.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {

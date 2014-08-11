@@ -166,15 +166,4 @@ namespace mongo {
         RecoveryUnit() { }
     };
 
-    class WriteUnitOfWork {
-        MONGO_DISALLOW_COPYING(WriteUnitOfWork);
-    public:
-        WriteUnitOfWork(RecoveryUnit* ru) : _ru(ru) { _ru->beginUnitOfWork(); }
-        ~WriteUnitOfWork(){ _ru->endUnitOfWork(); }
-
-        void commit() { _ru->commitUnitOfWork(); }
-
-        RecoveryUnit* const _ru;
-    };
-
 }  // namespace mongo

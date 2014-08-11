@@ -379,7 +379,7 @@ namespace BasicTests {
             OperationContextImpl txn;
             Lock::GlobalWrite lk(txn.lockState());
 
-            WriteUnitOfWork wunit(txn.recoveryUnit());
+            WriteUnitOfWork wunit(&txn);
             Database db( &txn, "dbtests_basictests_ownsns", NULL );
             wunit.commit();
 

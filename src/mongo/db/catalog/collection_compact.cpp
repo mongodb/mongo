@@ -162,7 +162,7 @@ namespace mongo {
             return StatusWith<CompactStats>( status );
 
         {
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             indexer.commit();
             wunit.commit();
         }

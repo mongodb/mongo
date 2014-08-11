@@ -1787,7 +1787,7 @@ namespace mongo {
                         return;
                     }
 
-                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    WriteUnitOfWork wunit(txn);
                     indexer.commit();
 
                     for (size_t i = 0; i < indexSpecs.size(); i++) {

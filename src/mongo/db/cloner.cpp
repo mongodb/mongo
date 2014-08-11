@@ -124,7 +124,7 @@ namespace mongo {
                          << "collection dropped during clone ["
                          << to_collection.ns() << "]",
                          !createdCollection );
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
                 createdCollection = true;
                 collection = db->createCollection( txn, to_collection.ns() );
                 verify( collection );
@@ -153,7 +153,7 @@ namespace mongo {
                 }
 
                 ++numSeen;
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
 
                 BSONObj js = tmp;
 
@@ -255,7 +255,7 @@ namespace mongo {
 
         Collection* collection = db->getCollection( txn, to_collection );
         if ( !collection ) {
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             collection = db->createCollection( txn, to_collection.ns() );
             invariant(collection);
             wunit.commit();
@@ -277,7 +277,7 @@ namespace mongo {
         uassertStatusOK(indexer.init(indexesToBuild));
         uassertStatusOK(indexer.insertAllDocumentsInCollection());
 
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         indexer.commit();
         if (logForRepl) {
             for (vector<BSONObj>::const_iterator it = indexesToBuild.begin();
@@ -309,7 +309,7 @@ namespace mongo {
         string temp = dbName + ".system.namespaces";
         BSONObj config = _conn->findOne(temp , BSON("name" << ns));
         if (config["options"].isABSONObj()) {
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             Status status = userCreateNS(txn, db, ns, config["options"].Obj(), logForRepl, 0);
             if ( !status.isOK() ) {
                 errmsg = status.toString();
@@ -477,7 +477,7 @@ namespace mongo {
 
                 Database* db;
                 {
-                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    WriteUnitOfWork wunit(txn);
                     // Copy releases the lock, so we need to re-load the database. This should
                     // probably throw if the database has changed in between, but for now preserve
                     // the existing behaviour.
@@ -533,7 +533,7 @@ namespace mongo {
                     uassertStatusOK(indexer.insertAllDocumentsInCollection(&dups));
 
                     for (set<DiskLoc>::const_iterator it = dups.begin(); it != dups.end(); ++it) {
-                        WriteUnitOfWork wunit(txn->recoveryUnit());
+                        WriteUnitOfWork wunit(txn);
                         BSONObj id;
 
                         c->deleteDocument(txn, *it, true, true, opts.logForRepl ? &id : NULL);
@@ -546,7 +546,7 @@ namespace mongo {
                         log() << "index build dropped: " << dups.size() << " dups";
                     }
 
-                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    WriteUnitOfWork wunit(txn);
                     indexer.commit();
                     if (opts.logForRepl) {
                         repl::logOp(txn,

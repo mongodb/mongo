@@ -104,7 +104,7 @@ namespace mongo {
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
             if (!ok) {
                 return false;
@@ -274,7 +274,7 @@ namespace mongo {
             result.appendNumber( "nIndexesWas", all.size() );
 
             {
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
                 Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
                 if ( !s.isOK() ) {
                     errmsg = "dropIndexes failed";
@@ -296,7 +296,7 @@ namespace mongo {
                 return appendCommandStatus( result, status );
 
             {
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
                 indexer.commit();
                 wunit.commit();
             }

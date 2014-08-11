@@ -130,7 +130,7 @@ namespace mongo {
         scoped_ptr<SortedDataBuilderInterface> builder;
 
         {
-            WriteUnitOfWork wunit(_txn->recoveryUnit());
+            WriteUnitOfWork wunit(_txn);
 
             if (_isMultiKey) {
                 _real->_btreeState->setMultikey( _txn );
@@ -144,7 +144,7 @@ namespace mongo {
             if (mayInterrupt)
                 _txn->checkForInterrupt(/*heedMutex*/ false);
 
-            WriteUnitOfWork wunit(_txn->recoveryUnit());
+            WriteUnitOfWork wunit(_txn);
 
             // Get the next datum and add it to the builder.
             BSONObjExternalSorter::Data d = i->next();

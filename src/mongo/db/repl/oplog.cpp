@@ -123,7 +123,7 @@ namespace repl {
         Lock::DBWrite lk(txn->lockState(), "local");
         // XXX soon this needs to be part of an outer WUOW not its own.
         // We can't do this yet due to locking limitations.
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
 
         const OpTime ts = op["ts"]._opTime();
         long long h = op["h"].numberLong();
@@ -244,7 +244,7 @@ namespace repl {
                          bool *bb,
                          bool fromMigrate ) {
         Lock::DBWrite lk1(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
             if ( strncmp(ns, "local.slaves", 12) == 0 )
@@ -336,7 +336,7 @@ namespace repl {
                           bool *bb,
                           bool fromMigrate ) {
         Lock::DBWrite lk(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         static BufBuilder bufbuilder(8*1024); // todo there is likely a mutex on this constructor
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
@@ -520,7 +520,7 @@ namespace repl {
         options.cappedSize = sz;
         options.autoIndexId = CollectionOptions::NO;
 
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         invariant(ctx.db()->createCollection(txn, ns, options));
         if( !rs )
             logOp(txn, "n", "", BSONObj() );

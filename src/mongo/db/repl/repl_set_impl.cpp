@@ -871,14 +871,14 @@ namespace {
 
     void ReplSetImpl::clearInitialSyncFlag(OperationContext* txn) {
         Lock::DBWrite lk(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         Helpers::putSingleton(txn, "local.replset.minvalid", BSON("$unset" << _initialSyncFlag));
         wunit.commit();
     }
 
     void ReplSetImpl::setInitialSyncFlag(OperationContext* txn) {
         Lock::DBWrite lk(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         Helpers::putSingleton(txn, "local.replset.minvalid", BSON("$set" << _initialSyncFlag));
         wunit.commit();
     }
@@ -900,7 +900,7 @@ namespace {
         subobj.done();
 
         Lock::DBWrite lk(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         Helpers::putSingleton(txn, "local.replset.minvalid", builder.obj());
         wunit.commit();
     }
