@@ -30,8 +30,12 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
 
+#include <boost/filesystem/operations.hpp>
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_database_catalog_entry.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+
+#include "mongo/db/storage_options.h"
 
 namespace mongo {
 
@@ -46,14 +50,25 @@ namespace mongo {
         }
     }
 
-    Status WiredTigerEngine::closeDatabase(OperationContext*, const StringData&) {
-	invariant("not supported" == 0);
-	return Status::OK();
+    Status WiredTigerEngine::closeDatabase(OperationContext*, const StringData& db ) {
+        boost::mutex::scoped_lock lk( _dbLock );
+        _dbs.erase( db.toString() );
+        return Status::OK();
     }
 
-    Status WiredTigerEngine::dropDatabase(OperationContext*, const StringData&) {
-	invariant("not supported" == 0);
-	return Status::OK();
+    Status WiredTigerEngine::dropDatabase(OperationContext* txn, const StringData& db) {
+        invariant (storageGlobalParams.directoryperdb);
+        Status status = closeDatabase( txn, db );
+        if ( !status.isOK() )
+            return status;
+
+        // Remove the database files. Code borrowed from mmap deleteDataFiles method.
+        MONGO_ASSERT_ON_EXCEPTION_WITH_MSG(
+            boost::filesystem::remove_all(
+                boost::filesystem::path(storageGlobalParams.dbpath) / db.toString()),
+                    "delete database files");
+
+        return Status::OK();
     }
 
     DatabaseCatalogEntry* WiredTigerEngine::getDatabaseCatalogEntry( OperationContext* opCtx,
