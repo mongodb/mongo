@@ -72,7 +72,7 @@ namespace repl {
     }
     LegacyReplicationCoordinator::~LegacyReplicationCoordinator() {}
 
-    void LegacyReplicationCoordinator::startReplication() {
+    void LegacyReplicationCoordinator::startReplication(OperationContext* txn) {
         // if we are going to be a replica set, we aren't doing other forms of replication.
         if (!_settings.replSet.empty()) {
             if (_settings.slave || _settings.master) {

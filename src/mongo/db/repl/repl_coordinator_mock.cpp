@@ -40,7 +40,7 @@ namespace repl {
             _settings(settings) {}
     ReplicationCoordinatorMock::~ReplicationCoordinatorMock() {}
 
-    void ReplicationCoordinatorMock::startReplication() {
+    void ReplicationCoordinatorMock::startReplication(OperationContext* txn) {
         // TODO
     }
 

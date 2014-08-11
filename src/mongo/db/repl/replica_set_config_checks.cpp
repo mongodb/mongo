@@ -230,6 +230,23 @@ namespace {
     }
 }  // namespace
 
+    StatusWith<int> validateConfigForStartUp(
+            ReplicationCoordinatorExternalState* externalState,
+            const ReplicaSetConfig& oldConfig,
+            const ReplicaSetConfig& newConfig) {
+        Status status = newConfig.validate();
+        if (!status.isOK()) {
+            return StatusWith<int>(status);
+        }
+        if (oldConfig.isInitialized()) {
+            status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);
+            if (!status.isOK()) {
+                return StatusWith<int>(status);
+            }
+        }
+        return findSelfInConfig(externalState, newConfig);
+    }
+
     StatusWith<int> validateConfigForInitiate(
             ReplicationCoordinatorExternalState* externalState,
             const ReplicaSetConfig& newConfig) {

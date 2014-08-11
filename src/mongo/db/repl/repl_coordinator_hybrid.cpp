@@ -50,9 +50,9 @@ namespace repl {
 
     HybridReplicationCoordinator::~HybridReplicationCoordinator() {}
 
-    void HybridReplicationCoordinator::startReplication() {
-        _legacy.startReplication();
-        _impl.startReplication();
+    void HybridReplicationCoordinator::startReplication(OperationContext* txn) {
+        _legacy.startReplication(txn);
+        _impl.startReplication(txn);
     }
 
     void HybridReplicationCoordinator::shutdown() {

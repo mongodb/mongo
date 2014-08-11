@@ -32,9 +32,11 @@
 
 namespace mongo {
 
-    struct HostAndPort;
+    class BSONObj;
     class OID;
     class OperationContext;
+    struct HostAndPort;
+    template <typename T> class StatusWith;
 
 namespace repl {
 
@@ -82,12 +84,17 @@ namespace repl {
          * exist or our hostname doesn't match what was recorded in local.me, generates a new OID
          * to use as our RID, stores it in local.me, and returns it.
          */
-        virtual OID ensureMe() = 0;
+        virtual OID ensureMe(OperationContext*) = 0;
 
         /**
          * Returns true if "host" is one of the network identities of this node.
          */
         virtual bool isSelf(const HostAndPort& host) = 0;
+
+        /**
+         * Gets the replica set config document from local storage, or returns an error.
+         */
+        virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn) = 0;
 
         /**
          * Returns the HostAndPort of the remote client connected to us that initiated the operation

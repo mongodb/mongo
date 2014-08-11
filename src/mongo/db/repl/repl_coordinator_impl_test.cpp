@@ -30,6 +30,7 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -41,6 +42,7 @@
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -59,6 +61,10 @@ namespace mongo {
 
 namespace repl {
 namespace {
+
+    bool stringContains(const std::string &haystack, const std::string& needle) {
+        return haystack.find(needle) != std::string::npos;
+    }
 
     const Seconds zeroSecs(0);
 
@@ -79,18 +85,6 @@ namespace {
     protected:
         ReplicationCoordinatorImpl* getReplCoord() {return _repl.get();}
         TopologyCoordinatorImpl& getTopoCoord() {return *_topo;}
-
-        void updateConfig(BSONObj configBSON, int me) {
-            ReplicaSetConfig config;
-            ASSERT_OK(config.initialize(configBSON));
-            updateConfig(config, me);
-        }
-
-        void updateConfig(ReplicaSetConfig config, int me) {
-            ReplicationExecutor::CallbackHandle cbh;
-            ReplicationExecutor::CallbackData cbData(NULL, cbh, Status::OK());
-            getTopoCoord().updateConfig(cbData, config, me, curTimeMillis64(), OpTime());
-        }
 
         void init() {
             invariant(!_repl);
@@ -121,14 +115,44 @@ namespace {
                 init();
             }
 
-            _repl->startReplication();
+            OperationContextNoop txn;
+            _repl->startReplication(&txn);
+            _repl->waitForStartUp();
             _callShutdown = true;
+        }
+
+        void start(const BSONObj& configDoc, const HostAndPort& selfHost) {
+            if (!_repl) {
+                init();
+            }
+            _externalState->setLocalConfigDocument(StatusWith<BSONObj>(configDoc));
+            _externalState->addSelf(selfHost);
+            start();
+        }
+
+        void assertStart(ReplicationCoordinator::Mode expectedMode,
+                         const BSONObj& configDoc,
+                         const HostAndPort& selfHost) {
+            start(configDoc, selfHost);
+            ASSERT_EQUALS(expectedMode, getReplCoord()->getReplicationMode());
+        }
+
+        void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost) {
+            assertStart(ReplicationCoordinator::modeReplSet, configDoc, selfHost);
         }
 
         void shutdown() {
             invariant(_callShutdown);
             _repl->shutdown();
             _callShutdown = false;
+        }
+
+        int64_t countLogLinesContaining(const std::string& needle) {
+            return std::count_if(getCapturedLogMessages().begin(),
+                                 getCapturedLogMessages().end(),
+                                 stdx::bind(stringContains,
+                                            stdx::placeholders::_1,
+                                            needle));
         }
 
     private:
@@ -143,14 +167,54 @@ namespace {
         bool _callShutdown;
     };
 
-    TEST_F(ReplCoordTest, StartupShutdown) {
+    TEST_F(ReplCoordTest, StartupWithValidLocalConfig) {
+        assertStart(
+                ReplicationCoordinator::modeReplSet,
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345"))),
+                HostAndPort("node1", 12345));
+    }
+
+    TEST_F(ReplCoordTest, StartupWithInvalidLocalConfig) {
+        startCapturingLogMessages();
+        assertStart(ReplicationCoordinator::modeNone,
+                    BSON("_id" << "mySet"), HostAndPort("node1", 12345));
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1, countLogLinesContaining("configuration does not parse"));
+    }
+
+    TEST_F(ReplCoordTest, StartupWithConfigMissingSelf) {
+        startCapturingLogMessages();
+        assertStart(
+                ReplicationCoordinator::modeNone,
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
+                                             BSON("_id" << 2 << "host" << "node2:54321"))),
+                HostAndPort("node3", 12345));
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1, countLogLinesContaining("NodeNotFound"));
+    }
+
+    TEST_F(ReplCoordTest, StartupWithLocalConfigSetNameMismatch) {
+        init("mySet");
+        startCapturingLogMessages();
+        assertStart(ReplicationCoordinator::modeNone,
+                    BSON("_id" << "notMySet" <<
+                         "version" << 2 <<
+                         "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345"))),
+                    HostAndPort("node1", 12345));
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1, countLogLinesContaining("reports set name of notMySet,"));
+    }
+
+    TEST_F(ReplCoordTest, StartupWithNoLocalConfig) {
+        startCapturingLogMessages();
         start();
-        updateConfig(BSON("_id" << "mySet" <<
-                          "version" << 2 <<
-                          "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
-                                                       "_id" << 0 ))),
-                     0);
-        shutdown();
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1, countLogLinesContaining("Did not find local "));
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
     }
 
     TEST_F(ReplCoordTest, AwaitReplicationNumberBaseCases) {
@@ -188,12 +252,11 @@ namespace {
     }
 
     TEST_F(ReplCoordTest, AwaitReplicationNumberOfNodesNonBlocking) {
-        start();
-        updateConfig(BSON("_id" << "mySet" <<
-                          "version" << 2 <<
-                          "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
-                                                       "_id" << 0 ))),
-                     0);
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0 ))),
+                HostAndPort("node1", 12345));
         OperationContextNoop txn;
 
         OID client1 = OID::gen();
@@ -297,12 +360,11 @@ namespace {
     };
 
     TEST_F(ReplCoordTest, AwaitReplicationNumberOfNodesBlocking) {
-        start();
-        updateConfig(BSON("_id" << "mySet" <<
-                          "version" << 2 <<
-                          "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
-                                                       "_id" << 0 ))),
-                     0);
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0 ))),
+                HostAndPort("node1", 12345));
 
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
@@ -347,12 +409,11 @@ namespace {
     }
 
     TEST_F(ReplCoordTest, AwaitReplicationTimeout) {
-        start();
-        updateConfig(BSON("_id" << "mySet" <<
-                          "version" << 2 <<
-                          "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
-                                                       "_id" << 0 ))),
-                     0);
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0 ))),
+                HostAndPort("node1", 12345));
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
@@ -377,12 +438,11 @@ namespace {
     }
 
     TEST_F(ReplCoordTest, AwaitReplicationShutdown) {
-        start();
-        updateConfig(BSON("_id" << "mySet" <<
-                          "version" << 2 <<
-                          "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
-                                                       "_id" << 0 ))),
-                     0);
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0 ))),
+                HostAndPort("node1", 12345));
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
@@ -405,6 +465,11 @@ namespace {
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, statusAndDur.status);
         awaiter.reset();
+    }
+
+    TEST_F(ReplCoordTest, AwaitReplicationNamedModes) {
+        // TODO(spencer): Test awaitReplication with w:majority and tag groups
+        warning() << "Test ReplCoordTest.AwaitReplicationNamedModes needs to be written.";
     }
 
     TEST_F(ReplCoordTest, GetReplicationModeNone) {
@@ -437,35 +502,27 @@ namespace {
         init(settings);
         ASSERT_EQUALS(ReplicationCoordinator::modeNone,
                       getReplCoord()->getReplicationMode());
-        start();
-        updateConfig((BSON("_id" << "mySet" <<
-                                "version" << 2 <<
-                                "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
-                                                             "_id" << 0 )))),
-                     0);
-        ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
-    }
-
-    TEST_F(ReplCoordTest, AwaitReplicationNamedModes) {
-        // TODO(spencer): Test awaitReplication with w:majority and tag groups
+        assertStart(
+                ReplicationCoordinator::modeReplSet,
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0 ))),
+                HostAndPort("node1", 12345));
     }
 
     TEST_F(ReplCoordTest, TestPrepareReplSetUpdatePositionCommand) {
-        init("mySet:/test1:1234,test2:1234,test3:1234");
-        start();
-        updateConfig(BSON("_id" << "mySet" <<
-                          "version" << 1 <<
-                          "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test1:1234") <<
-                                                  BSON("_id" << 1 << "host" << "test2:1234") <<
-                                                  BSON("_id" << 2 << "host" << "test3:1234"))),
-                     0);
-        OID rid1 = OID::gen();
+        OperationContextNoop txn;
+        init("mySet/test1:1234,test2:1234,test3:1234");
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test1:1234") <<
+                                             BSON("_id" << 1 << "host" << "test2:1234") <<
+                                             BSON("_id" << 2 << "host" << "test3:1234"))),
+                HostAndPort("test1", 1234));
+        OID rid1 = getReplCoord()->getMyRID(&txn);
         OID rid2 = OID::gen();
         OID rid3 = OID::gen();
-        HandshakeArgs handshake1;
-        handshake1.initialize(BSON("handshake" << rid1 <<
-                                   "member" << 0 <<
-                                   "config" << BSON("_id" << 0 << "host" << "test1:1234")));
         HandshakeArgs handshake2;
         handshake2.initialize(BSON("handshake" << rid2 <<
                                    "member" << 1 <<
@@ -474,8 +531,6 @@ namespace {
         handshake3.initialize(BSON("handshake" << rid3 <<
                                    "member" << 2 <<
                                    "config" << BSON("_id" << 2 << "host" << "test3:1234")));
-        OperationContextNoop txn;
-        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake3));
         OpTime optime1(1, 1);
@@ -511,17 +566,17 @@ namespace {
     }
 
     TEST_F(ReplCoordTest, TestHandshakes) {
-        init("mySet:/test1:1234,test2:1234,test3:1234");
-        start();
-        updateConfig(BSON("_id" << "mySet" <<
-                          "version" << 1 <<
-                          "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test1:1234") <<
-                                                  BSON("_id" << 1 << "host" << "test2:1234") <<
-                                                  BSON("_id" << 2 << "host" << "test3:1234"))),
-                     1);
+        init("mySet/test1:1234,test2:1234,test3:1234");
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test1:1234") <<
+                                             BSON("_id" << 1 << "host" << "test2:1234") <<
+                                             BSON("_id" << 2 << "host" << "test3:1234"))),
+                HostAndPort("test2", 1234));
         // Test generating basic handshake with no chaining
-        OperationContextNoop txn;
         std::vector<BSONObj> handshakes;
+        OperationContextNoop txn;
         getReplCoord()->prepareReplSetUpdatePositionCommandHandshakes(&txn, &handshakes);
         ASSERT_EQUALS(1U, handshakes.size());
         BSONObj handshakeCmd = handshakes[0];
@@ -580,15 +635,15 @@ namespace {
         // information for replSetGetStatus from a different source than the nodes that aren't
         // ourself.  After this setup, we call replSetGetStatus and make sure that the fields
         // returned for each member match our expectations.
-        init("mySet:/test1:1234,test2:1234,test3:1234");
-        start();
-        updateConfig(BSON("_id" << "mySet" <<
-                          "version" << 1 <<
-                          "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test0:1234") <<
-                                                  BSON("_id" << 1 << "host" << "test1:1234") <<
-                                                  BSON("_id" << 2 << "host" << "test2:1234") <<
-                                                  BSON("_id" << 3 << "host" << "test3:1234"))),
-                     3);
+        init("mySet/test1:1234,test2:1234,test3:1234");
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test0:1234") <<
+                                             BSON("_id" << 1 << "host" << "test1:1234") <<
+                                             BSON("_id" << 2 << "host" << "test2:1234") <<
+                                             BSON("_id" << 3 << "host" << "test3:1234"))),
+                HostAndPort("test3", 1234));
         Date_t startupTime(curTimeMillis64());
         OpTime electionTime(1, 2);
         OpTime oplogProgress(3, 4);
@@ -681,8 +736,12 @@ namespace {
     }
 
     TEST_F(ReplCoordTest, TestGetElectionId) {
-        init("mySet:/test1:1234,test2:1234,test3:1234");
-        start();
+        init("mySet/test1:1234,test2:1234,test3:1234");
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "test1:1234"))),
+                HostAndPort("test1", 1234));
         OID electionID1 = getReplCoord()->getElectionId();
         getTopoCoord()._changeMemberState(MemberState::RS_PRIMARY);
         OID electionID2 = getReplCoord()->getElectionId();

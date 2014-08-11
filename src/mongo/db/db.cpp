@@ -276,7 +276,10 @@ namespace mongo {
         server->setupSockets();
 
         logStartup();
-        repl::getGlobalReplicationCoordinator()->startReplication();
+        {
+            OperationContextImpl txn;
+            repl::getGlobalReplicationCoordinator()->startReplication(&txn);
+        }
         if (serverGlobalParams.isHttpInterfaceEnabled)
             boost::thread web(stdx::bind(&webServerThread,
                                          new RestAdminAccess())); // takes ownership

@@ -63,7 +63,7 @@ namespace repl {
 
         // ================== Members of public ReplicationCoordinator API ===================
 
-        virtual void startReplication();
+        virtual void startReplication(OperationContext* txn);
 
         virtual void shutdown();
 
@@ -190,6 +190,14 @@ namespace repl {
          */
         void cancelHeartbeats();
 
+        // ================== Test support API ===================
+
+        /**
+         * If called after startReplication(), blocks until all asynchronous
+         * activities associated with replication start-up complete.
+         */
+        void waitForStartUp();
+
     private:
 
         // Struct that holds information about clients waiting for replication.
@@ -212,13 +220,11 @@ namespace repl {
         // Called by the TopologyCoordinator whenever this node's replica set state transitions.
         void _onSelfStateChange(const MemberState& newState);
 
-        // Called by the TopologyCoordinator whenever the replica set configuration is updated
-        void _onReplicaSetConfigChange(const ReplicaSetConfig& newConfig, int myIndex);
-
         /*
          * Returns the OpTime of the last applied operation on this node.
          */
         OpTime _getLastOpApplied();
+        OpTime _getLastOpApplied_inlock();
 
         /*
          * Returns true if the given writeConcern is satisfied up to "optime".
@@ -241,7 +247,7 @@ namespace repl {
         void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle);
 
         /**
-         * Start a heartbeat for each member in the current config
+         * Starts a heartbeat for each member in the current config
          */
         void _startHeartbeats();
 
@@ -252,6 +258,23 @@ namespace repl {
          * "_mutex" to be called safely.
          */
         Mode _getReplicationMode_inlock() const;
+
+        /**
+         * Starts loading the replication configuration from local storage, and if it is valid,
+         * schedules a callback to set itas the current replica set config (sets _rsConfig and
+         * _thisMembersConfigIndex).
+         */
+        void _startLoadLocalConfig(OperationContext* txn);
+
+        /**
+         * Callback that finishes the work started in _startLoadLocalConfig.
+         */
+        void _finishLoadLocalConfig(const ReplicationExecutor::CallbackData& cbData,
+                                    const ReplicaSetConfig& localConfig);
+
+        // Handle for the callback that marks the end of startReplication()'s asynchronous
+        // work.  Used for testing, set in startReplication() and never changed.
+        ReplicationExecutor::CallbackHandle _startUpFinishedHandle;
 
         // Handles to actively queued heartbeats.
         // Only accessed serially in ReplicationExecutor callbacks, which makes it safe to access

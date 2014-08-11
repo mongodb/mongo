@@ -44,8 +44,9 @@ namespace repl {
         virtual void shutdown();
         virtual void forwardSlaveHandshake();
         virtual void forwardSlaveProgress();
-        virtual OID ensureMe();
+        virtual OID ensureMe(OperationContext* txn);
         virtual bool isSelf(const HostAndPort& host);
+        virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
 
     private:
