@@ -826,7 +826,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	/*
 	 * Make sure we don't try to open a new session after the application
 	 * closes the connection.  This is particularly intended to catch
-	 * casees where server threads open sessions.
+	 * cases where server threads open sessions.
 	 */
 	WT_ASSERT(session, F_ISSET(conn, WT_CONN_SERVER_RUN));
 
