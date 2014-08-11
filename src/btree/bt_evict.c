@@ -294,11 +294,14 @@ __wt_evict_destroy(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_cond_signal(session, cache->evict_waiter_cond));
 		WT_TRET(__wt_thread_join(session, workers[i].tid));
 	}
-	for (i = 0; i < conn->evict_workers_max; i++) {
-		wt_session = &conn->evict_workctx[i].session->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
+	/* Handle shutdown when cleaning up after a failed open */
+	if (conn->evict_workctx != NULL) {
+		for (i = 0; i < conn->evict_workers_max; i++) {
+			wt_session = &conn->evict_workctx[i].session->iface;
+			WT_TRET(wt_session->close(wt_session, NULL));
+		}
+		__wt_free(session, conn->evict_workctx);
 	}
-	__wt_free(session, conn->evict_workctx);
 
 	if (conn->evict_tid_set) {
 		WT_TRET(__wt_evict_server_wake(session));
