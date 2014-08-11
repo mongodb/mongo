@@ -294,7 +294,7 @@ namespace mongo {
                             Request r( msg , 0 );
                             r.init();
 
-                            r.d().reservedField() |= Reserved_FromWriteback;
+                            r.d().setReservedField(r.d().reservedField() | Reserved_FromWriteback);
 
                             ClientInfo * ci = r.getClientInfo();
                             if (!noauth) {

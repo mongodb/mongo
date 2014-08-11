@@ -37,7 +37,6 @@ namespace mongo {
     Request::Request( Message& m, AbstractMessagingPort* p ) :
         _m(m) , _d( m ) , _p(p) , _didInit(false) {
 
-        verify( _d.getns() );
         _id = _m.header()->id;
 
         _clientInfo = ClientInfo::get();
@@ -58,7 +57,7 @@ namespace mongo {
 
     // Deprecated, will move to the strategy itself
     void Request::reset() {
-        if ( _m.operation() == dbKillCursors ) {
+        if ( !_d.messageShouldHaveNs()) {
             return;
         }
 

@@ -13,3 +13,14 @@ env.StaticLibrary('common', ['field_ref.cpp'],
                            '$BUILD_DIR/mongo/foundation'])
 
 env.CppUnitTest('field_ref_test', ['field_ref_test.cpp'], LIBDEPS=['common'])
+
+env.CppUnitTest(
+    target="dbmessage_test",
+    source=[
+        "dbmessage_test.cpp"
+    ],
+    LIBDEPS=[
+        "common",
+        "$BUILD_DIR/mongo/clientdriver",
+    ],
+)
