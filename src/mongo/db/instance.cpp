@@ -1048,13 +1048,6 @@ namespace {
 
         log() << "dbexit: " << why;
 
-#if defined(_DEBUG)
-        try {
-            mutexDebugger.programEnding();
-        }
-        catch (...) { }
-#endif
-
 #ifdef _WIN32
         // Windows Service Controller wants to be told when we are down,
         //  so don't call ::_exit() yet, or say "really exiting now"

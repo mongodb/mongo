@@ -583,13 +583,10 @@ namespace mongo {
             // to finish (or at least to notice what is up and stop)
             Lock::GlobalWrite lk(txn->lockState());
 
-            // this is so the mutexdebugger doesn't get confused.  we are actually single threaded 
-            // at this point in the program so it wouldn't have been a true problem (I think)
-            
-            // can't lock groupCommitMutex here as 
+            // can't lock groupCommitMutex here as
             //   DurableMappedFile::close()->closingFileNotication()->groupCommit() will lock it
             //   and that would be recursive.
-            //   
+            //
             // SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
 
             _recover(); // throws on interruption

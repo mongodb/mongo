@@ -53,7 +53,6 @@ def add_exe( v ):
 
 env.Library('foundation',
             [ 'util/assert_util.cpp',
-              'util/concurrency/mutexdebugger.cpp',
               'util/concurrency/thread_pool.cpp',
               'util/debug_util.cpp',
               'util/exception_filter_win32.cpp',

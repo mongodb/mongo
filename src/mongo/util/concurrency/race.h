@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/util/concurrency/mutexdebugger.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/goodies.h" // printStackTrace
 #include "mongo/util/stacktrace.h"
@@ -51,8 +50,7 @@ namespace mongo {
             const std::string file;
             const unsigned line;
             void fail() { 
-                log() << "\n\n\nrace: synchronization (race condition) failure\ncurrent locks this thread (" << getThreadName() << "):" << std::endl
-                      << mutexDebugger.currentlyLocked();
+                log() << "\n\n\nrace: synchronization (race condition) failure\ncurrent locks this thread (" << getThreadName() << "):" << std::endl;
                 printStackTrace();
                 ::abort();
             }
