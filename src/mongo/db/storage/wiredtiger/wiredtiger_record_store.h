@@ -31,6 +31,7 @@
 
 #include <string>
 
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_database.h"
@@ -41,6 +42,8 @@ namespace mongo {
 
     class WiredTigerRecordStore : public RecordStore {
     public:
+        static int Create(WiredTigerDatabase *db, const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace);
+
         WiredTigerRecordStore(const StringData& ns,
 			  WiredTigerDatabase *db,
                           bool isCapped = false,
@@ -161,6 +164,9 @@ namespace mongo {
 
         static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx );
         static WiredTigerItem _makeKey(const DiskLoc &loc);
+        static std::string _getURI(const StringData &ns) {
+	    return "table:" + ns.toString();
+	}
 
         DiskLoc _nextId();
         bool cappedAndNeedDelete() const;

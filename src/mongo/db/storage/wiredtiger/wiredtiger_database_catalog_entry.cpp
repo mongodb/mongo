@@ -102,6 +102,9 @@ namespace mongo {
             return Status( ErrorCodes::NamespaceExists,
                            "cannot create collection, already exists" );
 
+	int ret = WiredTigerRecordStore::Create(_db, ns, options, allocateDefaultSpace);
+	invariant(ret == 0);
+
         entry = new Entry( ns, options );
 
         if ( options.capped ) {

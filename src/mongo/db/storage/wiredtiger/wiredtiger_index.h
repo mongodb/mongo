@@ -41,4 +41,92 @@ namespace mongo {
      */
     SortedDataInterface* getWiredTigerIndex(WiredTigerDatabase *db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info, boost::shared_ptr<void>* dataInOut);
 
-}  // namespace mongo
+    class WiredTigerIndex : public SortedDataInterface {
+    public:
+        WiredTigerIndex(WiredTigerDatabase *db, const IndexCatalogEntry& info, const std::string &uri) : _db(db), _info(info), _uri(uri) {}
+
+        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
+
+        virtual Status insert(OperationContext* txn,
+                              const BSONObj& key,
+                              const DiskLoc& loc,
+                              bool dupsAllowed);
+
+        virtual bool unindex(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
+
+        virtual void fullValidate(OperationContext* txn, long long *numKeysOut);
+
+        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
+
+        virtual bool isEmpty();
+
+        virtual Status touch(OperationContext* txn) const;
+	
+	virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
+
+	bool isDup(OperationContext *txn, const BSONObj& key, DiskLoc loc);
+
+        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
+
+        virtual Status initAsEmpty(OperationContext* txn);
+
+	WT_CURSOR *GetCursor(bool acquire=false) const;
+	const std::string &GetURI() const;
+
+
+    private:
+	    class IndexCursor : public SortedDataInterface::Cursor {
+	    public:
+		IndexCursor(WT_CURSOR *cursor,
+			WiredTigerDatabase *db, OperationContext *txn, bool forward)
+		   : _cursor(cursor, db), _txn(txn), _forward(forward) {}
+
+		virtual int getDirection() const;
+
+		virtual bool isEOF() const;
+
+		virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor &genother) const;
+
+		virtual void aboutToDeleteBucket(const DiskLoc& bucket);
+
+		virtual bool locate(const BSONObj &key, const DiskLoc& loc);
+
+		virtual void customLocate(const BSONObj& keyBegin,
+					  int keyBeginLen,
+					  bool afterKey,
+					  const vector<const BSONElement*>& keyEnd,
+					  const vector<bool>& keyEndInclusive);
+
+		void advanceTo(const BSONObj &keyBegin,
+			       int keyBeginLen,
+			       bool afterKey,
+			       const vector<const BSONElement*>& keyEnd,
+			       const vector<bool>& keyEndInclusive);
+
+		virtual BSONObj getKey() const;
+
+		virtual DiskLoc getDiskLoc() const;
+
+		virtual void advance();
+
+		virtual void savePosition();
+
+		virtual void restorePosition();
+
+	    private:
+		WiredTigerCursor _cursor;
+		OperationContext *_txn;
+		bool _forward;
+		bool _eof;
+
+		// For save/restorePosition since _it may be invalidated durring a yield.
+		bool _savedAtEnd;
+		BSONObj _savedKey;
+		DiskLoc _savedLoc;
+	    };
+
+        WiredTigerDatabase* _db;
+        const IndexCatalogEntry& _info;
+	std::string _uri;
+    };
+} // namespace

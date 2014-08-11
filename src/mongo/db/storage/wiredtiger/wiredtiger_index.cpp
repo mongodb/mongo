@@ -38,7 +38,6 @@
 
 
 namespace mongo {
-namespace {
     static const WiredTigerItem emptyItem(NULL, 0);
     
     bool hasFieldNames(const BSONObj& obj) {
@@ -98,234 +97,205 @@ namespace {
         unsigned long long _count;
     };
 
-    class WiredTigerIndex : public SortedDataInterface {
-    public:
-        WiredTigerIndex(WiredTigerDatabase *db, const IndexCatalogEntry& info, const std::string &uri) 
-            : _db(db), _info(info), _uri(uri) {}
+    SortedDataBuilderInterface* WiredTigerIndex::getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
+	return new WiredTigerBuilderImpl(dupsAllowed);
+    }
 
-        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
-            return new WiredTigerBuilderImpl(dupsAllowed);
-        }
+    Status WiredTigerIndex::insert(OperationContext* txn,
+			  const BSONObj& key,
+			  const DiskLoc& loc,
+			  bool dupsAllowed) {
+	invariant(!loc.isNull());
+	invariant(loc.isValid());
+	invariant(!hasFieldNames(key));
 
-        virtual Status insert(OperationContext* txn,
-                              const BSONObj& key,
-                              const DiskLoc& loc,
-                              bool dupsAllowed) {
-            invariant(!loc.isNull());
-            invariant(loc.isValid());
-            invariant(!hasFieldNames(key));
+	// TODO optimization: save the iterator from the dup-check to speed up insert
+	if (!dupsAllowed && isDup(txn, key, loc))
+	    return dupKeyError(key);
 
-            // TODO optimization: save the iterator from the dup-check to speed up insert
-            if (!dupsAllowed && isDup(txn, key, loc))
-                return dupKeyError(key);
+	WiredTigerCursor curwrap(GetCursor(), _db);
+	WT_CURSOR *c = curwrap.Get();
+	WiredTigerItem keyItem(_toItem(key)), locItem(_toItem(loc));
+	c->set_key(c, &keyItem, &locItem);
+	c->set_value(c, &emptyItem);
+	int ret = c->insert(c);
+	invariant(ret == 0);
+	return Status::OK();
+    }
 
-	    WiredTigerCursor curwrap(GetCursor(), _db);
-	    WT_CURSOR *c = curwrap.Get();
-	    WiredTigerItem keyItem(_toItem(key)), locItem(_toItem(loc));
-	    c->set_key(c, &keyItem, &locItem);
-	    c->set_value(c, &emptyItem);
-            int ret = c->insert(c);
-	    invariant(ret == 0);
-            return Status::OK();
-        }
+    bool WiredTigerIndex::unindex(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
+	invariant(!loc.isNull());
+	invariant(loc.isValid());
+	invariant(!hasFieldNames(key));
 
-        virtual bool unindex(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
-            invariant(!loc.isNull());
-            invariant(loc.isValid());
-            invariant(!hasFieldNames(key));
+	WiredTigerCursor curwrap(GetCursor(), _db);
+	WT_CURSOR *c = curwrap.Get();
+	WiredTigerItem keyItem(_toItem(key)), locItem(_toItem(loc));
+	c->set_key(c, &keyItem, &locItem);
+	int ret = c->remove(c);
+	invariant(ret == 0);
+	// TODO: can we avoid a search?
+	const size_t numDeleted = 1;
+	return numDeleted == 1;
+    }
 
-	    WiredTigerCursor curwrap(GetCursor(), _db);
-	    WT_CURSOR *c = curwrap.Get();
-	    WiredTigerItem keyItem(_toItem(key)), locItem(_toItem(loc));
-	    c->set_key(c, &keyItem, &locItem);
-            int ret = c->remove(c);
-	    invariant(ret == 0);
-	    // TODO: can we avoid a search?
-            const size_t numDeleted = 1;
-            return numDeleted == 1;
-        }
+    void WiredTigerIndex::fullValidate(OperationContext* txn, long long *numKeysOut) {
+	// TODO check invariants?
+	*numKeysOut = 1;
+    }
 
-        virtual void fullValidate(OperationContext* txn, long long *numKeysOut) {
-            // TODO check invariants?
-            *numKeysOut = 1;
-        }
+    Status WiredTigerIndex::dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
+	invariant(!hasFieldNames(key));
+	if (isDup(txn, key, loc))
+	    return dupKeyError(key);
+	return Status::OK();
+    }
 
-        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
-	    invariant(!hasFieldNames(key));
-            if (isDup(txn, key, loc))
-                return dupKeyError(key);
-            return Status::OK();
-        }
+    bool WiredTigerIndex::isEmpty() {
+	// XXX no context?
+	WiredTigerCursor curwrap(GetCursor(), _db);
+	WT_CURSOR *c = curwrap.Get();
+	int ret = c->next(c);
+	if (ret == WT_NOTFOUND)
+	    return true;
+	invariant(ret == 0);
+	return false;
+    }
 
-        virtual bool isEmpty() {
-	    // XXX no context?
-	    WiredTigerCursor curwrap(GetCursor(), _db);
-	    WT_CURSOR *c = curwrap.Get();
-	    int ret = c->next(c);
-	    if (ret == WT_NOTFOUND)
-		return true;
-	    invariant(ret == 0);
+    Status WiredTigerIndex::touch(OperationContext* txn) const{
+	// already in memory...
+	return Status::OK();
+    }
+    
+    long long WiredTigerIndex::getSpaceUsedBytes( OperationContext* txn ) const { return 1; }
+
+    bool WiredTigerIndex::isDup(OperationContext *txn, const BSONObj& key, DiskLoc loc) {
+	boost::scoped_ptr<SortedDataInterface::Cursor> cursor( newCursor( txn, 1 ) );
+	cursor->locate( key, DiskLoc() );
+
+	if ( cursor->isEOF() || cursor->getDiskLoc() == loc ) {
 	    return false;
-        }
+	} else {
+	    return true;
+	}
+    }
 
-        virtual Status touch(OperationContext* txn) const{
-            // already in memory...
-            return Status::OK();
-        }
-	
-	virtual long long getSpaceUsedBytes( OperationContext* txn ) const { return 1; }
+    /* Cursor implementation */
+    int WiredTigerIndex::IndexCursor::getDirection() const { return _forward ? 1 : -1; }
 
-	bool isDup(OperationContext *txn, const BSONObj& key, DiskLoc loc) {
-	    boost::scoped_ptr<SortedDataInterface::Cursor> cursor( newCursor( txn, 1 ) );
-	    cursor->locate( key, DiskLoc() );
+    bool WiredTigerIndex::IndexCursor::isEOF() const { return _eof; }
 
-	    if ( cursor->isEOF() || cursor->getDiskLoc() == loc ) {
-		return false;
-	    } else {
-		return true;
-	    }
+    bool WiredTigerIndex::IndexCursor::pointsToSamePlaceAs(const SortedDataInterface::Cursor &genother) const
+    {
+	    const WiredTigerIndex::IndexCursor &other = dynamic_cast<const WiredTigerIndex::IndexCursor &>(genother);
+	    WT_CURSOR *c = _cursor.Get(), *otherc = other._cursor.Get();
+	    int cmp, ret = c->compare(c, otherc, &cmp);
+	    invariant(ret == 0);
+	    return cmp == 0;
+    }
+
+    void WiredTigerIndex::IndexCursor::aboutToDeleteBucket(const DiskLoc& bucket) {
+	invariant(!"aboutToDeleteBucket should not be called");
+    }
+
+    bool WiredTigerIndex::IndexCursor::locate(const BSONObj &key, const DiskLoc& loc) {
+	WT_CURSOR *c = _cursor.Get();
+	int cmp = -1, ret;
+	if (key == BSONObj()) {
+	    ret = c->reset(c);
+	    advance();
+	    return !isEOF();
 	}
 
-        class IndexCursor : public SortedDataInterface::Cursor {
-        public:
-            IndexCursor(WT_CURSOR *cursor,
-		    WiredTigerDatabase *db, OperationContext *txn, bool forward)
-	       : _cursor(cursor, db), _txn(txn), _forward(forward) {}
+	WiredTigerItem keyItem(_toItem(key)), locItem(_toItem(loc));
+	c->set_key(c, &keyItem, &locItem);
+	ret = c->search_near(c, &cmp);
+	// Make sure we land on a matching key
+	if (ret == 0 && cmp < 0)
+	    ret = c->next(c);
+	if (ret == 0) {
+	    ret = c->get_key(c, &keyItem, &locItem);
+	    invariant(ret == 0);
+	    if (key != BSONObj(static_cast<const char *>(keyItem.data)))
+		ret = WT_NOTFOUND;
+	}
+	if (ret == WT_NOTFOUND) {
+	    _eof = true;
+	    return false;
+	}
+	invariant(ret == 0);
+	return true;
+    }
 
-            virtual int getDirection() const { return _forward ? 1 : -1; }
+    void WiredTigerIndex::IndexCursor::customLocate(const BSONObj& keyBegin,
+			      int keyBeginLen,
+			      bool afterKey,
+			      const vector<const BSONElement*>& keyEnd,
+			      const vector<bool>& keyEndInclusive) {
+    }
 
-            virtual bool isEOF() const { return _eof; }
+    void WiredTigerIndex::IndexCursor::advanceTo(const BSONObj &keyBegin,
+		   int keyBeginLen,
+		   bool afterKey,
+		   const vector<const BSONElement*>& keyEnd,
+		   const vector<bool>& keyEndInclusive) {
+	// XXX I think these do the same thing????
+	customLocate(keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive);
+    }
 
-            virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor &genother) const
-	    {
-		    const IndexCursor &other = dynamic_cast<const IndexCursor &>(genother);
-		    WT_CURSOR *c = _cursor.Get(), *otherc = other._cursor.Get();
-		    int cmp, ret = c->compare(c, otherc, &cmp);
-		    invariant(ret == 0);
-		    return cmp == 0;
-	    }
+    BSONObj WiredTigerIndex::IndexCursor::getKey() const {
+	WT_CURSOR *c = _cursor.Get();
+	WT_ITEM keyItem, locItem;
+	int ret = c->get_key(c, &keyItem, &locItem);
+	invariant(ret == 0);
+	return BSONObj(static_cast<const char *>(keyItem.data));
+    }
 
-            virtual void aboutToDeleteBucket(const DiskLoc& bucket) {
-                invariant(!"aboutToDeleteBucket should not be called");
-            }
+    DiskLoc WiredTigerIndex::IndexCursor::getDiskLoc() const {
+	WT_CURSOR *c = _cursor.Get();
+	WT_ITEM keyItem, locItem;
+	int ret = c->get_key(c, &keyItem, &locItem);
+	invariant(ret == 0);
+	return reinterpret_cast<const DiskLoc *>(locItem.data)[0];
+    }
 
-            virtual bool locate(const BSONObj &key, const DiskLoc& loc) {
-		WT_CURSOR *c = _cursor.Get();
-		int cmp = -1, ret;
-		if (key == BSONObj()) {
-		    ret = c->reset(c);
-		    advance();
-		    return !isEOF();
-		}
+    void WiredTigerIndex::IndexCursor::advance() {
+	WT_CURSOR *c = _cursor.Get();
+	int ret = c->next(c);
+	if (ret == WT_NOTFOUND)
+	    _eof = true;
+	else
+	    invariant(ret == 0);
+    }
 
-		WiredTigerItem keyItem(_toItem(key)), locItem(_toItem(loc));
-		c->set_key(c, &keyItem, &locItem);
-		ret = c->search_near(c, &cmp);
-		// Make sure we land on a matching key
-		if (ret == 0 && cmp < 0)
-		    ret = c->next(c);
-		if (ret == 0) {
-		    ret = c->get_key(c, &keyItem, &locItem);
-		    invariant(ret == 0);
-		    if (key != BSONObj(static_cast<const char *>(keyItem.data)))
-			ret = WT_NOTFOUND;
-		}
-		if (ret == WT_NOTFOUND) {
-		    _eof = true;
-		    return false;
-		}
-		invariant(ret == 0);
-		return true;
-	    }
+    void WiredTigerIndex::IndexCursor::savePosition() {
+	if (isEOF())
+	    _savedAtEnd = true;
+	else {
+	    _savedKey = getKey();
+	    _savedLoc = getDiskLoc();
+	}
+    }
 
-            virtual void customLocate(const BSONObj& keyBegin,
-                                      int keyBeginLen,
-                                      bool afterKey,
-                                      const vector<const BSONElement*>& keyEnd,
-                                      const vector<bool>& keyEndInclusive) {
-            }
+    void WiredTigerIndex::IndexCursor::restorePosition() {
+	if (_savedAtEnd)
+	    _eof = true;
+	else
+	    locate(_savedKey, _savedLoc);
+    }
 
-            void advanceTo(const BSONObj &keyBegin,
-                           int keyBeginLen,
-                           bool afterKey,
-                           const vector<const BSONElement*>& keyEnd,
-                           const vector<bool>& keyEndInclusive) {
-                // XXX I think these do the same thing????
-                customLocate(keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive);
-            }
+    SortedDataInterface::Cursor* WiredTigerIndex::newCursor(OperationContext* txn, int direction) const {
+	invariant((direction == 1) || (direction == -1));
+	return new IndexCursor(GetCursor(true), _db, txn, direction == 1);
+    }
 
-            virtual BSONObj getKey() const {
-		WT_CURSOR *c = _cursor.Get();
-		WT_ITEM keyItem, locItem;
-		int ret = c->get_key(c, &keyItem, &locItem);
-		invariant(ret == 0);
-                return BSONObj(static_cast<const char *>(keyItem.data));
-            }
+    Status WiredTigerIndex::initAsEmpty(OperationContext* txn) {
+	// No-op
+	return Status::OK();
+    }
 
-            virtual DiskLoc getDiskLoc() const {
-		WT_CURSOR *c = _cursor.Get();
-		WT_ITEM keyItem, locItem;
-		int ret = c->get_key(c, &keyItem, &locItem);
-		invariant(ret == 0);
-                return reinterpret_cast<const DiskLoc *>(locItem.data)[0];
-            }
-
-            virtual void advance() {
-		WT_CURSOR *c = _cursor.Get();
-		int ret = c->next(c);
-		if (ret == WT_NOTFOUND)
-		    _eof = true;
-		else
-		    invariant(ret == 0);
-            }
-
-            virtual void savePosition() {
-                if (isEOF())
-                    _savedAtEnd = true;
-		else {
-		    _savedKey = getKey();
-		    _savedLoc = getDiskLoc();
-		}
-            }
-
-            virtual void restorePosition() {
-                if (_savedAtEnd)
-                    _eof = true;
-                else
-                    locate(_savedKey, _savedLoc);
-            }
-
-        private:
-	    WiredTigerCursor _cursor;
-	    OperationContext *_txn;
-	    bool _forward;
-	    bool _eof;
-
-            // For save/restorePosition since _it may be invalidated durring a yield.
-            bool _savedAtEnd;
-            BSONObj _savedKey;
-            DiskLoc _savedLoc;
-        };
-
-        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const {
-	    invariant((direction == 1) || (direction == -1));
-            return new IndexCursor(GetCursor(true), _db, txn, direction == 1);
-        }
-
-        virtual Status initAsEmpty(OperationContext* txn) {
-            // No-op
-            return Status::OK();
-        }
-
-	WT_CURSOR *GetCursor(bool acquire=false) const { return _db->GetCursor(GetURI(), acquire); }
-	const std::string &GetURI() const { return _uri; }
-
-    private:
-        WiredTigerDatabase* _db;
-        const IndexCatalogEntry& _info;
-	std::string _uri;
-    };
-} // namespace
+    WT_CURSOR *WiredTigerIndex::GetCursor(bool acquire) const { return _db->GetCursor(GetURI(), acquire); }
+    const std::string &WiredTigerIndex::GetURI() const { return _uri; }
 
     SortedDataInterface* getWiredTigerIndex(WiredTigerDatabase *db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info, boost::shared_ptr<void>* dataInOut) {
 	return new WiredTigerIndex(db, info, "table:idx" + ns + "_" + idxName);

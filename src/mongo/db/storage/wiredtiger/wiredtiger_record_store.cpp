@@ -37,6 +37,12 @@
 
 namespace mongo {
 
+    int WiredTigerRecordStore::Create(WiredTigerDatabase *db, const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
+	WiredTigerSession swrap(db->GetSession(), db);
+	WT_SESSION *s(swrap.Get());
+	return s->create(s, _getURI(ns).c_str(), "type=file,key_format=u,value_format=u");
+    }
+
     WiredTigerRecordStore::WiredTigerRecordStore( const StringData& ns,
 		                        WiredTigerDatabase *db,
                                         bool isCapped,
@@ -45,7 +51,7 @@ namespace mongo {
                                         CappedDocumentDeleteCallback* cappedDeleteCallback )
         : RecordStore( ns ),
           _db( db ),
-	  _uri ( "table:" + ns.toString() ),
+	  _uri (_getURI(ns) ),
           _isCapped( isCapped ),
           _cappedMaxSize( cappedMaxSize ),
           _cappedMaxDocs( cappedMaxDocs ),
