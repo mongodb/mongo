@@ -59,12 +59,12 @@ By default, WiredTiger cache eviction is handled by a single, separate
 thread.  In a large, busy cache, a single thread will be insufficient
 (especially when the eviction thread must wait for I/O).  Further, if
 the eviction thread falls behind, application threads will be taken and
-used for eviction, potentially resulting in latency spikes.  The \c
-eviction_thread_min and \c eviction_thread_max configuration values can
-be used to configure the number of threads WiredTiger can use to keep
-up with the application eviction load. If WiredTiger eviction threads
-are unable to evict enough space in the cache to keep up with
-application demand, application threads will be do eviction as well.
+used for eviction, potentially resulting in latency spikes.  The
+\c eviction(threads_min) and \c eviction(threads_max) configuration values
+can be used to configure the number of threads WiredTiger can use to keep
+up with the application eviction load. If WiredTiger eviction threads are
+unable to evict enough space in the cache to keep up with application
+demand, application threads will be do eviction as well.
 
 @snippet ex_all.c Eviction worker configuration
 
