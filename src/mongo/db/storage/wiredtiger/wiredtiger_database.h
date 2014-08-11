@@ -34,7 +34,7 @@ namespace mongo {
 
 	struct WiredTigerSession {
 		WiredTigerSession(WT_SESSION *session, WiredTigerDatabase &db) : _session(session), _db(db) {}
-		WiredTigerSession(WiredTigerDatabase &db) : WiredTigerSession(db.GetSession(), db) {}
+		WiredTigerSession(WiredTigerDatabase &db) : _session(db.GetSession()), _db(db) {}
 		~WiredTigerSession() { _db.ReleaseSession(_session); }
 
 		void ReleaseCursor(WT_CURSOR *c) {
