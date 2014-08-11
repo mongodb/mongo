@@ -44,7 +44,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/log.h"
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 #include <ifaddrs.h>
 #include <netdb.h>
 #elif defined(_WIN32)
@@ -56,7 +56,7 @@
 #include <Ws2tcpip.h>
 #endif  // defined(_WIN32)
 
-#if defined(_WIN32) || defined(__linux__)
+#if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
 #define FASTPATH 1
 #endif
 
@@ -80,7 +80,7 @@ namespace {
      * we need gai_strerror.
      */
     std::string stringifyError(int code) {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
         return gai_strerror(code);
 #elif defined(_WIN32)
         // FormatMessage in errnoWithDescription works here on windows
@@ -221,7 +221,7 @@ namespace {
     std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
 #ifdef FASTPATH
         std::vector<std::string> out;
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 
         ifaddrs* addrs;
 
