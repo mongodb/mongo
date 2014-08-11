@@ -1021,7 +1021,7 @@ main(void)
 	/*! [Eviction worker configuration] */
 	/* Configure up to four eviction threads */
 	ret = wiredtiger_open(home, NULL,
-	    "create,eviction_trigger=90,eviction_thread_max=4", &conn);
+	    "create,eviction_trigger=90,eviction(threads_max=4)", &conn);
 	/*! [Eviction worker configuration] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
