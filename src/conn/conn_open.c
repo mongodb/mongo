@@ -16,6 +16,12 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
 	WT_SESSION_IMPL *session;
 
+	/*
+	 * Tell internal server threads to run: this must be set before opening
+	 * any sessions.
+	 */
+	F_SET(conn, WT_CONN_SERVER_RUN);
+
 	/* Default session. */
 	session = conn->default_session;
 	WT_ASSERT(session, session->iface.connection == &conn->iface);
@@ -193,8 +199,6 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
-
-	F_SET(conn, WT_CONN_SERVER_RUN);
 
 	/*
 	 * Start the eviction thread.

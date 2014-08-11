@@ -823,6 +823,13 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 
 	__wt_spin_lock(session, &conn->api_lock);
 
+	/*
+	 * Make sure we don't try to open a new session after the application
+	 * closes the connection.  This is particularly intended to catch
+	 * casees where server threads open sessions.
+	 */
+	WT_ASSERT(session, F_ISSET(conn, WT_CONN_SERVER_RUN));
+
 	/* Find the first inactive session slot. */
 	for (session_ret = conn->sessions,
 	    i = 0; i < conn->session_size; ++session_ret, ++i)
