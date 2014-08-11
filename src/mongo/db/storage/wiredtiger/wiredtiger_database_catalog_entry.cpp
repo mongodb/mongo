@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-    WiredTigerDatabaseCatalogEntry::WiredTigerDatabaseCatalogEntry( const StringData& name, WiredTigerDatabase *db )
+    WiredTigerDatabaseCatalogEntry::WiredTigerDatabaseCatalogEntry( const StringData& name, WiredTigerDatabase &db )
         : DatabaseCatalogEntry( name ), _db(db) { }
 
     WiredTigerDatabaseCatalogEntry::~WiredTigerDatabaseCatalogEntry() {

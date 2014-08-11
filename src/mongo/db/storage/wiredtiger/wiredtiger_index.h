@@ -39,11 +39,11 @@ namespace mongo {
      * Caller takes ownership.
      * All permanent data will be stored and fetch from dataInOut.
      */
-    SortedDataInterface* getWiredTigerIndex(WiredTigerDatabase *db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info, boost::shared_ptr<void>* dataInOut);
+    SortedDataInterface* getWiredTigerIndex(WiredTigerDatabase &db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info, boost::shared_ptr<void>* dataInOut);
 
     class WiredTigerIndex : public SortedDataInterface {
     public:
-        WiredTigerIndex(WiredTigerDatabase *db, const IndexCatalogEntry& info, const std::string &uri) : _db(db), _info(info), _uri(uri) {}
+        WiredTigerIndex(WiredTigerDatabase &db, const IndexCatalogEntry& info, const std::string &uri) : _db(db), _info(info), _uri(uri) {}
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
@@ -70,7 +70,7 @@ namespace mongo {
 
         virtual Status initAsEmpty(OperationContext* txn);
 
-	WT_CURSOR *GetCursor(bool acquire=false) const;
+	WT_CURSOR *GetCursor(WiredTigerSession &session, bool acquire=false) const;
 	const std::string &GetURI() const;
 
 
@@ -78,8 +78,8 @@ namespace mongo {
 	    class IndexCursor : public SortedDataInterface::Cursor {
 	    public:
 		IndexCursor(WT_CURSOR *cursor,
-			WiredTigerDatabase *db, OperationContext *txn, bool forward)
-		   : _cursor(cursor, db), _txn(txn), _forward(forward) {}
+			WiredTigerSession &session, OperationContext *txn, bool forward)
+		   : _cursor(cursor, session), _txn(txn), _forward(forward) {}
 
 		virtual int getDirection() const;
 
@@ -125,7 +125,7 @@ namespace mongo {
 		DiskLoc _savedLoc;
 	    };
 
-        WiredTigerDatabase* _db;
+        WiredTigerDatabase& _db;
         const IndexCatalogEntry& _info;
 	std::string _uri;
     };

@@ -34,7 +34,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/capped_callback.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_database.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
 
 namespace mongo {
 
@@ -42,10 +42,10 @@ namespace mongo {
 
     class WiredTigerRecordStore : public RecordStore {
     public:
-        static int Create(WiredTigerDatabase *db, const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace);
+        static int Create(WiredTigerDatabase &db, const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace);
 
         WiredTigerRecordStore(const StringData& ns,
-			  WiredTigerDatabase *db,
+			  WiredTigerDatabase &db,
                           bool isCapped = false,
                           int64_t cappedMaxSize = -1,
                           int64_t cappedMaxDocs = -1,
@@ -135,14 +135,16 @@ namespace mongo {
         bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
 
-	WT_CURSOR *GetCursor(bool acquire=false) const { return _db->GetCursor(GetURI(), acquire); }
+	WT_CURSOR *GetCursor(WiredTigerSession &session, bool acquire=false) const {
+		return session.GetCursor(GetURI(), acquire);
+	}
 	const std::string &GetURI() const { return _uri; }
 
     private:
 
         class Iterator : public RecordIterator {
         public:
-            Iterator( const WiredTigerRecordStore* rs, const CollectionScanParams::Direction& dir );
+            Iterator( const WiredTigerRecordStore& rs, WiredTigerSession &session, const CollectionScanParams::Direction& dir );
 
             virtual bool isEOF();
             virtual DiskLoc curr();
@@ -156,7 +158,8 @@ namespace mongo {
             bool _forward() const;
             void _checkStatus();
 
-            const WiredTigerRecordStore* _rs;
+            const WiredTigerRecordStore& _rs;
+	    WiredTigerSession &_session;
             CollectionScanParams::Direction _dir;
             WiredTigerCursor _cursor;
 	    bool _eof;
@@ -174,7 +177,7 @@ namespace mongo {
         void _changeNumRecords(OperationContext* txn, bool insert);
         void _increaseDataSize(OperationContext* txn, int amount);
 
-	WiredTigerDatabase *_db;
+	WiredTigerDatabase &_db;
 	const std::string _uri;
         const bool _isCapped;
         const int64_t _cappedMaxSize;

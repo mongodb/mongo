@@ -32,10 +32,8 @@
 
 #include "mongo/db/catalog/index_catalog_entry.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_database.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
-
-
 
 namespace mongo {
     static const WiredTigerItem emptyItem(NULL, 0);
@@ -113,7 +111,8 @@ namespace mongo {
 	if (!dupsAllowed && isDup(txn, key, loc))
 	    return dupKeyError(key);
 
-	WiredTigerCursor curwrap(GetCursor(), _db);
+	WiredTigerSession swrap(_db);
+	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
 	WiredTigerItem keyItem(_toItem(key)), locItem(_toItem(loc));
 	c->set_key(c, &keyItem, &locItem);
@@ -128,7 +127,8 @@ namespace mongo {
 	invariant(loc.isValid());
 	invariant(!hasFieldNames(key));
 
-	WiredTigerCursor curwrap(GetCursor(), _db);
+	WiredTigerSession swrap(_db);
+	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
 	WiredTigerItem keyItem(_toItem(key)), locItem(_toItem(loc));
 	c->set_key(c, &keyItem, &locItem);
@@ -153,7 +153,8 @@ namespace mongo {
 
     bool WiredTigerIndex::isEmpty() {
 	// XXX no context?
-	WiredTigerCursor curwrap(GetCursor(), _db);
+	WiredTigerSession swrap(_db);
+	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
 	int ret = c->next(c);
 	if (ret == WT_NOTFOUND)
@@ -286,7 +287,9 @@ namespace mongo {
 
     SortedDataInterface::Cursor* WiredTigerIndex::newCursor(OperationContext* txn, int direction) const {
 	invariant((direction == 1) || (direction == -1));
-	return new IndexCursor(GetCursor(true), _db, txn, direction == 1);
+	// XXX leak -- we need a session associated with the txn.
+	WiredTigerSession *session = new WiredTigerSession(_db.GetSession(), _db);
+	return new IndexCursor(GetCursor(*session, true), *session, txn, direction == 1);
     }
 
     Status WiredTigerIndex::initAsEmpty(OperationContext* txn) {
@@ -294,10 +297,12 @@ namespace mongo {
 	return Status::OK();
     }
 
-    WT_CURSOR *WiredTigerIndex::GetCursor(bool acquire) const { return _db->GetCursor(GetURI(), acquire); }
+    WT_CURSOR *WiredTigerIndex::GetCursor(WiredTigerSession &session, bool acquire) const {
+	    return session.GetCursor(GetURI(), acquire);
+    }
     const std::string &WiredTigerIndex::GetURI() const { return _uri; }
 
-    SortedDataInterface* getWiredTigerIndex(WiredTigerDatabase *db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info, boost::shared_ptr<void>* dataInOut) {
+    SortedDataInterface* getWiredTigerIndex(WiredTigerDatabase &db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info, boost::shared_ptr<void>* dataInOut) {
 	return new WiredTigerIndex(db, info, "table:idx" + ns + "_" + idxName);
     }
 

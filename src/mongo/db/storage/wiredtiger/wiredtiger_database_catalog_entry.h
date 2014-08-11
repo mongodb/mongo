@@ -44,7 +44,7 @@ namespace mongo {
 
     class WiredTigerDatabaseCatalogEntry : public DatabaseCatalogEntry {
     public:
-        WiredTigerDatabaseCatalogEntry( const StringData& name, WiredTigerDatabase *_db );
+        WiredTigerDatabaseCatalogEntry( const StringData& name, WiredTigerDatabase &_db );
 
         virtual ~WiredTigerDatabaseCatalogEntry();
 
@@ -158,7 +158,7 @@ namespace mongo {
             Indexes indexes;
         };
 
-	WiredTigerDatabase *_db;
+	WiredTigerDatabase &_db;
 
         mutable boost::mutex _entryMapLock;
         typedef std::map<std::string, Entry *> EntryMap;

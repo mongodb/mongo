@@ -37,14 +37,14 @@
 
 namespace mongo {
 
-    int WiredTigerRecordStore::Create(WiredTigerDatabase *db, const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
-	WiredTigerSession swrap(db->GetSession(), db);
+    int WiredTigerRecordStore::Create(WiredTigerDatabase &db, const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
+	WiredTigerSession swrap(db.GetSession(), db);
 	WT_SESSION *s(swrap.Get());
 	return s->create(s, _getURI(ns).c_str(), "type=file,key_format=u,value_format=u");
     }
 
     WiredTigerRecordStore::WiredTigerRecordStore( const StringData& ns,
-		                        WiredTigerDatabase *db,
+		                        WiredTigerDatabase &db,
                                         bool isCapped,
                                         int64_t cappedMaxSize,
                                         int64_t cappedMaxDocs,
@@ -88,7 +88,8 @@ namespace mongo {
 
     RecordData WiredTigerRecordStore::dataFor( const DiskLoc& loc) const {
         // ownership passes to the shared_array created below
-	WiredTigerCursor curwrap(GetCursor(), _db);
+	WiredTigerSession swrap(_db);
+	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
 	c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
@@ -104,7 +105,8 @@ namespace mongo {
     }
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& loc ) {
-	WiredTigerCursor curwrap(GetCursor(), _db);
+        WiredTigerSession swrap(_db);
+	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
 	c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
@@ -137,8 +139,8 @@ namespace mongo {
     }
 
     void WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
-
-	WiredTigerCursor curwrap(GetCursor(), _db);
+        WiredTigerSession swrap(_db);
+	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
         int ret = c->next(c);
         while ( ret == 0 && cappedAndNeedDelete() ) {
@@ -169,7 +171,8 @@ namespace mongo {
                                        "object to insert exceeds cappedMaxSize" );
         }
 
-	WiredTigerCursor curwrap(GetCursor(), _db);
+	WiredTigerSession swrap(_db);
+	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
         DiskLoc loc = _nextId();
 	c->set_key(c, _makeKey(loc));
@@ -198,7 +201,8 @@ namespace mongo {
         boost::shared_array<char> buf( new char[len] );
         doc->writeDocument( buf.get() );
 
-	WiredTigerCursor curwrap(GetCursor(), _db);
+	WiredTigerSession swrap(_db);
+	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
         DiskLoc loc = _nextId();
 	c->set_key(c, _makeKey(loc));
@@ -220,7 +224,8 @@ namespace mongo {
                                                         int len,
                                                         bool enforceQuota,
                                                         UpdateMoveNotifier* notifier ) {
-	WiredTigerCursor curwrap(GetCursor(), _db);
+        WiredTigerSession swrap(_db);
+	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
 	c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
@@ -250,7 +255,8 @@ namespace mongo {
         WiredTigerItem key = _makeKey( loc );
 
         // get original value
-	WiredTigerCursor curwrap(GetCursor(), _db);
+	WiredTigerSession swrap(_db);
+	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
 	c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
@@ -286,8 +292,10 @@ namespace mongo {
                                                    ) const {
         invariant( start == DiskLoc() );
         invariant( !tailable );
-
-        return new Iterator( this, dir );
+	//
+	// XXX leak -- we need a session associated with the txn.
+	WiredTigerSession *session = new WiredTigerSession(_db.GetSession(), _db);
+        return new Iterator(*this, *session, dir);
     }
 
 
@@ -320,7 +328,7 @@ namespace mongo {
                                       RecordStoreCompactAdaptor* adaptor,
                                       const CompactOptions* options,
                                       CompactStats* stats ) {
-	WiredTigerSession swrap(_db->GetSession(), _db);
+	WiredTigerSession swrap(_db.GetSession(), _db);
 	WT_SESSION *s(swrap.Get());
         int ret = s->compact(s, GetURI().c_str(), NULL);
         invariant(ret == 0);
@@ -408,12 +416,12 @@ namespace mongo {
 
     // --------
 
-    WiredTigerRecordStore::Iterator::Iterator( const WiredTigerRecordStore* rs,
-                                          const CollectionScanParams::Direction& dir )
+    WiredTigerRecordStore::Iterator::Iterator(const WiredTigerRecordStore& rs, WiredTigerSession &session, const CollectionScanParams::Direction& dir )
         : _rs( rs ),
+	  _session( session ),
           _dir( dir ),
           // XXX not using a snapshot here
-	  _cursor(rs->GetCursor(), rs->_db),
+	  _cursor(rs.GetCursor(session), session),
           _eof(false)	{}
 
     bool WiredTigerRecordStore::Iterator::isEOF() {
@@ -471,7 +479,7 @@ namespace mongo {
             return RecordData( reinterpret_cast<const char *>(value.data), value.size, data );
         }
 
-        return _rs->dataFor( loc );
+        return _rs.dataFor( loc );
     }
 
     bool WiredTigerRecordStore::Iterator::_forward() const {

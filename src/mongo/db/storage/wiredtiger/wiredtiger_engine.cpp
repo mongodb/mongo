@@ -77,7 +77,7 @@ namespace mongo {
 
         // THIS is temporary I think
         _dbs.insert( dbName.toString() );
-        return new WiredTigerDatabaseCatalogEntry( dbName, _db );
+        return new WiredTigerDatabaseCatalogEntry( dbName, *_db );
         /*
         WiredTigerDatabaseCatalogEntry*& db = _dbs[dbName.toString()];
         if ( !db )
