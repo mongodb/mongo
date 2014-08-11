@@ -204,6 +204,7 @@ struct __wt_connection_impl {
 	int		 evict_tid_set;	/* Eviction server thread ID set */
 
 	uint32_t	 evict_workers_max;/* Max eviction workers */
+	uint32_t	 evict_workers_min;/* Min eviction workers */
 	uint32_t	 evict_workers;	/* Number of eviction workers */
 	WT_EVICT_WORKER	*evict_workctx;	/* Eviction worker context */
 

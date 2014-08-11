@@ -168,12 +168,25 @@ __evict_server(void *arg)
 		 * If we have caught up and there are more than the minimum
 		 * number of eviction workers running, shut one down.
 		 */
-		if (conn->evict_workers > 2) {
+		if (conn->evict_workers > conn->evict_workers_min) {
+                        WT_TRET(__wt_verbose(session, WT_VERB_EVICTSERVER,
+                            "Stopping evict worker: %"PRIu32"\n",
+                            conn->evict_workers));
 			worker = &conn->evict_workctx[--conn->evict_workers];
 			F_CLR(worker, WT_EVICT_WORKER_RUN);
 			WT_TRET(__wt_cond_signal(
 			    session, cache->evict_waiter_cond));
 			WT_TRET(__wt_thread_join(session, worker->tid));
+			/*
+			 * Flag errors here with a message, but don't shut down
+			 * the eviction server - that's fatal.
+			 */
+			WT_ASSERT(session, ret == 0);
+			if (ret != 0) {
+				(void)__wt_msg(session,
+				    "Error stopping eviction worker: %d", ret);
+				ret = 0;
+			}
 		}
 		F_CLR(cache, WT_EVICT_ACTIVE);
 		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "sleeping"));
@@ -238,8 +251,7 @@ __wt_evict_create(WT_CONNECTION_IMPL *conn)
 			WT_RET(__wt_open_internal_session(conn,
 			    "eviction-worker", 0, 0, &workers[i].session));
 			workers[i].id = i;
-			/* Start at most two worker threads initially. */
-			if (i < 2) {
+			if (i < conn->evict_workers_min) {
 				++conn->evict_workers;
 				F_SET(&workers[i], WT_EVICT_WORKER_RUN);
 				WT_RET(__wt_thread_create(
@@ -433,6 +445,9 @@ __evict_pass(WT_SESSION_IMPL *session)
 		/* Start a worker if we have capacity and the cache is full. */
 		if (bytes_inuse > conn->cache_size &&
 		    conn->evict_workers < conn->evict_workers_max) {
+                        WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
+                            "Starting evict worker: %"PRIu32"\n",
+                            conn->evict_workers));
 			worker = &conn->evict_workctx[conn->evict_workers++];
 			F_SET(worker, WT_EVICT_WORKER_RUN);
 			WT_RET(__wt_thread_create(session,

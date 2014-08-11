@@ -1526,13 +1526,17 @@ struct __wt_connection {
 	 * total memory than the value\, as a percentage of the total cache
 	 * size.  Must be less than \c eviction_trigger., an integer between 10
 	 * and 99; default \c 80.}
+	 * @config{eviction_thread_max, maximum number of threads WiredTiger
+	 * will start to help evict pages from cache.  The number of threads
+	 * currently running will vary depending on the current eviction load.,
+	 * an integer between 1 and 20; default \c 3.}
+	 * @config{eviction_thread_min, minimum number of threads WiredTiger
+	 * will start to help evict pages from cache.  The number of threads
+	 * currently running will vary depending on the current eviction load.,
+	 * an integer between 1 and 20; default \c 1.}
 	 * @config{eviction_trigger, trigger eviction when the cache is using
 	 * this much memory\, as a percentage of the total cache size., an
 	 * integer between 10 and 99; default \c 95.}
-	 * @config{eviction_worker_max, maximum number of additional threads
-	 * WiredTiger will start to help evict pages from cache.  The number of
-	 * threads currently running will vary depending on the current eviction
-	 * load., an integer between 0 and 20; default \c 0.}
 	 * @config{shared_cache = (, shared cache configuration options.  A
 	 * database should configure either a cache_size or a shared_cache not
 	 * both., a set of related configuration options defined below.}
@@ -1842,13 +1846,17 @@ struct __wt_connection {
  * @config{eviction_target, continue evicting until the cache has less total
  * memory than the value\, as a percentage of the total cache size.  Must be
  * less than \c eviction_trigger., an integer between 10 and 99; default \c 80.}
+ * @config{eviction_thread_max, maximum number of threads WiredTiger will start
+ * to help evict pages from cache.  The number of threads currently running will
+ * vary depending on the current eviction load., an integer between 1 and 20;
+ * default \c 3.}
+ * @config{eviction_thread_min, minimum number of threads WiredTiger will start
+ * to help evict pages from cache.  The number of threads currently running will
+ * vary depending on the current eviction load., an integer between 1 and 20;
+ * default \c 1.}
  * @config{eviction_trigger, trigger eviction when the cache is using this much
  * memory\, as a percentage of the total cache size., an integer between 10 and
  * 99; default \c 95.}
- * @config{eviction_worker_max, maximum number of additional threads WiredTiger
- * will start to help evict pages from cache.  The number of threads currently
- * running will vary depending on the current eviction load., an integer between
- * 0 and 20; default \c 0.}
  * @config{exclusive, fail if the database already exists\, generally used with
  * the \c create option., a boolean flag; default \c false.}
  * @config{extensions, list of shared library extensions to load (using dlopen).

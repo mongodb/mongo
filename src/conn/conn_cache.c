@@ -55,9 +55,28 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret =
-	    __wt_config_gets(session, cfg, "eviction_worker_max", &cval)) == 0)
+	    __wt_config_gets(session, cfg, "eviction_thread_max", &cval)) == 0)
 		conn->evict_workers_max = (u_int)cval.val;
 	WT_RET_NOTFOUND_OK(ret);
+	if ((ret =
+	    __wt_config_gets(session, cfg, "eviction_thread_min", &cval)) == 0)
+		conn->evict_workers_min = (u_int)cval.val;
+	WT_RET_NOTFOUND_OK(ret);
+
+	if (conn->evict_workers_min > conn->evict_workers_max)
+		WT_RET_MSG(session, EINVAL,
+		    "eviction_thread_min cannot be greater than "
+                    "eviction_thread_max");
+
+        /*
+         * The eviction thread configuration options include the main eviction
+         * thread and workers. Our implementation splits them out. Adjust
+         * for that here.
+         */
+        WT_ASSERT(session,
+            conn->evict_workers_max > 0 && conn->evict_workers_min > 0);
+        conn->evict_workers_max--;
+        conn->evict_workers_min--;
 
 	return (0);
 }
