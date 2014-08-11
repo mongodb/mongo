@@ -779,7 +779,7 @@ __wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
 			*cmpp = 1;
 		break;
 	case BTREE_ROW:
-		WT_RET(__wt_lex_compare_collator(
+		WT_RET(__wt_compare(
 		    session, btree->collator, &a->key, &b->key, cmpp));
 		break;
 	WT_ILLEGAL_VALUE(session);

@@ -363,10 +363,9 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 				if (first)
 					first = 0;
 				else {
-					WT_ASSERT(session,
-					    __wt_lex_compare_collator(
-					    session, btree->collator,
-					    last, next, &cmp) == 0);
+					WT_ASSERT(session, __wt_compare(
+					    session, btree->collator, last,
+					    next, &cmp) == 0);
 					WT_ASSERT(session, cmp < 0);
 				}
 			}

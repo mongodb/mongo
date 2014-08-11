@@ -33,8 +33,7 @@ __wt_search_insert_append(WT_SESSION_IMPL *session,
 	key.data = WT_INSERT_KEY(ins);
 	key.size = WT_INSERT_KEY_SIZE(ins);
 
-	WT_RET(
-	    __wt_lex_compare_collator(session, collator, srch_key, &key, &cmp));
+	WT_RET(__wt_compare(session, collator, srch_key, &key, &cmp));
 	if (cmp >= 0) {
 		/*
 		 * !!!
@@ -102,7 +101,7 @@ __wt_search_insert(
 			key.data = WT_INSERT_KEY(ins);
 			key.size = WT_INSERT_KEY_SIZE(ins);
 			match = WT_MIN(skiplow, skiphigh);
-			WT_RET(__wt_lex_compare_skip_collator(
+			WT_RET(__wt_compare_skip(
 			    session, collator, srch_key, &key, &cmp, &match));
 		}
 
@@ -210,7 +209,7 @@ restart:	page = parent->page;
 		if (append_check) {
 			child = pindex->index[pindex->entries - 1];
 			__wt_ref_key(page, child, &item->data, &item->size);
-			WT_ERR(__wt_lex_compare_collator(
+			WT_ERR(__wt_compare(
 			    session, collator, srch_key, item, &cmp));
 			if (cmp >= 0)
 				goto descend;
@@ -264,7 +263,7 @@ restart:	page = parent->page;
 				__wt_ref_key(
 				    page, child, &item->data, &item->size);
 
-				WT_ERR(__wt_lex_compare_collator(
+				WT_ERR(__wt_compare(
 				    session, collator, srch_key, item, &cmp));
 				if (cmp > 0) {
 					base = indx + 1;
@@ -387,7 +386,7 @@ leaf_only:
 			rip = page->pg_row_d + indx;
 			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
 
-			WT_ERR(__wt_lex_compare_collator(
+			WT_ERR(__wt_compare(
 			    session, collator, srch_key, item, &cmp));
 			if (cmp > 0) {
 				base = indx + 1;

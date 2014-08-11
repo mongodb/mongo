@@ -1159,12 +1159,12 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 }
 
 /*
- * __wt_lex_compare_collator --
+ * __wt_compare --
  *	The same as __wt_lex_compare, but using the application's collator
  * function when configured.
  */
 static inline int
-__wt_lex_compare_collator(WT_SESSION_IMPL *session, WT_COLLATOR *collator,
+__wt_compare(WT_SESSION_IMPL *session, WT_COLLATOR *collator,
     const WT_ITEM *user_item, const WT_ITEM *tree_item, int *cmpp)
 {
 	if (collator == NULL) {
@@ -1210,12 +1210,12 @@ __wt_lex_compare_skip(
 }
 
 /*
- * __wt_lex_compare_skip_collator --
+ * __wt_compare_skip --
  *	The same as __wt_lex_compare_skip, but using the application's collator
  * function when configured.
  */
 static inline int
-__wt_lex_compare_skip_collator(WT_SESSION_IMPL *session, WT_COLLATOR *collator,
+__wt_compare_skip(WT_SESSION_IMPL *session, WT_COLLATOR *collator,
     const WT_ITEM *user_item, const WT_ITEM *tree_item, int *cmpp,
     size_t *matchp)
 {

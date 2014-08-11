@@ -368,7 +368,7 @@ key_compare:	/*
 		 */
 		if ((dsk->type == WT_PAGE_ROW_INT && cell_num > 3) ||
 		    (dsk->type != WT_PAGE_ROW_INT && cell_num > 1)) {
-			WT_ERR(__wt_lex_compare_collator(
+			WT_ERR(__wt_compare(
 			    session, btree->collator, last, current, &cmp));
 			if (cmp >= 0)
 				WT_ERR_VRFY(session,
