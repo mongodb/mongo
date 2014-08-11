@@ -368,8 +368,8 @@ key_compare:	/*
 		 */
 		if ((dsk->type == WT_PAGE_ROW_INT && cell_num > 3) ||
 		    (dsk->type != WT_PAGE_ROW_INT && cell_num > 1)) {
-			WT_ERR(WT_LEX_CMP(
-			    session, btree->collator, last, current, cmp));
+			WT_ERR(__wt_lex_compare_collator(
+			    session, btree->collator, last, current, &cmp));
 			if (cmp >= 0)
 				WT_ERR_VRFY(session,
 				    "the %" PRIu32 " and %" PRIu32 " keys on "

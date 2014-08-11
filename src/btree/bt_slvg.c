@@ -16,7 +16,6 @@ struct __wt_track; 		typedef struct __wt_track WT_TRACK;
  */
 struct __wt_stuff {
 	WT_SESSION_IMPL *session;		/* Salvage session */
-	WT_BTREE  *btree;			/* Enclosing Btree */
 
 	WT_TRACK **pages;			/* Pages */
 	uint32_t   pages_next;			/* Next empty slot */
@@ -151,7 +150,6 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	WT_CLEAR(stuff);
 	ss = &stuff;
 	ss->session = session;
-	ss->btree = btree;
 	ss->page_type = WT_PAGE_INVALID;
 
 	/* Allocate temporary buffers. */
@@ -1310,9 +1308,10 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			 * We're done if this page starts after our stop, no
 			 * subsequent pages can overlap our page.
 			 */
-			WT_RET(WT_LEX_CMP(session, btree->collator,
+			WT_RET(__wt_lex_compare_collator(
+			    session, btree->collator,
 			    &ss->pages[j]->row_start,
-			    &ss->pages[i]->row_stop, cmp));
+			    &ss->pages[i]->row_stop, &cmp));
 			if (cmp > 0)
 				break;
 
@@ -1402,8 +1401,8 @@ __slvg_row_range_overlap(
 #define	__slvg_key_copy(session, dst, src)				\
 	__wt_buf_set(session, dst, (src)->data, (src)->size)
 
-	WT_RET(WT_LEX_CMP(
-	    session, btree->collator, A_TRK_START, B_TRK_START, cmp));
+	WT_RET(__wt_lex_compare_collator(
+	    session, btree->collator, A_TRK_START, B_TRK_START, &cmp));
 	if (cmp == 0) {					/* Case #1, #4, #9 */
 		/*
 		 * The secondary sort of the leaf page array was the page's LSN,
@@ -1413,8 +1412,8 @@ __slvg_row_range_overlap(
 		 * this simplifies things, it guarantees a_trk has a higher LSN
 		 * than b_trk.
 		 */
-		WT_RET(WT_LEX_CMP(
-		    session, btree->collator, A_TRK_STOP, B_TRK_STOP, cmp));
+		WT_RET(__wt_lex_compare_collator(
+		    session, btree->collator, A_TRK_STOP, B_TRK_STOP, &cmp));
 		if (cmp >= 0)
 			/*
 			 * Case #1, #4: a_trk is a superset of b_trk, and a_trk
@@ -1433,8 +1432,8 @@ __slvg_row_range_overlap(
 		goto merge;
 	}
 
-	WT_RET(WT_LEX_CMP(
-	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, cmp));
+	WT_RET(__wt_lex_compare_collator(
+	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, &cmp));
 	if (cmp == 0) {					/* Case #6 */
 		if (a_trk->gen > b_trk->gen)
 			/*
@@ -1452,8 +1451,8 @@ __slvg_row_range_overlap(
 		goto merge;
 	}
 
-	WT_RET(WT_LEX_CMP(
-	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, cmp));
+	WT_RET(__wt_lex_compare_collator(
+	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, &cmp));
 	if (cmp < 0) {					/* Case #3/7 */
 		if (a_trk->gen > b_trk->gen) {
 			/*
@@ -1599,7 +1598,8 @@ __slvg_row_trk_update_start(
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ROW_FOREACH(page, rip, i) {
 		WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
-		WT_ERR(WT_LEX_CMP(session, btree->collator, key, stop, cmp));
+		WT_ERR(__wt_lex_compare_collator(
+		    session, btree->collator, key, stop, &cmp));
 		if (cmp > 0) {
 			found = 1;
 			break;
@@ -1624,8 +1624,8 @@ __slvg_row_trk_update_start(
 	for (i = slot + 1; i < ss->pages_next; ++i) {
 		if (ss->pages[i] == NULL)
 			continue;
-		WT_ERR(WT_LEX_CMP(session, btree->collator,
-		    SLOT_START(i), &trk->row_stop, cmp));
+		WT_ERR(__wt_lex_compare_collator(session,
+		    btree->collator, SLOT_START(i), &trk->row_stop, &cmp));
 		if (cmp > 0)
 			break;
 	}
@@ -1769,8 +1769,8 @@ __slvg_row_build_leaf(
 			/*
 			 * >= is correct: see the comment above.
 			 */
-			WT_ERR(WT_LEX_CMP(session,
-			    btree->collator, key, &trk->row_start, cmp));
+			WT_ERR(__wt_lex_compare_collator(session,
+			    btree->collator, key, &trk->row_start, &cmp));
 			if (cmp >= 0)
 				break;
 			if (WT_VERBOSE_ISSET(session, WT_VERB_SALVAGE)) {
@@ -1792,8 +1792,8 @@ __slvg_row_build_leaf(
 			/*
 			 * < is correct: see the comment above.
 			 */
-			WT_ERR(WT_LEX_CMP(session,
-			    btree->collator, key, &trk->row_stop, cmp));
+			WT_ERR(__wt_lex_compare_collator(session,
+			    btree->collator, key, &trk->row_stop, &cmp));
 			if (cmp < 0)
 				break;
 			if (WT_VERBOSE_ISSET(session, WT_VERB_SALVAGE)) {
@@ -2092,7 +2092,7 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
 static int
 __slvg_trk_compare_key(const void *a, const void *b)
 {
-	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
 	WT_TRACK *a_trk, *b_trk;
 	uint64_t a_gen, a_recno, b_gen, b_recno;
 	int cmp;
@@ -2118,15 +2118,16 @@ __slvg_trk_compare_key(const void *a, const void *b)
 			return (-1);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		btree = a_trk->ss->btree;
 		/*
 		 * XXX
-		 * WT_LEX_CMP can potentially fail, and we're ignoring that
-		 * error because this routine is called as an underlying qsort
-		 * routine.
+		 * __wt_lex_compare_collator can potentially fail, and we're
+		 * ignoring that error because this routine is called as an
+		 * underlying qsort routine.
 		 */
-		(void)WT_LEX_CMP(a_trk->ss->session,
-		    btree->collator, &a_trk->row_start, &b_trk->row_start, cmp);
+		session = a_trk->ss->session;
+		(void)__wt_lex_compare_collator(
+		    session, S2BT(session)->collator,
+		    &a_trk->row_start, &b_trk->row_start, &cmp);
 		if (cmp != 0)
 			return (cmp);
 		break;
