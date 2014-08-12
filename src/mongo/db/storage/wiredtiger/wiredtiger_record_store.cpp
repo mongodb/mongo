@@ -91,7 +91,7 @@ namespace mongo {
 	WiredTigerSession swrap(_db);
 	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
-	c->set_key(c, _makeKey(loc));
+	c->set_key(c, _makeKey(loc).Get());
         int ret = c->search(c);
 	invariant(ret == 0);
 
@@ -108,7 +108,7 @@ namespace mongo {
         WiredTigerSession swrap(_db);
 	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
-	c->set_key(c, _makeKey(loc));
+	c->set_key(c, _makeKey(loc).Get());
         int ret = c->search(c);
 	invariant(ret == 0);
 
@@ -149,7 +149,7 @@ namespace mongo {
             WT_ITEM key;
 	    ret = c->get_key(c, &key);
 	    invariant(ret == 0);
-            DiskLoc oldest = reinterpret_cast<const DiskLoc*>( key.data )[0];
+            DiskLoc oldest = reinterpret_cast<const DiskLoc*>(key.data)[0];
 
             if ( _cappedDeleteCallback )
                 uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
@@ -175,8 +175,8 @@ namespace mongo {
 	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
         DiskLoc loc = _nextId();
-	c->set_key(c, _makeKey(loc));
-	c->set_value(c, WiredTigerItem(data, len));
+	c->set_key(c, _makeKey(loc).Get());
+	c->set_value(c, WiredTigerItem(data, len).Get());
         int ret = c->insert(c);
 	invariant(ret == 0);
 
@@ -205,8 +205,8 @@ namespace mongo {
 	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
         DiskLoc loc = _nextId();
-	c->set_key(c, _makeKey(loc));
-	c->set_value(c, WiredTigerItem(buf.get(), len));
+	c->set_key(c, _makeKey(loc).Get());
+	c->set_value(c, WiredTigerItem(buf.get(), len).Get());
         int ret = c->insert(c);
 	invariant(ret == 0);
 
@@ -227,7 +227,7 @@ namespace mongo {
         WiredTigerSession swrap(_db);
 	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
-	c->set_key(c, _makeKey(loc));
+	c->set_key(c, _makeKey(loc).Get());
         int ret = c->search(c);
 	invariant(ret == 0);
 
@@ -237,7 +237,7 @@ namespace mongo {
 
         int old_length = old_value.size;
 
-	c->set_value(c, WiredTigerItem(data, len));
+	c->set_value(c, WiredTigerItem(data, len).Get());
 	ret = c->insert(c);
 	invariant(ret == 0);
 
@@ -252,13 +252,11 @@ namespace mongo {
                                                 const DiskLoc& loc,
                                                 const char* damangeSource,
                                                 const mutablebson::DamageVector& damages ) {
-        WiredTigerItem key = _makeKey( loc );
-
         // get original value
 	WiredTigerSession swrap(_db);
 	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
-	c->set_key(c, _makeKey(loc));
+	c->set_key(c, _makeKey(loc).Get());
         int ret = c->search(c);
 	invariant(ret == 0);
 
@@ -278,7 +276,7 @@ namespace mongo {
         }
 
         // write back
-	c->set_value(c, WiredTigerItem(data));
+	c->set_value(c, WiredTigerItem(data).Get());
 	ret = c->insert(c);
 	invariant(ret == 0);
 

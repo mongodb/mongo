@@ -84,5 +84,6 @@ namespace mongo {
 			data = str.c_str();
 			size = str.size();
 		}
+		WT_ITEM *Get() { return this; }
 	};
 }
