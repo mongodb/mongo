@@ -486,7 +486,6 @@ void mongo::dbexit( ExitCode rc, const char *why ) {
 #endif
     log() << "dbexit: " << why
           << " rc:" << rc
-          << " " << ( why ? why : "" )
           << endl;
     flushForGcov();
     ::_exit(rc);

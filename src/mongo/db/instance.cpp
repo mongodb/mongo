@@ -1055,7 +1055,7 @@ namespace {
 
         audit::logShutdown(currentClient.get());
 
-        log() << "dbexit: " << why;
+        log() << "dbexit: " << why << " rc: " << rc;
 
 #ifdef _WIN32
         // Windows Service Controller wants to be told when we are down,
