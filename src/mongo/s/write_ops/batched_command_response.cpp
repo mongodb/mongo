@@ -170,7 +170,7 @@ namespace mongo {
         std::vector<BatchedUpsertDetail*>* tempUpsertDetails = NULL;
         fieldState = FieldParser::extract( source, upsertDetails, &tempUpsertDetails, errMsg );
         if ( fieldState == FieldParser::FIELD_INVALID ) return false;
-        if ( fieldState == FieldParser::FIELD_SET ) _upsertDetails.reset( tempUpsertDetails );
+        _upsertDetails.reset(tempUpsertDetails);
 
         fieldState = FieldParser::extract(source, lastOp, &_lastOp, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
@@ -183,12 +183,12 @@ namespace mongo {
         std::vector<WriteErrorDetail*>* tempErrDetails = NULL;
         fieldState = FieldParser::extract(source, writeErrors, &tempErrDetails, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        if (fieldState == FieldParser::FIELD_SET) _writeErrorDetails.reset(tempErrDetails);
+        _writeErrorDetails.reset(tempErrDetails);
 
         WCErrorDetail* wcError = NULL;
         fieldState = FieldParser::extract(source, writeConcernError, &wcError, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        if (fieldState == FieldParser::FIELD_SET) _wcErrDetails.reset(wcError);
+        _wcErrDetails.reset(wcError);
 
         return true;
     }
