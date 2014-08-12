@@ -28,6 +28,8 @@
 #include "leveldb_wt.h"
 #include <errno.h>
 #include <sstream>
+#include <sys/param.h>
+#include <sys/stat.h>
 
 using leveldb::ReplayIterator;
 using leveldb::Status;
@@ -285,7 +287,48 @@ ReplayIteratorImpl::SeekTo(WT_LSN *target_lsn) {
 Status
 DbImpl::LiveBackup(const Slice& name)
 {
-	return Status::NotSupported("DB::LiveBackup");
+	OperationContext *context = GetContext();
+	WT_SESSION *session = context->GetSession();
+	WT_CURSOR *cursor;
+	int ret = session->open_cursor(
+            session, "backup:", NULL, NULL, &cursor);
+	int t_ret;
+	const char *filename;
+	const char *home = conn_->get_home(conn_);
+	char backup[MAXPATHLEN], buf[MAXPATHLEN * 2];
+ 
+	// If we couldn't open the backup cursor, we're done.
+	if (ret != 0)
+		return (WiredTigerErrorToStatus(ret));
+
+	// Remove any old directory and create the backup directory.
+	// WT single-threads hot backups.  If we get here we already have
+	// the backup cursor open and we do not have to worry about other
+	// threads trying to remove and recreate the same directory out
+	// from under us.
+	snprintf(buf, sizeof(buf), "rm -rf %s/backup-%s", home,
+	    (char *)name.data());
+	if ((ret = system(buf)) != 0)
+		return WiredTigerErrorToStatus(ret);
+	snprintf(backup, sizeof(backup), "%s/backup-%s", home,
+	    (char *)name.data());
+	if ((ret = mkdir(backup, 0777)) != 0)
+		return WiredTigerErrorToStatus(ret);
+	// Copy all files returned by backup cursor.
+	while ((ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_key(cursor, &filename)) == 0) {
+		snprintf(buf, sizeof(buf), "cp %s/%s %s/%s",
+		    home, filename, backup, filename);
+		if ((ret = system(buf)) != 0)
+			break;
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	if ((t_ret = cursor->close(cursor)) != 0 && ret == 0)
+		ret = t_ret;
+	// Does this now require walking the log with a ReplayIterator
+	// to apply all the operations onto the backup table?
+	return (WiredTigerErrorToStatus(ret));
 }
 
 // Return an opaque timestamp that identifies the current point in time of the
