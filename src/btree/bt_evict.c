@@ -762,18 +762,19 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 
 	/*
 	 * The eviction server thread doesn't do any actual eviction if there
-	 * are eviction workers running.
+	 * are multiple eviction workers running.
 	 */
 	WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
 
-	if (S2C(session)->evict_workers > 0) {
+	if (S2C(session)->evict_workers > 1) {
 		WT_STAT_FAST_CONN_INCR(
 		    session, cache_eviction_server_not_evicting);
 		/*
-		 * Give other threads a chance to access the queue before
-		 * gathering more candidates.
+		 * If there are candidates queued, give other threads a chance
+		 * to access them before gathering more.
 		 */
-		__wt_yield();
+		if (candidates > 10 && cache->evict_current != NULL)
+			__wt_yield();
 	} else {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_server_evicting);
 		WT_RET(__evict_lru_pages(session, 0));
