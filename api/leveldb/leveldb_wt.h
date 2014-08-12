@@ -54,7 +54,9 @@
 #define	WT_TIMESTAMP_FORMAT "%d.%llu"
 // We're also only interested in operations to the user file.  Skip over 
 // any changes to the metadata.
-// XXX - Currently assume metadata fileid is 0.
+// !!! Currently WT guarantees that the metadata file is always at
+// fileid 0 and the implementation here only uses one table.  This will
+// breakdown if either of those assumptions changes.
 #define	WT_VALID_OPERATION(fileid, optype)				\
 	((fileid) != 0 &&						\
 	 ((optype) == WT_LOGOP_COL_PUT ||				\
