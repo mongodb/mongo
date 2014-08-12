@@ -57,7 +57,7 @@ class ReplayIteratorImpl : public ReplayIterator {
     status_ = WiredTigerErrorToStatus(ret);
     valid_ = false;
     // Position on requested record.  valid_ will be set appropriately.
-    SkipTo(timestamp);
+    SeekTo(timestamp);
   }
 
   // An iterator is either positioned at a deleted key, present key/value pair,
@@ -74,11 +74,12 @@ class ReplayIteratorImpl : public ReplayIterator {
   // unsorted.
   // The iterator is Valid() after this call iff the source contains
   // an entry that comes at or past target.
-  virtual void SkipTo(const Slice& target) {
-	// Assume target data is a timestamp string for the moment.
-	SkipTo(std::string((char *)target.data())); }
-  virtual void SkipTo(const std::string& timestamp);
-  virtual void SkipToLast();
+  // Per Robert at Hyperdex, the SkipTo functions are hacky optimizations
+  // for LevelDB and its key layout.  It is okay for them to be no-ops. 
+  virtual void SkipTo(const Slice& target) { }
+  virtual void SkipToLast() { }
+  virtual void SeekTo(const std::string& timestamp);
+  virtual void SeekToLast();
 
   // Return true if the current entry points to a key-value pair.  If this
   // returns false, it means the current entry is a deleted entry.
@@ -140,7 +141,7 @@ class ReplayIteratorImpl : public ReplayIterator {
   }
 
  private:
-  void SkipTo(WT_LSN *lsn);
+  void SeekTo(WT_LSN *lsn);
   // No copying allowed
   ReplayIteratorImpl(const ReplayIterator&) { }
   void operator=(const ReplayIterator&) { }
@@ -185,7 +186,7 @@ ReplayIteratorImpl::Next() {
 }
 
 void
-ReplayIteratorImpl::SkipToLast() {
+ReplayIteratorImpl::SeekToLast() {
 	int ret = 0;
 	WT_LSN last_lsn;
 
@@ -215,12 +216,12 @@ ReplayIteratorImpl::SkipToLast() {
 			ret = Close();
 			assert(ret == 0);
 		} else
-			SkipTo(&last_lsn);
+			SeekTo(&last_lsn);
 	}
 }
 
 void
-ReplayIteratorImpl::SkipTo(const std::string& timestamp) {
+ReplayIteratorImpl::SeekTo(const std::string& timestamp) {
 	WT_LSN target_lsn;
 	int ret = 0;
 
@@ -235,18 +236,18 @@ ReplayIteratorImpl::SkipTo(const std::string& timestamp) {
 		}
 	}
 	if (timestamp == "now") {
-		SkipToLast();
+		SeekToLast();
 		return;
 	}
 	sscanf(timestamp.c_str(), WT_TIMESTAMP_FORMAT,
 	    &target_lsn.file, &target_lsn.offset);
-	SkipTo(&target_lsn);
+	SeekTo(&target_lsn);
 }
 
 // Set the cursor on the first modification record at or after the
 // given LSN.
 void
-ReplayIteratorImpl::SkipTo(WT_LSN *target_lsn) {
+ReplayIteratorImpl::SeekTo(WT_LSN *target_lsn) {
 	int ret = 0;
 
 	valid_ = false;
@@ -296,7 +297,7 @@ DbImpl::GetReplayTimestamp(std::string* timestamp)
 	OperationContext *context = GetContext();
 	ReplayIteratorImpl *iter = new ReplayIteratorImpl(context);
 
-	iter->SkipToLast();
+	iter->SeekToLast();
 	*timestamp = iter->GetTimestamp();
 	ReleaseReplayIterator(iter);
 }
@@ -316,8 +317,8 @@ DbImpl::ValidateTimestamp(const std::string& timestamp)
 	OperationContext *context = GetContext();
 	ReplayIteratorImpl *iter = new ReplayIteratorImpl(context);
 
-	// The SkipTo function will handle "all" or "now".
-	iter->SkipTo(timestamp);
+	// The SeekTo function will handle "all" or "now".
+	iter->SeekTo(timestamp);
 	valid = iter->Valid();
 	ReleaseReplayIterator(iter);
 	return valid;
@@ -332,9 +333,9 @@ DbImpl::CompareTimestamps(const std::string& lhs, const std::string& rhs)
 	ReplayIteratorImpl *rhiter = new ReplayIteratorImpl(context);
 	int cmp = 0;
 	
-	// The SkipTo function will handle "all" or "now".
-	lhiter->SkipTo(lhs);
-	rhiter->SkipTo(rhs);
+	// The SeekTo function will handle "all" or "now".
+	lhiter->SeekTo(lhs);
+	rhiter->SeekTo(rhs);
 	if (lhiter->Valid() && rhiter->Valid())
 		cmp = lhiter->Compare(rhiter);
 	ReleaseReplayIterator(lhiter);
