@@ -45,9 +45,10 @@
 #include "wiredtiger.h"
 
 #define WT_URI          "table:data"
-#define WT_CONN_CONFIG  "log=(enabled),checkpoint=(wait=180),"		\
-    "checkpoint_sync=false,session_max=8192,eviction_workers=4,"	\
-    "mmap=false,transaction_sync=(enabled=true,method=none),"
+#define WT_CONN_CONFIG                                                  \
+        "log=(enabled),checkpoint=(wait=180),checkpoint_sync=false,"    \
+        "session_max=8192,mmap=false,"                                  \
+        "transaction_sync=(enabled=true,method=none),"
 // Note: LSM doesn't split, build full pages from the start
 #define WT_TABLE_CONFIG "type=lsm,split_pct=100,leaf_item_max=1KB,"	\
     "lsm=(chunk_size=100MB,bloom_config=(leaf_page_max=8MB)),"
