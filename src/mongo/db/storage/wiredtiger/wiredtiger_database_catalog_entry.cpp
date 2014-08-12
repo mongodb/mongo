@@ -54,6 +54,7 @@ namespace mongo {
             delete i->second;
         }
         _entryMap.clear();
+        delete &_db;
     }
 
     bool WiredTigerDatabaseCatalogEntry::isEmpty() const {

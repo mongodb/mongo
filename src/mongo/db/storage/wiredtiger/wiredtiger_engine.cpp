@@ -87,8 +87,22 @@ namespace mongo {
         boost::mutex::scoped_lock lk( _dbLock );
 
         WiredTigerDatabaseCatalogEntry*& db = _dbs[dbName.toString()];
-        if ( !db )
-            db = new WiredTigerDatabaseCatalogEntry( dbName, *_db );
+        if ( !db ) {
+            boost::filesystem::path dbpath =
+                boost::filesystem::path(storageGlobalParams.dbpath) / dbName.toString();
+            // Ensure that the database directory exists
+            if ( !exists( dbpath ) )
+                MONGO_ASSERT_ON_EXCEPTION(boost::filesystem::create_directory(dbpath));
+            WT_CONNECTION *conn;
+            int ret = wiredtiger_open(dbpath.string().c_str(), NULL, "create", &conn);
+            invariant(ret == 0);
+            // The WiredTigerDatabase lifespan is currently tied to a
+            // WiredTigerDatabaseCatalogEntry. In future we may want to split
+            // that out
+            WiredTigerDatabase *database = new WiredTigerDatabase(conn);
+            db = new WiredTigerDatabaseCatalogEntry( dbName, *database );
+            _dbs[dbName.toString()] = db;
+        }
         return db;
     }
 
