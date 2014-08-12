@@ -96,8 +96,7 @@ namespace mongo {
 	WiredTigerSession swrap(_db);
 	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
-	WiredTigerItem keyItem(_toItem(key)), locItem(_toItem(loc));
-	c->set_key(c, &keyItem, &locItem);
+	c->set_key(c, _toItem(key).Get(), _toItem(loc).Get());
 	c->set_value(c, &emptyItem);
 	int ret = c->insert(c);
 	invariant(ret == 0);
@@ -112,8 +111,7 @@ namespace mongo {
 	WiredTigerSession swrap(_db);
 	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
-	WiredTigerItem keyItem(_toItem(key)), locItem(_toItem(loc));
-	c->set_key(c, &keyItem, &locItem);
+	c->set_key(c, _toItem(key).Get(), _toItem(loc).Get());
 	int ret = c->remove(c);
 	invariant(ret == 0);
 	// TODO: can we avoid a search?
@@ -156,13 +154,9 @@ namespace mongo {
 
     bool WiredTigerIndex::isDup(OperationContext *txn, const BSONObj& key, DiskLoc loc) {
 	boost::scoped_ptr<SortedDataInterface::Cursor> cursor( newCursor( txn, 1 ) );
-	cursor->locate( key, DiskLoc() );
+	cursor->locate(key, DiskLoc());
 
-	if ( cursor->isEOF() || cursor->getDiskLoc() == loc ) {
-	    return false;
-	} else {
-	    return true;
-	}
+	return !cursor->isEOF() && cursor->getDiskLoc() == loc;
     }
 
     /* Cursor implementation */
@@ -192,13 +186,13 @@ namespace mongo {
 	    return !isEOF();
 	}
 
-	WiredTigerItem keyItem(_toItem(key)), locItem(_toItem(loc));
-	c->set_key(c, &keyItem, &locItem);
+	c->set_key(c, _toItem(key).Get(), _toItem(loc).Get());
 	ret = c->search_near(c, &cmp);
 	// Make sure we land on a matching key
 	if (ret == 0 && cmp < 0)
 	    ret = c->next(c);
 	if (ret == 0) {
+	    WT_ITEM keyItem, locItem;
 	    ret = c->get_key(c, &keyItem, &locItem);
 	    invariant(ret == 0);
 	    if (key != BSONObj(static_cast<const char *>(keyItem.data)))
@@ -209,6 +203,7 @@ namespace mongo {
 	    return false;
 	}
 	invariant(ret == 0);
+	_eof = false;
 	return true;
     }
 
@@ -217,6 +212,8 @@ namespace mongo {
 			      bool afterKey,
 			      const vector<const BSONElement*>& keyEnd,
 			      const vector<bool>& keyEndInclusive) {
+	// TODO
+	invariant(0);
     }
 
     void WiredTigerIndex::IndexCursor::advanceTo(const BSONObj &keyBegin,
@@ -249,8 +246,10 @@ namespace mongo {
 	int ret = c->next(c);
 	if (ret == WT_NOTFOUND)
 	    _eof = true;
-	else
+	else {
 	    invariant(ret == 0);
+	    _eof = false;
+	}
     }
 
     void WiredTigerIndex::IndexCursor::savePosition() {
@@ -294,14 +293,16 @@ namespace mongo {
     
     class WiredTigerBuilderImpl : public SortedDataBuilderInterface {
     public:
-        WiredTigerBuilderImpl(bool dupsAllowed)
-                : _count(0) { }
+        WiredTigerBuilderImpl(WiredTigerIndex &idx, OperationContext *txn, bool dupsAllowed)
+                : _idx(idx), _txn(txn), _dupsAllowed(dupsAllowed), _count(0) { }
 
         ~WiredTigerBuilderImpl() { }
 
         Status addKey(const BSONObj& key, const DiskLoc& loc) {
-            _count++;
-            return Status::OK();
+	    Status s = _idx.insert(_txn, key, loc, _dupsAllowed);
+	    if (s.isOK())
+		    _count++;
+            return s;
         }
 
         unsigned long long commit(bool mayInterrupt) {
@@ -309,11 +310,14 @@ namespace mongo {
         }
 
     private:
+	WiredTigerIndex &_idx;
+	OperationContext *_txn;
+	bool _dupsAllowed;
         unsigned long long _count;
     };
 
     SortedDataBuilderInterface* WiredTigerIndex::getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
-	return new WiredTigerBuilderImpl(dupsAllowed);
+	return new WiredTigerBuilderImpl(*this, txn, dupsAllowed);
     }
 
 }  // namespace mongo

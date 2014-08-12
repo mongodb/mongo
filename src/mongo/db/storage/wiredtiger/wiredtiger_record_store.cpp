@@ -442,6 +442,7 @@ namespace mongo {
         DiskLoc toReturn = curr();
 	WT_CURSOR *c = _cursor.Get();
 	int ret = _forward() ? c->next(c) : c->prev(c);
+	invariant(ret == 0 || ret == WT_NOTFOUND);
 	_eof = (ret == WT_NOTFOUND);
         return toReturn;
     }
