@@ -1,5 +1,21 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_231 Upgrading to Version 2.3.1
+
+<dl>
+<dt>::wiredtiger_open eviction_workers configuration changed</dt>
+<dd>
+The \c eviction_workers configuration setting has been replaced by
+\c eviction=(threads_min) and \c eviction=(threads_max) settings. To
+replicate the old default behavior set
+<code>eviction=(threads_min=1,threads_max=1)</code>.
+
+There is also a semantic change \c eviction_workers used to configure
+additional threads whereas the new settings configure the total number
+of threads involved with eviction.
+</dd>
+</dl>
+
 @section version_230 Upgrading to Version 2.3.0
 
 There are no special upgrade steps required.

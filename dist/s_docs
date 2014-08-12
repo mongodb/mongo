@@ -43,18 +43,29 @@ wtperf_config()
 	 rm -f /tmp/__doxy
 }
 
-sectionchk()
+structurechk()
 {
 	# sections are a global name space for doxygen, and must be uniquely
 	# named or you can get the wrong results.  For example, if you have
 	# "@section foo ABC" and "@section foo DEF", they will both appear as
 	# "ABC" or "DEF".
 	(cd ../src/docs &&
-	egrep -h '@section' *.dox |
-	sort -u | awk '{ print $2 }' | sort | uniq -d) > $t
+	sed -n 's/@section \([^ ]*\)/\1/p' *.dox | sort | uniq -d) > $t
 	test -s $t && {
 		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 		echo '@section references that are not uniquely named'
+		sed -e 's/^/	/' < $t
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		e=1
+	}
+	# we want a simple tree structure for navigation, otherwise
+	# clicking in the navigation tree can jump to a different point in
+	# the tree
+	(cd ../src/docs &&
+	sed -n 's/@subpage \([^ ]*\)/\1/p' *.dox | sort | uniq -d) > $t
+	test -s $t && {
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		echo 'multiple @subpage references for the same page'
 		sed -e 's/^/	/' < $t
 		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 		e=1
@@ -179,9 +190,9 @@ changelog
 # Generate the list of wtperf configuration options.
 wtperf_config
 
-# Spell and section-name check the documentation.
+# Spell and structure check the documentation.
 spellchk
-sectionchk
+structurechk
 
 # Build the documentation.
 build $clean

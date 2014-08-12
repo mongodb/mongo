@@ -1,4 +1,3 @@
-skip	bench/tcbench/wttest.c
 skip	build_posix/wiredtiger_config.h
 skip	dist/api_config.py
 skip	dist/api_data.py

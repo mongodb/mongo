@@ -27,7 +27,7 @@ ext_collate(WT_EXTENSION_API *wt_api,
 	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
 		session = conn->default_session;
 
-	WT_RET(WT_LEX_CMP(session, wt_api->collator, first, second, *cmpp));
+	WT_RET(__wt_compare(session, wt_api->collator, first, second, cmpp));
 
 	return (0);
 }

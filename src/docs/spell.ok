@@ -72,6 +72,7 @@ WiredTigerCheckpoint
 WiredTigerTestCase
 Za
 aR
+abstime
 ack'ed
 alloc
 allocator
@@ -111,6 +112,7 @@ changelog
 checksum
 checksums
 ckp
+clickable
 colgroup
 colgroups
 combinatorial
@@ -195,6 +197,7 @@ href
 hrow
 hsearch
 html
+htmlinclude
 huffman
 hugepage
 hyperleveldb
@@ -290,6 +293,7 @@ nowait
 nul
 num
 numa
+nvd
 objectsin
 ol
 oltp
