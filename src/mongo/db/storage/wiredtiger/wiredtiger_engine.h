@@ -49,6 +49,8 @@ namespace mongo {
 
         virtual ~WiredTigerEngine() {}
 
+        virtual void cleanShutdown( OperationContext* opCtx );
+
         virtual RecoveryUnit* newRecoveryUnit( OperationContext* opCtx );
 
         virtual void listDatabases( std::vector<std::string>* out ) const;

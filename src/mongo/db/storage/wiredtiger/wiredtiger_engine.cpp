@@ -44,8 +44,14 @@ namespace mongo {
         return new WiredTigerRecoveryUnit();
     }
 
+    void WiredTigerEngine::cleanShutdown( OperationContext* opCtx) {
+        for ( DBMap::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
+            delete i->second;
+        } 
+    }
+
     void WiredTigerEngine::listDatabases( std::vector<std::string>* out ) const {
-        invariant(storageGlobalParams.directoryperdb);
+        // TODO: invariant(storageGlobalParams.directoryperdb);
 
         boost::filesystem::path path( storageGlobalParams.dbpath );
         for ( boost::filesystem::directory_iterator i( path );
@@ -68,7 +74,7 @@ namespace mongo {
     }
 
     Status WiredTigerEngine::dropDatabase(OperationContext* txn, const StringData& db) {
-        invariant (storageGlobalParams.directoryperdb);
+        // TODO: invariant(storageGlobalParams.directoryperdb);
         Status status = closeDatabase( txn, db );
         if ( !status.isOK() )
             return status;
