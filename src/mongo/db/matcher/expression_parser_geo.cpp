@@ -42,7 +42,7 @@ namespace mongo {
                                                                int type,
                                                                const BSONObj& section ) {
         if (BSONObj::opWITHIN == type || BSONObj::opGEO_INTERSECTS == type) {
-            auto_ptr<GeoQuery> gq(new GeoQuery(name));
+            auto_ptr<GeoExpression> gq(new GeoExpression(name));
             if ( !gq->parseFrom( section ) )
                 return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                   string("bad geo query: ") + section.toString() );
@@ -61,7 +61,7 @@ namespace mongo {
         }
         else {
             verify(BSONObj::opNEAR == type);
-            auto_ptr<NearQuery> nq(new NearQuery(name));
+            auto_ptr<GeoNearExpression> nq(new GeoNearExpression(name));
             Status s = nq->parseFrom( section );
             if ( !s.isOK() ) {
                 return StatusWithMatchExpression( s );

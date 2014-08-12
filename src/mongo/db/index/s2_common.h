@@ -26,10 +26,9 @@
 *    it in the license file.
 */
 
-#include "mongo/db/geo/geoparser.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/s2.h"
-#include "third_party/s2/s2regioncoverer.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2polyline.h"
 #include "third_party/s2/s2polygon.h"
@@ -85,15 +84,6 @@ namespace mongo {
             // This is advisory; the two above are strict.
             coverer->set_max_cells(maxCellsInCovering);
         }
-    };
-
-    class S2SearchUtil {
-    public:
-        // Given a coverer, region, and field name, generate a BSONObj that we can pass to a
-        // FieldRangeSet so that we only examine the keys that the provided region may intersect.
-        static BSONObj coverAsBSON(const std::vector<S2CellId> &cover, const std::string& field,
-                                   const int coarsestIndexedLevel);
-        static void setCoverLimitsBasedOnArea(double area, S2RegionCoverer *coverer, int coarsestIndexedLevel);
     };
 
 }  // namespace mongo

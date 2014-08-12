@@ -179,8 +179,7 @@ env.Library('expressions',
 
 env.Library('expressions_geo',
             ['db/matcher/expression_geo.cpp',
-             'db/matcher/expression_parser_geo.cpp',
-             'db/geo/geo_query.cpp'],
+             'db/matcher/expression_parser_geo.cpp'],
             LIBDEPS=['expressions','db/geo/geometry','db/geo/geoparser'] )
 
 env.Library('expressions_text',
@@ -635,7 +634,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/index_rebuilder.cpp",
                     "db/commands/geo_near_cmd.cpp",
                     "db/geo/haystack.cpp",
-                    "db/geo/s2common.cpp",
                     "db/ops/delete.cpp",
                     "db/ops/delete_executor.cpp",
                     "db/ops/insert.cpp",

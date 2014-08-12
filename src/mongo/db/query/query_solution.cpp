@@ -28,6 +28,7 @@
 
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/matcher/expression_geo.h"
 
 namespace mongo {
 
@@ -695,7 +696,7 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "keyPattern = " << indexKeyPattern.toString() << '\n';
         addCommon(ss, indent);
-        *ss << "nearQuery = " << nq.toString() << '\n';
+        *ss << "nearQuery = " << nq->toString() << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString();
@@ -728,7 +729,7 @@ namespace mongo {
         addCommon(ss, indent);
         *ss << "baseBounds = " << baseBounds.toString() << '\n';
         addIndent(ss, indent + 1);
-        *ss << "nearQuery = " << nq.toString() << '\n';
+        *ss << "nearQuery = " << nq->toString() << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString();

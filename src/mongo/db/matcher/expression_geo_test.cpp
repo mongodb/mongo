@@ -43,7 +43,7 @@ namespace mongo {
     TEST( ExpressionGeoTest, Geo1 ) {
         BSONObj query = fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
 
-        auto_ptr<GeoQuery> gq(new GeoQuery);
+        auto_ptr<GeoExpression> gq(new GeoExpression);
         ASSERT( gq->parseFrom( query["loc"].Obj() ) );
 
         GeoMatchExpression ge;
@@ -60,14 +60,14 @@ namespace mongo {
     TEST(ExpressionGeoTest, GeoNear1) {
         BSONObj query = fromjson("{loc:{$near:{$maxDistance:100, "
                                  "$geometry:{type:\"Point\", coordinates:[0,0]}}}}");
-        auto_ptr<NearQuery> nq(new NearQuery);
+        auto_ptr<GeoNearExpression> nq(new GeoNearExpression);
         ASSERT_OK(nq->parseFrom(query["loc"].Obj()));
 
         GeoNearMatchExpression gne;
         ASSERT(gne.init("a", nq.release(), query).isOK());
 
         // We can't match the data but we can make sure it was parsed OK.
-        ASSERT_EQUALS(gne.getData().centroid.crs, SPHERE);
+        ASSERT_EQUALS(gne.getData().centroid->crs, SPHERE);
         ASSERT_EQUALS(gne.getData().minDistance, 0);
         ASSERT_EQUALS(gne.getData().maxDistance, 100);
     }

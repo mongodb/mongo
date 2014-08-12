@@ -32,8 +32,9 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/geo/geo_query.h"
+#include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/index_bounds.h"
 
 namespace mongo {
@@ -48,11 +49,13 @@ namespace mongo {
         }
 
         // MatchExpression to apply to the index keys and fetched documents
+        // Not owned here, owned by solution nodes
         MatchExpression* filter;
         // Index scan bounds, not including the geo bounds
         IndexBounds baseBounds;
 
-        NearQuery nearQuery;
+        // Not owned here
+        const GeoNearExpression* nearQuery;
         bool addPointMeta;
         bool addDistMeta;
     };

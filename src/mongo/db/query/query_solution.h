@@ -30,7 +30,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/geo/geo_query.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_cache.h"
@@ -39,6 +38,8 @@
 namespace mongo {
 
     using mongo::fts::FTSQuery;
+
+    class GeoNearExpression;
 
     /**
      * This is an abstract representation of a query plan.  It can be transcribed into a tree of
@@ -579,7 +580,8 @@ namespace mongo {
 
         BSONObjSet _sorts;
 
-        NearQuery nq;
+        // Not owned here
+        const GeoNearExpression* nq;
         IndexBounds baseBounds;
 
         BSONObj indexKeyPattern;
@@ -604,7 +606,8 @@ namespace mongo {
 
         BSONObjSet _sorts;
 
-        NearQuery nq;
+        // Not owned here
+        const GeoNearExpression* nq;
         IndexBounds baseBounds;
 
         BSONObj indexKeyPattern;

@@ -153,13 +153,13 @@ namespace {
      * - CRS (flat or spherical)
      */
     void encodeGeoMatchExpression(const GeoMatchExpression* tree, mongoutils::str::stream* os) {
-        const GeoQuery& geoQuery = tree->getGeoQuery();
+        const GeoExpression& geoQuery = tree->getGeoExpression();
 
         // Type of geo query.
         switch (geoQuery.getPred()) {
-        case GeoQuery::WITHIN: *os << "wi"; break;
-        case GeoQuery::INTERSECT: *os << "in"; break;
-        case GeoQuery::INVALID: *os << "id"; break;
+        case GeoExpression::WITHIN: *os << "wi"; break;
+        case GeoExpression::INTERSECT: *os << "in"; break;
+        case GeoExpression::INVALID: *os << "id"; break;
         }
 
         // Geometry type.
@@ -191,18 +191,18 @@ namespace {
      */
     void encodeGeoNearMatchExpression(const GeoNearMatchExpression* tree,
                                       mongoutils::str::stream* os) {
-        const NearQuery& nearQuery = tree->getData();
+        const GeoNearExpression& nearQuery = tree->getData();
 
         // isNearSphere
         *os << (nearQuery.isNearSphere ? "ns" : "nr");
 
         // CRS (flat or spherical or strict-winding spherical)
-        switch (nearQuery.centroid.crs) {
+        switch (nearQuery.centroid->crs) {
         case FLAT: *os << "fl"; break;
         case SPHERE: *os << "sp"; break;
         case STRICT_SPHERE: *os << "ss"; break;
         case UNSET:
-            error() << "unknown CRS type " << (int)nearQuery.centroid.crs
+            error() << "unknown CRS type " << (int)nearQuery.centroid->crs
                     << " in point geometry for near query";
             invariant(false);
             break;

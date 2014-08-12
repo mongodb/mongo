@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/geo/s2common.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/index/btree_based_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
