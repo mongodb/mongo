@@ -421,8 +421,9 @@ namespace mongo {
 	  _session( session ),
           _dir( dir ),
           // XXX not using a snapshot here
-	  _cursor(rs.GetCursor(session), session),
-          _eof(false)	{}
+	  _cursor(rs.GetCursor(session), session) {
+        (void)getNext();
+    }
 
     bool WiredTigerRecordStore::Iterator::isEOF() {
         return _eof;
