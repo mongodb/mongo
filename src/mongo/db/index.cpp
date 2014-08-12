@@ -431,6 +431,7 @@ namespace mongo {
             BSONObj o = io;
             if ( plugin ) {
                 o = plugin->adjustIndexSpec(o);
+                key = o.getObjectField("key");
             }
             BSONObjBuilder b;
             int v = DefaultIndexVersionNumber;
