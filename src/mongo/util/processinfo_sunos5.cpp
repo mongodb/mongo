@@ -44,6 +44,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -144,6 +145,36 @@ namespace mongo {
         numCores = static_cast<unsigned>(sysconf(_SC_NPROCESSORS_CONF));
         cpuArch = unameData.machine;
         hasNuma = checkNumaEnabled();
+
+        // We prefer FSync over msync, when:
+        // 1. Pre-Oracle Solaris 11.2 releases
+        // 2. Illumos kernel releases (which is all non Oracle Solaris releases)
+        preferMsyncOverFSync = false;
+
+        if (mongoutils::str::startsWith(osName, "Oracle Solaris")) {
+
+            std::vector<std::string> versionComponents;
+            splitStringDelim(osVersion, &versionComponents, '.');
+
+            if (versionComponents.size() > 1) {
+                unsigned majorInt, minorInt;
+                Status majorStatus =
+                    parseNumberFromString<unsigned>(versionComponents[0], &majorInt);
+
+                Status minorStatus =
+                    parseNumberFromString<unsigned>(versionComponents[1], &minorInt);
+
+                if (!majorStatus.Ok() || !minorStatus.Ok()) {
+                    warning() << "Could not parse OS version numbers from uname: " << osVersion;
+                }
+                else if ((majorInt == 11 && minorInt >= 2) || major > 11) {
+                    preferMsyncOverFSync = true;
+                }
+            }
+            else {
+                warning() << "Could not parse OS version string from uname: " << osVersion;
+            }
+        }
 
         BSONObjBuilder bExtra;
         bExtra.append("kernelVersion", unameData.release);
