@@ -784,10 +784,23 @@ namespace mongo {
                 // check no $ modifiers.  note we only check top level.  
                 // (scanning deep would be quite expensive)
                 uassert( 13511, "document to insert can't have $ fields", e.fieldName()[0] != '$' );
-                
-                // check no regexp for _id (SERVER-9502)
+
                 if (str::equals(e.fieldName(), "_id")) {
+                    // check no regexp for _id (SERVER-9502)
                     uassert(16824, "can't use a regex for _id", e.type() != RegEx);
+
+                    uassert(ErrorCodes::BadValue,
+                            "can't use an undefined for _id",
+                            e.type() != Undefined );
+
+                    uassert(ErrorCodes::BadValue,
+                            "can't use an array for _id",
+                            e.type() != Array);
+
+                    if ( e.type() == Object ) {
+                        BSONObj obj = e.Obj();
+                        uassert(ErrorCodes::BadValue, "illegal object for _id", obj.okForStorage());
+                    }
                 }
             }
         }
