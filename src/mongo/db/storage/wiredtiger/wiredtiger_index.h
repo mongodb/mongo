@@ -43,7 +43,12 @@ namespace mongo {
 
     class WiredTigerIndex : public SortedDataInterface {
     public:
-        WiredTigerIndex(WiredTigerDatabase &db, const IndexCatalogEntry& info, const std::string &uri) : _db(db), _info(info), _uri(uri) {}
+        static std::string _getURI(const std::string &ns, const std::string &idxName) {
+	    return "table:" + ns + "_idx_" + idxName;
+	}
+	static int Create(WiredTigerDatabase &db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info);
+
+        WiredTigerIndex(WiredTigerDatabase &db, const IndexCatalogEntry& info, const std::string &ns, const std::string &idxName) : _db(db), _info(info), _uri(_getURI(ns, idxName)) {}
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
@@ -72,7 +77,6 @@ namespace mongo {
 
 	WT_CURSOR *GetCursor(WiredTigerSession &session, bool acquire=false) const;
 	const std::string &GetURI() const;
-
 
     private:
 	    class IndexCursor : public SortedDataInterface::Cursor {

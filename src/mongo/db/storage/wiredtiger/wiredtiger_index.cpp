@@ -74,29 +74,11 @@ namespace mongo {
         sb << "dup key: " << key;
         return Status(ErrorCodes::DuplicateKey, sb.str());
     }
-    
-    class WiredTigerBuilderImpl : public SortedDataBuilderInterface {
-    public:
-        WiredTigerBuilderImpl(bool dupsAllowed)
-                : _count(0) { }
 
-        ~WiredTigerBuilderImpl() { }
-
-        Status addKey(const BSONObj& key, const DiskLoc& loc) {
-            _count++;
-            return Status::OK();
-        }
-
-        unsigned long long commit(bool mayInterrupt) {
-            return _count;
-        }
-
-    private:
-        unsigned long long _count;
-    };
-
-    SortedDataBuilderInterface* WiredTigerIndex::getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
-	return new WiredTigerBuilderImpl(dupsAllowed);
+    int WiredTigerIndex::Create(WiredTigerDatabase &db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info) {
+	WiredTigerSession swrap(db.GetSession(), db);
+	WT_SESSION *s(swrap.Get());
+	return s->create(s, _getURI(ns, idxName).c_str(), "type=file,key_format=uu,value_format=u");
     }
 
     Status WiredTigerIndex::insert(OperationContext* txn,
@@ -156,6 +138,8 @@ namespace mongo {
 	WiredTigerSession swrap(_db);
 	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
 	WT_CURSOR *c = curwrap.Get();
+	if (!c)
+		return true;
 	int ret = c->next(c);
 	if (ret == WT_NOTFOUND)
 	    return true;
@@ -303,7 +287,33 @@ namespace mongo {
     const std::string &WiredTigerIndex::GetURI() const { return _uri; }
 
     SortedDataInterface* getWiredTigerIndex(WiredTigerDatabase &db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info, boost::shared_ptr<void>* dataInOut) {
-	return new WiredTigerIndex(db, info, "table:idx" + ns + "_" + idxName);
+	int ret = WiredTigerIndex::Create(db, ns, idxName, info);
+	invariant(ret == 0);
+	return new WiredTigerIndex(db, info, ns, idxName);
+    }
+    
+    class WiredTigerBuilderImpl : public SortedDataBuilderInterface {
+    public:
+        WiredTigerBuilderImpl(bool dupsAllowed)
+                : _count(0) { }
+
+        ~WiredTigerBuilderImpl() { }
+
+        Status addKey(const BSONObj& key, const DiskLoc& loc) {
+            _count++;
+            return Status::OK();
+        }
+
+        unsigned long long commit(bool mayInterrupt) {
+            return _count;
+        }
+
+    private:
+        unsigned long long _count;
+    };
+
+    SortedDataBuilderInterface* WiredTigerIndex::getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
+	return new WiredTigerBuilderImpl(dupsAllowed);
     }
 
 }  // namespace mongo
