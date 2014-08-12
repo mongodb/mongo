@@ -112,7 +112,7 @@ namespace mongo {
                 else {
                     bool replJustOne = true;
                     repl::logOp(_txn, "d", _collection->ns().ns().c_str(), deletedDoc, 0,
-                                &replJustOne);
+                                &replJustOne, _params.fromMigrate);
                 }
             }
 

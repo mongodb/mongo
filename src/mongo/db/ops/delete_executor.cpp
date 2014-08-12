@@ -115,15 +115,24 @@ namespace mongo {
         PlanExecutor* rawExec;
         if (_canonicalQuery.get()) {
             // This is the non-idhack branch.
-            uassertStatusOK(getExecutorDelete(_request->getOpCtx(), collection,
-                                              _canonicalQuery.release(), _request->isMulti(),
-                                              _request->shouldCallLogOp(), &rawExec));
+            uassertStatusOK(getExecutorDelete(_request->getOpCtx(),
+                                              collection,
+                                              _canonicalQuery.release(),
+                                              _request->isMulti(),
+                                              _request->shouldCallLogOp(),
+                                              _request->isFromMigrate(),
+                                              &rawExec));
         }
         else {
             // This is the idhack branch.
-            uassertStatusOK(getExecutorDelete(_request->getOpCtx(), collection, ns.ns(),
-                                              _request->getQuery(), _request->isMulti(),
-                                              _request->shouldCallLogOp(), &rawExec));
+            uassertStatusOK(getExecutorDelete(_request->getOpCtx(),
+                                              collection,
+                                              ns.ns(),
+                                              _request->getQuery(),
+                                              _request->isMulti(),
+                                              _request->shouldCallLogOp(),
+                                              _request->isFromMigrate(),
+                                              &rawExec));
         }
         scoped_ptr<PlanExecutor> exec(rawExec);
 

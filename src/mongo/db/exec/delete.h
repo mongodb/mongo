@@ -36,7 +36,7 @@ namespace mongo {
     class OperationContext;
 
     struct DeleteStageParams {
-        DeleteStageParams() : isMulti(false), shouldCallLogOp(false) { }
+        DeleteStageParams() : isMulti(false), shouldCallLogOp(false), fromMigrate(false) { }
 
         // Should we delete all documents returned from the child (a "multi delete"), or at most one
         // (a "single delete")?
@@ -44,6 +44,10 @@ namespace mongo {
 
         // Should we write each delete to the oplog?
         bool shouldCallLogOp;
+
+        // Is this delete part of a migrate operation that is essentially like a no-op
+        // when the cluster is observed by an external client.
+        bool fromMigrate;
     };
 
     /**

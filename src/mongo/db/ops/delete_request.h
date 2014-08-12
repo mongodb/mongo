@@ -44,18 +44,21 @@ namespace mongo {
             _nsString(nsString),
             _multi(false),
             _logop(false),
-            _god(false) {}
+            _god(false),
+            _fromMigrate(false) {}
 
         void setQuery(const BSONObj& query) { _query = query; }
         void setMulti(bool multi = true) { _multi = multi; }
         void setUpdateOpLog(bool logop = true) { _logop = logop; }
         void setGod(bool god = true) { _god = god; }
+        void setFromMigrate(bool fromMigrate = true) { _fromMigrate = fromMigrate; }
 
         const NamespaceString& getNamespaceString() const { return _nsString; }
         const BSONObj& getQuery() const { return _query; }
         bool isMulti() const { return _multi; }
         bool shouldCallLogOp() const { return _logop; }
         bool isGod() const { return _god; }
+        bool isFromMigrate() const { return _fromMigrate; }
         OperationContext* getOpCtx() const { return _txn; }
 
         std::string toString() const;
@@ -67,6 +70,7 @@ namespace mongo {
         bool _multi;
         bool _logop;
         bool _god;
+        bool _fromMigrate;
     };
 
 }  // namespace mongo

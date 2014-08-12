@@ -61,6 +61,7 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/oplog.h"
@@ -2140,20 +2141,21 @@ namespace mongo {
                         }
                     }
 
-                    // id object most likely has form { _id : ObjectId(...) }
-                    // infer from that correct index to use, e.g. { _id : 1 }
-                    BSONObj idIndexPattern = Helpers::inferKeyPattern( id );
+                    Lock::DBWrite lk(txn->lockState(), ns);
+                    Client::Context ctx(txn, ns);
 
-                    // TODO: create a better interface to remove objects directly
-                    KeyRange range( ns, id, id, idIndexPattern );
-                    const WriteConcernOptions singleNodeWrite(1, WriteConcernOptions::NONE,
-                            WriteConcernOptions::kNoTimeout);
-                    Helpers::removeRange( txn,
-                                          range ,
-                                          true , /*maxInclusive*/
-                                          singleNodeWrite,
-                                          serverGlobalParams.moveParanoia ? &rs : 0 , /*callback*/
-                                          true ); /*fromMigrate*/
+                    if (serverGlobalParams.moveParanoia) {
+                        rs.goingToDelete(fullObj);
+                    }
+
+                    deleteObjects(txn,
+                                  ctx.db(),
+                                  ns,
+                                  id,
+                                  true /* justOne */,
+                                  true /* logOp */,
+                                  false /* god */,
+                                  true /* fromMigrate */);
 
                     *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();
                     cx.commit();
