@@ -299,7 +299,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 err:		/* On error, clear any left-over tree walk. */
 		if (next_ref != NULL)
 			WT_TRET(__wt_page_release(
-			    session, next_ref, WT_READ_CACHE | WT_READ_NO_GEN));
+			    session, next_ref, WT_READ_NO_GEN));
 	}
 
 	if (eviction_enabled)
