@@ -76,6 +76,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	WT_REF *ref;
 	int block_manager_begin, skip;
+	uint32_t flags;
 
 	WT_UNUSED(cfg);
 
@@ -84,6 +85,13 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	bm = btree->bm;
 	ref = NULL;
 	block_manager_begin = 0;
+ 
+	/*
+	 * Pages read for compaction aren't "useful"; don't update the read
+	 * generation of pages already in memory, and if a page is read, set
+	 * its generation to a low value so it is evicted quickly.
+	 */
+	flags = WT_READ_COMPACT | WT_READ_NO_GEN | WT_READ_WONT_NEED;
 
 	WT_STAT_FAST_DATA_INCR(session, session_compact);
 
@@ -142,14 +150,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Walk the tree reviewing pages to see if they should be re-written. */
 	session->compaction = 1;
 	for (;;) {
-		/*
-		 * Pages read for compaction aren't "useful"; don't update the
-		 * read generation of pages already in memory, and if a page is
-		 * read, set its generation to a low value so it is evicted
-		 * quickly.
-		 */
-		WT_ERR(__wt_tree_walk(session, &ref,
-		    WT_READ_COMPACT | WT_READ_NO_GEN | WT_READ_WONT_NEED));
+		WT_ERR(__wt_tree_walk(session, &ref, flags));
 		if (ref == NULL)
 			break;
 
@@ -165,7 +166,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 err:	if (ref != NULL)
-		WT_TRET(__wt_page_release(session, ref));
+		WT_TRET(__wt_page_release(session, ref, flags));
 
 	if (block_manager_begin)
 		WT_TRET(bm->compact_end(bm, session));

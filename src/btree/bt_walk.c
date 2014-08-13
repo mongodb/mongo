@@ -107,7 +107,7 @@ ascend:	/*
 	 * Release any hazard-pointer we're holding.
 	 */
 	if (__wt_ref_is_root(ref)) {
-		WT_ERR(__wt_page_release(session, couple));
+		WT_ERR(__wt_page_release(session, couple, flags));
 		goto done;
 	}
 
@@ -161,7 +161,8 @@ restart:	/*
 			 * return.
 			 */
 			if (__wt_ref_is_root(ref))
-				WT_ERR(__wt_page_release(session, couple));
+				WT_ERR(__wt_page_release(
+				    session, couple, flags));
 			else {
 				/*
 				 * Locate the reference to our parent page then
@@ -178,8 +179,8 @@ restart:	/*
 				__wt_page_refp(session, ref, &pindex, &slot);
 				if ((ret = __wt_page_swap(
 				    session, couple, ref, flags)) != 0) {
-					WT_TRET(
-					    __wt_page_release(session, couple));
+					WT_TRET(__wt_page_release(
+					    session, couple, flags));
 					WT_ERR(ret);
 				}
 			}

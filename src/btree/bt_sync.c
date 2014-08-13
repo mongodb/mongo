@@ -155,7 +155,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 
 err:	/* On error, clear any left-over tree walk. */
 	if (walk != NULL)
-		WT_TRET(__wt_page_release(session, walk));
+		WT_TRET(__wt_page_release(session, walk, flags));
 
 	if (txn->isolation == TXN_ISO_READ_COMMITTED && session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
@@ -299,7 +299,8 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 	if (0) {
 err:		/* On error, clear any left-over tree walk. */
 		if (next_ref != NULL)
-			WT_TRET(__wt_page_release(session, next_ref));
+			WT_TRET(__wt_page_release(
+			    session, next_ref, WT_READ_CACHE | WT_READ_NO_GEN));
 	}
 
 	if (eviction_enabled)

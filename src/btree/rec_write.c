@@ -956,7 +956,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 #define	CHILD_RELEASE(session, hazard, ref) do {			\
 	if (hazard) {							\
 		hazard = 0;						\
-		WT_TRET(__wt_page_release(session, ref));		\
+		WT_TRET(__wt_page_release(session, ref, WT_READ_NO_GEN));\
 	}								\
 } while (0)
 #undef	CHILD_RELEASE_ERR

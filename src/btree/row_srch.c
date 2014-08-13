@@ -456,7 +456,7 @@ leaf_match:	cbt->compare = 0;
 	return (0);
 
 err:	if (leaf != NULL)
-		WT_TRET(__wt_page_release(session, child));
+		WT_TRET(__wt_page_release(session, child, 0));
 	return (ret);
 }
 
@@ -503,7 +503,7 @@ restart:
 		 * it and restart the search from the top of the tree.
 		 */
 		if (ret == WT_RESTART &&
-		    (ret = __wt_page_release(session, parent)) == 0)
+		    (ret = __wt_page_release(session, parent, 0)) == 0)
 			goto restart;
 		return (ret);
 	}
@@ -547,6 +547,6 @@ restart:
 
 	return (0);
 
-err:	WT_TRET(__wt_page_release(session, child));
+err:	WT_TRET(__wt_page_release(session, child, 0));
 	return (ret);
 }

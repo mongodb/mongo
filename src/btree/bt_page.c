@@ -120,7 +120,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			    force_attempts < 10 &&
 			    __evict_force_check(session, page)) {
 				++force_attempts;
-				WT_RET(__wt_page_release(session, ref));
+				WT_RET(__wt_page_release(session, ref, flags));
 				break;
 			}
 
