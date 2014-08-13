@@ -241,9 +241,6 @@ __wt_evict_create(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_open_internal_session(
 	    conn, "eviction-server", 0, 0, &conn->evict_session));
 	session = conn->evict_session;
-	WT_RET(__wt_thread_create(
-	    session, &conn->evict_tid, __evict_server, session));
-	conn->evict_tid_set = 1;
 
 	/*
 	 * If there's only a single eviction thread, it may be called upon to
@@ -268,11 +265,20 @@ __wt_evict_create(WT_CONNECTION_IMPL *conn)
 				++conn->evict_workers;
 				F_SET(&workers[i], WT_EVICT_WORKER_RUN);
 				WT_RET(__wt_thread_create(
-				    session, &workers[i].tid,
+				    workers[i].session, &workers[i].tid,
 				    __evict_worker, &workers[i]));
 			}
 		}
 	}
+
+	/*
+	 * Start the primary eviction server thread after the worker threads
+	 * have started to avoid it starting additional worker threads before
+	 * the worker's sessions are created.
+	 */
+	WT_RET(__wt_thread_create(
+	    session, &conn->evict_tid, __evict_server, session));
+	conn->evict_tid_set = 1;
 
 	return (0);
 }
