@@ -29,7 +29,9 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommands
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
 
@@ -50,6 +52,8 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using logger::LogComponent;
 
     map<string,Command*> * Command::_commandsByBestName;
     map<string,Command*> * Command::_webCommands;
@@ -317,7 +321,7 @@ namespace mongo {
         namespace mmb = mutablebson;
         Status status = _checkAuthorizationImpl(c, client, dbname, cmdObj, fromRepl);
         if (!status.isOK()) {
-            log() << status << std::endl;
+            log(LogComponent::kAccessControl) << status << std::endl;
         }
         mmb::Document cmdToLog(cmdObj, mmb::Document::kInPlaceDisabled);
         c->redactForLogging(&cmdToLog);
