@@ -1769,6 +1769,17 @@ namespace mongo {
                 indexer.removeExistingIndexes(&indexSpecs);
 
                 if (!indexSpecs.empty()) {
+                    // Only copy indexes if the collection does not have any documents.
+                    if (collection->numRecords() > 0) {
+                        errmsg = str::stream() << "aborting migration, shard is missing "
+                                               << indexSpecs.size() << " indexes and "
+                                               << "collection is not empty. Non-trivial "
+                                               << "index creation should be scheduled manually";
+                        warning() << errmsg;
+                        setState(FAIL);
+                        return;
+                    }
+
                     Status status = indexer.init(indexSpecs);
                     if ( !status.isOK() ) {
                         errmsg = str::stream() << "failed to create index before migrating data. "
