@@ -134,9 +134,9 @@ __wt_sweep_create(WT_CONNECTION_IMPL *conn)
 	/* Set first, the thread might run before we finish up. */
 	F_SET(conn, WT_CONN_SERVER_SWEEP);
 
-	WT_RET(
-	    __wt_open_internal_session(conn, "sweep-server", 1, 1, &session));
-	conn->sweep_session = session;
+	WT_RET(__wt_open_internal_session(
+	    conn, "sweep-server", 1, 1, &conn->sweep_session));
+	session = conn->sweep_session;
 
 	/*
 	 * Handle sweep does enough I/O it may be called upon to perform slow
