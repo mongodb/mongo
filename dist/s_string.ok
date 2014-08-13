@@ -499,6 +499,7 @@ fflush
 ffs
 fgetln
 fh
+fileID
 filefrag
 fileid
 filename
@@ -780,6 +781,7 @@ recnos
 reconfig
 reconfiguring
 recsize
+rectype
 recurse
 refp
 reinitialization
@@ -813,6 +815,7 @@ scr
 sd
 searchable
 sed
+seqno
 serializable
 sessionp
 setstr

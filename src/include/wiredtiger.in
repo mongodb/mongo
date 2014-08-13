@@ -864,9 +864,9 @@ struct __wt_session {
 	 *  @row{<code>log:</code>,
 	 *	log cursor,
 	 *	key=<code>long fileID\, long offset\, int seqno</code>\,
-	 *	value=<code>uint64_t txnid, uint32_t rectype, uint32_t optype,
-	 *	uint32_t fileid, WT_ITEM key, WT_ITEM value</code>:
-	 *	see @ref cursor_log}
+	 *	value=<code>uint64_t txnid\, uint32_t rectype\,
+	 *	uint32_t optype\, uint32_t fileid\,
+	*	WT_ITEM key\, WT_ITEM value</code>: see @ref cursor_log}
 	 *  @row{<code>lsm:\<name\></code>,
 	 *	LSM cursor,
 	 *	LSM key\, LSM value: see @ref lsm}
