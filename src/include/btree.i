@@ -954,7 +954,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 
 	/* Attempt to evict pages with the special "oldest" read generation. */
 	if (LF_ISSET(WT_READ_NO_GEN) ||
-            page->read_gen != WT_READGEN_OLDEST ||
+	    page->read_gen != WT_READGEN_OLDEST ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    (btree->checkpointing && __wt_page_is_modified(page)))
 		return (__wt_hazard_clear(session, page));

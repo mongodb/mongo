@@ -85,7 +85,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	bm = btree->bm;
 	ref = NULL;
 	block_manager_begin = 0;
- 
+
 	/*
 	 * Pages read for compaction aren't "useful"; don't update the read
 	 * generation of pages already in memory, and if a page is read, set
