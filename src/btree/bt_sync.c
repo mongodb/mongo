@@ -27,6 +27,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 
 	btree = S2BT(session);
 
+	flags = WT_READ_CACHE | WT_READ_NO_GEN;
 	walk = NULL;
 	txn = &session->txn;
 
@@ -52,8 +53,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			return (0);
 		}
 
-		flags = WT_READ_CACHE |
-		    WT_READ_NO_GEN | WT_READ_NO_WAIT | WT_READ_SKIP_INTL;
+		flags |= WT_READ_NO_WAIT | WT_READ_SKIP_INTL;
 		for (walk = NULL;;) {
 			WT_ERR(__wt_tree_walk(session, &walk, flags));
 			if (walk == NULL)
@@ -100,7 +100,6 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		}
 
 		/* Write all dirty in-cache pages. */
-		flags = WT_READ_CACHE | WT_READ_NO_GEN;
 		for (walk = NULL;;) {
 			WT_ERR(__wt_tree_walk(session, &walk, flags));
 			if (walk == NULL)
