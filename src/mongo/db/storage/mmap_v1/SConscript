@@ -105,13 +105,13 @@ env.Library(
 env.Library(
     target= 'btree_test_help',
     source= [
-        'btree/btree_test_help.cpp'
+        'btree/btree_test_help.cpp',
+        'heap_record_store_btree.cpp'
         ],
     LIBDEPS= [
         'btree',
         '$BUILD_DIR/mongo/mongocommon',  # for ProgressMeter
         '$BUILD_DIR/mongo/db/storage/mmap_v1/record_store_v1_test_help',
-        '$BUILD_DIR/mongo/db/storage/heap1/heap_record_store'  # XXX?
         ]
     )
 
