@@ -155,10 +155,6 @@ namespace mongo {
         return getDur().commitIfNeeded(_txn, force);
     }
 
-    bool DurRecoveryUnit::isCommitNeeded() const {
-        return getDur().isCommitNeeded();
-    }
-
     void* DurRecoveryUnit::writingPtr(void* data, size_t len) {
         invariant(len > 0);
 #if ROLLBACK_ENABLED

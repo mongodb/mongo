@@ -89,8 +89,6 @@ namespace mongo {
     }
 
     bool RocksRecoveryUnit::commitIfNeeded(bool force ) {
-        if ( !isCommitNeeded() )
-            return false;
         commitUnitOfWork();
         return true;
     }
@@ -98,13 +96,6 @@ namespace mongo {
     bool RocksRecoveryUnit::awaitCommit() {
         // TODO
         return true;
-    }
-
-    bool RocksRecoveryUnit::isCommitNeeded() const {
-        return
-            _writeBatch &&
-            ( _writeBatch->GetDataSize() > ( 1024 * 1024 * 50 ) ||
-              _writeBatch->Count() > 1000 );
     }
 
     void* RocksRecoveryUnit::writingPtr(void* data, size_t len) {

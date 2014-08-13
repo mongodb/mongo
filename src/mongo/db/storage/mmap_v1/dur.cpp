@@ -266,10 +266,6 @@ namespace mongo {
             return p;
         }
 
-        bool DurableImpl::isCommitNeeded() const {
-            return commitJob.bytes() > UncommittedBytesLimit;
-        }
-
         bool NOINLINE_DECL DurableImpl::_aCommitIsNeeded(OperationContext* txn) {
             switch (txn->lockState()->threadState()) {
                 case '\0': {

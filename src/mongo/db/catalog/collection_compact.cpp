@@ -132,15 +132,20 @@ namespace mongo {
             }
         }
 
-        // note that the drop indexes call also invalidates all clientcursors for the namespace,
-        // which is important and wanted here
-        log() << "compact dropping indexes" << endl;
-        Status status = _indexCatalog.dropAllIndexes(txn, true);
-        if ( !status.isOK() ) {
-            return StatusWith<CompactStats>( status );
-        }
-
+        // Give a chance to be interrupted *before* we drop all indexes.
         txn->checkForInterrupt();
+
+        {
+            // note that the drop indexes call also invalidates all clientcursors for the namespace,
+            // which is important and wanted here
+            WriteUnitOfWork wunit(txn);
+            log() << "compact dropping indexes" << endl;
+            Status status = _indexCatalog.dropAllIndexes(txn, true);
+            if ( !status.isOK() ) {
+                return StatusWith<CompactStats>( status );
+            }
+            wunit.commit();
+        }
 
         CompactStats stats;
 
@@ -148,7 +153,7 @@ namespace mongo {
         indexer.allowInterruption();
         indexer.ignoreUniqueConstraint(); // in compact we should be doing no checking
 
-        status = indexer.init( indexSpecs );
+        Status status = indexer.init( indexSpecs );
         if ( !status.isOK() )
             return StatusWith<CompactStats>( status );
 

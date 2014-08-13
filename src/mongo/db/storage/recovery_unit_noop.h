@@ -45,10 +45,6 @@ namespace mongo {
             return true;
         }
 
-        virtual bool isCommitNeeded() const {
-            return false;
-        }
-
         virtual void registerChange(Change* change) {
             change->commit();
             delete change;
