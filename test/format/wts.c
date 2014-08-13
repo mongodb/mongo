@@ -85,12 +85,14 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "create,"
 	    "checkpoint_sync=false,cache_size=%" PRIu32 "MB,"
 	    "buffer_alignment=512,error_prefix=\"%s\","
+	    "eviction=(threads_max=%" PRIu32 "),"
 	    "%s,%s,%s,%s,"
 	    "extensions="
 	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
+	    g.c_evict_max,
 	    g.c_data_extend ? "file_extend=(data=8MB)" : "",
 	    g.c_logging ? "log=(enabled=true)" : "",
 	    g.c_mmap ? "mmap=true" : "mmap=false",
