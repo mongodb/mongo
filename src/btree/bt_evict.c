@@ -241,6 +241,9 @@ __wt_evict_create(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_open_internal_session(
 	    conn, "eviction-server", 0, 0, &session));
 	conn->evict_session = session;
+	WT_RET(__wt_thread_create(
+	    session, &conn->evict_tid, __evict_server, session));
+	conn->evict_tid_set = 1;
 
 	/*
 	 * If there's only a single eviction thread, it may be called upon to
@@ -270,10 +273,6 @@ __wt_evict_create(WT_CONNECTION_IMPL *conn)
 			}
 		}
 	}
-
-	WT_RET(__wt_thread_create(
-	    session, &conn->evict_tid, __evict_server, conn->evict_session));
-	conn->evict_tid_set = 1;
 
 	return (0);
 }
