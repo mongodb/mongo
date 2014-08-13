@@ -31,6 +31,8 @@
 
 #include "mongo/util/mmap.h"
 
+#include "mongo/util/allocator.h"
+
 /* in memory (no file) version */
 
 namespace mongo {
@@ -51,7 +53,7 @@ namespace mongo {
 
     void* MemoryMappedFile::map(const char *filename, long& length , int options ) {
         verify( length );
-        view = malloc( length );
+        view = mongoMalloc( length );
         return view;
     }
 

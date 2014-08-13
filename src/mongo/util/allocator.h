@@ -29,29 +29,20 @@
 
 #pragma once
 
-#include <stdlib.h>
-
-// we need the "real" malloc here
-#include "mongo/client/undef_macros.h"
+#include <cstddef>
 
 namespace mongo {
 
-    inline void * ourmalloc(size_t size) {
-        void *x = malloc(size);
-        if ( x == 0 ) abort();
-        return x;
-    }
+    /**
+     * Wrapper around std::malloc().
+     * If std::malloc() fails, reports error with stack trace and exit.
+     */
+    void* mongoMalloc(size_t size);
 
-    inline void * ourrealloc(void *ptr, size_t size) {
-        void *x = realloc(ptr, size);
-        if ( x == 0 ) abort();
-        return x;
-    }
-
-#define MONGO_malloc ::mongo::ourmalloc
-#define MONGO_realloc ::mongo::ourrealloc
-
-// this redefines 'malloc' to 'MONGO_malloc', etc
-#include "mongo/client/redef_macros.h"
+    /**
+     * Wrapper around std::realloc().
+     * If std::realloc() fails, reports error with stack trace and exit.
+     */
+    void* mongoRealloc(void* ptr, size_t size);
 
 } // namespace mongo

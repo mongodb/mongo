@@ -33,6 +33,7 @@
 #include "mongo/util/logfile.h"
 
 #include "mongo/platform/posix_fadvise.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
@@ -49,7 +50,7 @@ namespace mongo {
             if( 0 && debug ) {
                 try {
                     LogFile f("logfile_test");
-                    void *p = malloc(16384);
+                    void *p = mongoMalloc(16384);
                     char *buf = (char*) p;
                     buf += 4095;
                     buf = (char*) (((size_t)buf)&(~0xfff));

@@ -32,6 +32,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/signal_handlers_synchronous.h"
 
 namespace mongo {
 namespace {
@@ -51,17 +52,19 @@ namespace {
     typedef int(*SaslCallbackFn)();
 
     void* saslOurMalloc(SaslAllocSize sz) {
-        return ourmalloc(sz);
+        return mongoMalloc(sz);
     }
 
     void* saslOurCalloc(SaslAllocSize count, SaslAllocSize size) {
         void* ptr = calloc(count, size);
-        if (!ptr) abort();
+        if (!ptr) {
+            reportOutOfMemoryErrorAndExit();
+        }
         return ptr;
     }
 
     void* saslOurRealloc(void* ptr, SaslAllocSize sz) {
-        return ourrealloc(ptr, sz);
+        return mongoRealloc(ptr, sz);
     }
 
     /*

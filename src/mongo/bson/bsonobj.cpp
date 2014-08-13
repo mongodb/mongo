@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bson_validate.h"
 #include "mongo/db/json.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/str.h"
@@ -69,7 +70,7 @@ namespace mongo {
     }
 
     BSONObj BSONObj::copy() const {
-        Holder *h = (Holder*) malloc(objsize() + sizeof(unsigned));
+        Holder *h = (Holder*) mongoMalloc(objsize() + sizeof(unsigned));
         h->zero();
         memcpy(h->data, objdata(), objsize());
         return BSONObj(h);

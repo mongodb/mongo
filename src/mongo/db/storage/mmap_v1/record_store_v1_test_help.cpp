@@ -38,6 +38,7 @@
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -222,7 +223,7 @@ namespace mongo {
         size = quantizeExtentSize( size );
 
         ExtentInfo info;
-        info.data = static_cast<char*>( malloc( size ) );
+        info.data = static_cast<char*>( mongoMalloc( size ) );
         info.length = size;
 
         DiskLoc loc( _extents.size(), 0 );

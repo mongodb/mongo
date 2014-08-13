@@ -47,6 +47,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/logfile.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
@@ -174,7 +175,7 @@ void go() {
     }
     lf = new LogFile(fname,true);
     const unsigned sz = 1024 * 1024 * 32; // needs to be big as we are using synchronousAppend.  if we used a regular MongoFile it wouldn't have to be
-    char *buf = (char*) malloc(sz+4096);
+    char *buf = (char*) mongoMalloc(sz+4096);
     const char *p = round(buf);
     for( unsigned long long i = 0; i < len; i += sz ) { 
         lf->synchronousAppend(p, sz);

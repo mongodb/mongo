@@ -32,6 +32,7 @@
 #include <boost/noncopyable.hpp>
 #include "mongo/platform/atomic_word.h"
 #include "mongo/base/string_data.h"
+#include "mongo/util/allocator.h"
 
 namespace mongo {
 
@@ -128,7 +129,7 @@ namespace mongo {
     private:
         // these can only be created by calling create()
         RCString() {};
-        void* operator new (size_t objSize, size_t realSize) { return malloc(realSize); }
+        void* operator new (size_t objSize, size_t realSize) { return mongoMalloc(realSize); }
 
         int _size; // does NOT include trailing NUL byte.
         // char[_size+1] array allocated past end of class

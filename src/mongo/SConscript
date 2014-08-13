@@ -341,7 +341,10 @@ if env['MONGO_BUILD_SASL_CLIENT']:
     env.Library('sasl_client_session',
                 ['client/sasl_client_session.cpp',
                  'client/sasl_sspi.cpp'],
-                LIBDEPS=['foundation'],
+                LIBDEPS = [
+                    'foundation',
+                    'signal_handlers_synchronous',
+                ],
                 SYSLIBDEPS=saslLibs)
     commonFiles.extend(['client/sasl_client_authenticate_impl.cpp'])
     extraCommonLibdeps.append('sasl_client_session')
@@ -936,7 +939,8 @@ serveronlyEnv.Library("serveronly", serverOnlyFiles,
 env.Library("message_server_port", "util/net/message_server_port.cpp")
 
 env.Library("signal_handlers_synchronous",
-            ['util/signal_handlers_synchronous.cpp',],
+            ['util/signal_handlers_synchronous.cpp',
+             'util/allocator.cpp',],
             LIBDEPS=["stacktrace", "foundation"]
             )
 
@@ -1031,7 +1035,10 @@ env.Library("mongofiles_options", ["tools/mongofiles_options.cpp"],
 env.Library("bsondump_options", ["tools/bsondump_options.cpp"],
             LIBDEPS=['tool_options'])
 env.Library("mongobridge_options", ["tools/mongobridge_options.cpp"],
-            LIBDEPS=['tool_options'])
+            LIBDEPS = [
+                'tool_options',
+                'signal_handlers_synchronous',
+            ])
 
 env.Install( '#/', [
         env.Program( "mongofiles", ["tools/files.cpp", "tools/mongofiles_options_init.cpp"],
@@ -1041,7 +1048,12 @@ env.Install( '#/', [
         env.Program( "mongobridge", ["tools/bridge.cpp", "tools/mongobridge_options_init.cpp"],
                      LIBDEPS=["serveronly", "coreserver", "coredb", "mongobridge_options"] ),
         env.Program( "mongoperf", "client/examples/mongoperf.cpp",
-                     LIBDEPS=["serveronly", "coreserver", "coredb"] ),
+                     LIBDEPS = [
+                         "serveronly",
+                         "coreserver",
+                         "coredb",
+                         "signal_handlers_synchronous",
+                     ] ),
         ] )
 
 # mongos options
@@ -1100,6 +1112,7 @@ test = env.Install(
                        "coredb",
                        "testframework",
                        "gridfs",
+                       "signal_handlers_synchronous",
                        "s/upgrade",
                        "s/cluster_ops",
                        "s/cluster_ops_impl",
@@ -1113,7 +1126,14 @@ test = env.Install(
 if len(env.subst('$PROGSUFFIX')):
     env.Alias( "dbtest", "#/${PROGPREFIX}dbtest${PROGSUFFIX}" )
 
-env.Install( '#/', env.Program( "perftest", [ "dbtests/perf/perftest.cpp" ], LIBDEPS=["serveronly", "coreserver", "coredb", "testframework" ] ) )
+env.Install( '#/', env.Program( "perftest", [ "dbtests/perf/perftest.cpp" ],
+                                 LIBDEPS = [
+                                     "serveronly",
+                                     "coreserver",
+                                     "coredb",
+                                     "testframework",
+                                     "signal_handlers_synchronous",
+                                 ] ) )
 
 # --- sniffer ---
 mongosniff_built = False
@@ -1128,7 +1148,13 @@ if darwin or env["_HAVEPCAP"]:
         sniffEnv.Append( LIBS=[ "wpcap" ] )
 
     sniffEnv.Install( '#/', sniffEnv.Program( "mongosniff", "tools/sniffer.cpp",
-                                              LIBDEPS=["gridfs", "serveronly", "coreserver", "coredb"]))
+                                              LIBDEPS = [
+                                                 "gridfs",
+                                                 "serveronly",
+                                                 "coreserver",
+                                                 "coredb",
+                                                 "signal_handlers_synchronous",
+                                              ] ) )
 
 # --- shell ---
 

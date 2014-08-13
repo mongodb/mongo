@@ -39,6 +39,7 @@
 #endif
 
 #include "mongo/platform/basic.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace std;
@@ -303,7 +304,7 @@ namespace mongo {
             utf8argLength.push_back(argLength);
             blockSize += argLength;
         }
-        _argv = static_cast<char**>(malloc(blockSize));
+        _argv = static_cast<char**>(mongoMalloc(blockSize));
         for (int i = 0; i < argc; ++i) {
             _argv[i] = reinterpret_cast<char*>(_argv) + blockPtr;
             strcpy_s(_argv[i], utf8argLength[i], utf8args[i].c_str());
@@ -326,7 +327,7 @@ namespace mongo {
             utf8envLength.push_back(envLength);
             blockSize += envLength;
         }
-        _envp = static_cast<char**>(malloc(blockSize));
+        _envp = static_cast<char**>(mongoMalloc(blockSize));
         size_t i;
         for (i = 0; i < envCount; ++i) {
             _envp[i] = reinterpret_cast<char*>(_envp) + blockPtr;

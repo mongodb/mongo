@@ -1,5 +1,6 @@
-/*
- *    Copyright 2010 10gen Inc.
+// allocator.cpp
+
+/*    Copyright 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,47 +27,28 @@
  *    then also delete it in the license file.
  */
 
-#undef MONGO_EXPOSE_MACROS
+#include "mongo/platform/basic.h"
 
-// pragma push_macro only works in gcc 4.3+
-// However, you had to define a special macro
-// and build gcc yourself for it to work in 4.3.
-// Version 4.4+ activate the feature by default.
+#include <cstdlib>
 
-#define GCC_VERSION (__GNUC__ * 10000                 \
-                     + __GNUC_MINOR__ * 100           \
-                     + __GNUC_PATCHLEVEL__)
+#include "mongo/util/signal_handlers_synchronous.h"
 
-#if GCC_VERSION >= 40402
+namespace mongo {
 
-# define malloc 42
+    void* mongoMalloc(size_t size) {
+        void* x = std::malloc(size);
+        if (x == NULL) {
+            reportOutOfMemoryErrorAndExit();
+        }
+        return x;
+    }
 
-# include "mongo/client/redef_macros.h"
-# include "mongo/client/undef_macros.h"
+    void* mongoRealloc(void *ptr, size_t size) {
+        void* x = std::realloc(ptr, size);
+        if (x == NULL) {
+            reportOutOfMemoryErrorAndExit();
+        }
+        return x;
+    }
 
-# if malloc == 42
-# else
-#  error malloc macro molested
-# endif
-
-# undef malloc
-
-#ifndef MONGO_MALLOC
-#define MONGO_MALLOC 1
-#endif
-
-# define malloc 42
-
-# include "mongo/client/redef_macros.h"
-# include "mongo/client/undef_macros.h"
-
-# if malloc == 42
-# else
-#  error malloc macro molested
-# endif
-
-# undef malloc
-
-
-#endif // gcc 4.3
-
+} // namespace mongo
