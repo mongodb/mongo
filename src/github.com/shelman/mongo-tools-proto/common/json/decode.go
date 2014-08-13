@@ -161,9 +161,40 @@ func (n Number) Float64() (float64, error) {
 	return strconv.ParseFloat(string(n), 64)
 }
 
+// Int32 returns the number as an int32.
+func (n Number) Int32() (int32, error) {
+	x, err := n.Int64()
+	return int32(x), err
+}
+
 // Int64 returns the number as an int64.
 func (n Number) Int64() (int64, error) {
-	return strconv.ParseInt(string(n), 10, 64)
+	base := 10
+	if isHexPrefix(string(n)) {
+		base = 0 // strconv.ParseInt will infer base 16
+	}
+	return strconv.ParseInt(string(n), base, 64)
+}
+
+// Uint8 returns the number as an uint8.
+func (n Number) Uint8() (uint8, error) {
+	x, err := n.Uint64()
+	return uint8(x), err
+}
+
+// Uint32 returns the number as an uint32.
+func (n Number) Uint32() (uint32, error) {
+	x, err := n.Uint64()
+	return uint32(x), err
+}
+
+// Uint64 returns the number as an uint64.
+func (n Number) Uint64() (uint64, error) {
+	base := 10
+	if isHexPrefix(string(n)) {
+		base = 0 // strconv.ParseUint will infer base 16
+	}
+	return strconv.ParseUint(string(n), base, 64)
 }
 
 // decodeState represents the state while decoding a JSON value.
@@ -509,7 +540,7 @@ func (d *decodeState) object(v reflect.Value) {
 		start := d.off - 1
 		op = d.scanWhile(scanContinue)
 		item := d.data[start : d.off-1]
-		key, ok := unquoteBytes(item)
+		key, ok := maybeUnquoteBytes(item)
 		if !ok {
 			d.error(errPhase)
 		}
@@ -604,11 +635,20 @@ func (d *decodeState) literal(v reflect.Value) {
 	d.literalStore(d.data[start:d.off], v, false)
 }
 
-// convertNumber converts the number literal s to a float64 or a Number
-// depending on the setting of d.useNumber.
+// convertNumber converts the number literal s to an int64, a float64,
+// or a Number depending on the setting of d.useNumber and whether the
+// string is specified in hexadecimal.
 func (d *decodeState) convertNumber(s string) (interface{}, error) {
 	if d.useNumber {
 		return Number(s), nil
+	}
+	if isHexPrefix(s) {
+		// strconv.ParseInt will infer base 16
+		n, err := strconv.ParseInt(s, 0, 64)
+		if err != nil {
+			return nil, &UnmarshalTypeError{"number " + s, reflect.TypeOf(0)}
+		}
+		return n, nil
 	}
 	f, err := strconv.ParseFloat(s, 64)
 	if err != nil {
@@ -631,7 +671,7 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 		d.saveError(fmt.Errorf("json: invalid use of ,string struct tag, trying to unmarshal %q into %v", item, v.Type()))
 		return
 	}
-	wantptr := item[0] == 'n' // null
+	wantptr := isNull(item) // null
 	u, ut, pv := d.indirect(v, wantptr)
 	if u != nil {
 		err := u.UnmarshalJSON(item)
@@ -665,14 +705,14 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 
 	v = pv
 
-	switch c := item[0]; c {
-	case 'n': // null
+	switch c := item[0]; {
+	case isNull(item): // null
 		switch v.Kind() {
 		case reflect.Interface, reflect.Ptr, reflect.Map, reflect.Slice:
 			v.Set(reflect.Zero(v.Type()))
 			// otherwise, ignore null for primitives/string
 		}
-	case 't', 'f': // true, false
+	case c == 't', c == 'f': // true, false
 		value := c == 't'
 		switch v.Kind() {
 		default:
@@ -691,7 +731,7 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 			}
 		}
 
-	case '"': // string
+	case c == '"', c == '\'': // string
 		s, ok := unquoteBytes(item)
 		if !ok {
 			if fromQuoted {
@@ -725,14 +765,7 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 			}
 		}
 
-	default: // number
-		if c != '-' && (c < '0' || c > '9') {
-			if fromQuoted {
-				d.error(fmt.Errorf("json: invalid use of ,string struct tag, trying to unmarshal %q into %v", item, v.Type()))
-			} else {
-				d.error(errPhase)
-			}
-		}
+	case isNumber(item):
 		s := string(item)
 		switch v.Kind() {
 		default:
@@ -758,7 +791,11 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 			v.Set(reflect.ValueOf(n))
 
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			n, err := strconv.ParseInt(s, 10, 64)
+			base := 10
+			if isHexPrefix(s) {
+				base = 0 // strconv.ParseInt will infer base 16
+			}
+			n, err := strconv.ParseInt(s, base, 64)
 			if err != nil || v.OverflowInt(n) {
 				d.saveError(&UnmarshalTypeError{"number " + s, v.Type()})
 				break
@@ -766,7 +803,11 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 			v.SetInt(n)
 
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			n, err := strconv.ParseUint(s, 10, 64)
+			base := 10
+			if isHexPrefix(s) {
+				base = 0 // strconv.ParseUint will infer base 16
+			}
+			n, err := strconv.ParseUint(s, base, 64)
 			if err != nil || v.OverflowUint(n) {
 				d.saveError(&UnmarshalTypeError{"number " + s, v.Type()})
 				break
@@ -780,6 +821,15 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 				break
 			}
 			v.SetFloat(n)
+		}
+
+	default:
+		if ok := d.storeExtendedLiteral(item, v, fromQuoted); !ok {
+			if fromQuoted {
+				d.error(fmt.Errorf("json: invalid use of ,string struct tag, trying to unmarshal %q into %v", item, v.Type()))
+			} else {
+				d.error(errPhase)
+			}
 		}
 	}
 }
@@ -888,29 +938,33 @@ func (d *decodeState) literalInterface() interface{} {
 	d.scan.undo(op)
 	item := d.data[start:d.off]
 
-	switch c := item[0]; c {
-	case 'n': // null
+	switch c := item[0]; {
+	case isNull(item): // null
 		return nil
 
-	case 't', 'f': // true, false
+	case c == 't', c == 'f': // true, false
 		return c == 't'
 
-	case '"': // string
+	case c == '"', c == '\'': // string
 		s, ok := unquote(item)
 		if !ok {
 			d.error(errPhase)
 		}
 		return s
 
-	default: // number
-		if c != '-' && (c < '0' || c > '9') {
-			d.error(errPhase)
-		}
+	case isNumber(item): // number
 		n, err := d.convertNumber(string(item))
 		if err != nil {
 			d.saveError(err)
 		}
 		return n
+
+	default:
+		if value, ok := d.getExtendedLiteral(item); ok {
+			return value
+		}
+		d.error(errPhase)
+		panic("unreachable")
 	}
 }
 
@@ -936,9 +990,10 @@ func unquote(s []byte) (t string, ok bool) {
 }
 
 func unquoteBytes(s []byte) (t []byte, ok bool) {
-	if len(s) < 2 || s[0] != '"' || s[len(s)-1] != '"' {
+	if len(s) < 2 || s[0] != '"' && s[0] != '\'' || s[len(s)-1] != '"' && s[len(s)-1] != '\'' {
 		return
 	}
+	singleQuoted := s[0] == '\''
 	s = s[1 : len(s)-1]
 
 	// Check for unusual characters. If there are none,
@@ -947,7 +1002,7 @@ func unquoteBytes(s []byte) (t []byte, ok bool) {
 	r := 0
 	for r < len(s) {
 		c := s[r]
-		if c == '\\' || c == '"' || c < ' ' {
+		if c == '\\' || c == '"' || c == '\'' || c < ' ' {
 			break
 		}
 		if c < utf8.RuneSelf {
@@ -1029,8 +1084,12 @@ func unquoteBytes(s []byte) (t []byte, ok bool) {
 				w += utf8.EncodeRune(b[w:], rr)
 			}
 
-		// Quote, control characters are invalid.
-		case c == '"', c < ' ':
+		// Double quote, control characters are invalid.
+		case !singleQuoted && c == '"', c < ' ':
+			return
+
+		// Single quote characters are invalid.
+		case singleQuoted && c == '\'':
 			return
 
 		// ASCII

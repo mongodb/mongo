@@ -107,16 +107,21 @@ type scanner struct {
 // every subsequent call will return scanError too.
 const (
 	// Continue.
-	scanContinue     = iota // uninteresting byte
-	scanBeginLiteral        // end implied by next result != scanContinue
-	scanBeginObject         // begin object
-	scanObjectKey           // just finished object key (string)
-	scanObjectValue         // just finished non-last object value
-	scanEndObject           // end object (implies scanObjectValue if possible)
-	scanBeginArray          // begin array
-	scanArrayValue          // just finished array value
-	scanEndArray            // end array (implies scanArrayValue if possible)
-	scanSkipSpace           // space byte; can skip; known to be last "continue" result
+	scanContinue      = iota // uninteresting byte
+	scanBeginLiteral         // end implied by next result != scanContinue
+	scanBeginObject          // begin object
+	scanObjectKey            // just finished object key (string)
+	scanObjectValue          // just finished non-last object value
+	scanEndObject            // end object (implies scanObjectValue if possible)
+	scanBeginArray           // begin array
+	scanArrayValue           // just finished array value
+	scanEndArray             // end array (implies scanArrayValue if possible)
+	scanBeginCtor            // begin constructor
+	scanCtorArg              // just finished constructor argument
+	scanEndCtor              // end constructor (implies scanCtorArg if possible)
+	scanRegexpPattern        // inside regular expression pattern
+	scanRegexpOptions        // inside regular expression options
+	scanSkipSpace            // space byte; can skip; known to be last "continue" result
 
 	// Stop.
 	scanEnd   // top-level value ended *before* this byte; known to be first "stop" result
@@ -131,6 +136,7 @@ const (
 	parseObjectKey   = iota // parsing object key (before colon)
 	parseObjectValue        // parsing object value (after colon)
 	parseArrayValue         // parsing array value
+	parseCtorArg            // parsing constructor argument
 )
 
 // reset prepares the scanner for use.
@@ -213,11 +219,17 @@ func stateBeginValue(s *scanner, c int) int {
 	case '"':
 		s.step = stateInString
 		return scanBeginLiteral
-	case '-':
-		s.step = stateNeg
+	case '\'':
+		s.step = stateInSingleQuotedString
+		return scanBeginLiteral
+	case '+', '-':
+		s.step = stateSign
 		return scanBeginLiteral
 	case '0': // beginning of 0.123
 		s.step = state0
+		return scanBeginLiteral
+	case '.': // beginning of .123
+		s.step = stateDot
 		return scanBeginLiteral
 	case 't': // beginning of true
 		s.step = stateT
@@ -233,7 +245,7 @@ func stateBeginValue(s *scanner, c int) int {
 		s.step = state1
 		return scanBeginLiteral
 	}
-	return s.error(c, "looking for beginning of value")
+	return stateBeginExtendedValue(s, c)
 }
 
 // stateBeginStringOrEmpty is the state after reading `{`.
@@ -256,6 +268,14 @@ func stateBeginString(s *scanner, c int) int {
 	}
 	if c == '"' {
 		s.step = stateInString
+		return scanBeginLiteral
+	}
+	if c == '\'' {
+		s.step = stateInSingleQuotedString
+		return scanBeginLiteral
+	}
+	if isBeginUnquotedString(c) {
+		s.step = stateInUnquotedString
 		return scanBeginLiteral
 	}
 	return s.error(c, "looking for beginning of object key string")
@@ -305,6 +325,16 @@ func stateEndValue(s *scanner, c int) int {
 			return scanEndArray
 		}
 		return s.error(c, "after array element")
+	case parseCtorArg:
+		if c == ',' {
+			s.step = stateBeginValue
+			return scanCtorArg
+		}
+		if c == ')' {
+			s.popParseState()
+			return scanEndCtor
+		}
+		return s.error(c, "after constructor argument")
 	}
 	return s.error(c, "")
 }
@@ -390,14 +420,22 @@ func stateInStringEscU123(s *scanner, c int) int {
 	return s.error(c, "in \\u hexadecimal character escape")
 }
 
-// stateNeg is the state after reading `-` during a number.
-func stateNeg(s *scanner, c int) int {
+// stateSign is the state after reading `+` or `-` during a number.
+func stateSign(s *scanner, c int) int {
 	if c == '0' {
 		s.step = state0
 		return scanContinue
 	}
+	if c == '.' {
+		s.step = stateDot
+		return scanContinue
+	}
 	if '1' <= c && c <= '9' {
 		s.step = state1
+		return scanContinue
+	}
+	if c == 'I' {
+		s.step = stateI
 		return scanContinue
 	}
 	return s.error(c, "in numeric literal")
@@ -421,6 +459,10 @@ func state0(s *scanner, c int) int {
 	}
 	if c == 'e' || c == 'E' {
 		s.step = stateE
+		return scanContinue
+	}
+	if c == 'x' || c == 'X' {
+		s.step = stateHex
 		return scanContinue
 	}
 	return stateEndValue(s, c)
@@ -550,11 +592,15 @@ func stateFals(s *scanner, c int) int {
 
 // stateN is the state after reading `n`.
 func stateN(s *scanner, c int) int {
+	if c == 'e' {
+		s.step = stateNe
+		return scanContinue
+	}
 	if c == 'u' {
 		s.step = stateNu
 		return scanContinue
 	}
-	return s.error(c, "in literal null (expecting 'u')")
+	return s.error(c, "in literal new or null (expecting 'e' or 'u')")
 }
 
 // stateNu is the state after reading `nu`.
