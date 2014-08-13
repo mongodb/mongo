@@ -588,7 +588,6 @@ namespace mongo {
                     WriteUnitOfWork wunit(_txn);
                     BSONObj o = cursor->nextSafe();
                     Helpers::upsert( _txn, _config.outputOptions.finalNamespace , o );
-                    _txn->recoveryUnit()->commitIfNeeded();
                     wunit.commit();
                     pm.hit();
                 }
@@ -635,7 +634,6 @@ namespace mongo {
                         Helpers::upsert( _txn, _config.outputOptions.finalNamespace , temp );
                     }
                     wunit.commit();
-                    _txn->recoveryUnit()->commitIfNeeded();
                     pm.hit();
                 }
                 pm.finished();
@@ -690,7 +688,6 @@ namespace mongo {
 
             coll->insertDocument( _txn, o, true );
             ctx.commit();
-            _txn->recoveryUnit()->commitIfNeeded();
         }
 
         State::State(OperationContext* txn, const Config& c) :

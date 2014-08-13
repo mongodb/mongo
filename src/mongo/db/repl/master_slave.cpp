@@ -987,8 +987,6 @@ namespace repl {
                         break;
                     }
                     op = oplogReader.next();
-
-                    getDur().commitIfNeeded(txn);
                 }
             }
         }

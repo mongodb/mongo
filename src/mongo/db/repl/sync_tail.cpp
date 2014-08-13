@@ -112,14 +112,11 @@ namespace repl {
         }
 
         Client::Context ctx(txn, ns);
-        WriteUnitOfWork wunit(txn);
         ctx.getClient()->curop()->reset();
         // For non-initial-sync, we convert updates to upserts
         // to suppress errors when replaying oplog entries.
         bool ok = !applyOperation_inlock(txn, ctx.db(), op, true, convertUpdateToUpsert);
         opsAppliedStats.increment();
-        wunit.commit();
-        txn->recoveryUnit()->commitIfNeeded();
 
         return ok;
     }

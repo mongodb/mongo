@@ -115,7 +115,6 @@ namespace mongo {
             }
         }
         data_file_check(_mb);
-        header()->checkUpgrade(txn);
         return Status::OK();
     }
 
@@ -226,8 +225,10 @@ namespace mongo {
         if ( freeListStart == minDiskLoc ) {
             // we are upgrading from 2.4 to 2.6
             invariant( freeListEnd == minDiskLoc ); // both start and end should be (0,0) or real
+            WriteUnitOfWork wunit(txn);
             *txn->recoveryUnit()->writing( &freeListStart ) = DiskLoc();
             *txn->recoveryUnit()->writing( &freeListEnd ) = DiskLoc();
+            wunit.commit();
         }
     }
 

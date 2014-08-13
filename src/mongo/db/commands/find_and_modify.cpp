@@ -342,6 +342,7 @@ namespace mongo {
             if (out.isEmpty()) {
                 if (!upsert) {
                     result.appendNull("value");
+                    wunit.commit();
                     return true;
                 }
 
@@ -359,6 +360,7 @@ namespace mongo {
 
                 if (!cmdObj["new"].trueValue()) {
                     result.appendNull("value");
+                    wunit.commit();
                     return true;
                 }
 

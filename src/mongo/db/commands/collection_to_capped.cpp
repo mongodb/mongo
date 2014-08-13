@@ -69,9 +69,11 @@ namespace mongo {
             if ( temp )
                 spec.appendBool( "temp", true );
 
+            WriteUnitOfWork wunit(txn);
             Status status = userCreateNS( txn, ctx.db(), toNs, spec.done(), logForReplication );
             if ( !status.isOK() )
                 return status;
+            wunit.commit();
         }
 
         Collection* toCollection = db->getCollection( txn, toNs );
@@ -110,10 +112,11 @@ namespace mongo {
                     continue;
                 }
 
+                WriteUnitOfWork wunit(txn);
                 toCollection->insertDocument( txn, obj, true );
                 if ( logForReplication )
                     repl::logOp(txn, "i", toNs.c_str(), obj);
-                txn->recoveryUnit()->commitIfNeeded();
+                wunit.commit();
             }
         }
 
@@ -159,13 +162,9 @@ namespace mongo {
             }
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, dbname);
 
             Status status = cloneCollectionAsCapped( txn, ctx.db(), from, to, size, temp, true );
-            if (status.isOK()) {
-                wunit.commit();
-            }
             return appendCommandStatus( result, status );
         }
     } cmdCloneCollectionAsCapped;
@@ -216,7 +215,6 @@ namespace mongo {
             // calls renamecollection which does a global lock, so we must too:
             //
             Lock::GlobalWrite globalWriteLock(txn->lockState());
-            WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, dbname);
 
             Database* db = ctx.db();
@@ -249,6 +247,7 @@ namespace mongo {
 
             verify( db->getCollection( txn, longTmpName ) );
 
+            WriteUnitOfWork wunit(txn);
             status = db->dropCollection( txn, longSource );
             if ( !status.isOK() )
                 return appendCommandStatus( result, status );

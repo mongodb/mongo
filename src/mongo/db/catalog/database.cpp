@@ -207,17 +207,19 @@ namespace mongo {
             if ( !options.temp )
                 continue;
 
+            WriteUnitOfWork wunit(txn);
             Status status = dropCollection( txn, ns );
             if ( !status.isOK() ) {
                 warning() << "could not drop temp collection '" << ns << "': " << status;
+                continue;
             }
-            else {
-                string cmdNs = _name + ".$cmd";
-                repl::logOp( txn,
-                             "c",
-                             cmdNs.c_str(),
-                             BSON( "drop" << nsToCollectionSubstring( ns ) ) );
-            }
+
+            string cmdNs = _name + ".$cmd";
+            repl::logOp( txn,
+                         "c",
+                         cmdNs.c_str(),
+                         BSON( "drop" << nsToCollectionSubstring( ns ) ) );
+            wunit.commit();
         }
     }
 

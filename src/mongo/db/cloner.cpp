@@ -173,7 +173,6 @@ namespace mongo {
                     repl::logOp(txn, "i", to_collection.ns().c_str(), js);
 
                 wunit.commit();
-                txn->recoveryUnit()->commitIfNeeded();
 
                 RARELY if ( time( 0 ) - saveLast > 60 ) {
                     log() << numSeen << " objects cloned so far from collection " << from_collection;

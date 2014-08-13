@@ -117,12 +117,15 @@ namespace mongo {
         // this locks _m for defensive checks, so we don't want to be locked right here :
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
         invariant(storageEngine);
-        DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry( txn, dbname );
-        invariant( entry );
-        justCreated = !entry->exists();
-        Database *db = new Database(txn,
-                                    dbname,
-                                    entry );
+        Database *db;
+        {
+            WriteUnitOfWork wunit(txn);
+            DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(txn, dbname);
+            invariant(entry);
+            justCreated = !entry->exists();
+            db = new Database(txn, dbname, entry);
+            wunit.commit();
+        }
 
         {
             SimpleMutex::scoped_lock lk(_m);

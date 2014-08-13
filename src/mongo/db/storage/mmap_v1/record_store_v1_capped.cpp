@@ -326,6 +326,7 @@ namespace mongo {
     void CappedRecordStoreV1::cappedCheckMigrate(OperationContext* txn) {
         // migrate old RecordStoreV1MetaData format
         if ( _details->capExtent().a() == 0 && _details->capExtent().getOfs() == 0 ) {
+            WriteUnitOfWork wunit(txn);
             _details->setCapFirstNewRecord( txn, DiskLoc().setInvalid() );
             // put all the DeletedRecords in cappedListOfAllDeletedRecords()
             for ( int i = 1; i < Buckets; ++i ) {
@@ -342,6 +343,7 @@ namespace mongo {
 
             // Last, in case we're killed before getting here
             _details->setCapExtent( txn, _details->firstExtent(txn) );
+            wunit.commit();
         }
     }
 
@@ -455,7 +457,6 @@ namespace mongo {
                 // 'end' has been found and removed, so break.
                 break;
             }
-            txn->recoveryUnit()->commitIfNeeded();
             // 'curr' will point to the newest document in the collection.
             DiskLoc curr = theCapExtent()->lastRecord;
             invariant( !curr.isNull() );
@@ -475,6 +476,7 @@ namespace mongo {
             // this case instead of asserting.
             uassert( 13415, "emptying the collection is not allowed", _details->numRecords() > 1 );
 
+            WriteUnitOfWork wunit(txn);
             // Delete the newest record, and coalesce the new deleted
             // record with existing deleted records.
             Status status = _deleteCallback->aboutToDeleteCapped( txn, curr );
@@ -502,6 +504,7 @@ namespace mongo {
                     // update cappedLastDelRecLastExtent()
                     cappedTruncateLastDelUpdate(txn);
                 }
+                wunit.commit();
                 continue;
             }
 
@@ -539,6 +542,8 @@ namespace mongo {
                 // update cappedLastDelRecLastExtent()
                 cappedTruncateLastDelUpdate(txn);
             }
+
+            wunit.commit();
         }
     }
 

@@ -314,16 +314,17 @@ namespace mongo {
             scoped_ptr<MMAPV1DatabaseCatalogEntry> dbEntry;
             scoped_ptr<Database> tempDatabase;
             {
-                dbEntry.reset( new MMAPV1DatabaseCatalogEntry( txn,
-                                                               dbName,
-                                                               reservedPathString,
-                                                               storageGlobalParams.directoryperdb,
-                                                               true ) );
-                invariant( !dbEntry->exists() );
-                tempDatabase.reset( new Database( txn,
-                                                  dbName,
-                                                  dbEntry.get() ) );
-
+                WriteUnitOfWork wunit(txn);
+                dbEntry.reset(new MMAPV1DatabaseCatalogEntry(txn,
+                                                             dbName,
+                                                             reservedPathString,
+                                                             storageGlobalParams.directoryperdb,
+                                                             true));
+                invariant(!dbEntry->exists());
+                tempDatabase.reset( new Database(txn,
+                                                 dbName,
+                                                 dbEntry.get()));
+                wunit.commit();
             }
 
             map<string,CollectionOptions> namespacesToCopy;

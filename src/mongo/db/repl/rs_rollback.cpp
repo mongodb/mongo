@@ -444,7 +444,12 @@ namespace repl {
                 Database* db = dbHolder().getOrCreate(txn, nss.db().toString(), unused);
                 invariant(db);
 
-                db->dropCollection(txn, ns);
+                {
+                    WriteUnitOfWork wunit(txn);
+                    db->dropCollection(txn, ns);
+                    wunit.commit();
+                }
+
                 {
                     string errmsg;
 
@@ -503,9 +508,14 @@ namespace repl {
         for (set<string>::iterator it = fixUpInfo.toDrop.begin();
                 it != fixUpInfo.toDrop.end();
                 it++) {
-            Client::Context ctx(txn, *it);
             log() << "replSet rollback drop: " << *it << rsLog;
-            ctx.db()->dropCollection(txn, *it);
+
+            Database* db = dbHolder().get(txn, nsToDatabaseSubstring(*it));
+            if (db) {
+                WriteUnitOfWork wunit(txn);
+                db->dropCollection(txn, *it);
+                wunit.commit();
+            }
         }
 
         sethbmsg("rollback 4.7");
@@ -538,8 +548,6 @@ namespace repl {
                     // we just synced this entire collection
                     continue;
                 }
-
-                txn->recoveryUnit()->commitIfNeeded();
 
                 // keep an archive of items rolled back
                 shared_ptr<Helpers::RemoveSaver>& removeSaver = removeSavers[doc.ns];
@@ -586,7 +594,9 @@ namespace repl {
                                     catch (DBException& e) {
                                         if (e.getCode() == 13415) {
                                             // hack: need to just make cappedTruncate do this...
+                                            WriteUnitOfWork wunit(txn);
                                             uassertStatusOK(collection->truncate(txn));
+                                            wunit.commit();
                                         }
                                         else {
                                             throw e;
@@ -616,7 +626,9 @@ namespace repl {
                                 BSONObj nsResult = them->findOne(sys, QUERY("name" << doc.ns));
                                 if (nsResult.isEmpty()) {
                                     // we should drop
+                                    WriteUnitOfWork wunit(txn);
                                     ctx.db()->dropCollection(txn, doc.ns);
+                                    wunit.commit();
                                 }
                             }
                             catch (DBException&) {

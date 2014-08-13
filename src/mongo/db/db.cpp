@@ -332,7 +332,6 @@ namespace mongo {
 
         OperationContextImpl txn;
         Lock::GlobalWrite lk(txn.lockState());
-        WriteUnitOfWork wunit(&txn);
 
         vector< string > dbNames;
 
@@ -405,7 +404,6 @@ namespace mongo {
                 dbHolder().close( &txn, dbName );
             }
         }
-        wunit.commit();
 
         LOG(1) << "done repairDatabases" << endl;
     }

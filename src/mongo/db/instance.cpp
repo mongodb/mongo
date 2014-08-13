@@ -961,7 +961,6 @@ namespace {
         verify( dbResponse.response );
         dbResponse.response->concat(); // can get rid of this if we make response handling smarter
         response = *dbResponse.response;
-        _txn->recoveryUnit()->commitIfNeeded();
         return true;
     }
 
@@ -971,7 +970,6 @@ namespace {
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
         assembleResponse( _txn, toSend, dbResponse , _clientHost );
-        _txn->recoveryUnit()->commitIfNeeded();
     }
 
     auto_ptr<DBClientCursor> DBDirectClient::query(const string &ns, Query query, int nToReturn , int nToSkip ,

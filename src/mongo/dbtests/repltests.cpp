@@ -170,17 +170,16 @@ namespace ReplTests {
             wunit.commit();
             return count;
         }
-        static void applyAllOperations() {
-            OperationContextImpl txn;
-            Lock::GlobalWrite lk(txn.lockState());
-            WriteUnitOfWork wunit(&txn);
+        void applyAllOperations() {
+            Lock::GlobalWrite lk(_txn.lockState());
+            WriteUnitOfWork wunit(&_txn);
             vector< BSONObj > ops;
             {
-                Client::Context ctx(&txn,  cllNS() );
+                Client::Context ctx(&_txn,  cllNS() );
                 Database* db = ctx.db();
-                Collection* coll = db->getCollection( &txn, cllNS() );
+                Collection* coll = db->getCollection( &_txn, cllNS() );
 
-                RecordIterator* it = coll->getIterator( &txn, DiskLoc(), false,
+                RecordIterator* it = coll->getIterator( &_txn, DiskLoc(), false,
                                                         CollectionScanParams::FORWARD );
                 while ( !it->isEOF() ) {
                     DiskLoc currLoc = it->getNext();
@@ -189,16 +188,16 @@ namespace ReplTests {
                 delete it;
             }
             {
-                Client::Context ctx(&txn,  ns() );
+                Client::Context ctx(&_txn,  ns() );
                 BSONObjBuilder b;
                 b.append("host", "localhost");
                 b.appendTimestamp("syncedTo", 0);
-                ReplSource a(&txn, b.obj());
+                ReplSource a(&_txn, b.obj());
                 for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i ) {
                     if ( 0 ) {
                         mongo::unittest::log() << "op: " << *i << endl;
                     }
-                    a.applyOperation( &txn, ctx.db(), *i );
+                    a.applyOperation( &_txn, ctx.db(), *i );
                 }
             }
             wunit.commit();
@@ -262,6 +261,7 @@ namespace ReplTests {
 
             if ( o.hasField( "_id" ) ) {
                 coll->insertDocument( &txn, o, true );
+                wunit.commit();
                 return;
             }
 

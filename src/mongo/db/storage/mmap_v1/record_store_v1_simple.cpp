@@ -74,7 +74,9 @@ namespace mongo {
         _normalCollection = NamespaceString::normal( ns );
         if ( _details->paddingFactor() == 0 ) {
             warning() << "implicit updgrade of paddingFactor of very old collection" << endl;
+            WriteUnitOfWork wunit(txn);
             _details->setPaddingFactor(txn, 1.0);
+            wunit.commit();
         }
 
     }

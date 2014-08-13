@@ -84,7 +84,6 @@ namespace mongo {
             // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple 
             // ns used so locking individually requires more analysis
             Lock::GlobalWrite globalWriteLock(txn->lockState());
-            WriteUnitOfWork wunit(txn);
 
             DBDirectClient db(txn);
 
@@ -131,6 +130,10 @@ namespace mongo {
                 // operations are applied.  We are already locked globally at this point, so taking
                 // a DBWrite on the namespace creates a nested lock, and yields are disallowed for
                 // operations that hold a nested lock.
+                //
+                // We do not have a wrapping WriteUnitOfWork so it is possible for a journal commit
+                // to happen with a subset of ops applied.
+                // TODO figure out what to do about this.
                 Lock::DBWrite lk(txn->lockState(), ns);
                 invariant(txn->lockState()->isRecursive());
 
@@ -177,7 +180,6 @@ namespace mongo {
                 return false;
             }
 
-            wunit.commit();
             return true;
         }
     } applyOpsCmd;
