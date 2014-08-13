@@ -343,10 +343,10 @@ connection_runtime_config = [
 	Config('eviction', '', r'''
 	    eviction configuration options.''',
 	    type='category', subconfig=[
-            Config('threads_max', '3', r'''
-                maximum number of threads WiredTiger will start to help
-                evict pages from cache. The number of threads currently running
-                will vary depending on the current eviction load''',
+            Config('threads_max', '1', r'''
+		maximum number of threads WiredTiger will start to help evict
+		pages from cache. The number of threads started will vary
+		depending on the current eviction load''',
                 min=1, max=20),
             Config('threads_min', '1', r'''
                 minimum number of threads WiredTiger will start to help evict

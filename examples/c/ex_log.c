@@ -130,8 +130,7 @@ walk_log(WT_SESSION *session)
 	memset(&lsnsave, 0, sizeof(lsnsave));
 	while ((ret = cursor->next(cursor)) == 0) {
 		/*! [log cursor get_key] */
-		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset,
-		    &opcount);
+		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset, &opcount);
 		/*! [log cursor get_key] */
 		/*
 		 * Save one of the LSNs we get back to search for it
@@ -187,7 +186,7 @@ walk_log(WT_SESSION *session)
 
 	cursor->reset(cursor);
 	/*! [log cursor set_key] */
-	cursor->set_key(cursor, lsnsave.file, lsnsave.offset, 0, 0);
+	cursor->set_key(cursor, lsnsave.file, lsnsave.offset, 0);
 	/*! [log cursor set_key] */
 	/*! [log cursor search] */
 	ret = cursor->search(cursor);
