@@ -485,6 +485,8 @@ namespace repl {
         NetworkInterface();
     };
 
+    typedef StatusWith<BSONObj> ResponseStatus;
+
     /**
      * Description of a scheduled but not-yet-run work item.
      *

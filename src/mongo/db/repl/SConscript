@@ -94,6 +94,10 @@ env.Library('repl_coordinator_interface',
 env.Library('repl_coordinator_global',
             'repl_coordinator_global.cpp',
             LIBDEPS=['repl_coordinator_interface'])
+            
+env.CppUnitTest('network_interface_mock_test',
+                'network_interface_mock_test.cpp',
+                LIBDEPS=['replmocks'])
 
 env.Library('replmocks',
             ['repl_coordinator_mock.cpp',
