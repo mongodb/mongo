@@ -30,6 +30,9 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_database_catalog_entry.h"
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
@@ -44,10 +47,20 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
+#include "mongo/db/storage_options.h"
+
 namespace mongo {
 
     WiredTigerDatabaseCatalogEntry::WiredTigerDatabaseCatalogEntry( const StringData& name, WiredTigerDatabase &db )
-        : DatabaseCatalogEntry( name ), _db(db) { }
+        : DatabaseCatalogEntry( name ), _db(db) {
+            // If the catalog hasn't been created, nothing to do.
+            boost::filesystem::path dbpath =
+                boost::filesystem::path(storageGlobalParams.dbpath) / name.toString();
+            if ( !boost::filesystem::exists( dbpath ) )
+                return;
+
+            initCollectionNamespaces();
+    }
 
     WiredTigerDatabaseCatalogEntry::~WiredTigerDatabaseCatalogEntry() {
         for ( EntryMap::const_iterator i = _entryMap.begin(); i != _entryMap.end(); ++i ) {
@@ -85,6 +98,43 @@ namespace mongo {
         return i->second->rs.get();
     }
 
+    void WiredTigerDatabaseCatalogEntry::initCollectionNamespaces() {
+        int ret;
+        const char *key;
+        WT_SESSION *session = _db.GetSession();
+        boost::mutex::scoped_lock lk( _entryMapLock );
+        fprintf(stderr, "Initializing collection namespaces for: %s\n", name().c_str());
+
+        /* Only do this once. */
+        if (!_entryMap.empty())
+            return;
+
+        WT_CURSOR *c;
+        ret = session->open_cursor(session, "metadata:", NULL, NULL, &c);
+        invariant(ret == 0);
+        while ((ret = c->next(c)) == 0) {
+            ret = c->get_key(c, &key);
+            invariant(ret == 0);
+            if (strcmp("metadata:", key) == 0)
+                continue;
+            if (strncmp("table:", key, 6) != 0)
+                continue;
+            if (strstr(key, "_idx") != NULL)
+                continue;
+
+            // Move the pointer past table:NAME.
+            key = key + 6;
+            fprintf(stderr, "adding entry for: %s\n", key);
+            // TODO: retrieve options? Filter indexes? manage memory?
+            CollectionOptions *options = new CollectionOptions();
+            Entry *entry = new Entry(mongo::StringData(key), *options);
+            _entryMap[key] = entry;
+        }
+        invariant(ret == WT_NOTFOUND);
+        _db.ReleaseSession(session);
+        name();
+    }
+
     void WiredTigerDatabaseCatalogEntry::getCollectionNamespaces( std::list<std::string>* out ) const {
         boost::mutex::scoped_lock lk( _entryMapLock );
         for ( EntryMap::const_iterator i = _entryMap.begin(); i != _entryMap.end(); ++i ) {
@@ -96,6 +146,7 @@ namespace mongo {
                                                         const StringData& ns,
                                                         const CollectionOptions& options,
                                                         bool allocateDefaultSpace ) {
+        initCollectionNamespaces();
         dynamic_cast<WiredTigerRecoveryUnit*>( opCtx->recoveryUnit() )->rollbackPossible = false;
         boost::mutex::scoped_lock lk( _entryMapLock );
         Entry*& entry = _entryMap[ ns.toString() ];
@@ -119,6 +170,7 @@ namespace mongo {
         } else {
             entry->rs.reset( new WiredTigerRecordStore( ns, _db ) );
         }
+        _entryMap[ns.toString()] = entry;
 
         return Status::OK();
     }

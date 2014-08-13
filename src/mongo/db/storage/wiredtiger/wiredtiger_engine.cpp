@@ -53,6 +53,7 @@ namespace mongo {
     void WiredTigerEngine::listDatabases( std::vector<std::string>* out ) const {
         // TODO: invariant(storageGlobalParams.directoryperdb);
 
+        // TODO: Save this information into a map, don't keep hitting disk.
         boost::filesystem::path path( storageGlobalParams.dbpath );
         for ( boost::filesystem::directory_iterator i( path );
             i != boost::filesystem::directory_iterator();
@@ -60,7 +61,7 @@ namespace mongo {
             boost::filesystem::path p = *i;
             string dbName = p.leaf().string();
             p /= "WiredTiger.wt";
-            if ( exists (p ) )
+            if ( exists ( p ) )
                     out->push_back( dbName );
         }
     }

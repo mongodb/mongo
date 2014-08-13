@@ -95,6 +95,7 @@ namespace mongo {
 
     private:
 
+        void initCollectionNamespaces();
         struct IndexEntry {
             std::string name;
             BSONObj spec;
