@@ -95,13 +95,13 @@ namespace mongo {
         int ret = c->search(c);
 	invariant(ret == 0);
 
-	WT_ITEM vitem;
-	ret = c->get_value(c, &vitem);
+	WT_ITEM value;
+	ret = c->get_value(c, &value);
 	invariant(ret == 0);
 
-        std::string* value = new std::string();
-        boost::shared_array<char> data( reinterpret_cast<char*>( value ) );
-        return RecordData( reinterpret_cast<const char *>(vitem.data), vitem.size, data );
+        boost::shared_array<char> data( new char[value.size] );
+        memcpy( data.get(), value.data, value.size );
+        return RecordData(reinterpret_cast<const char *>(data.get()), value.size, data );
     }
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& loc ) {
@@ -419,7 +419,8 @@ namespace mongo {
 	  _session( session ),
           _dir( dir ),
           // XXX not using a snapshot here
-	  _cursor(rs.GetCursor(session), session) {
+	  _cursor(rs.GetCursor(session), session),
+	  _eof( true ) {
         (void)getNext();
     }
 
@@ -451,6 +452,7 @@ namespace mongo {
 	WT_CURSOR *c = _cursor.Get();
         int ret = c->reset(c);
 	invariant(ret == 0);
+	_eof = true;
     }
 
     void WiredTigerRecordStore::Iterator::saveState() {
@@ -475,8 +477,7 @@ namespace mongo {
 
             boost::shared_array<char> data( new char[value.size] );
             memcpy( data.get(), value.data, value.size );
-
-            return RecordData( reinterpret_cast<const char *>(value.data), value.size, data );
+            return RecordData(reinterpret_cast<const char *>(data.get()), value.size, data );
         }
 
         return _rs.dataFor( loc );
