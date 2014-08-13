@@ -30,15 +30,14 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/data_file.h"
 
 #include <boost/filesystem/operations.hpp>
 
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
-#include "mongo/db/lockstate.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"

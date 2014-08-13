@@ -51,7 +51,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/d_globals.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbmessage.h"

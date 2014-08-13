@@ -37,7 +37,7 @@
 #pragma once
 
 #include "mongo/db/client_basic.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/stats/top.h"

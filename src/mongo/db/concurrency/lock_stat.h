@@ -1,4 +1,4 @@
-// lockstat.h
+// lock_stat.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.

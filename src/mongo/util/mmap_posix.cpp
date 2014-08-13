@@ -36,7 +36,7 @@
 #include <sys/types.h>
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mmap.h"

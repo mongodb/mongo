@@ -34,8 +34,8 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/lockstate.h"
 #include "mongo/db/concurrency/lock_mgr.h"
+#include "mongo/db/concurrency/lock_state.h"
 
 
 namespace mongo {

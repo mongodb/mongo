@@ -34,7 +34,7 @@
 
 #include "mongo/db/storage/mmap_v1/durop.h"
 
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/util/alignedbuilder.h"

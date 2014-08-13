@@ -27,7 +27,7 @@
  */
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/d_logic.h"

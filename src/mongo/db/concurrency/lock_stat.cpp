@@ -1,4 +1,4 @@
-// lockstat.cpp
+// lock_stat.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -29,9 +29,9 @@
 */
 
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/lockstat.h"
+#include "mongo/db/concurrency/lock_stat.h"
 
 #include "mongo/db/jsobj.h"
 

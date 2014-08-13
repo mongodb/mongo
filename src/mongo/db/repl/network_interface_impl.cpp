@@ -31,7 +31,7 @@
 #include "mongo/db/repl/network_interface_impl.h"
 
 #include "mongo/client/connpool.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/assert_util.h"
 
