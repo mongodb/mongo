@@ -274,7 +274,7 @@ ReplayIteratorImpl::SeekTo(WT_LSN *target_lsn) {
 		valid_ = true;
 		// We're only interested in modification operations.
 		// Continue for any other type of record.
-		if (WT_VALID_OPERATION(fileid, optype))
+		if (!WT_VALID_OPERATION(fileid, optype))
 			Next();
 	}
 }
