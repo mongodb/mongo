@@ -69,24 +69,24 @@ const int scramHashSize = 20;
 
         // U1 = HMAC(input, salt || 1)
         fassert(17494, HMAC(EVP_sha1(),
-                input,
-                inputLen,
-                startKey,
-                saltLen + 4,
-                output,
-                &hashLen));
+                            input,
+                            inputLen,
+                            startKey,
+                            saltLen + 4,
+                            output,
+                            &hashLen));
 
         memcpy(tmpRes, output, scramHashSize);
 
         // tmpRes contain Uj and result contains the accumulated XOR:ed result
         for (size_t i = 2; i <= iterationCount; i++) {
             fassert(17495, HMAC(EVP_sha1(),
-                    input,
-                    inputLen,
-                    tmpRes,
-                    scramHashSize,
-                    tmpRes,
-                    &hashLen));
+                                input,
+                                inputLen,
+                                tmpRes,
+                                scramHashSize,
+                                tmpRes,
+                                &hashLen));
 
             for (int k = 0; k < scramHashSize; k++) {
                 output[k] ^= tmpRes[k];
@@ -97,11 +97,11 @@ const int scramHashSize = 20;
     /* Compute the SCRAM secrets storedKey and serverKey
      * as defined in RFC5802 */
     static void computeSCRAMProperties(const std::string& password,
-                                const unsigned char salt[],
-                                size_t saltLen,
-                                size_t iterationCount,
-                                unsigned char storedKey[scramHashSize],
-                                unsigned char serverKey[scramHashSize]) {
+                                       const unsigned char salt[],
+                                       size_t saltLen,
+                                       size_t iterationCount,
+                                       unsigned char storedKey[scramHashSize],
+                                       unsigned char serverKey[scramHashSize]) {
 
         unsigned char saltedPassword[scramHashSize];
         unsigned char clientKey[scramHashSize];
@@ -118,12 +118,12 @@ const int scramHashSize = 20;
         // clientKey = HMAC(saltedPassword, "Client Key")
         const std::string clientKeyConst = "Client Key";
         fassert(17498, HMAC(EVP_sha1(),
-                 saltedPassword,
-                 scramHashSize,
-                 reinterpret_cast<const unsigned char*>(clientKeyConst.data()),
-                 clientKeyConst.size(),
-                 clientKey,
-                 &hashLen));
+                            saltedPassword,
+                            scramHashSize,
+                            reinterpret_cast<const unsigned char*>(clientKeyConst.data()),
+                            clientKeyConst.size(),
+                            clientKey,
+                            &hashLen));
         
         // storedKey = H(clientKey)
         fassert(17499, SHA1(clientKey, scramHashSize, storedKey));
@@ -131,12 +131,12 @@ const int scramHashSize = 20;
         // serverKey = HMAC(saltedPassword, "Server Key")
         const std::string serverKeyConst = "Server Key";
         fassert(17500, HMAC(EVP_sha1(),
-                 saltedPassword,
-                 scramHashSize,
-                 reinterpret_cast<const unsigned char*>(serverKeyConst.data()),
-                 serverKeyConst.size(),
-                 serverKey,
-                 &hashLen));
+                            saltedPassword,
+                            scramHashSize,
+                            reinterpret_cast<const unsigned char*>(serverKeyConst.data()),
+                            serverKeyConst.size(),
+                            serverKey,
+                            &hashLen));
     }
     
 #endif //MONGO_SSL
@@ -158,7 +158,7 @@ const int scramHashSize = 20;
         userSalt[0] = sr->nextInt64();
         userSalt[1] = sr->nextInt64();
         std::string encodedUserSalt = 
-            base64::encode(reinterpret_cast<char*>(&userSalt[0]), sizeof(userSalt));
+            base64::encode(reinterpret_cast<char*>(userSalt), sizeof(userSalt));
 
         // Compute SCRAM secrets serverKey and storedKey
         unsigned char storedKey[scramHashSize];
@@ -172,14 +172,14 @@ const int scramHashSize = 20;
                                serverKey);
 
         std::string encodedStoredKey = 
-            base64::encode(reinterpret_cast<char*>(&storedKey[0]), scramHashSize);
+            base64::encode(reinterpret_cast<char*>(storedKey), scramHashSize);
         std::string encodedServerKey = 
-            base64::encode(reinterpret_cast<char*>(&serverKey[0]), scramHashSize);
+            base64::encode(reinterpret_cast<char*>(serverKey), scramHashSize);
      
         return BSON("iterationCount" << iterationCount <<
-                                          "salt" << encodedUserSalt << 
-                                          "storedKey" << encodedStoredKey <<
-                                          "serverKey" << encodedServerKey);
+                    "salt" << encodedUserSalt << 
+                    "storedKey" << encodedStoredKey <<
+                    "serverKey" << encodedServerKey);
 #endif
     }
 } // namespace mongo
