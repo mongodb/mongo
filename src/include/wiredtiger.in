@@ -138,7 +138,7 @@ struct __wt_item {
 #endif
 };
 
-/*!
+/*
  * We rely on this structure being aligned at 64 bits by the compiler,
  * if we were paranoid we could add an unused field to ensure the padding
  * is correct.
@@ -146,9 +146,12 @@ struct __wt_item {
  * NOTE:  If you change the contents of this structure you must also update
  * the macros in log.h.
  */
+/*!
+ * A log sequence number, representing a position in the transaction log.
+ */
 struct __wt_lsn {
-	uint32_t        file;           /* Log file number */
-	off_t           offset;         /* Log file offset */
+	uint32_t        file;           /*!< Log file number */
+	off_t           offset;         /*!< Log file offset */
 };
 
 /*!
@@ -832,37 +835,44 @@ struct __wt_session {
 	 *  The following are the builtin cursor types:
 	 *  <table>
 	 *  @hrow{URI, Type, Key/Value types}
-	 *  @row{<tt>backup:</tt>,
+	 *  @row{<code>backup:</code>,
 	 *	hot backup cursor,
 	 *	key=<code>string</code>\, see @ref hot_backup for details}
-	 *  @row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
+	 *  @row{<code>colgroup:\<table name\>:\<column group name\></code>,
 	 *	column group cursor,
 	 *	table key\, column group value(s)}
-	 *  @row{<tt>index:\<table name\>:\<index name\>[\<projection\>]</tt>,
+	 *  @row{
+	 *  <code>index:\<table name\>:\<index name\>[\<projection\>]</code>,
 	 *	index cursor,
 	 *	key=index key\, value=table value(s) with optional projection
 	 *	of columns}
-	 *  @row{<tt>statistics:[\<data source URI\>]</tt>,
+	 *  @row{<code>statistics:[\<data source URI\>]</code>,
 	 *	database or data source statistics cursor,
 	 *	key=<code>int id</code>\, value=(<code>string description\,
 	 *	string value\, uint64_t value</code>)\,
 	 *	see @ref data_statistics for details}
-	 *  @row{<tt>table:\<table name\>[\<projection\>]</tt>,
+	 *  @row{<code>table:\<table name\>[\<projection\>]</code>,
 	 *	table cursor,
 	 *	table key\, table value(s) with optional projection of columns}
 	 *  </table>
 	 *  Advanced applications may also choose to open the following
 	 *  additional cursor types:
 	 *  <table>
-	 *  @row{<tt>file:\<file name\></tt>,
+	 *  @row{<code>file:\<file name\></code>,
 	 *	file cursor,
 	 *	file key\, file value}
-	 *  @row{<tt>lsm:\<name\></tt>,
+	 *  @row{<code>log:</code>,
+	 *	log cursor,
+	 *	key=<code>long fileID\, long offset\, int seqno</code>\,
+	 *	value=<code>uint64_t txnid, uint32_t rectype, uint32_t optype,
+	 *	uint32_t fileid, WT_ITEM key, WT_ITEM value</code>:
+	 *	see @ref cursor_log}
+	 *  @row{<code>lsm:\<name\></code>,
 	 *	LSM cursor,
 	 *	LSM key\, LSM value: see @ref lsm}
-	 *  @row{<tt>metadata:</tt>,
+	 *  @row{<code>metadata:</code>,
 	 *	metadata cursor,
-	 *	metadata key\, metadata value: see @ref metadata}
+	 *	key=\c string\, value=\c string: see @ref metadata}
 	 *  </table>
 	 * @param to_dup a cursor to duplicate
 	 * @configstart{session.open_cursor, see dist/api_data.py}
@@ -2283,6 +2293,7 @@ int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
  * @errors
  */
 int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
+/*! @} */
 
 /*!
  * @name Configuration string parsing
@@ -2432,9 +2443,7 @@ struct __wt_config_parser {
 };
 
 #endif /* !defined(SWIG) */
-/*!
- * @}
- */
+/*! @} */
 
 /*!
  * Get version information.
@@ -3386,6 +3395,11 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*
  * Statistics section: END
  * DO NOT EDIT: automatically built by dist/api_stat.py.
+ */
+/*!
+ * @name Log record and operation types
+ * @anchor log_types
+ * @{
  */
 /*
  * DO NOT EDIT: automatically built by dist/log.py.

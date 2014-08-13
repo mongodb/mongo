@@ -1564,6 +1564,7 @@ PREDEFINED             = DOXYGEN \
                          __wt_extension_api:=WT_EXTENSION_API \
                          __wt_extractor:=WT_EXTRACTOR \
                          __wt_item:=WT_ITEM \
+                         __wt_lsn:=WT_LSN \
                          __wt_session:=WT_SESSION \
                          __wt_txn_notify:=WT_TXN_NOTIFY \
                          WT_HANDLE_CLOSED(x):=x \
