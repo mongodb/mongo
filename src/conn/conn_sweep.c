@@ -138,6 +138,12 @@ __wt_sweep_create(WT_CONNECTION_IMPL *conn)
 	    __wt_open_internal_session(conn, "sweep-server", 1, 1, &session));
 	conn->sweep_session = session;
 
+	/*
+	 * Handle sweep does enough I/O it may be called upon to perform slow
+	 * operations for the block manager.
+	 */
+	F_SET(session, WT_SESSION_CAN_WAIT);
+
 	WT_RET(__wt_cond_alloc(
 	    session, "handle sweep server", 0, &conn->sweep_cond));
 

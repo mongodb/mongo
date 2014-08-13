@@ -242,6 +242,14 @@ __wt_evict_create(WT_CONNECTION_IMPL *conn)
 	    conn, "eviction-server", 0, 0, &session));
 	conn->evict_session = session;
 
+	/*
+	 * If there's only a single eviction thread, it may be called upon to
+	 * perform slow operations for the block manager.  (The flag is not
+	 * reset if reconfigured later, but I doubt that's a problem.)
+	 */
+	if (conn->evict_workers_max == 0)
+		F_SET(session, WT_SESSION_CAN_WAIT);
+
 	if (conn->evict_workers_max > 0) {
 		WT_RET(__wt_calloc_def(
 		    session, conn->evict_workers_max, &workers));
@@ -251,6 +259,8 @@ __wt_evict_create(WT_CONNECTION_IMPL *conn)
 			WT_RET(__wt_open_internal_session(conn,
 			    "eviction-worker", 0, 0, &workers[i].session));
 			workers[i].id = i;
+			F_SET(workers[i].session, WT_SESSION_CAN_WAIT);
+
 			if (i < conn->evict_workers_min) {
 				++conn->evict_workers;
 				F_SET(&workers[i], WT_EVICT_WORKER_RUN);

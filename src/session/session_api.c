@@ -690,9 +690,6 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_STAT_FAST_CONN_INCR(session, txn_checkpoint);
 	SESSION_API_CALL(session, checkpoint, config, cfg);
 
-	/* Don't highjack the session checkpoint thread for eviction. */
-	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
-
 	/*
 	 * Checkpoints require a snapshot to write a transactionally consistent
 	 * snapshot of the data.
@@ -719,6 +716,15 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_ERR(__wt_session_reset_cursors(session));
 
 	/*
+	 * Don't highjack the session checkpoint thread for eviction.
+	 *
+	 * Application threads are not generally available for potentially slow
+	 * operations, but checkpoint does enough I/O it may be called upon to
+	 * perform slow operations for the block manager.
+	 */
+	F_SET(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
+
+	/*
 	 * Only one checkpoint can be active at a time, and checkpoints must run
 	 * in the same order as they update the metadata.  It's probably a bad
 	 * idea to run checkpoints out of multiple threads, but serialize them
@@ -732,7 +738,8 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
 	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 
-err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
+err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
+
 	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 

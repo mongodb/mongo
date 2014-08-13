@@ -102,6 +102,12 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_open_internal_session(
 	    conn, "checkpoint-server", 1, 1, &conn->ckpt_session));
 
+	/*
+	 * Checkpoint does enough I/O it may be called upon to perform slow
+	 * operations for the block manager.
+	 */
+	F_SET(conn->ckpt_session, WT_SESSION_CAN_WAIT);
+
 	WT_RET(
 	    __wt_cond_alloc(session, "checkpoint server", 0, &conn->ckpt_cond));
 
