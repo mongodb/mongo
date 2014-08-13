@@ -28,7 +28,7 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/dbtests/framework.h"
 
@@ -40,6 +40,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/dbtests/dbtests.h"
@@ -92,6 +93,9 @@ namespace mongo {
                     }
                     else if (minutesRunning > 1){
                         warning() << currentTestName << " has been running for more than " << minutesRunning-1 << " minutes." << endl;
+                        
+                        // See what is stuck
+                        newlm::Locker::dumpGlobalLockManager();
                     }
                 }
             }

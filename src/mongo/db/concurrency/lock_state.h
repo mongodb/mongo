@@ -1,32 +1,32 @@
 // lock_state.h
 
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2008 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #pragma once
 
@@ -35,10 +35,6 @@
 
 
 namespace mongo {
-
-    class Acquiring;
-
-
 namespace newlm {
     
     /**
@@ -185,7 +181,14 @@ namespace newlm {
 } // namespace newlm
 
 
-    // per thread
+    /**
+     * One of these exists per OperationContext and serves as interface for acquiring locks and
+     * obtaining lock statistics for this particular operation.
+     *
+     * TODO: It is only temporary that this class inherits from Locker. Both will eventually be
+     * merged and most of the code in LockState will go away (i.e., once we move the GlobalLock to
+     * be its own lock resource under the lock manager).
+     */
     class LockState : public newlm::Locker {
     public:
         LockState();
@@ -198,7 +201,9 @@ namespace newlm {
         unsigned recursiveCount() const { return _recursive; }
 
         /**
-         * @return 0 rwRW
+         * Indicates the mode of acquisition of the GlobalLock by this particular thread. The
+         * return values are '0' (no global lock is held), 'r', 'w', 'R', 'W'. See the commends of
+         * QLock for more information on what these modes mean.
          */
         char threadState() const { return _threadState; }
         
@@ -206,7 +211,6 @@ namespace newlm {
         bool isW() const; // W
         bool hasAnyReadLock() const; // explicitly rR
         
-        bool isLocked(const StringData& ns) const; // rwRW
         bool isLocked() const;
         bool isWriteLocked() const;
         bool isWriteLocked(const StringData& ns) const;
@@ -231,25 +235,14 @@ namespace newlm {
          * this is mostly for W_to_R or R_to_W
          */
         void changeLockState( char newstate );
-
-        Lock::Nestable whichNestable() const { return _whichNestable; }
-        int nestableCount() const { return _nestableCount; }
         
-        int otherCount() const { return _otherCount; }
-        const std::string& otherName() const { return _otherName; }
-        WrapperForRWLock* otherLock() const { return _otherLock; }
-        
-        void enterScopedLock( Lock::ScopedLock* lock );
-        Lock::ScopedLock* leaveScopedLock();
+        // Those are only used for TempRelease. Eventually they should be removed.
+        void enterScopedLock(Lock::ScopedLock* lock);
+        Lock::ScopedLock* getCurrentScopedLock() const;
+        void leaveScopedLock(Lock::ScopedLock* lock);
 
-        void lockedNestable( Lock::Nestable what , int type );
-        void unlockedNestable();
-        void lockedOther( const StringData& db , int type , WrapperForRWLock* lock );
-        void lockedOther( int type );  // "same lock as last time" case 
-        void unlockedOther();
         bool _batchWriter;
 
-        LockStat* getRelevantLockStat();
         void recordLockTime() { _scopedLk->recordTime(); }
         void resetLockTime() { _scopedLk->resetTime(); }
         
@@ -259,14 +252,6 @@ namespace newlm {
         // global lock related
         char _threadState;             // 0, 'r', 'w', 'R', 'W'
 
-        // db level locking related
-        Lock::Nestable _whichNestable;
-        int _nestableCount;            // recursive lock count on local or admin db XXX - change name
-        
-        int _otherCount;               //   >0 means write lock, <0 read lock - XXX change name
-        std::string _otherName;             // which database are we locking and working with (besides local/admin)
-        WrapperForRWLock* _otherLock;  // so we don't have to check the map too often (the map has a mutex)
-
         // for temprelease
         // for the nonrecursive case. otherwise there would be many
         // the first lock goes here, which is ok since we can't yield recursive locks
@@ -275,42 +260,9 @@ namespace newlm {
         bool _lockPending;
         bool _lockPendingParallelWriter;
 
-        friend class Acquiring;
         friend class AcquiringParallelWriter;
     };
 
-    class WrapperForRWLock : boost::noncopyable {
-        SimpleRWLock rw;
-        SimpleMutex m;
-        bool sharedLatching;
-        LockStat stats;
-    public:
-        std::string name() const { return rw.name; }
-        LockStat& getStats() { return stats; }
-
-        WrapperForRWLock(const StringData& name)
-            : rw(name), m(name) {
-            // For the local datbase, all operations are short,
-            // either writing one entry, or doing a tail.
-            // In tests, use a SimpleMutex is much faster for the local db.
-            sharedLatching = name != "local";
-        }
-        void lock()          { if ( sharedLatching ) { rw.lock(); } else { m.lock(); } }
-        void lock_shared()   { if ( sharedLatching ) { rw.lock_shared(); } else { m.lock(); } }
-        void unlock()        { if ( sharedLatching ) { rw.unlock(); } else { m.unlock(); } }
-        void unlock_shared() { if ( sharedLatching ) { rw.unlock_shared(); } else { m.unlock(); } }
-    };
-
-    class ScopedLock;
-
-    class Acquiring {
-    public:
-        Acquiring( Lock::ScopedLock* lock, LockState& ls );
-        ~Acquiring();
-    private:
-        Lock::ScopedLock* _lock;
-        LockState& _ls;
-    };
         
     class AcquiringParallelWriter {
     public:

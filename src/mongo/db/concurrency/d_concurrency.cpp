@@ -32,6 +32,7 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/d_globals.h"
@@ -40,7 +41,6 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mapsf.h"
 #include "mongo/util/concurrency/qlock.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -59,30 +59,6 @@ namespace mongo {
         DBTryLockTimeoutException() {}
         virtual ~DBTryLockTimeoutException() throw() { }
     };
-
-    /* dbname->lock
-       Currently these are never deleted - will linger if db was closed. (that should be fine.)
-       We don't put the lock inside the Database object as those can come and go with open and 
-       closes and that would just add complexity. 
-       Note there is no path concept for where the database is; if somehow you had two db's open 
-       in different directories with the same name, it will be ok but they are sharing a lock 
-       then.
-    */
-    typedef mapsf< StringMap<WrapperForRWLock*> > DBLocksMap;
-    static DBLocksMap dblocks;
-
-    /* we don't want to touch dblocks too much as a mutex is involved.  thus party for that, 
-       this is here...
-    */
-    WrapperForRWLock *nestableLocks[] = { 
-        0, 
-        new WrapperForRWLock("local"),
-        new WrapperForRWLock("admin")
-    };
-
-    LockStat* Lock::nestableLockStat( Nestable db ) {
-        return &nestableLocks[db]->getStats();
-    }
 
     class WrapperForQLock { 
     public:
@@ -144,9 +120,28 @@ namespace mongo {
     };
 
     static WrapperForQLock& qlk = *new WrapperForQLock();
-    LockStat* Lock::globalLockStat() {
-        return &qlk.stats;
-    }
+
+    /**
+     * SERVER-14978: This class is temporary and is used to aggregate the per-operation lock
+     * acquisition times. It will go away once we have figured out the lock stats reporting story.
+     */
+    class TrackLockAcquireTime {
+        MONGO_DISALLOW_COPYING(TrackLockAcquireTime);
+    public:
+        TrackLockAcquireTime(char type) : _type(type) {
+
+        }
+
+        ~TrackLockAcquireTime() {
+            if (haveClient()) {
+                cc().curop()->lockStat().recordAcquireTimeMicros(_type, _timer.micros());
+            }
+        }
+
+    private:
+        char _type;
+        Timer _timer;
+    };
 
 
     RWLockRecursive &Lock::ParallelBatchWriterMode::_batchLock = *(new RWLockRecursive("special"));
@@ -172,75 +167,58 @@ namespace mongo {
 
 
     Lock::ScopedLock::ScopedLock(LockState* lockState, char type)
-        : _lockState(lockState), _pbws_lk(lockState), _type(type), _stat(0) {
+        : _lockState(lockState), _pbws_lk(lockState), _type(type) {
 
         _lockState->enterScopedLock(this);
     }
 
     Lock::ScopedLock::~ScopedLock() { 
-        int prevCount = _lockState->recursiveCount();
-        Lock::ScopedLock* what = _lockState->leaveScopedLock();
-        fassert( 16171 , prevCount != 1 || what == this );
-    }
-    
-    long long Lock::ScopedLock::acquireFinished( LockStat* stat ) {
-        long long acquisitionTime = _timer.micros();
-        _timer.reset();
-        _stat = stat;
-
-        // increment the operation level statistics
-        cc().curop()->lockStat().recordAcquireTimeMicros( _type , acquisitionTime );
-
-        return acquisitionTime;
+        _lockState->leaveScopedLock(this);
     }
 
     void Lock::ScopedLock::tempRelease() {
-        long long micros = _timer.micros();
         _tempRelease();
         _pbws_lk.tempRelease();
-        _recordTime( micros ); // might as well do after we unlock
     }
 
-    void Lock::ScopedLock::_recordTime( long long micros ) {
-        if ( _stat )
-            _stat->recordLockTimeMicros( _type , micros );
-        cc().curop()->lockStat().recordLockTimeMicros( _type , micros );
-    }
-
-    void Lock::ScopedLock::recordTime() {
-        _recordTime(_timer.micros());
+    void Lock::ScopedLock::relock() {
+        _pbws_lk.relock();
+        _relock();
     }
 
     void Lock::ScopedLock::resetTime() {
         _timer.reset();
     }
-    
-    void Lock::ScopedLock::relock() {
-        _pbws_lk.relock();
-        resetTime();
-        _relock();
+
+    void Lock::ScopedLock::recordTime() {
+        if (haveClient()) {
+            cc().curop()->lockStat().recordLockTimeMicros(_type, _timer.micros());
+        }
     }
 
     Lock::TempRelease::TempRelease(LockState* lockState)
         : cant(lockState->isRecursive()), _lockState(lockState) {
 
-        if( cant )
+        if (cant) {
             return;
+        }
 
         fassert(16116, _lockState->recursiveCount() == 1);
         fassert(16117, _lockState->threadState() != 0);
         
-        scopedLk = _lockState->leaveScopedLock();
+        scopedLk = _lockState->getCurrentScopedLock();
         fassert(16118, scopedLk);
 
         invariant(_lockState == scopedLk->_lockState);
 
         scopedLk->tempRelease();
+        _lockState->leaveScopedLock(scopedLk);
     }
-    Lock::TempRelease::~TempRelease()
-    {
-        if( cant )
+
+    Lock::TempRelease::~TempRelease() {
+        if (cant) {
             return;
+        }
         
         fassert(16119, scopedLk);
         fassert(16120, _lockState->threadState() == 0);
@@ -252,16 +230,18 @@ namespace mongo {
     void Lock::GlobalWrite::_tempRelease() { 
         fassert(16121, !noop);
         char ts = _lockState->threadState();
-        fassert(16122, ts != 'R'); // indicates downgraded; not allowed with temprelease
         fassert(16123, ts == 'W');
         qlk.unlock_W(_lockState);
+        recordTime();
     }
     void Lock::GlobalWrite::_relock() { 
         fassert(16125, !noop);
         char ts = _lockState->threadState();
         fassert(16126, ts == 0);
-        Acquiring a(this, *_lockState);
+
+        TrackLockAcquireTime a('W');
         qlk.lock_W(_lockState);
+        resetTime();
     }
 
     void Lock::GlobalRead::_tempRelease() { 
@@ -269,26 +249,30 @@ namespace mongo {
         char ts = _lockState->threadState();
         fassert(16128, ts == 'R');
         qlk.unlock_R(_lockState);
+        recordTime();
     }
+
     void Lock::GlobalRead::_relock() { 
         fassert(16129, !noop);
         char ts = _lockState->threadState();
         fassert(16130, ts == 0);
-        Acquiring a(this, *_lockState);
+
+        TrackLockAcquireTime a('R');
         qlk.lock_R(_lockState);
+        resetTime();
     }
 
     void Lock::DBWrite::_tempRelease() { 
         unlockDB();
     }
     void Lock::DBWrite::_relock() { 
-        lockDB(_what);
+        lockDB();
     }
     void Lock::DBRead::_tempRelease() {
         unlockDB();
     }
     void Lock::DBRead::_relock() { 
-        lockDB(_what);
+        lockDB();
     }
 
     Lock::GlobalWrite::GlobalWrite(LockState* lockState, int timeoutms)
@@ -302,7 +286,7 @@ namespace mongo {
         }
         dassert( ts == 0 );
 
-        Acquiring a(this, *_lockState);
+        TrackLockAcquireTime a('W');
         
         if ( timeoutms != -1 ) {
             bool success = qlk.lock_W_try(_lockState, timeoutms);
@@ -311,18 +295,22 @@ namespace mongo {
         else {
             qlk.lock_W(_lockState);
         }
+
+        resetTime();
     }
     Lock::GlobalWrite::~GlobalWrite() {
         if( noop ) { 
             return;
         }
-        recordTime();  // for lock stats
+
         if (_lockState->threadState() == 'R') { // we downgraded
             qlk.unlock_R(_lockState);
         }
         else {
             qlk.unlock_W(_lockState);
         }
+
+        recordTime();
     }
     void Lock::GlobalWrite::downgrade() { 
         verify( !noop );
@@ -351,7 +339,7 @@ namespace mongo {
             return;
         }
 
-        Acquiring a(this, *_lockState);
+        TrackLockAcquireTime a('R');
 
         if ( timeoutms != -1 ) {
             bool success = qlk.lock_R_try(_lockState, timeoutms);
@@ -361,301 +349,187 @@ namespace mongo {
             // we are unlocked in the qlock/top sense.  lock_R will assert if we are in an in compatible state
             qlk.lock_R(_lockState); 
         }
+
+        resetTime();
     }
+
     Lock::GlobalRead::~GlobalRead() {
         if( !noop ) {
-            recordTime();  // for lock stats
             qlk.unlock_R(_lockState);
+            recordTime();
         }
     }
 
-    void Lock::DBWrite::lockNestable(Nestable db) { 
-        _nested = true;
-
-        if (_lockState->nestableCount()) {
-            if( db != _lockState->whichNestable() ) { 
-                error() << "can't lock local and admin db at the same time " << (int) db << ' ' << (int) _lockState->whichNestable() << endl;
-                fassert(16131,false);
-            }
-            verify( _lockState->nestableCount() > 0 );
-        }
-        else {
-            fassert(16132,_weLocked==0);
-            _lockState->lockedNestable(db, 1);
-            _weLocked = nestableLocks[db];
-            _weLocked->lock();
-        }
-    }
-    void Lock::DBRead::lockNestable(Nestable db) { 
-        _nested = true;
-
-        if (_lockState->nestableCount()) {
-            // we are nested in our locking of local.  previous lock could be read OR write lock on local.
-        }
-        else {
-            _lockState->lockedNestable(db, -1);
-            fassert(16133,_weLocked==0);
-            _weLocked = nestableLocks[db];
-            _weLocked->lock_shared();
-        }
+    static bool isLocalOrAdmin(const string& dbName) {
+        return (dbName == "local" || dbName == "admin");
     }
 
-    void Lock::DBWrite::lockOtherRead(const StringData& db) {
-        fassert(18517, !db.empty());
 
-        // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
-        if( _lockState->otherCount() ) { 
-            // nested. prev could be read or write. if/when we do temprelease with DBRead/DBWrite we will need to increment/decrement here
-            // (so we can not release or assert if nested).  temprelease we should avoid if we can though, it's a bit of an anti-pattern.
-            invariant(db == _lockState->otherName());
-            return;
-        }
-
-        // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
-        invariant(_lockState->nestableCount() == 0);
-
-        if (db != _lockState->otherName()) {
-            DBLocksMap::ref r(dblocks);
-            WrapperForRWLock*& lock = r[db];
-            if (lock == NULL) {
-                lock = new WrapperForRWLock(db);
-            }
-
-            _lockState->lockedOther(db, -1, lock);
-        }
-        else { 
-            DEV OCCASIONALLY{ dassert(dblocks.get(db) == _lockState->otherLock()); }
-            _lockState->lockedOther(-1);
-        }
-
-        fassert(18515, _weLocked == 0);
-        _lockState->otherLock()->lock_shared();
-        _weLocked = _lockState->otherLock();
-    }
-
-    void Lock::DBWrite::lockOtherWrite(const StringData& db) {
-        fassert(16252, !db.empty());
-
-        // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
-        if (_lockState->otherCount()) {
-            // nested. if/when we do temprelease with DBWrite we will need to increment here
-            // (so we can not release or assert if nested).
-            invariant(db == _lockState->otherName());
-            return;
-        }
-
-        // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
-        invariant(_lockState->nestableCount() == 0);
-
-        if (db != _lockState->otherName()) {
-            DBLocksMap::ref r(dblocks);
-            WrapperForRWLock*& lock = r[db];
-            if (lock == NULL) {
-                lock = new WrapperForRWLock(db);
-            }
-
-            _lockState->lockedOther(db, 1, lock);
-        }
-        else { 
-            DEV OCCASIONALLY{ dassert(dblocks.get(db) == _lockState->otherLock()); }
-            _lockState->lockedOther(1);
-        }
-        
-        fassert(16134,_weLocked==0);
-
-        _lockState->otherLock()->lock();
-        _weLocked = _lockState->otherLock();
-    }
-
-    static Lock::Nestable n(const StringData& db) { 
-        if( db == "local" )
-            return Lock::local;
-        if( db == "admin" )
-            return Lock::admin;
-        return Lock::notnestable;
-    }
-
-    void Lock::DBWrite::lockDB(const string& ns) {
-        fassert( 16253, !ns.empty() );
-
-        Acquiring a(this, *_lockState);
-        _locked_W=false;
-        _locked_w=false; 
-        _weLocked=0;
-
-        invariant(!_lockState->hasAnyReadLock());
-
-        if (_lockState->isW())
-            return;
-
-        StringData db = nsToDatabaseSubstring( ns );
-        Nestable nested = n(db);
-        if( nested == admin ) { 
-            // we can't nestedly lock both admin and local as implemented. so lock_W.
-            qlk.lock_W(_lockState);
-            _locked_W = true;
-            return;
-        } 
-
-        if (!nested) {
-            if (_isIntentWrite) {
-                lockOtherRead(db);
-            }
-            else {
-                lockOtherWrite(db);
-            }
-        }
-
-        lockTop();
-        if( nested )
-            lockNestable(nested);
-    }
-
-    void Lock::DBRead::lockDB(const string& ns) {
-        fassert( 16254, !ns.empty() );
-
-        Acquiring a(this, *_lockState);
-        _locked_r=false; 
-        _weLocked=0; 
-
-        if (_lockState->isRW())
-            return;
-
-        StringData db = nsToDatabaseSubstring(ns);
-        Nestable nested = n(db);
-        if( !nested )
-            lockOther(db);
-        lockTop();
-        if( nested )
-            lockNestable(nested);
-    }
-
-    Lock::DBWrite::DBWrite(LockState* lockState, const StringData& ns, bool intentWrite)
+    Lock::DBWrite::DBWrite(LockState* lockState, const StringData& dbOrNs)
         : ScopedLock(lockState, 'w'),
-          _isIntentWrite(intentWrite),
-          _what(ns.toString()),
-          _nested(false) {
-        lockDB(_what);
-    }
+          _lockAcquired(false),
+          _ns(dbOrNs.toString()) {
 
-    Lock::DBRead::DBRead(LockState* lockState, const StringData& ns)
-        : ScopedLock(lockState, 'r' ), _what(ns.toString()), _nested(false) {
-        lockDB( _what );
+        fassert(16253, !_ns.empty());
+        lockDB();
     }
 
     Lock::DBWrite::~DBWrite() {
         unlockDB();
     }
+
+    void Lock::DBWrite::lockTop() {
+        switch (_lockState->threadState()) {
+        case 0:
+            _lockState->lockedStart('w');
+            qlk.q.lock_w();
+            break;
+        case 'w':
+            break;
+        default:
+            invariant(!"Invalid thread state");
+        }
+    }
+
+    void Lock::DBWrite::lockDB() {
+        if (_lockState->isW()) {
+            return;
+        }
+
+        TrackLockAcquireTime a('w');
+
+        const StringData db = nsToDatabaseSubstring(_ns);
+        const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
+
+        // As weird as it looks, currently the top (global 'w' lock) is acquired after the DB lock
+        // has been acquired in order to avoid deadlock with UpgradeGlobalLockToExclusive, which is
+        // called while holding some form of write lock on the database.
+        //
+        // However, for the local/admin database, since its lock is acquired usually after another
+        // DB lock is already held, the nested database's lock (local or admin) needs to be
+        // acquired after the global lock. Consider the following sequence:
+        // 
+        // T1: Acquires DBWrite on 'other' DB, then 'w'
+        // T2: Wants to flush so it queues behind T1 for 'R' lock
+        // T3: Acquires DBRead on 'local' DB, then blocks on 'r' (T2 has precedence, due to 'R')
+        // T1: Does whatever writes it does and tries to acquire DBWrite on 'local' in order to
+        //     insert in the OpLog, and blocks because of T3's 'r' lock on local.
+        //
+        // This is a deadlock T1 -> T3 -> T2 -> T1.
+        //
+        // Moving the acquisition of local or admin's lock to be after the global lock solves this
+        // problem, which would otherwise break replication.
+        //
+        // TODO: This whole lock ordering mess will go away once we make flush be it's own lock
+        // instead of doing upgrades on the global lock.
+        if (isLocalOrAdmin(db.toString())) {
+            lockTop();
+        }
+
+        _lockState->lock(resIdDb, newlm::MODE_X);
+
+        if (!isLocalOrAdmin(db.toString())) {
+            lockTop();
+        }
+
+        _lockAcquired = true;
+
+        resetTime();
+    }
+
+    void Lock::DBWrite::unlockDB() {
+        if (_lockAcquired) {
+            const StringData db = nsToDatabaseSubstring(_ns);
+            const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
+
+            _lockState->unlock(resIdDb);
+
+            // The last one frees the Global lock
+            if (_lockState->recursiveCount() == 1) {
+                invariant(_lockState->threadState() == 'w');
+                qlk.q.unlock_w();
+                _lockState->unlocked();
+                recordTime();
+            }
+
+            _lockAcquired = false;
+        }
+    }
+
+
+    Lock::DBRead::DBRead(LockState* lockState, const StringData& dbOrNs)
+        : ScopedLock(lockState, 'r'),
+          _lockAcquired(false),
+          _ns(dbOrNs.toString()) {
+
+        fassert(16254, !_ns.empty());
+        lockDB();
+    }
+
     Lock::DBRead::~DBRead() {
         unlockDB();
     }
 
-    void Lock::DBWrite::unlockDB() {
-        if( _weLocked ) {
-            recordTime();  // for lock stats
-        
-            if ( _nested )
-                _lockState->unlockedNestable();
-            else
-                _lockState->unlockedOther();
-    
-            _weLocked->unlock();
-        }
-
-        if( _locked_w ) {
-            wassert(_lockState->threadState() == 'w');
-            _lockState->unlocked();
-            qlk.q.unlock_w();
-        }
-
-        if( _locked_W ) {
-            qlk.unlock_W(_lockState);
-        }
-
-        _weLocked = 0;
-        _locked_W = _locked_w = false;
-    }
-    void Lock::DBRead::unlockDB() {
-        if( _weLocked ) {
-            recordTime();  // for lock stats
-        
-            if( _nested )
-                _lockState->unlockedNestable();
-            else
-                _lockState->unlockedOther();
-
-            _weLocked->unlock_shared();
-        }
-
-        if( _locked_r ) {
-            wassert(_lockState->threadState() == 'r');
-            _lockState->unlocked();
-            qlk.q.unlock_r();
-        }
-        _weLocked = 0;
-        _locked_r = false;
-    }
-
-    void Lock::DBWrite::lockTop() { 
+    void Lock::DBRead::lockTop() {
         switch (_lockState->threadState()) {
-        case 'w':
+        case 0:
+            _lockState->lockedStart('r');
+            qlk.q.lock_r();
             break;
-        default:
-            verify(false);
-        case  0  : 
-            verify(_lockState->threadState() == 0);
-            _lockState->lockedStart('w');
-            qlk.q.lock_w();
-            _locked_w = true;
-        }
-    }
-    void Lock::DBRead::lockTop() { 
-        switch (_lockState->threadState()) {
         case 'r':
         case 'w':
             break;
         default:
-            verify(false);
-        case  0  : 
-            verify(_lockState->threadState() == 0);
-            _lockState->lockedStart('r');
-            qlk.q.lock_r();
-            _locked_r = true;
+            invariant(false);
         }
     }
 
-    void Lock::DBRead::lockOther(const StringData& db) {
-        fassert( 16255, !db.empty() );
-
-        // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
-        if( _lockState->otherCount() ) { 
-            // nested. prev could be read or write. if/when we do temprelease with DBRead/DBWrite we will need to increment/decrement here
-            // (so we can not release or assert if nested).  temprelease we should avoid if we can though, it's a bit of an anti-pattern.
-            invariant(db == _lockState->otherName());
+    void Lock::DBRead::lockDB() {
+        if (_lockState->isRW()) {
             return;
         }
 
-        // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
-        invariant(_lockState->nestableCount() == 0);
+        TrackLockAcquireTime a('r');
 
-        if (db != _lockState->otherName()) {
-            DBLocksMap::ref r(dblocks);
-            WrapperForRWLock*& lock = r[db];
-            if (lock == NULL) {
-                lock = new WrapperForRWLock(db);
+        const StringData db = nsToDatabaseSubstring(_ns);
+        const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
+
+        // Keep the order of acquisition of the 'r' lock the same as it is in DBWrite in order to
+        // avoid deadlocks. See the comment inside DBWrite::lockDB for more information on the
+        // reason for the weird ordering of locks.
+        if (isLocalOrAdmin(db.toString())) {
+            lockTop();
+        }
+
+        _lockState->lock(resIdDb, newlm::MODE_S);
+
+        if (!isLocalOrAdmin(db.toString())) {
+            lockTop();
+        }
+
+        _lockAcquired = true;
+        resetTime();
+    }
+
+    void Lock::DBRead::unlockDB() {
+        if (_lockAcquired) {
+            const StringData db = nsToDatabaseSubstring(_ns);
+            const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
+
+            _lockState->unlock(resIdDb);
+            
+            // The last one frees the Global lock
+            if (_lockState->recursiveCount() == 1) {
+                invariant(_lockState->threadState() == 'r');
+                qlk.q.unlock_r();
+                _lockState->unlocked();
+                recordTime();
             }
 
-            _lockState->lockedOther(db, -1, lock);
+            _lockAcquired = false;
         }
-        else { 
-            DEV OCCASIONALLY{ dassert(dblocks.get(db) == _lockState->otherLock()); }
-            _lockState->lockedOther(-1);
-        }
-
-        fassert(16135,_weLocked==0);
-        _lockState->otherLock()->lock_shared();
-        _weLocked = _lockState->otherLock();
     }
+
 
     Lock::UpgradeGlobalLockToExclusive::UpgradeGlobalLockToExclusive(LockState* lockState)
             : _lockState(lockState) {
@@ -767,7 +641,7 @@ namespace mongo {
             BSONObjBuilder t;
 
             t.append( "totalTime" , (long long)(1000 * ( curTimeMillis64() - _started ) ) );
-            t.append( "lockTime" , Lock::globalLockStat()->getTimeLocked( 'W' ) );
+            t.append( "lockTime" , qlk.stats.getTimeLocked( 'W' ) );
 
             // This returns the blocked lock states
             {
@@ -811,14 +685,9 @@ namespace mongo {
         BSONObj generateSection( const BSONElement& configElement ) const {
             BSONObjBuilder b;
             b.append(".", qlk.stats.report());
-            b.append("admin", nestableLocks[Lock::admin]->getStats().report());
-            b.append("local", nestableLocks[Lock::local]->getStats().report());
-            {
-                DBLocksMap::ref r(dblocks);
-                for( DBLocksMap::const_iterator i = r.r.begin(); i != r.r.end(); ++i ) {
-                    b.append(i->first, i->second->getStats().report());
-                }
-            }
+
+            // TODO: Add per-db lock information here
+
             return b.obj();
         }
 

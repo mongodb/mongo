@@ -46,10 +46,6 @@ namespace mongo {
           _batchWriter(false),
           _recursive(0),
           _threadState(0),
-          _whichNestable( Lock::notnestable ),
-          _nestableCount(0), 
-          _otherCount(0), 
-          _otherLock(NULL),
           _scopedLk(NULL),
           _lockPending(false),
           _lockPendingParallelWriter(false)
@@ -68,24 +64,6 @@ namespace mongo {
         return _threadState == 'r' || _threadState == 'R';
     }
 
-    bool LockState::isLocked( const StringData& ns ) const {
-        char db[MaxDatabaseNameLen];
-        nsToDatabase(ns, db);
-        
-        DEV verify( _otherName.find( '.' ) == string::npos ); // XXX this shouldn't be here, but somewhere
-        if ( _otherCount && db == _otherName )
-            return true;
-
-        if ( _nestableCount ) {
-            if ( mongoutils::str::equals( db , "local" ) )
-                return _whichNestable == Lock::local;
-            if ( mongoutils::str::equals( db , "admin" ) )
-                return _whichNestable == Lock::admin;
-        }
-
-        return false;
-    }
-
     bool LockState::isLocked() const {
         return threadState() != 0;
     }
@@ -99,7 +77,10 @@ namespace mongo {
             return true;
         }
 
-        return isLocked(ns);
+        const StringData db = nsToDatabaseSubstring(ns);
+        const newlm::ResourceId resIdNs(newlm::RESOURCE_DATABASE, db);
+
+        return isLockHeldForMode(resIdNs, newlm::MODE_X);
     }
 
     bool LockState::isAtLeastReadLocked(const StringData& ns) const {
@@ -107,7 +88,11 @@ namespace mongo {
             return true; // global
         if (threadState() == 0)
             return false;
-        return isLocked(ns);
+
+        const StringData db = nsToDatabaseSubstring(ns);
+        const newlm::ResourceId resIdNs(newlm::RESOURCE_DATABASE, db);
+
+        return isLockHeldForMode(resIdNs, newlm::MODE_S);
     }
 
     bool LockState::isLockedForCommitting() const {
@@ -138,6 +123,7 @@ namespace mongo {
     void LockState::lockedStart( char newState ) {
         _threadState = newState;
     }
+
     void LockState::unlocked() {
         _threadState = 0;
     }
@@ -174,22 +160,9 @@ namespace mongo {
             buf[1] = 0;
             b.append("^", buf);
         }
-        if( _nestableCount ) {
-            string s = "?";
-            if( _whichNestable == Lock::local ) 
-                s = "^local";
-            else if( _whichNestable == Lock::admin ) 
-                s = "^admin";
-            b.append(s, kind(_nestableCount));
-        }
-        if( _otherCount ) { 
-            WrapperForRWLock *k = _otherLock;
-            if( k ) {
-                string s = "^";
-                s += k->name();
-                b.append(s, kind(_otherCount));
-            }
-        }
+
+        // SERVER-14978: Report state from the Locker
+
         BSONObj o = b.obj();
         if (!o.isEmpty()) {
             res->append("locks", o);
@@ -205,104 +178,33 @@ namespace mongo {
             ss << "unlocked"; 
         }
         else {
-            ss << s;
-            if( _recursive ) { 
-                ss << " recursive:" << _recursive;
-            }
-            ss << " otherCount:" << _otherCount;
-            if( _otherCount ) {
-                ss << " otherdb:" << _otherName;
-            }
-            if( _nestableCount ) {
-                ss << " nestableCount:" << _nestableCount << " which:";
-                if( _whichNestable == Lock::local ) 
-                    ss << "local";
-                else if( _whichNestable == Lock::admin ) 
-                    ss << "admin";
-                else 
-                    ss << (int)_whichNestable;
-            }
+            // SERVER-14978: Dump lock stats information
         }
         log() << ss.str() << endl;
     }
 
-    void LockState::enterScopedLock( Lock::ScopedLock* lock ) {
+    void LockState::enterScopedLock(Lock::ScopedLock* lock) {
         _recursive++;
-        if ( _recursive == 1 ) {
-            fassert(16115, _scopedLk == 0);
+        if (_recursive == 1) {
+            invariant(_scopedLk == NULL);
             _scopedLk = lock;
         }
     }
 
-    Lock::ScopedLock* LockState::leaveScopedLock() {
+    Lock::ScopedLock* LockState::getCurrentScopedLock() const {
+        invariant(_recursive == 1);
+        return _scopedLk;
+    }
+
+    void LockState::leaveScopedLock(Lock::ScopedLock* lock) {
+        if (_recursive == 1) {
+            // Sanity check we are releasing the same lock
+            invariant(_scopedLk == lock);
+            _scopedLk = NULL;
+        }
         _recursive--;
-        dassert( _recursive < 10000 );
-        Lock::ScopedLock* temp = _scopedLk;
-
-        if ( _recursive > 0 ) {
-            return NULL;
-        }
-        
-        _scopedLk = NULL;
-        return temp;
     }
 
-    void LockState::lockedNestable( Lock::Nestable what , int type) {
-        verify( type );
-        _whichNestable = what;
-        _nestableCount += type;
-    }
-
-    void LockState::unlockedNestable() {
-        _whichNestable = Lock::notnestable;
-        _nestableCount = 0;
-    }
-
-    void LockState::lockedOther( int type ) {
-        fassert( 16231 , _otherCount == 0 );
-        _otherCount = type;
-    }
-
-    void LockState::lockedOther( const StringData& other , int type , WrapperForRWLock* lock ) {
-        fassert( 16170 , _otherCount == 0 );
-        _otherName = other.toString();
-        _otherCount = type;
-        _otherLock = lock;
-    }
-
-    void LockState::unlockedOther() {
-        // we leave _otherName and _otherLock set as
-        // _otherLock exists to cache a pointer
-        _otherCount = 0;
-    }
-
-    LockStat* LockState::getRelevantLockStat() {
-        if ( _whichNestable )
-            return Lock::nestableLockStat( _whichNestable );
-
-        if ( _otherCount && _otherLock )
-            return &_otherLock->getStats();
-        
-        if ( isRW() ) 
-            return Lock::globalLockStat();
-
-        return 0;
-    }
-
-
-    Acquiring::Acquiring( Lock::ScopedLock* lock,  LockState& ls )
-        : _lock( lock ), _ls( ls ){
-        _ls._lockPending = true;
-    }
-
-    Acquiring::~Acquiring() {
-        _ls._lockPending = false;
-        LockStat* stat = _ls.getRelevantLockStat();
-        if ( stat && _lock ) {
-            // increment the global stats for this counter
-            stat->recordAcquireTimeMicros( _ls.threadState(), _lock->acquireFinished( stat ) );
-        }
-    }
     
     AcquiringParallelWriter::AcquiringParallelWriter( LockState& ls )
         : _ls( ls ) {

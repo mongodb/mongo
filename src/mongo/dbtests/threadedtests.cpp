@@ -128,7 +128,14 @@ namespace ThreadedTests {
 
         virtual void subthread(int tnumber) {
             Client::initThread("mongomutextest");
+
             LockState lockState;
+            mongo::unittest::log().stream() 
+                << "Thread "
+                << boost::this_thread::get_id()
+                << " has lock state "
+                << &lockState
+                << '\n';
 
             sleepmillis(0);
             for( int i = 0; i < N; i++ ) {

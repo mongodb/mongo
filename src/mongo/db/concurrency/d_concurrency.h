@@ -42,16 +42,10 @@
 
 namespace mongo {
 
-    class WrapperForRWLock;
     class LockState;
 
     class Lock : boost::noncopyable { 
     public:
-        enum Nestable { notnestable=0, local, admin };
-        
-        static LockStat* globalLockStat();
-        static LockStat* nestableLockStat( Nestable db );
-
         class ScopedLock;
 
         // note: avoid TempRelease when possible. not a good thing.
@@ -84,19 +78,18 @@ namespace mongo {
         public:
             virtual ~ScopedLock();
 
-            /** @return micros since we started acquiring */
-            long long acquireFinished( LockStat* stat );
-
-            // Accrue elapsed lock time since last we called reset
-            void recordTime();
             // Start recording a new period, starting now()
             void resetTime();
 
+            // Accrue elapsed lock time since last we called reset
+            void recordTime();
+
         protected:
-            explicit ScopedLock(LockState* lockState, char type ); 
+            explicit ScopedLock(LockState* lockState, char type );
 
         private:
             friend struct TempRelease;
+
             void tempRelease(); // TempRelease class calls these
             void relock();
 
@@ -123,10 +116,8 @@ namespace mongo {
 
             ParallelBatchWriterSupport _pbws_lk;
 
-            void _recordTime( long long micros );
             Timer _timer;
             char _type;      // 'r','w','R','W'
-            LockStat* _stat; // the stat for the relevant lock to increment when we're done
         };
 
         // note that for these classes recursive locking is ok if the recursive locking "makes sense"
@@ -160,19 +151,8 @@ namespace mongo {
 
         // lock this database. do not shared_lock globally first, that is handledin herein. 
         class DBWrite : public ScopedLock {
-            /**
-             * flow
-             *   1) lockDB
-             *      a) lockTop
-             *      b) lockNestable or lockOther
-             *   2) unlockDB
-             */
-
             void lockTop();
-            void lockNestable(Nestable db);
-            void lockOtherWrite(const StringData& db);
-            void lockOtherRead(const StringData& db);
-            void lockDB(const std::string& ns);
+            void lockDB();
             void unlockDB();
 
         protected:
@@ -180,24 +160,18 @@ namespace mongo {
             void _relock();
 
         public:
-            DBWrite(LockState* lockState, const StringData& dbOrNs, bool intentWrite = false);
+            DBWrite(LockState* lockState, const StringData& dbOrNs);
             virtual ~DBWrite();
 
         private:
-            bool _locked_w;
-            bool _locked_W;
-            bool _isIntentWrite;
-            WrapperForRWLock *_weLocked;
-            const std::string _what;
-            bool _nested;
+            bool _lockAcquired;
+            const std::string _ns;
         };
 
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
         class DBRead : public ScopedLock {
             void lockTop();
-            void lockNestable(Nestable db);
-            void lockOther(const StringData& db);
-            void lockDB(const std::string& ns);
+            void lockDB();
             void unlockDB();
 
         protected:
@@ -209,11 +183,8 @@ namespace mongo {
             virtual ~DBRead();
 
         private:
-            bool _locked_r;
-            WrapperForRWLock *_weLocked;
-            std::string _what;
-            bool _nested;
-            
+            bool _lockAcquired;
+            const std::string _ns;
         };
 
         /**

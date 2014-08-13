@@ -22,7 +22,8 @@ env.Library(
 
 env.CppUnitTest(
     target='lock_mgr_test',
-    source=['lock_mgr_new_test.cpp',
+    source=['d_concurrency_test.cpp',
+            'lock_mgr_new_test.cpp',
             'lock_state_test.cpp'
     ],
     LIBDEPS=[

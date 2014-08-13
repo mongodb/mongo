@@ -31,53 +31,52 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "mongo/unittest/unittest.h"
-#include "mongo/db/concurrency/lock_mgr.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/unittest/unittest.h"
 
+
+// Most of the tests here will be removed once we move everything over to using LockManager
+//
 
 namespace mongo {
-namespace newlm {
 
-    class TrackingLockGrantNotification : public LockGrantNotification {
-    public:
-        TrackingLockGrantNotification() : numNotifies(0), lastResult(LOCK_INVALID) {
+    // These two tests ensure that we have preserved the behaviour of TempRelease
+    TEST(DConcurrency, TempReleaseOneDB) {
+        LockState ls;
 
+        Lock::DBRead r1(&ls, "db1");
+
+        {
+            Lock::TempRelease tempRelease(&ls);
         }
 
-        virtual void notify(const ResourceId& resId, LockResult result) {
-            numNotifies++;
-            lastResId = resId;
-            lastResult = result;
+        ls.assertAtLeastReadLocked("db1");
+    }
+
+    TEST(DConcurrency, TempReleaseRecursive) {
+        LockState ls;
+
+        Lock::DBRead r1(&ls, "db1");
+        Lock::DBRead r2(&ls, "db2");
+
+        {
+            Lock::TempRelease tempRelease(&ls);
+
+            ls.assertAtLeastReadLocked("db1");
+            ls.assertAtLeastReadLocked("db2");
         }
 
-    public:
-        int numNotifies;
-
-        ResourceId lastResId;
-        LockResult lastResult;
-    };
-
-    
-    TEST(Locker, BasicLockNoConflict) {
-        Locker locker(1);
-        TrackingLockGrantNotification notify;
-
-        const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
-
-        ASSERT(LOCK_OK == locker.lockExtended(resId, MODE_X, &notify));
-        ASSERT(locker.isLockHeldForMode(resId, MODE_X));
-        ASSERT(locker.isLockHeldForMode(resId, MODE_S));
-
-        locker.unlock(resId);
-
-        ASSERT(!locker.isLockHeldForMode(resId, MODE_NONE));
+        ls.assertAtLeastReadLocked("db1");
+        ls.assertAtLeastReadLocked("db2");
     }
 
-    // Randomly acquires and releases locks, just to make sure that no assertions pop-up
-    TEST(Locker, RandomizedAcquireRelease) {
-        // TODO: Make sure to print the seed
-    }
+    TEST(DConcurrency, MultipleDBLocks) {
+        LockState ls;
 
-} // namespace newlm
+        Lock::DBWrite r1(&ls, "db1");
+        Lock::DBRead r2(&ls, "db1");
+
+        ls.assertWriteLocked("db1");
+    }
 } // namespace mongo
