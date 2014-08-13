@@ -39,8 +39,16 @@ extern "C" int main() {
   assert(s.ok());
 
   s = db->Put(leveldb::WriteOptions(), "key", "value");
+  s = db->Put(leveldb::WriteOptions(), "key2", "value2");
+  s = db->Put(leveldb::WriteOptions(), "key3", "value3");
+  s = db->Put(leveldb::WriteOptions(), "key4", "value4");
   assert(s.ok());
 
+#ifdef	HAVE_HYPERLEVELDB
+  s = db->LiveBackup("test");
+#endif
+
+  // Read through the main database
   leveldb::ReadOptions read_options;
   read_options.snapshot = db->GetSnapshot();
   leveldb::Iterator* iter = db->NewIterator(read_options);
@@ -52,6 +60,24 @@ extern "C" int main() {
   db->ReleaseSnapshot(read_options.snapshot);
 
   delete db;
+
+#ifdef	HAVE_HYPERLEVELDB
+  // Read through the backup database
+  leveldb::DB* db_bkup;
+  options.create_if_missing = false;
+  s = leveldb::DB::Open(options, "WTLDB_HOME/backup-test", &db_bkup);
+  read_options.snapshot = db_bkup->GetSnapshot();
+  iter = db_bkup->NewIterator(read_options);
+  cout << "Backup:" << endl;
+  for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
+    cout << iter->key().ToString() << ": "  << iter->value().ToString() << endl;
+  }
+
+  delete iter;
+  db_bkup->ReleaseSnapshot(read_options.snapshot);
+
+  delete db_bkup;
+#endif
 
   return (0);
 }
