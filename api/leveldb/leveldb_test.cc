@@ -45,10 +45,62 @@ extern "C" int main() {
   assert(s.ok());
 
 #ifdef	HAVE_HYPERLEVELDB
+  leveldb::ReplayIterator* replay_start;
+  leveldb::ReplayIterator* replay_ts;
+  leveldb::ReplayIterator* replay_now;
+  leveldb::ReplayIterator* replay_last;
+  std::string timestamp;
+  std::string timestamp_last;
+
+  cout << "Perform Live Backup" << endl;
   s = db->LiveBackup("test");
+
+  // Test out a bunch of the ReplayIterator methods.
+  db->GetReplayTimestamp(&timestamp);
+  cout << "timestamp 1 " << timestamp << endl << "Put key5" << endl;
+  s = db->Put(leveldb::WriteOptions(), "key5", "value5");
+  db->GetReplayTimestamp(&timestamp_last);
+  // Verify a bunch of timestamp comparisons
+  cout << "timestamp 2 " << timestamp_last << endl;
+  cout << "CompareTimestamps tests" << endl;
+  assert(db->CompareTimestamps(timestamp, timestamp_last) < 0);
+  assert(db->CompareTimestamps("all", timestamp_last) < 0);
+  assert(db->CompareTimestamps(timestamp, "now") < 0);
+  assert(db->CompareTimestamps("now", timestamp_last) == 0);
+  assert(db->CompareTimestamps(timestamp_last, "now") == 0);
+  assert(db->CompareTimestamps("now", timestamp) > 0);
+  assert(db->CompareTimestamps("now", "all") > 0);
+
+  s = db->GetReplayIterator("all", &replay_start);
+  assert(replay_start->Valid());
+  cout << "Replay at all(start):" << endl;
+  cout << replay_start->key().ToString() << ": " << replay_start->value().ToString() << endl;
+  s = db->GetReplayIterator(timestamp, &replay_ts);
+  assert(replay_ts->Valid());
+  cout << "Replay at timestamp " << timestamp << ":" << endl;
+  cout << replay_ts->key().ToString() << ": " << replay_ts->value().ToString() << endl;
+  s = db->GetReplayIterator("now", &replay_now);
+  assert(replay_now->Valid());
+  cout << "Replay at now(end):" << endl;
+  cout << replay_now->key().ToString() << ": " << replay_now->value().ToString() << endl;
+  s = db->GetReplayIterator(timestamp_last, &replay_last);
+  assert(replay_last->Valid());
+  cout << "Replay at last timestamp " << timestamp_last << ":" << endl;
+  cout << replay_last->key().ToString() << ": " << replay_last->value().ToString() << endl;
+  assert(replay_now->key().ToString() == replay_last->key().ToString());
+  cout << "Replay walk from all/start:" << endl;
+  while (replay_start->Valid()) {
+    cout << replay_start->key().ToString() << ": " << replay_start->value().ToString() << endl;
+    replay_start->Next();
+  }
+  db->ReleaseReplayIterator(replay_start);
+  db->ReleaseReplayIterator(replay_ts);
+  db->ReleaseReplayIterator(replay_now);
+  db->ReleaseReplayIterator(replay_last);
 #endif
 
   // Read through the main database
+  cout << "Read main database:" << endl;
   leveldb::ReadOptions read_options;
   read_options.snapshot = db->GetSnapshot();
   leveldb::Iterator* iter = db->NewIterator(read_options);
@@ -68,7 +120,7 @@ extern "C" int main() {
   s = leveldb::DB::Open(options, "WTLDB_HOME/backup-test", &db_bkup);
   read_options.snapshot = db_bkup->GetSnapshot();
   iter = db_bkup->NewIterator(read_options);
-  cout << "Backup:" << endl;
+  cout << "Read Backup database:" << endl;
   for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
     cout << iter->key().ToString() << ": "  << iter->value().ToString() << endl;
   }
