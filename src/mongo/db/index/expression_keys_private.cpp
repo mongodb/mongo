@@ -39,6 +39,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2regioncoverer.h"
@@ -90,6 +91,11 @@ namespace {
 
         GeometryContainer geoContainer;
         if (!geoContainer.parseFrom(obj)) { return false; }
+
+        // Don't index big polygon
+        if (geoContainer.getNativeCRS() == STRICT_SPHERE) {
+            return false;
+        }
 
         // Only certain geometries can be indexed in the old index format S2_INDEX_VERSION_1.  See
         // definition of S2IndexVersion for details.

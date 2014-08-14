@@ -32,6 +32,9 @@ env.Program('console_test', 'console_test.cpp',
 env.CppUnitTest('log_test', 'log_test.cpp',
                 LIBDEPS=['logger', '$BUILD_DIR/mongo/foundation'])
 
+env.CppUnitTest('log_function_test', 'log_function_test.cpp',
+                LIBDEPS=['logger', '$BUILD_DIR/mongo/foundation'])
+
 env.CppUnitTest('rotatable_file_writer_test',
                 'rotatable_file_writer_test.cpp',
                 LIBDEPS=['logger'])

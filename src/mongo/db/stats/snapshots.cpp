@@ -34,6 +34,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/util/log.h"
 
 /**
    handles snapshotting performance metrics and other such things

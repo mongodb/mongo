@@ -55,7 +55,7 @@ namespace mongo {
     bool GeometryContainer::hasS2Region() const {
         return (NULL != _point && _point->crs == SPHERE)
                || NULL != _line
-               || (NULL != _polygon && _polygon->crs == SPHERE)
+               || (NULL != _polygon && (_polygon->crs == SPHERE || _polygon->crs == STRICT_SPHERE))
                || (NULL != _cap && _cap->crs == SPHERE)
                || NULL != _multiPoint
                || NULL != _multiLine
@@ -68,8 +68,10 @@ namespace mongo {
             return _point->cell;
         } else if (NULL != _line) {
             return _line->line;
-        } else if (NULL != _polygon && SPHERE == _polygon->crs) {
-            return _polygon->polygon;
+        } else if (NULL != _polygon && NULL != _polygon->s2Polygon) {
+            return *_polygon->s2Polygon;
+        } else if (NULL != _polygon && NULL != _polygon->bigPolygon) {
+            return *_polygon->bigPolygon;
         } else if (NULL != _cap && SPHERE == _cap->crs) {
             return _cap->cap;
         } else if (NULL != _multiPoint) {
@@ -286,7 +288,8 @@ namespace mongo {
         }
 
         if (NULL != otherContainer._polygon) {
-            return contains(otherContainer._polygon->polygon);
+            invariant(NULL != otherContainer._polygon->s2Polygon);
+            return contains(*otherContainer._polygon->s2Polygon);
         }
 
         if (NULL != otherContainer._multiPoint) {
@@ -331,7 +334,7 @@ namespace mongo {
 
             const vector<PolygonWithCRS*>& polys = c.polygons.vector();
             for (size_t i = 0; i < polys.size(); ++i) {
-                if (!contains(polys[i]->polygon)) { return false; }
+                if (!contains(*polys[i]->s2Polygon)) { return false; }
             }
 
             const vector<MultiPointWithCRS*>& multipoints = c.multiPoints.vector();
@@ -372,8 +375,14 @@ namespace mongo {
     }
 
     bool GeometryContainer::contains(const S2Cell& otherCell, const S2Point& otherPoint) const {
-        if (NULL != _polygon && (_polygon->crs == SPHERE)) {
-            return containsPoint(_polygon->polygon, otherCell, otherPoint);
+        if (NULL != _polygon && (NULL != _polygon->s2Polygon)) {
+            return containsPoint(*_polygon->s2Polygon, otherCell, otherPoint);
+        }
+
+        if (NULL != _polygon && (NULL != _polygon->bigPolygon)) {
+            if (_polygon->bigPolygon->Contains(otherPoint))
+                return true;
+            return _polygon->bigPolygon->MayIntersect(otherCell);
         }
 
         if (NULL != _cap && (_cap->crs == SPHERE)) {
@@ -390,9 +399,9 @@ namespace mongo {
         if (NULL != _geometryCollection) {
             const vector<PolygonWithCRS*>& polys = _geometryCollection->polygons.vector();
             for (size_t i = 0; i < polys.size(); ++i) {
-                if (containsPoint(polys[i]->polygon, otherCell, otherPoint)) { return true; }
+                if (containsPoint(*polys[i]->s2Polygon, otherCell, otherPoint)) { return true; }
             }
-            
+
             const vector<MultiPolygonWithCRS*>& multipolys =_geometryCollection->multiPolygons.vector();
             for (size_t i = 0; i < multipolys.size(); ++i) {
                 const vector<S2Polygon*>& innerpolys = multipolys[i]->polygons.vector();
@@ -424,8 +433,12 @@ namespace mongo {
     }
 
     bool GeometryContainer::contains(const S2Polyline& otherLine) const {
-        if (NULL != _polygon && (_polygon->crs == SPHERE)) {
-            return containsLine(_polygon->polygon, otherLine);
+        if (NULL != _polygon && NULL != _polygon->s2Polygon) {
+            return containsLine(*_polygon->s2Polygon, otherLine);
+        }
+
+        if (NULL != _polygon && NULL != _polygon->bigPolygon) {
+            return _polygon->bigPolygon->Contains(otherLine);
         }
 
         if (NULL != _multiPolygon) {
@@ -438,9 +451,9 @@ namespace mongo {
         if (NULL != _geometryCollection) {
             const vector<PolygonWithCRS*>& polys = _geometryCollection->polygons.vector();
             for (size_t i = 0; i < polys.size(); ++i) {
-                if (containsLine(polys[i]->polygon, otherLine)) { return true; }
+                if (containsLine(*polys[i]->s2Polygon, otherLine)) { return true; }
             }
-            
+
             const vector<MultiPolygonWithCRS*>& multipolys =_geometryCollection->multiPolygons.vector();
             for (size_t i = 0; i < multipolys.size(); ++i) {
                 const vector<S2Polygon*>& innerpolys = multipolys[i]->polygons.vector();
@@ -458,8 +471,12 @@ namespace mongo {
     }
 
     bool GeometryContainer::contains(const S2Polygon& otherPolygon) const {
-        if (NULL != _polygon && (_polygon->crs == SPHERE)) {
-            return containsPolygon(_polygon->polygon, otherPolygon);
+        if (NULL != _polygon && NULL != _polygon->s2Polygon) {
+            return containsPolygon(*_polygon->s2Polygon, otherPolygon);
+        }
+
+        if (NULL != _polygon && NULL != _polygon->bigPolygon) {
+            return _polygon->bigPolygon->Contains(otherPolygon);
         }
 
         if (NULL != _multiPolygon) {
@@ -472,9 +489,9 @@ namespace mongo {
         if (NULL != _geometryCollection) {
             const vector<PolygonWithCRS*>& polys = _geometryCollection->polygons.vector();
             for (size_t i = 0; i < polys.size(); ++i) {
-                if (containsPolygon(polys[i]->polygon, otherPolygon)) { return true; }
+                if (containsPolygon(*polys[i]->s2Polygon, otherPolygon)) { return true; }
             }
-            
+
             const vector<MultiPolygonWithCRS*>& multipolys =_geometryCollection->multiPolygons.vector();
             for (size_t i = 0; i < multipolys.size(); ++i) {
                 const vector<S2Polygon*>& innerpolys = multipolys[i]->polygons.vector();
@@ -493,8 +510,8 @@ namespace mongo {
         } else if (NULL != otherContainer._line) {
             return intersects(otherContainer._line->line);
         } else if (NULL != otherContainer._polygon) {
-            if (SPHERE != otherContainer._polygon->crs) { return false; }
-            return intersects(otherContainer._polygon->polygon);
+            if (NULL == otherContainer._polygon->s2Polygon) { return false; }
+            return intersects(*otherContainer._polygon->s2Polygon);
         } else if (NULL != otherContainer._multiPoint) {
             return intersects(*otherContainer._multiPoint);
         } else if (NULL != otherContainer._multiLine) {
@@ -509,7 +526,7 @@ namespace mongo {
             }
 
             for (size_t i = 0; i < c.polygons.vector().size(); ++i) {
-                if (intersects(c.polygons.vector()[i]->polygon)) { return true; }
+                if (intersects(*c.polygons.vector()[i]->s2Polygon)) { return true; }
             }
 
             for (size_t i = 0; i < c.lines.vector().size(); ++i) {
@@ -559,8 +576,10 @@ namespace mongo {
             return _point->cell.MayIntersect(otherPoint);
         } else if (NULL != _line) {
             return _line->line.MayIntersect(otherPoint);
-        } else if (NULL != _polygon) {
-            return _polygon->polygon.MayIntersect(otherPoint);
+        } else if (NULL != _polygon && NULL != _polygon->s2Polygon) {
+            return _polygon->s2Polygon->MayIntersect(otherPoint);
+        } else if (NULL != _polygon && NULL != _polygon->bigPolygon) {
+            return _polygon->bigPolygon->MayIntersect(otherPoint);
         } else if (NULL != _multiPoint) {
             const vector<S2Cell>& cells = _multiPoint->cells;
             for (size_t i = 0; i < cells.size(); ++i) {
@@ -584,7 +603,7 @@ namespace mongo {
             }
 
             for (size_t i = 0; i < c.polygons.vector().size(); ++i) {
-                if (c.polygons.vector()[i]->polygon.MayIntersect(otherPoint)) { return true; }
+                if (c.polygons.vector()[i]->s2Polygon->MayIntersect(otherPoint)) { return true; }
             }
 
             for (size_t i = 0; i < c.lines.vector().size(); ++i) {
@@ -633,8 +652,10 @@ namespace mongo {
             return otherLine.MayIntersect(_point->cell);
         } else if (NULL != _line) {
             return otherLine.Intersects(&_line->line);
-        } else if (NULL != _polygon && (_polygon->crs == SPHERE)) {
-            return polygonLineIntersection(otherLine, _polygon->polygon);
+        } else if (NULL != _polygon && NULL != _polygon->s2Polygon) {
+            return polygonLineIntersection(otherLine, *_polygon->s2Polygon);
+        } else if (NULL != _polygon && NULL != _polygon->bigPolygon) {
+            return _polygon->bigPolygon->Intersects(otherLine);
         } else if (NULL != _multiPoint) {
             for (size_t i = 0; i < _multiPoint->cells.size(); ++i) {
                 if (otherLine.MayIntersect(_multiPoint->cells[i])) { return true; }
@@ -659,7 +680,7 @@ namespace mongo {
             }
 
             for (size_t i = 0; i < c.polygons.vector().size(); ++i) {
-                if (polygonLineIntersection(otherLine, c.polygons.vector()[i]->polygon)) {
+                if (polygonLineIntersection(otherLine, *c.polygons.vector()[i]->s2Polygon)) {
                     return true;
                 }
             }
@@ -703,8 +724,10 @@ namespace mongo {
             return otherPolygon.MayIntersect(_point->cell);
         } else if (NULL != _line) {
             return polygonLineIntersection(_line->line, otherPolygon);
-        } else if (NULL != _polygon) {
-            return otherPolygon.Intersects(&_polygon->polygon);
+        } else if (NULL != _polygon && NULL != _polygon->s2Polygon) {
+            return otherPolygon.Intersects(_polygon->s2Polygon.get());
+        } else if (NULL != _polygon && NULL != _polygon->bigPolygon) {
+            return _polygon->bigPolygon->Intersects(otherPolygon);
         } else if (NULL != _multiPoint) {
             for (size_t i = 0; i < _multiPoint->cells.size(); ++i) {
                 if (otherPolygon.MayIntersect(_multiPoint->cells[i])) { return true; }
@@ -729,7 +752,7 @@ namespace mongo {
             }
 
             for (size_t i = 0; i < c.polygons.vector().size(); ++i) {
-                if (otherPolygon.Intersects(&c.polygons.vector()[i]->polygon)) {
+                if (otherPolygon.Intersects(c.polygons.vector()[i]->s2Polygon.get())) {
                     return true;
                 }
             }
@@ -825,7 +848,7 @@ namespace mongo {
                 _s2Region->Add(&_geometryCollection->lines.vector()[i]->line);
             }
             for (size_t i = 0; i < _geometryCollection->polygons.vector().size(); ++i) {
-                _s2Region->Add(&_geometryCollection->polygons.vector()[i]->polygon);
+                _s2Region->Add(_geometryCollection->polygons.vector()[i]->s2Polygon.get());
             }
             for (size_t i = 0; i < _geometryCollection->multiPoints.vector().size(); ++i) {
                 MultiPointWithCRS* multiPoint = _geometryCollection->multiPoints.vector()[i];
@@ -901,7 +924,9 @@ namespace mongo {
         }
         else if (NULL != _line) { return _line->crs == otherCRS; }
         else if (NULL != _box) { return _box->crs == otherCRS; }
-        else if (NULL != _polygon) { return _polygon->crs == otherCRS; }
+        else if (NULL != _polygon) {
+            return ShapeProjection::supportsProject(*_polygon, otherCRS);
+        }
         else if (NULL != _cap ) { return _cap->crs == otherCRS; }
         else if (NULL != _multiPoint) { return _multiPoint->crs == otherCRS; }
         else if (NULL != _multiLine) { return _multiLine->crs == otherCRS; }
@@ -914,11 +939,14 @@ namespace mongo {
 
     void GeometryContainer::projectInto(CRS otherCRS) {
 
-        if (otherCRS == getNativeCRS())
+        if (getNativeCRS() == otherCRS) return;
+
+        if (NULL != _polygon) {
+            ShapeProjection::projectInto(_polygon.get(), otherCRS);
             return;
+        }
 
         invariant(NULL != _point);
-
         ShapeProjection::projectInto(_point.get(), otherCRS);
     }
 
@@ -995,7 +1023,9 @@ namespace mongo {
             it != geometryCollection.polygons.vector().end(); ++it) {
 
             invariant(SPHERE == (*it)->crs);
-            double nextDistance = S2Distance::minDistanceRad(s2Point, (*it)->polygon);
+            // We don't support distances for big polygons yet.
+            invariant(NULL != (*it)->s2Polygon);
+            double nextDistance = S2Distance::minDistanceRad(s2Point, *((*it)->s2Polygon));
             if (minDistance < 0 || nextDistance < minDistance) {
                 minDistance = nextDistance;
             }
@@ -1060,7 +1090,9 @@ namespace mongo {
                 minDistance = S2Distance::minDistanceRad(otherPoint.point, _line->line);
             }
             else if (NULL != _polygon) {
-                minDistance = S2Distance::minDistanceRad(otherPoint.point, _polygon->polygon);
+                // We don't support distances for big polygons yet.
+                invariant(NULL != _polygon->s2Polygon);
+                minDistance = S2Distance::minDistanceRad(otherPoint.point, *_polygon->s2Polygon);
             }
             else if (NULL != _cap) {
                 minDistance = S2Distance::minDistanceRad(otherPoint.point, _cap->cap);

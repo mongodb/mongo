@@ -32,12 +32,15 @@
    if you don't care about journaling/durability (temp sort files & such) use MemoryMappedFile class, not this.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 
 
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/util/mongoutils/str.h"
@@ -46,8 +49,6 @@
 using namespace mongoutils;
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     void DurableMappedFile::remapThePrivateView() {
         verify(storageGlobalParams.dur);
@@ -139,7 +140,7 @@ namespace mongo {
         else
             _fileSuffixNo = (int) str::toUnsigned(suffix);
 
-        _p = RelativePath::fromFullPath(prefix);
+        _p = RelativePath::fromFullPath(storageGlobalParams.dbpath, prefix);
     }
 
     bool DurableMappedFile::open(const std::string& fname, bool sequentialHint) {

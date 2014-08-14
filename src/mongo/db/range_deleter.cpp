@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/range_deleter.h"
@@ -94,8 +96,6 @@ namespace {
 }
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     namespace duration = boost::posix_time;
 

@@ -14,7 +14,10 @@
 #include "logging.h"
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+
+LogMessageInfo::LogMessageInfo() : _lsb(mongo::log()) { }
 
 LogMessageFatal::LogMessageFatal(const char* file, int line) :
     _lsb(mongo::severe()) {

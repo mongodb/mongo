@@ -400,6 +400,8 @@ namespace repl {
     public:
         CallbackHandle() : _generation(0) {}
 
+        bool isValid() const { return _finishedEvent.isValid(); }
+
         bool operator==(const CallbackHandle &other) const {
             return (_finishedEvent == other._finishedEvent);
         }

@@ -68,7 +68,7 @@ namespace repl {
 
             const std::string ns = parseNs(dbname, cmdObj);
             Lock::GlobalWrite globalWriteLock(txn->lockState());
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, ns);
             if (getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
                 if (!theReplSet) {

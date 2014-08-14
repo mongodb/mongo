@@ -31,9 +31,11 @@
 #pragma once
 
 #include <map>
+#include <stack>
 #include <string>
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -66,6 +68,8 @@ namespace mongo {
         virtual void* writingPtr(void* data, size_t len);
 
         virtual void syncDataAndTruncateJournal();
+
+        virtual void registerChange(Change* change);
 
         // local api
 

@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndexing
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/ttl.h"
@@ -48,8 +50,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
 
     Counter64 ttlPasses;
     Counter64 ttlDeletedDocuments;

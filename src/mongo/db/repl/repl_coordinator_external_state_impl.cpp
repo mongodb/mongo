@@ -25,8 +25,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
- 
-#include "mongo/platform/basic.h"
 
 #include "mongo/platform/basic.h"
 
@@ -34,11 +32,11 @@
 
 #include <string>
 
+#include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sock.h"
@@ -65,35 +63,51 @@ namespace repl {
         _syncSourceFeedback.forwardSlaveProgress();
     }
 
-    OID ReplicationCoordinatorExternalStateImpl::ensureMe() {
+    OID ReplicationCoordinatorExternalStateImpl::ensureMe(OperationContext* txn) {
         std::string myname = getHostName();
         OID myRID;
         {
-            OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, "local");
+            Client::WriteContext ctx(txn, "local");
 
             BSONObj me;
             // local.me is an identifier for a server for getLastError w:2+
-            if (!Helpers::getSingleton(&txn, "local.me", me) ||
+            if (!Helpers::getSingleton(txn, "local.me", me) ||
                     !me.hasField("host") ||
                     me["host"].String() != myname) {
 
                 myRID = OID::gen();
 
                 // clean out local.me
-                Helpers::emptyCollection(&txn, "local.me");
+                Helpers::emptyCollection(txn, "local.me");
 
                 // repopulate
                 BSONObjBuilder b;
                 b.append("_id", myRID);
                 b.append("host", myname);
-                Helpers::putSingleton(&txn, "local.me", b.done());
+                Helpers::putSingleton(txn, "local.me", b.done());
             } else {
                 myRID = me["_id"].OID();
             }
             ctx.commit();
         }
         return myRID;
+    }
+
+    StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocument(
+            OperationContext* txn) {
+        try {
+            BSONObj config;
+            Client::ReadContext ctx(txn, "local");
+            if (!Helpers::getSingleton(txn, "local.system.replset", config)) {
+                return StatusWith<BSONObj>(
+                        ErrorCodes::NoMatchingDocument,
+                        "Did not find replica set configuration document in local.system.replset");
+            }
+            return StatusWith<BSONObj>(config);
+        }
+        catch (const DBException& ex) {
+            return StatusWith<BSONObj>(ex.toStatus());
+        }
     }
 
     bool ReplicationCoordinatorExternalStateImpl::isSelf(const HostAndPort& host) {

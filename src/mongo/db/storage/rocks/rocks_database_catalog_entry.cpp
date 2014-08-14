@@ -36,6 +36,7 @@
 #include "mongo/db/storage/rocks/rocks_collection_catalog_entry.h"
 #include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bson_validate.h"
 #include "mongo/db/json.h"
+#include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/str.h"
 
@@ -819,50 +820,5 @@ namespace mongo {
         o.toString( s );
         return s;
     }
-
-    template <class T>
-    void BSONObj::Vals(std::vector<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            T t;
-            i.next().Val(t);
-            v.push_back(t);
-        }
-    }
-    template <class T>
-    void BSONObj::Vals(std::list<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            T t;
-            i.next().Val(t);
-            v.push_back(t);
-        }
-    }
-
-    template <class T>
-    void BSONObj::vals(std::vector<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            try {
-                T t;
-                i.next().Val(t);
-                v.push_back(t);
-            }
-            catch(...) { }
-        }
-    }
-    template <class T>
-    void BSONObj::vals(std::list<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            try {
-                T t;
-                i.next().Val(t);
-                v.push_back(t);
-            }
-            catch(...) { }
-        }
-    }
-
 
 } // namespace mongo

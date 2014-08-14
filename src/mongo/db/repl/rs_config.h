@@ -34,7 +34,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/util/concurrency/list.h"
-#include "mongo/util/concurrency/race.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -101,7 +100,6 @@ namespace repl {
             BSONObj asBson() const;
             bool potentiallyHot() const { return !arbiterOnly && priority > 0; }
             void updateGroups(const OpTime& last) {
-                RACECHECK
                 scoped_lock lk(ReplSetConfig::groupMx);
                 for (std::set<TagSubgroup*>::const_iterator it = groups().begin(); it != groups().end(); it++) {
                     (*it)->updateLast(last);

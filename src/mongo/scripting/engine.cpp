@@ -38,6 +38,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/file.h"
+#include "mongo/util/log.h"
 #include "mongo/util/text.h"
 
 namespace mongo {

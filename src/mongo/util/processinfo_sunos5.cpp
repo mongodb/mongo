@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "mongo/util/file.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 

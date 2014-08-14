@@ -40,6 +40,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 using std::string;

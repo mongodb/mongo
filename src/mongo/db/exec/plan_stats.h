@@ -559,6 +559,41 @@ namespace mongo {
         BSONObj keyPattern;
     };
 
+    struct UpdateStats : public SpecificStats {
+        UpdateStats()
+            : nMatched(0),
+              nModified(0),
+              fastmod(false),
+              fastmodinsert(false),
+              inserted(false) { }
+
+        virtual SpecificStats* clone() const {
+            return new UpdateStats(*this);
+        }
+
+        // The number of documents which match the query part of the update.
+        size_t nMatched;
+
+        // The number of documents modified by this update.
+        size_t nModified;
+
+        // A 'fastmod' update is an in-place update that does not have to modify
+        // any indices. It's "fast" because the only work needed is changing the bits
+        // inside the document.
+        bool fastmod;
+
+        // A 'fastmodinsert' is an insert resulting from an {upsert: true} update
+        // which is a doc-replacement style update. It's "fast" because we don't need
+        // to compute the document to insert based on the modifiers.
+        bool fastmodinsert;
+
+        // Is this an {upsert: true} update that did an insert?
+        bool inserted;
+
+        // The object that was inserted. This is an empty document if no insert was performed.
+        BSONObj objInserted;
+    };
+
     struct TextStats : public SpecificStats {
         TextStats() : keysExamined(0), fetches(0), parsedTextQuery() { }
 

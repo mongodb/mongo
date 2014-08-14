@@ -31,6 +31,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/util/alignedbuilder.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

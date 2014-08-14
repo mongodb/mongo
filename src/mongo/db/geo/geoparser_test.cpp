@@ -143,7 +143,7 @@ namespace {
         GeoParser::parsePolygon(
             fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]] ]}"),
             &polygonA);
-        ASSERT_TRUE(polygonA.polygon.Contains(point.point));
+        ASSERT_TRUE(polygonA.s2Polygon->Contains(point.point));
 
         PolygonWithCRS polygonB;
         GeoParser::parsePolygon(
@@ -151,7 +151,7 @@ namespace {
                      " [[1,1],[1,4],[4,4],[4,1],[1,1]] ]}"),
             &polygonB);
         // We removed this in the hole.
-        ASSERT_FALSE(polygonB.polygon.Contains(point.point));
+        ASSERT_FALSE(polygonB.s2Polygon->Contains(point.point));
 
         // Now we reverse the orientations and verify that the code fixes it up
         // (outer loop must be CCW, inner CW).
@@ -159,7 +159,7 @@ namespace {
         GeoParser::parsePolygon(
             fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[0,5],[5,5],[5,0],[0,0]] ]}"),
             &polygonC);
-        ASSERT_TRUE(polygonC.polygon.Contains(point.point));
+        ASSERT_TRUE(polygonC.s2Polygon->Contains(point.point));
 
         PolygonWithCRS polygonD;
         GeoParser::parsePolygon(
@@ -167,7 +167,7 @@ namespace {
                      " [[1,1],[1,4],[4,4],[4,1],[1,1]] ]}"),
             &polygonD);
         // Also removed in the loop.
-        ASSERT_FALSE(polygonD.polygon.Contains(point.point));
+        ASSERT_FALSE(polygonD.s2Polygon->Contains(point.point));
 
         //
         // Bad polygon examples
@@ -300,7 +300,7 @@ namespace {
             fromjson("{'type':'MultiLine','coordinates':[ [[1,1],[2,2],[3,3]],"
                                                                "[[4,5],[6,7]]]}"),
             &mls);
-                                                               
+
         GeoParser::parseMultiLine(
             fromjson("{'type':'MultiLine','coordinates':[ [[1,1],[2,2]],"
                                                                "[[4,5],[6,7]]]}"),

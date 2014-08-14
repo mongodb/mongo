@@ -95,6 +95,7 @@ namespace mongo {
 
         virtual Status commitBulk( IndexAccessMethod* bulk,
                                    bool mayInterrupt,
+                                   bool dupsAllowed,
                                    std::set<DiskLoc>* dups );
 
         virtual Status touch(OperationContext* txn, const BSONObj& obj);

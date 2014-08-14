@@ -37,6 +37,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

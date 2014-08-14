@@ -28,6 +28,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/chunk.h"
@@ -62,8 +64,6 @@
 #include "mongo/db/write_concern_options.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
 
     inline bool allOfType(BSONType type, const BSONObj& o) {
         BSONObjIterator it(o);

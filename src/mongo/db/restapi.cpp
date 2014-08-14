@@ -43,6 +43,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/net/miniwebserver.h"

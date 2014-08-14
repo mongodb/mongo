@@ -267,20 +267,7 @@ namespace mongo {
             _a[0] = _a[1] = _a[2] = 0;
         }
 
-        void operator=(const DiskLoc& loc) {
-            ofs = loc.getOfs();
-            int la = loc.a();
-            invariant( la <= 0xffffff ); // must fit in 3 bytes
-            if( la < 0 ) {
-                if ( la != -1 ) {
-                    log() << "btree diskloc isn't negative 1: " << la << std::endl;
-                    invariant ( la == -1 );
-                }
-                la = 0;
-                ofs = OurNullOfs;
-            }
-            memcpy(_a, &la, 3); // endian
-        }
+        void operator=(const DiskLoc& loc);
 
         //
         // Type Conversion

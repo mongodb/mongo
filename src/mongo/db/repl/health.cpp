@@ -43,6 +43,7 @@
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/goodies.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/ramlog.h"
 

@@ -56,6 +56,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/sequence_util.h"

@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/scripting/engine_v8.h"
@@ -42,8 +44,6 @@
 using namespace mongoutils;
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
 
 #ifndef _MSC_EXTENSIONS
     const int V8Scope::objectDepthLimit;
@@ -586,11 +586,11 @@ namespace mongo {
         string exceptionText;
         v8::HandleScope handle_scope;
         try {
-            v8::Local<v8::External> f =
-                    v8::External::Cast(*args.Callee()->Get(scope->strLitToV8("_native_function")));
+            v8::Local<v8::External> f = args.Callee()->GetHiddenValue(
+                scope->strLitToV8("_native_function")).As<v8::External>();
             NativeFunction function = (NativeFunction)(f->Value());
-            v8::Local<v8::External> data =
-                    v8::External::Cast(*args.Callee()->Get(scope->strLitToV8("_native_data")));
+            v8::Local<v8::External> data = args.Callee()->GetHiddenValue(
+                scope->strLitToV8("_native_data")).As<v8::External>();
             BSONObjBuilder b;
             for (int i = 0; i < args.Length(); ++i)
                 scope->v8ToMongoElement(b, BSONObjBuilder::numStr(i), args[i]);
@@ -1136,16 +1136,15 @@ namespace mongo {
         injectNative(field, func, _global, data);
     }
 
-    void V8Scope::injectNative(const char *field, NativeFunction func, v8::Handle<v8::Object>& obj,
+    void V8Scope::injectNative(const char* field,
+                               NativeFunction nativeFunc,
+                               v8::Handle<v8::Object>& obj,
                                void* data) {
         v8::Handle<v8::FunctionTemplate> ft = createV8Function(nativeCallback);
-        ft->Set(strLitToV8("_native_function"),
-                           v8::External::New((void*)func),
-                           v8::PropertyAttribute(v8::DontEnum | v8::ReadOnly));
-        ft->Set(strLitToV8("_native_data"),
-                           v8::External::New(data),
-                           v8::PropertyAttribute(v8::DontEnum | v8::ReadOnly));
         injectV8Function(field, ft, obj);
+        v8::Handle<v8::Function> func = ft->GetFunction();
+        func->SetHiddenValue(strLitToV8("_native_function"), v8::External::New((void*)nativeFunc));
+        func->SetHiddenValue(strLitToV8("_native_data"), v8::External::New(data));
     }
 
     v8::Handle<v8::FunctionTemplate> V8Scope::injectV8Function(const char *field, v8Function func) {
@@ -1784,6 +1783,51 @@ namespace mongo {
         }
         return scope->mongoToLZV8(scope->_cpuProfiler.fetch(
                 *v8::String::Utf8Value(args[0]->ToString())));
+    }
+
+    /**
+     * Check for an error condition (e.g. empty handle, JS exception, OOM) after executing
+     * a v8 operation.
+     * @resultHandle         handle storing the result of the preceding v8 operation
+     * @try_catch            the active v8::TryCatch exception handler
+     * @param reportError    if true, log an error message
+     * @param assertOnError  if true, throw an exception if an error is detected
+     *                       if false, return value indicates error state
+     * @return true if an error was detected and assertOnError is set to false
+     *         false if no error was detected
+     */
+    template <typename _HandleType>
+    bool V8Scope::checkV8ErrorState(const _HandleType& resultHandle,
+                                    const v8::TryCatch& try_catch,
+                                    bool reportError,
+                                    bool assertOnError) {
+        bool haveError = false;
+
+        if (try_catch.HasCaught() && try_catch.CanContinue()) {
+            // normal JS exception
+            _error = v8ExceptionToSTLString(&try_catch);
+            haveError = true;
+        }
+        else if (hasOutOfMemoryException()) {
+            // out of memory exception (treated as terminal)
+            _error = "JavaScript execution failed -- v8 is out of memory";
+            haveError = true;
+        }
+        else if (resultHandle.IsEmpty() || try_catch.HasCaught()) {
+            // terminal exception (due to empty handle, termination, etc.)
+            _error = "JavaScript execution failed";
+            haveError = true;
+        }
+
+        if (haveError) {
+            if (reportError)
+                log() << _error << std::endl;
+            if (assertOnError)
+                uasserted(16722, _error);
+            return true;
+        }
+
+        return false;
     }
 
     MONGO_INITIALIZER(JavascriptPrintDomain)(InitializerContext*) {

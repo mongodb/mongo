@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/database.h"
@@ -58,8 +60,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     void massertNamespaceNotIndex( const StringData& ns, const StringData& caller ) {
         massert( 17320,
@@ -510,7 +510,9 @@ namespace mongo {
             if ( collection->requiresIdIndex() ) {
                 if ( options.autoIndexId == CollectionOptions::YES ||
                      options.autoIndexId == CollectionOptions::DEFAULT ) {
-                    uassertStatusOK( collection->getIndexCatalog()->ensureHaveIdIndex(txn) );
+                    IndexCatalog* ic = collection->getIndexCatalog();
+                    uassertStatusOK(
+                        ic->createIndexOnEmptyCollection(txn, ic->getDefaultIdIndexSpec()));
                 }
             }
 
@@ -539,7 +541,7 @@ namespace mongo {
 
         for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
             if( *i != "local" ) {
-                WriteUnitOfWork wunit(txn->recoveryUnit());
+                WriteUnitOfWork wunit(txn);
                 Client::Context ctx(txn, *i);
                 dropDatabase(txn, ctx.db());
                 wunit.commit();

@@ -44,6 +44,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -63,7 +64,7 @@ namespace ReplTests {
         mutable DBDirectClient _client;
 
     public:
-        Base() : _wunit( _txn.recoveryUnit()),
+        Base() : _wunit(&_txn),
                  _client(&_txn) {
 
             ReplSettings replSettings;
@@ -82,7 +83,8 @@ namespace ReplTests {
                 c = ctx.ctx().db()->createCollection(&_txn, ns());
             }
 
-            c->getIndexCatalog()->ensureHaveIdIndex(&_txn);
+            ASSERT(c->getIndexCatalog()->haveIdIndex());
+            ctx.commit();
         }
         ~Base() {
             try {
@@ -149,7 +151,7 @@ namespace ReplTests {
         static int opCount() {
             OperationContextImpl txn;
             Lock::GlobalWrite lk(txn.lockState());
-            WriteUnitOfWork wunit(txn.recoveryUnit());
+            WriteUnitOfWork wunit(&txn);
             Client::Context ctx(&txn,  cllNS() );
 
             Database* db = ctx.db();
@@ -171,7 +173,7 @@ namespace ReplTests {
         static void applyAllOperations() {
             OperationContextImpl txn;
             Lock::GlobalWrite lk(txn.lockState());
-            WriteUnitOfWork wunit(txn.recoveryUnit());
+            WriteUnitOfWork wunit(&txn);
             vector< BSONObj > ops;
             {
                 Client::Context ctx(&txn,  cllNS() );
@@ -204,7 +206,7 @@ namespace ReplTests {
         static void printAll( const char *ns ) {
             OperationContextImpl txn;
             Lock::GlobalWrite lk(txn.lockState());
-            WriteUnitOfWork wunit(txn.recoveryUnit());
+            WriteUnitOfWork wunit(&txn);
             Client::Context ctx(&txn,  ns );
 
             Database* db = ctx.db();
@@ -228,7 +230,7 @@ namespace ReplTests {
             OperationContextImpl txn;
             Lock::GlobalWrite lk(txn.lockState());
             Client::Context ctx(&txn,  ns );
-            WriteUnitOfWork wunit(txn.recoveryUnit());
+            WriteUnitOfWork wunit(&txn);
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &txn, ns );
             if ( !coll ) {
@@ -251,7 +253,7 @@ namespace ReplTests {
             OperationContextImpl txn;
             Lock::GlobalWrite lk(txn.lockState());
             Client::Context ctx(&txn,  ns() );
-            WriteUnitOfWork wunit(txn.recoveryUnit());
+            WriteUnitOfWork wunit(&txn);
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &txn, ns() );
             if ( !coll ) {

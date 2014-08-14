@@ -34,8 +34,8 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/lockstate.h"
 #include "mongo/db/concurrency/lock_mgr.h"
+#include "mongo/db/concurrency/lock_state.h"
 
 
 namespace mongo {
@@ -125,6 +125,21 @@ namespace mongo {
 
     protected:
         OperationContext() { }
+    };
+
+    class WriteUnitOfWork {
+        MONGO_DISALLOW_COPYING(WriteUnitOfWork);
+    public:
+        WriteUnitOfWork(OperationContext* txn)
+                 : _txn(txn) {
+            _txn->recoveryUnit()->beginUnitOfWork();
+        }
+
+        ~WriteUnitOfWork(){ _txn->recoveryUnit()->endUnitOfWork(); }
+
+        void commit() { _txn->recoveryUnit()->commitUnitOfWork(); }
+
+        OperationContext* const _txn;
     };
 
 }  // namespace mongo

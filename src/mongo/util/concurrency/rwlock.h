@@ -34,14 +34,7 @@
 #include "mongo/util/concurrency/rwlockimpl.h"
 #include "mongo/util/concurrency/simplerwlock.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
-
-#if defined(_DEBUG)
-#include "mongo/util/concurrency/mutexdebugger.h"
-#endif
-
-
 
 namespace mongo {
 
@@ -54,14 +47,8 @@ namespace mongo {
         }
         void lock() {
             RWLockBase::lock();
-#if defined(_DEBUG)
-            mutexDebugger.entering(_name);
-#endif
         }
         void unlock() {
-#if defined(_DEBUG)            
-            mutexDebugger.leaving(_name);
-#endif
             RWLockBase::unlock();
         }
 
@@ -82,13 +69,7 @@ namespace mongo {
         bool lock_shared_try( int millis ) { return RWLockBase::lock_shared_try(millis); }
 
         bool lock_try( int millis = 0 ) {
-            if( RWLockBase::lock_try(millis) ) {
-#if defined(_DEBUG)            
-                mutexDebugger.entering(_name);
-#endif
-                return true;
-            }
-            return false;
+            return RWLockBase::lock_try(millis);
         }
 
         /** acquire upgradable state.  You must be unlocked before creating.
@@ -251,7 +232,6 @@ namespace mongo {
                 i += ( sleep - 1 );
             }
             if ( ! got ) {
-                log() << "couldn't lazily get rwlock";
                 RWLockBase::lock();
             }
         }

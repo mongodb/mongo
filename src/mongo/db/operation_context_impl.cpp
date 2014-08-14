@@ -35,6 +35,7 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/log.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {

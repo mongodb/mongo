@@ -759,6 +759,11 @@ namespace mongo {
         return isValidLngLat(point.oldPoint.x, point.oldPoint.y);
     }
 
+    bool ShapeProjection::supportsProject(const PolygonWithCRS& polygon, const CRS crs) {
+        return polygon.crs == crs
+            || (polygon.crs == STRICT_SPHERE && crs == SPHERE);
+    }
+
     void ShapeProjection::projectInto(PointWithCRS* point, CRS crs) {
         dassert(supportsProject(*point, crs));
 
@@ -766,6 +771,7 @@ namespace mongo {
             return;
 
         if (FLAT == point->crs) {
+            // Prohibit projection to STRICT_SPHERE CRS
             invariant(SPHERE == crs);
 
             // Note that it's (lat, lng) for S2 but (lng, lat) for MongoDB.
@@ -775,16 +781,23 @@ namespace mongo {
             point->point = latLng.ToPoint();
             point->cell = S2Cell(point->point);
             point->crs = SPHERE;
+            return;
         }
-        else {
-            invariant(SPHERE == point->crs);
-            invariant(FLAT == crs);
 
-            // Just remove the additional spherical information
-            point->point = S2Point();
-            point->cell = S2Cell();
-            point->crs = FLAT;
-        }
+        // Prohibit projection to STRICT_SPHERE CRS
+        invariant(SPHERE == point->crs && FLAT == crs);
+        // Just remove the additional spherical information
+        point->point = S2Point();
+        point->cell = S2Cell();
+        point->crs = FLAT;
+    }
+
+    void ShapeProjection::projectInto(PolygonWithCRS* polygon, CRS crs) {
+        if (polygon->crs == crs) return;
+
+        // Only project from STRICT_SPHERE to SPHERE
+        invariant(STRICT_SPHERE == polygon->crs && SPHERE == crs);
+        polygon->crs = SPHERE;
     }
 
 }  // namespace mongo

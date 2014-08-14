@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetworking
+
 #include "mongo/pch.h"
 
 #include "mongo/client/dbclientcursor.h"
@@ -36,6 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -193,16 +196,16 @@ namespace mongo {
 
     void DBClientCursor::dataReceived( bool& retry, string& host ) {
 
-        QueryResult *qr = (QueryResult *) batch.m->singleData();
-        resultFlags = qr->resultFlags();
+        QueryResult::View qr = batch.m->singleData().view2ptr();
+        resultFlags = qr.getResultFlags();
 
-        if ( qr->resultFlags() & ResultFlag_ErrSet ) {
+        if ( qr.getResultFlags() & ResultFlag_ErrSet ) {
             wasError = true;
         }
 
-        if ( qr->resultFlags() & ResultFlag_CursorNotFound ) {
+        if ( qr.getResultFlags() & ResultFlag_CursorNotFound ) {
             // cursor id no longer valid at the server.
-            verify( qr->cursorId == 0 );
+            verify( qr.getCursorId() == 0 );
             cursorId = 0; // 0 indicates no longer valid (dead)
             if ( ! ( opts & QueryOption_CursorTailable ) )
                 throw UserException( 13127 , "getMore: cursor didn't exist on server, possible restart or timeout?" );
@@ -211,16 +214,16 @@ namespace mongo {
         if ( cursorId == 0 || ! ( opts & QueryOption_CursorTailable ) ) {
             // only set initially: we don't want to kill it on end of data
             // if it's a tailable cursor
-            cursorId = qr->cursorId;
+            cursorId = qr.getCursorId();
         }
 
-        batch.nReturned = qr->nReturned;
+        batch.nReturned = qr.getNReturned();
         batch.pos = 0;
-        batch.data = qr->data();
+        batch.data = qr.data();
 
         _client->checkResponse( batch.data, batch.nReturned, &retry, &host ); // watches for "not master"
 
-        if( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
+        if( qr.getResultFlags() & ResultFlag_ShardConfigStale ) {
             BSONObj error;
             verify( peekError( &error ) );
             throw RecvStaleConfigException( (string)"stale config on lazy receive" + causedBy( getErrField( error ) ), error );
@@ -265,6 +268,16 @@ namespace mongo {
         BSONObj o(batch.data);
         batch.data += o.objsize();
         /* todo would be good to make data null at end of batch for safety */
+        return o;
+    }
+
+    BSONObj DBClientCursor::nextSafe() {
+        BSONObj o = next();
+        if( strcmp(o.firstElementFieldName(), "$err") == 0 ) {
+            std::string s = "nextSafe(): " + o.toString();
+            LOG(5) << s;
+            uasserted(13106, s);
+        }
         return o;
     }
 

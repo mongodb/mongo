@@ -44,6 +44,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

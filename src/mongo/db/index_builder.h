@@ -56,7 +56,7 @@ namespace mongo {
          */
         virtual std::string name() const;
 
-        Status build(OperationContext* txn, Database* db) const;
+        Status buildInForeground(OperationContext* txn, Database* db) const;
 
         /**
          * Kill all in-progress indexes matching criteria, if non-empty:
@@ -75,6 +75,8 @@ namespace mongo {
         static void restoreIndexes(const std::vector<BSONObj>& indexes);
 
     private:
+        Status build(OperationContext* txn, Database* db, bool allowBackgroundBuilding) const;
+
         const BSONObj _index;
         std::string _name; // name of this builder, not related to the index
         static AtomicUInt32 _indexBuildCount;

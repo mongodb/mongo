@@ -313,9 +313,7 @@ namespace mongo {
             return s;
         }
 
-        unsigned long long commit(bool mayInterrupt) {
-            return _count;
-        }
+        void commit(bool mayInterrupt) { }
 
     private:
     WiredTigerIndex &_idx;

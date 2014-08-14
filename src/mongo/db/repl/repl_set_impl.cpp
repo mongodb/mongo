@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_set_impl.h"
@@ -50,8 +52,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
 
 namespace repl {
 #ifdef MONGO_PLATFORM_64
@@ -470,7 +470,6 @@ namespace {
     void ReplSetImpl::_go() {
         OperationContextImpl txn;
 
-        indexRebuilder.wait();
         try {
             loadLastOpTimeWritten(&txn);
         }
@@ -872,14 +871,14 @@ namespace {
 
     void ReplSetImpl::clearInitialSyncFlag(OperationContext* txn) {
         Lock::DBWrite lk(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         Helpers::putSingleton(txn, "local.replset.minvalid", BSON("$unset" << _initialSyncFlag));
         wunit.commit();
     }
 
     void ReplSetImpl::setInitialSyncFlag(OperationContext* txn) {
         Lock::DBWrite lk(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         Helpers::putSingleton(txn, "local.replset.minvalid", BSON("$set" << _initialSyncFlag));
         wunit.commit();
     }
@@ -901,7 +900,7 @@ namespace {
         subobj.done();
 
         Lock::DBWrite lk(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         Helpers::putSingleton(txn, "local.replset.minvalid", builder.obj());
         wunit.commit();
     }

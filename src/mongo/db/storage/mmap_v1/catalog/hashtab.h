@@ -34,8 +34,10 @@
 
 #pragma once
 
-#include "mongo/pch.h"
 #include <map>
+
+#include "mongo/db/storage/mmap_v1/catalog/namespace.h"
+#include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/functional.h"
@@ -47,11 +49,14 @@ namespace mongo {
     /* you should define:
 
        int Key::hash() return > 0 always.
+       Used in NamespaceIndex only.
     */
 
-    template <class Key,class Type>
-    class HashTable : boost::noncopyable {
+    class NamespaceHashTable : boost::noncopyable {
     public:
+        typedef Namespace Key;
+        typedef NamespaceDetails Type;
+
         const char *name;
         struct Node {
             int hash;
@@ -73,59 +78,11 @@ namespace mongo {
             return nodes[i];
         }
 
-        int _find(const Key& k, bool& found) {
-            found = false;
-            int h = k.hash();
-            int i = h % n;
-            int start = i;
-            int chain = 0;
-            int firstNonUsed = -1;
-            while ( 1 ) {
-                if ( !nodes(i).inUse() ) {
-                    if ( firstNonUsed < 0 )
-                        firstNonUsed = i;
-                }
-
-                if ( nodes(i).hash == h && nodes(i).k == k ) {
-                    if ( chain >= 200 )
-                        log() << "warning: hashtable " << name << " long chain " << std::endl;
-                    found = true;
-                    return i;
-                }
-                chain++;
-                i = (i+1) % n;
-                if ( i == start ) {
-                    // shouldn't get here / defensive for infinite loops
-                    log() << "error: hashtable " << name << " is full n:" << n << std::endl;
-                    return -1;
-                }
-                if( chain >= maxChain ) {
-                    if ( firstNonUsed >= 0 )
-                        return firstNonUsed;
-                    log() << "error: hashtable " << name << " max chain reached:" << maxChain << std::endl;
-                    return -1;
-                }
-            }
-        }
+        int _find(const Key& k, bool& found);
 
     public:
         /* buf must be all zeroes on initialization. */
-        HashTable(void* buf, int buflen, const char *_name) : name(_name) {
-            int m = sizeof(Node);
-            // log() << "hashtab init, buflen:" << buflen << " m:" << m << std::endl;
-            n = buflen / m;
-            if ( (n & 1) == 0 )
-                n--;
-            maxChain = (int) (n * 0.05);
-            _buf = buf;
-            //nodes = (Node *) buf;
-
-            if ( sizeof(Node) != 628 ) {
-                log() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << " sizeof(Key): " << sizeof(Key) << " sizeof(Type):" << sizeof(Type) << std::endl;
-                verify( sizeof(Node) == 628 );
-            }
-
-        }
+        NamespaceHashTable(void* buf, int buflen, const char *_name);
 
         Type* get(const Key& k) {
             bool found;

@@ -37,6 +37,10 @@
 #include "mongo/bson/inline_decls.h"
 #include "mongo/client/export_macros.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/logger/log_severity.h"
+#include "mongo/logger/logger.h"
+#include "mongo/logger/logstream_builder.h"
+#include "mongo/util/concurrency/thread_name.h"
 
 namespace mongo {
 
@@ -311,10 +315,16 @@ namespace mongo {
     try { \
         expression; \
     } catch ( const std::exception &e ) { \
-        ::mongo::log() << "caught exception (" << e.what() << ") in destructor (" << __FUNCTION__ \
-              << ")" << std::endl; \
+        ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), \
+                                          ::mongo::getThreadName(), \
+                                          ::mongo::logger::LogSeverity::Log()) \
+            << "caught exception (" << e.what() << ") in destructor (" << __FUNCTION__ \
+            << ")" << std::endl; \
     } catch ( ... ) { \
-        ::mongo::log() << "caught unknown exception in destructor (" << __FUNCTION__ << ")" \
-              << std::endl; \
+        ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), \
+                                          ::mongo::getThreadName(), \
+                                          ::mongo::logger::LogSeverity::Log()) \
+            << "caught unknown exception in destructor (" << __FUNCTION__ << ")" \
+            << std::endl; \
     }
 

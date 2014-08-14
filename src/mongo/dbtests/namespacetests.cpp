@@ -51,6 +51,7 @@
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/util/log.h"
 
 namespace NamespaceTests {
 
@@ -531,7 +532,7 @@ namespace NamespaceTests {
 
                 Collection* committedColl;
                 {
-                    WriteUnitOfWork wunit(txn.recoveryUnit());
+                    WriteUnitOfWork wunit(&txn);
                     ASSERT_FALSE(db->getCollection(&txn, committedName));
                     committedColl = db->createCollection(&txn, committedName);
                     ASSERT_EQUALS(db->getCollection(&txn, committedName), committedColl);
@@ -541,7 +542,7 @@ namespace NamespaceTests {
                 ASSERT_EQUALS(db->getCollection(&txn, committedName), committedColl);
 
                 {
-                    WriteUnitOfWork wunit(txn.recoveryUnit());
+                    WriteUnitOfWork wunit(&txn);
                     ASSERT_FALSE(db->getCollection(&txn, rolledBackName));
                     Collection* rolledBackColl = db->createCollection(&txn, rolledBackName);
                     ASSERT_EQUALS(db->getCollection(&txn, rolledBackName), rolledBackColl);
@@ -573,7 +574,7 @@ namespace NamespaceTests {
                 ASSERT(justCreated);
 
                 {
-                    WriteUnitOfWork wunit(txn.recoveryUnit());
+                    WriteUnitOfWork wunit(&txn);
                     ASSERT_FALSE(db->getCollection(&txn, droppedName));
                     Collection* droppedColl;
                     droppedColl = db->createCollection(&txn, droppedName);
@@ -586,7 +587,7 @@ namespace NamespaceTests {
                 ASSERT_FALSE(db->getCollection(&txn, droppedName));
 
                 {
-                    WriteUnitOfWork wunit(txn.recoveryUnit());
+                    WriteUnitOfWork wunit(&txn);
                     ASSERT_FALSE(db->getCollection(&txn, rolledBackName));
                     Collection* rolledBackColl = db->createCollection(&txn, rolledBackName);
                     wunit.commit();

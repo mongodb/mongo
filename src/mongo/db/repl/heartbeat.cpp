@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include <boost/thread/thread.hpp>
 
 #include "mongo/bson/util/bson_extract.h"
@@ -48,6 +50,7 @@
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/goodies.h"
+#include "mongo/util/log.h"
 #include "mongo/util/ramlog.h"
 
 namespace mongo {

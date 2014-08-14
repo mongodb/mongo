@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/sync_source_feedback.h"
@@ -45,8 +47,6 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
-
 namespace repl {
 
     // used in replAuthenticate
@@ -57,6 +57,11 @@ namespace repl {
                                                _handshakeNeeded(false),
                                                _shutdownSignaled(false) {}
     SyncSourceFeedback::~SyncSourceFeedback() {}
+
+    void SyncSourceFeedback::_resetConnection() {
+        LOG(1) << "resetting connection in sync source feedback";
+        _connection.reset();
+    }
 
     bool SyncSourceFeedback::replAuthenticate() {
         if (!getGlobalAuthorizationManager()->isAuthEnabled())

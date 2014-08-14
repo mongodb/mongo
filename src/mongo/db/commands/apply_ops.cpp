@@ -84,7 +84,7 @@ namespace mongo {
             // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple 
             // ns used so locking individually requires more analysis
             Lock::GlobalWrite globalWriteLock(txn->lockState());
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
 
             DBDirectClient db(txn);
 

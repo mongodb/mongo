@@ -45,6 +45,7 @@
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/server.h"
 #include "mongo/util/alignedbuilder.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/timer.h"

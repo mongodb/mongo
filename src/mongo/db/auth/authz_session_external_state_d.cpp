@@ -33,7 +33,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/scripting/engine.h"

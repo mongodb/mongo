@@ -69,6 +69,8 @@
    @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kJournaling
+
 #include "mongo/platform/basic.h"
 
 #include <boost/thread/thread.hpp>
@@ -85,7 +87,6 @@
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/server.h"
-#include "mongo/util/concurrency/race.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
@@ -94,9 +95,6 @@
 using namespace mongoutils;
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
-
     namespace dur {
 
         void PREPLOGBUFFER(JSectHeader& outParm, AlignedBuilder&);
@@ -810,8 +808,6 @@ namespace mongo {
             }
 
             while( !inShutdown() ) {
-                RACECHECK
-
                 unsigned ms = storageGlobalParams.journalCommitInterval;
                 if( ms == 0 ) { 
                     // use default
@@ -890,6 +886,10 @@ namespace mongo {
             preallocateFiles();
 
             boost::thread t(durThread);
+        }
+
+        DurableInterface::~DurableInterface() {
+            log() << "ERROR warning ~DurableInterface not intended to be called" << std::endl;
         }
 
         void DurableImpl::syncDataAndTruncateJournal(OperationContext* txn) {

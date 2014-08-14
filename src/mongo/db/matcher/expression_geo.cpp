@@ -52,6 +52,10 @@ namespace mongo {
         if ( !geometry.parseFrom( e.Obj() ) )
                 return false;
 
+        // Never match big polygon
+        if (geometry.getNativeCRS() == STRICT_SPHERE)
+            return false;
+
         // Project this geometry into the CRS of the query
         if (!geometry.supportsProject(_query->getGeometry().getNativeCRS()))
             return false;

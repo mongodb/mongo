@@ -40,6 +40,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
 #include "mongo/s/shard.h"
+#include "mongo/util/log.h"
 #include "mongo/util/concurrency/thread_name.h"
 
 /*
@@ -61,8 +62,6 @@ namespace mongo {
     }
 
     TSP_DEFINE(Client,currentClient)
-
-    LockState::LockState(){} // ugh
 
     Client::Client(const string& desc, AbstractMessagingPort *p) :
         ClientBasic(p),

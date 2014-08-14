@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/sync.h"
@@ -42,8 +44,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
 
 namespace repl {
 
@@ -129,7 +129,7 @@ namespace repl {
             return false;
         }
         else {
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             Collection* collection = ctx.db()->getOrCreateCollection(txn, ns);
             invariant(collection != NULL); // should never happen
 

@@ -39,6 +39,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/log.h"
 #include "mongo/util/password_digest.h"
 
 namespace mongo {

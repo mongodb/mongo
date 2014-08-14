@@ -57,7 +57,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/goodies.h"
-#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

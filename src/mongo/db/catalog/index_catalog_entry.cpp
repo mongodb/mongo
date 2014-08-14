@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndexing
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/index_catalog_entry.h"
@@ -41,8 +43,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
 
     class HeadManagerImpl : public HeadManager {
     public:

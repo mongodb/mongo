@@ -48,6 +48,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 #include "mongo/db/storage_options.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

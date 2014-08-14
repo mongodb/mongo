@@ -64,6 +64,7 @@ env.Library(
         "stagedebug_cmd.cpp",
         "subplan.cpp",
         "text.cpp",
+        "update.cpp",
         "working_set_common.cpp",
     ],
     LIBDEPS = [

@@ -37,6 +37,7 @@
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/version_mongos.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/startup_test.h"

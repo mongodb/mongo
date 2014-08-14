@@ -38,6 +38,7 @@
 #include "processinfo.h"
 #include "boost/filesystem.hpp"
 #include <mongo/util/file.h>
+#include "mongo/util/log.h"
 
 using namespace std;
 

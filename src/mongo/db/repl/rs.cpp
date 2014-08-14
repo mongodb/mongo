@@ -39,6 +39,7 @@
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/repl_set_impl.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {

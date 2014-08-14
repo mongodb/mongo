@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/oplogreader.h"
@@ -47,8 +49,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
 
 namespace repl {
 
@@ -153,6 +153,13 @@ namespace repl {
             return passthroughHandshake(rid, from);
         }
         return false;
+    }
+
+    void OplogReader::tailCheck() {
+        if( cursor.get() && cursor->isDead() ) {
+            log() << "repl: old cursor isDead, will initiate a new one" << std::endl;
+            resetCursor();
+        }
     }
 
     bool OplogReader::passthroughHandshake(const mongo::OID& rid, const int nextOnChainId) {

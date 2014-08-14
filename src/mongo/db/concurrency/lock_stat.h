@@ -1,3 +1,5 @@
+// lock_stat.h
+
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -26,10 +28,41 @@
 *    it in the license file.
 */
 
-// This file contains declarations that should not be considered part of pdfile's
-// public interface, but are currently accessed by other modules within mongod.
 
 #pragma once
-namespace mongo {
-    extern bool inDBRepair;
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/timer.h"
+
+namespace mongo { 
+
+    class BSONObj;
+
+    class LockStat { 
+        enum { N = 4 };
+    public:
+        void recordAcquireTimeMicros( char type , long long micros );
+        void recordLockTimeMicros( char type , long long micros );
+
+        void reset();
+
+        BSONObj report() const;
+        void report( StringBuilder& builder ) const;
+
+        long long getTimeLocked( char type ) const { return timeLocked[mapNo(type)].load(); }
+    private:
+        static void _append( BSONObjBuilder& builder,
+                             const AtomicInt64* data,
+                             const AtomicInt64* additionalIndicator );
+        
+        // RWrw
+        // in micros
+        AtomicInt64 timeAcquiring[N];
+        AtomicInt64 timeLocked[N];
+
+        static unsigned mapNo(char type);
+        static char nameFor(unsigned offset);
+    };
+
 }

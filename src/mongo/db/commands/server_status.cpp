@@ -42,6 +42,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"

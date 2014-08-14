@@ -77,6 +77,5 @@ namespace mongo {
 #include "mongo/util/debug_util.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/allocator.h"
-#include "mongo/util/log.h"
 
 #endif // MONGO_PCH_H

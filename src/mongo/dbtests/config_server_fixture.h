@@ -52,21 +52,21 @@ namespace mongo {
             // This is tailored to act as a dummy response for write commands.
 
             BufBuilder bb;
-            bb.skip(sizeof(QueryResult));
+            bb.skip(sizeof(QueryResult::Value));
 
             BSONObj cmdResult(BSON("ok" << 1));
 
             bb.appendBuf(cmdResult.objdata(), cmdResult.objsize());
 
-            QueryResult* qr = reinterpret_cast<QueryResult*>(bb.buf());
+            QueryResult::View qr = bb.buf();
             bb.decouple();
-            qr->setResultFlagsToOk();
-            qr->len = bb.len();
-            qr->setOperation(opReply);
-            qr->cursorId = 0;
-            qr->startingFrom = 0;
-            qr->nReturned = 1;
-            m.setData(qr, true);
+            qr.setResultFlagsToOk();
+            qr.msgdata().setLen(bb.len());
+            qr.msgdata().setOperation(opReply);
+            qr.setCursorId(0);
+            qr.setStartingFrom(0);
+            qr.setNReturned(1);
+            m.setData(qr.view2ptr(), true);
 
             return true;
         }

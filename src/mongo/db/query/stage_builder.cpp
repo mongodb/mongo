@@ -49,6 +49,7 @@
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

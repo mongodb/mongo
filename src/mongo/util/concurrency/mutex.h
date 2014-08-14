@@ -42,10 +42,6 @@
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/time_support.h"
 
-#if defined(_DEBUG)
-#include "mongo/util/concurrency/mutexdebugger.h"
-#endif
-
 // Macro to get line as a std::string constant
 #define MONGO_STRINGIFY(X) #X
 // Double-expansion trick to get preproc to actually substitute __LINE__
@@ -112,25 +108,10 @@ namespace mongo {
 
         class scoped_lock : boost::noncopyable {
         public:
-#if defined(_DEBUG)
-            struct PostStaticCheck {
-                PostStaticCheck();
-            } _check;
-            mongo::mutex * const _mut;
-#endif
             scoped_lock( mongo::mutex &m ) : 
-#if defined(_DEBUG)
-            _mut(&m),
-#endif
             _l( m.boost() ) {
-#if defined(_DEBUG)
-                mutexDebugger.entering(_mut->_name);
-#endif
             }
             ~scoped_lock() {
-#if defined(_DEBUG)
-                mutexDebugger.leaving(_mut->_name);
-#endif
             }
             boost::timed_mutex::scoped_lock &boost() { return _l; }
         private:

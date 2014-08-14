@@ -57,20 +57,7 @@ namespace repl {
             rwlock lk(m, false);
             return sp.primary;
         }
-        void change(MemberState s, const Member *self) {
-            rwlock lk(m, true);
-            if( sp.state != s ) {
-                log() << "replSet " << s.toString() << rsLog;
-            }
-            sp.state = s;
-            if( s.primary() ) {
-                sp.primary = self;
-            }
-            else {
-                if( self == sp.primary )
-                    sp.primary = 0;
-            }
-        }
+        void change(MemberState s, const Member *self);
         void set(MemberState s, const Member *p) {
             rwlock lk(m, true);
             sp.state = s;

@@ -57,9 +57,3 @@
 
 // prefetch data from memory
 //#define PREFETCH MONGOPREFETCH
-
-// logs at most once per secs
-#define LOGATMOST(secs) static time_t __last = 0; time_t __now=time(0); if(__last+secs>__now) {} else if ( ( __last = __now ) > 0 ) log() 
-
-// log but not too fast.  this is rather simplistic we can do something fancier later
-#define LOGSOME LOGATMOST(20)

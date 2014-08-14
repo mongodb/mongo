@@ -66,9 +66,12 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/log.h"
 
 
 namespace mongo {
+
+    using logger::LogComponent;
 
     mongo::mutex& Client::clientsMutex = *(new mutex("clientsMutex"));
     set<Client*>& Client::clients = *(new set<Client*>); // always be in clientsMutex when manipulating this
@@ -203,11 +206,13 @@ namespace mongo {
 
         // we usually don't get here, so doesn't matter how fast this part is
         {
-            DEV log() << "_DEBUG ReadContext db wasn't open, will try to open " << ns << endl;
+            DEV log(LogComponent::kStorage)
+                << "_DEBUG ReadContext db wasn't open, will try to open " << ns << endl;
             if (txn->lockState()->isW()) {
                 // write locked already
-                WriteUnitOfWork wunit(txn->recoveryUnit());
-                DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
+                WriteUnitOfWork wunit(txn);
+                DEV RARELY log(LogComponent::kStorage)
+                    << "write locked on ReadContext construction " << ns << endl;
                 _c.reset(new Context(txn, ns, doVersion));
                 wunit.commit();
             }
@@ -215,7 +220,7 @@ namespace mongo {
                 _lk.reset(0);
                 {
                     Lock::GlobalWrite w(txn->lockState());
-                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    WriteUnitOfWork wunit(txn);
                     Context c(txn, ns, doVersion);
                     wunit.commit();
                 }
@@ -237,7 +242,7 @@ namespace mongo {
     Client::WriteContext::WriteContext(
                 OperationContext* opCtx, const std::string& ns, bool doVersion)
         : _lk(opCtx->lockState(), ns),
-          _wunit(opCtx->recoveryUnit()),
+          _wunit(opCtx),
           _c(opCtx, ns, doVersion) {
     }
 

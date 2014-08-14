@@ -35,7 +35,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 #include "mongo/db/storage_options.h"
@@ -58,24 +57,11 @@ namespace mongo {
             return rp;
         }
         
-        /** from a full path */
-        static RelativePath fromFullPath(boost::filesystem::path f) {
-            boost::filesystem::path dbp(storageGlobalParams.dbpath); // normalizes / and backslash
-            std::string fullpath = f.string();
-            std::string relative = str::after(fullpath, dbp.string());
-            if( relative.empty() ) {
-                log() << "warning file is not under db path? " << fullpath << ' ' << dbp.string();
-                RelativePath rp;
-                rp._p = fullpath;
-                return rp;
-            }
-            if( str::startsWith(relative, "/") || str::startsWith(relative, "\\") ) {
-                relative.erase(0, 1);
-            }
-            RelativePath rp;
-            rp._p = relative;
-            return rp;
-        }
+        /**
+         * Returns path relative to 'dbpath' from a full path 'f'.
+         */
+        static RelativePath fromFullPath(boost::filesystem::path dbpath,
+                                         boost::filesystem::path f);
 
         std::string toString() const { return _p; }
 
@@ -91,15 +77,7 @@ namespace mongo {
 
     };
 
-    inline dev_t getPartition(const std::string& path){
-        struct stat stats;
-
-        if (stat(path.c_str(), &stats) != 0){
-            uasserted(13646, str::stream() << "stat() failed for file: " << path << " " << errnoWithDescription());
-        }
-
-        return stats.st_dev;
-    }
+    dev_t getPartition(const std::string& path);
     
     inline bool onSamePartition(const std::string& path1, const std::string& path2){
         dev_t dev1 = getPartition(path1);

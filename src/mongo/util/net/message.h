@@ -33,6 +33,8 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/cstdint.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/encoded_value_storage.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
@@ -106,69 +108,217 @@ namespace mongo {
 
     }
 
+    namespace MSGHEADER {
 #pragma pack(1)
-    /* see http://dochub.mongodb.org/core/mongowireprotocol
-    */
-    struct MSGHEADER {
-        int messageLength; // total message size, including this
-        int requestID;     // identifier for this message
-        int responseTo;    // requestID from the original request
-        //   (used in responses from db)
-        int opCode;
-    };
+        /* see http://dochub.mongodb.org/core/mongowireprotocol
+        */
+        struct Layout {
+            int32_t messageLength; // total message size, including this
+            int32_t requestID;     // identifier for this message
+            int32_t responseTo;    // requestID from the original request
+            //   (used in responses from db)
+            int32_t opCode;
+        };
 #pragma pack()
 
+        class ConstView {
+        public:
+            typedef ConstDataView view_type;
+
+            ConstView(const char* data) : _data(data) { }
+
+            const char* view2ptr() const {
+                return data().view();
+            }
+
+            int32_t getMessageLength() const {
+                return data().readLE<int32_t>(offsetof(Layout, messageLength));
+            }
+
+            int32_t getRequestID() const {
+                return data().readLE<int32_t>(offsetof(Layout, requestID));
+            }
+
+            int32_t getResponseTo() const {
+                return data().readLE<int32_t>(offsetof(Layout, responseTo));
+            }
+
+            int32_t getOpCode() const {
+                return data().readLE<int32_t>(offsetof(Layout, opCode));
+            }
+
+        protected:
+            const view_type& data() const {
+                return _data;
+            }
+
+        private:
+            view_type _data;
+        };
+
+        class View : public ConstView {
+        public:
+            typedef DataView view_type;
+
+            View(char* data) : ConstView(data) {}
+
+            using ConstView::view2ptr;
+            char* view2ptr() {
+                return data().view();
+            }
+
+            void setMessageLength(int32_t value) {
+                return data().writeLE(value, offsetof(Layout, messageLength));
+            }
+
+            void setRequestID(int32_t value) {
+                return data().writeLE(value, offsetof(Layout, requestID));
+            }
+
+            void setResponseTo(int32_t value) {
+                return data().writeLE(value, offsetof(Layout, responseTo));
+            }
+
+            void setOpCode(int32_t value) {
+                return data().writeLE(value, offsetof(Layout, opCode));
+            }
+
+        private:
+            view_type data() const {
+                return const_cast<char *>(ConstView::view2ptr());
+            }
+        };
+
+        class Value : public EncodedValueStorage<Layout, ConstView, View> {
+        public:
+            Value() {
+                BOOST_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
+            }
+
+            Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}
+        };
+
+    } // namespace MSGHEADER
+
+    namespace MsgData {
 #pragma pack(1)
-    /* todo merge this with MSGHEADER (or inherit from it). */
-    class MsgData {
-        friend class Message;
-        friend class DbMessage;
-        friend class MessagingPort;
-    public:
-        int len; /* len of the msg, including this field */
-        MSGID id; /* request/reply id's match... */
-        MSGID responseTo; /* id of the message we are responding to */
-        short _operation;
-        char _flags;
-        char _version;
-
-        int operation() const {
-            return _operation;
-        }
-        void setOperation(int o) {
-            _flags = 0;
-            _version = 0;
-            _operation = o;
-        }
-
-        int& dataAsInt() {
-            return *((int *) _data);
-        }
-
-        bool valid() {
-            if ( len <= 0 || len > ( 4 * BSONObjMaxInternalSize ) )
-                return false;
-            if ( _operation < 0 || _operation > 30000 )
-                return false;
-            return true;
-        }
-
-        long long getCursor() {
-            verify( responseTo > 0 );
-            verify( _operation == opReply );
-            long long * l = (long long *)(_data + 4);
-            return l[0];
-        }
-
-        int dataLen(); // len without header
-    private:
-        char _data[4]; //must be last member
-    };
-    const int MsgDataHeaderSize = sizeof(MsgData) - 4;
-    inline int MsgData::dataLen() {
-        return len - MsgDataHeaderSize;
-    }
+        struct Layout {
+            MSGHEADER::Layout header;
+            char data[4];
+        };
 #pragma pack()
+
+        class ConstView {
+        public:
+            ConstView(const char* storage) : _storage(storage) { }
+
+            const char* view2ptr() const {
+                return storage().view();
+            }
+
+            int32_t getLen() const {
+                return header().getMessageLength();
+            }
+
+            MSGID getId() const {
+                return header().getRequestID();
+            }
+
+            MSGID getResponseTo() const {
+                return header().getResponseTo();
+            }
+
+            int32_t getOperation() const {
+                return header().getOpCode();
+            }
+
+            const char* data() const {
+                return storage().view(offsetof(Layout, data));
+            }
+
+            bool valid() const {
+                if ( getLen() <= 0 || getLen() > ( 4 * BSONObjMaxInternalSize ) )
+                    return false;
+                if ( getOperation() < 0 || getOperation() > 30000 )
+                    return false;
+                return true;
+            }
+
+            int64_t getCursor() const {
+                verify( getResponseTo() > 0 );
+                verify( getOperation() == opReply );
+                return ConstDataView(data() + sizeof(int32_t)).readLE<int64_t>();
+            }
+
+            int dataLen() const; // len without header
+
+        protected:
+            const ConstDataView& storage() const {
+                return _storage;
+            }
+
+            MSGHEADER::ConstView header() const {
+                return storage().view(offsetof(Layout, header));
+            }
+
+        private:
+            ConstDataView _storage;
+        };
+
+        class View : public ConstView {
+        public:
+            View(char* storage) : ConstView(storage) {}
+
+            using ConstView::view2ptr;
+            char* view2ptr() {
+                return storage().view();
+            }
+
+            void setLen(int value) {
+                return header().setMessageLength(value);
+            }
+
+            void setId(MSGID value) {
+                return header().setRequestID(value);
+            }
+
+            void setResponseTo(MSGID value) {
+                return header().setResponseTo(value);
+            }
+
+            void setOperation(int value) {
+                return header().setOpCode(value);
+            }
+
+            using ConstView::data;
+            char* data() {
+                return storage().view(offsetof(Layout, data));
+            }
+
+        private:
+            DataView storage() const {
+                return const_cast<char *>(ConstView::view2ptr());
+            }
+
+            MSGHEADER::View header() const {
+                return storage().view(offsetof(Layout, header));
+            }
+        };
+
+        class Value : public EncodedValueStorage<Layout, ConstView, View> {
+        public:
+            Value() {
+                BOOST_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
+            }
+
+            Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}
+        };
+
+        const int MsgDataHeaderSize = sizeof(Value) - 4;
+        inline int ConstView::dataLen() const {
+            return getLen() - MsgDataHeaderSize;
+        }
+    } // namespace MsgData
 
     class Message {
     public:
@@ -176,7 +326,7 @@ namespace mongo {
         Message() : _buf( 0 ), _data( 0 ), _freeIt( false ) {}
         Message( void * data , bool freeIt ) :
             _buf( 0 ), _data( 0 ), _freeIt( false ) {
-            _setData( reinterpret_cast< MsgData* >( data ), freeIt );
+            _setData( reinterpret_cast< char* >( data ), freeIt );
         };
         Message(Message& r) : _buf( 0 ), _data( 0 ), _freeIt( false ) {
             *this = r;
@@ -187,13 +337,14 @@ namespace mongo {
 
         SockAddr _from;
 
-        MsgData *header() const {
+        MsgData::View header() const {
             verify( !empty() );
-            return _buf ? _buf : reinterpret_cast< MsgData* > ( _data[ 0 ].first );
+            return _buf ? _buf : _data[ 0 ].first;
         }
-        int operation() const { return header()->operation(); }
 
-        MsgData *singleData() const {
+        int operation() const { return header().getOperation(); }
+
+        MsgData::View singleData() const {
             massert( 13273, "single data buffer expected", _buf );
             return header();
         }
@@ -203,7 +354,7 @@ namespace mongo {
         int size() const {
             int res = 0;
             if ( _buf ) {
-                res =  _buf->len;
+                res =  MsgData::ConstView(_buf).getLen();
             }
             else {
                 for (MsgVec::const_iterator it = _data.begin(); it != _data.end(); ++it) {
@@ -213,7 +364,7 @@ namespace mongo {
             return res;
         }
 
-        int dataSize() const { return size() - sizeof(MSGHEADER); }
+        int dataSize() const { return size() - sizeof(MSGHEADER::Value); }
 
         // concat multiple buffers - noop if <2 buffers already, otherwise can be expensive copy
         // can get rid of this if we make response handling smarter
@@ -236,7 +387,7 @@ namespace mongo {
                 p += i->second;
             }
             reset();
-            _setData( (MsgData*)buf, true );
+            _setData( buf, true );
         }
 
         // vector swap() so this is fast
@@ -275,22 +426,22 @@ namespace mongo {
                 return;
             }
             if ( empty() ) {
-                MsgData *md = (MsgData*)d;
-                md->len = size; // can be updated later if more buffers added
-                _setData( md, true );
+                MsgData::View md = d;
+                md.setLen(size); // can be updated later if more buffers added
+                _setData( md.view2ptr(), true );
                 return;
             }
             verify( _freeIt );
             if ( _buf ) {
-                _data.push_back(std::make_pair((char*)_buf, _buf->len));
+                _data.push_back(std::make_pair(_buf, MsgData::ConstView(_buf).getLen()));
                 _buf = 0;
             }
             _data.push_back(std::make_pair(d, size));
-            header()->len += size;
+            header().setLen(header().getLen() + size);
         }
 
         // use to set first buffer if empty
-        void setData(MsgData *d, bool freeIt) {
+        void setData(char* d, bool freeIt) {
             verify( empty() );
             _setData( d, freeIt );
         }
@@ -299,12 +450,12 @@ namespace mongo {
         }
         void setData(int operation, const char *msgdata, size_t len) {
             verify( empty() );
-            size_t dataLen = len + sizeof(MsgData) - 4;
-            MsgData *d = (MsgData *) malloc(dataLen);
-            memcpy(d->_data, msgdata, len);
-            d->len = fixEndian(dataLen);
-            d->setOperation(operation);
-            _setData( d, true );
+            size_t dataLen = len + sizeof(MsgData::Value) - 4;
+            MsgData::View d = reinterpret_cast<char *>(malloc(dataLen));
+            memcpy(d.data(), msgdata, len);
+            d.setLen(dataLen);
+            d.setOperation(operation);
+            _setData( d.view2ptr(), true );
         }
 
         bool doIFreeIt() {
@@ -316,12 +467,12 @@ namespace mongo {
         std::string toString() const;
 
     private:
-        void _setData( MsgData *d, bool freeIt ) {
+        void _setData( char* d, bool freeIt ) {
             _freeIt = freeIt;
             _buf = d;
         }
         // if just one buffer, keep it in _buf, otherwise keep a sequence of buffers in _data
-        MsgData * _buf;
+        char* _buf;
         // byte buffer(s) - the first must contain at least a full MsgData unless using _buf for storage instead
         typedef std::vector< std::pair< char*, int > > MsgVec;
         MsgVec _data;

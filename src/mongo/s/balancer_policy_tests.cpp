@@ -31,6 +31,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommands
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/mr.h"
@@ -59,8 +61,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     namespace mr {
 
@@ -348,20 +348,23 @@ namespace mongo {
                 // Intentionally not replicating the inc collection to secondaries.
                 Client::WriteContext incCtx(_txn, _config.incLong);
                 Collection* incColl = incCtx.ctx().db()->getCollection( _txn, _config.incLong );
-                if ( !incColl ) {
-                    CollectionOptions options;
-                    options.setNoIdIndex();
-                    options.temp = true;
-                    incColl = incCtx.ctx().db()->createCollection( _txn, _config.incLong, options );
-                }
+                invariant(!incColl);
+
+                CollectionOptions options;
+                options.setNoIdIndex();
+                options.temp = true;
+                incColl = incCtx.ctx().db()->createCollection( _txn, _config.incLong, options );
+                invariant(incColl);
 
                 BSONObj indexSpec = BSON( "key" << BSON( "0" << 1 ) << "ns" << _config.incLong
                                           << "name" << "_temp_0" );
-                Status status = incColl->getIndexCatalog()->createIndex(_txn, indexSpec, false);
+                Status status = incColl->getIndexCatalog()->createIndexOnEmptyCollection(_txn,
+                                                                                         indexSpec);
                 if ( !status.isOK() ) {
                     uasserted( 17305 , str::stream() << "createIndex failed for mr incLong ns: " <<
                             _config.incLong << " err: " << status.code() );
                 }
+                incCtx.commit();
             }
 
             vector<BSONObj> indexesToInsert;
@@ -402,22 +405,31 @@ namespace mongo {
                         repl::getGlobalReplicationCoordinator()->
                         canAcceptWritesForDatabase(nsToDatabase(_config.tempNamespace.c_str())));
                 Collection* tempColl = tempCtx.ctx().db()->getCollection( _txn, _config.tempNamespace );
-                if ( !tempColl ) {
-                    CollectionOptions options;
-                    options.temp = true;
-                    tempColl = tempCtx.ctx().db()->createCollection( _txn, _config.tempNamespace, options );
+                invariant(!tempColl);
 
-                    // Log the createCollection operation.
-                    BSONObjBuilder b;
-                    b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
-                    b.appendElements( options.toBSON() );
-                    string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
-                    repl::logOp(_txn, "c", logNs.c_str(), b.obj());
-                }
+                CollectionOptions options;
+                options.temp = true;
+                tempColl = tempCtx.ctx().db()->createCollection(_txn,
+                                                                _config.tempNamespace,
+                                                                options);
+
+                // Log the createCollection operation.
+                BSONObjBuilder b;
+                b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
+                b.appendElements( options.toBSON() );
+                string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
+                repl::logOp(_txn, "c", logNs.c_str(), b.obj());
 
                 for ( vector<BSONObj>::iterator it = indexesToInsert.begin();
                         it != indexesToInsert.end(); ++it ) {
-                    tempColl->getIndexCatalog()->createIndex(_txn, *it, false );
+                    Status status =
+                        tempColl->getIndexCatalog()->createIndexOnEmptyCollection(_txn, *it);
+                    if (!status.isOK()) {
+                        if (status.code() == ErrorCodes::IndexAlreadyExists) {
+                            continue;
+                        }
+                        uassertStatusOK(status);
+                    }
                     // Log the createIndex operation.
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
                     repl::logOp(_txn, "i", logNs.c_str(), *it);
@@ -573,7 +585,7 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::DBWrite lock(_txn->lockState(), _config.outputOptions.finalNamespace);
-                    WriteUnitOfWork wunit(_txn->recoveryUnit());
+                    WriteUnitOfWork wunit(_txn);
                     BSONObj o = cursor->nextSafe();
                     Helpers::upsert( _txn, _config.outputOptions.finalNamespace , o );
                     _txn->recoveryUnit()->commitIfNeeded();
@@ -593,7 +605,7 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::GlobalWrite lock(txn->lockState()); // TODO(erh) why global?
-                    WriteUnitOfWork wunit(txn->recoveryUnit());
+                    WriteUnitOfWork wunit(txn);
                     BSONObj temp = cursor->nextSafe();
                     BSONObj old;
 
@@ -1094,7 +1106,7 @@ namespace mongo {
                 return;
 
             Lock::DBWrite kl(_txn->lockState(), _config.incLong);
-            WriteUnitOfWork wunit(_txn->recoveryUnit());
+            WriteUnitOfWork wunit(_txn);
 
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ) {
                 BSONList& all = i->second;

@@ -34,6 +34,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_document_parser.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

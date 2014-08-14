@@ -27,11 +27,12 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/lasterror.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
@@ -115,6 +116,15 @@ namespace mongo {
         if ( ret && !ret->disabled )
             return ret;
         return 0;
+    }
+
+    LastError * LastErrorHolder::getSafe() {
+        LastError * le = get(false);
+        if ( ! le ) {
+            error() << " no LastError!" << std::endl;
+            verify( le );
+        }
+        return le;
     }
 
     LastError * LastErrorHolder::_get( bool create ) {

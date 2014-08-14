@@ -2,7 +2,8 @@ Import("env")
 
 env.Library(
     target = 'storage_mmapv1',
-    source = [ "catalog/index_details.cpp",
+    source = [ "catalog/hashtab.cpp",
+               "catalog/index_details.cpp",
                "catalog/namespace.cpp",
                "catalog/namespace_details.cpp",
                "catalog/namespace_details_collection_entry.cpp",
@@ -93,6 +94,7 @@ env.Library(
     source= [
         'btree/btree_logic.cpp',
         'btree/btree_interface.cpp',
+        'btree/btree_ondisk.cpp',
         'btree/key.cpp'
         ],
     LIBDEPS= [

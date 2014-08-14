@@ -32,6 +32,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/path_internal.h"
 #include "mongo/db/matcher/path.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

@@ -47,7 +47,7 @@ namespace repl {
         LegacyReplicationCoordinator(const ReplSettings& settings);
         virtual ~LegacyReplicationCoordinator();
 
-        virtual void startReplication();
+        virtual void startReplication(OperationContext*);
 
         virtual void shutdown();
 

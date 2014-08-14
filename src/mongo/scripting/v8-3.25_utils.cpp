@@ -40,6 +40,7 @@
 #include "mongo/platform/cstdint.h"
 #include "mongo/scripting/engine_v8-3.25.h"
 #include "mongo/scripting/v8-3.25_db.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace std;

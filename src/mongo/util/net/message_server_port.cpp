@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetworking
+
 #include "mongo/pch.h"
 
 #include <boost/thread/thread.hpp>
@@ -41,6 +43,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_port.h"

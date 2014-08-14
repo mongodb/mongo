@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
@@ -47,8 +49,6 @@
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     static Counter64 freelistAllocs;
     static Counter64 freelistBucketExhausted;

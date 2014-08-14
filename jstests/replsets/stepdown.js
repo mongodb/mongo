@@ -123,15 +123,21 @@ catch (e) {
 
 master = replTest.getMaster();
 assert.soon(function() {
-    var result = master.getDB("admin").runCommand({replSetGetStatus:1});
-    for (var i in result.members) {
-        if (result.members[i].self) {
-            continue;
+    try {
+        var result = master.getDB("admin").runCommand({replSetGetStatus:1});
+        for (var i in result.members) {
+            if (result.members[i].self) {
+                continue;
+            }
+
+            return result.members[i].health == 0;
         }
-
-        return result.members[i].health == 0;
     }
-
+    catch (e) {
+        print("error getting status from master: " + e);
+        master = replTest.getMaster();
+        return false;
+    }
 }, 'make sure master knows that slave is down before proceeding');
 
 

@@ -49,7 +49,7 @@ namespace repl {
         HybridReplicationCoordinator(const ReplSettings& settings);
         virtual ~HybridReplicationCoordinator();
 
-        virtual void startReplication();
+        virtual void startReplication(OperationContext* txn);
 
         virtual void shutdown();
 

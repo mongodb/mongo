@@ -28,11 +28,13 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/durop.h"
 
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/util/alignedbuilder.h"
@@ -46,8 +48,6 @@ using namespace mongoutils;
 #include <boost/filesystem/operations.hpp>
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     namespace dur {
 
@@ -98,7 +98,7 @@ namespace mongo {
 
         FileCreatedOp::FileCreatedOp(const std::string& f, unsigned long long l) :
             DurOp(JEntry::OpCode_FileCreated) {
-            _p = RelativePath::fromFullPath(f);
+            _p = RelativePath::fromFullPath(storageGlobalParams.dbpath, f);
             _len = l;
         }
 

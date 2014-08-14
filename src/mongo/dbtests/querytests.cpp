@@ -65,7 +65,7 @@ namespace QueryTests {
 
     public:
         Base() : _lk(_txn.lockState()),
-                 _wunit(_txn.recoveryUnit()),
+                 _wunit(&_txn),
                  _context(&_txn, ns()) {
             _database = _context.db();
             _collection = _database->getCollection( &_txn, ns() );
@@ -89,13 +89,7 @@ namespace QueryTests {
             return "unittests.querytests";
         }
         void addIndex( const BSONObj &key ) {
-            BSONObjBuilder b;
-            b.append( "name", key.firstElementFieldName() );
-            b.append( "ns", ns() );
-            b.append( "key", key );
-            BSONObj o = b.done();
-            Status s = _collection->getIndexCatalog()->createIndex(&_txn, o, false);
-            uassertStatusOK( s );
+            Helpers::ensureIndex(&_txn, _collection, key, false, key.firstElementFieldName());
         }
         void insert( const char *s ) {
             insert( fromjson( s ) );
@@ -246,7 +240,7 @@ namespace QueryTests {
             {
                 // Check internal server handoff to getmore.
                 Lock::DBWrite lk(_txn.lockState(), ns);
-                WriteUnitOfWork wunit(_txn.recoveryUnit());
+                WriteUnitOfWork wunit(&_txn);
                 Client::Context ctx(&_txn,  ns );
                 ClientCursorPin clientCursor( ctx.db()->getCollection(&_txn, ns), cursorId );
                 // pq doesn't exist if it's a runner inside of the clientcursor.
@@ -595,7 +589,7 @@ namespace QueryTests {
         void run() {
             const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
             Lock::DBWrite lk(_txn.lockState(), ns);
-            WriteUnitOfWork wunit(_txn.recoveryUnit());
+            WriteUnitOfWork wunit(&_txn);
             Client::Context ctx(&_txn,  ns );
 
             BSONObj info;
@@ -1061,7 +1055,7 @@ namespace QueryTests {
         void run() {
             Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx(&_txn, "unittests.DirectLocking");
-            WriteUnitOfWork wunit(_txn.recoveryUnit());
+            WriteUnitOfWork wunit(&_txn);
             _client.remove( "a.b", BSONObj() );
             wunit.commit();
             ASSERT_EQUALS( "unittests", ctx.db()->name() );
@@ -1430,7 +1424,7 @@ namespace QueryTests {
         CollectionInternalBase( const char *nsLeaf ) :
           CollectionBase( nsLeaf ),
           _lk(_txn.lockState(), ns() ),
-          _wunit( _txn.recoveryUnit() ),
+          _wunit( &_txn ),
           _ctx(&_txn, ns()) {
         }
         ~CollectionInternalBase() {

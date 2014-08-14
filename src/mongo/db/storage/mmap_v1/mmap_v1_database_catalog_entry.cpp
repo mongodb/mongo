@@ -50,6 +50,7 @@
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

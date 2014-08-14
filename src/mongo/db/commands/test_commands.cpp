@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -64,7 +65,7 @@ namespace mongo {
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
 
             Lock::DBWrite lk(txn->lockState(), ns);
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn,  ns );
             Database* db = ctx.db();
             Collection* collection = db->getCollection( txn, ns );

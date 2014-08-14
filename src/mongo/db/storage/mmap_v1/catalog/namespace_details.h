@@ -32,11 +32,11 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/mmap_v1/catalog/index_details.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace.h"
-#include "mongo/db/storage/mmap_v1/catalog/namespace_index.h"
 
 namespace mongo {
 
     class Collection;
+    class NamespaceIndex;
     class OperationContext;
 
     /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes

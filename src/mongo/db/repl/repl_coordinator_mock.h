@@ -46,7 +46,7 @@ namespace repl {
         ReplicationCoordinatorMock(const ReplSettings& settings);
         virtual ~ReplicationCoordinatorMock();
 
-        virtual void startReplication();
+        virtual void startReplication(OperationContext* txn);
 
         virtual void shutdown();
 

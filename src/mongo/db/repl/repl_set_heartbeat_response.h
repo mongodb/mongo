@@ -46,6 +46,15 @@ namespace repl {
      */
     class ReplSetHeartbeatResponse {
     public:
+        /**
+         * Actions taken based on heartbeat responses
+         */
+        enum HeartbeatResultAction {
+            StepDown,
+            StartElection,
+            NoAction
+        };
+
         ReplSetHeartbeatResponse();
 
         /**

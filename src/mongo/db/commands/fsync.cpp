@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/commands/fsync.h"
 
 #include <string>
@@ -37,7 +39,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
@@ -46,6 +48,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/background.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
     

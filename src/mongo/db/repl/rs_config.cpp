@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include <boost/algorithm/string.hpp>
@@ -46,8 +48,6 @@
 #include "mongo/util/text.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
 
 namespace repl {
 
@@ -196,7 +196,6 @@ namespace {
         uassert(17492, "arbiter must vote (cannot have 0 votes)", !arbiterOnly || votes > 0);
     }
     void ReplSetConfig::TagSubgroup::updateLast(const OpTime& op) {
-        RACECHECK
         if (last < op) {
             last = op;
 
@@ -207,7 +206,6 @@ namespace {
     }
 
     void ReplSetConfig::TagClause::updateLast(const OpTime& op) {
-        RACECHECK
         if (last >= op) {
             return;
         }

@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/util/fail_point.h"
+#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 #include "mongo/unittest/unittest.h"
 

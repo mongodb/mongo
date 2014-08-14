@@ -29,6 +29,7 @@
 
 #include "mongo/db/storage/heap1/record_store_heap.h"
 
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

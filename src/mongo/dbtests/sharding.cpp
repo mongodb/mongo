@@ -40,6 +40,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
+#include "mongo/util/log.h"
 
 namespace ShardingTests {
 

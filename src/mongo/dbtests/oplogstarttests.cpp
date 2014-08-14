@@ -36,7 +36,7 @@ namespace OplogStartTests {
     class Base {
     public:
         Base() : _lk(_txn.lockState()),
-                 _wunit(_txn.recoveryUnit()),
+                 _wunit(&_txn),
                  _context(&_txn, ns()),
                  _client(&_txn) {
 
@@ -44,7 +44,7 @@ namespace OplogStartTests {
             if (!c) {
                 c = _context.db()->createCollection(&_txn, ns());
             }
-            c->getIndexCatalog()->ensureHaveIdIndex(&_txn);
+            ASSERT(c->getIndexCatalog()->haveIdIndex());
         }
 
         ~Base() {

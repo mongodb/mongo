@@ -30,8 +30,10 @@
 
 #include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 
+#include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
@@ -39,7 +41,11 @@
 namespace mongo {
 namespace repl {
 
-    ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock() {}
+    ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock()
+        : _localRsConfigDocument(Status(ErrorCodes::NoMatchingDocument,
+                                        "No local config document")) {
+    }
+
     ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
 
     void ReplicationCoordinatorExternalStateMock::runSyncSourceFeedback() {}
@@ -47,7 +53,7 @@ namespace repl {
     void ReplicationCoordinatorExternalStateMock::forwardSlaveHandshake() {}
     void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}
 
-    OID ReplicationCoordinatorExternalStateMock::ensureMe() {
+    OID ReplicationCoordinatorExternalStateMock::ensureMe(OperationContext*) {
         return OID::gen();
     }
 
@@ -62,6 +68,17 @@ namespace repl {
     HostAndPort ReplicationCoordinatorExternalStateMock::getClientHostAndPort(
             const OperationContext* txn) {
         return HostAndPort();
+    }
+
+    StatusWith<BSONObj> ReplicationCoordinatorExternalStateMock::loadLocalConfigDocument(
+            OperationContext* txn) {
+        return _localRsConfigDocument;
+    }
+
+    void ReplicationCoordinatorExternalStateMock::setLocalConfigDocument(
+            const StatusWith<BSONObj>& localConfigDocument) {
+
+        _localRsConfigDocument = localConfigDocument;
     }
 
 } // namespace repl

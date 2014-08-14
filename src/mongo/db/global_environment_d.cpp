@@ -35,6 +35,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

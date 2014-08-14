@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 

@@ -33,7 +33,6 @@
 #include <iostream>
 #include <sstream>
 
-#include <boost/detail/endian.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -89,8 +88,6 @@ namespace mongo {
 // PRINTFL; prints file:line
 #define MONGO_PRINTFL std::cout << __FILE__ ":" << __LINE__ << std::endl
 #define PRINTFL MONGO_PRINTFL
-#define MONGO_FLOG log() << __FILE__ ":" << __LINE__ << std::endl
-#define FLOG MONGO_FLOG
 
     inline bool startsWith(const char *str, const char *prefix) {
         size_t l = strlen(prefix);
@@ -107,26 +104,6 @@ namespace mongo {
         if ( b > a ) return false;
         return strcmp(p + a - b, suffix) == 0;
     }
-
-    inline unsigned long swapEndian(unsigned long x) {
-        return
-            ((x & 0xff) << 24) |
-            ((x & 0xff00) << 8) |
-            ((x & 0xff0000) >> 8) |
-            ((x & 0xff000000) >> 24);
-    }
-
-#if defined(BOOST_LITTLE_ENDIAN)
-    inline unsigned long fixEndian(unsigned long x) {
-        return x;
-    }
-#elif defined(BOOST_BIG_ENDIAN)
-    inline unsigned long fixEndian(unsigned long x) {
-        return swapEndian(x);
-    }
-#else
-#error no boost endian header defined
-#endif
 
 #if !defined(_WIN32)
     typedef int HANDLE;

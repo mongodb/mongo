@@ -33,6 +33,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/log.h"
 #include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {

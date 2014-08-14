@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetworking
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/isself.h"
@@ -33,6 +35,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include "mongo/base/init.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/auth/action_set.h"
@@ -44,7 +47,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/log.h"
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 #include <ifaddrs.h>
 #include <netdb.h>
 #elif defined(_WIN32)
@@ -56,7 +59,7 @@
 #include <Ws2tcpip.h>
 #endif  // defined(_WIN32)
 
-#if defined(_WIN32) || defined(__linux__)
+#if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
 #define FASTPATH 1
 #endif
 
@@ -80,7 +83,7 @@ namespace {
      * we need gai_strerror.
      */
     std::string stringifyError(int code) {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
         return gai_strerror(code);
 #elif defined(_WIN32)
         // FormatMessage in errnoWithDescription works here on windows
@@ -131,14 +134,12 @@ namespace {
         }
 
         if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
-            LogstreamBuilder builder(logger::globalLogDomain(),
-                                     getThreadName(),
-                                     logger::LogSeverity::Debug(2));
+            StringBuilder builder;
             builder << "getAddrsForHost(\"" << iporhost << ":" << port << "\"):";
             for (std::vector<std::string>::const_iterator o = out.begin(); o != out.end(); ++o) {
                 builder << " [ " << *o << "]";
             }
-            builder << std::endl;
+            LOG(2) << builder.str();
         }
 
         return out;
@@ -221,7 +222,7 @@ namespace {
     std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
 #ifdef FASTPATH
         std::vector<std::string> out;
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 
         ifaddrs* addrs;
 
@@ -338,14 +339,12 @@ namespace {
 
 #endif  // defined(_WIN32)
         if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
-            LogstreamBuilder builder(logger::globalLogDomain(),
-                                     getThreadName(),
-                                     logger::LogSeverity::Debug(2));
+            StringBuilder builder;
             builder << "getBoundAddrs():";
             for (std::vector<std::string>::const_iterator o = out.begin(); o != out.end(); ++o) {
                 builder << " [ " << *o << "]";
             }
-            builder << std::endl;
+            LOG(2) << builder.str();
         }
         return out;
 #else  // ifdef FASTPATH

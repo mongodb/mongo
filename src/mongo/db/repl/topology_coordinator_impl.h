@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <limits>
 #include <string>
 #include <vector>
 
@@ -53,13 +52,9 @@ namespace repl {
      */
     class PingStats {
     public:
-        PingStats() : count(0), value(std::numeric_limits<int>::max()) {}
+        PingStats();
 
-        void hit(int millis) {
-            ++count;
-            value = value == 0 ? millis :
-                                 static_cast<unsigned long>((value * .8) + (millis * .2));
-        }
+        void hit(int millis);
 
         unsigned int getCount() {
             return count;
@@ -72,7 +67,6 @@ namespace repl {
         unsigned int count;
         unsigned int value;
     };
-
 
     class TopologyCoordinatorImpl : public TopologyCoordinator {
     public:
@@ -122,10 +116,11 @@ namespace repl {
                                               Status* result);
 
         // updates internal state with heartbeat response
-        HeartbeatResultAction updateHeartbeatData(Date_t now,
-                                                  const MemberHeartbeatData& newInfo,
-                                                  int id,
-                                                  const OpTime& lastOpApplied);
+        ReplSetHeartbeatResponse::HeartbeatResultAction 
+            updateHeartbeatData(Date_t now,
+                                const MemberHeartbeatData& newInfo,
+                                int id,
+                                const OpTime& lastOpApplied);
 
         // produces a reply to a status request
         virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,

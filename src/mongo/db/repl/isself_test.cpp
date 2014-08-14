@@ -41,7 +41,7 @@ namespace repl {
 namespace {
 
     TEST(IsSelf, DetectsSameHostIPv4) {
-#if defined(_WIN32) || defined(__linux__)
+#if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
         bool wasEnabled = IPv6Enabled();
         enableIPv6(false);
         ON_BLOCK_EXIT(enableIPv6, wasEnabled);
@@ -60,7 +60,7 @@ namespace {
     }
 
     TEST(IsSelf, DetectsSameHostIPv6) {
-#if defined(_WIN32) || defined(__linux__)
+#if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
         bool wasEnabled = IPv6Enabled();
         enableIPv6(true);
         ON_BLOCK_EXIT(enableIPv6, wasEnabled);

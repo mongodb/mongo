@@ -28,9 +28,10 @@
 *    it in the license file.
 */
 
-#include "mongo/db/lockstate.h"
+#include "mongo/db/concurrency/lock_state.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 

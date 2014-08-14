@@ -41,7 +41,6 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/v8_deadline_monitor.h"
 #include "mongo/scripting/v8_profiler.h"
-#include "mongo/util/log.h"
 
 /**
  * V8_SIMPLE_HEADER must be placed in any function called from a public API
@@ -90,12 +89,6 @@ namespace mongo {
          * V8Scope is destructed.
          */
         ~ObjTracker() {
-            MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kQuery);
-
-            if (!_container.empty()) {
-                LOG(1) << "freeing " << _container.size() << " uncollected "
-                       << typeid(_ObjType).name() << " objects" << std::endl;
-            }
             typename std::set<TrackedPtr*>::iterator it = _container.begin();
             while (it != _container.end()) {
                 delete *it;
@@ -573,51 +566,6 @@ namespace mongo {
         bool _readOnly;
         std::set<std::string> _removed;
     };
-
-    /**
-     * Check for an error condition (e.g. empty handle, JS exception, OOM) after executing
-     * a v8 operation.
-     * @resultHandle         handle storing the result of the preceding v8 operation
-     * @try_catch            the active v8::TryCatch exception handler
-     * @param reportError    if true, log an error message
-     * @param assertOnError  if true, throw an exception if an error is detected
-     *                       if false, return value indicates error state
-     * @return true if an error was detected and assertOnError is set to false
-     *         false if no error was detected
-     */
-    template <typename _HandleType>
-    bool V8Scope::checkV8ErrorState(const _HandleType& resultHandle,
-                                    const v8::TryCatch& try_catch,
-                                    bool reportError,
-                                    bool assertOnError) {
-        bool haveError = false;
-
-        if (try_catch.HasCaught() && try_catch.CanContinue()) {
-            // normal JS exception
-            _error = v8ExceptionToSTLString(&try_catch);
-            haveError = true;
-        }
-        else if (hasOutOfMemoryException()) {
-            // out of memory exception (treated as terminal)
-            _error = "JavaScript execution failed -- v8 is out of memory";
-            haveError = true;
-        }
-        else if (resultHandle.IsEmpty() || try_catch.HasCaught()) {
-            // terminal exception (due to empty handle, termination, etc.)
-            _error = "JavaScript execution failed";
-            haveError = true;
-        }
-
-        if (haveError) {
-            if (reportError)
-                log() << _error << std::endl;
-            if (assertOnError)
-                uasserted(16722, _error);
-            return true;
-        }
-
-        return false;
-    }
 
     extern ScriptEngine* globalScriptEngine;
 

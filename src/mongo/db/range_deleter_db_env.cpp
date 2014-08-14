@@ -37,6 +37,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

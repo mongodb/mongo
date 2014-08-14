@@ -28,20 +28,20 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndexing
+
 #include "mongo/platform/basic.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_index.h"
 
 #include <boost/filesystem/operations.hpp>
 
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
 
     NamespaceDetails* NamespaceIndex::details(const StringData& ns) {
         Namespace n(ns);
@@ -197,7 +197,7 @@ namespace mongo {
 
 
         verify( len <= 0x7fffffff );
-        _ht.reset(new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index"));
+        _ht.reset(new NamespaceHashTable(p, (int) len, "namespace index"));
     }
 
 

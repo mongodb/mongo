@@ -1,4 +1,4 @@
-// lockstate.h
+// lock_state.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -31,7 +31,8 @@
 
 #pragma once
 
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+
 
 namespace mongo {
 

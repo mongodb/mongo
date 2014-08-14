@@ -43,6 +43,7 @@
 #include "mongo/s/type_database.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

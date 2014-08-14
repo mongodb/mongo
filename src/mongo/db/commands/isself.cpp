@@ -60,4 +60,4 @@ namespace mongo {
         return Status::OK();
     }
 
-}
+}  // namespace mongo

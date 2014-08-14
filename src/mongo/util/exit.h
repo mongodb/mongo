@@ -32,6 +32,7 @@
 
 namespace mongo {
 
+    // Note: whyMsg can never be NULL.
     void dbexit( ExitCode returnCode, const char *whyMsg = "" );
 
     MONGO_CLIENT_API bool inShutdown();

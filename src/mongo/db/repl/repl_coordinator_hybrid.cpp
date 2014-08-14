@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_coordinator_hybrid.h"
@@ -33,10 +35,9 @@
 #include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
 
 namespace repl {
 
@@ -50,9 +51,9 @@ namespace repl {
 
     HybridReplicationCoordinator::~HybridReplicationCoordinator() {}
 
-    void HybridReplicationCoordinator::startReplication() {
-        _legacy.startReplication();
-        _impl.startReplication();
+    void HybridReplicationCoordinator::startReplication(OperationContext* txn) {
+        _legacy.startReplication(txn);
+        _impl.startReplication(txn);
     }
 
     void HybridReplicationCoordinator::shutdown() {

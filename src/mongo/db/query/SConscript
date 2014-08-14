@@ -16,6 +16,7 @@ env.Library(
         "planner_ixselect.cpp",
         "query_knobs.cpp",
         "query_planner.cpp",
+        "query_planner_common.cpp",
         "query_solution.cpp",
     ],
     LIBDEPS=[

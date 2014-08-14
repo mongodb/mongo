@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kJournaling
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
@@ -47,7 +49,6 @@
 #include "mongo/util/alignedbuilder.h"
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
-#include "mongo/util/concurrency/race.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/logfile.h"
@@ -60,8 +61,6 @@
 using namespace mongoutils;
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
 
     class AlignedBuilder;
 
@@ -614,7 +613,6 @@ namespace mongo {
             concurrency: called by durThread only.
         */
         void Journal::updateLSNFile() {
-            RACECHECK
             if( !_writeToLSNNeeded )
                 return;
             _writeToLSNNeeded = false;
@@ -688,8 +686,6 @@ namespace mongo {
 
         void Journal::_rotate() {
 
-            RACECHECK;
-
             _curLogFileMutex.dassertLocked();
 
             if ( inShutdown() || !_curLogFile )
@@ -731,7 +727,6 @@ namespace mongo {
             stats.curr->_writeToJournalMicros += t.micros();
         }
         void Journal::journal(const JSectHeader& h, const AlignedBuilder& uncompressed) {
-            RACECHECK
             static AlignedBuilder b(32*1024*1024);
             /* buffer to journal will be
                JSectHeader

@@ -33,6 +33,7 @@
 #include "mongo/util/logfile.h"
 
 #include "mongo/platform/posix_fadvise.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/startup_test.h"

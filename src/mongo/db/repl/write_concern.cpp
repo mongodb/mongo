@@ -38,6 +38,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 //#define REPLDEBUG(x) log() << "replBlock: "  << x << endl;

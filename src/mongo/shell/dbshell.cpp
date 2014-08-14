@@ -52,6 +52,7 @@
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/file.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password.h"
 #include "mongo/util/signal_handlers.h"

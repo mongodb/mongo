@@ -37,6 +37,21 @@ namespace repl {
     class ReplicaSetConfig;
 
     /**
+     * Validates that "newConfig" is a legal configuration that the current
+     * node can accept from its local storage during startup.
+     *
+     * Returns the index of the current node's member configuration in "newConfig",
+     * on success, and an indicative error on failure.
+     *
+     * If "oldConfig" is valid, this method only succeds if "newConfig" is a legal
+     * successor configuration.
+     */
+    StatusWith<int> validateConfigForStartUp(
+            ReplicationCoordinatorExternalState* externalState,
+            const ReplicaSetConfig& oldConfig,
+            const ReplicaSetConfig& newConfig);
+
+    /**
      * Validates that "newConfig" is a legal initial configuration that can be
      * initiated by the current node (identified via "externalState").
      *

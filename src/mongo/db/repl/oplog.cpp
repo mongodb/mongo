@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/oplog.h"
@@ -68,8 +70,6 @@
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
 
 namespace repl {
 
@@ -123,7 +123,7 @@ namespace repl {
         Lock::DBWrite lk(txn->lockState(), "local");
         // XXX soon this needs to be part of an outer WUOW not its own.
         // We can't do this yet due to locking limitations.
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
 
         const OpTime ts = op["ts"]._opTime();
         long long h = op["h"].numberLong();
@@ -244,7 +244,7 @@ namespace repl {
                          bool *bb,
                          bool fromMigrate ) {
         Lock::DBWrite lk1(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
             if ( strncmp(ns, "local.slaves", 12) == 0 )
@@ -336,7 +336,7 @@ namespace repl {
                           bool *bb,
                           bool fromMigrate ) {
         Lock::DBWrite lk(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         static BufBuilder bufbuilder(8*1024); // todo there is likely a mutex on this constructor
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
@@ -520,7 +520,7 @@ namespace repl {
         options.cappedSize = sz;
         options.autoIndexId = CollectionOptions::NO;
 
-        WriteUnitOfWork wunit(txn->recoveryUnit());
+        WriteUnitOfWork wunit(txn);
         invariant(ctx.db()->createCollection(txn, ns, options));
         if( !rs )
             logOp(txn, "n", "", BSONObj() );
@@ -588,7 +588,7 @@ namespace repl {
                 }
                 else {
                     IndexBuilder builder(o);
-                    Status status = builder.build(txn, db);
+                    Status status = builder.buildInForeground(txn, db);
                     if ( status.isOK() ) {
                         // yay
                     }
@@ -633,8 +633,16 @@ namespace repl {
                 else {
                     // probably don't need this since all replicated colls have _id indexes now
                     // but keep it just in case
-                    RARELY if ( indexCatalog && !collection->isCapped() ) {
-                        indexCatalog->ensureHaveIdIndex(txn);
+                    RARELY if ( indexCatalog
+                                 && !collection->isCapped()
+                                 && !indexCatalog->haveIdIndex() ) {
+                        try {
+                            Helpers::ensureIndex(txn, collection, BSON("_id" << 1), true, "_id_");
+                        }
+                        catch (const DBException& e) {
+                            warning() << "Ignoring error building id index on " << collection->ns()
+                                      << ": " << e.toString();
+                        }
                     }
 
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
@@ -662,8 +670,14 @@ namespace repl {
 
             // probably don't need this since all replicated colls have _id indexes now
             // but keep it just in case
-            RARELY if ( indexCatalog && !collection->isCapped() ) {
-                indexCatalog->ensureHaveIdIndex(txn);
+            RARELY if ( indexCatalog && !collection->isCapped() && !indexCatalog->haveIdIndex() ) {
+                try {
+                    Helpers::ensureIndex(txn, collection, BSON("_id" << 1), true, "_id_");
+                }
+                catch (const DBException& e) {
+                    warning() << "Ignoring error building id index on " << collection->ns()
+                              << ": " << e.toString();
+                }
             }
 
             OpDebug debug;

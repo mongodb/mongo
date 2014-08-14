@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include <boost/thread/thread.hpp>
@@ -49,7 +51,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/d_globals.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbmessage.h"
@@ -111,7 +113,7 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
+    using logger::LogComponent;
 
     void (*snmpInit)() = NULL;
 
@@ -133,7 +135,7 @@ namespace mongo {
         }
     } mystartupdbcpp;
 
-    QueryResult* emptyMoreResult(long long);
+    QueryResult::View emptyMoreResult(long long);
 
 
     /* todo: make this a real test.  the stuff in dbtests/ seem to do all dbdirectclient which exhaust doesn't support yet. */
@@ -198,17 +200,17 @@ namespace mongo {
                 if ( dbresponse.response ) {
                     port->reply(m, *dbresponse.response, dbresponse.responseTo);
                     if( dbresponse.exhaustNS.size() > 0 ) {
-                        MsgData *header = dbresponse.response->header();
-                        QueryResult *qr = (QueryResult *) header;
-                        long long cursorid = qr->cursorId;
+                        MsgData::View header = dbresponse.response->header();
+                        QueryResult::View qr = header.view2ptr();
+                        long long cursorid = qr.getCursorId();
                         if( cursorid ) {
                             verify( dbresponse.exhaustNS.size() && dbresponse.exhaustNS[0] );
                             string ns = dbresponse.exhaustNS; // before reset() free's it...
                             m.reset();
                             BufBuilder b(512);
                             b.appendNum((int) 0 /*size set later in appendData()*/);
-                            b.appendNum(header->id);
-                            b.appendNum(header->responseTo);
+                            b.appendNum(header.getId());
+                            b.appendNum(header.getResponseTo());
                             b.appendNum((int) dbGetMore);
                             b.appendNum((int) 0);
                             b.appendStr(ns);
@@ -276,7 +278,10 @@ namespace mongo {
         server->setupSockets();
 
         logStartup();
-        repl::getGlobalReplicationCoordinator()->startReplication();
+        {
+            OperationContextImpl txn;
+            repl::getGlobalReplicationCoordinator()->startReplication(&txn);
+        }
         if (serverGlobalParams.isHttpInterfaceEnabled)
             boost::thread web(stdx::bind(&webServerThread,
                                          new RestAdminAccess())); // takes ownership
@@ -327,7 +332,7 @@ namespace mongo {
 
         OperationContextImpl txn;
         Lock::GlobalWrite lk(txn.lockState());
-        WriteUnitOfWork wunit(txn.recoveryUnit());
+        WriteUnitOfWork wunit(&txn);
 
         vector< string > dbNames;
 
@@ -546,7 +551,7 @@ namespace mongo {
                 repl::getGlobalReplicationCoordinator()->getSettings();
         {
             ProcessId pid = ProcessId::getCurrent();
-            LogstreamBuilder l = log();
+            LogstreamBuilder l = log(LogComponent::kDefault);
             l << "MongoDB starting : pid=" << pid
               << " port=" << serverGlobalParams.port
               << " dbpath=" << storageGlobalParams.dbpath;
@@ -554,7 +559,7 @@ namespace mongo {
             if( replSettings.slave )  l << " slave=" << (int) replSettings.slave;
             l << ( is32bit ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << endl;
         }
-        DEV log() << "_DEBUG build (which is slower)" << endl;
+        DEV log(LogComponent::kDefault) << "_DEBUG build (which is slower)" << endl;
         logStartupWarnings();
 #if defined(_WIN32)
         printTargetMinOS();
@@ -664,8 +669,7 @@ namespace mongo {
 
         getDeleter()->startWorkers();
 
-        // Starts a background thread that rebuilds all incomplete indices. 
-        indexRebuilder.go(); 
+        restartInProgressIndexesFromLastShutdown();
 
         listen(listenPort);
 
@@ -898,7 +902,7 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
         unsigned x = 0x12345678;
         unsigned char& b = (unsigned char&) x;
         if ( b != 0x78 ) {
-            log() << "big endian cpus not yet supported" << endl;
+            mongo::log(LogComponent::kDefault) << "big endian cpus not yet supported" << endl;
             return 33;
         }
     }
@@ -908,7 +912,7 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
 
     Status status = mongo::runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {
-        severe() << "Failed global initialization: " << status;
+        severe(LogComponent::kDefault) << "Failed global initialization: " << status;
         ::_exit(EXIT_FAILURE);
     }
 

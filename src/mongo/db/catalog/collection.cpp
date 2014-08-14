@@ -28,6 +28,10 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/catalog/collection.h"
 
 #include "mongo/base/counter.h"
@@ -45,8 +49,11 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    using logger::LogComponent;
 
     std::string CompactOptions::toString() const {
         std::stringstream ss;
@@ -191,20 +198,17 @@ namespace mongo {
 
     StatusWith<DiskLoc> Collection::insertDocument( OperationContext* txn,
                                                     const BSONObj& doc,
-                                                    MultiIndexBlock& indexBlock ) {
+                                                    MultiIndexBlock* indexBlock,
+                                                    bool enforceQuota ) {
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
                                                               doc.objdata(),
                                                               doc.objsize(),
-                                                              0 );
+                                                              _enforceQuota(enforceQuota) );
 
         if ( !loc.isOK() )
             return loc;
 
-        InsertDeleteOptions indexOptions;
-        indexOptions.logIfError = false;
-        indexOptions.dupsAllowed = true; // in repair we should be doing no checking
-
-        Status status = indexBlock.insert( doc, loc.getValue(), indexOptions );
+        Status status = indexBlock->insert( doc, loc.getValue() );
         if ( !status.isOK() )
             return StatusWith<DiskLoc>( status );
 
@@ -476,7 +480,7 @@ namespace mongo {
 
         // 4) re-create indexes
         for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
-            status = _indexCatalog.createIndex(txn, indexSpecs[i], false);
+            status = _indexCatalog.createIndexOnEmptyCollection(txn, indexSpecs[i]);
             if ( !status.isOK() )
                 return status;
         }
@@ -525,7 +529,7 @@ namespace mongo {
                 IndexCatalog::IndexIterator i = _indexCatalog.getIndexIterator(false);
                 while( i.more() ) {
                     const IndexDescriptor* descriptor = i.next();
-                    log() << "validating index " << descriptor->indexNamespace() << endl;
+                    log(LogComponent::kIndexing) << "validating index " << descriptor->indexNamespace() << endl;
                     IndexAccessMethod* iam = _indexCatalog.getIndex( descriptor );
                     invariant( iam );
 
