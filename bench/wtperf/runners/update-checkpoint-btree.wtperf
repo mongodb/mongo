@@ -5,6 +5,6 @@ icount=5000000
 report_interval=5
 checkpoint_threads=1
 checkpoint_interval=10
-run_time=120
+run_time=300
 populate_threads=1
 threads=((count=2,inserts=1),(count=2,reads=1),(count=2,updates=1))
