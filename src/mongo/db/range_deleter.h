@@ -328,7 +328,7 @@ namespace mongo {
         Notification* notifyDone;
 
         // Time since the last time we reported this object.
-        Date_t timeSinceLastLog;
+        Date_t lastLoggedTS;
 
         DeleteJobStats stats;
 
