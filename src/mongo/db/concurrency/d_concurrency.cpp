@@ -467,7 +467,7 @@ namespace mongo {
         _weLocked = _lockState->otherLock();
     }
 
-    static Lock::Nestable n(const StringData& db) { 
+    static Lock::Nestable makeNestable(const StringData& db) { 
         if( db == "local" )
             return Lock::local;
         if( db == "admin" )
@@ -489,7 +489,7 @@ namespace mongo {
             return;
 
         StringData db = nsToDatabaseSubstring( ns );
-        Nestable nested = n(db);
+        Nestable nested = makeNestable(db);
         if( nested == admin ) { 
             // we can't nestedly lock both admin and local as implemented. so lock_W.
             qlk.lock_W(_lockState);
@@ -522,7 +522,7 @@ namespace mongo {
             return;
 
         StringData db = nsToDatabaseSubstring(ns);
-        Nestable nested = n(db);
+        Nestable nested = makeNestable(db);
         if( !nested )
             lockOther(db);
         lockTop();
