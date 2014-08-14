@@ -39,6 +39,7 @@
 #include <cmath>
 #include <limits>
 
+#include "mongo/base/data_view.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
@@ -143,7 +144,7 @@ namespace mongo {
         BSONObjBuilder& appendObject(const StringData& fieldName, const char * objdata , int size = 0 ) {
             verify( objdata );
             if ( size == 0 ) {
-                size = *((int*)objdata);
+                size = ConstDataView(objdata).readNative<int>();
             }
 
             verify( size > 4 && size < 100000000 );
@@ -705,7 +706,7 @@ namespace mongo {
             _b.appendNum((char) EOO);
             char *data = _b.buf() + _offset;
             int size = _b.len() - _offset;
-            *((int*)data) = size;
+            DataView(data).writeNative(size);
             if ( _tracker )
                 _tracker->got( size );
             return data;

@@ -33,6 +33,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/data_view.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/export_macros.h"
@@ -119,7 +120,10 @@ namespace mongo {
         operator std::string() const { return toString(); }
 
         /** Returns the type of the element */
-        BSONType type() const { return (BSONType) *reinterpret_cast< const signed char * >(data); }
+        BSONType type() const {
+            const signed char typeByte = ConstDataView(data).readNative<signed char>();
+            return static_cast<BSONType>(typeByte);
+        }
 
         /** retrieve a field within this element
             throws exception if *this is not an embedded object
@@ -193,7 +197,7 @@ namespace mongo {
             @see Bool(), trueValue()
         */
         Date_t date() const {
-            return *reinterpret_cast< const Date_t* >( value() );
+            return Date_t(ConstDataView(value()).readNative<unsigned long long>());
         }
 
         /** Convert the value to boolean, regardless of its type, in a javascript-like fashion
@@ -208,11 +212,19 @@ namespace mongo {
         bool isNumber() const;
 
         /** Return double value for this field. MUST be NumberDouble type. */
-        double _numberDouble() const {return (reinterpret_cast< const PackedDouble* >( value() ))->d; }
+        double _numberDouble() const {
+            return ConstDataView(value()).readNative<double>();
+        }
+
         /** Return int value for this field. MUST be NumberInt type. */
-        int _numberInt() const {return *reinterpret_cast< const int* >( value() ); }
+        int _numberInt() const {
+            return ConstDataView(value()).readNative<int>();
+        }
+
         /** Return long long value for this field. MUST be NumberLong type. */
-        long long _numberLong() const {return *reinterpret_cast< const long long* >( value() ); }
+        long long _numberLong() const {
+            return ConstDataView(value()).readNative<long long>();
+        }
 
         /** Retrieve int value for the element safely.  Zero returned if not a number. */
         int numberInt() const;
@@ -239,7 +251,11 @@ namespace mongo {
 
         /** Retrieve the object ID stored in the object.
             You must ensure the element is of type jstOID first. */
-        const mongo::OID &__oid() const { return *reinterpret_cast< const mongo::OID* >( value() ); }
+        mongo::OID __oid() const {
+            class OID oid;
+            std::memcpy(&oid, value(), sizeof(oid));
+            return oid;
+        }
 
         /** True if element is null. */
         bool isNull() const {
@@ -251,12 +267,12 @@ namespace mongo {
             @return std::string size including terminating null
         */
         int valuestrsize() const {
-            return *reinterpret_cast< const int* >( value() );
+            return ConstDataView(value()).readNative<int>();
         }
 
         // for objects the size *includes* the size of the size field
         size_t objsize() const {
-            return static_cast< const size_t >( *reinterpret_cast< const uint32_t* >( value() ) );
+            return ConstDataView(value()).readNative<uint32_t>();
         }
 
         /** Get a string's value.  Also gives you start of the real data for an embedded object.
@@ -293,7 +309,7 @@ namespace mongo {
          *  This INCLUDES the null char at the end */
         int codeWScopeCodeLen() const {
             massert( 16178 , "not codeWScope" , type() == CodeWScope );
-            return *(int *)( value() + 4 );
+            return ConstDataView(value() + 4).readNative<int>();
         }
 
         /** Get the scope SavedContext of a CodeWScope data element.
@@ -418,15 +434,15 @@ namespace mongo {
         }
 
         Date_t timestampTime() const {
-            unsigned long long t = ((unsigned int*)(value() + 4 ))[0];
+            unsigned long long t = ConstDataView(value() + 4).readNative<unsigned int>();
             return t * 1000;
         }
         unsigned int timestampInc() const {
-            return ((unsigned int*)(value() ))[0];
+            return ConstDataView(value()).readNative<unsigned int>();
         }
 
         unsigned long long timestampValue() const {
-            return reinterpret_cast<const unsigned long long*>( value() )[0];
+            return ConstDataView(value()).readNative<unsigned long long>();
         }
 
         const char * dbrefNS() const {
@@ -434,11 +450,13 @@ namespace mongo {
             return value() + 4;
         }
 
-        const mongo::OID& dbrefOID() const {
+        const mongo::OID dbrefOID() const {
             uassert( 10064 ,  "not a dbref" , type() == DBRef );
             const char * start = value();
-            start += 4 + *reinterpret_cast< const int* >( start );
-            return *reinterpret_cast< const mongo::OID* >( start );
+            start += 4 + ConstDataView(start).readNative<int>();
+            class OID result;
+            std::memcpy(&result, start, sizeof(result));
+            return result;
         }
 
         /** this does not use fieldName in the comparison, just the value */
@@ -522,11 +540,11 @@ namespace mongo {
         // NOTE Behavior changes must be replicated in Value::coerceToBool().
         switch( type() ) {
         case NumberLong:
-            return *reinterpret_cast< const long long* >( value() ) != 0;
+            return _numberLong() != 0;
         case NumberDouble:
-            return (reinterpret_cast < const PackedDouble* >(value ()))->d != 0;
+            return _numberDouble() != 0;
         case NumberInt:
-            return *reinterpret_cast< const int* >( value() ) != 0;
+            return _numberInt() != 0;
         case mongo::Bool:
             return boolean();
         case EOO:
@@ -572,9 +590,9 @@ namespace mongo {
         case NumberDouble:
             return _numberDouble();
         case NumberInt:
-            return *reinterpret_cast< const int* >( value() );
+            return _numberInt();
         case NumberLong:
-            return (double) *reinterpret_cast< const long long* >( value() );
+            return _numberLong();
         default:
             return 0;
         }

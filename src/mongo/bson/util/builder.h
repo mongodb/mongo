@@ -36,8 +36,9 @@
 #include <string>
 #include <string.h>
 
-#include "mongo/bson/inline_decls.h"
+#include "mongo/base/data_view.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/inline_decls.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 
@@ -160,34 +161,34 @@ namespace mongo {
         void decouple() { data = 0; }
 
         void appendUChar(unsigned char j) {
-            *((unsigned char*)grow(sizeof(unsigned char))) = j;
+            appendNumImpl(j);
         }
         void appendChar(char j) {
-            *((char*)grow(sizeof(char))) = j;
+            appendNumImpl(j);
         }
         void appendNum(char j) {
-            *((char*)grow(sizeof(char))) = j;
+            appendNumImpl(j);
         }
         void appendNum(short j) {
-            *((short*)grow(sizeof(short))) = j;
+            appendNumImpl(j);
         }
         void appendNum(int j) {
-            *((int*)grow(sizeof(int))) = j;
+            appendNumImpl(j);
         }
         void appendNum(unsigned j) {
-            *((unsigned*)grow(sizeof(unsigned))) = j;
+            appendNumImpl(j);
         }
         void appendNum(bool j) {
-            *((bool*)grow(sizeof(bool))) = j;
+            appendNumImpl(j);
         }
         void appendNum(double j) {
-            (reinterpret_cast< PackedDouble* >(grow(sizeof(double))))->d = j;
+            appendNumImpl(j);
         }
         void appendNum(long long j) {
-            *((long long*)grow(sizeof(long long))) = j;
+            appendNumImpl(j);
         }
         void appendNum(unsigned long long j) {
-            *((unsigned long long*)grow(sizeof(unsigned long long))) = j;
+            appendNumImpl(j);
         }
 
         void appendBuf(const void *src, size_t len) {
@@ -222,6 +223,12 @@ namespace mongo {
         }
 
     private:
+        template<typename T>
+        void appendNumImpl(T t) {
+            DataView(grow(sizeof(t))).writeNative(t);
+        }
+
+
         /* "slow" portion of 'grow()'  */
         void NOINLINE_DECL grow_reallocate(int newLen) {
             int a = 64;

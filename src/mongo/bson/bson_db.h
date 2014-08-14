@@ -38,6 +38,7 @@
 
 #pragma once
 
+#include "mongo/base/data_view.h"
 #include "mongo/bson/optime.h"
 #include "mongo/util/time_support.h"
 
@@ -61,7 +62,7 @@ namespace mongo {
 
     inline OpTime BSONElement::_opTime() const {
         if( type() == mongo::Date || type() == Timestamp )
-            return OpTime( *reinterpret_cast< const unsigned long long* >( value() ) );
+            return OpTime(ConstDataView(value()).readNative<unsigned long long>());
         return OpTime();
     }
 

@@ -402,7 +402,7 @@ namespace mongo {
 
     BSONObj BSONElement::codeWScopeObject() const {
         verify( type() == CodeWScope );
-        int strSizeWNull = *(int *)( value() + 4 );
+        int strSizeWNull = ConstDataView(value() + 4).readNative<int>();
         return BSONObj( value() + 4 + 4 + strSizeWNull );
     }
 
@@ -673,8 +673,9 @@ namespace mongo {
         case DBRef:
             s << "DBRef('" << valuestr() << "',";
             {
-                mongo::OID *x = (mongo::OID *) (valuestr() + valuestrsize());
-                s << *x << ')';
+                mongo::OID x;
+                std::memcpy(&x, valuestr() + valuestrsize(), sizeof(x));
+                s << x << ')';
             }
             break;
         case jstOID:

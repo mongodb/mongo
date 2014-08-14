@@ -276,7 +276,7 @@ namespace mongo {
                 break;
             case jstOID:
                 b.appendUChar(coid|bits);
-                b.appendBuf(&e.__oid(), sizeof(OID));
+                b.appendStruct(e.__oid());
                 break;
             case BinData:
                 {
