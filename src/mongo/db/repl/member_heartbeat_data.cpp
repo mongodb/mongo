@@ -65,26 +65,27 @@ namespace repl {
                                           OpTime optime,
                                           const std::string& syncingTo,
                                           const std::string& heartbeatMessage) {
-        _authIssue = false;
-        _health = 1;
-
-        _lastHeartbeat = now;
-        _upSince = now;
         _state = state;
-        _electionTime = electionTime;
-        _opTime = optime;
-        _syncSource = syncingTo;
+        _health = 1;
+        if (_upSince == 0) {
+            _upSince = now;
+        }
+        _lastHeartbeat = now;
         _lastHeartbeatMsg = heartbeatMessage;
+        _syncSource = syncingTo;
+        _opTime = optime;
+        _authIssue = false;
+        _electionTime = electionTime;
     }
 
     void MemberHeartbeatData::setDownValues(Date_t now,
                                             const std::string& heartbeatMessage) {
-        _authIssue = false;
-        _health = 0;
         _state = MemberState::RS_DOWN;
-
+        _health = 0;
+        _upSince = 0;
         _lastHeartbeat = now;
         _lastHeartbeatMsg = heartbeatMessage;
+        _authIssue = false;
     }
 
 } // namespace repl

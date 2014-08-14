@@ -37,7 +37,6 @@
 
 namespace mongo {
 namespace repl {
-
 namespace {
 
     TEST(TopologyCoordinator, ChooseSyncSourceBasic) {
@@ -387,6 +386,124 @@ namespace {
         ASSERT_EQUALS(topocoord.getSyncSourceAddress(),HostAndPort("h3"));
     }
 
+    TEST(TopologyCoordinator, ReplSetGetStatus) {
+        // This test starts by configuring a TopologyCoordinator as a member of a 4 node replica
+        // set, with each node in a different state.
+        // The first node is DOWN, as if we tried heartbeating them and it failed in some way.
+        // The second node is in state SECONDARY, as if we've received a valid heartbeat from them.
+        // The third node is in state UNKNOWN, as if we've not yet had any heartbeating activity
+        // with them yet.  The fourth node is PRIMARY and corresponds to ourself, which gets its
+        // information for replSetGetStatus from a different source than the nodes that aren't
+        // ourself.  After this setup, we call prepareStatusResponse and make sure that the fields
+        // returned for each member match our expectations.
+        Date_t startupTime(100);
+        Date_t heartbeatTime = 5000;
+        Seconds uptimeSecs(10);
+        Date_t curTime = heartbeatTime + uptimeSecs.total_milliseconds();
+        OpTime electionTime(1, 2);
+        OpTime oplogProgress(3, 4);
+        ReplicationExecutor::CallbackHandle cbh;
+        ReplicationExecutor::CallbackData cbData(NULL,
+                                                 cbh,
+                                                 Status::OK());
+        TopologyCoordinatorImpl topocoord((Seconds(999)));
+
+        ReplicaSetConfig config;
+        ASSERT_OK(config.initialize(
+                BSON("_id" << "mySet" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test0:1234") <<
+                                             BSON("_id" << 1 << "host" << "test1:1234") <<
+                                             BSON("_id" << 2 << "host" << "test2:1234") <<
+                                             BSON("_id" << 3 << "host" << "test3:1234")))));
+        topocoord.updateConfig(cbData, config, 3, startupTime + 1, OpTime(0,0));
+
+        // Now that the replica set is setup, put the members into the states we want them in.
+        MemberHeartbeatData member0hb(0);
+        member0hb.setDownValues(heartbeatTime, "");
+        topocoord.updateHeartbeatData(heartbeatTime, member0hb, 0, oplogProgress);
+        MemberHeartbeatData member1hb(1);
+        member1hb.setUpValues(
+                heartbeatTime, MemberState::RS_SECONDARY, electionTime, oplogProgress, "", "READY");
+        topocoord.updateHeartbeatData(startupTime, member1hb, 1, oplogProgress);
+        topocoord._changeMemberState(MemberState::RS_PRIMARY);
+
+        // Now node 0 is down, node 1 is up, and for node 2 we have no heartbeat data yet.
+        BSONObjBuilder statusBuilder;
+        Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
+        topocoord.prepareStatusResponse(cbData,
+                                        curTime,
+                                        uptimeSecs.total_seconds(),
+                                        oplogProgress,
+                                        &statusBuilder,
+                                        &resultStatus);
+        ASSERT_OK(resultStatus);
+        BSONObj rsStatus = statusBuilder.obj();
+
+        // Test results for all non-self members
+        ASSERT_EQUALS("mySet", rsStatus["set"].String());
+        ASSERT_EQUALS(curTime.asInt64(), rsStatus["date"].Date().asInt64());
+        std::vector<BSONElement> memberArray = rsStatus["members"].Array();
+        ASSERT_EQUALS(4U, memberArray.size());
+        BSONObj member0Status = memberArray[0].Obj();
+        BSONObj member1Status = memberArray[1].Obj();
+        BSONObj member2Status = memberArray[2].Obj();
+
+        // Test member 0, the node that's DOWN
+        ASSERT_EQUALS(0, member0Status["_id"].Int());
+        ASSERT_EQUALS("test0:1234", member0Status["name"].String());
+        ASSERT_EQUALS(0, member0Status["health"].Double());
+        ASSERT_EQUALS(MemberState::RS_DOWN, member0Status["state"].Int());
+        ASSERT_EQUALS("(not reachable/healthy)", member0Status["stateStr"].String());
+        ASSERT_EQUALS(0, member0Status["uptime"].Int());
+        ASSERT_EQUALS(OpTime(), OpTime(member0Status["optime"].timestampValue()));
+        ASSERT_EQUALS(OpTime().asDate(), member0Status["optimeDate"].Date().millis);
+        ASSERT_EQUALS(heartbeatTime, member0Status["lastHeartbeat"].Date());
+        ASSERT_EQUALS(Date_t(), member0Status["lastHeartbeatRecv"].Date());
+
+        // Test member 1, the node that's SECONDARY
+        ASSERT_EQUALS(1, member1Status["_id"].Int());
+        ASSERT_EQUALS("test1:1234", member1Status["name"].String());
+        ASSERT_EQUALS(1, member1Status["health"].Double());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, member1Status["state"].Int());
+        ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
+                      member1Status["stateStr"].String());
+        ASSERT_EQUALS(uptimeSecs.total_seconds(), member1Status["uptime"].Int());
+        ASSERT_EQUALS(oplogProgress, OpTime(member1Status["optime"].timestampValue()));
+        ASSERT_EQUALS(oplogProgress.asDate(), member1Status["optimeDate"].Date().millis);
+        ASSERT_EQUALS(heartbeatTime, member1Status["lastHeartbeat"].Date());
+        ASSERT_EQUALS(Date_t(), member1Status["lastHeartbeatRecv"].Date());
+        ASSERT_EQUALS("READY", member1Status["lastHeartbeatMessage"].String());
+
+        // Test member 2, the node that's UNKNOWN
+        ASSERT_EQUALS(2, member2Status["_id"].Int());
+        ASSERT_EQUALS("test2:1234", member2Status["name"].String());
+        ASSERT_EQUALS(-1, member2Status["health"].Double());
+        ASSERT_EQUALS(MemberState::RS_UNKNOWN, member2Status["state"].Int());
+        ASSERT_EQUALS(MemberState(MemberState::RS_UNKNOWN).toString(),
+                      member2Status["stateStr"].String());
+        ASSERT_FALSE(member2Status.hasField("uptime"));
+        ASSERT_FALSE(member2Status.hasField("optime"));
+        ASSERT_FALSE(member2Status.hasField("optimeDate"));
+        ASSERT_FALSE(member2Status.hasField("lastHearbeat"));
+        ASSERT_FALSE(member2Status.hasField("lastHearbeatRecv"));
+
+        // Now test results for ourself, the PRIMARY
+        ASSERT_EQUALS(MemberState::RS_PRIMARY, rsStatus["myState"].Int());
+        BSONObj selfStatus = memberArray[3].Obj();
+        ASSERT_TRUE(selfStatus["self"].Bool());
+        ASSERT_EQUALS(3, selfStatus["_id"].Int());
+        ASSERT_EQUALS("test3:1234", selfStatus["name"].String());
+        ASSERT_EQUALS(1, selfStatus["health"].Double());
+        ASSERT_EQUALS(MemberState::RS_PRIMARY, selfStatus["state"].Int());
+        ASSERT_EQUALS(MemberState(MemberState::RS_PRIMARY).toString(),
+                      selfStatus["stateStr"].String());
+        ASSERT_EQUALS(uptimeSecs.total_seconds(), selfStatus["uptime"].Int());
+        ASSERT_EQUALS(oplogProgress, OpTime(selfStatus["optime"].timestampValue()));
+        ASSERT_EQUALS(oplogProgress.asDate(), selfStatus["optimeDate"].Date().millis);
+
+        // TODO(spencer): Test electionTime and pingMs are set properly
+    }
 
 }  // namespace
 }  // namespace repl
