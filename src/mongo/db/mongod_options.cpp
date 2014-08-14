@@ -201,6 +201,7 @@ namespace mongo {
 
         general_options.addOptionChaining("storage.quota.enforced", "quota", moe::Switch,
                 "limits each database to a certain number of files (8 default)")
+                                         .setSources(moe::SourceAllLegacy)
                                          .incompatibleWith("keyFile");
 
         general_options.addOptionChaining("storage.quota.maxFilesPerDB", "quotaFiles", moe::Int,
