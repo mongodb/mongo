@@ -34,3 +34,6 @@ test> db.test.find()
 Fetched 2 record(s) in 1ms -- Index[none]
 
 --headerline should have no effect on JSON input sources
+
+3. this mongoimport will import data in JSON arrays of an arbitrary size - the
+current mongoimport will only work on arrays <= 16 MB
