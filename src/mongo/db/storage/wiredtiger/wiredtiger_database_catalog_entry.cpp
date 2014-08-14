@@ -103,7 +103,6 @@ namespace mongo {
         const char *key;
         WT_SESSION *session = _db.GetSession();
         boost::mutex::scoped_lock lk( _entryMapLock );
-        fprintf(stderr, "Initializing collection namespaces for: %s\n", name().c_str());
 
         /* Only do this once. */
         if (!_entryMap.empty())
@@ -124,10 +123,11 @@ namespace mongo {
 
             // Move the pointer past table:NAME.
             key = key + 6;
-            fprintf(stderr, "adding entry for: %s\n", key);
             // TODO: retrieve options? Filter indexes? manage memory?
             CollectionOptions *options = new CollectionOptions();
             Entry *entry = new Entry(mongo::StringData(key), *options);
+            entry->rs.reset(new WiredTigerRecordStore(key, _db));
+
             _entryMap[key] = entry;
         }
         invariant(ret == WT_NOTFOUND);
