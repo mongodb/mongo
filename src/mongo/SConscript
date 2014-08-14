@@ -236,7 +236,8 @@ env.Library( 'mongohasher', [ "db/hasher.cpp" ] )
 
 env.Library('synchronization', [ 'util/concurrency/synchronization.cpp' ])
 
-env.Library('auth_helpers', ['client/auth_helpers.cpp'])
+env.Library('auth_helpers', ['client/auth_helpers.cpp'],
+            LIBDEPS=['clientdriver'])
 
 env.Library('global_optime', ['db/global_optime.cpp'])
 
@@ -292,8 +293,7 @@ env.Library('clientdriver', [
             "client/syncclusterconnection.cpp",
             "db/dbmessage.cpp"
             ],
-            LIBDEPS=['auth_helpers',
-                     'network',
+            LIBDEPS=['network',
             ])
 
 env.CppUnitTest("replica_set_monitor_test",
