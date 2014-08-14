@@ -47,7 +47,7 @@ namespace mongo {
                      fieldName == "name" ||
                      fieldName == "v" ||
                      fieldName == "background" || // this is a creation time option only
-                     fieldName == "dropDups" || // this is a creation time option only
+                     fieldName == "dropDups" || // this is now ignored
                      fieldName == "sparse" || // checked specially
                      fieldName == "unique" // check specially
                      ) {

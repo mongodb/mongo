@@ -519,13 +519,6 @@ namespace {
                                          << keyStatus.reason() );
         }
 
-        if ( _collection->isCapped() && spec["dropDups"].trueValue() ) {
-            return Status( ErrorCodes::CannotCreateIndex,
-                           str::stream() << "Cannot create an index with dropDups=true on a "
-                                         << "capped collection, as capped collections do "
-                                         << "not allow document removal." );
-        }
-
         if ( IndexDescriptor::isIdIndexPattern( key ) ) {
             BSONElement uniqueElt = spec["unique"];
             if ( !uniqueElt.eoo() && !uniqueElt.trueValue() ) {
@@ -1133,7 +1126,7 @@ namespace {
                 if ( s == "_id" ) {
                     // skip
                 }
-                else if ( s == "dropDup" ) {
+                else if ( s == "dropDups" ) {
                     // dropDups is silently ignored and removed from the spec as of SERVER-14710.
                 }
                 else if ( s == "v" || s == "unique" ||

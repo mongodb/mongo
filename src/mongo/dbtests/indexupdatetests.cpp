@@ -728,7 +728,6 @@ namespace IndexUpdateTests {
                     BSON("name" << "super"
                          << "ns" << _ns
                          << "unique" << 1
-                         << "dropDups" << true
                          << "sparse" << true
                          << "expireAfterSeconds" << 3600
                          << "key" << BSON("superIdx" << "2d")));
@@ -746,7 +745,6 @@ namespace IndexUpdateTests {
                          << "expireAfterSeconds" << 3600
                          << "sparse" << true
                          << "unique" << 1
-                         << "dropDups" << true
                          << "key" << BSON("superIdx" << "2d")));
             ASSERT_EQUALS(_client.getLastError(), "");
         }
@@ -762,7 +760,6 @@ namespace IndexUpdateTests {
                     BSON("name" << "super2"
                          << "ns" << _ns
                          << "unique" << false
-                         << "dropDups" << true
                          << "sparse" << true
                          << "expireAfterSeconds" << 3600
                          << "key" << BSON("superIdx" << "2d")));
@@ -777,7 +774,6 @@ namespace IndexUpdateTests {
                     BSON("name" << "super2"
                          << "ns" << _ns
                          << "unique" << 1
-                         << "dropDups" << true
                          << "sparse" << false
                          << "background" << true
                          << "expireAfterSeconds" << 3600
@@ -793,7 +789,6 @@ namespace IndexUpdateTests {
                     BSON("name" << "super2"
                          << "ns" << _ns
                          << "unique" << 1
-                         << "dropDups" << true
                          << "sparse" << true
                          << "expireAfterSeconds" << 2400
                          << "key" << BSON("superIdx" << "2d")));
