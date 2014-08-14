@@ -127,8 +127,9 @@ namespace mongo {
     class MoveTimingHelper {
     public:
         MoveTimingHelper( const string& where , const string& ns , BSONObj min , BSONObj max ,
-                          int total , string* cmdErrmsg )
-            : _where( where ) , _ns( ns ) , _next( 0 ) , _total( total ) , _cmdErrmsg( cmdErrmsg ) {
+                          int total, string* cmdErrmsg, string toShard, string fromShard )
+            : _where( where ) , _ns( ns ) , _to( toShard ), _from( fromShard ), _next( 0 ),
+            _total( total ) , _cmdErrmsg( cmdErrmsg ) {
             _b.append( "min" , min );
             _b.append( "max" , max );
         }
@@ -137,6 +138,12 @@ namespace mongo {
             // even if logChange doesn't throw, bson does
             // sigh
             try {
+                if ( !_to.empty() ){
+                    _b.append( "to", _to );
+                }
+                if ( !_from.empty() ){
+                    _b.append( "from", _from );
+                }
                 if ( _next != _total ) {
                     _b.append( "note" , "aborted" );
                 }
@@ -184,6 +191,8 @@ namespace mongo {
 
         string _where;
         string _ns;
+        string _to;
+        string _from;
 
         int _next;
         int _total; // expected # of steps
@@ -948,7 +957,8 @@ namespace mongo {
                 return false;
             }
 
-            MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */ , &errmsg );
+            MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */ , &errmsg,
+                toShardName, fromShardName );
 
             log() << "received moveChunk request: " << cmdObj << migrateLog;
 
@@ -1677,7 +1687,7 @@ namespace mongo {
                   << " at epoch " << epoch.toString() << endl;
 
             string errmsg;
-            MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ , &errmsg );
+            MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ , &errmsg, "", "" );
 
             ScopedDbConnection conn(from);
             conn->getLastError(); // just test connection
