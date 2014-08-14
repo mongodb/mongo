@@ -113,7 +113,7 @@ valid_build()
 	}
 	classf=`ls ../docs/struct___* 2>/dev/null`
 	for c in $classf; do
-		echo "$c: Need to add class to PREDEFINE in src/docs/Doxyfile"
+		echo "$c: Need to add class to PREDEFINED in src/docs/Doxyfile"
 	done
 }
 
