@@ -306,6 +306,10 @@ namespace mongo {
         IndexCatalogEntry* _setupInMemoryStructures(OperationContext* txn,
                                                     IndexDescriptor* descriptor );
 
+        // Apply a set of transformations to the user-provided index object 'spec' to make it
+        // conform to the standard for insertion.  This function adds the 'v' field if it didn't
+        // exist, removes the '_id' field if it exists, applies plugin-level transformations if
+        // appropriate, etc.
         static BSONObj _fixIndexSpec( const BSONObj& spec );
 
         Status _isSpecOk( const BSONObj& spec ) const;

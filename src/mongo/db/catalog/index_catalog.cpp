@@ -462,6 +462,21 @@ namespace {
 
         const NamespaceString& nss = _collection->ns();
 
+        BSONElement vElt = spec["v"];
+        if( !vElt.eoo() ) {
+            if ( !vElt.isNumber() ) {
+                return Status( ErrorCodes::CannotCreateIndex,
+                               str::stream() << "non-numeric value for \"v\" field:" << vElt );
+            }
+            double v = vElt.Number();
+            // note (one day) we may be able to fresh build less versions than we can use
+            // isASupportedIndexVersionNumber() is what we can use
+            if ( v != 0 && v != 1 ) {
+                return Status( ErrorCodes::CannotCreateIndex,
+                               str::stream() << "this version of mongod cannot build new indexes "
+                                             << "of version number " << v );
+            }
+        }
 
         if ( nss.isSystemDotIndexes() )
             return Status( ErrorCodes::CannotCreateIndex,
@@ -511,7 +526,13 @@ namespace {
                                          << "not allow document removal." );
         }
 
-        if ( !IndexDescriptor::isIdIndexPattern( key ) ) {
+        if ( IndexDescriptor::isIdIndexPattern( key ) ) {
+            BSONElement uniqueElt = spec["unique"];
+            if ( !uniqueElt.eoo() && !uniqueElt.trueValue() ) {
+                return Status( ErrorCodes::CannotCreateIndex, "_id index cannot be non-unique" );
+            }
+        }
+        else {
             // for non _id indexes, we check to see if replication has turned off all indexes
             // we _always_ created _id index
             repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
@@ -1085,13 +1106,9 @@ namespace {
 
         int v = DefaultIndexVersionNumber;
         if( !o["v"].eoo() ) {
-            double vv = o["v"].Number();
-            // note (one day) we may be able to fresh build less versions than we can use
-            // isASupportedIndexVersionNumber() is what we can use
-            uassert(14803, str::stream() << "this version of mongod cannot build new indexes of version number " << vv, 
-                    vv == 0 || vv == 1);
-            v = (int) vv;
+            v = o["v"].numberInt();
         }
+
         // idea is to put things we use a lot earlier
         b.append("v", v);
 
