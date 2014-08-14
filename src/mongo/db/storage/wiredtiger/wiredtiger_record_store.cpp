@@ -56,7 +56,8 @@ namespace mongo {
           _isCapped( isCapped ),
           _cappedMaxSize( cappedMaxSize ),
           _cappedMaxDocs( cappedMaxDocs ),
-          _cappedDeleteCallback( cappedDeleteCallback ) {
+          _cappedDeleteCallback( cappedDeleteCallback ),
+          _numRecords( 0 ) {
         if (_isCapped) {
             invariant(_cappedMaxSize > 0);
             invariant(_cappedMaxDocs == -1 || _cappedMaxDocs > 0);
@@ -318,7 +319,7 @@ namespace mongo {
             deleteRecord( txn, loc );
         }
 
-        // TODO? clear current transaction
+        // TODO: clear current transaction
         // WiredTigerRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         return Status::OK();
