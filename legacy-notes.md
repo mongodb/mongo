@@ -1,5 +1,7 @@
 On legacy tools, if the "-d" option is blank it assumes the default database ('test'). It might be preferable and of lower risk to the user to require that -d is specified, instead of assuming a default value.
 
+#####note: This behavior differs from tool to tool. In mongodump, no -d field means *all* databases instead of "test"
+
 ##Mongoexport:
 
 What should be the behavior if the user specifiees both --fields *AND* --fieldFile?
