@@ -389,6 +389,7 @@ namespace {
             if (rid != getMyRID(txn)) {
                 BSONObj config;
                 if (getReplicationMode() == modeReplSet) {
+                    invariant(_ridMemberMap.count(rid));
                     Member* mem = _ridMemberMap[rid];
                     invariant(mem);
                     config = BSON("_id" << mem->id());

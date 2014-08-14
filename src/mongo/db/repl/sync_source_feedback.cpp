@@ -156,7 +156,6 @@ namespace repl {
             return false;
         }
 
-        replHandshake(txn);
         return hasConnection();
     }
 
@@ -256,6 +255,7 @@ namespace repl {
                     sleepmillis(500);
                     continue;
                 }
+                handshakeNeeded = true;
             }
             if (handshakeNeeded) {
                 if (!replHandshake(&txn)) {
