@@ -45,7 +45,7 @@ namespace mongo {
         static int Create(WiredTigerDatabase &db, const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace);
 
         WiredTigerRecordStore(const StringData& ns,
-			  WiredTigerDatabase &db,
+                          WiredTigerDatabase &db,
                           bool isCapped = false,
                           int64_t cappedMaxSize = -1,
                           int64_t cappedMaxDocs = -1,
@@ -135,10 +135,10 @@ namespace mongo {
         bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
 
-	WT_CURSOR *GetCursor(WiredTigerSession &session, bool acquire=false) const {
-		return session.GetCursor(GetURI(), acquire);
-	}
-	const std::string &GetURI() const { return _uri; }
+        WT_CURSOR *GetCursor(WiredTigerSession &session, bool acquire=false) const {
+                return session.GetCursor(GetURI(), acquire);
+        }
+        const std::string &GetURI() const { return _uri; }
 
     private:
 
@@ -159,17 +159,17 @@ namespace mongo {
             void _checkStatus();
 
             const WiredTigerRecordStore& _rs;
-	    WiredTigerSession &_session;
+            WiredTigerSession &_session;
             CollectionScanParams::Direction _dir;
             WiredTigerCursor _cursor;
-	    bool _eof;
+            bool _eof;
         };
 
         static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx );
         static WiredTigerItem _makeKey(const DiskLoc &loc);
         static std::string _getURI(const StringData &ns) {
-	    return "table:" + ns.toString();
-	}
+            return "table:" + ns.toString();
+        }
 
         DiskLoc _nextId();
         bool cappedAndNeedDelete() const;
@@ -177,8 +177,8 @@ namespace mongo {
         void _changeNumRecords(OperationContext* txn, bool insert);
         void _increaseDataSize(OperationContext* txn, int amount);
 
-	WiredTigerDatabase &_db;
-	const std::string _uri;
+        WiredTigerDatabase &_db;
+        const std::string _uri;
         const bool _isCapped;
         const int64_t _cappedMaxSize;
         const int64_t _cappedMaxDocs;

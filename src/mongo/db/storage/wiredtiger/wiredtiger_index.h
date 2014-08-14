@@ -44,9 +44,9 @@ namespace mongo {
     class WiredTigerIndex : public SortedDataInterface {
     public:
         static std::string _getURI(const std::string &ns, const std::string &idxName) {
-	    return "table:" + ns + "_idx_" + idxName;
-	}
-	static int Create(WiredTigerDatabase &db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info);
+            return "table:" + ns + "_idx_" + idxName;
+        }
+        static int Create(WiredTigerDatabase &db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info);
 
         WiredTigerIndex(WiredTigerDatabase &db, const IndexCatalogEntry& info, const std::string &ns, const std::string &idxName) : _db(db), _info(info), _uri(_getURI(ns, idxName)) {}
 
@@ -66,73 +66,73 @@ namespace mongo {
         virtual bool isEmpty();
 
         virtual Status touch(OperationContext* txn) const;
-	
-	virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
+        
+        virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 
-	bool isDup(OperationContext *txn, const BSONObj& key, DiskLoc loc);
+        bool isDup(OperationContext *txn, const BSONObj& key, DiskLoc loc);
 
         virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
 
         virtual Status initAsEmpty(OperationContext* txn);
 
-	WT_CURSOR *GetCursor(WiredTigerSession &session, bool acquire=false) const;
-	const std::string &GetURI() const;
+        WT_CURSOR *GetCursor(WiredTigerSession &session, bool acquire=false) const;
+        const std::string &GetURI() const;
 
     private:
-	    class IndexCursor : public SortedDataInterface::Cursor {
-	    public:
-		IndexCursor(WT_CURSOR *cursor,
-			WiredTigerSession &session, OperationContext *txn, bool forward)
-		   : _cursor(cursor, session), _txn(txn), _forward(forward), _eof() {
-			advance();
-	 	}
+            class IndexCursor : public SortedDataInterface::Cursor {
+            public:
+                IndexCursor(WT_CURSOR *cursor,
+                        WiredTigerSession &session, OperationContext *txn, bool forward)
+                   : _cursor(cursor, session), _txn(txn), _forward(forward), _eof() {
+                        advance();
+                 }
 
-		virtual int getDirection() const;
+                virtual int getDirection() const;
 
-		virtual bool isEOF() const;
+                virtual bool isEOF() const;
 
-		virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor &genother) const;
+                virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor &genother) const;
 
-		virtual void aboutToDeleteBucket(const DiskLoc& bucket);
+                virtual void aboutToDeleteBucket(const DiskLoc& bucket);
 
-		virtual bool locate(const BSONObj &key, const DiskLoc& loc);
+                virtual bool locate(const BSONObj &key, const DiskLoc& loc);
 
-		virtual void customLocate(const BSONObj& keyBegin,
-					  int keyBeginLen,
-					  bool afterKey,
-					  const vector<const BSONElement*>& keyEnd,
-					  const vector<bool>& keyEndInclusive);
+                virtual void customLocate(const BSONObj& keyBegin,
+                                          int keyBeginLen,
+                                          bool afterKey,
+                                          const vector<const BSONElement*>& keyEnd,
+                                          const vector<bool>& keyEndInclusive);
 
-		void advanceTo(const BSONObj &keyBegin,
-			       int keyBeginLen,
-			       bool afterKey,
-			       const vector<const BSONElement*>& keyEnd,
-			       const vector<bool>& keyEndInclusive);
+                void advanceTo(const BSONObj &keyBegin,
+                               int keyBeginLen,
+                               bool afterKey,
+                               const vector<const BSONElement*>& keyEnd,
+                               const vector<bool>& keyEndInclusive);
 
-		virtual BSONObj getKey() const;
+                virtual BSONObj getKey() const;
 
-		virtual DiskLoc getDiskLoc() const;
+                virtual DiskLoc getDiskLoc() const;
 
-		virtual void advance();
+                virtual void advance();
 
-		virtual void savePosition();
+                virtual void savePosition();
 
-		virtual void restorePosition();
+                virtual void restorePosition();
 
-	    private:
-		WiredTigerCursor _cursor;
-		OperationContext *_txn;
-		bool _forward;
-		bool _eof;
+            private:
+                WiredTigerCursor _cursor;
+                OperationContext *_txn;
+                bool _forward;
+                bool _eof;
 
-		// For save/restorePosition since _it may be invalidated durring a yield.
-		bool _savedAtEnd;
-		BSONObj _savedKey;
-		DiskLoc _savedLoc;
-	    };
+                // For save/restorePosition since _it may be invalidated durring a yield.
+                bool _savedAtEnd;
+                BSONObj _savedKey;
+                DiskLoc _savedLoc;
+            };
 
         WiredTigerDatabase& _db;
         const IndexCatalogEntry& _info;
-	std::string _uri;
+        std::string _uri;
     };
 } // namespace

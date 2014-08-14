@@ -38,20 +38,20 @@
 namespace mongo {
 
     int WiredTigerRecordStore::Create(WiredTigerDatabase &db, const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
-	WiredTigerSession swrap(db.GetSession(), db);
-	WT_SESSION *s(swrap.Get());
-	return s->create(s, _getURI(ns).c_str(), "type=file,key_format=u,value_format=u");
+        WiredTigerSession swrap(db.GetSession(), db);
+        WT_SESSION *s(swrap.Get());
+        return s->create(s, _getURI(ns).c_str(), "type=file,key_format=u,value_format=u");
     }
 
     WiredTigerRecordStore::WiredTigerRecordStore( const StringData& ns,
-		                        WiredTigerDatabase &db,
+                                        WiredTigerDatabase &db,
                                         bool isCapped,
                                         int64_t cappedMaxSize,
                                         int64_t cappedMaxDocs,
                                         CappedDocumentDeleteCallback* cappedDeleteCallback )
         : RecordStore( ns ),
           _db( db ),
-	  _uri (_getURI(ns) ),
+          _uri (_getURI(ns) ),
           _isCapped( isCapped ),
           _cappedMaxSize( cappedMaxSize ),
           _cappedMaxDocs( cappedMaxDocs ),
@@ -88,16 +88,16 @@ namespace mongo {
 
     RecordData WiredTigerRecordStore::dataFor( const DiskLoc& loc) const {
         // ownership passes to the shared_array created below
-	WiredTigerSession swrap(_db);
-	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
-	WT_CURSOR *c = curwrap.Get();
-	c->set_key(c, _makeKey(loc).Get());
+        WiredTigerSession swrap(_db);
+        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WT_CURSOR *c = curwrap.Get();
+        c->set_key(c, _makeKey(loc).Get());
         int ret = c->search(c);
-	invariant(ret == 0);
+        invariant(ret == 0);
 
-	WT_ITEM value;
-	ret = c->get_value(c, &value);
-	invariant(ret == 0);
+        WT_ITEM value;
+        ret = c->get_value(c, &value);
+        invariant(ret == 0);
 
         boost::shared_array<char> data( new char[value.size] );
         memcpy( data.get(), value.data, value.size );
@@ -106,20 +106,20 @@ namespace mongo {
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& loc ) {
         WiredTigerSession swrap(_db);
-	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
-	WT_CURSOR *c = curwrap.Get();
-	c->set_key(c, _makeKey(loc).Get());
+        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WT_CURSOR *c = curwrap.Get();
+        c->set_key(c, _makeKey(loc).Get());
         int ret = c->search(c);
-	invariant(ret == 0);
+        invariant(ret == 0);
 
-	WT_ITEM old_value;
-	ret = c->get_value(c, &old_value);
-	invariant(ret == 0);
+        WT_ITEM old_value;
+        ret = c->get_value(c, &old_value);
+        invariant(ret == 0);
 
         int old_length = old_value.size;
 
         ret = c->remove(c);
-	invariant(ret == 0);
+        invariant(ret == 0);
 
         _changeNumRecords(txn, false);
         _increaseDataSize(txn, -old_length);
@@ -140,26 +140,26 @@ namespace mongo {
 
     void WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
         WiredTigerSession swrap(_db);
-	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
-	WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WT_CURSOR *c = curwrap.Get();
         int ret = c->next(c);
         while ( ret == 0 && cappedAndNeedDelete() ) {
             invariant(_numRecords > 0);
 
             WT_ITEM key;
-	    ret = c->get_key(c, &key);
-	    invariant(ret == 0);
+            ret = c->get_key(c, &key);
+            invariant(ret == 0);
             DiskLoc oldest = reinterpret_cast<const DiskLoc*>(key.data)[0];
 
             if ( _cappedDeleteCallback )
                 uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
 
             ret = c->remove(c);
-	    invariant(ret == 0);
+            invariant(ret == 0);
             ret = c->next(c);
         }
 
-	invariant(ret == 0 || ret == WT_NOTFOUND);
+        invariant(ret == 0 || ret == WT_NOTFOUND);
     }
 
     StatusWith<DiskLoc> WiredTigerRecordStore::insertRecord( OperationContext* txn,
@@ -171,14 +171,14 @@ namespace mongo {
                                        "object to insert exceeds cappedMaxSize" );
         }
 
-	WiredTigerSession swrap(_db);
-	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
-	WT_CURSOR *c = curwrap.Get();
+        WiredTigerSession swrap(_db);
+        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WT_CURSOR *c = curwrap.Get();
         DiskLoc loc = _nextId();
-	c->set_key(c, _makeKey(loc).Get());
-	c->set_value(c, WiredTigerItem(data, len).Get());
+        c->set_key(c, _makeKey(loc).Get());
+        c->set_value(c, WiredTigerItem(data, len).Get());
         int ret = c->insert(c);
-	invariant(ret == 0);
+        invariant(ret == 0);
 
         _changeNumRecords( txn, true );
         _increaseDataSize( txn, len );
@@ -201,14 +201,14 @@ namespace mongo {
         boost::shared_array<char> buf( new char[len] );
         doc->writeDocument( buf.get() );
 
-	WiredTigerSession swrap(_db);
-	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
-	WT_CURSOR *c = curwrap.Get();
+        WiredTigerSession swrap(_db);
+        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WT_CURSOR *c = curwrap.Get();
         DiskLoc loc = _nextId();
-	c->set_key(c, _makeKey(loc).Get());
-	c->set_value(c, WiredTigerItem(buf.get(), len).Get());
+        c->set_key(c, _makeKey(loc).Get());
+        c->set_value(c, WiredTigerItem(buf.get(), len).Get());
         int ret = c->insert(c);
-	invariant(ret == 0);
+        invariant(ret == 0);
 
         _changeNumRecords( txn, true );
         _increaseDataSize( txn, len );
@@ -225,21 +225,21 @@ namespace mongo {
                                                         bool enforceQuota,
                                                         UpdateMoveNotifier* notifier ) {
         WiredTigerSession swrap(_db);
-	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
-	WT_CURSOR *c = curwrap.Get();
-	c->set_key(c, _makeKey(loc).Get());
+        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WT_CURSOR *c = curwrap.Get();
+        c->set_key(c, _makeKey(loc).Get());
         int ret = c->search(c);
-	invariant(ret == 0);
+        invariant(ret == 0);
 
-	WT_ITEM old_value;
-	ret = c->get_value(c, &old_value);
-	invariant(ret == 0);
+        WT_ITEM old_value;
+        ret = c->get_value(c, &old_value);
+        invariant(ret == 0);
 
         int old_length = old_value.size;
 
-	c->set_value(c, WiredTigerItem(data, len).Get());
-	ret = c->insert(c);
-	invariant(ret == 0);
+        c->set_value(c, WiredTigerItem(data, len).Get());
+        ret = c->insert(c);
+        invariant(ret == 0);
 
         _increaseDataSize(txn, len - old_length);
 
@@ -253,18 +253,18 @@ namespace mongo {
                                                 const char* damangeSource,
                                                 const mutablebson::DamageVector& damages ) {
         // get original value
-	WiredTigerSession swrap(_db);
-	WiredTigerCursor curwrap(GetCursor(swrap), swrap);
-	WT_CURSOR *c = curwrap.Get();
-	c->set_key(c, _makeKey(loc).Get());
+        WiredTigerSession swrap(_db);
+        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WT_CURSOR *c = curwrap.Get();
+        c->set_key(c, _makeKey(loc).Get());
         int ret = c->search(c);
-	invariant(ret == 0);
+        invariant(ret == 0);
 
-	WT_ITEM old_value;
-	ret = c->get_value(c, &old_value);
-	invariant(ret == 0);
+        WT_ITEM old_value;
+        ret = c->get_value(c, &old_value);
+        invariant(ret == 0);
 
-	std::string data(reinterpret_cast<const char *>(old_value.data), old_value.size);
+        std::string data(reinterpret_cast<const char *>(old_value.data), old_value.size);
 
         // apply changes to our copy
         char* root = const_cast<char*>( data.c_str() );
@@ -276,9 +276,9 @@ namespace mongo {
         }
 
         // write back
-	c->set_value(c, WiredTigerItem(data).Get());
-	ret = c->insert(c);
-	invariant(ret == 0);
+        c->set_value(c, WiredTigerItem(data).Get());
+        ret = c->insert(c);
+        invariant(ret == 0);
 
         return Status::OK();
     }
@@ -290,9 +290,9 @@ namespace mongo {
                                                    ) const {
         invariant( start == DiskLoc() );
         invariant( !tailable );
-	//
-	// XXX leak -- we need a session associated with the txn.
-	WiredTigerSession *session = new WiredTigerSession(_db.GetSession(), _db);
+        //
+        // XXX leak -- we need a session associated with the txn.
+        WiredTigerSession *session = new WiredTigerSession(_db.GetSession(), _db);
         return new Iterator(*this, *session, dir);
     }
 
@@ -326,8 +326,8 @@ namespace mongo {
                                       RecordStoreCompactAdaptor* adaptor,
                                       const CompactOptions* options,
                                       CompactStats* stats ) {
-	WiredTigerSession swrap(_db.GetSession(), _db);
-	WT_SESSION *s(swrap.Get());
+        WiredTigerSession swrap(_db.GetSession(), _db);
+        WT_SESSION *s(swrap.Get());
         int ret = s->compact(s, GetURI().c_str(), NULL);
         invariant(ret == 0);
         return Status::OK();
@@ -371,7 +371,7 @@ namespace mongo {
         if ( !option.isBoolean() ) {
             return Status( ErrorCodes::BadValue, "Invalid Value" );
         }
-	// TODO: expose some WiredTiger configurations
+        // TODO: expose some WiredTiger configurations
         if ( optionName.compare( "verify_checksums" ) == 0 ) {
         }
         else
@@ -405,7 +405,7 @@ namespace mongo {
 
     void WiredTigerRecordStore::_increaseDataSize( OperationContext* txn, int amount ) {
         _dataSize += amount;
-	// TODO make this persistent
+        // TODO make this persistent
     }
 
     WiredTigerItem WiredTigerRecordStore::_makeKey( const DiskLoc& loc ) {
@@ -416,11 +416,11 @@ namespace mongo {
 
     WiredTigerRecordStore::Iterator::Iterator(const WiredTigerRecordStore& rs, WiredTigerSession &session, const CollectionScanParams::Direction& dir )
         : _rs( rs ),
-	  _session( session ),
+          _session( session ),
           _dir( dir ),
           // XXX not using a snapshot here
-	  _cursor(rs.GetCursor(session), session),
-	  _eof( true ) {
+          _cursor(rs.GetCursor(session), session),
+          _eof( true ) {
         (void)getNext();
     }
 
@@ -432,27 +432,27 @@ namespace mongo {
         if (_eof)
             return DiskLoc();
 
-	WT_CURSOR *c = _cursor.Get();
-	WT_ITEM key;
+        WT_CURSOR *c = _cursor.Get();
+        WT_ITEM key;
         int ret = c->get_key(c, &key);
-	invariant(ret == 0);
+        invariant(ret == 0);
         return reinterpret_cast<const DiskLoc*>( key.data )[0];
     }
 
     DiskLoc WiredTigerRecordStore::Iterator::getNext() {
         DiskLoc toReturn = curr();
-	WT_CURSOR *c = _cursor.Get();
-	int ret = _forward() ? c->next(c) : c->prev(c);
-	invariant(ret == 0 || ret == WT_NOTFOUND);
-	_eof = (ret == WT_NOTFOUND);
+        WT_CURSOR *c = _cursor.Get();
+        int ret = _forward() ? c->next(c) : c->prev(c);
+        invariant(ret == 0 || ret == WT_NOTFOUND);
+        _eof = (ret == WT_NOTFOUND);
         return toReturn;
     }
 
     void WiredTigerRecordStore::Iterator::invalidate( const DiskLoc& dl ) {
-	WT_CURSOR *c = _cursor.Get();
+        WT_CURSOR *c = _cursor.Get();
         int ret = c->reset(c);
-	invariant(ret == 0);
-	_eof = true;
+        invariant(ret == 0);
+        _eof = true;
     }
 
     void WiredTigerRecordStore::Iterator::saveState() {
@@ -465,15 +465,15 @@ namespace mongo {
     }
 
     RecordData WiredTigerRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
-	WT_CURSOR *c = _cursor.Get();
-	WT_ITEM key;
+        WT_CURSOR *c = _cursor.Get();
+        WT_ITEM key;
         int ret = c->get_key(c, &key);
-	invariant(ret == 0);
+        invariant(ret == 0);
         DiskLoc curr = reinterpret_cast<const DiskLoc*>( key.data )[0];
         if (curr == loc) {
-	    WT_ITEM value;
-	    int ret = c->get_value(c, &value);
-	    invariant(ret == 0);
+            WT_ITEM value;
+            int ret = c->get_value(c, &value);
+            invariant(ret == 0);
 
             boost::shared_array<char> data( new char[value.size] );
             memcpy( data.get(), value.data, value.size );

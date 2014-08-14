@@ -45,7 +45,7 @@ namespace mongo {
 
     class WiredTigerEngine : public StorageEngine {
     public:
-	WiredTigerEngine(const std::string &) {}
+        WiredTigerEngine(const std::string &) {}
 
         virtual ~WiredTigerEngine() {}
 
@@ -55,9 +55,9 @@ namespace mongo {
 
         virtual void listDatabases( std::vector<std::string>* out ) const;
 
-	virtual Status closeDatabase(OperationContext*, const StringData&);
+        virtual Status closeDatabase(OperationContext*, const StringData&);
 
-	virtual Status dropDatabase(OperationContext*, const StringData&);
+        virtual Status dropDatabase(OperationContext*, const StringData&);
 
         virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                const StringData& db );
@@ -73,8 +73,8 @@ namespace mongo {
                                        bool backupOriginalFiles = false ) { return Status::OK(); }
 
     private:
-	std::string _path;
-	WiredTigerDatabase *_db;
+        std::string _path;
+        WiredTigerDatabase *_db;
 
         mutable boost::mutex _dbLock;
         typedef std::map<std::string, WiredTigerDatabaseCatalogEntry *> DBMap;

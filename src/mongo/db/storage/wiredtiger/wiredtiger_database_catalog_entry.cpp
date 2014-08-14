@@ -154,19 +154,19 @@ namespace mongo {
             return Status( ErrorCodes::NamespaceExists,
                            "cannot create collection, already exists" );
 
-	int ret = WiredTigerRecordStore::Create(_db, ns, options, allocateDefaultSpace);
-	invariant(ret == 0);
+        int ret = WiredTigerRecordStore::Create(_db, ns, options, allocateDefaultSpace);
+        invariant(ret == 0);
 
         entry = new Entry( ns, options );
 
         if ( options.capped ) {
             entry->rs.reset(new WiredTigerRecordStore(ns,
-				                _db,
-                                                true,
-                                                options.cappedSize
-                                                     ? options.cappedSize : 4096, // default size
-                                                options.cappedMaxDocs
-                                                     ? options.cappedMaxDocs : -1)); // no limit
+                            _db,
+                            true,
+                            options.cappedSize
+                                ? options.cappedSize : 4096, // default size
+                            options.cappedMaxDocs
+                                ? options.cappedMaxDocs : -1)); // no limit
         } else {
             entry->rs.reset( new WiredTigerRecordStore( ns, _db ) );
         }

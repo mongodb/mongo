@@ -159,7 +159,7 @@ namespace mongo {
             Indexes indexes;
         };
 
-	WiredTigerDatabase &_db;
+        WiredTigerDatabase &_db;
 
         mutable boost::mutex _entryMapLock;
         typedef std::map<std::string, Entry *> EntryMap;
