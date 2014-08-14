@@ -136,14 +136,14 @@ namespace mongo {
 
         bool isServerSet() const { return _isServerSet; }
 
-                // Calling get*() methods when the member is not set results in undefined behavior
+        // Calling get*() methods when the member is not set results in undefined behavior
         const std::string& getServer() const {
             dassert(_isServerSet);
             return _what;
         }
 
         void setWhat(const StringData& what) {
-            _server = what.toString();
+            _what = what.toString();
             _isWhatSet = true;
         }
 
