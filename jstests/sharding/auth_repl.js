@@ -117,7 +117,7 @@ for (var x = 0; x < nodeCount; x++) {
 assert(secNodeIdx >= 0); // test sanity check
 
 // Kill the cached secondary
-replTest.stop(secNodeIdx, 15, true, { auth: { user: 'user', pwd: 'user' }});
+replTest.stop(secNodeIdx, 15, { auth: { user: 'user', pwd: 'user' }});
 
 assert(testDB.logout().ok);
 
