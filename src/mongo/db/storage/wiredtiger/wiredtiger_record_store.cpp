@@ -37,7 +37,8 @@
 
 namespace mongo {
 
-    int WiredTigerRecordStore::Create(WiredTigerDatabase &db, const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
+    int WiredTigerRecordStore::Create(WiredTigerDatabase &db,
+            const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
         WiredTigerSession swrap(db.GetSession(), db);
         WT_SESSION *s(swrap.Get());
         return s->create(s, _getURI(ns).c_str(), "type=file,key_format=u,value_format=u");
@@ -301,7 +302,8 @@ namespace mongo {
         return getIterator( txn );
     }
 
-    std::vector<RecordIterator*> WiredTigerRecordStore::getManyIterators( OperationContext* txn ) const {
+    std::vector<RecordIterator*> WiredTigerRecordStore::getManyIterators(
+            OperationContext* txn ) const {
         // XXX do we want this to actually return a set of iterators?
 
         std::vector<RecordIterator*> iterators;
@@ -414,7 +416,8 @@ namespace mongo {
 
     // --------
 
-    WiredTigerRecordStore::Iterator::Iterator(const WiredTigerRecordStore& rs, WiredTigerSession &session, const CollectionScanParams::Direction& dir )
+    WiredTigerRecordStore::Iterator::Iterator(const WiredTigerRecordStore& rs,
+            WiredTigerSession &session, const CollectionScanParams::Direction& dir )
         : _rs( rs ),
           _session( session ),
           _dir( dir ),

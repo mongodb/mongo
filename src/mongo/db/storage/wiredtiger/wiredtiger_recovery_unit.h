@@ -35,7 +35,7 @@
 namespace mongo {
 
     class WiredTigerRecoveryUnit : public RecoveryUnit {
-    public:
+        public:
         WiredTigerRecoveryUnit() {
             rollbackPossible = true;
         }

@@ -41,8 +41,9 @@ namespace mongo {
     class WiredTigerRecoveryUnit;
 
     class WiredTigerRecordStore : public RecordStore {
-    public:
-        static int Create(WiredTigerDatabase &db, const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace);
+        public:
+        static int Create(WiredTigerDatabase &db,
+            const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace);
 
         WiredTigerRecordStore(const StringData& ns,
                           WiredTigerDatabase &db,
@@ -131,7 +132,9 @@ namespace mongo {
                                               DiskLoc end,
                                               bool inclusive);
 
-        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) { _cappedDeleteCallback = cb; }
+        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
+            _cappedDeleteCallback = cb;
+        }
         bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
 
@@ -144,7 +147,9 @@ namespace mongo {
 
         class Iterator : public RecordIterator {
         public:
-            Iterator( const WiredTigerRecordStore& rs, WiredTigerSession &session, const CollectionScanParams::Direction& dir );
+            Iterator( const WiredTigerRecordStore& rs,
+                      WiredTigerSession &session,
+                      const CollectionScanParams::Direction& dir );
 
             virtual bool isEOF();
             virtual DiskLoc curr();

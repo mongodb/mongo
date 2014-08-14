@@ -39,18 +39,25 @@ namespace mongo {
      * Caller takes ownership.
      * All permanent data will be stored and fetch from dataInOut.
      */
-    SortedDataInterface* getWiredTigerIndex(WiredTigerDatabase &db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info, boost::shared_ptr<void>* dataInOut);
+    SortedDataInterface* getWiredTigerIndex(
+            WiredTigerDatabase &db, const std::string &ns,
+            const std::string &idxName, IndexCatalogEntry& info,
+            boost::shared_ptr<void>* dataInOut);
 
     class WiredTigerIndex : public SortedDataInterface {
-    public:
+        public:
         static std::string _getURI(const std::string &ns, const std::string &idxName) {
             return "table:" + ns + "_idx_" + idxName;
         }
-        static int Create(WiredTigerDatabase &db, const std::string &ns, const std::string &idxName, IndexCatalogEntry& info);
+        static int Create(WiredTigerDatabase &db,
+                const std::string &ns, const std::string &idxName, IndexCatalogEntry& info);
 
-        WiredTigerIndex(WiredTigerDatabase &db, const IndexCatalogEntry& info, const std::string &ns, const std::string &idxName) : _db(db), _info(info), _uri(_getURI(ns, idxName)) {}
+        WiredTigerIndex(WiredTigerDatabase &db, const IndexCatalogEntry& info,
+                const std::string &ns, const std::string &idxName)
+            : _db(db), _info(info), _uri(_getURI(ns, idxName)) {}
 
-        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
+        virtual SortedDataBuilderInterface* getBulkBuilder(
+                OperationContext* txn, bool dupsAllowed);
 
         virtual Status insert(OperationContext* txn,
                               const BSONObj& key,
@@ -71,16 +78,17 @@ namespace mongo {
 
         bool isDup(OperationContext *txn, const BSONObj& key, DiskLoc loc);
 
-        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
+        virtual SortedDataInterface::Cursor* newCursor(
+                OperationContext* txn, int direction) const;
 
         virtual Status initAsEmpty(OperationContext* txn);
 
         WT_CURSOR *GetCursor(WiredTigerSession &session, bool acquire=false) const;
         const std::string &GetURI() const;
 
-    private:
+        private:
             class IndexCursor : public SortedDataInterface::Cursor {
-            public:
+                public:
                 IndexCursor(WT_CURSOR *cursor,
                         WiredTigerSession &session, OperationContext *txn, bool forward)
                    : _cursor(cursor, session), _txn(txn), _forward(forward), _eof() {
@@ -91,7 +99,8 @@ namespace mongo {
 
                 virtual bool isEOF() const;
 
-                virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor &genother) const;
+                virtual bool pointsToSamePlaceAs(
+                        const SortedDataInterface::Cursor &genother) const;
 
                 virtual void aboutToDeleteBucket(const DiskLoc& bucket);
 
@@ -129,7 +138,7 @@ namespace mongo {
                 bool _savedAtEnd;
                 BSONObj _savedKey;
                 DiskLoc _savedLoc;
-            };
+        };
 
         WiredTigerDatabase& _db;
         const IndexCatalogEntry& _info;

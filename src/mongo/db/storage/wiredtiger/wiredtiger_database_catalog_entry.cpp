@@ -51,7 +51,8 @@
 
 namespace mongo {
 
-    WiredTigerDatabaseCatalogEntry::WiredTigerDatabaseCatalogEntry( const StringData& name, WiredTigerDatabase &db )
+    WiredTigerDatabaseCatalogEntry::WiredTigerDatabaseCatalogEntry(
+                const StringData& name, WiredTigerDatabase &db )
         : DatabaseCatalogEntry( name ), _db(db) {
             // If the catalog hasn't been created, nothing to do.
             boost::filesystem::path dbpath =
@@ -80,8 +81,9 @@ namespace mongo {
                                                       double scale ) const {
     }
 
-    CollectionCatalogEntry* WiredTigerDatabaseCatalogEntry::getCollectionCatalogEntry( OperationContext* opCtx,
-                                                                                  const StringData& ns ) const {
+    CollectionCatalogEntry* WiredTigerDatabaseCatalogEntry::getCollectionCatalogEntry(
+            OperationContext* opCtx,
+            const StringData& ns ) const {
         boost::mutex::scoped_lock lk( _entryMapLock );
         EntryMap::const_iterator i = _entryMap.find( ns.toString() );
         if ( i == _entryMap.end() )
@@ -135,7 +137,8 @@ namespace mongo {
         name();
     }
 
-    void WiredTigerDatabaseCatalogEntry::getCollectionNamespaces( std::list<std::string>* out ) const {
+    void WiredTigerDatabaseCatalogEntry::getCollectionNamespaces(
+            std::list<std::string>* out ) const {
         boost::mutex::scoped_lock lk( _entryMapLock );
         for ( EntryMap::const_iterator i = _entryMap.begin(); i != _entryMap.end(); ++i ) {
             out->push_back( i->first );
@@ -194,8 +197,8 @@ namespace mongo {
 
 
     IndexAccessMethod* WiredTigerDatabaseCatalogEntry::getIndex( OperationContext* txn,
-                                                            const CollectionCatalogEntry* collection,
-                                                            IndexCatalogEntry* index ) {
+                        const CollectionCatalogEntry* collection,
+                        IndexCatalogEntry* index ) {
         const Entry* entry = dynamic_cast<const Entry*>( collection );
 
         Entry::Indexes::const_iterator i = entry->indexes.find( index->descriptor()->indexName() );
@@ -209,7 +212,10 @@ namespace mongo {
         // Need the Head to be non-Null to avoid asserts. TODO remove the asserts.
         index->headManager()->setHead(txn, DiskLoc(0xDEAD, 0xBEAF));
 
-        std::auto_ptr<SortedDataInterface> wtidx(getWiredTigerIndex(_db, collection->ns().ns(), index->descriptor()->indexName(), *index, &i->second->data));
+        std::auto_ptr<SortedDataInterface> wtidx(getWiredTigerIndex(
+                _db, collection->ns().ns(),
+                index->descriptor()->indexName(),
+                *index, &i->second->data));
 
         if ("" == type)
             return new BtreeAccessMethod( index, wtidx.release() );
@@ -242,7 +248,8 @@ namespace mongo {
 
     // ------------------
 
-    WiredTigerDatabaseCatalogEntry::Entry::Entry( const StringData& ns, const CollectionOptions& o )
+    WiredTigerDatabaseCatalogEntry::Entry::Entry(
+        const StringData& ns, const CollectionOptions& o )
         : CollectionCatalogEntry( ns ), options( o ) {
     }
 
@@ -264,18 +271,21 @@ namespace mongo {
         return ready;
     }
 
-    void WiredTigerDatabaseCatalogEntry::Entry::getAllIndexes( std::vector<std::string>* names ) const {
+    void WiredTigerDatabaseCatalogEntry::Entry::getAllIndexes(
+            std::vector<std::string>* names ) const {
         for ( Indexes::const_iterator i = indexes.begin(); i != indexes.end(); ++i )
             names->push_back( i->second->name );
     }
 
-    BSONObj WiredTigerDatabaseCatalogEntry::Entry::getIndexSpec( const StringData& idxName ) const {
+    BSONObj WiredTigerDatabaseCatalogEntry::Entry::getIndexSpec(
+            const StringData& idxName ) const {
         Indexes::const_iterator i = indexes.find( idxName.toString() );
         invariant( i != indexes.end() );
         return i->second->spec; 
     }
 
-    bool WiredTigerDatabaseCatalogEntry::Entry::isIndexMultikey( const StringData& idxName) const {
+    bool WiredTigerDatabaseCatalogEntry::Entry::isIndexMultikey(
+            const StringData& idxName) const {
         Indexes::const_iterator i = indexes.find( idxName.toString() );
         invariant( i != indexes.end() );
         return i->second->isMultikey;
