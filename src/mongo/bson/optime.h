@@ -144,4 +144,6 @@ namespace mongo {
     };
 #pragma pack()
 
+    std::ostream& operator<<(std::ostream &s, const OpTime &ot);
+
 } // namespace mongo

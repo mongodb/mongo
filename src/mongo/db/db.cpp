@@ -237,7 +237,7 @@ namespace mongo {
     static void logStartup() {
         BSONObjBuilder toLog;
         stringstream id;
-        id << getHostNameCached() << "-" << jsTime();
+        id << getHostNameCached() << "-" << jsTime().asInt64();
         toLog.append( "_id", id.str() );
         toLog.append( "hostname", getHostNameCached() );
 
