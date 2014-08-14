@@ -1,5 +1,7 @@
 # wtperf options file: btree with inserts/updates and checkpointing, in memory
-conn_config="cache_size=1G"
+# Note:  The cache needs to be sized to approximate the amount of inserts
+# that will happen during the given run_time.
+conn_config="cache_size=25G"
 table_config="type=file"
 icount=5000000
 report_interval=5
