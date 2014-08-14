@@ -70,10 +70,9 @@ namespace mongo {
     }
 
     BSONObj BSONObj::copy() const {
-        Holder *h = (Holder*) mongoMalloc(objsize() + sizeof(unsigned));
-        h->zero();
-        memcpy(h->data, objdata(), objsize());
-        return BSONObj(h);
+        char* storage = static_cast<char*>(mongoMalloc(sizeof(Holder) + objsize()));
+        memcpy(storage + sizeof(Holder), objdata(), objsize());
+        return BSONObj::takeOwnership(storage);
     }
 
     BSONObj BSONObj::getOwned() const {
@@ -676,11 +675,6 @@ namespace mongo {
         return e.type() == String ? e.valuestr() : "";
     }
 
-    bool BSONObj::isValid() const {
-        int x = objsize();
-        return x > 0 && x <= BSONObjMaxInternalSize;
-    }
-
     bool BSONObj::getObjectID(BSONElement& e) const {
         BSONElement f = getField("_id");
         if( !f.eoo() ) {
@@ -765,15 +759,6 @@ namespace mongo {
             n++;
         }
         return n;
-    }
-
-    BSONObj::BSONObj() {
-        /* little endian ordering here, but perhaps that is ok regardless as BSON is spec'd
-           to be little endian external to the system. (i.e. the rest of the implementation of bson,
-           not this part, fails to support big endian)
-        */
-        static char p[] = { /*size*/5, 0, 0, 0, /*eoo*/0 };
-        _objdata = p;
     }
 
     std::string BSONObj::toString( bool isArray, bool full ) const {

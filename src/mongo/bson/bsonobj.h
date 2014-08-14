@@ -35,6 +35,7 @@
 #include <list>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/base/string_data.h"
@@ -89,27 +90,35 @@ namespace mongo {
     class MONGO_CLIENT_API BSONObj {
     public:
 
-        /** Construct a BSONObj from data in the proper format.
-         *  Use this constructor when something else owns msgdata's buffer
-        */
-        explicit BSONObj(const char *msgdata) {
-            init(msgdata);
-        }
-
-        /** Construct a BSONObj from data in the proper format.
-         *  Use this constructor when you want BSONObj to free(holder) when it is no longer needed
-         *  BSONObj::Holder has an extra 4 bytes for a ref-count before the start of the object
-        */
-        class Holder;
-        explicit BSONObj(Holder* holder) {
-            init(holder);
-        }
-
         /** Construct an empty BSONObj -- that is, {}. */
-        BSONObj();
+        BSONObj() {
+            // Little endian ordering here, but that is ok regardless as BSON is spec'd to be
+            // little endian external to the system. (i.e. the rest of the implementation of
+            // bson, not this part, fails to support big endian)
+            static const char kEmptyObjectPrototype[] = { /*size*/5, 0, 0, 0, /*eoo*/0 };
+            _objdata = kEmptyObjectPrototype;
+        }
 
-        ~BSONObj() {
-            _objdata = 0; // defensive
+        /** Construct a BSONObj from data in the proper format.
+         *  Use this constructor when something else owns bsonData's buffer
+        */
+        explicit BSONObj(const char *bsonData) {
+            init(bsonData);
+        }
+
+        /** Provide assignment semantics. We use the value taking form so that we can use copy
+         *  and swap, and consume both lvalue and rvalue references.
+         */
+        BSONObj& operator=(BSONObj otherCopy) {
+            this->swap(otherCopy);
+            return *this;
+        }
+
+        /** Swap this BSONObj with 'other' */
+        void swap(BSONObj& other) {
+            using std::swap;
+            swap(_objdata, other._objdata);
+            swap(_holder, other._holder);
         }
 
         /**
@@ -282,11 +291,15 @@ namespace mongo {
         const char *objdata() const {
             return _objdata;
         }
+
         /** @return total size of the BSON object in bytes */
         int objsize() const { return *(reinterpret_cast<const int*>(objdata())); }
 
         /** performs a cursory check on the object's size only. */
-        bool isValid() const;
+        bool isValid() const {
+            int x = objsize();
+            return x > 0 && x <= BSONObjMaxInternalSize;
+        }
 
         /** @return ok if it can be stored as a valid embedded doc.
          *  Not valid if any field name:
@@ -492,64 +505,74 @@ namespace mongo {
 
         template<typename T> bool coerceVector( std::vector<T>* out ) const;
 
-#pragma pack(1)
-        // NOTE(schwerin): This class is a POD.  Layout matters.
         class Holder {
-        private:
-            Holder(); // this class should never be explicitly created
-            Holder(const Holder&);
-            Holder& operator=(const Holder&);
-
         public:
-            AtomicUInt32 refCount;
-            char data[4]; // start of object
-
-            void zero() { refCount.store(0U); }
+            explicit Holder(AtomicUInt32::WordType initial = AtomicUInt32::WordType())
+                : _refCount(initial) {}
 
             // these are called automatically by boost::intrusive_ptr
-            friend void intrusive_ptr_add_ref(Holder* h) { h->refCount.fetchAndAdd(1); }
-            friend void intrusive_ptr_release(Holder* h) {
-                if (h->refCount.subtractAndFetch(1) == 0)
-                    free(h);
+            friend void intrusive_ptr_add_ref(Holder* h) {
+                h->_refCount.fetchAndAdd(1);
             }
+
+            friend void intrusive_ptr_release(Holder* h) {
+                if (h->_refCount.subtractAndFetch(1) == 0) {
+                    // We placement new'ed a Holder in BSONObj::takeOwnership below,
+                    // so we must destroy the object here.
+                    h->~Holder();
+                    free(h);
+                }
+            }
+
+            char* data() {
+                return reinterpret_cast<char *>(this + 1);
+            }
+
+            const char* data() const {
+                return reinterpret_cast<const char *>(this + 1);
+            }
+
+        private:
+            AtomicUInt32 _refCount;
         };
-#pragma pack()
 
-    BSONObj(const BSONObj &rO):
-        _objdata(rO._objdata), _holder(rO._holder) {
+        /** Given a pointer to a region of un-owned memory containing BSON data, prefixed by
+         *  sufficient space for a BSONObj::Holder object, return a BSONObj that owns the
+         *  memory.
+         */
+        static BSONObj takeOwnership(char* holderPrefixedData) {
+            // Initialize the refcount to 1 so we don't need to increment it in the constructor
+            // (see private BSONObj(Holder*) constructor below).
+            //
+            // TODO: Should dassert alignment of holderPrefixedData
+            // here if possible.
+            return BSONObj(new(holderPrefixedData) BSONObj::Holder(1U));
         }
 
-    BSONObj &operator=(const BSONObj &rRHS) {
-        if (this != &rRHS) {
-            _objdata = rRHS._objdata;
-            _holder = rRHS._holder;
+        /// members for Sorter
+        struct SorterDeserializeSettings {}; // unused
+        void serializeForSorter(BufBuilder& buf) const { buf.appendBuf(objdata(), objsize()); }
+        static BSONObj deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+            const int size = buf.peek<int>();
+            const void* ptr = buf.skip(size);
+            return BSONObj(static_cast<const char*>(ptr));
         }
-        return *this;
-    }
-
-    /// members for Sorter
-    struct SorterDeserializeSettings {}; // unused
-    void serializeForSorter(BufBuilder& buf) const { buf.appendBuf(objdata(), objsize()); }
-    static BSONObj deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
-        const int size = buf.peek<int>();
-        const void* ptr = buf.skip(size);
-        return BSONObj(static_cast<const char*>(ptr));
-    }
-    int memUsageForSorter() const {
-        // TODO consider ownedness?
-        return sizeof(BSONObj) + objsize();
-    }
+        int memUsageForSorter() const {
+            // TODO consider ownedness?
+            return sizeof(BSONObj) + objsize();
+        }
 
     private:
-        const char *_objdata;
-        boost::intrusive_ptr< Holder > _holder;
+        /** Construct a new BSONObj using the given Holder object */
+        explicit BSONObj(Holder* holder)
+            : _holder(holder, false) {
+            // NOTE: The 'false' is because we have already initialized the Holder with a
+            // refcount of '1' in takeOwnership above.
+            init(holder->data());
+        }
 
         void _assertInvalid() const;
 
-        void init(Holder *holder) {
-            _holder = holder; // holder is now managed by intrusive_ptr
-            init(holder->data);
-        }
         void init(const char *data) {
             _objdata = data;
             if ( !isValid() )
@@ -563,6 +586,9 @@ namespace mongo {
          * If 'deep' is false then do not traverse through children
          */
         Status _okForStorage(bool root, bool deep) const;
+
+        const char* _objdata;
+        boost::intrusive_ptr< Holder > _holder;
     };
 
     std::ostream& operator<<( std::ostream &s, const BSONObj &o );
@@ -571,6 +597,9 @@ namespace mongo {
     StringBuilder& operator<<( StringBuilder &s, const BSONObj &o );
     StringBuilder& operator<<( StringBuilder &s, const BSONElement &e );
 
+    inline void swap(BSONObj& l, BSONObj& r) {
+        l.swap(r);
+    }
 
     struct BSONArray : BSONObj {
         // Don't add anything other than forwarding constructors!!!

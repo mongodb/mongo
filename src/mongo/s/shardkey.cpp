@@ -110,8 +110,8 @@ namespace mongo {
 
         }
         else {
-            BufBuilder buf (obj.objsize());
-            buf.appendNum((unsigned)0); // refcount
+            BufBuilder buf (sizeof(BSONObj::Holder) + obj.objsize());
+            buf.skip(sizeof(BSONObj::Holder));
             buf.appendNum(obj.objsize());
 
             vector<pair<const char*, size_t> > copies;
@@ -154,9 +154,9 @@ namespace mongo {
 
             buf.appendChar('\0');
 
-            BSONObj out ((BSONObj::Holder*)buf.buf());
+            char* const bufData = buf.buf();
             buf.decouple();
-            return out;
+            return BSONObj::takeOwnership(bufData);
         }
     }
 
