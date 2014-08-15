@@ -134,6 +134,10 @@ static CONFIG c[] = {
 	  "if values are dictionary compressed",		/* 20% */
 	  C_BOOL, 20, 0, 0, &g.c_dictionary, NULL },
 
+	{ "evict_max",
+	  "the maximum number of eviction workers",
+	  0x0, 0, 5, 100, &g.c_evict_max, NULL },
+
 	{ "file_type",
 	  "type of store to create (fix | var | row)",
 	  C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_file_type },

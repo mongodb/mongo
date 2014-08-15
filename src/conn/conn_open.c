@@ -36,6 +36,16 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 * need to get cleaned up on close.
 	 */
 	WT_RET(__wt_open_internal_session(conn, "connection", 1, 0, &session));
+
+	/*
+	 * The connection's default session is originally a static structure,
+	 * swap that out for a more fully-functional session.  It's necessary
+	 * to have this step: the session allocation code uses the connection's
+	 * session, and if we pass a reference to the default session as the
+	 * place to store the allocated session, things get confused and error
+	 * handling can be corrupted.  So, we allocate into a stack variable
+	 * and then assign it on success.
+	 */
 	conn->default_session = session;
 
 	/*
