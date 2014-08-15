@@ -16,31 +16,19 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
 	WT_SESSION_IMPL *session;
 
+	/* Default session. */
+	session = conn->default_session;
+	WT_ASSERT(session, session->iface.connection == &conn->iface);
+
 	/*
 	 * Tell internal server threads to run: this must be set before opening
 	 * any sessions.
 	 */
 	F_SET(conn, WT_CONN_SERVER_RUN);
 
-	/* Default session. */
-	session = conn->default_session;
-	WT_ASSERT(session, session->iface.connection == &conn->iface);
-
 	/* WT_SESSION_IMPL array. */
 	WT_RET(__wt_calloc(session,
 	    conn->session_size, sizeof(WT_SESSION_IMPL), &conn->sessions));
-
-	/* Create the cache. */
-	WT_RET(__wt_cache_create(conn, cfg));
-
-	/* Initialize transaction support. */
-	WT_RET(__wt_txn_global_init(conn, cfg));
-
-	/*
-	 * Publish: there must be a barrier to ensure the connection structure
-	 * fields are set before other threads read from the pointer.
-	 */
-	WT_WRITE_BARRIER();
 
 	/*
 	 * Open the default session.  We open this before starting service
@@ -49,6 +37,21 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_RET(__wt_open_internal_session(conn, "connection", 1, 0, &session));
 	conn->default_session = session;
+
+	/*
+	 * Publish: there must be a barrier to ensure the connection structure
+	 * fields are set before other threads read from the pointer.
+	 */
+	WT_WRITE_BARRIER();
+
+	/* Connect to a cache pool. */
+	WT_RET(__wt_conn_cache_pool_config(session, cfg));
+
+	/* Create the cache. */
+	WT_RET(__wt_cache_create(conn, cfg));
+
+	/* Initialize transaction support. */
+	WT_RET(__wt_txn_global_init(conn, cfg));
 
 	return (0);
 }
