@@ -91,8 +91,6 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
-
 	/* Nothing to do if the server is already running. */
 	if (conn->ckpt_session != NULL)
 		return (0);
@@ -101,6 +99,13 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 	/* The checkpoint server gets its own session. */
 	WT_RET(__wt_open_internal_session(
 	    conn, "checkpoint-server", 1, 1, &conn->ckpt_session));
+	session = conn->ckpt_session;
+
+	/*
+	 * Checkpoint does enough I/O it may be called upon to perform slow
+	 * operations for the block manager.
+	 */
+	F_SET(session, WT_SESSION_CAN_WAIT);
 
 	WT_RET(
 	    __wt_cond_alloc(session, "checkpoint server", 0, &conn->ckpt_cond));
@@ -109,7 +114,7 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 	 * Start the thread.
 	 */
 	WT_RET(__wt_thread_create(
-	    session, &conn->ckpt_tid, __ckpt_server, conn->ckpt_session));
+	    session, &conn->ckpt_tid, __ckpt_server, session));
 	conn->ckpt_tid_set = 1;
 
 	return (0);

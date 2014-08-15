@@ -98,6 +98,7 @@ flags = {
 		'CONN_WAS_BACKUP',
 	],
 	'session' : [
+		'SESSION_CAN_WAIT',
 		'SESSION_INTERNAL',
 		'SESSION_LOGGING_INMEM',
 		'SESSION_NO_CACHE',

@@ -376,7 +376,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "connection.reconfigure",
 	  "async=(enabled=0,ops_max=1024,threads=2),cache_size=100MB,"
 	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),error_prefix=,"
-	  "eviction=(threads_max=3,threads_min=1),eviction_dirty_target=80,"
+	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
 	  "eviction_target=80,eviction_trigger=95,shared_cache=(chunk=10MB,"
 	  "name=,reserve=0,size=500MB),statistics=none,"
 	  "statistics_log=(on_close=0,path=\"WiredTigerStat.%d.%H\","
@@ -486,7 +486,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "async=(enabled=0,ops_max=1024,threads=2),buffer_alignment=-1,"
 	  "cache_size=100MB,checkpoint=(name=\"WiredTigerCheckpoint\","
 	  "wait=0),checkpoint_sync=,create=0,direct_io=,error_prefix=,"
-	  "eviction=(threads_max=3,threads_min=1),eviction_dirty_target=80,"
+	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
 	  "eviction_target=80,eviction_trigger=95,exclusive=0,extensions=,"
 	  "file_extend=,hazard_max=1000,log=(archive=,enabled=0,"
 	  "file_max=100MB,path=\"\"),lsm_merge=,mmap=,multiprocess=0,"

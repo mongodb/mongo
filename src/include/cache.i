@@ -42,6 +42,33 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *fullp, int wake)
 }
 
 /*
+ * __wt_session_can_wait --
+ *	Return if a session available for a potentially slow operation.
+ */
+static inline int
+__wt_session_can_wait(WT_SESSION_IMPL *session)
+{
+	/*
+	 * Return if a session available for a potentially slow operation;
+	 * for example, used by the block manager in the case of flushing
+	 * the system cache.
+	 */
+	if (!F_ISSET(session, WT_SESSION_CAN_WAIT))
+		return (0);
+
+	/*
+	 * LSM sets the no-cache-check flag when holding the LSM tree lock,
+	 * in that case, or when holding the schema lock, we don't want to
+	 * highjack the thread for eviction.
+	 */
+	if (F_ISSET(session,
+	    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
+		return (0);
+
+	return (1);
+}
+
+/*
  * __wt_cache_full_check --
  *	Wait for there to be space in the cache before a read or update.
  */

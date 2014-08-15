@@ -1,3 +1,58 @@
+/*! @class doc_cursor_types
+
+The following are the builtin basic cursor types:
+<table>
+@hrow{URI, Type, Notes}
+@row{<tt>table:\<table name\>[\<projection\>]</tt>,
+	table cursor,
+	table key\, table value(s) with optional projection of columns}
+@row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
+	column group cursor,
+	table key\, column group value(s)}
+@row{<tt>index:\<table name\>:\<index name\>[\<projection\>]</tt>,
+	index cursor,
+	key=index key\, value=table value(s) with optional projection
+	of columns}
+</table>
+Some administrative tasks can be accomplished using the following special
+cursor types that give access to data managed by WiredTiger:
+<table>
+@hrow{URI, Type, Notes}
+@row{<tt>backup:</tt>,
+	hot backup cursor,
+	key=<code>string</code>\, see @ref hot_backup for details}
+@row{<code>log:</code>,
+	log cursor,
+	key=<code>(long fileID\, long offset\, int seqno)</code>\,<br>
+	value=<code>(uint64_t txnid\, uint32_t rectype\,<br>
+	uint32_t optype\, uint32_t fileid\,<br>
+	WT_ITEM key\, WT_ITEM value)</code>\,<br>
+	see @ref cursor_log for details}
+@row{<tt>metadata:</tt>,
+	metadata cursor,
+	key=<code>string</code>\, value=<code>string</code>\,<br>
+	see @ref metadata for details}
+@row{<tt>statistics:[\<data source URI\>]</tt>,
+	database or data source statistics cursor,
+	key=<code>int id</code>\,<br>
+	value=<code>(string description\,
+	string value\, uint64_t value)</code>\,<br>
+	see @ref data_statistics for details}
+</table>
+Advanced applications may also open the following low-level cursor types:
+<table>
+@hrow{URI, Type, Notes}
+@row{<tt>file:\<file name\></tt>,
+	file cursor,
+	file key\, file value(s)}
+@row{<tt>lsm:\<name\></tt>,
+	LSM cursor (key=LSM key\, value=LSM value), LSM key\, LSM value\,<br>
+	see @ref lsm}
+</table>
+*/
+
+/* ----------------- */
+
 /*! @page data_sources Data Sources
 
 WiredTiger provides access to data from a variety of sources.  At the
@@ -13,38 +68,7 @@ cursors.
 
 @section data_builtin Builtin data sources
 
-The following are the builtin cursor types:
-
-<table>
-@hrow{URI, Type, Key/Value types}
-@row{<tt>backup:</tt>,
-	hot backup cursor,
-	key=<code>string</code>\, see @ref hot_backup for details}
-@row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
-	column group cursor,
-	table key\, column group value(s)}
-@row{<tt>index:\<table name\>:\<index name\>[\<projection\>]</tt>,
-	index cursor,
-	key=index key\, value=table value(s) with optional projection
-	of columns}
-@row{<tt>statistics:[\<data source URI\>]</tt>,
-	database or data source statistics cursor,
-	key=<code>int id</code>\, value=(<code>string description\,
-	string value\, uint64_t value</code>)\,
-	see @ref data_statistics for details}
-@row{<tt>table:\<table name\>[\<projection\>]</tt>,
-	table cursor,
-	table key\, table value(s) with optional projection of columns}
-</table>
-
-Advanced applications may also open the following low-level cursor types:
-<table>
-@row{<tt>file:\<file name\></tt>,
-	file cursor,
-	file key\, file value(s)}
-@row{<tt>lsm:\<name\></tt>,
-	LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
-</table>
+@copydoc doc_cursor_types
 
 @subsection data_files Raw Files
 
