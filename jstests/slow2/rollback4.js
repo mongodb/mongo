@@ -43,7 +43,9 @@ replTest.stop( 0 );
 // Wait for slave to take over
 // This can take a while if the secondary has queued up many writes in its
 // buffer, since it needs to flush those out before it can assume the primaryship.
-assert.soon(function () { return B.isMaster().ismaster; }, "waiting for new primary", 60000);
+assert.soon(function () { return B.isMaster().ismaster; },
+            "waiting for new primary",
+            2 * 60 * 1000);
 master = replTest.getMaster();
 
 // Save to new master, forcing rollback of old master
