@@ -149,7 +149,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 		 * quickly.
 		 */
 		WT_ERR(__wt_tree_walk(session, &ref,
-		 WT_READ_COMPACT | WT_READ_NO_GEN | WT_READ_WONT_NEED));
+		    WT_READ_COMPACT | WT_READ_NO_GEN | WT_READ_WONT_NEED));
 		if (ref == NULL)
 			break;
 
