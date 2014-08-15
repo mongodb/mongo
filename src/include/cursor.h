@@ -221,6 +221,7 @@ struct __wt_cursor_data_source {
 	WT_CURSOR iface;
 
 	WT_COLLATOR *collator;		/* Configured collator */
+	int collator_owned;		/* Collator needs to be terminated */
 
 	WT_CURSOR *source;		/* Application-owned cursor */
 };

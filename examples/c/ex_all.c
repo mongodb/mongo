@@ -762,7 +762,7 @@ add_collator(WT_CONNECTION *conn)
 	int ret;
 
 	/*! [WT_COLLATOR register] */
-	static WT_COLLATOR my_collator = { my_compare, NULL };
+	static WT_COLLATOR my_collator = { my_compare, NULL, NULL };
 	ret = conn->add_collator(conn, "my_collator", &my_collator, NULL);
 	/*! [WT_COLLATOR register] */
 
