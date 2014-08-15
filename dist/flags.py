@@ -34,6 +34,7 @@ flags = {
 		'READ_CACHE',
 		'READ_COMPACT',
 		'READ_NO_GEN',
+		'READ_NO_EVICT',
 		'READ_NO_WAIT',
 		'READ_PREV',
 		'READ_SKIP_INTL',

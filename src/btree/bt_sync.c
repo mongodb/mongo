@@ -100,6 +100,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		}
 
 		/* Write all dirty in-cache pages. */
+		flags |= WT_READ_NO_EVICT;
 		for (walk = NULL;;) {
 			WT_ERR(__wt_tree_walk(session, &walk, flags));
 			if (walk == NULL)
@@ -225,7 +226,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 	/* Walk the tree, discarding pages. */
 	next_ref = NULL;
 	WT_ERR(__wt_tree_walk(
-	    session, &next_ref, WT_READ_CACHE | WT_READ_NO_GEN));
+	    session, &next_ref, WT_READ_CACHE | WT_READ_NO_EVICT));
 	while ((ref = next_ref) != NULL) {
 		page = ref->page;
 
@@ -262,7 +263,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 		 * the tree.
 		 */
 		WT_ERR(__wt_tree_walk(
-		    session, &next_ref, WT_READ_CACHE | WT_READ_NO_GEN));
+		    session, &next_ref, WT_READ_CACHE | WT_READ_NO_EVICT));
 
 		switch (syncop) {
 		case WT_SYNC_CLOSE:
