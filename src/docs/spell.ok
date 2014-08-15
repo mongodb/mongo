@@ -124,6 +124,7 @@ configurign
 conn
 const
 control's
+copydoc
 cpp
 crashless
 cursortype
@@ -172,6 +173,7 @@ fadvise
 failchk
 fd's
 fieldname
+fileID
 fileformats
 fileid
 filename
@@ -298,6 +300,7 @@ objectsin
 ol
 oltp
 oob
+optype
 os
 ovfl
 pareto
@@ -332,6 +335,7 @@ recnoN
 recnum
 reconf
 recs
+rectype
 rerequests
 ret
 rf
@@ -349,6 +353,7 @@ scanf
 schemas
 selectable
 seqname
+seqno
 serializable
 sess
 skiplist
@@ -387,6 +392,7 @@ transactional
 transactionally
 tt
 txn
+txnid
 txns
 typedef
 uint

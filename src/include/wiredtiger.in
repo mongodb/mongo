@@ -832,48 +832,7 @@ struct __wt_session {
 	 *  (for example, they may be read-only or not support transactional
 	 *  updates).  See @ref data_sources for more information.
 	 *  <br>
-	 *  The following are the builtin cursor types:
-	 *  <table>
-	 *  @hrow{URI, Type, Key/Value types}
-	 *  @row{<code>backup:</code>,
-	 *	hot backup cursor,
-	 *	key=<code>string</code>\, see @ref hot_backup for details}
-	 *  @row{<code>colgroup:\<table name\>:\<column group name\></code>,
-	 *	column group cursor,
-	 *	table key\, column group value(s)}
-	 *  @row{
-	 *  <code>index:\<table name\>:\<index name\>[\<projection\>]</code>,
-	 *	index cursor,
-	 *	key=index key\, value=table value(s) with optional projection
-	 *	of columns}
-	 *  @row{<code>statistics:[\<data source URI\>]</code>,
-	 *	database or data source statistics cursor,
-	 *	key=<code>int id</code>\, value=(<code>string description\,
-	 *	string value\, uint64_t value</code>)\,
-	 *	see @ref data_statistics for details}
-	 *  @row{<code>table:\<table name\>[\<projection\>]</code>,
-	 *	table cursor,
-	 *	table key\, table value(s) with optional projection of columns}
-	 *  </table>
-	 *  Advanced applications may also choose to open the following
-	 *  additional cursor types:
-	 *  <table>
-	 *  @row{<code>file:\<file name\></code>,
-	 *	file cursor,
-	 *	file key\, file value}
-	 *  @row{<code>log:</code>,
-	 *	log cursor,
-	 *	key=<code>long fileID\, long offset\, int seqno</code>\,
-	 *	value=<code>uint64_t txnid\, uint32_t rectype\,
-	 *	uint32_t optype\, uint32_t fileid\,
-	*	WT_ITEM key\, WT_ITEM value</code>: see @ref cursor_log}
-	 *  @row{<code>lsm:\<name\></code>,
-	 *	LSM cursor,
-	 *	LSM key\, LSM value: see @ref lsm}
-	 *  @row{<code>metadata:</code>,
-	 *	metadata cursor,
-	 *	key=\c string\, value=\c string: see @ref metadata}
-	 *  </table>
+	 *  @copydoc doc_cursor_types
 	 * @param to_dup a cursor to duplicate
 	 * @configstart{session.open_cursor, see dist/api_data.py}
 	 * @config{append, append the value as a new record\, creating a new

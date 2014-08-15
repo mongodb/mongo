@@ -395,6 +395,7 @@ config
 conn
 connectionp
 const
+copydoc
 copyin
 copyout
 cp
