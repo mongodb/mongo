@@ -45,6 +45,7 @@
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_coordinator_hybrid.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/util/background.h"
@@ -596,6 +597,16 @@ namespace {
         }
 
         _cfg = new ReplSetConfig(c);
+
+        {
+            // Hack to force ReplicationCoordinatorImpl to have a config.
+            // TODO(spencer): rm this once the ReplicationCoordinatorImpl can load its own config.
+            HybridReplicationCoordinator* replCoord =
+                    dynamic_cast<HybridReplicationCoordinator*>(getGlobalReplicationCoordinator());
+            fassert(18648, replCoord);
+            replCoord->setImplConfigHack(_cfg);
+        }
+
         // config() is same thing but const, so we use that when we can for clarity below
         dassert(&config() == _cfg);
         verify(config().ok());

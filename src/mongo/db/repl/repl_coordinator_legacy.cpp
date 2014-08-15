@@ -395,7 +395,7 @@ namespace {
                     config = BSON("_id" << mem->id());
                 }
                 LOG(2) << "received notification that node with RID " << rid << " and config "
-                       << config << " has reached optime: " << ts.toStringPretty();
+                       << config << " has reached optime: " << ts;
 
                 // This is what updates the progress information used for satisfying write concern
                 // and wakes up threads waiting for replication.

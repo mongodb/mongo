@@ -174,6 +174,11 @@ namespace repl {
 
         // ================== Members of replication code internal API ===================
 
+        // This is a temporary hack to set the replset config to the config detected by the
+        // legacy coordinator.
+        // TODO(spencer): Remove this once this class can load its own config
+        void forceCurrentRSConfigHack(const BSONObj& config, int myIndex);
+
         /**
          * Does a heartbeat for a member of the replica set.
          * Should be started during (re)configuration or in the heartbeat callback only.
@@ -220,6 +225,10 @@ namespace repl {
         // Called by the TopologyCoordinator whenever this node's replica set state transitions.
         void _onSelfStateChange(const MemberState& newState);
 
+        // Helper to update our saved config, cancel any pending heartbeats, and kick off sending
+        // new heartbeats based on the new config.
+        void _setCurrentRSConfig_inlock(const ReplicaSetConfig& newConfig, int myIndex);
+
         /*
          * Returns the OpTime of the last applied operation on this node.
          */
@@ -261,16 +270,28 @@ namespace repl {
 
         /**
          * Starts loading the replication configuration from local storage, and if it is valid,
-         * schedules a callback to set itas the current replica set config (sets _rsConfig and
-         * _thisMembersConfigIndex).
+         * schedules a callback (of _finishLoadLocalConfig) to set it as the current replica set
+         * config (sets _rsConfig and _thisMembersConfigIndex).
+         * Returns true if it finishes loading the local config, which most likely means there
+         * was no local config at all or it was invalid in some way, and false if there was a valid
+         * config detected but more work is needed to set it as the local config (which will be
+         * handled by the callback to _finishLoadLocalConfig).
          */
-        void _startLoadLocalConfig(OperationContext* txn);
+        bool _startLoadLocalConfig(OperationContext* txn);
 
         /**
-         * Callback that finishes the work started in _startLoadLocalConfig.
+         * Callback that finishes the work started in _startLoadLocalConfig and sets
+         * _localConfigLoaded to true, so that we can begin processing heartbeats and reconfigs.
          */
         void _finishLoadLocalConfig(const ReplicationExecutor::CallbackData& cbData,
                                     const ReplicaSetConfig& localConfig);
+
+        /**
+         * Helper method that does most of the work of _finishLoadLocalConfig, minus setting
+         * _localConfigLoaded to true.
+         */
+        void _finishLoadLocalConfig_helper(const ReplicationExecutor::CallbackData& cbData,
+                                           const ReplicaSetConfig& localConfig);
 
         // Handle for the callback that marks the end of startReplication()'s asynchronous
         // work.  Used for testing, set in startReplication() and never changed.
@@ -324,6 +345,11 @@ namespace repl {
 
         // Set to true when we are in the process of shutting down replication.
         bool _inShutdown;
+
+        // Set to true until after we're done loading the local replset config from
+        // local.system.replset (if one exists).  Used to ensure that we don't process any
+        // heartbeats or reconfig commands until after we have finished installing our local config.
+        bool _localConfigLoaded;
 
         // Election ID of the last election that resulted in this node becoming primary.
         OID _electionID;
