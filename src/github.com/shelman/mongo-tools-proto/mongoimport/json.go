@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/bson_ext"
+	"gopkg.in/mgo.v2/bson"
 	"io"
-	"labix.org/v2/mgo/bson"
 	"strings"
 )
 

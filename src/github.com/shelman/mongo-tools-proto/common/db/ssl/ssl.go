@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/common/util"
+	"gopkg.in/mgo.v2"
 	"io/ioutil"
-	"labix.org/v2/mgo"
 	"net"
 	"time"
 )

@@ -2,9 +2,9 @@ package mongoimport
 
 import (
 	. "github.com/smartystreets/goconvey/convey"
+	"gopkg.in/mgo.v2/bson"
 	"io"
 	"io/ioutil"
-	"labix.org/v2/mgo/bson"
 	"os"
 	"testing"
 )

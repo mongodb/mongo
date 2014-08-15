@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"github.com/shelman/mongo-tools-proto/common/bson_ext"
 	. "github.com/smartystreets/goconvey/convey"
-	"labix.org/v2/mgo/bson"
+	"gopkg.in/mgo.v2/bson"
 	"os"
 	"testing"
 )

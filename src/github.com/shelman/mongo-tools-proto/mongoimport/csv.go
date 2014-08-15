@@ -2,8 +2,8 @@ package mongoimport
 
 import (
 	"encoding/csv"
+	"gopkg.in/mgo.v2/bson"
 	"io"
-	"labix.org/v2/mgo/bson"
 	"strconv"
 	"strings"
 )

@@ -3,8 +3,8 @@ package mongoexport
 import (
 	"encoding/json"
 	"github.com/shelman/mongo-tools-proto/common/bson_ext"
+	"gopkg.in/mgo.v2/bson"
 	"io"
-	"labix.org/v2/mgo/bson"
 )
 
 //JSONExportOutput is an implementation of ExportOutput that writes documents

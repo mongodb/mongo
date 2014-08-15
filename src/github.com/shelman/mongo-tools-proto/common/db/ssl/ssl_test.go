@@ -4,7 +4,7 @@ import (
 	"github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
-	"labix.org/v2/mgo"
+	"gopkg.in/mgo.v2"
 	"testing"
 )
 

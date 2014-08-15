@@ -3,7 +3,7 @@ package db
 import (
 	"github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/common/util"
-	"labix.org/v2/mgo"
+	"gopkg.in/mgo.v2"
 	"time"
 )
 

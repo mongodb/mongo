@@ -5,10 +5,10 @@ package db
 import (
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/db/command"
-	"github.com/shelman/mongo-tools-proto/common/db/ssl"
 	"github.com/shelman/mongo-tools-proto/common/db/kerberos"
+	"github.com/shelman/mongo-tools-proto/common/db/ssl"
 	"github.com/shelman/mongo-tools-proto/common/options"
-	"labix.org/v2/mgo"
+	"gopkg.in/mgo.v2"
 	"sync"
 )
 
