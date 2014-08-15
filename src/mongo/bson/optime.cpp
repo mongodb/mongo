@@ -42,7 +42,4 @@ namespace mongo {
         return OpTime(t, i);
     }
 
-    std::ostream& operator<<(std::ostream &s, const OpTime &ot) {
-        return s << ot.toString();
-    }
 }
