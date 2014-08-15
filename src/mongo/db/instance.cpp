@@ -1032,7 +1032,7 @@ namespace {
         storageEngine->cleanShutdown(txn);
     }
 
-    void exitCleanly( ExitCode code ) {
+    void exitCleanly( ExitCode code, OperationContext* txn ) {
         shutdownInProgress.store(1);
 
         // Global storage engine may not be started in all cases before we exit
@@ -1042,14 +1042,18 @@ namespace {
 
             repl::getGlobalReplicationCoordinator()->shutdown();
 
-            OperationContextImpl txn;
-            Lock::GlobalWrite lk(txn.lockState());
+            if (!txn) {
+                // leaked, but we are exiting so doesn't matter
+                txn = new OperationContextImpl();
+            }
+
+            Lock::GlobalWrite lk(txn->lockState());
             log() << "now exiting" << endl;
 
             // Execute the graceful shutdown tasks, such as flushing the outstanding journal 
             // and data files, close sockets, etc.
             try {
-                shutdownServer(&txn);
+                shutdownServer(txn);
             }
             catch (const DBException& ex) {
                 severe() << "shutdown failed with DBException " << ex;

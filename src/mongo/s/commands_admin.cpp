@@ -1911,7 +1911,7 @@ namespace mongo {
     }
 
     bool CmdShutdown::run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-        return shutdownHelper();
+        return shutdownHelper(txn);
     }
 
 } // namespace mongo

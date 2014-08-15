@@ -120,7 +120,7 @@ namespace mongo {
 
         writelocktry wlt(txn->lockState(), 2 * 60 * 1000);
         uassert( 13455 , "dbexit timed out getting lock" , wlt.got() );
-        return shutdownHelper();
+        return shutdownHelper(txn);
     }
 
     class CmdDropDatabase : public Command {
