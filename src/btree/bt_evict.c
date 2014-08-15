@@ -549,7 +549,8 @@ __evict_clear_walks(WT_SESSION_IMPL *session)
 			 * current eviction walk point.
 			 */
 			btree->evict_ref = NULL;
-			WT_TRET(__wt_page_release(session, ref));
+			WT_TRET(
+			    __wt_page_release(session, ref, WT_READ_NO_EVICT));
 		}
 		session->dhandle = NULL;
 	}
@@ -978,7 +979,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	end = WT_MIN(start + WT_EVICT_WALK_PER_FILE,
 	    cache->evict + cache->evict_slots);
 
-	walk_flags = WT_READ_CACHE | WT_READ_NO_GEN | WT_READ_NO_WAIT;
+	walk_flags =
+	    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
 
 	/*
 	 * Get some more eviction candidate pages.

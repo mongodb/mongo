@@ -441,7 +441,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 			/* Verify the subtree. */
 			WT_RET(__wt_page_in(session, child_ref, 0));
 			ret = __verify_tree(session, child_ref, vs);
-			WT_TRET(__wt_page_release(session, child_ref));
+			WT_TRET(__wt_page_release(session, child_ref, 0));
 			WT_RET(ret);
 
 			__wt_cell_unpack(child_ref->addr, unpack);
@@ -469,7 +469,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 			/* Verify the subtree. */
 			WT_RET(__wt_page_in(session, child_ref, 0));
 			ret = __verify_tree(session, child_ref, vs);
-			WT_TRET(__wt_page_release(session, child_ref));
+			WT_TRET(__wt_page_release(session, child_ref, 0));
 			WT_RET(ret);
 
 			__wt_cell_unpack(child_ref->addr, unpack);

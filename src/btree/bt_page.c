@@ -116,11 +116,11 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			WT_ASSERT(session, page != NULL);
 
 			/* Forcibly evict pages that are too big. */
-			if (!LF_ISSET(WT_READ_NO_GEN) &&
+			if (!LF_ISSET(WT_READ_NO_EVICT) &&
 			    force_attempts < 10 &&
 			    __evict_force_check(session, page)) {
 				++force_attempts;
-				WT_RET(__wt_page_release(session, ref));
+				WT_RET(__wt_page_release(session, ref, flags));
 				break;
 			}
 

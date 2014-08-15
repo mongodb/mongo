@@ -935,7 +935,7 @@ __wt_ref_info(WT_SESSION_IMPL *session,
  *	Release a reference to a page.
  */
 static inline int
-__wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -953,7 +953,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref)
 	page = ref->page;
 
 	/* Attempt to evict pages with the special "oldest" read generation. */
-	if (page->read_gen != WT_READGEN_OLDEST ||
+	if (LF_ISSET(WT_READ_NO_EVICT) ||
+	    page->read_gen != WT_READGEN_OLDEST ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    (btree->checkpointing && __wt_page_is_modified(page)))
 		return (__wt_hazard_clear(session, page));
@@ -1020,14 +1021,14 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
 
 	/* Discard the original held page. */
 	acquired = ret == 0;
-	WT_TRET(__wt_page_release(session, held));
+	WT_TRET(__wt_page_release(session, held, flags));
 
 	/*
 	 * If there was an error discarding the original held page, discard
 	 * the acquired page too, keeping it is never useful.
 	 */
 	if (acquired && ret != 0)
-		WT_TRET(__wt_page_release(session, want));
+		WT_TRET(__wt_page_release(session, want, flags));
 	return (ret);
 }
 

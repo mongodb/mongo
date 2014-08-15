@@ -956,7 +956,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 #define	CHILD_RELEASE(session, hazard, ref) do {			\
 	if (hazard) {							\
 		hazard = 0;						\
-		WT_TRET(__wt_page_release(session, ref));		\
+		WT_TRET(						\
+		    __wt_page_release(session, ref, WT_READ_NO_EVICT));	\
 	}								\
 } while (0)
 #undef	CHILD_RELEASE_ERR
@@ -1070,7 +1071,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * for checkpoint.
 			 */
 			if ((ret = __wt_page_in(session, ref,
-			    WT_READ_CACHE |
+			    WT_READ_CACHE | WT_READ_NO_EVICT |
 			    WT_READ_NO_GEN | WT_READ_NO_WAIT)) == WT_NOTFOUND) {
 				ret = 0;
 				break;

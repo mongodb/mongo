@@ -882,7 +882,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * now, so that we can safely access it after updating the index.
 	 */
 	if (!__wt_ref_is_root(parent_ref = parent->pg_intl_parent_ref)) {
-		WT_ERR(__wt_page_in(session, parent_ref, WT_READ_NO_GEN));
+		WT_ERR(__wt_page_in(session, parent_ref, WT_READ_NO_EVICT));
 		hazard = 1;
 	}
 
