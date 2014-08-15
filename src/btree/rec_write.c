@@ -3859,7 +3859,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_REF *ref;
 	size_t size;
 	u_int vtype;
-	int hazard, onpage_ovfl, ovfl_key, state;
+	int hazard, key_onpage_ovfl, ovfl_key, state;
 	const void *p;
 
 	btree = S2BT(session);
@@ -3907,11 +3907,12 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		ikey = __wt_ref_key_instantiated(ref);
 		if (ikey == NULL || ikey->cell_offset == 0) {
 			cell = NULL;
-			onpage_ovfl = 0;
+			key_onpage_ovfl = 0;
 		} else {
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
 			__wt_cell_unpack(cell, kpack);
-			onpage_ovfl = kpack->ovfl == 1 ? 1 : 0;
+			key_onpage_ovfl =
+			    kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM;
 		}
 
 		WT_ERR(__rec_child_modify(session, r, ref, &hazard, &state));
@@ -3928,7 +3929,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * always instantiated.  Don't worry about reuse,
 			 * reusing this key in this reconciliation is unlikely.
 			 */
-			if (onpage_ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM)
+			if (key_onpage_ovfl)
 				WT_ERR(__wt_ovfl_discard_add(
 				    session, page, kpack->cell));
 			CHILD_RELEASE_ERR(session, hazard, ref);
@@ -3954,8 +3955,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * worry about reuse, reusing this key in this
 				 * reconciliation is unlikely.
 				 */
-				if (onpage_ovfl &&
-				    kpack->raw != WT_CELL_KEY_OVFL_RM)
+				if (key_onpage_ovfl)
 					WT_ERR(__wt_ovfl_discard_add(
 					    session, page, kpack->cell));
 				CHILD_RELEASE_ERR(session, hazard, ref);
@@ -3970,8 +3970,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * worry about reuse, reusing this key in this
 				 * reconciliation is unlikely.
 				 */
-				if (onpage_ovfl &&
-				    kpack->raw != WT_CELL_KEY_OVFL_RM)
+				if (key_onpage_ovfl)
 					WT_ERR(__wt_ovfl_discard_add(
 					    session, page, kpack->cell));
 
@@ -4011,18 +4010,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/*
-		 * If the key is an overflow key, check to see if the backing
-		 * blocks have been freed; in that case, we have to build a new
-		 * key.
-		 */
-		if (onpage_ovfl && kpack->raw == WT_CELL_KEY_OVFL_RM)
-			onpage_ovfl = 0;
-
-		/*
 		 * Build key cell.
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		if (onpage_ovfl) {
+		if (key_onpage_ovfl) {
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_total_len(kpack);
 			key->cell_len = 0;
@@ -4048,10 +4039,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * case, we have to build the actual key now because we
 			 * are about to promote it.
 			 */
-			if (onpage_ovfl) {
+			if (key_onpage_ovfl) {
 				WT_ERR(__wt_buf_set(session,
 				    r->cur, WT_IKEY_DATA(ikey), ikey->size));
-				onpage_ovfl = 0;
+				key_onpage_ovfl = 0;
 			}
 			WT_ERR(__rec_split(session, r));
 		}
