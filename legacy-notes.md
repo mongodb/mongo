@@ -2,6 +2,42 @@ On legacy tools, if the "-d" option is blank it assumes the default database ('t
 
 #####note: This behavior differs from tool to tool. In mongodump, no -d field means *all* databases instead of "test"
 
+##Mongoimport:
+If you supply both --headerline and --fields
+(or --fieldFile) it, firstly allows this, and just appends the header
+lines to the fields already specified.
+This seems confusing at best and could be buggy but alas, the same
+behavior is replicated herein to maintain the API contract.
+2. If you run:
+
+mongoimport -d test    -c test  --file inputFile  --headerline --stopOnError
+
+where inputFile contains:
+
+{"_id":2}
+{"_id":3}
+{"_id":2}
+
+mongoimport displays:
+
+connected to: 127.0.0.1
+2014-07-25T12:47:44.075-0400 dropping: test.test
+2014-07-25T12:47:44.078-0400 imported 3 objects
+
+but in the database:
+
+test> db.test.find()
+{
+  "_id": 3
+}
+{
+  "_id": 2
+}
+Fetched 2 record(s) in 1ms -- Index[none]
+
+--headerline should have no effect on JSON input sources
+
+
 ##Mongoexport:
 
 What should be the behavior if the user specifiees both --fields *AND* --fieldFile?
