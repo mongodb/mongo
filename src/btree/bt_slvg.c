@@ -1907,7 +1907,7 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 	bm = S2BT(session)->bm;
 	unpack = &_unpack;
 
-	for (rip = page->pg_row_d + start; start < stop; ++start) {
+	for (rip = page->pg_row_d + start; start < stop; ++start, ++rip) {
 		copy = WT_ROW_KEY_COPY(rip);
 		(void)__wt_row_leaf_key_info(
 		    page, copy, NULL, &cell, NULL, NULL);
