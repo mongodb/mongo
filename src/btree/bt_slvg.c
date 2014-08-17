@@ -828,9 +828,8 @@ __slvg_col_range_overlap(
 	 * #10			AAAAAA			A is middle of B
 	 * #11			AAAAAAAAAA		A is a suffix of B
 	 *
-	 * Because the leaf page array was sorted by record number and a_trk
-	 * appears earlier in that array than b_trk, cases #2/8, #10 and #11
-	 * are impossible.
+	 * Note the leaf page array was sorted by key and a_trk appears earlier
+	 * in the array than b_trk, so cases #2/8, #10 and #11 are impossible.
 	 *
 	 * Finally, there's one additional complicating factor -- final ranges
 	 * are assigned based on the page's LSN.
@@ -1384,9 +1383,8 @@ __slvg_row_range_overlap(
 	 * #10			AAAAAA			A is middle of B
 	 * #11			AAAAAAAAAA		A is a suffix of B
 	 *
-	 * Because the leaf page array was sorted by record number and a_trk
-	 * appears earlier in that array than b_trk, cases #2/8, #10 and #11
-	 * are impossible.
+	 * Note the leaf page array was sorted by key and a_trk appears earlier
+	 * in the array than b_trk, so cases #2/8, #10 and #11 are impossible.
 	 *
 	 * Finally, there's one additional complicating factor -- final ranges
 	 * are assigned based on the page's LSN.
