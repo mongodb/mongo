@@ -882,7 +882,7 @@ __slvg_col_range_overlap(
 	if  (a_trk->col_stop < b_trk->col_stop) {	/* Case #3/7 */
 		if (a_trk->gen > b_trk->gen) {
 			/*
-			 * Case #3/8: a_trk is more desirable, delete a_trk's
+			 * Case #3/7: a_trk is more desirable, delete a_trk's
 			 * key range from b_trk;
 			 */
 			b_trk->col_start = a_trk->col_stop + 1;
@@ -890,7 +890,7 @@ __slvg_col_range_overlap(
 			F_SET(b_trk, WT_TRACK_MERGE);
 		} else {
 			/*
-			 * Case #3/8: b_trk is more desirable, delete b_trk's
+			 * Case #3/7: b_trk is more desirable, delete b_trk's
 			 * key range from a_trk;
 			 */
 			a_trk->col_stop = b_trk->col_start - 1;
@@ -1455,7 +1455,7 @@ __slvg_row_range_overlap(
 	if (cmp < 0) {					/* Case #3/7 */
 		if (a_trk->gen > b_trk->gen) {
 			/*
-			 * Case #3/8: a_trk is more desirable, delete a_trk's
+			 * Case #3/7: a_trk is more desirable, delete a_trk's
 			 * key range from b_trk;
 			 */
 			WT_RET(__slvg_row_trk_update_start(
@@ -1463,7 +1463,7 @@ __slvg_row_range_overlap(
 			F_SET(b_trk, WT_TRACK_CHECK_START | WT_TRACK_MERGE);
 		} else {
 			/*
-			 * Case #3/8: b_trk is more desirable, delete b_trk's
+			 * Case #3/7: b_trk is more desirable, delete b_trk's
 			 * key range from a_trk;
 			 */
 			WT_RET(__slvg_key_copy(
