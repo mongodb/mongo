@@ -948,17 +948,19 @@ delete:		return (__slvg_trk_free(session,
 	__slvg_col_trk_update_start(a_slot + 1, ss);
 
 	/*
-	 * Fourth, the new WT_TRACK information doesn't reference any file
-	 * blocks (let the original a_trk structure reference file blocks).
-	 */
-	F_SET(new, WT_TRACK_MERGE | WT_TRACK_NO_FILE_BLOCKS);
-
-	/*
-	 * Finally, set the original WT_TRACK information to reference only
+	 * Fourth, set the original WT_TRACK information to reference only
 	 * the initial key space in the page, that is, everything up to the
 	 * starting key of the middle chunk (that's b_trk).
 	 */
 	a_trk->col_stop = b_trk->col_start - 1;
+
+	/*
+	 * Fifth, the new WT_TRACK information doesn't reference any file
+	 * blocks (let the original a_trk structure reference file blocks).
+	 */
+	F_SET(new, WT_TRACK_NO_FILE_BLOCKS);
+
+	F_SET(new, WT_TRACK_MERGE);
 	F_SET(a_trk, WT_TRACK_MERGE);
 
 merge:	WT_RET(__wt_verbose(session, WT_VERB_SALVAGE,
@@ -1521,19 +1523,22 @@ delete:		return (__slvg_trk_free(session,
 	    __slvg_row_trk_update_start(session, B_TRK_STOP, a_slot + 1, ss));
 
 	/*
-	 * Fourth, the new WT_TRACK information doesn't reference any file
-	 * blocks (let the original a_trk structure reference file blocks).
-	 */
-	F_SET(new,
-	    WT_TRACK_CHECK_START | WT_TRACK_MERGE | WT_TRACK_NO_FILE_BLOCKS);
-
-	/*
-	 * Finally, set the original WT_TRACK information to reference only
+	 * Fourth, set the original WT_TRACK information to reference only
 	 * the initial key space in the page, that is, everything up to the
 	 * starting key of the middle chunk (that's b_trk).
 	 */
 	WT_RET(__slvg_key_copy(session, A_TRK_STOP, B_TRK_START));
-	F_SET(a_trk, WT_TRACK_CHECK_STOP | WT_TRACK_MERGE);
+	F_SET(new, WT_TRACK_CHECK_START);
+	F_SET(a_trk, WT_TRACK_CHECK_STOP);
+
+	/*
+	 * Fifth, the new WT_TRACK information doesn't reference any file
+	 * blocks (let the original a_trk structure reference file blocks).
+	 */
+	F_SET(new, WT_TRACK_NO_FILE_BLOCKS);
+
+	F_SET(new, WT_TRACK_MERGE);
+	F_SET(a_trk, WT_TRACK_MERGE);
 
 merge:	WT_RET(__wt_verbose(session, WT_VERB_SALVAGE,
 	    "%s and %s require merge",
