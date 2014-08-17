@@ -1833,45 +1833,32 @@ __slvg_row_build_leaf(
 	    page->pg_row_entries - skip_stop, page->pg_row_entries));
 
 	/*
-	 * If we take all of the keys, we don't write the page and we clear the
-	 * merge flags so that the underlying blocks are not later freed (for
-	 * merge pages re-written into the file, the underlying blocks have to
-	 * be freed, but if this page never gets written, we shouldn't free the
-	 * blocks).
+	 * Change the page to reflect the correct record count: there is no
+	 * need to copy anything on the page itself, the entries value limits
+	 * the number of page items.
 	 */
-	if (skip_start == 0 && skip_stop == 0)
-		F_CLR(trk, WT_TRACK_MERGE);
-	else {
-		/*
-		 * Change the page to reflect the correct record count: there
-		 * is no need to copy anything on the page itself, the entries
-		 * value limits the number of page items.
-		 */
-		page->pg_row_entries -= skip_stop;
-		cookie->skip = skip_start;
+	page->pg_row_entries -= skip_stop;
+	cookie->skip = skip_start;
 
-		/*
-		 * We can't discard the original blocks associated with the page
-		 * now.  (The problem is we don't want to overwrite any original
-		 * information until the salvage run succeeds -- if we free the
-		 * blocks now, the next merge page we write might allocate those
-		 * blocks and overwrite them, and should the salvage run fail,
-		 * the original information would have been lost to subsequent
-		 * salvage runs.)  Clear the reference addr so eviction doesn't
-		 * free the underlying blocks.
-		 */
-		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-		__wt_free(session, ref->addr);
-		ref->addr = NULL;
+	/*
+	 * We can't discard the original blocks associated with this page now.
+	 * (The problem is we don't want to overwrite any original information
+	 * until the salvage run succeeds -- if we free the blocks now, the next
+	 * merge page we write might allocate those blocks and overwrite them,
+	 * and should the salvage run eventually fail, the original information
+	 * would have been lost.)  Clear the reference addr so eviction doesn't
+	 * free the underlying blocks.
+	 */
+	__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+	__wt_free(session, ref->addr);
+	ref->addr = NULL;
 
-		/* Write the new version of the leaf page to disk. */
-		WT_ERR(__slvg_modify_init(session, page));
-		WT_ERR(__wt_rec_write(
-		    session, ref, cookie, WT_SKIP_UPDATE_ERR));
+	/* Write the new version of the leaf page to disk. */
+	WT_ERR(__slvg_modify_init(session, page));
+	WT_ERR(__wt_rec_write(session, ref, cookie, WT_SKIP_UPDATE_ERR));
 
-		/* Reset the page. */
-		page->pg_row_entries += skip_stop;
-	}
+	/* Reset the page. */
+	page->pg_row_entries += skip_stop;
 
 	/*
 	 * Discard our hazard pointer and evict the page, updating the
