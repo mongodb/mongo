@@ -2183,8 +2183,7 @@ __slvg_merge_block_free(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	for (i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
-		if (F_ISSET(trk, WT_TRACK_MERGE) &&
-		    !F_ISSET(trk, WT_TRACK_NO_FILE_BLOCKS))
+		if (F_ISSET(trk, WT_TRACK_MERGE))
 			WT_RET(__slvg_trk_free(
 			    session, &ss->pages[i], WT_TRK_FREE_BLOCKS));
 	}
