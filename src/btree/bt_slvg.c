@@ -2264,7 +2264,8 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 	 * we were tracking but eventually decided not to use.  That merits a
 	 * verbose description.
 	 */
-	if (LF_ISSET(WT_TRK_FREE_BLOCKS)) {
+	if (LF_ISSET(WT_TRK_FREE_BLOCKS) &&
+	    !F_ISSET(trk, WT_TRACK_NO_FILE_BLOCKS)) {
 		WT_RET(__wt_verbose(session, WT_VERB_SALVAGE,
 		    "%s page discarded: discard freed file bytes %" PRIu32,
 		    __wt_addr_string(
