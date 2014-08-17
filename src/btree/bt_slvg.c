@@ -834,6 +834,11 @@ __slvg_col_range_overlap(
 	 * Finally, there's one additional complicating factor -- final ranges
 	 * are assigned based on the page's LSN.
 	 */
+						/* Case #2/8, #10, #11 */
+	if (a_trk->col_start > b_trk->col_start)
+		WT_PANIC_RET(
+		    session, EINVAL, "unexpected merge array sort order");
+
 	if (a_trk->col_start == b_trk->col_start) {	/* Case #1, #4 and #9 */
 		/*
 		 * The secondary sort of the leaf page array was the page's LSN,
@@ -1401,6 +1406,11 @@ __slvg_row_range_overlap(
 	    session, btree->collator, A_TRK_START, B_TRK_START, &start_cmp));
 	WT_RET(__wt_compare(
 	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, &stop_cmp));
+
+	if (start_cmp > 0)			/* Case #2/8, #10, #11 */
+		WT_PANIC_RET(
+		    session, EINVAL, "unexpected merge array sort order");
+
 	if (start_cmp == 0) {				/* Case #1, #4, #9 */
 		/*
 		 * The secondary sort of the leaf page array was the page's LSN,
