@@ -904,9 +904,8 @@ __slvg_col_range_overlap(
 	 * discard b_trk.
 	 */
 	if (a_trk->gen > b_trk->gen) {
-delete:		WT_RET(__slvg_trk_free(session,
+delete:		return (__slvg_trk_free(session,
 		    &ss->pages[b_slot], WT_TRK_FREE_BLOCKS | WT_TRK_FREE_OVFL));
-		return (0);
 	}
 
 	/*
@@ -1478,9 +1477,8 @@ __slvg_row_range_overlap(
 	 * discard b_trk.
 	 */
 	if (a_trk->gen > b_trk->gen) {
-delete:		WT_RET(__slvg_trk_free(session,
+delete:		return (__slvg_trk_free(session,
 		    &ss->pages[b_slot], WT_TRK_FREE_BLOCKS | WT_TRK_FREE_OVFL));
-		return (0);
 	}
 
 	/*
