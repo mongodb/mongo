@@ -1341,7 +1341,7 @@ __slvg_row_range_overlap(
 {
 	WT_BTREE *btree;
 	WT_TRACK *a_trk, *b_trk, *new;
-	int cmp;
+	int start_cmp, stop_cmp;
 
 	/*
 	 * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR
@@ -1398,8 +1398,10 @@ __slvg_row_range_overlap(
 	__wt_buf_set(session, dst, (src)->data, (src)->size)
 
 	WT_RET(__wt_compare(
-	    session, btree->collator, A_TRK_START, B_TRK_START, &cmp));
-	if (cmp == 0) {					/* Case #1, #4, #9 */
+	    session, btree->collator, A_TRK_START, B_TRK_START, &start_cmp));
+	WT_RET(__wt_compare(
+	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, &stop_cmp));
+	if (start_cmp == 0) {				/* Case #1, #4, #9 */
 		/*
 		 * The secondary sort of the leaf page array was the page's LSN,
 		 * in high-to-low order, which means a_trk has a higher LSN, and
@@ -1408,9 +1410,7 @@ __slvg_row_range_overlap(
 		 * this simplifies things, it guarantees a_trk has a higher LSN
 		 * than b_trk.
 		 */
-		WT_RET(__wt_compare(
-		    session, btree->collator, A_TRK_STOP, B_TRK_STOP, &cmp));
-		if (cmp >= 0)
+		if (stop_cmp >= 0)
 			/*
 			 * Case #1, #4: a_trk is a superset of b_trk, and a_trk
 			 * is more desirable -- discard b_trk.
@@ -1428,9 +1428,7 @@ __slvg_row_range_overlap(
 		goto merge;
 	}
 
-	WT_RET(__wt_compare(
-	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, &cmp));
-	if (cmp == 0) {					/* Case #6 */
+	if (stop_cmp == 0) {				/* Case #6 */
 		if (a_trk->gen > b_trk->gen)
 			/*
 			 * Case #6: a_trk is a superset of b_trk and a_trk is
@@ -1447,9 +1445,7 @@ __slvg_row_range_overlap(
 		goto merge;
 	}
 
-	WT_RET(__wt_compare(
-	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, &cmp));
-	if (cmp < 0) {					/* Case #3/7 */
+	if (stop_cmp < 0) {				/* Case #3/7 */
 		if (a_trk->gen > b_trk->gen) {
 			/*
 			 * Case #3/7: a_trk is more desirable, delete a_trk's
