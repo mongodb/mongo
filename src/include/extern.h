@@ -589,9 +589,10 @@ extern int __wt_ext_config_get(WT_EXTENSION_API *wt_api,
     WT_CONFIG_ARG *cfg_arg,
     const char *key,
     WT_CONFIG_ITEM *cval);
-extern int __wt_collator_config( WT_SESSION_IMPL *session,
+extern int __wt_collator_config(WT_SESSION_IMPL *session,
     const char **cfg,
-    WT_COLLATOR **collatorp);
+    WT_COLLATOR **collatorp,
+    int *ownp);
 extern int __wt_conn_remove_collator(WT_CONNECTION_IMPL *conn,
     WT_NAMED_COLLATOR *ncoll);
 extern int __wt_conn_remove_compressor( WT_CONNECTION_IMPL *conn,

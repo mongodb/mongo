@@ -930,6 +930,8 @@ struct __wt_session {
 	 * by overflow items\, and the default value of 4KB is a good choice
 	 * absent requirements from the operating system or storage device., an
 	 * integer between 512B and 128MB; default \c 4KB.}
+	 * @config{app_metadata, application-owned metadata for this object., a
+	 * string; default empty.}
 	 * @config{block_allocation, configure block allocation.  Permitted
 	 * values are \c "first" or \c "best"; the \c "first" configuration uses
 	 * a first-available algorithm during block allocation\, the \c "best"
@@ -2524,6 +2526,15 @@ struct __wt_collator {
 	 */
 	int (*compare)(WT_COLLATOR *collator, WT_SESSION *session,
 	    const WT_ITEM *key1, const WT_ITEM *key2, int *cmp);
+
+	/*!
+	 * If non-NULL, this callback is called to customize the collator
+	 * for each data source.  If the callback returns a non-NULL
+	 * collator, that instance is used instead of this one for all
+	 * comparisons.
+	 */
+	int (*customize)(WT_COLLATOR *collator, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ITEM *appcfg, WT_COLLATOR **customp);
 
 	/*!
 	 * If non-NULL, a callback performed when the database is closed.

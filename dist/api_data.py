@@ -47,8 +47,10 @@ class Config:
 	def __cmp__(self, other):
 		return cmp(self.name, other.name)
 
-# All schema objects can have column names (optional for simple tables).
-column_meta = [
+# Metadata shared by all schema objects
+common_meta = [
+	Config('app_metadata', '', r'''
+	    application-owned metadata for this object'''),
 	Config('columns', '', r'''
 	    list of the column names.  Comma-separated list of the form
 	    <code>(column[,...])</code>.  For tables, the number of entries
@@ -73,7 +75,7 @@ source_meta = [
 	    configured by the application'''),
 ]
 
-format_meta = column_meta + [
+format_meta = common_meta + [
 	Config('key_format', 'u', r'''
 	    the format of the data packed into key items.  See @ref
 	    schema_format_types for details.  By default, the key_format is
@@ -289,7 +291,7 @@ table_only_meta = [
 	    WT_SESSION::create''', type='list'),
 ]
 
-colgroup_meta = column_meta + source_meta
+colgroup_meta = common_meta + source_meta
 
 index_meta = format_meta + source_meta
 

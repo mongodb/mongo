@@ -407,16 +407,24 @@ err:	__curds_txn_leave(session);
 static int
 __curds_close(WT_CURSOR *cursor)
 {
-	WT_CURSOR *source;
+	WT_CURSOR_DATA_SOURCE *cds;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
+	cds = (WT_CURSOR_DATA_SOURCE *)cursor;
 
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	if (source != NULL)
-		ret = source->close(source);
+	if (cds->source != NULL)
+		ret = cds->source->close(cds->source);
+
+	if (cds->collator_owned) {
+		if (cds->collator->terminate != NULL)
+			WT_TRET(cds->collator->terminate(
+			    cds->collator, &session->iface));
+		cds->collator_owned = 0;
+	}
+	cds->collator = NULL;
 
 	/*
 	 * The key/value formats are in allocated memory, which isn't standard
@@ -488,7 +496,8 @@ __wt_curds_open(
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
 	/* Data-source cursors have a collator reference. */
-	WT_ERR(__wt_collator_config(session, cfg, &data_source->collator));
+	WT_ERR(__wt_collator_config(session, cfg,
+	    &data_source->collator, &data_source->collator_owned));
 
 	WT_ERR(dsrc->open_cursor(dsrc,
 	    &session->iface, uri, (WT_CONFIG_ARG *)cfg, &data_source->source));
