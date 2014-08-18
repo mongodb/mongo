@@ -1,5 +1,17 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_232 Upgrading to Version 2.3.2
+
+<dl>
+<dt>WT_COLLATOR interface changes</dt>
+<dd>
+Add a new WT_COLLATOR::customize callback that WiredTiger will call (if set)
+for each data source configured to use the collator.  Applications using the
+existing WT_COLLATOR interface that do not require the new functionality should
+set this callback to \c NULL.
+</dd>
+</dl>
+
 @section version_231 Upgrading to Version 2.3.1
 
 <dl>
