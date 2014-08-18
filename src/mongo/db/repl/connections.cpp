@@ -34,6 +34,7 @@
 
 #include "mongo/db/repl/connections.h"
 
+#include "mongo/db/repl/rslog.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

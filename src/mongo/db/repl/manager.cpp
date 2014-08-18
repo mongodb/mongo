@@ -37,6 +37,7 @@
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rslog.h"
 #include "mongo/db/client.h"
 #include "mongo/util/log.h"
 

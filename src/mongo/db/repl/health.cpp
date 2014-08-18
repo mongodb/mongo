@@ -47,7 +47,6 @@
 #include "mongo/util/goodies.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/html.h"
-#include "mongo/util/ramlog.h"
 
 namespace mongo {
 namespace repl {
@@ -56,9 +55,6 @@ namespace repl {
     mutex ScopedConn::mapMutex("ScopedConn::mapMutex");
 
     using namespace html;
-
-    static RamLog * _rsLog = RamLog::get("rs");
-    Tee* rsLog = _rsLog;
 
     string ago(time_t t) {
         if( t == 0 ) return "";
@@ -296,11 +292,6 @@ namespace repl {
         for( map<int,string>::const_iterator i = mp.begin(); i != mp.end(); i++ )
             s << i->second;
         s << _table();
-    }
-
-
-    void fillRsLog(stringstream& s) {
-        _rsLog->toHTML( s );
     }
 
     const Member* ReplSetImpl::findById(unsigned id) const {

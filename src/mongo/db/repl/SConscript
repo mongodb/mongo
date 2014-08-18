@@ -9,6 +9,12 @@ env.Library('repl_settings',
                 '$BUILD_DIR/mongo/server_parameters'
             ])
 
+env.Library('rslog',
+            'rslog.cpp',
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/logger/logger',
+            ])
+
 env.Library(
     'network_interface_impl',
     'network_interface_impl.cpp',
@@ -31,7 +37,8 @@ env.Library('topology_coordinator_impl',
             ['topology_coordinator_impl.cpp',
              'member_heartbeat_data.cpp'],
             LIBDEPS=['replication_executor',
-                     'repl_settings'])
+                     'repl_settings',
+                     'rslog'])
 
 env.CppUnitTest('topology_coordinator_impl_test',
                 'topology_coordinator_impl_test.cpp',

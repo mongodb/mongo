@@ -26,43 +26,22 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#pragma once
 
-#include "mongo/db/repl/initial_sync.h"
-
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replset_commands.h"
-#include "mongo/db/repl/rs.h"
-#include "mongo/db/repl/rslog.h"
-#include "mongo/util/log.h"
-
+#include <string>
 
 namespace mongo {
+
+namespace logger {
+    class Tee;
+} // namespace logger
+
 namespace repl {
-    InitialSync::InitialSync(BackgroundSyncInterface *q) : 
-        SyncTail(q) {}
 
-    InitialSync::~InitialSync() {}
+    void fillRsLog(std::stringstream* s);
 
-    /* initial oplog application, during initial sync, after cloning.
-    */
-    BSONObj InitialSync::oplogApplication(OperationContext* txn,
-                                          const BSONObj& applyGTEObj,
-                                          const BSONObj& minValidObj) {
-        if (replSetForceInitialSyncFailure > 0) {
-            log() << "replSet test code invoked, forced InitialSync failure: "
-                  << replSetForceInitialSyncFailure << rsLog;
-            replSetForceInitialSyncFailure--;
-            throw DBException("forced error",0);
-        }
-
-        // create the initial oplog entry
-        syncApply(txn, applyGTEObj);
-        _logOpObjRS(txn, applyGTEObj);
-
-        return oplogApplySegment(applyGTEObj, minValidObj, multiInitialSyncApply);
-    }
+    // ramlog used for replSet actions
+    extern logger::Tee* rsLog;
 
 } // namespace repl
 } // namespace mongo

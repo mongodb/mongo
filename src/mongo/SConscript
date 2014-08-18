@@ -926,6 +926,7 @@ serveronlyLibdeps = ["coreshard",
                      "db/repl/topology_coordinator_impl",
                      "db/repl/repl_coordinator_global",
                      "db/repl/replication_executor",
+                     "db/repl/rslog",
                      'db/storage/mmap_v1/storage_mmapv1',
                      'db/storage/heap1/storage_heap1',
                      '$BUILD_DIR/third_party/shim_snappy']

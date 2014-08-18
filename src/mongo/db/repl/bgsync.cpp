@@ -39,6 +39,7 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rslog.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/base/counter.h"

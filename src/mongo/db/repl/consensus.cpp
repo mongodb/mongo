@@ -37,6 +37,7 @@
 #include "mongo/db/repl/multicmd.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/replset_commands.h"
+#include "mongo/db/repl/rslog.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

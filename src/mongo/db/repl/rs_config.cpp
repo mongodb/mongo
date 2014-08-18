@@ -42,6 +42,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rslog.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
