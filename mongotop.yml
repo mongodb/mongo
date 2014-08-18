@@ -16,7 +16,7 @@ functions:
         rm -rf mongodb
         mkdir mongodb
         cd mongodb
-        wget -q ${mongo_url} -O mongodb.tgz
+        curl -s ${mongo_url} --output mongodb.tgz
         tar xvf mongodb.tgz --strip-components=1
 
   "start mongod":
@@ -35,7 +35,7 @@ functions:
       working_dir: src/src/github.com/shelman/mongo-tools-proto/mongotop
       script: |
         set -o verbose
-        wget https://s3.amazonaws.com/mciuploads/mcitools/binaries/${build_id}/mongotop
+        curl -s https://s3.amazonaws.com/mciuploads/mcitools/binaries/${build_id}/mongotop --output mongotop
         chmod 755 mongotop
         ./smoke.sh
 
