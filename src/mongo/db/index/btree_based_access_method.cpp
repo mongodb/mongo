@@ -255,20 +255,6 @@ namespace mongo {
         setDifference(data->oldKeys, data->newKeys, &data->removed);
         setDifference(data->newKeys, data->oldKeys, &data->added);
 
-        bool checkForDups = !data->added.empty()
-            && (KeyPattern::isIdKeyPattern(_descriptor->keyPattern()) || _descriptor->unique())
-            && !options.dupsAllowed;
-
-        if (checkForDups) {
-            for (vector<BSONObj*>::iterator i = data->added.begin(); i != data->added.end(); i++) {
-                Status check = _newInterface->dupKeyCheck(txn, **i, record);
-                if (!check.isOK()) {
-                    status->_isValid = false;
-                    return check;
-                }
-            }
-        }
-
         status->_isValid = true;
 
         return Status::OK();

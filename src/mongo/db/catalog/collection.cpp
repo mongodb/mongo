@@ -191,13 +191,6 @@ namespace mongo {
             }
         }
 
-        if ( isCapped() ) {
-            // TOOD: old god not done
-            Status ret = _indexCatalog.checkNoIndexConflicts( txn, docToInsert );
-            if ( !ret.isOK() )
-                return StatusWith<DiskLoc>( ret );
-        }
-
         return _insertDocument( txn, docToInsert, enforceQuota );
     }
 
@@ -241,22 +234,9 @@ namespace mongo {
 
         _infoCache.notifyOfWriteOp();
 
-        try {
-            _indexCatalog.indexRecord(txn, docToInsert, loc.getValue());
-        }
-        catch ( AssertionException& e ) {
-            if ( isCapped() ) {
-                return StatusWith<DiskLoc>( ErrorCodes::InternalError,
-                                            str::stream() << "unexpected index insertion failure on"
-                                            << " capped collection" << e.toString()
-                                            << " - collection and its index will not match" );
-            }
-
-            // indexRecord takes care of rolling back indexes
-            // so we just have to delete the main storage
-            _recordStore->deleteRecord( txn, loc.getValue() );
-            return StatusWith<DiskLoc>( e.toStatus( "insertDocument" ) );
-        }
+        Status s = _indexCatalog.indexRecord(txn, docToInsert, loc.getValue());
+        if (!s.isOK())
+            return StatusWith<DiskLoc>(s);
 
         return loc;
     }
@@ -368,7 +348,9 @@ namespace mongo {
                     debug->nmoved += 1;
             }
 
-            _indexCatalog.indexRecord(txn, objNew, newLocation.getValue());
+            Status s = _indexCatalog.indexRecord(txn, objNew, newLocation.getValue());
+            if (!s.isOK())
+                return StatusWith<DiskLoc>(s);
 
             return newLocation;
         }
