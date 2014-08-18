@@ -133,7 +133,6 @@ env.CppUnitTest('safe_num_test', ['util/safe_num_test.cpp'],
 env.CppUnitTest('string_map_test', ['util/string_map_test.cpp'],
                 LIBDEPS=['bson','foundation'])
 
-
 env.CppUnitTest('bson_field_test', ['bson/bson_field_test.cpp'],
                 LIBDEPS=['bson'])
 
@@ -1134,6 +1133,17 @@ env.Install( '#/', env.Program( "perftest", [ "dbtests/perf/perftest.cpp" ],
                                      "testframework",
                                      "signal_handlers_synchronous",
                                  ] ) )
+
+env.Install('#/build', env.Program('file_allocator_bench',
+            'util/file_allocator_bench.cpp',
+            LIBDEPS=[
+                'mongocommon',
+                'signal_handlers_synchronous',
+                '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
+                'serveronly',
+                'coredb',
+                'coreserver',
+            ]))
 
 # --- sniffer ---
 mongosniff_built = False
