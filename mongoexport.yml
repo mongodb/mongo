@@ -151,7 +151,18 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   expansions:
-    mongo_url: http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-2.6.1.tgz
+    mongo_url: http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-2.6.4.tgz
   tasks:
   - name: dist
   - name: unit
+
+- name: osx 10.8
+  display_name: OSX 10.8
+  run_on:
+  - osx-108
+  expansions:
+    mongo_url: https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.6.4.tgz
+  tasks:
+  - name: dist
+  - name: unit
+
