@@ -249,3 +249,13 @@ buildvariants:
     mongod_extra_options: --auth
   tasks:
   - name: auth
+
+- name: osx-108
+  display_name: OSX 10.8
+  run_on:
+  - osx-108
+  expansions:
+    mongo_url: https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-latest.tgz
+  tasks:
+  - name: db
+  - name: util
