@@ -38,8 +38,10 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/message_port.h"
 #include "mongo/util/net/sock.h"
 
 namespace mongo {
@@ -138,5 +140,8 @@ namespace {
         return HostAndPort(txn->getClient()->clientAddress(true));
     }
 
+    void ReplicationCoordinatorExternalStateImpl::closeClientConnections() {
+        MessagingPort::closeAllSockets(ScopedConn::keepOpen);
+    }
 } // namespace repl
 } // namespace mongo

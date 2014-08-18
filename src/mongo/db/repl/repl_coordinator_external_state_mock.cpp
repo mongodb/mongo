@@ -43,7 +43,8 @@ namespace repl {
 
     ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock()
         : _localRsConfigDocument(Status(ErrorCodes::NoMatchingDocument,
-                                        "No local config document")) {
+                                        "No local config document")),
+         _connectionsClosed(false) {
     }
 
     ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
@@ -86,6 +87,10 @@ namespace repl {
             const StatusWith<BSONObj>& localConfigDocument) {
 
         _localRsConfigDocument = localConfigDocument;
+    }
+
+    void ReplicationCoordinatorExternalStateMock::closeClientConnections() {
+        _connectionsClosed = true;
     }
 
 } // namespace repl

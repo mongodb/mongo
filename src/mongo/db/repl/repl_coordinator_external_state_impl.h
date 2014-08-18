@@ -49,6 +49,7 @@ namespace repl {
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
+        virtual void closeClientConnections();
 
     private:
 

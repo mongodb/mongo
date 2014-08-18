@@ -107,6 +107,13 @@ namespace repl {
          * represented by "txn".
          */
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn) = 0;
+
+        /**
+         * Close all client connections.
+         * This is used during stepdown, and transition out of primary.
+         *
+         */
+        virtual void closeClientConnections() = 0;
     };
 
 } // namespace repl
