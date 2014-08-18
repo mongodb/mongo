@@ -99,7 +99,7 @@ namespace repl {
         _replExecutor(network),
         _externalState(externalState),
         _inShutdown(false),
-        _localConfigLoaded(false),
+        _isStartupComplete(false),
         _thisMembersConfigIndex(-1) {
 
         if (!isReplEnabled()) {
@@ -170,28 +170,28 @@ namespace repl {
         }
         _finishLoadLocalConfig_helper(cbData, localConfig);
 
-        // Make sure that no matter how _finishLoadLocalConfig_helper terminates, we always
-        // set _localConfigLoaded to true.
+        // Make sure that no matter how _finishLoadLocalConfig_helper terminates (short of
+        // throwing an exception, which it shouldn't do and would cause the process to terminate),
+        // we always set _isStartupComplete to true.
         boost::lock_guard<boost::mutex> lk(_mutex);
-        _localConfigLoaded = true;
+        _isStartupComplete = true;
+        _startupCompleteCondition.notify_all();
     }
 
     void ReplicationCoordinatorImpl::_finishLoadLocalConfig_helper(
             const ReplicationExecutor::CallbackData& cbData,
             const ReplicaSetConfig& localConfig) {
 
-        ReplicaSetConfig oldConfig;
-        {
-            boost::lock_guard<boost::mutex> lk(_mutex);
-            oldConfig = _rsConfig;
-        }
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        ReplicaSetConfig oldConfig = _rsConfig;
+        lk.unlock();
 
         // We copy _rsConfig to oldConfig so that we can call validateConfigForStartUp without
         // holding _mutex, as validateConfigForStartUp calls isSelf, which might lead to network
         // traffic.  For this to work, we are depending on _rsConfig not changing between now
         // and when we re-acquire the lock further down.  We ensure that by not processing any
         // heartbeats or reconfigs until after this method finishes.
-        // TODO(spencer): Block in replSetReconfig until _localConfigLoaded is true.
+        // TODO(spencer): Block in replSetReconfig until _isStartupComplete is true.
         StatusWith<int> myIndex = validateConfigForStartUp(_externalState.get(),
                                                            oldConfig,
                                                            localConfig);
@@ -202,7 +202,7 @@ namespace repl {
             return;
         }
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        lk.lock();
         // Assert that the config didn't change while we were unlocked.  This isn't a perfect
         // check as they could be different configs with the same version number, but at least
         // it's something.
@@ -244,7 +244,8 @@ namespace repl {
             // If we're not done loading the config, then _localConfigLoaded will be set by
             // _finishLoadLocalConfig.
             boost::lock_guard<boost::mutex> lk(_mutex);
-            _localConfigLoaded = true;
+            _isStartupComplete = true;
+            _startupCompleteCondition.notify_all();
         }
     }
 
@@ -372,7 +373,9 @@ namespace repl {
             const OpTime& opId, const WriteConcernOptions& writeConcern) {
         int numNodes;
         if (!writeConcern.wMode.empty()) {
-            if (writeConcern.wMode != "majority") return true; // TODO(spencer): Handle tags
+            if (writeConcern.wMode != "majority") {
+                return true; // TODO(spencer): Handle tags
+            }
             numNodes = _rsConfig.getMajorityNumber();
         }
         else {
@@ -620,9 +623,9 @@ namespace repl {
                                          _rsConfig.getTagConfig()));
                 }
                 else {
-                    entry.append("config",
-                                 _rsConfig.findMemberByID(info.memberID)->toBSON(
-                                         _rsConfig.getTagConfig()));
+                    const MemberConfig* member = _rsConfig.findMemberByID(info.memberID);
+                    fassert(18651, member); // We ensured the member existed in processHandshake.
+                    entry.append("config", member->toBSON(_rsConfig.getTagConfig()));
                 }
             }
         }
@@ -664,8 +667,9 @@ namespace repl {
                 // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
                 // we need to keep sending it for 2.6 compatibility.
                 // TODO(spencer): Remove this after 2.8 is released.
-                subCmd.append("config",
-                              _rsConfig.findMemberByID(memberID)->toBSON(_rsConfig.getTagConfig()));
+                const MemberConfig* member = _rsConfig.findMemberByID(memberID);
+                fassert(18650, member); // We ensured the member existed in processHandshake.
+                subCmd.append("config", member->toBSON(_rsConfig.getTagConfig()));
             }
             handshakes->push_back(cmd.obj());
         }
@@ -735,7 +739,7 @@ namespace repl {
                                                         ReplSetHeartbeatResponse* response) {
         {
             boost::lock_guard<boost::mutex> lock(_mutex);
-            if (!_localConfigLoaded) {
+            if (!_isStartupComplete) {
                 return Status(ErrorCodes::NotYetInitialized,
                               "Received heartbeat while still initializing replication system");
             }
@@ -817,20 +821,12 @@ namespace repl {
         fassert(18647, config.initialize(configObj));
 
 
-        {
-            // Wait until we're done loading our local config
-            while (true) {
-                {
-                    boost::lock_guard<boost::mutex> lock(_mutex);
-                    if (_localConfigLoaded) {
-                        break;
-                    }
-                }
-                sleepmillis(10);
-            }
+        // Wait until we're done loading our local config
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        while (!_isStartupComplete) {
+            _startupCompleteCondition.wait(lock);
         }
 
-        boost::lock_guard<boost::mutex> lock(_mutex);
         _setCurrentRSConfig_inlock(config, myIndex);
 
         CBHStatus cbh = _replExecutor.scheduleWork(

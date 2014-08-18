@@ -281,14 +281,14 @@ namespace repl {
 
         /**
          * Callback that finishes the work started in _startLoadLocalConfig and sets
-         * _localConfigLoaded to true, so that we can begin processing heartbeats and reconfigs.
+         * _isStartupComplete to true, so that we can begin processing heartbeats and reconfigs.
          */
         void _finishLoadLocalConfig(const ReplicationExecutor::CallbackData& cbData,
                                     const ReplicaSetConfig& localConfig);
 
         /**
          * Helper method that does most of the work of _finishLoadLocalConfig, minus setting
-         * _localConfigLoaded to true.
+         * _isStartupComplete to true.
          */
         void _finishLoadLocalConfig_helper(const ReplicationExecutor::CallbackData& cbData,
                                            const ReplicaSetConfig& localConfig);
@@ -346,10 +346,12 @@ namespace repl {
         // Set to true when we are in the process of shutting down replication.
         bool _inShutdown;
 
-        // Set to true until after we're done loading the local replset config from
-        // local.system.replset (if one exists).  Used to ensure that we don't process any
-        // heartbeats or reconfig commands until after we have finished installing our local config.
-        bool _localConfigLoaded;
+        // Indicates whether the replication startup work has completed.  The coordinator will not
+        // process heartbeats or reconfig commands while this is false.
+        bool _isStartupComplete;
+
+        // Used to signal threads waiting for _isStartupComplete to become true.
+        boost::condition_variable _startupCompleteCondition;
 
         // Election ID of the last election that resulted in this node becoming primary.
         OID _electionID;
