@@ -108,7 +108,7 @@ buildvariants:
 - name: osx 10.8
   display_name: OSX 10.8
   run_on:
-  - ubuntu1404-test
+  - osx-108
   expansions:
     mongo_url: https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.6.4.tgz
   tasks:
