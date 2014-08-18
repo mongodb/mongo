@@ -36,6 +36,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
@@ -92,7 +93,7 @@ namespace repl {
                     _helper(fn) {}
 
     ResponseStatus NetworkInterfaceMock::runCommand(
-                                        const ReplicationExecutor::RemoteCommandRequest& request) {
+            const ReplicationExecutor::RemoteCommandRequest& request) {
         if (_simulatedNetworkLatencyMillis) {
             sleepmillis(_simulatedNetworkLatencyMillis);
         }
@@ -128,7 +129,9 @@ namespace repl {
                                                 BlockableResponseStatus(
                                                      !response.isOK() ?
                                                             ResponseStatus(response.getStatus()) :
-                                                            ResponseStatus(response.getValue())
+                                                            ResponseStatus(Response(
+                                                                               response.getValue(),
+                                                                               Milliseconds(0)))
                                                      , isBlocked))).second;
     }
 
@@ -188,7 +191,9 @@ namespace repl {
         str::stream out;
         out <<  "BlockableResponseStatus -- isBlocked:" << isBlocked;
         if (response.isOK())
-            out << " bson:" << response.getValue();
+            out << " bson:" << response.getValue().data
+                << " millis:"
+                << response.getValue().elapsedMillis.total_milliseconds();
         else
             out << " error:" << response.getStatus().toString();
         return out;

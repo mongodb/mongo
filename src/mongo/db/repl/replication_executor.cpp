@@ -194,7 +194,7 @@ namespace {
             const ReplicationExecutor::CallbackData& cbData,
             const ReplicationExecutor::RemoteCommandCallbackFn& cb,
             const ReplicationExecutor::RemoteCommandRequest& request,
-            const StatusWith<BSONObj>& response) {
+            const ResponseStatus& response) {
 
         if (cbData.status.isOK()) {
             cb(ReplicationExecutor::RemoteCommandCallbackData(
@@ -205,7 +205,7 @@ namespace {
                        cbData.executor,
                        cbData.myHandle,
                        request,
-                       StatusWith<BSONObj>(cbData.status)));
+                       ResponseStatus(cbData.status)));
         }
     }
 
@@ -219,7 +219,7 @@ namespace {
                    cbData.executor,
                    cbData.myHandle,
                    request,
-                   StatusWith<BSONObj>(cbData.status)));
+                   ResponseStatus(cbData.status)));
     }
 
     void ReplicationExecutor::doRemoteCommand(
@@ -250,7 +250,7 @@ namespace {
         }
         lk.unlock();
 
-        StatusWith<BSONObj> cmdResult = _networkInterface->runCommand(request);
+        ResponseStatus cmdResult = _networkInterface->runCommand(request);
 
         lk.lock();
         if (_inShutdown)
@@ -460,11 +460,22 @@ namespace {
                                                               timeoutMillis.total_milliseconds());
     }
 
+    std::string ReplicationExecutor::RemoteCommandRequest::toString() const {
+        str::stream out;
+        out << "RemoteCommand -- target:" << target.toString() << " db:" << dbname;
+
+        if (expirationDate  != kNoExpirationDate)
+            out << " expDate:" << expirationDate.toString();
+
+        out << " cmd:" << cmdObj.getOwned().toString();
+        return out;
+    }
+
     ReplicationExecutor::RemoteCommandCallbackData::RemoteCommandCallbackData(
             ReplicationExecutor* theExecutor,
             const CallbackHandle& theHandle,
             const RemoteCommandRequest& theRequest,
-            const StatusWith<BSONObj>& theResponse) :
+            const ResponseStatus& theResponse) :
         executor(theExecutor),
         myHandle(theHandle),
         request(theRequest),

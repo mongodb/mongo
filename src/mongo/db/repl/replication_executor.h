@@ -438,22 +438,12 @@ namespace repl {
                              const BSONObj& theCmdObj,
                              const Milliseconds timeoutMillis = kNoTimeout);
 
+        std::string toString() const;
+
         HostAndPort target;
         std::string dbname;
         BSONObj cmdObj;
         Date_t expirationDate;
-    };
-
-    struct ReplicationExecutor::RemoteCommandCallbackData {
-        RemoteCommandCallbackData(ReplicationExecutor* theExecutor,
-                                  const CallbackHandle& theHandle,
-                                  const RemoteCommandRequest& theRequest,
-                                  const StatusWith<BSONObj>& theResponse);
-
-        ReplicationExecutor* executor;
-        CallbackHandle myHandle;
-        RemoteCommandRequest request;
-        StatusWith<BSONObj> response;
     };
 
     /**
@@ -462,6 +452,15 @@ namespace repl {
     class ReplicationExecutor::NetworkInterface {
         MONGO_DISALLOW_COPYING(NetworkInterface);
     public:
+        struct Response {
+            Response() : data(), elapsedMillis(Milliseconds(0)) {}
+            Response(BSONObj obj, Milliseconds millis)
+                        : data(obj),
+                          elapsedMillis(millis) {}
+            BSONObj data;
+            Milliseconds elapsedMillis;
+        };
+
         virtual ~NetworkInterface();
 
         /**
@@ -472,7 +471,7 @@ namespace repl {
         /**
          * Runs the command described by "request" synchronously.
          */
-        virtual StatusWith<BSONObj> runCommand(
+        virtual StatusWith<Response> runCommand(
                 const RemoteCommandRequest& request) = 0;
 
         /**
@@ -485,7 +484,20 @@ namespace repl {
         NetworkInterface();
     };
 
-    typedef StatusWith<BSONObj> ResponseStatus;
+    typedef StatusWith<ReplicationExecutor::NetworkInterface::Response> ResponseStatus;
+
+    // Must be after NetworkInterface class
+    struct ReplicationExecutor::RemoteCommandCallbackData {
+        RemoteCommandCallbackData(ReplicationExecutor* theExecutor,
+                                  const CallbackHandle& theHandle,
+                                  const RemoteCommandRequest& theRequest,
+                                  const ResponseStatus& theResponse);
+
+        ReplicationExecutor* executor;
+        CallbackHandle myHandle;
+        RemoteCommandRequest request;
+        ResponseStatus response;
+    };
 
     /**
      * Description of a scheduled but not-yet-run work item.

@@ -34,6 +34,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace repl {
@@ -65,7 +66,7 @@ namespace repl {
         }
     } //namespace
 
-    StatusWith<BSONObj> NetworkInterfaceImpl::runCommand(
+    ResponseStatus NetworkInterfaceImpl::runCommand(
             const ReplicationExecutor::RemoteCommandRequest& request) {
 
         try {
@@ -73,19 +74,20 @@ namespace repl {
 
             StatusWith<int> timeoutStatus = getTimeoutMillis(request.expirationDate);
             if (!timeoutStatus.isOK())
-                return StatusWith<BSONObj>(timeoutStatus.getStatus());
+                return ResponseStatus(timeoutStatus.getStatus());
 
             int timeout = timeoutStatus.getValue();
+            Timer timer;
             ScopedDbConnection conn(request.target.toString(), timeout);
             conn->runCommand(request.dbname, request.cmdObj, output);
             conn.done();
-            return StatusWith<BSONObj>(output);
+            return ResponseStatus(Response(output, Milliseconds(timer.millis())));
         }
         catch (const DBException& ex) {
-            return StatusWith<BSONObj>(ex.toStatus());
+            return ResponseStatus(ex.toStatus());
         }
         catch (const std::exception& ex) {
-            return StatusWith<BSONObj>(
+            return ResponseStatus(
                     ErrorCodes::UnknownError,
                     mongoutils::str::stream() <<
                     "Sending command " << request.cmdObj << " on database " << request.dbname <<

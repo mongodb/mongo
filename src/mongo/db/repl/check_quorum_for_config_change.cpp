@@ -361,7 +361,7 @@ namespace {
             _down.push_back(cbData.request.target);
             return;
         }
-        BSONObj res = cbData.response.getValue();
+        BSONObj res = cbData.response.getValue().data;
         if (res["mismatch"].trueValue()) {
             std::string message = str::stream() << "Our set name did not match that of " <<
                 cbData.request.target.toString();

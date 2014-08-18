@@ -42,14 +42,17 @@ namespace repl {
 
 namespace {
 
+    typedef StatusWith<ReplicationExecutor::NetworkInterface::Response> ResponseStatus;
     static int counter = 0;
 
     ResponseStatus responseLookup(const ReplicationExecutor::RemoteCommandRequest& request) {
         if (request.target.host() != "localhost") {
-            return ResponseStatus(ErrorCodes::HostUnreachable, "network unavailable");
+            return StatusWith<NetworkInterfaceMock::Response>(ErrorCodes::HostUnreachable,
+                                                              "network unavailable");
         }
 
-        return ResponseStatus(BSON("ok"<< 1.0 << "c" << ++counter));
+        return ResponseStatus(NetworkInterfaceMock::Response(BSON("ok"<< 1.0 << "c" << ++counter),
+                                                             Milliseconds(2)));
     }
 
     TEST(NetworkInterfaceMock, MissingMappedRequest) {
@@ -58,7 +61,7 @@ namespace {
                 HostAndPort("localhost", 27017),
                 "mydb",
                 BSON("whatsUp" << "doc"));
-        StatusWith<BSONObj> resp = net->runCommand(cmdReq);
+        ResponseStatus resp = net->runCommand(cmdReq);
         ASSERT_NOT_OK(resp.getStatus());
         ASSERT_EQUALS(resp.getStatus().code(), ErrorCodes::NoSuchKey);
     }
@@ -72,10 +75,10 @@ namespace {
 
         const StatusWith<BSONObj> expectedResp(BSON("ok" << 1.0 << "a" << 0));
         net->addResponse(cmdReq, expectedResp, false);
-        StatusWith<BSONObj> resp = net->runCommand(cmdReq);
+        ResponseStatus resp = net->runCommand(cmdReq);
 
         ASSERT_OK(resp.getStatus());
-        ASSERT_EQUALS(resp.getValue(), expectedResp.getValue());
+        ASSERT_EQUALS(resp.getValue().data, expectedResp.getValue());
     }
 
 
@@ -85,12 +88,14 @@ namespace {
                 HostAndPort("localhost", 27017),
                 "mydb",
                 BSON("whatsUp" << "doc"));
-        StatusWith<BSONObj> resp = net->runCommand(cmdReq);
+        ResponseStatus resp = net->runCommand(cmdReq);
         ASSERT_OK(resp.getStatus());
-        ASSERT_EQUALS(resp.getValue()["c"].Int(), 1);
-        StatusWith<BSONObj> resp2 = net->runCommand(cmdReq);
+        ASSERT_EQUALS(resp.getValue().data["c"].Int(), 1);
+        ASSERT_EQUALS(resp.getValue().elapsedMillis.total_milliseconds(), 2);
+        ResponseStatus resp2 = net->runCommand(cmdReq);
         ASSERT_OK(resp2.getStatus());
-        ASSERT_EQUALS(resp2.getValue()["c"].Int(), 2);
+        ASSERT_EQUALS(resp2.getValue().data["c"].Int(), 2);
+        ASSERT_EQUALS(resp2.getValue().elapsedMillis.total_milliseconds(), 2);
     }
 
     TEST(NetworkInterfaceMock, HelperWithError) {
@@ -99,7 +104,7 @@ namespace {
                 HostAndPort("removeHost", 27017),
                 "mydb",
                 BSON("whatsUp" << "doc"));
-        StatusWith<BSONObj> resp = net->runCommand(cmdReq);
+        ResponseStatus resp = net->runCommand(cmdReq);
         ASSERT_NOT_OK(resp.getStatus());
     }
 }  // namespace
