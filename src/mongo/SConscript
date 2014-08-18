@@ -1134,7 +1134,7 @@ env.Install( '#/', env.Program( "perftest", [ "dbtests/perf/perftest.cpp" ],
                                      "signal_handlers_synchronous",
                                  ] ) )
 
-env.Install('#/build', env.Program('file_allocator_bench',
+env.Install('#/', env.Program('file_allocator_bench',
             'util/file_allocator_bench.cpp',
             LIBDEPS=[
                 'mongocommon',

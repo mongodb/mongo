@@ -69,7 +69,7 @@ class FileAllocatorBenchmark(Benchmark):
             opts.append("--quiet")
 
         super(FileAllocatorBenchmark, self).__init__("FileAllocatorBenchmark-%s" % variant,
-                                                     "build/file_allocator_bench",
+                                                     "file_allocator_bench",
                                                      opts)
 
 def configure_parser():
