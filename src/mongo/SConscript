@@ -1145,6 +1145,8 @@ env.Install('#/', env.Program('file_allocator_bench',
                 'coreserver',
             ]))
 
+env.Alias('file_allocator_bench', "#/" + add_exe("file_allocator_bench"))
+
 # --- sniffer ---
 mongosniff_built = False
 if darwin or env["_HAVEPCAP"]:
