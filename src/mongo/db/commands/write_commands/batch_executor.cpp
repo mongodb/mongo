@@ -942,6 +942,10 @@ namespace mongo {
                                             request->getTargetingNS())));
                 return false;
             }
+            repl::logOp(txn,
+                        "c",
+                        (database->name() + ".$cmd").c_str(),
+                        BSON("create" << nsToCollectionSubstring(request->getTargetingNS())));
             wunit.commit();
         }
         return true;

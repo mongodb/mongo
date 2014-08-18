@@ -144,6 +144,9 @@ namespace mongo {
                 WriteUnitOfWork wunit(txn);
                 collection = db->createCollection( txn, ns.ns() );
                 invariant( collection );
+                if (!fromRepl) {
+                    repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), BSON("create" << ns.coll()));
+                }
                 wunit.commit();
             }
 

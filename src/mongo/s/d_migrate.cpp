@@ -1685,15 +1685,14 @@ namespace mongo {
                 if ( !collection ) {
                     string system_namespaces = nsToDatabase(ns) + ".system.namespaces";
                     BSONObj entry = conn->findOne( system_namespaces, BSON( "name" << ns ) );
-                    if ( entry["options"].isABSONObj() ) {
-                        Status status = userCreateNS( txn, db, ns, entry["options"].Obj(), true, 0 );
-                        if ( !status.isOK() ) {
-                            warning() << "failed to create collection [" << ns << "] "
-                                      << " with options: " << status;
-                        }
-                    }
-                    else {
-                        db->createCollection( txn, ns );
+                    BSONObj options;
+                    if ( entry["options"].isABSONObj() )
+                        options = entry["options"].Obj();
+
+                    Status status = userCreateNS( txn, db, ns, options, true, false );
+                    if ( !status.isOK() ) {
+                        warning() << "failed to create collection [" << ns << "] "
+                                  << " with options " << options << ": " << status;
                     }
                 }
                 ctx.commit();

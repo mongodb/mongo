@@ -798,6 +798,10 @@ namespace mongo {
                 WriteUnitOfWork wunit(txn);
                 collection = ctx.db()->createCollection( txn, targetNS );
                 verify( collection );
+                repl::logOp(txn,
+                            "c",
+                            (ctx.db()->name() + ".$cmd").c_str(),
+                            BSON("create" << nsToCollectionSubstring(targetNS)));
                 wunit.commit();
             }
 
@@ -838,6 +842,10 @@ namespace mongo {
         if ( !collection ) {
             collection = ctx.db()->createCollection( txn, ns );
             verify( collection );
+            repl::logOp(txn,
+                        "c",
+                        (ctx.db()->name() + ".$cmd").c_str(),
+                        BSON("create" << nsToCollectionSubstring(ns)));
         }
 
         StatusWith<DiskLoc> status = collection->insertDocument( txn, js, true );

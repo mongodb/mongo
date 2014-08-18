@@ -128,6 +128,12 @@ namespace mongo {
                 createdCollection = true;
                 collection = db->createCollection( txn, to_collection.ns() );
                 verify( collection );
+                if (logForRepl) {
+                    repl::logOp(txn,
+                                "c",
+                                (_dbName + ".$cmd").c_str(),
+                                BSON("create" << to_collection.coll()));
+                }
                 wunit.commit();
             }
 
@@ -258,6 +264,12 @@ namespace mongo {
             WriteUnitOfWork wunit(txn);
             collection = db->createCollection( txn, to_collection.ns() );
             invariant(collection);
+            if (logForRepl) {
+                repl::logOp(txn,
+                            "c",
+                            (toDBName + ".$cmd").c_str(),
+                            BSON("create" << to_collection.coll()));
+            }
             wunit.commit();
         }
 

@@ -35,6 +35,7 @@ var secondary = rt.getSecondary();
 var primary = rt.getPrimary();
 var testDB = primary.getDB("test");
 
+assert.commandWorked(testDB.createCollection('a'));
 assert.writeOK(testDB.b.insert({}, { writeConcern: { w: 2 }}));
 
 var ss = secondary.getDB("test").serverStatus();
