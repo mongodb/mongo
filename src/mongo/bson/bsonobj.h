@@ -106,6 +106,22 @@ namespace mongo {
             init(bsonData);
         }
 
+#if __cplusplus >= 201103L
+        /** Move construct a BSONObj */
+        BSONObj(BSONObj&& other)
+            : _objdata(std::move(other._objdata))
+            , _holder(std::move(other._holder)) {
+            other._objdata = BSONObj()._objdata; // To return to an empty state.
+            dassert(!other._holder);
+        }
+
+        // The explicit move constructor above will inhibit generation of the copy ctor, so
+        // explicitly request the default implementation.
+
+        /** Copy construct a BSONObj. */
+        BSONObj(const BSONObj&) = default;
+#endif
+
         /** Provide assignment semantics. We use the value taking form so that we can use copy
          *  and swap, and consume both lvalue and rvalue references.
          */
