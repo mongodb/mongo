@@ -545,12 +545,12 @@ __evict_clear_walks(WT_SESSION_IMPL *session)
 		if ((ref = btree->evict_ref) != NULL) {
 			/*
 			 * Clear evict_ref first, in case releasing it forces
-			 * eviction (we check that we never try to evict the
-			 * current eviction walk point.
+			 * eviction (we assert that we never try to evict the
+			 * current eviction walk point).
 			 */
 			btree->evict_ref = NULL;
 			WT_TRET(
-			    __wt_page_release(session, ref, WT_READ_NO_EVICT));
+			    __wt_page_release(session, ref, WT_READ_NO_GEN));
 		}
 		session->dhandle = NULL;
 	}
