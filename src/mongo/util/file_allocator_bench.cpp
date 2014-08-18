@@ -54,7 +54,7 @@ using namespace mongo;
 
 namespace {
     namespace file = boost::filesystem;
-    namespace time = boost::posix_time;
+    namespace ptime = boost::posix_time;
 
     typedef unsigned long long bytes_t;
     typedef long long micros_t;
@@ -114,7 +114,7 @@ public:
             file::path filePath = _params.path / fileName;
             _files.push_back(filePath);
             bytes_t size_allocated = _params.bytes;
-            const time::ptime start = time::microsec_clock::universal_time();
+            const ptime::ptime start = ptime::microsec_clock::universal_time();
 
             _fa->allocateAsap(filePath.string(), size_allocated);
 
@@ -123,7 +123,7 @@ public:
                           << _params.bytes;
             }
 
-            const time::ptime end = time::microsec_clock::universal_time();
+            const ptime::ptime end = ptime::microsec_clock::universal_time();
             _results.push_back((end - start).total_microseconds());
         }
 
