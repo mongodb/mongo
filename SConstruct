@@ -2089,4 +2089,4 @@ def clean_old_dist_builds(env, target, source):
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
 
-env.Alias('all', ['core', 'tools', 'dbtest', 'unittests'])
+env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'build/file_allocator_bench'])
