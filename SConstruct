@@ -285,7 +285,7 @@ add_option( "use-system-tcmalloc", "use system version of tcmalloc library", 0, 
 add_option( "use-system-pcre", "use system version of pcre library", 0, True )
 
 # library choices
-boost_choices = ['1.49', '1.55']
+boost_choices = ['1.49', '1.56']
 add_option( "internal-boost", "Specify internal boost version to use", 1, True,
            type='choice', default=boost_choices[0], choices=boost_choices)
 
@@ -977,7 +977,7 @@ if not windows:
 boostSuffix = "";
 if not use_system_version_of_library("boost"):
     if get_option( "internal-boost") != "1.49":
-        boostSuffix = "-1.55.0"
+        boostSuffix = "-1.56.0"
     env.Prepend(CPPDEFINES=['BOOST_ALL_NO_LIB'])
 
 env.Append( CPPPATH=['$EXTRACPPPATH'],
