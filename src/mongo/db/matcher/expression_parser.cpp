@@ -696,19 +696,20 @@ namespace mongo {
 
         // object case
 
-        StatusWithMatchExpression sub = _parse( obj, level );
-        if ( !sub.isOK() )
-            return sub;
+        StatusWithMatchExpression subRaw = _parse( obj, level );
+        if ( !subRaw.isOK() )
+            return subRaw;
+        std::auto_ptr<MatchExpression> sub( subRaw.getValue() );
 
         // $where is not supported under $elemMatch because $where
         // applies to top-level document, not array elements in a field.
-        if ( hasNode( sub.getValue(), MatchExpression::WHERE ) ) {
+        if ( hasNode( sub.get(), MatchExpression::WHERE ) ) {
             return StatusWithMatchExpression( ErrorCodes::BadValue,
                 "$elemMatch cannot contain $where expression" );
         }
 
         std::auto_ptr<ElemMatchObjectMatchExpression> temp( new ElemMatchObjectMatchExpression() );
-        Status status = temp->init( name, sub.getValue() );
+        Status status = temp->init( name, sub.release() );
         if ( !status.isOK() )
             return StatusWithMatchExpression( status );
 
