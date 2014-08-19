@@ -225,9 +225,19 @@ namespace repl {
         // Called by the TopologyCoordinator whenever this node's replica set state transitions.
         void _onSelfStateChange(const MemberState& newState);
 
-        // Helper to update our saved config, cancel any pending heartbeats, and kick off sending
-        // new heartbeats based on the new config.
-        void _setCurrentRSConfig_inlock(const ReplicaSetConfig& newConfig, int myIndex);
+        /**
+         * Helpers to update our saved config, cancel any pending heartbeats, and kick off sending
+         * new heartbeats based on the new config.  Must *only* be called from within the
+         * ReplicationExecutor context.
+         */
+        void _setCurrentRSConfig(
+                const ReplicationExecutor::CallbackData& cbData,
+                const ReplicaSetConfig& newConfig,
+                int myIndex);
+        void _setCurrentRSConfig_inlock(
+                const ReplicationExecutor::CallbackData& cbData,
+                const ReplicaSetConfig& newConfig,
+                int myIndex);
 
         /*
          * Returns the OpTime of the last applied operation on this node.

@@ -208,15 +208,7 @@ namespace repl {
         // it's something.
         invariant(_rsConfig.getConfigVersion() == oldConfig.getConfigVersion());
 
-        OpTime lastAppliedOpTime = _getLastOpApplied_inlock();
-        _topCoord->updateConfig(
-                cbData,
-                localConfig,
-                myIndex.getValue(),
-                Date_t(curTimeMillis64()),
-                lastAppliedOpTime);
-
-        _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
+        _setCurrentRSConfig_inlock(cbData, localConfig, myIndex.getValue());
     }
 
     void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
@@ -861,15 +853,30 @@ namespace repl {
         return Status::OK();
     }
 
-    void ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& newConfig,
-                                                                int myIndex) {
+    void ReplicationCoordinatorImpl::_setCurrentRSConfig(
+            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicaSetConfig& newConfig,
+            int myIndex) {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
+    }
+
+    void ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
+            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicaSetConfig& newConfig,
+            int myIndex) {
          invariant(_settings.usingReplSets());
          if (_rsConfig.isInitialized()) {
              cancelHeartbeats();
          }
          _rsConfig = newConfig;
          _thisMembersConfigIndex = myIndex;
-
+         _topCoord->updateConfig(
+                 cbData,
+                 newConfig,
+                 myIndex,
+                 Date_t(curTimeMillis64()),
+                 _getLastOpApplied_inlock());
          _startHeartbeats();
      }
 
@@ -886,17 +893,17 @@ namespace repl {
         while (!_isStartupComplete) {
             _startupCompleteCondition.wait(lock);
         }
-
-        _setCurrentRSConfig_inlock(config, myIndex);
+        lock.unlock();
 
         CBHStatus cbh = _replExecutor.scheduleWork(
-                stdx::bind(&TopologyCoordinator::updateConfig,
-                           _topCoord.get(),
+                stdx::bind(&ReplicationCoordinatorImpl::_setCurrentRSConfig,
+                           this,
                            stdx::placeholders::_1,
                            config,
-                           myIndex,
-                           Date_t(curTimeMillis64()),
-                           _getLastOpApplied_inlock()));
+                           myIndex));
+        if (cbh.isOK()) {
+            _replExecutor.wait(cbh.getValue());
+        }
     }
 
     Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
