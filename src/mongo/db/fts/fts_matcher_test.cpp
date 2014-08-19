@@ -38,7 +38,7 @@ namespace mongo {
 
         TEST( FTSMatcher, NegWild1 ) {
             FTSQuery q;
-            ASSERT_OK( q.parse( "foo -bar", "english" ) );
+            ASSERT_OK( q.parse( "foo -bar", "english", TEXT_INDEX_VERSION_2 ) );
             FTSMatcher m( q,
                           FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
 
@@ -49,7 +49,7 @@ namespace mongo {
         // Regression test for SERVER-11994.
         TEST( FTSMatcher, NegWild2 ) {
             FTSQuery q;
-            ASSERT_OK( q.parse( "pizza -restaurant", "english" ) );
+            ASSERT_OK( q.parse( "pizza -restaurant", "english", TEXT_INDEX_VERSION_2 ) );
             FTSMatcher m( q,
                           FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
 
@@ -59,7 +59,7 @@ namespace mongo {
 
         TEST( FTSMatcher, Phrase1 ) {
             FTSQuery q;
-            ASSERT_OK( q.parse( "foo \"table top\"", "english" ) );
+            ASSERT_OK( q.parse( "foo \"table top\"", "english", TEXT_INDEX_VERSION_2 ) );
             FTSMatcher m( q,
                           FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "$**" << "text" ) ) ) ) );
             
@@ -75,7 +75,7 @@ namespace mongo {
 
         TEST( FTSMatcher, Phrase2 ) {
             FTSQuery q;
-            ASSERT_OK( q.parse( "foo \"table top\"", "english" ) );
+            ASSERT_OK( q.parse( "foo \"table top\"", "english", TEXT_INDEX_VERSION_2 ) );
             FTSMatcher m( q,
                           FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
             ASSERT( m.phraseMatch( "table top",
@@ -86,7 +86,7 @@ namespace mongo {
         // language.
         TEST( FTSMatcher, ParsesUsingDocLanguage ) {
             FTSQuery q;
-            ASSERT_OK( q.parse( "-glad", "none" ) );
+            ASSERT_OK( q.parse( "-glad", "none", TEXT_INDEX_VERSION_2 ) );
             FTSMatcher m( q,
                           FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
 
