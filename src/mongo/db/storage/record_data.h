@@ -52,7 +52,7 @@ namespace mongo {
         /**
          * Returns true if this owns its own memory, and false otherwise
          */
-        bool isOwned() const { return _dataPtr; }
+        bool isOwned() const { return _dataPtr.get(); }
 
         // TODO eliminate double-copying
         BSONObj toBson() const { return isOwned() ? BSONObj(_data).getOwned() : BSONObj(_data); }

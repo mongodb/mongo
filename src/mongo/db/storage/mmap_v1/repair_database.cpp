@@ -373,7 +373,6 @@ namespace mongo {
 
                 Collection* tempCollection = NULL;
                 {
-                    Client::Context tempContext(txn, ns, tempDatabase );
                     WriteUnitOfWork wunit(txn);
                     tempCollection = tempDatabase->createCollection(txn, ns, options, true, false);
                     wunit.commit();
@@ -396,7 +395,6 @@ namespace mongo {
                         indexes.push_back( desc->infoObj() );
                     }
 
-                    Client::Context tempContext(txn, ns, tempDatabase);
                     Status status = indexer.init( indexes );
                     if ( !status.isOK() )
                         return status;
@@ -411,8 +409,6 @@ namespace mongo {
 
                     BSONObj doc = originalCollection->docFor( loc );
 
-                    Client::Context tempContext(txn, ns, tempDatabase);
-                    
                     WriteUnitOfWork wunit(txn);
                     StatusWith<DiskLoc> result = tempCollection->insertDocument(txn,
                                                                                 doc,
@@ -430,7 +426,6 @@ namespace mongo {
                     return status;
 
                 {
-                    Client::Context tempContext(txn, ns, tempDatabase);
                     WriteUnitOfWork wunit(txn);
                     indexer.commit();
                     wunit.commit();
