@@ -54,7 +54,7 @@ functions:
         rm -rf mongodb
         mkdir mongodb
         cd mongodb
-        wget -q ${mongo_url} -O mongodb.tgz
+        curl --silent ${mongo_url} --output mongodb.tgz
         tar xvf mongodb.tgz --strip-components=1
 
   "start mongod":
