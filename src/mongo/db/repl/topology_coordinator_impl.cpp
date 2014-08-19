@@ -972,7 +972,7 @@ namespace repl {
     void TopologyCoordinatorImpl::prepareStatusResponse(
             const ReplicationExecutor::CallbackData& data,
             Date_t now,
-            unsigned uptime,
+            unsigned selfUptime,
             const OpTime& lastOpApplied,
             BSONObjBuilder* response,
             Status* result) {
@@ -996,7 +996,7 @@ namespace repl {
                 bb.append("health", 1.0);
                 bb.append("state", static_cast<int>(myState.s));
                 bb.append("stateStr", myState.toString());
-                bb.append("uptime", uptime);
+                bb.append("uptime", selfUptime);
                 if (!_selfConfig().isArbiter()) {
                     bb.append("optime", lastOpApplied);
                     bb.appendDate("optimeDate", lastOpApplied.asDate());
