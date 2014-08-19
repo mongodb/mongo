@@ -693,6 +693,71 @@ namespace {
         ASSERT_NOT_EQUALS(electionID1, electionID2);
     }
 
+    TEST_F(ReplCoordTest, TestProcessReplSetSyncFromSelfArbiter) {
+        init("mySet/test1:1234,test2:1234,test3:1234");
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                  "host" << "test0:1234" <<
+                                                  "arbiterOnly" << true) <<
+                                             BSON("_id" << 1 << "host" << "test1:1234"))),
+                HostAndPort("test0", 1234));
+
+        // Try to sync while we are an arbiter
+        BSONObjBuilder response;
+        Status result = getReplCoord()->processReplSetSyncFrom("test0:1234", &response);
+        ASSERT_EQUALS(ErrorCodes::NotSecondary, result);
+    }
+
+    TEST_F(ReplCoordTest, TestProcessReplSetSyncFrom) {
+        init("mySet/test1:1234,test2:1234,test3:1234");
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                  "host" << "test0:1234" <<
+                                                  "arbiterOnly" << true) <<
+                                             BSON("_id" << 1 << "host" << "test1:1234") <<
+                                             BSON("_id" << 2 <<
+                                                  "host" << "test2:1234" <<
+                                                  "priority" << 0 <<
+                                                  "buildIndexes" << false) <<
+                                             BSON("_id" << 3 << "host" << "test3:1234"))),
+                HostAndPort("test1", 1234));
+
+
+        // Try to sync from an invalid URL
+        BSONObjBuilder response;
+        Status result = getReplCoord()->processReplSetSyncFrom("", &response);
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, result);
+
+        // Try to sync while in PRIMARY state
+        getTopoCoord()._changeMemberState(MemberState::RS_PRIMARY);
+        result = getReplCoord()->processReplSetSyncFrom("test1:1234", &response);
+        ASSERT_EQUALS(ErrorCodes::NotSecondary, result);
+
+        // Try to sync from self
+        getTopoCoord()._changeMemberState(MemberState::RS_SECONDARY);
+        result = getReplCoord()->processReplSetSyncFrom("test1:1234", &response);
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
+
+        // Try to sync from non-existent member
+        result = getReplCoord()->processReplSetSyncFrom("fakemember:1234", &response);
+        ASSERT_EQUALS(ErrorCodes::NodeNotFound, result);
+
+        // Try to sync from an arbiter
+        result = getReplCoord()->processReplSetSyncFrom("test0:1234", &response);
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
+
+        // Try to sync from a node that doesn't build indexes
+        result = getReplCoord()->processReplSetSyncFrom("test2:1234", &response);
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
+
+        // Finally sync from someone valid
+        result = getReplCoord()->processReplSetSyncFrom("test3:1234", &response);
+        ASSERT_OK(result);
+    }
     // TODO(spencer): Unit test replSetFreeze
 
 }  // namespace

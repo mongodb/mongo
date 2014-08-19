@@ -39,6 +39,7 @@
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/rslog.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -281,6 +282,51 @@ namespace repl {
             log() << "replSet warning caught unexpected exception in electSelf()";
         }
 */
+    }
+
+    void TopologyCoordinatorImpl::prepareSyncFromResponse(
+            const ReplicationExecutor::CallbackData& data,
+            int targetIndex,
+            const OpTime& lastOpApplied,
+            BSONObjBuilder* response,
+            Status* result) {
+        if (data.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+
+        const MemberConfig& targetConfig = _currentConfig.getMemberAt(targetIndex);
+        const MemberHeartbeatData& hbdata = _hbdata[targetIndex];
+        const std::string targetHostAndPort = targetConfig.getHostAndPort().toString();
+        if (hbdata.hasAuthIssue()) {
+            *result = Status(ErrorCodes::Unauthorized,
+                             "not authorized to communicate with " + targetHostAndPort);
+            return;
+        }
+        if (hbdata.getHealth() == 0) {
+            *result = Status(ErrorCodes::HostUnreachable,
+                             str::stream() << "I cannot reach the requested member: \"" <<
+                                     targetHostAndPort << "\"");
+            return;
+        }
+        if (hbdata.getOpTime().getSecs()+10 < lastOpApplied.getSecs()) {
+            warning() << "attempting to sync from " << targetHostAndPort
+                      << ", but its latest opTime is " << hbdata.getOpTime().getSecs()
+                      << " and ours is " << lastOpApplied.getSecs() << " so this may not work"
+                      << rsLog;
+            response->append("warning",
+                             "requested member \"" + targetHostAndPort + "\" is more than 10 "
+                                     "seconds behind us");
+            // not returning bad Status, just warning
+        }
+
+        HostAndPort prevSyncSource = getSyncSourceAddress();
+        if (!prevSyncSource.empty()) {
+            response->append("prevSyncTarget", prevSyncSource.toString());
+        }
+
+        setForceSyncSourceIndex(targetIndex);
+        *result = Status::OK();
     }
 
     // Produce a reply to a RAFT-style RequestVote RPC; this is MongoDB ReplSetFresh command

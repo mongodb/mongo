@@ -88,5 +88,11 @@ namespace repl {
         _authIssue = false;
     }
 
+    void MemberHeartbeatData::setAuthIssue() {
+        _state = MemberState::RS_UNKNOWN;
+        _health = 0; // set health to 0 so that this doesn't count towards majority.
+        _authIssue = true;
+    }
+
 } // namespace repl
 } // namespace mongo

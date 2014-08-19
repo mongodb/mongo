@@ -91,6 +91,13 @@ namespace repl {
         // Applier calls this to notify that it's now safe to transition from SECONDARY to PRIMARY
         virtual void signalDrainComplete() = 0;
 
+        // produces a reply to a replSetSyncFrom command
+        virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackData& data,
+                                             int targetIndex,
+                                             const OpTime& lastOpApplied,
+                                             BSONObjBuilder* response,
+                                             Status* result) = 0;
+
         // produce a reply to a RAFT-style RequestVote RPC
         virtual void prepareRequestVoteResponse(const Date_t now,
                                                 const BSONObj& cmdObj,

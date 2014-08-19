@@ -386,6 +386,72 @@ namespace {
         ASSERT_EQUALS(topocoord.getSyncSourceAddress(),HostAndPort("h3"));
     }
 
+    TEST(TopologyCoordinator, PrepareSyncFromResponse) {
+        ReplicationExecutor::CallbackHandle cbh;
+        ReplicationExecutor::CallbackData cbData(NULL,
+                                                 cbh,
+                                                 Status::OK());
+        ReplicaSetConfig config;
+
+        ASSERT_OK(config.initialize(BSON("_id" << "rs0" <<
+                                         "version" << 1 <<
+                                         "members" << BSON_ARRAY(
+                                             BSON("_id" << 10 << "host" << "hself") <<
+                                             BSON("_id" << 20 << "host" << "h1") <<
+                                             BSON("_id" << 30 << "host" << "h2") <<
+                                             BSON("_id" << 40 << "host" << "h3")))));
+
+        OpTime staleOpTime(1, 1);
+        OpTime ourOpTime(staleOpTime.getSecs() + 11, 1);
+
+
+        TopologyCoordinatorImpl topocoord((Seconds(999)));
+        Date_t now = 0;
+        topocoord.updateConfig(cbData, config, 0, now++, OpTime(0,0));
+
+        MemberHeartbeatData hselfInfo(0);
+        hselfInfo.setAuthIssue();
+        topocoord.updateHeartbeatData(now++, hselfInfo, 10, OpTime(0,0));
+
+        MemberHeartbeatData h1Info(1);
+        h1Info.setDownValues(now, "");
+        topocoord.updateHeartbeatData(now++, h1Info, 20, OpTime(0,0));
+
+        MemberHeartbeatData h2Info(2);
+        h2Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), staleOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h2Info, 30, OpTime(0,0));
+
+        MemberHeartbeatData h3Info(2);
+        h3Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), ourOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h3Info, 40, OpTime(0,0));
+
+        Status result = Status::OK();
+        BSONObjBuilder response0;
+        topocoord.prepareSyncFromResponse(cbData, 0, ourOpTime, &response0, &result);
+        ASSERT_EQUALS(ErrorCodes::Unauthorized, result);
+
+        BSONObjBuilder response1;
+        topocoord.prepareSyncFromResponse(cbData, 1, ourOpTime, &response1, &result);
+        ASSERT_EQUALS(ErrorCodes::HostUnreachable, result);
+
+        BSONObjBuilder response2;
+        topocoord.prepareSyncFromResponse(cbData, 2, ourOpTime, &response2, &result);
+        ASSERT_OK(result);
+        topocoord.chooseNewSyncSource(now++, ourOpTime);
+        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h2"));
+        ASSERT_EQUALS("requested member \"h2:27017\" is more than 10 seconds behind us",
+                      response2.obj()["warning"].String());
+
+        BSONObjBuilder response3;
+        topocoord.prepareSyncFromResponse(cbData, 3, ourOpTime, &response3, &result);
+        ASSERT_OK(result);
+        topocoord.chooseNewSyncSource(now++, ourOpTime);
+        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h3"));
+        BSONObj response3Obj = response3.obj();
+        ASSERT_FALSE(response3Obj.hasField("warning"));
+        ASSERT_EQUALS(HostAndPort("h2").toString(), response3Obj["prevSyncTarget"].String());
+    }
+
     TEST(TopologyCoordinator, ReplSetGetStatus) {
         // This test starts by configuring a TopologyCoordinator as a member of a 4 node replica
         // set, with each node in a different state.

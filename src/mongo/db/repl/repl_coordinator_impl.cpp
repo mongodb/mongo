@@ -706,8 +706,68 @@ namespace repl {
 
     Status ReplicationCoordinatorImpl::processReplSetSyncFrom(const std::string& target,
                                                               BSONObjBuilder* resultObj) {
-        // TODO
-        return Status::OK();
+        resultObj->append("syncFromRequested", target);
+
+        HostAndPort targetHostAndPort;
+        Status status = targetHostAndPort.initialize(target);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        const MemberConfig& selfConfig = _rsConfig.getMemberAt(_thisMembersConfigIndex);
+        if (selfConfig.isArbiter()) {
+            return Status(ErrorCodes::NotSecondary, "arbiters don't sync");
+        }
+        if (_getCurrentMemberState_inlock().primary()) {
+            return Status(ErrorCodes::NotSecondary, "primaries don't sync");
+        }
+
+        ReplicaSetConfig::MemberIterator targetConfig = _rsConfig.membersEnd();
+        int targetIndex = 0;
+        for (ReplicaSetConfig::MemberIterator it = _rsConfig.membersBegin();
+                it != _rsConfig.membersEnd(); ++it) {
+            if (it->getHostAndPort() == targetHostAndPort) {
+                targetConfig = it;
+                break;
+            }
+            ++targetIndex;
+        }
+        if (targetConfig == _rsConfig.membersEnd()) {
+            return Status(ErrorCodes::NodeNotFound,
+                          str::stream() << "Could not find member \"" << target <<
+                                  "\" in replica set");
+        }
+        if (targetIndex == _thisMembersConfigIndex) {
+            return Status(ErrorCodes::InvalidOptions, "I cannot sync from myself");
+        }
+        if (targetConfig->isArbiter()) {
+            return Status(ErrorCodes::InvalidOptions,
+                          str::stream() << "Cannot sync from \"" << target <<
+                                  "\" because it is an arbiter");
+        }
+        if (!targetConfig->shouldBuildIndexes() && selfConfig.shouldBuildIndexes()) {
+            // TODO(spencer): Is this check actually necessary?
+            return Status(ErrorCodes::InvalidOptions,
+                          str::stream() << "Cannot sync from \"" << target <<
+                                  "\" because it does not build indexes");
+        }
+
+        Status result(ErrorCodes::InternalError, "didn't set status in prepareSyncFromResponse");
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&TopologyCoordinator::prepareSyncFromResponse,
+                       _topCoord.get(),
+                       stdx::placeholders::_1,
+                       targetIndex,
+                       _getLastOpApplied_inlock(),
+                       resultObj,
+                       &result));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+        }
+        fassert(18649, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+        return result;
     }
 
     Status ReplicationCoordinatorImpl::processReplSetMaintenance(OperationContext* txn,
