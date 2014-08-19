@@ -56,7 +56,7 @@ struct __wt_track {
 	 * reconciliation of page references to overflow records.
 	 */
 	WT_ADDR	  *ovfl_addr;			/* Overflow page by address */
-	WT_TRACK **ovfl_track;			/* Overflow page by WT_TRACK */
+	uint32_t  *ovfl_track;			/* Overflow page by WT_TRACK */
 	uint32_t ovfl_cnt;			/* Overflow list elements */
 
 	union {
@@ -796,6 +796,7 @@ __slvg_col_range_overlap(
     WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_slot, WT_STUFF *ss)
 {
 	WT_TRACK *a_trk, *b_trk, *new;
+	uint32_t i;
 
 	/*
 	 * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR
@@ -860,8 +861,7 @@ __slvg_col_range_overlap(
 			 * Case #1, #4: a_trk is a superset of b_trk, and a_trk
 			 * is more desirable -- discard b_trk.
 			 */
-			return (
-			    __slvg_trk_free(session, &ss->pages[b_slot], 1));
+			goto delete_b;
 
 		/*
 		 * Case #9: b_trk is a superset of a_trk, but a_trk is more
@@ -880,8 +880,7 @@ __slvg_col_range_overlap(
 			 * Case #6: a_trk is a superset of b_trk and a_trk is
 			 * more desirable -- discard b_trk.
 			 */
-			return (
-			    __slvg_trk_free(session, &ss->pages[b_slot], 1));
+			goto delete_b;
 
 		/*
 		 * Case #6: a_trk is a superset of b_trk, but b_trk is more
@@ -916,8 +915,25 @@ __slvg_col_range_overlap(
 	 * Case #5: a_trk is a superset of b_trk and a_trk is more desirable --
 	 * discard b_trk.
 	 */
-	if (a_trk->gen > b_trk->gen)
+	if (a_trk->gen > b_trk->gen) {
+delete_b:	/*
+		 * After page and overflow reconciliation, one (and only one)
+		 * page can reference an overflow record.  But, if we split a
+		 * page into multiple chunks, any of the chunks might own any
+		 * of the backing overflow records, so overflow records cannot
+		 * be discarded until after the merge phase completes.  (The
+		 * merge phase is where the final pages are written, and we
+		 * figure out which referenced overflow records are actually
+		 * used.) If freeing page blocks and the page is not involved
+		 * in a merge, the overflow records are known to be useless,
+		 * discard them to keep the final file size small.
+		 */
+		if (!F_ISSET(b_trk, WT_TRACK_MERGE))
+			for (i = 0; i < b_trk->ovfl_cnt; ++i)
+				WT_RET(__slvg_trk_free(session,
+				    &ss->ovfl[b_trk->ovfl_track[i]], 1));
 		return (__slvg_trk_free(session, &ss->pages[b_slot], 1));
+	}
 
 	/*
 	 * Case #5: b_trk is more desirable and is a middle chunk of a_trk.
@@ -1132,7 +1148,7 @@ __slvg_col_build_internal(
 			/* All overflow items referenced by this page used. */
 			for (j = 0; j < trk->ovfl_cnt; ++j)
 				WT_ERR(__slvg_ovfl_ref(
-				    session, trk->ovfl_track[j]));
+				    session, ss->ovfl[trk->ovfl_track[j]]));
 		}
 		++ref;
 	}
@@ -1252,17 +1268,19 @@ static int
 __slvg_col_merge_ovfl_single(
     WT_SESSION_IMPL *session, WT_TRACK *trk, WT_CELL_UNPACK *unpack)
 {
+	WT_TRACK *ovfl;
 	uint32_t i;
 
 	/*
 	 * Search the list of overflow records for this page -- we should find
 	 * exactly one match, and we mark it as referenced.
 	 */
-	for (i = 0; i < trk->ovfl_cnt; ++i)
-		if (unpack->size == trk->ovfl_track[i]->addr.size &&
-		    memcmp(unpack->data,
-		    trk->ovfl_track[i]->addr.addr, unpack->size) == 0)
-			return (__slvg_ovfl_ref(session, trk->ovfl_track[i]));
+	for (i = 0; i < trk->ovfl_cnt; ++i) {
+		ovfl = trk->ss->ovfl[trk->ovfl_track[i]];
+		if (unpack->size == ovfl->addr.size &&
+		    memcmp(unpack->data, ovfl->addr.addr, unpack->size) == 0)
+			return (__slvg_ovfl_ref(session, ovfl));
+	}
 
 	WT_PANIC_RET(session,
 	    EINVAL, "overflow record at column-store page merge not found");
@@ -1378,6 +1396,7 @@ __slvg_row_range_overlap(
 {
 	WT_BTREE *btree;
 	WT_TRACK *a_trk, *b_trk, *new;
+	uint32_t i;
 	int start_cmp, stop_cmp;
 
 	/*
@@ -1457,8 +1476,7 @@ __slvg_row_range_overlap(
 			 * Case #1, #4: a_trk is a superset of b_trk, and a_trk
 			 * is more desirable -- discard b_trk.
 			 */
-			return (
-			    __slvg_trk_free(session, &ss->pages[b_slot], 1));
+			goto delete_b;
 
 		/*
 		 * Case #9: b_trk is a superset of a_trk, but a_trk is more
@@ -1477,8 +1495,7 @@ __slvg_row_range_overlap(
 			 * Case #6: a_trk is a superset of b_trk and a_trk is
 			 * more desirable -- discard b_trk.
 			 */
-			return (
-			    __slvg_trk_free(session, &ss->pages[b_slot], 1));
+			goto delete_b;
 
 		/*
 		 * Case #6: a_trk is a superset of b_trk, but b_trk is more
@@ -1514,8 +1531,25 @@ __slvg_row_range_overlap(
 	 * Case #5: a_trk is a superset of b_trk and a_trk is more desirable --
 	 * discard b_trk.
 	 */
-	if (a_trk->gen > b_trk->gen)
+	if (a_trk->gen > b_trk->gen) {
+delete_b:	/*
+		 * After page and overflow reconciliation, one (and only one)
+		 * page can reference an overflow record.  But, if we split a
+		 * page into multiple chunks, any of the chunks might own any
+		 * of the backing overflow records, so overflow records cannot
+		 * be discarded until after the merge phase completes.  (The
+		 * merge phase is where the final pages are written, and we
+		 * figure out which referenced overflow records are actually
+		 * used.) If freeing page blocks and the page is not involved
+		 * in a merge, the overflow records are known to be useless,
+		 * discard them to keep the final file size small.
+		 */
+		if (!F_ISSET(b_trk, WT_TRACK_MERGE))
+			for (i = 0; i < b_trk->ovfl_cnt; ++i)
+				WT_RET(__slvg_trk_free(session,
+				    &ss->ovfl[b_trk->ovfl_track[i]], 1));
 		return (__slvg_trk_free(session, &ss->pages[b_slot], 1));
+	}
 
 	/*
 	 * Case #5: b_trk is more desirable and is a middle chunk of a_trk.
@@ -1746,7 +1780,7 @@ __slvg_row_build_internal(
 			/* All overflow items referenced by this page used. */
 			for (j = 0; j < trk->ovfl_cnt; ++j)
 				WT_ERR(__slvg_ovfl_ref(
-				    session, trk->ovfl_track[j]));
+				    session, ss->ovfl[trk->ovfl_track[j]]));
 		}
 		++ref;
 	}
@@ -1928,6 +1962,7 @@ __slvg_row_merge_ovfl_single(
     WT_SESSION_IMPL *session, WT_TRACK *trk, WT_CELL *cell)
 {
 	WT_CELL_UNPACK unpack;
+	WT_TRACK *ovfl;
 	uint32_t i;
 
 	/* Unpack the cell, and check if it's an overflow record. */
@@ -1940,11 +1975,12 @@ __slvg_row_merge_ovfl_single(
 	 * Search the list of overflow records for this page -- we should find
 	 * exactly one match, and we mark it as referenced.
 	 */
-	for (i = 0; i < trk->ovfl_cnt; ++i)
-		if (unpack.size == trk->ovfl_track[i]->addr.size &&
-		    memcmp(unpack.data,
-		    trk->ovfl_track[i]->addr.addr, unpack.size) == 0)
-			return (__slvg_ovfl_ref(session, trk->ovfl_track[i]));
+	for (i = 0; i < trk->ovfl_cnt; ++i) {
+		ovfl = trk->ss->ovfl[trk->ovfl_track[i]];
+		if (unpack.size == ovfl->addr.size &&
+		    memcmp(unpack.data, ovfl->addr.addr, unpack.size) == 0)
+			return (__slvg_ovfl_ref(session, ovfl));
+	}
 
 	WT_PANIC_RET(session,
 	    EINVAL, "overflow record at row-store page merge not found");
@@ -2039,7 +2075,7 @@ static int
 __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	WT_ADDR *addr;
-	WT_TRACK **searchp, *trk;
+	WT_TRACK **searchp, *ovfl, *trk;
 	uint32_t i, j;
 
 	/*
@@ -2088,10 +2124,11 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			if (searchp != NULL &&
 			    !F_ISSET(*searchp, WT_TRACK_OVFL_REFD)) {
 				/*
-				 * Convert each block address into a reference
-				 * in the list of overflow pages as we go.
+				 * Convert each block address into a slot in the
+				 * list of overflow pages as we go.
 				 */
-				trk->ovfl_track[j] = *searchp;
+				trk->ovfl_track[j] =
+				    (uint32_t)(searchp - ss->ovfl);
 				F_SET(*searchp, WT_TRACK_OVFL_REFD);
 				continue;
 			}
@@ -2105,13 +2142,15 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
 
 			/*
 			 * Clear the "referenced" flag for any overflow pages
-			 * already claimed by this leaf page, then discard the
-			 * page.
+			 * already claimed by this leaf page some other page
+			 * might claim them.
 			 */
-			while (j > 0)
-				F_CLR(trk->ovfl_track[--j], WT_TRACK_OVFL_REFD);
-			WT_RET(__slvg_trk_free(session, &ss->pages[i], 1));
+			while (j > 0) {
+				ovfl = ss->ovfl[trk->ovfl_track[--j]];
+				F_CLR(ovfl, WT_TRACK_OVFL_REFD);
+			}
 			trk = NULL;
+			WT_RET(__slvg_trk_free(session, &ss->pages[i], 1));
 			break;
 		}
 
@@ -2304,6 +2343,22 @@ __slvg_cleanup(WT_SESSION_IMPL *session, WT_STUFF *ss)
 }
 
 /*
+ * __slvg_trk_free_addr --
+ *	Discard address information.
+ */
+static void
+__slvg_trk_free_addr(WT_SESSION_IMPL *session, WT_TRACK *trk)
+{
+	uint32_t i;
+
+	if (trk->ovfl_addr != NULL) {
+		for (i = 0; i < trk->ovfl_cnt; ++i)
+			__wt_free(session, trk->ovfl_addr[i].addr);
+		__wt_free(session, trk->ovfl_addr);
+	}
+}
+
+/*
  * __slvg_trk_free_block --
  *	Discard underlying blocks.
  */
@@ -2327,22 +2382,6 @@ __slvg_trk_free_block(WT_SESSION_IMPL *session, WT_TRACK *trk)
 }
 
 /*
- * __slvg_trk_free_addr --
- *	Discard address information.
- */
-static void
-__slvg_trk_free_addr(WT_SESSION_IMPL *session, WT_TRACK *trk)
-{
-	uint32_t i;
-
-	if (trk->ovfl_addr != NULL) {
-		for (i = 0; i < trk->ovfl_cnt; ++i)
-			__wt_free(session, trk->ovfl_addr[i].addr);
-		__wt_free(session, trk->ovfl_addr);
-	}
-}
-
-/*
  * __slvg_trk_free --
  *	Discard a WT_TRACK structure and (optionally) its underlying blocks.
  */
@@ -2355,8 +2394,8 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, int free_blocks)
 	*trkp = NULL;
 
 	/*
-	 * Check the no-file-blocks flag in all cases, the original chunk in a
-	 * merge set owns the backing blocks.
+	 * If we split a page into two chunks, only one of them can own the
+	 * backing page blocks; check before freeing those blocks.
 	 */
 	if (free_blocks && !F_ISSET(trk, WT_TRACK_NO_FILE_BLOCKS))
 		WT_RET(__slvg_trk_free_block(session, trk));
