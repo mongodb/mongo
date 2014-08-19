@@ -583,6 +583,172 @@ namespace {
         // TODO(spencer): Test electionTime and pingMs are set properly
     }
 
+    TEST(TopologyCoordinator, PrepareRequestVoteResponse) {
+        ReplicationExecutor::CallbackHandle cbh;
+        ReplicationExecutor::CallbackData cbData(NULL,
+                                                 cbh,
+                                                 Status::OK());
+        ReplicaSetConfig config;
+
+        ASSERT_OK(config.initialize(BSON("_id" << "rs0" <<
+                                         "version" << 10 <<
+                                         "members" << BSON_ARRAY(
+                                             BSON("_id" << 10 <<
+                                                  "host" << "hself" <<
+                                                  "priority" << 10) <<
+                                             BSON("_id" << 20 << "host" << "h1") <<
+                                             BSON("_id" << 30 << "host" << "h2") <<
+                                             BSON("_id" << 40 <<
+                                                  "host" << "h3" <<
+                                                  "priority" << 10)))));
+        ASSERT_OK(config.validate());
+
+        TopologyCoordinatorImpl topocoord((Seconds(999)));
+        Date_t now = 0;
+        topocoord.updateConfig(cbData, config, 0, now++, OpTime(0,0));
+
+        OpTime ourOpTime(10, 10);
+        OpTime staleOpTime = (1, 1);
+
+        Status internalErrorStatus(ErrorCodes::InternalError, "didn't set status");
+
+        // Test with incorrect replset name
+        ReplicationCoordinator::ReplSetFreshArgs args;
+        args.setName = "fakeset";
+
+        BSONObjBuilder responseBuilder0;
+        Status status0 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder0, &status0);
+        ASSERT_EQUALS(ErrorCodes::ReplicaSetNotFound, status0);
+        ASSERT_TRUE(responseBuilder0.obj().isEmpty());
+
+
+        // Test with non-existent node.
+        args.setName = "rs0";
+        args.cfgver = 5; // stale config
+        args.id = 0;
+        args.who = HostAndPort("fakenode");
+        args.opTime = staleOpTime;
+
+        BSONObjBuilder responseBuilder1;
+        Status status1 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder1, &status1);
+        ASSERT_OK(status1);
+        BSONObj response1 = responseBuilder1.obj();
+        ASSERT_EQUALS("config version stale", response1["info"].String());
+        ASSERT_EQUALS(ourOpTime, OpTime(response1["opTime"].timestampValue()));
+        ASSERT_TRUE(response1["fresher"].Bool());
+        ASSERT_TRUE(response1["veto"].Bool());
+        ASSERT_EQUALS("replSet couldn't find member with id 0", response1["errmsg"].String());
+
+
+        // Test when we are primary and target node is stale.
+        args.id = 20;
+        args.cfgver = 10;
+        args.who = HostAndPort("h1");
+        args.opTime = ourOpTime;
+
+        MemberHeartbeatData h1Info(1);
+        h1Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), staleOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h1Info, 20, ourOpTime);
+
+        topocoord._setCurrentPrimaryForTest(0);
+
+        BSONObjBuilder responseBuilder2;
+        Status status2 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder2, &status2);
+        ASSERT_OK(status2);
+        BSONObj response2 = responseBuilder2.obj();
+        ASSERT_FALSE(response2.hasField("info"));
+        ASSERT_EQUALS(ourOpTime, OpTime(response2["opTime"].timestampValue()));
+        ASSERT_FALSE(response2["fresher"].Bool());
+        ASSERT_TRUE(response2["veto"].Bool());
+        ASSERT_EQUALS("I am already primary, h1:27017 can try again once I've stepped down",
+                      response2["errmsg"].String());
+
+
+        // Test when someone else is primary and target node is stale.
+        MemberHeartbeatData h2Info(2);
+        h2Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), ourOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h2Info, 30, ourOpTime);
+
+        topocoord._changeMemberState(MemberState::RS_SECONDARY);
+        topocoord._setCurrentPrimaryForTest(2);
+
+        BSONObjBuilder responseBuilder3;
+        Status status3 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder3, &status3);
+        ASSERT_OK(status3);
+        BSONObj response3 = responseBuilder3.obj();
+        ASSERT_FALSE(response3.hasField("info"));
+        ASSERT_EQUALS(ourOpTime, OpTime(response3["opTime"].timestampValue()));
+        ASSERT_FALSE(response3["fresher"].Bool());
+        ASSERT_TRUE(response3["veto"].Bool());
+        ASSERT_EQUALS(
+                "h1:27017 is trying to elect itself but h2:27017 is already primary and more "
+                        "up-to-date",
+                response3["errmsg"].String());
+
+
+        // Test trying to elect a node that is caught up but isn't the highest priority node.
+        h1Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), ourOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h1Info, 20, ourOpTime);
+        h2Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), staleOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h2Info, 30, ourOpTime);
+        MemberHeartbeatData h3Info(3);
+        h3Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), ourOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h3Info, 40, ourOpTime);
+
+        BSONObjBuilder responseBuilder4;
+        Status status4 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder4, &status4);
+        ASSERT_OK(status4);
+        BSONObj response4 = responseBuilder4.obj();
+        ASSERT_FALSE(response4.hasField("info"));
+        ASSERT_EQUALS(ourOpTime, OpTime(response4["opTime"].timestampValue()));
+        ASSERT_FALSE(response4["fresher"].Bool());
+        ASSERT_TRUE(response4["veto"].Bool());
+        ASSERT_EQUALS("h1:27017 has lower priority than hself:27017", response4["errmsg"].String());
+
+
+        // Test trying to elect a node that isn't electable
+        args.id = 40;
+        args.who = HostAndPort("h3");
+
+        h3Info.setDownValues(now, "");
+        topocoord.updateHeartbeatData(now++, h3Info, 40, ourOpTime);
+
+        BSONObjBuilder responseBuilder5;
+        Status status5 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder5, &status5);
+        ASSERT_OK(status5);
+        BSONObj response5 = responseBuilder5.obj();
+        ASSERT_FALSE(response5.hasField("info"));
+        ASSERT_EQUALS(ourOpTime, OpTime(response5["opTime"].timestampValue()));
+        ASSERT_FALSE(response5["fresher"].Bool());
+        ASSERT_TRUE(response5["veto"].Bool());
+        ASSERT_EQUALS("I don't think h3:27017 is electable", response5["errmsg"].String());
+
+
+        // Finally, test trying to elect a valid node
+        args.id = 10;
+        args.who = HostAndPort("hself");
+
+        h3Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), ourOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h3Info, 40, ourOpTime);
+
+        BSONObjBuilder responseBuilder6;
+        Status status6 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder6, &status6);
+        ASSERT_OK(status6);
+        BSONObj response6 = responseBuilder6.obj();
+        cout << response6.jsonString(TenGen, 1);
+        ASSERT_FALSE(response6.hasField("info"));
+        ASSERT_EQUALS(ourOpTime, OpTime(response6["opTime"].timestampValue()));
+        ASSERT_FALSE(response6["fresher"].Bool());
+        ASSERT_FALSE(response6["veto"].Bool());
+        ASSERT_FALSE(response6.hasField("errmsg"));
+    }
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

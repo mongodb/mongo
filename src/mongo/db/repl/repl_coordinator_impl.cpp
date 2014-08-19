@@ -843,8 +843,22 @@ namespace repl {
 
     Status ReplicationCoordinatorImpl::processReplSetFresh(const ReplSetFreshArgs& args,
                                                            BSONObjBuilder* resultObj) {
-        // TODO
-        return Status::OK();
+
+        Status result(ErrorCodes::InternalError, "didn't set status in prepareFreshResponse");
+        CBHStatus cbh = _replExecutor.scheduleWork(
+                stdx::bind(&TopologyCoordinator::prepareFreshResponse,
+                           _topCoord.get(),
+                           stdx::placeholders::_1,
+                           args,
+                           _getLastOpApplied_inlock(),
+                           resultObj,
+                           &result));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+        }
+        fassert(18652, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+        return result;
     }
 
     Status ReplicationCoordinatorImpl::processReplSetElect(const ReplSetElectArgs& args,

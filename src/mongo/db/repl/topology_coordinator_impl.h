@@ -72,8 +72,6 @@ namespace repl {
     public:
         explicit TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs);
 
-        virtual void setCommitOkayThrough(const OpTime& optime);
-        virtual void setLastReceived(const OpTime& optime);
         // TODO(spencer): Can this be made private?
         virtual void setForceSyncSourceIndex(int index);
 
@@ -102,12 +100,11 @@ namespace repl {
                                              BSONObjBuilder* response,
                                              Status* result);
 
-        // produces a reply to a RAFT-style RequestVote RPC
-        virtual void prepareRequestVoteResponse(const Date_t now,
-                                                const BSONObj& cmdObj,
-                                                const OpTime& lastOpApplied,
-                                                std::string& errmsg, 
-                                                BSONObjBuilder& result);
+        virtual void prepareFreshResponse(const ReplicationExecutor::CallbackData& data,
+                                          const ReplicationCoordinator::ReplSetFreshArgs& args,
+                                          const OpTime& lastOpApplied,
+                                          BSONObjBuilder* response,
+                                          Status* result);
 
         // produces a reply to a received electCmd
         virtual void prepareElectCmdResponse(const Date_t now,
@@ -164,6 +161,11 @@ namespace repl {
         // call this method from outside of TopologyCoordinatorImpl or a unit test.
         void _changeMemberState(const MemberState& newMemberState);
 
+        // Sets _currentPrimaryIndex to the given index.  Should only be used in unit tests!
+        // TODO(spencer): Remove this once we can easily call for an election in unit tests to
+        // set the current primary.
+        void _setCurrentPrimaryForTest(int primaryIndex);
+
     private:
 
         // Returns the number of heartbeat pings which have occurred.
@@ -172,9 +174,12 @@ namespace repl {
         // Returns the current "ping" value for the given member by their address
         virtual int _getPing(const HostAndPort& host);
 
-        // Determines if we will veto the member in the "fresh" command response
+        // Determines if we will veto the member specified by "memberID", given that the last op
+        // we have applied locally is "lastOpApplied".
         // If we veto, the errmsg will be filled in with a reason
-        bool _shouldVeto(const BSONObj& cmdObj, string& errmsg) const;
+        bool _shouldVetoMember(unsigned int memberID,
+                               const OpTime& lastOpApplied,
+                               std::string* errmsg) const;
 
         // Returns the index of the member with the matching id, or -1 if none match.
         int _getMemberIndex(int id) const; 
@@ -196,9 +201,6 @@ namespace repl {
 
         // Scans the electable set and returns the highest priority member index
         int _getHighestPriorityElectableIndex() const;
-
-        OpTime _commitOkayThrough; // the primary's latest op that won't get rolled back
-        OpTime _lastReceived; // the last op we have received from our sync source
 
         // Our current state (PRIMARY, SECONDARY, etc)
         MemberState _memberState;

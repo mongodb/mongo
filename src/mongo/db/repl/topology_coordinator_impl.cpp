@@ -70,14 +70,6 @@ namespace repl {
     {
     }
 
-    void TopologyCoordinatorImpl::setCommitOkayThrough(const OpTime& optime) {
-        _commitOkayThrough = optime;
-    }
-
-    void TopologyCoordinatorImpl::setLastReceived(const OpTime& optime) {
-        _lastReceived = optime;
-    }
-
     void TopologyCoordinatorImpl::setForceSyncSourceIndex(int index) {
         invariant(_forceSyncSourceIndex < _currentConfig.getNumMembers());
         _forceSyncSourceIndex = index;
@@ -329,72 +321,72 @@ namespace repl {
         *result = Status::OK();
     }
 
-    // Produce a reply to a RAFT-style RequestVote RPC; this is MongoDB ReplSetFresh command
-    // The caller should validate that the message is for the correct set, and has the required data
-    void TopologyCoordinatorImpl::prepareRequestVoteResponse(const Date_t now,
-                                                             const BSONObj& cmdObj,
-                                                             const OpTime& lastOpApplied,
-                                                             std::string& errmsg,
-                                                             BSONObjBuilder& result) {
+    void TopologyCoordinatorImpl::prepareFreshResponse(
+            const ReplicationExecutor::CallbackData& data,
+            const ReplicationCoordinator::ReplSetFreshArgs& args,
+            const OpTime& lastOpApplied,
+            BSONObjBuilder* response,
+            Status* result) {
 
-        string who = cmdObj["who"].String();
-        int cfgver = cmdObj["cfgver"].Int();
-        OpTime opTime(cmdObj["opTime"].Date());
+        if (args.setName != _currentConfig.getReplSetName()) {
+            *result = Status(ErrorCodes::ReplicaSetNotFound,
+                             str::stream() << "Wrong repl set name. Expected: " <<
+                                     _currentConfig.getReplSetName() <<
+                                     ", received: " << args.setName);
+            return;
+        }
 
         bool weAreFresher = false;
-        if( _currentConfig.getConfigVersion() > cfgver ) {
-            log() << "replSet member " << who << " is not yet aware its cfg version "
-                  << cfgver << " is stale";
-            result.append("info", "config version stale");
+        if( _currentConfig.getConfigVersion() > args.cfgver ) {
+            log() << "replSet member " << args.who << " is not yet aware its cfg version "
+                  << args.cfgver << " is stale";
+            response->append("info", "config version stale");
             weAreFresher = true;
         }
         // check not only our own optime, but any other member we can reach
-        else if( opTime < _commitOkayThrough ||
-                 opTime < _latestKnownOpTime())  {
+        else if( args.opTime < lastOpApplied ||
+                 args.opTime < _latestKnownOpTime())  {
             weAreFresher = true;
         }
-        result.appendDate("opTime", lastOpApplied.asDate());
-        result.append("fresher", weAreFresher);
+        response->appendDate("opTime", lastOpApplied.asDate());
+        response->append("fresher", weAreFresher);
 
-        bool doVeto = _shouldVeto(cmdObj, errmsg);
-        result.append("veto",doVeto);
+        std::string errmsg;
+        bool doVeto = _shouldVetoMember(args.id, lastOpApplied, &errmsg);
+        response->append("veto", doVeto);
         if (doVeto) {
-            result.append("errmsg", errmsg);
+            response->append("errmsg", errmsg);
         }
+        *result = Status::OK();
     }
 
-    bool TopologyCoordinatorImpl::_shouldVeto(const BSONObj& cmdObj, string& errmsg) const {
-        // don't veto older versions
-        if (cmdObj["id"].eoo()) {
-            // they won't be looking for the veto field
-            return false;
-        }
-
-        const int id = cmdObj["id"].Int();
-        const int hopefulIndex = _getMemberIndex(id);
+    bool TopologyCoordinatorImpl::_shouldVetoMember(unsigned int memberID,
+                                                    const OpTime& lastOpApplied,
+                                                    std::string* errmsg) const {
+        const int hopefulIndex = _getMemberIndex(memberID);
         const int highestPriorityIndex = _getHighestPriorityElectableIndex();
 
         if (hopefulIndex == -1) {
-            errmsg = str::stream() << "replSet couldn't find member with id " << id;
+            *errmsg = str::stream() << "replSet couldn't find member with id " << memberID;
             return true;
         }
 
-        if ((_currentPrimaryIndex != -1) && 
-            (_commitOkayThrough >= _hbdata[hopefulIndex].getOpTime())) {
-            // hbinfo is not updated, so we have to check the primary's last optime separately
-            errmsg = str::stream() << "I am already primary, " << 
+        if ((_currentPrimaryIndex == _selfIndex) &&
+            (lastOpApplied >= _hbdata[hopefulIndex].getOpTime())) {
+            // hbinfo is not updated for ourself, so if we are primary we have to check the
+            // primary's last optime separately
+            *errmsg = str::stream() << "I am already primary, " <<
                 _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() << 
                 " can try again once I've stepped down";
             return true;
         }
 
         if (_currentPrimaryIndex != -1 &&
-            (_currentConfig.getMemberAt(hopefulIndex).getId() != 
-             _currentConfig.getMemberAt(_currentPrimaryIndex).getId()) &&
-            (_hbdata[_currentPrimaryIndex].getOpTime() >= 
-             _hbdata[hopefulIndex].getOpTime())) {
+                (hopefulIndex != _currentPrimaryIndex) &&
+                (_hbdata[_currentPrimaryIndex].getOpTime() >=
+                        _hbdata[hopefulIndex].getOpTime())) {
             // other members might be aware of more up-to-date nodes
-            errmsg = str::stream() << 
+            *errmsg = str::stream() <<
                 _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() <<
                 " is trying to elect itself but " << 
                 _currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort().toString() <<
@@ -405,15 +397,15 @@ namespace repl {
         if ((highestPriorityIndex != -1) &&
             _currentConfig.getMemberAt(highestPriorityIndex).getPriority() > 
             _currentConfig.getMemberAt(hopefulIndex).getPriority()) {
-            errmsg = str::stream() << 
+            *errmsg = str::stream() <<
                 _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() << 
                 " has lower priority than " << 
                 _currentConfig.getMemberAt(highestPriorityIndex).getHostAndPort().toString();
             return true;
         }
 
-        if (!_electableSet.count(id)) {
-            errmsg = str::stream() << "I don't think "
+        if (!_electableSet.count(memberID)) {
+            *errmsg = str::stream() << "I don't think "
                 << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() <<
                 " is electable";
             return true;
@@ -967,6 +959,10 @@ namespace repl {
              it != _stateChangeCallbacks.end(); ++it) {
             (*it)(_memberState);
         }
+    }
+
+    void TopologyCoordinatorImpl::_setCurrentPrimaryForTest(int primaryIndex) {
+        _currentPrimaryIndex = primaryIndex;
     }
 
     void TopologyCoordinatorImpl::prepareStatusResponse(
