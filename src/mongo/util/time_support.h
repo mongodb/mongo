@@ -64,8 +64,6 @@ namespace mongo {
         bool isFormatable() const;
     };
 
-    std::ostream& operator<<(std::ostream &s, const Date_t &t);
-
     // uses ISO 8601 dates without trailing Z
     // colonsOk should be false when creating filenames
     std::string terseCurrentTime(bool colonsOk=true);

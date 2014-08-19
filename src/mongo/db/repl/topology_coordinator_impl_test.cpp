@@ -36,6 +36,18 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+    // So that you can ASSERT_EQUALS two OpTimes
+    std::ostream& operator<<( std::ostream &s, const OpTime &ot ) {
+        s << ot.toString();
+        return s;
+    }
+    // So that you can ASSERT_EQUALS two Date_ts
+    std::ostream& operator<<( std::ostream &s, const Date_t &t ) {
+        s << t.toString();
+        return s;
+    }
+
 namespace repl {
 namespace {
 
