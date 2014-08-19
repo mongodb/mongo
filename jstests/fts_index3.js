@@ -84,27 +84,27 @@ assert.eq(1, coll.runCommand("text", {search: "hello", filter: {b: 2}}).stats.n)
 coll.drop();
 res = coll.ensureIndex({a: "text"});
 assert.isnull(res);
-coll.insert({a: "testing", language: "es"});
+coll.insert({a: "testing", language: "spanish"});
 assert(!db.getLastError());
-assert.eq(1, coll.runCommand("text", {search: "testing", language: "es"}).stats.n);
-assert.eq(0, coll.runCommand("text", {search: "testing", language: "en"}).stats.n);
-coll.update({}, {$set: {language: "en"}});
+assert.eq(1, coll.runCommand("text", {search: "testing", language: "spanish"}).stats.n);
+assert.eq(0, coll.runCommand("text", {search: "testing", language: "english"}).stats.n);
+coll.update({}, {$set: {language: "english"}});
 assert(!db.getLastError());
-assert.eq(0, coll.runCommand("text", {search: "testing", language: "es"}).stats.n);
-assert.eq(1, coll.runCommand("text", {search: "testing", language: "en"}).stats.n);
+assert.eq(0, coll.runCommand("text", {search: "testing", language: "spanish"}).stats.n);
+assert.eq(1, coll.runCommand("text", {search: "testing", language: "english"}).stats.n);
 
 // 8) Same as #7, but with a wildcard text index.
 coll.drop();
 res = coll.ensureIndex({"$**": "text"});
 assert.isnull(res);
-coll.insert({a: "testing", language: "es"});
+coll.insert({a: "testing", language: "spanish"});
 assert(!db.getLastError());
-assert.eq(1, coll.runCommand("text", {search: "testing", language: "es"}).stats.n);
-assert.eq(0, coll.runCommand("text", {search: "testing", language: "en"}).stats.n);
-coll.update({}, {$set: {language: "en"}});
+assert.eq(1, coll.runCommand("text", {search: "testing", language: "spanish"}).stats.n);
+assert.eq(0, coll.runCommand("text", {search: "testing", language: "english"}).stats.n);
+coll.update({}, {$set: {language: "english"}});
 assert(!db.getLastError());
-assert.eq(0, coll.runCommand("text", {search: "testing", language: "es"}).stats.n);
-assert.eq(1, coll.runCommand("text", {search: "testing", language: "en"}).stats.n);
+assert.eq(0, coll.runCommand("text", {search: "testing", language: "spanish"}).stats.n);
+assert.eq(1, coll.runCommand("text", {search: "testing", language: "english"}).stats.n);
 
 // 9) Create a text index on a single field with a custom language override, insert a document,
 // update the language of the document (so as to change the stemming), and verify that searching
@@ -112,24 +112,24 @@ assert.eq(1, coll.runCommand("text", {search: "testing", language: "en"}).stats.
 coll.drop();
 res = coll.ensureIndex({a: "text"}, {language_override: "idioma"});
 assert.isnull(res);
-coll.insert({a: "testing", idioma: "es"});
+coll.insert({a: "testing", idioma: "spanish"});
 assert(!db.getLastError());
-assert.eq(1, coll.runCommand("text", {search: "testing", language: "es"}).stats.n);
-assert.eq(0, coll.runCommand("text", {search: "testing", language: "en"}).stats.n);
-coll.update({}, {$set: {idioma: "en"}});
+assert.eq(1, coll.runCommand("text", {search: "testing", language: "spanish"}).stats.n);
+assert.eq(0, coll.runCommand("text", {search: "testing", language: "english"}).stats.n);
+coll.update({}, {$set: {idioma: "english"}});
 assert(!db.getLastError());
-assert.eq(0, coll.runCommand("text", {search: "testing", language: "es"}).stats.n);
-assert.eq(1, coll.runCommand("text", {search: "testing", language: "en"}).stats.n);
+assert.eq(0, coll.runCommand("text", {search: "testing", language: "spanish"}).stats.n);
+assert.eq(1, coll.runCommand("text", {search: "testing", language: "english"}).stats.n);
 
 // 10) Same as #9, but with a wildcard text index.
 coll.drop();
 res = coll.ensureIndex({"$**": "text"}, {language_override: "idioma"});
 assert.isnull(res);
-coll.insert({a: "testing", idioma: "es"});
+coll.insert({a: "testing", idioma: "spanish"});
 assert(!db.getLastError());
-assert.eq(1, coll.runCommand("text", {search: "testing", language: "es"}).stats.n);
-assert.eq(0, coll.runCommand("text", {search: "testing", language: "en"}).stats.n);
-coll.update({}, {$set: {idioma: "en"}});
+assert.eq(1, coll.runCommand("text", {search: "testing", language: "spanish"}).stats.n);
+assert.eq(0, coll.runCommand("text", {search: "testing", language: "english"}).stats.n);
+coll.update({}, {$set: {idioma: "english"}});
 assert(!db.getLastError());
-assert.eq(0, coll.runCommand("text", {search: "testing", language: "es"}).stats.n);
-assert.eq(1, coll.runCommand("text", {search: "testing", language: "en"}).stats.n);
+assert.eq(0, coll.runCommand("text", {search: "testing", language: "spanish"}).stats.n);
+assert.eq(1, coll.runCommand("text", {search: "testing", language: "english"}).stats.n);
