@@ -156,8 +156,8 @@ namespace mongo {
             FTSQuery q;
             ASSERT( q.parse( "the running", "eng", TEXT_INDEX_VERSION_1 ).isOK() );
             ASSERT_EQUALS( 2U, q.getTerms().size() );
-            ASSERT_EQUALS( 1U, std::count( q.getTerms().begin(), q.getTerms().end(), "the" ) );
-            ASSERT_EQUALS( 1U, std::count( q.getTerms().begin(), q.getTerms().end(), "run" ) );
+            ASSERT_EQUALS( 1, std::count( q.getTerms().begin(), q.getTerms().end(), "the" ) );
+            ASSERT_EQUALS( 1, std::count( q.getTerms().begin(), q.getTerms().end(), "run" ) );
             ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
             ASSERT_EQUALS( 0U, q.getPhr().size() );
             ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
@@ -169,8 +169,8 @@ namespace mongo {
             FTSQuery q;
             ASSERT( q.parse( "the running", "invalid", TEXT_INDEX_VERSION_1 ).isOK() );
             ASSERT_EQUALS( 2U, q.getTerms().size() );
-            ASSERT_EQUALS( 1U, std::count( q.getTerms().begin(), q.getTerms().end(), "the" ) );
-            ASSERT_EQUALS( 1U, std::count( q.getTerms().begin(), q.getTerms().end(), "running" ) );
+            ASSERT_EQUALS( 1, std::count( q.getTerms().begin(), q.getTerms().end(), "the" ) );
+            ASSERT_EQUALS( 1, std::count( q.getTerms().begin(), q.getTerms().end(), "running" ) );
             ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
             ASSERT_EQUALS( 0U, q.getPhr().size() );
             ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
