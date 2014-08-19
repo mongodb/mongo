@@ -93,8 +93,8 @@ type Auth struct {
 
 // Struct for Kerberos/GSSAPI-specific options
 type Kerberos struct {
-	Service string `long:"gssapiServiceName" description:"Service name to use when authenticating using GSSAPI/Kerberos ('mongodb' by default)"`
-	// TODO: Add Hostname: https://github.com/mongodb/mongo/commit/f18e88ffafd615d515f3359ee73f719b1667e193
+	Service     string `long:"gssapiServiceName" description:"Service name to use when authenticating using GSSAPI/Kerberos ('mongodb' by default)"`
+	ServiceHost string `long:"gssapiHostName" description:"Hostname to use when authenticating using GSSAPI/Kerberos (remote server's address by default)"`
 }
 
 // Ask for a new instance of tool options
