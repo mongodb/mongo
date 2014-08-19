@@ -341,7 +341,7 @@ namespace mongo {
                                        ValidateAdaptor* adaptor,
                                        ValidateResults* results,
                                        BSONObjBuilder* output ) const {
-        RecordIterator* iter = getIterator( txn );
+        boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         while( !iter->isEOF() ) {
             RecordData data = dataFor( iter->curr() );
             if ( scanData ) {

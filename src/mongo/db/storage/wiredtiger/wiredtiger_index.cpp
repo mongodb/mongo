@@ -79,6 +79,7 @@ namespace mongo {
             const std::string &ns, const std::string &idxName, IndexCatalogEntry& info) {
         WiredTigerSession swrap(db.GetSession(), db);
         WT_SESSION *s(swrap.Get());
+        fprintf(stderr, "Creating index: %s\n", idxName.c_str());
         return s->create(s, _getURI(ns, idxName).c_str(),
             "type=file,key_format=uu,value_format=u");
     }

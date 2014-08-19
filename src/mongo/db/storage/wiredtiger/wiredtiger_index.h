@@ -47,7 +47,7 @@ namespace mongo {
     class WiredTigerIndex : public SortedDataInterface {
         public:
         static std::string _getURI(const std::string &ns, const std::string &idxName) {
-            return "table:" + ns + "_idx_" + idxName;
+            return "table:" + ns + ".$" + idxName;
         }
         static int Create(WiredTigerDatabase &db,
                 const std::string &ns, const std::string &idxName, IndexCatalogEntry& info);

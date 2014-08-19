@@ -121,7 +121,7 @@ namespace mongo {
                 continue;
             if (strncmp("table:", key, 6) != 0)
                 continue;
-            if (strstr(key, "_idx") != NULL)
+            if (strstr(key, ".$") != NULL)
                 continue;
 
             // Move the pointer past table:NAME.
@@ -133,7 +133,33 @@ namespace mongo {
 
             _entryMap[key] = entry;
         }
-        invariant(ret == WT_NOTFOUND);
+        for ( EntryMap::const_iterator i = _entryMap.begin(); i != _entryMap.end(); ++i ) {
+            std::string tbl_uri = std::string("table:" + i->first);
+            c->set_key(c, tbl_uri.c_str());
+            int cmp;
+            ret = c->search_near(c, &cmp);
+            if (cmp == -1)
+                ret = c->next(c);
+            const char *uri_str;
+            while (ret == 0) {
+                ret = c->get_key(c, &uri_str);
+                invariant ( ret == 0);
+                std::string uri(uri_str);
+                // No more indexes for this table
+                if (uri.substr(0, tbl_uri.size()) != tbl_uri)
+                    break;
+
+                size_t pos;
+                if ((pos = uri.find('$')) != std::string::npos && pos < uri.size() - 1) {
+                    std::string idx_name = uri.substr(pos + 1);
+                    // Skip to the start of the index name
+                    fprintf(stderr, "Found index: %s\n", idx_name.c_str());
+                }
+
+                ret = c->next(c);
+            }
+        }
+        invariant(ret == WT_NOTFOUND || ret == 0);
         _db.ReleaseSession(session);
         name();
     }
@@ -190,7 +216,24 @@ namespace mongo {
         if ( i == _entryMap.end() )
             return Status( ErrorCodes::NamespaceNotFound, "namespace not found" );
 
-        delete i->second;
+        Entry *entry = i->second;
+        // Remove the underlying table from WiredTiger
+        WT_SESSION *session = _db.GetSession();
+        int ret;
+        std::string uri = "table:" + ns.toString();
+        ret = session->drop(session, uri.c_str(), NULL);
+        // Find and drop any indexes.
+        _db.ReleaseSession(session);
+        if (ret != 0)
+            return Status( ErrorCodes::OperationFailed, "Collection drop failed" );
+
+        std::vector<std::string> names;
+        entry->getAllIndexes( &names );
+        std::vector<std::string>::const_iterator indexes;
+        for (indexes = names.begin(); indexes != names.end(); ++indexes) {
+            fprintf(stderr, "Index name: %s\n", (*indexes).c_str());
+        }
+        delete entry;
         _entryMap.erase( i );
 
         return Status::OK();
