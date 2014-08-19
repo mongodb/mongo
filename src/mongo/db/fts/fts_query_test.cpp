@@ -37,7 +37,7 @@ namespace mongo {
 
         TEST( FTSQuery, Basic1 ) {
             FTSQuery q;
-            ASSERT( q.parse( "this is fun", "english" ).isOK() );
+            ASSERT( q.parse( "this is fun", "english", TEXT_INDEX_VERSION_2 ).isOK() );
 
             ASSERT_EQUALS( 1U, q.getTerms().size() );
             ASSERT_EQUALS( "fun", q.getTerms()[0] );
@@ -48,7 +48,7 @@ namespace mongo {
 
         TEST( FTSQuery, Neg1 ) {
             FTSQuery q;
-            ASSERT( q.parse( "this is -really fun", "english" ).isOK() );
+            ASSERT( q.parse( "this is -really fun", "english", TEXT_INDEX_VERSION_2 ).isOK() );
 
             ASSERT_EQUALS( 1U, q.getTerms().size() );
             ASSERT_EQUALS( "fun", q.getTerms()[0] );
@@ -58,7 +58,8 @@ namespace mongo {
 
         TEST( FTSQuery, Phrase1 ) {
             FTSQuery q;
-            ASSERT( q.parse( "doing a \"phrase test\" for fun", "english" ).isOK() );
+            ASSERT( q.parse( "doing a \"phrase test\" for fun", "english",
+                             TEXT_INDEX_VERSION_2 ).isOK() );
 
             ASSERT_EQUALS( 3U, q.getTerms().size() );
             ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
@@ -71,28 +72,31 @@ namespace mongo {
 
         TEST( FTSQuery, Phrase2 ) {
             FTSQuery q;
-            ASSERT( q.parse( "doing a \"phrase-test\" for fun", "english" ).isOK() );
+            ASSERT( q.parse( "doing a \"phrase-test\" for fun", "english",
+                             TEXT_INDEX_VERSION_2 ).isOK() );
             ASSERT_EQUALS( 1U, q.getPhr().size() );
             ASSERT_EQUALS( "phrase-test", q.getPhr()[0] );
         }
 
         TEST( FTSQuery, NegPhrase1 ) {
             FTSQuery q;
-            ASSERT( q.parse( "doing a -\"phrase test\" for fun", "english" ).isOK() );
+            ASSERT( q.parse( "doing a -\"phrase test\" for fun", "english",
+                             TEXT_INDEX_VERSION_2 ).isOK() );
             ASSERT_EQUALS( "fun||||||phrase test", q.debugString() );
         }
 
         TEST( FTSQuery, Mix1 ) {
             FTSQuery q;
-            ASSERT( q.parse( "\"industry\" -Melbourne -Physics", "english" ).isOK() );
+            ASSERT( q.parse( "\"industry\" -Melbourne -Physics", "english",
+                             TEXT_INDEX_VERSION_2 ).isOK() );
             ASSERT_EQUALS( "industri||melbourn|physic||industry||", q.debugString() );
         }
 
         TEST( FTSQuery, NegPhrase2) {
             FTSQuery q1, q2, q3;
-            ASSERT( q1.parse( "foo \"bar\"", "english" ).isOK() );
-            ASSERT( q2.parse( "foo \"-bar\"", "english" ).isOK() );
-            ASSERT( q3.parse( "foo \" -bar\"", "english" ).isOK() );
+            ASSERT( q1.parse( "foo \"bar\"", "english", TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT( q2.parse( "foo \"-bar\"", "english", TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT( q3.parse( "foo \" -bar\"", "english", TEXT_INDEX_VERSION_2 ).isOK() );
 
             ASSERT_EQUALS( 2U, q1.getTerms().size() );
             ASSERT_EQUALS( 2U, q2.getTerms().size() );
@@ -113,9 +117,9 @@ namespace mongo {
 
         TEST( FTSQuery, NegPhrase3) {
             FTSQuery q1, q2, q3;
-            ASSERT( q1.parse( "foo -\"bar\"", "english" ).isOK() );
-            ASSERT( q2.parse( "foo -\"-bar\"", "english" ).isOK() );
-            ASSERT( q3.parse( "foo -\" -bar\"", "english" ).isOK() );
+            ASSERT( q1.parse( "foo -\"bar\"", "english", TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT( q2.parse( "foo -\"-bar\"", "english", TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT( q3.parse( "foo -\" -bar\"", "english", TEXT_INDEX_VERSION_2 ).isOK() );
 
             ASSERT_EQUALS( 1U, q1.getTerms().size() );
             ASSERT_EQUALS( 1U, q2.getTerms().size() );
@@ -132,6 +136,44 @@ namespace mongo {
             ASSERT_EQUALS( 1U, q1.getNegatedPhr().size() );
             ASSERT_EQUALS( 1U, q2.getNegatedPhr().size() );
             ASSERT_EQUALS( 1U, q3.getNegatedPhr().size() );
+        }
+
+        // Test textIndexVersion:1 query with language "english".  This invokes the standard English
+        // stemmer and stopword list.
+        TEST( FTSQuery, TextIndexVersion1LanguageEnglish ) {
+            FTSQuery q;
+            ASSERT( q.parse( "the running", "english", TEXT_INDEX_VERSION_1 ).isOK() );
+            ASSERT_EQUALS( 1U, q.getTerms().size() );
+            ASSERT_EQUALS( "run", q.getTerms()[0] );
+            ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
+            ASSERT_EQUALS( 0U, q.getPhr().size() );
+            ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
+        }
+
+        // Test textIndexVersion:1 query with language "eng".  "eng" uses the English stemmer, and
+        // no stopword list.
+        TEST( FTSQuery, TextIndexVersion1LanguageEng ) {
+            FTSQuery q;
+            ASSERT( q.parse( "the running", "eng", TEXT_INDEX_VERSION_1 ).isOK() );
+            ASSERT_EQUALS( 2U, q.getTerms().size() );
+            ASSERT_EQUALS( 1U, std::count( q.getTerms().begin(), q.getTerms().end(), "the" ) );
+            ASSERT_EQUALS( 1U, std::count( q.getTerms().begin(), q.getTerms().end(), "run" ) );
+            ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
+            ASSERT_EQUALS( 0U, q.getPhr().size() );
+            ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
+        }
+
+        // Test textIndexVersion:1 query with language "invalid".  No stemming will be performed,
+        // and no stopword list will be used.
+        TEST( FTSQuery, TextIndexVersion1LanguageInvalid ) {
+            FTSQuery q;
+            ASSERT( q.parse( "the running", "invalid", TEXT_INDEX_VERSION_1 ).isOK() );
+            ASSERT_EQUALS( 2U, q.getTerms().size() );
+            ASSERT_EQUALS( 1U, std::count( q.getTerms().begin(), q.getTerms().end(), "the" ) );
+            ASSERT_EQUALS( 1U, std::count( q.getTerms().begin(), q.getTerms().end(), "running" ) );
+            ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
+            ASSERT_EQUALS( 0U, q.getPhr().size() );
+            ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
         }
 
     }

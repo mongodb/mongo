@@ -49,7 +49,13 @@ namespace mongo {
         class FTSQuery {
 
         public:
-            Status parse(const std::string& query, const StringData& language);
+            // Initializes an FTSQuery.  Note that the parsing of "language" depends on the text
+            // index version, since a query which doesn't specify a language and is against a
+            // version 1 text index with a version 1 default language string needs to be parsed as
+            // version 1 (see fts_language.cpp for a list of language strings specific to version
+            // 1).
+            Status parse(const std::string& query, const StringData& language,
+                         TextIndexVersion textIndexVersion);
 
             const std::vector<std::string>& getTerms() const { return _terms; }
             const std::set<std::string>& getNegatedTerms() const { return _negatedTerms; }
