@@ -664,10 +664,7 @@ __slvg_trk_leaf_ovfl(
 	if (ovfl_cnt == 0)
 		return (0);
 
-	/*
-	 * Allocate room for the addresses and the array slot, then fill in the
-	 * list of addresses.
-	 */
+	/* Allocate room for the array of overflow addresses and fill it in. */
 	WT_RET(__wt_calloc_def(session, ovfl_cnt, &trk->trk_ovfl_addr));
 	trk->trk_ovfl_cnt = ovfl_cnt;
 
