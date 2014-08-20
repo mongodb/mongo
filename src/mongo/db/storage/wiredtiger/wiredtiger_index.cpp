@@ -251,19 +251,10 @@ namespace mongo {
         invariant(!"aboutToDeleteBucket should not be called");
     }
 
-    bool WiredTigerIndex::IndexCursor::locate(const BSONObj &key, const DiskLoc& loc) {
+    bool WiredTigerIndex::IndexCursor::_locate(const BSONObj &key, const DiskLoc& loc) {
         WT_CURSOR *c = _cursor.Get();
         int cmp = -1, ret;
-	// Empty keys mean go to the beginning
-        if (key.isEmpty()) {
-            ret = c->reset(c);
-            advance();
-            return !isEOF();
-        }
-
-        const BSONObj& finalKey = stripFieldNames( key );
-	fprintf(stderr, "searching in index %s: %s (%s)\n", c->uri, finalKey.jsonString().c_str(), loc.toString().c_str());
-        c->set_key(c, _toItem(finalKey).Get(), _toItem(loc).Get());
+        c->set_key(c, _toItem(key).Get(), _toItem(loc).Get());
         ret = c->search_near(c, &cmp);
         fprintf(stderr, "searching index, search_near returned (%d, %d)\n", ret, cmp);
 
@@ -274,7 +265,7 @@ namespace mongo {
             WT_ITEM keyItem, locItem;
             ret = c->get_key(c, &keyItem, &locItem);
             invariant(ret == 0);
-            if (finalKey != BSONObj(static_cast<const char *>(keyItem.data)))
+            if (key != BSONObj(static_cast<const char *>(keyItem.data)))
 		ret = WT_NOTFOUND;
         }
         if (ret == WT_NOTFOUND) {
@@ -286,14 +277,21 @@ namespace mongo {
         return true;
     }
 
-    void WiredTigerIndex::IndexCursor::customLocate(const BSONObj& keyBegin,
-                  int keyBeginLen,
-                  bool afterKey,
-                  const vector<const BSONElement*>& keyEnd,
-                  const vector<bool>& keyEndInclusive) {
-        // TODO
-        invariant(0);
-    }
+    bool WiredTigerIndex::IndexCursor::locate(const BSONObj &key, const DiskLoc& loc) {
+        int ret;
+
+	// Empty keys mean go to the beginning
+        if (key.isEmpty()) {
+	    WT_CURSOR *c = _cursor.Get();
+            ret = c->reset(c);
+	    invariant(ret == 0);
+            advance();
+            return !isEOF();
+        }
+
+        const BSONObj& finalKey = stripFieldNames( key );
+	return _locate(finalKey, loc);
+   }
 
     void WiredTigerIndex::IndexCursor::advanceTo(const BSONObj &keyBegin,
            int keyBeginLen,
@@ -301,7 +299,20 @@ namespace mongo {
            const vector<const BSONElement*>& keyEnd,
            const vector<bool>& keyEndInclusive) {
         // XXX I think these do the same thing????
-        customLocate(keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive);
+
+        BSONObj key = IndexEntryComparison::makeQueryObject(
+			 keyBegin, keyBeginLen,
+			 afterKey, keyEnd, keyEndInclusive, getDirection() );
+
+        _locate(key, DiskLoc());
+    }
+
+    void WiredTigerIndex::IndexCursor::customLocate(const BSONObj& keyBegin,
+                  int keyBeginLen,
+                  bool afterKey,
+                  const vector<const BSONElement*>& keyEnd,
+                  const vector<bool>& keyEndInclusive) {
+        advanceTo(keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive);
     }
 
     BSONObj WiredTigerIndex::IndexCursor::getKey() const {
