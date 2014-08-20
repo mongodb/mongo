@@ -41,6 +41,8 @@ namespace mongo {
 
     } // namespace
 
+    bool hasGlobalEnvironment() { return globalEnvironmentExperiment; }
+
     GlobalEnvironmentExperiment* getGlobalEnvironment() {
         fassert(17508, globalEnvironmentExperiment);
         return globalEnvironmentExperiment;

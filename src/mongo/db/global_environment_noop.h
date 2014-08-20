@@ -42,6 +42,8 @@ namespace mongo {
 
         bool getKillAllOperations();
 
+        void registerKillOpListener(KillOpListenerInterface* listener);
+
         void registerOperationContext(OperationContext* txn);
 
         void unregisterOperationContext(OperationContext* txn);

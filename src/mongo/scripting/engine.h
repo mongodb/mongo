@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -187,7 +188,7 @@ namespace mongo {
         bool _lastRetIsNativeCode; // v8 only: set to true if eval'd script returns a native func
     };
 
-    class ScriptEngine {
+    class ScriptEngine : public KillOpListenerInterface {
         MONGO_DISALLOW_COPYING(ScriptEngine);
     public:
         ScriptEngine();

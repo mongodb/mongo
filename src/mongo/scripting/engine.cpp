@@ -36,6 +36,7 @@
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"

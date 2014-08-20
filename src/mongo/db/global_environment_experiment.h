@@ -35,6 +35,26 @@ namespace mongo {
     class OperationContext;
     class StorageEngine;
 
+    /**
+     * Classes that implement this interface can receive notification on killOp.
+     *
+     * See GlobalEnvironmentExperiment::registerKillOpListener() for more information, including
+     * limitations on the lifetime of registered listeners.
+     */
+    class KillOpListenerInterface {
+    public:
+        /**
+         * Will be called *after* ops have been told they should die.
+         * Callback must not fail.
+         */
+        virtual void interrupt(unsigned opId) = 0;
+        virtual void interruptAll() = 0;
+
+    protected:
+        // Should not delete through a pointer of this type
+        virtual ~KillOpListenerInterface() {}
+    };
+
     class GlobalEnvironmentExperiment {
         MONGO_DISALLOW_COPYING(GlobalEnvironmentExperiment);
     public:
@@ -71,6 +91,14 @@ namespace mongo {
          * @return if operation was found 
          **/
         virtual bool killOperation(unsigned int opId) = 0;
+
+        /**
+         * Registers a listener to be notified each time an op is killed.
+         *
+         * listener does not become owned by the environment. As there is currently no way to
+         * unregister, the listener object must outlive this GlobalEnvironmentExperiment object.
+         */
+        virtual void registerKillOpListener(KillOpListenerInterface* listener) = 0;
 
         /**
          * Registers the specified operation context on the global environment, so it is
@@ -128,7 +156,14 @@ namespace mongo {
     };
 
     /**
+     * Returns true if there is a globalEnvironment.
+     */
+    bool hasGlobalEnvironment();
+
+    /**
      * Returns the singleton GlobalEnvironmentExperiment for this server process.
+     *
+     * Fatal if there is currently no globalEnvironment.
      *
      * Caller does not own pointer.
      */

@@ -55,24 +55,17 @@ namespace mongo {
         return globalStorageEngine;
     }
 
-    namespace {
-        void interruptJs(unsigned int op) {
-            if (!globalScriptEngine) {
-                return;
+    void GlobalEnvironmentMongoD::setKillAllOperations() {
+        scoped_lock clientLock(Client::clientsMutex);
+        _globalKill = true;
+        for (size_t i = 0; i < _killOpListeners.size(); i++) {
+            try {
+                _killOpListeners[i]->interruptAll();
             }
-
-            if (!op) {
-                globalScriptEngine->interruptAll();
-            }
-            else {
-                globalScriptEngine->interrupt(op);
+            catch (...) {
+                std::terminate();
             }
         }
-    }  // namespace
-
-    void GlobalEnvironmentMongoD::setKillAllOperations() {
-        _globalKill = true;
-        interruptJs(0);
     }
 
     bool GlobalEnvironmentMongoD::getKillAllOperations() {
@@ -102,14 +95,27 @@ namespace mongo {
                 }
             }
         }
-        if ( found ) {
-            interruptJs( opId );
+
+        if (found) {
+            for (size_t i = 0; i < _killOpListeners.size(); i++) {
+                try {
+                    _killOpListeners[i]->interrupt(opId);
+                }
+                catch (...) {
+                    std::terminate();
+                }
+            }
         }
         return found;
     }
 
     void GlobalEnvironmentMongoD::unsetKillAllOperations() {
         _globalKill = false;
+    }
+
+    void GlobalEnvironmentMongoD::registerKillOpListener(KillOpListenerInterface* listener) {
+        scoped_lock clientLock(Client::clientsMutex);
+        _killOpListeners.push_back(listener);
     }
 
     void GlobalEnvironmentMongoD::registerOperationContext(OperationContext* txn) {

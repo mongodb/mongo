@@ -48,6 +48,9 @@ namespace mongo {
         return false;
     }
 
+    void GlobalEnvironmentNoop::registerKillOpListener(KillOpListenerInterface* listener) {
+    }
+
     void GlobalEnvironmentNoop::registerOperationContext(OperationContext* txn) {
 
     }
