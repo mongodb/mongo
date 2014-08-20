@@ -40,16 +40,18 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/range_arithmetic.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
-    struct RangeDeleterEnv;
     class OperationContext;
-    struct RangeDeleteEntry;
     struct DeleteJobStats;
+    struct RangeDeleteEntry;
+    struct RangeDeleterEnv;
+    struct RangeDeleterOptions;
 
     /**
      * Class for deleting documents for a given namespace and range.  It contains a queue of
@@ -135,11 +137,7 @@ namespace mongo {
          * Returns true if the task is queued and false If the given range is blacklisted,
          * is already queued, or stopWorkers() was called.
          */
-        bool queueDelete(const std::string& ns,
-                         const BSONObj& min,
-                         const BSONObj& max,
-                         const BSONObj& shardKeyPattern,
-                         const WriteConcernOptions& writeConcern,
+        bool queueDelete(const RangeDeleterOptions& options,
                          Notification* notifyDone,
                          std::string* errMsg);
 
@@ -151,11 +149,7 @@ namespace mongo {
          * was already queued, or stopWorkers() was called.
          */
         bool deleteNow(OperationContext* txn,
-                       const std::string& ns,
-                       const BSONObj& min,
-                       const BSONObj& max,
-                       const BSONObj& shardKeyPattern,
-                       const WriteConcernOptions& writeConcern,
+                       const RangeDeleterOptions& options,
                        std::string* errMsg);
 
         /**
@@ -305,27 +299,25 @@ namespace mongo {
         }
     };
 
+    struct RangeDeleterOptions {
+        RangeDeleterOptions(const KeyRange& range);
+
+        const KeyRange range;
+
+        WriteConcernOptions writeConcern;
+        std::string removeSaverReason;
+        bool fromMigrate;
+        bool onlyRemoveOrphanedDocs;
+        bool waitForOpenCursors;
+    };
+
+    /**
+     * For internal use only.
+     */
     struct RangeDeleteEntry {
-        RangeDeleteEntry(const std::string& ns,
-                         const BSONObj& min,
-                         const BSONObj& max,
-                         const BSONObj& shardKey,
-                         const WriteConcernOptions& writeConcern);
+        RangeDeleteEntry(const RangeDeleterOptions& options);
 
-        const std::string ns;
-
-        // Inclusive lower range.
-        const BSONObj min;
-
-        // Exclusive upper range.
-        const BSONObj max;
-
-        // The key pattern of the index the range refers to.
-        // This is relevant especially with special indexes types
-        // like hash indexes.
-        const BSONObj shardKeyPattern;
-
-        const WriteConcernOptions writeConcern;
+        const RangeDeleterOptions options;
 
         // Sets of cursors to wait to close until this can be ready
         // for deletion.

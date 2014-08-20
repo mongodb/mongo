@@ -74,6 +74,7 @@ namespace repl {
 
         virtual void setCommitOkayThrough(const OpTime& optime);
         virtual void setLastReceived(const OpTime& optime);
+        // TODO(spencer): Can this be made private?
         virtual void setForceSyncSourceIndex(int index);
 
         // Looks up syncSource's address and returns it, for use by the Applier
@@ -93,6 +94,13 @@ namespace repl {
         
         // Applier calls this to notify that it's now safe to transition from SECONDARY to PRIMARY
         virtual void signalDrainComplete();
+
+        // produces a reply to a replSetSyncFrom command
+        virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackData& data,
+                                             int targetIndex,
+                                             const OpTime& lastOpApplied,
+                                             BSONObjBuilder* response,
+                                             Status* result);
 
         // produces a reply to a RAFT-style RequestVote RPC
         virtual void prepareRequestVoteResponse(const Date_t now,
@@ -208,7 +216,7 @@ namespace repl {
         // the member we currently believe is primary, if one exists
         int _currentPrimaryIndex;
         // the member we are currently syncing from
-        // NULL if no sync source (we are primary, or we cannot connect to anyone yet)
+        // -1 if no sync source (we are primary, or we cannot connect to anyone yet)
         int _syncSourceIndex; 
         // These members are not chosen as sync sources for a period of time, due to connection
         // issues with them
@@ -238,7 +246,10 @@ namespace repl {
         const MemberConfig& _selfConfig();  // Helper shortcut to self config
 
         ReplicaSetConfig _currentConfig; // The current config, including a vector of MemberConfigs
-        std::vector<MemberHeartbeatData> _hbdata; // heartbeat data for each member
+        // heartbeat data for each member.  It is guaranteed that this vector will be maintained
+        // in the same order as the MemberConfigs in _currentConfig, therefore the member config
+        // index can be used to index into this vector as well.
+        std::vector<MemberHeartbeatData> _hbdata;
 
         // Time when stepDown command expires
         Date_t _stepDownUntil;

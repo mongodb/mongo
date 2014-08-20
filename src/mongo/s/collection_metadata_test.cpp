@@ -429,6 +429,7 @@ namespace {
 
         ASSERT( keyRange.minKey.woCompare( metadata.getMinKey() ) == 0 );
         ASSERT( keyRange.maxKey.woCompare( metadata.getMaxKey() ) == 0 );
+        ASSERT( keyRange.keyPattern.woCompare( metadata.getKeyPattern() ) == 0 );
 
         // Make sure we don't have any more ranges
         ASSERT( !metadata.getNextOrphanRange( keyRange.maxKey, &keyRange ) );
@@ -459,10 +460,12 @@ namespace {
         ASSERT( cloned->getNextOrphanRange( cloned->getMinKey(), &keyRange ) );
         ASSERT( keyRange.minKey.woCompare( cloned->getMinKey() ) == 0 );
         ASSERT( keyRange.maxKey.woCompare( BSON( "a" << 10 ) ) == 0 );
+        ASSERT( keyRange.keyPattern.woCompare( cloned->getKeyPattern() ) == 0 );
 
         ASSERT( cloned->getNextOrphanRange( keyRange.maxKey, &keyRange ) );
         ASSERT( keyRange.minKey.woCompare( BSON( "a" << 20 ) ) == 0 );
         ASSERT( keyRange.maxKey.woCompare( cloned->getMaxKey() ) == 0 );
+        ASSERT( keyRange.keyPattern.woCompare( cloned->getKeyPattern() ) == 0 );
 
         ASSERT( !cloned->getNextOrphanRange( keyRange.maxKey, &keyRange ) );
     }
@@ -800,10 +803,12 @@ namespace {
         ASSERT( getCollMetadata().getNextOrphanRange( getCollMetadata().getMinKey(), &keyRange ) );
         ASSERT( keyRange.minKey.woCompare( getCollMetadata().getMinKey() ) == 0 );
         ASSERT( keyRange.maxKey.woCompare( BSON( "a" << 10 ) ) == 0 );
+        ASSERT( keyRange.keyPattern.woCompare( getCollMetadata().getKeyPattern() ) == 0 );
 
         ASSERT( getCollMetadata().getNextOrphanRange( keyRange.maxKey, &keyRange ) );
         ASSERT( keyRange.minKey.woCompare( BSON( "a" << 20 ) ) == 0 );
         ASSERT( keyRange.maxKey.woCompare( getCollMetadata().getMaxKey() ) == 0 );
+        ASSERT( keyRange.keyPattern.woCompare( getCollMetadata().getKeyPattern() ) == 0 );
 
         ASSERT( !getCollMetadata().getNextOrphanRange( keyRange.maxKey, &keyRange ) );
     }
@@ -1096,14 +1101,17 @@ namespace {
         ASSERT( getCollMetadata().getNextOrphanRange( getCollMetadata().getMinKey(), &keyRange ) );
         ASSERT( keyRange.minKey.woCompare( getCollMetadata().getMinKey() ) == 0 );
         ASSERT( keyRange.maxKey.woCompare( BSON( "a" << 10 << "b" << 0 ) ) == 0 );
+        ASSERT( keyRange.keyPattern.woCompare( getCollMetadata().getKeyPattern() ) == 0 );
 
         ASSERT( getCollMetadata().getNextOrphanRange( keyRange.maxKey, &keyRange ) );
         ASSERT( keyRange.minKey.woCompare( BSON( "a" << 20 << "b" << 0 ) ) == 0 );
         ASSERT( keyRange.maxKey.woCompare( BSON( "a" << 30 << "b" << 0 ) ) == 0 );
+        ASSERT( keyRange.keyPattern.woCompare( getCollMetadata().getKeyPattern() ) == 0 );
 
         ASSERT( getCollMetadata().getNextOrphanRange( keyRange.maxKey, &keyRange ) );
         ASSERT( keyRange.minKey.woCompare( BSON( "a" << 40 << "b" << 0 ) ) == 0 );
         ASSERT( keyRange.maxKey.woCompare( getCollMetadata().getMaxKey() ) == 0 );
+        ASSERT( keyRange.keyPattern.woCompare( getCollMetadata().getKeyPattern() ) == 0 );
 
         ASSERT( !getCollMetadata().getNextOrphanRange( keyRange.maxKey, &keyRange ) );
     }
@@ -1125,10 +1133,12 @@ namespace {
         ASSERT( cloned->getNextOrphanRange( cloned->getMinKey(), &keyRange ) );
         ASSERT( keyRange.minKey.woCompare( cloned->getMinKey() ) == 0 );
         ASSERT( keyRange.maxKey.woCompare( BSON( "a" << 10 << "b" << 0 ) ) == 0 );
+        ASSERT( keyRange.keyPattern.woCompare( cloned->getKeyPattern() ) == 0 );
 
         ASSERT( cloned->getNextOrphanRange( keyRange.maxKey, &keyRange ) );
         ASSERT( keyRange.minKey.woCompare( BSON( "a" << 40 << "b" << 0 ) ) == 0 );
         ASSERT( keyRange.maxKey.woCompare( cloned->getMaxKey() ) == 0 );
+        ASSERT( keyRange.keyPattern.woCompare( cloned->getKeyPattern() ) == 0 );
 
         ASSERT( !cloned->getNextOrphanRange( keyRange.maxKey, &keyRange ) );
     }

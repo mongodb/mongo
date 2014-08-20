@@ -26,6 +26,10 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/auth/authz_session_external_state_server_common.h"
 
 #include "mongo/base/status.h"

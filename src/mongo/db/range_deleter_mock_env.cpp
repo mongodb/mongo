@@ -130,10 +130,10 @@ namespace mongo {
             scoped_lock sl(_deleteListMutex);
 
             DeletedRange entry;
-            entry.ns = taskDetails.ns;
-            entry.min = taskDetails.min.getOwned();
-            entry.max = taskDetails.max.getOwned();
-            entry.shardKeyPattern = taskDetails.shardKeyPattern.getOwned();
+            entry.ns = taskDetails.options.range.ns;
+            entry.min = taskDetails.options.range.minKey.getOwned();
+            entry.max = taskDetails.options.range.maxKey.getOwned();
+            entry.shardKeyPattern = taskDetails.options.range.keyPattern.getOwned();
 
             _deleteList.push_back(entry);
         }

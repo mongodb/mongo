@@ -201,7 +201,6 @@ namespace mongo {
 
         general_options.addOptionChaining("storage.quota.enforced", "quota", moe::Switch,
                 "limits each database to a certain number of files (8 default)")
-                                         .setSources(moe::SourceAllLegacy)
                                          .incompatibleWith("keyFile");
 
         general_options.addOptionChaining("storage.quota.maxFilesPerDB", "quotaFiles", moe::Int,
@@ -976,7 +975,8 @@ namespace mongo {
             storageGlobalParams.smallfiles = params["storage.smallFiles"].as<bool>();
         }
         if (params.count("diaglog")) {
-            warning() << "--diaglog is deprecated and will be removed in a future release";
+            warning() << "--diaglog is deprecated and will be removed in a future release"
+                      << startupWarningsLog;
             int x = params["diaglog"].as<int>();
             if ( x < 0 || x > 7 ) {
                 return Status(ErrorCodes::BadValue, "can't interpret --diaglog setting");

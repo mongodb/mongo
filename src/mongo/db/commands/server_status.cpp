@@ -266,13 +266,12 @@ namespace mongo {
             virtual bool includeByDefault() const { return true; }
 
             BSONObj generateSection(const BSONElement& configElement) const {
-                BSONObjBuilder security;
+                BSONObj result;
                 if (getSSLManager()) {
-                    security.appendDate( "SSLCertificateExpirationDate",
-                                         getSSLManager()->getServerCertificateExpirationDate() );
+                    result = getSSLManager()->getSSLConfiguration().getServerStatusBSON();
                 }
 
-                return security.obj();
+                return result;
             }
         } security;
 #endif

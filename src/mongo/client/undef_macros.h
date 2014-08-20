@@ -33,14 +33,6 @@
 
 #ifdef MONGO_MACROS_PUSHED
 
-// util/allocator.h
-#ifdef MONGO_MALLOC
-#undef malloc
-#pragma pop_macro("malloc")
-#undef realloc
-#pragma pop_macro("realloc")
-#endif
-
 // util/assert_util.h
 #undef dassert
 #pragma pop_macro("dassert")

@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/rs.h"
@@ -38,6 +40,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/repl_set_impl.h"
+#include "mongo/db/repl/rslog.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
 

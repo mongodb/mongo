@@ -468,6 +468,7 @@ namespace mongo {
                              CanonicalQuery* rawCanonicalQuery,
                              bool isMulti,
                              bool shouldCallLogOp,
+                             bool fromMigrate,
                              PlanExecutor** out) {
         auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
         auto_ptr<WorkingSet> ws(new WorkingSet());
@@ -482,6 +483,7 @@ namespace mongo {
         DeleteStageParams deleteStageParams;
         deleteStageParams.isMulti = isMulti;
         deleteStageParams.shouldCallLogOp = shouldCallLogOp;
+        deleteStageParams.fromMigrate = fromMigrate;
         root = new DeleteStage(txn, deleteStageParams, ws.get(), collection, root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
         // solution may be null.
@@ -496,11 +498,13 @@ namespace mongo {
                              const BSONObj& unparsedQuery,
                              bool isMulti,
                              bool shouldCallLogOp,
+                             bool fromMigrate,
                              PlanExecutor** out) {
         auto_ptr<WorkingSet> ws(new WorkingSet());
         DeleteStageParams deleteStageParams;
         deleteStageParams.isMulti = isMulti;
         deleteStageParams.shouldCallLogOp = shouldCallLogOp;
+        deleteStageParams.fromMigrate = fromMigrate;
         if (!collection) {
             LOG(2) << "Collection " << ns << " does not exist."
                    << " Using EOF stage: " << unparsedQuery.toString();
@@ -530,7 +534,8 @@ namespace mongo {
             return status;
 
         // Takes ownership of 'cq'.
-        return getExecutorDelete(txn, collection, cq, isMulti, shouldCallLogOp, out);
+        return getExecutorDelete(txn, collection, cq, isMulti,
+                                 shouldCallLogOp, fromMigrate, out);
     }
 
     //

@@ -39,6 +39,7 @@
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
+#include "mongo/db/repl/rslog.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

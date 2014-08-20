@@ -45,6 +45,7 @@ namespace mongo {
                             BSONObj pattern,
                             bool justOne,
                             bool logop = false,
-                            bool god = false);
+                            bool god = false,
+                            bool fromMigrate = false);
 
 }

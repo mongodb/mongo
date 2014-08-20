@@ -34,16 +34,6 @@
 
 #define MONGO_MACROS_PUSHED 1
 
-// util/allocator.h
-#ifdef MONGO_MALLOC
-#pragma push_macro("malloc")
-#undef malloc
-#define malloc MONGO_malloc
-#pragma push_macro("realloc")
-#undef realloc
-#define realloc MONGO_realloc
-#endif
-
 // util/assert_util.h
 #pragma push_macro("verify")
 #undef verify

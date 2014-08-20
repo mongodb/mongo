@@ -38,7 +38,6 @@
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/range_arithmetic.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -185,21 +184,18 @@ namespace mongo {
         }
     }
 
-    bool RangeDeleter::queueDelete(const std::string& ns,
-                                   const BSONObj& min,
-                                   const BSONObj& max,
-                                   const BSONObj& shardKeyPattern,
-                                   const WriteConcernOptions& writeConcern,
+    bool RangeDeleter::queueDelete(const RangeDeleterOptions& options,
                                    Notification* notifyDone,
                                    std::string* errMsg) {
         string dummy;
         if (errMsg == NULL) errMsg = &dummy;
 
-        auto_ptr<RangeDeleteEntry> toDelete(new RangeDeleteEntry(ns,
-                                                                 min.getOwned(),
-                                                                 max.getOwned(),
-                                                                 shardKeyPattern.getOwned(),
-                                                                 writeConcern));
+        const string& ns(options.range.ns);
+        const BSONObj& min(options.range.minKey);
+        const BSONObj& max(options.range.maxKey);
+
+        auto_ptr<RangeDeleteEntry> toDelete(
+                new RangeDeleteEntry(options));
         toDelete->notifyDone = notifyDone;
 
         {
@@ -213,10 +209,10 @@ namespace mongo {
                 return false;
             }
 
-            _deleteSet.insert(new NSMinMax(ns, min, max));
+            _deleteSet.insert(new NSMinMax(ns, min.getOwned(), max.getOwned()));
         }
 
-        {
+        if (options.waitForOpenCursors) {
             boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
             _env->getCursorIds(txn.get(), ns, &toDelete->cursorsToWait);
         }
@@ -278,11 +274,7 @@ namespace {
 }
 
     bool RangeDeleter::deleteNow(OperationContext* txn,
-                                 const std::string& ns,
-                                 const BSONObj& min,
-                                 const BSONObj& max,
-                                 const BSONObj& shardKeyPattern,
-                                 const WriteConcernOptions& writeConcern,
+                                 const RangeDeleterOptions& options,
                                  string* errMsg) {
         if (stopRequested()) {
             *errMsg = "deleter is already stopped.";
@@ -291,6 +283,10 @@ namespace {
 
         string dummy;
         if (errMsg == NULL) errMsg = &dummy;
+
+        const string& ns(options.range.ns);
+        const BSONObj& min(options.range.minKey);
+        const BSONObj& max(options.range.maxKey);
 
         NSMinMax deleteRange(ns, min, max);
         {
@@ -308,7 +304,9 @@ namespace {
         }
 
         set<CursorId> cursorsToWait;
-        _env->getCursorIds(txn, ns, &cursorsToWait);
+        if (options.waitForOpenCursors) {
+            _env->getCursorIds(txn, ns, &cursorsToWait);
+        }
 
         long long checkIntervalMillis = 5;
 
@@ -317,7 +315,7 @@ namespace {
                   << " cursors in " << ns << " to finish" << endl;
         }
 
-        RangeDeleteEntry taskDetails(ns, min, max, shardKeyPattern, writeConcern);
+        RangeDeleteEntry taskDetails(options);
         taskDetails.stats.queueStartTS = jsTime();
 
         Date_t timeSinceLastLog;
@@ -494,8 +492,13 @@ namespace {
 
                             set<CursorId> cursorsNow;
                             {
-                                boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
-                                _env->getCursorIds(txn.get(), entry->ns, &cursorsNow);
+                                boost::scoped_ptr<OperationContext> txn(
+                                        getGlobalEnvironment()->newOpCtx());
+                                if (entry->options.waitForOpenCursors) {
+                                    _env->getCursorIds(txn.get(),
+                                                       entry->options.range.ns,
+                                                       &cursorsNow);
+                                }
                             }
 
                             set<CursorId> cursorsLeft;
@@ -521,9 +524,9 @@ namespace {
                                     entry->timeSinceLastLog.millis > LogCursorsIntervalMillis) {
 
                                     entry->timeSinceLastLog = jsTime();
-                                    logCursorsWaiting(entry->ns,
-                                                      entry->min,
-                                                      entry->max,
+                                    logCursorsWaiting(entry->options.range.ns,
+                                                      entry->options.range.minKey,
+                                                      entry->options.range.maxKey,
                                                       elapsedMillis,
                                                       entry->cursorsToWait);
                                 }
@@ -573,7 +576,9 @@ namespace {
             {
                 scoped_lock sl(_queueMutex);
 
-                NSMinMax setEntry(nextTask->ns, nextTask->min, nextTask->max);
+                NSMinMax setEntry(nextTask->options.range.ns,
+                                  nextTask->options.range.minKey,
+                                  nextTask->options.range.maxKey);
                 deletePtrElement(&_deleteSet, &setEntry);
                 _deletesInProgress--;
 
@@ -661,24 +666,16 @@ namespace {
         _statsHistory.push_back(newStat);
     }
 
-    RangeDeleteEntry::RangeDeleteEntry(const std::string& ns,
-                                       const BSONObj& min,
-                                       const BSONObj& max,
-                                       const BSONObj& shardKey,
-                                       const WriteConcernOptions& writeConcern):
-                                               ns(ns),
-                                               min(min),
-                                               max(max),
-                                               shardKeyPattern(shardKey),
-                                               writeConcern(writeConcern),
-                                               notifyDone(NULL) {
+    RangeDeleteEntry::RangeDeleteEntry(const RangeDeleterOptions& options):
+            options(options),
+            notifyDone(NULL) {
     }
 
     BSONObj RangeDeleteEntry::toBSON() const {
         BSONObjBuilder builder;
-        builder.append("ns", ns);
-        builder.append("min", min);
-        builder.append("max", max);
+        builder.append("ns", options.range.ns);
+        builder.append("min", options.range.minKey);
+        builder.append("max", options.range.maxKey);
         BSONArrayBuilder cursorBuilder(builder.subarrayStart("cursors"));
 
         for (std::set<CursorId>::const_iterator it = cursorsToWait.begin();
@@ -689,5 +686,12 @@ namespace {
 
         return builder.done().copy();
     }
+
+  RangeDeleterOptions::RangeDeleterOptions(const KeyRange& range):
+            range(range),
+            fromMigrate(false),
+            onlyRemoveOrphanedDocs(false),
+            waitForOpenCursors(false) {
+  }
 
 }

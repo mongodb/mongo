@@ -36,6 +36,7 @@
 #include <fcntl.h>
 #include <time.h>
 
+#include "mongo/util/allocator.h"
 #include "mongo/util/background.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/log.h"
@@ -228,7 +229,7 @@ again:
             psock->setHandshakeReceived();
             int z = (len+1023)&0xfffffc00;
             verify(z>=len);
-            MsgData::View md = reinterpret_cast<char *>(malloc(z));
+            MsgData::View md = reinterpret_cast<char *>(mongoMalloc(z));
             ScopeGuard guard = MakeGuard(free, md.view2ptr());
             verify(md.view2ptr());
 

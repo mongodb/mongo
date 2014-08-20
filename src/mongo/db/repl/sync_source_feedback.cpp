@@ -42,6 +42,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/rslog.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 
@@ -156,7 +157,6 @@ namespace repl {
             return false;
         }
 
-        replHandshake(txn);
         return hasConnection();
     }
 
@@ -256,6 +256,7 @@ namespace repl {
                     sleepmillis(500);
                     continue;
                 }
+                handshakeNeeded = true;
             }
             if (handshakeNeeded) {
                 if (!replHandshake(&txn)) {

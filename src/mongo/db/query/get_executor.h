@@ -144,6 +144,7 @@ namespace mongo {
                              CanonicalQuery* rawCanonicalQuery,
                              bool isMulti,
                              bool shouldCallLogOp,
+                             bool fromMigrate,
                              PlanExecutor** execOut);
 
     /**
@@ -161,6 +162,7 @@ namespace mongo {
                              const BSONObj& unparsedQuery,
                              bool isMulti,
                              bool shouldCallLogOp,
+                             bool fromMigrate,
                              PlanExecutor** execOut);
 
     //

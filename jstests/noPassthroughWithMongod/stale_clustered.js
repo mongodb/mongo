@@ -78,7 +78,7 @@ rsA.overflow( badSec )
 
 prt("6: stop non-overflowed secondary")
 
-rsA.stop( goodSec, undefined, true )
+rsA.stop(goodSec);
 
 prt("7: check our regular and slaveOk query")
 

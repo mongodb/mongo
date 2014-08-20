@@ -37,6 +37,7 @@
 #include "mongo/db/storage/mmap_v1/btree/key.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/float_utils.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
@@ -2018,7 +2019,7 @@ namespace JsobjTests {
         void run() {
             BSONObj x = BSON( "_id" << 5 << "t" << 2 );
             {
-                char * crap = (char*)malloc( x.objsize() );
+                char * crap = (char*)mongoMalloc( x.objsize() );
                 memcpy( crap , x.objdata() , x.objsize() );
                 BSONObj y( crap );
                 ASSERT_EQUALS( x , y );
@@ -2026,7 +2027,7 @@ namespace JsobjTests {
             }
 
             {
-                char * crap = (char*)malloc( x.objsize() );
+                char * crap = (char*)mongoMalloc( x.objsize() );
                 memcpy( crap , x.objdata() , x.objsize() );
                 int * foo = (int*)crap;
                 foo[0] = 123123123;

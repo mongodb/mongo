@@ -77,12 +77,14 @@ namespace mongo {
         return db;
     }
 
+    const Ordering dummyOrdering = Ordering::make( BSONObj() );
+
     TEST( RocksRecordStoreTest, BrainDead ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             BSONObj key = BSON( "" << 1 );
             DiskLoc loc( 5, 16 );
@@ -132,7 +134,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             BSONObj key = BSON( "" << 1 );
             DiskLoc loc( 5, 16 );
@@ -169,7 +171,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -219,7 +221,7 @@ namespace mongo {
         {
             boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = makeColumnFamily( db.get() );
 
-            RocksSortedDataImpl sortedData( db.get(), cfh.get() );
+            RocksSortedDataImpl sortedData( db.get(), cfh.get(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -248,7 +250,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -292,7 +294,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -346,7 +348,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -390,7 +392,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -442,7 +444,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -490,7 +492,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -548,7 +550,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             BSONObj key = BSON( "" << 1 );
             DiskLoc loc( 5, 16 );
@@ -586,7 +588,7 @@ namespace mongo {
         {
             boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = makeColumnFamily( db.get() );
 
-            RocksSortedDataImpl sortedData( db.get(), cfh.get() );
+            RocksSortedDataImpl sortedData( db.get(), cfh.get(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -615,7 +617,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -669,7 +671,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -713,7 +715,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -770,7 +772,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -820,7 +822,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -869,7 +871,7 @@ namespace mongo {
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
         {
-            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily() );
+            RocksSortedDataImpl sortedData( db.get(), db->DefaultColumnFamily(), dummyOrdering );
 
             {
                 MyOperationContext opCtx( db.get() );

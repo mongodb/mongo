@@ -32,6 +32,7 @@
 #ifdef MONGO_SSL
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/time_support.h"
 
@@ -60,6 +61,26 @@ namespace mongo {
         SSLConnection(SSL_CTX* ctx, Socket* sock, const char* initialBytes, int len); 
 
         ~SSLConnection();
+    };
+
+    struct SSLConfiguration {
+        SSLConfiguration() :
+            serverSubjectName(""), clientSubjectName(""),
+            hasCA(false) {}
+        SSLConfiguration(const std::string& serverSubjectName,
+                         const std::string& clientSubjectName,
+                         const Date_t& serverCertificateExpirationDate,
+                         bool hasCA) :
+            serverSubjectName(serverSubjectName),
+            clientSubjectName(clientSubjectName),
+            serverCertificateExpirationDate(serverCertificateExpirationDate),
+            hasCA(hasCA) {}
+
+        BSONObj getServerStatusBSON() const;
+        std::string serverSubjectName;
+        std::string clientSubjectName;
+        Date_t serverCertificateExpirationDate;
+        bool hasCA;
     };
 
     class SSLManagerInterface {
@@ -95,23 +116,10 @@ namespace mongo {
         virtual void cleanupThreadLocals() = 0;
 
         /**
-         * Gets the subject name of our own server certificate
-         * @return the subject name.
+         * Gets the SSLConfiguration containing all information about the current SSL setup
+         * @return the SSLConfiguration
          */
-        virtual std::string getServerSubjectName() = 0;
-
-        /**
-         * Gets the subject name of our own client certificate
-         * used for cluster authentiation
-         * @return the subject name.
-         */
-        virtual std::string getClientSubjectName() = 0;
-
-        /**
-         * Gets the expiration date of our own server certificate.
-         * @return the expiration date.
-         */
-        virtual Date_t getServerCertificateExpirationDate() = 0;
+         virtual const SSLConfiguration& getSSLConfiguration() const = 0;
 
         /**
         * Fetches the error text for an error code, in a thread-safe manner.

@@ -48,7 +48,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/timer_stats.h"

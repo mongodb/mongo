@@ -38,6 +38,7 @@
 
 #include "mongo/bson/inline_decls.h"
 #include "mongo/base/string_data.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -74,8 +75,8 @@ namespace mongo {
 
     class TrivialAllocator { 
     public:
-        void* Malloc(size_t sz) { return malloc(sz); }
-        void* Realloc(void *p, size_t sz) { return realloc(p, sz); }
+        void* Malloc(size_t sz) { return mongoMalloc(sz); }
+        void* Realloc(void *p, size_t sz) { return mongoRealloc(p, sz); }
         void Free(void *p) { free(p); }
     };
 
@@ -84,18 +85,18 @@ namespace mongo {
         enum { SZ = 512 };
         void* Malloc(size_t sz) {
             if( sz <= SZ ) return buf;
-            return malloc(sz); 
+            return mongoMalloc(sz);
         }
         void* Realloc(void *p, size_t sz) { 
             if( p == buf ) {
                 if( sz <= SZ ) return buf;
-                void *d = malloc(sz);
+                void *d = mongoMalloc(sz);
                 if ( d == 0 )
                     msgasserted( 15912 , "out of memory StackAllocator::Realloc" );
                 memcpy(d, p, SZ);
                 return d;
             }
-            return realloc(p, sz); 
+            return mongoRealloc(p, sz);
         }
         void Free(void *p) { 
             if( p != buf )

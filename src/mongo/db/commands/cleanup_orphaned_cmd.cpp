@@ -120,6 +120,7 @@ namespace mongo {
 
             return CleanupResult_Done;
         }
+        orphanRange.ns = ns;
         *stoppedAtKey = orphanRange.maxKey;
 
         // We're done with this metadata now, no matter what happens
@@ -133,14 +134,16 @@ namespace mongo {
 
         // Metadata snapshot may be stale now, but deleter checks metadata again in write lock
         // before delete.
-        if ( !getDeleter()->deleteNow( txn,
-                                       ns.toString(),
-                                       orphanRange.minKey,
-                                       orphanRange.maxKey,
-                                       keyPattern,
-                                       secondaryThrottle,
-                                       errMsg ) ) {
+        RangeDeleterOptions deleterOptions(orphanRange);
+        deleterOptions.writeConcern = secondaryThrottle;
+        deleterOptions.onlyRemoveOrphanedDocs = true;
+        deleterOptions.fromMigrate = true;
+        // Must wait for cursors since there can be existing cursors with an older
+        // CollectionMetadata.
+        deleterOptions.waitForOpenCursors = true;
+        deleterOptions.removeSaverReason = "cleanup-cmd";
 
+        if (!getDeleter()->deleteNow(txn, deleterOptions, errMsg)) {
             warning() << *errMsg << endl;
             return CleanupResult_Error;
         }

@@ -80,7 +80,7 @@ namespace mongo {
 
         if (_isServerSet) builder.append(server(), _server);
         if (_isTimeSet) builder.append(time(), _time);
-        if (_isWhatSet) builder.append(what(), _time);
+        if (_isWhatSet) builder.append(what(), _what);
         if (_isDetailsSet) builder.append(details(), _details);
 
         return builder.obj();

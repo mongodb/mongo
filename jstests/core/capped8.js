@@ -13,8 +13,8 @@ function obj( size, x ) {
     return {X:x, a:new Array( size + 1 ).toString()};;
 }
 
-function withinOne( a, b ) {
-    assert( Math.abs( a - b ) <= 1, "not within one: " + a + ", " + b )
+function withinTwo( a, b ) {
+    assert( Math.abs( a - b ) <= 2, "not within one: " + a + ", " + b )
 }
 
 var X = 0;
@@ -66,14 +66,15 @@ function insertAndTruncate( first ) {
     } else {
         // Check that we are able to insert roughly the same number of documents
         // after truncating.  The exact values are slightly variable as a result
-        // of the capped allocation algorithm.
-        withinOne( initialCount, myInitialCount );
-        withinOne( fiftyCount, myFiftyCount );
-        withinOne( twokCount, myTwokCount );
+        // of the capped allocation algorithm and where the remaining entry is.
+        withinTwo( initialCount, myInitialCount );
+        withinTwo( fiftyCount, myFiftyCount );
+        withinTwo( twokCount, myTwokCount );
     }
     count = t.count();
     // Check that we can truncate the collection successfully.
     assert.commandWorked( db.runCommand( { captrunc:"jstests_capped8", n:count - 1, inc:false } ) );
+    assert.eq( 1, t.count() );
 }
 
 /** Test truncating and subsequent inserts */

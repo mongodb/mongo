@@ -44,13 +44,15 @@ namespace mongo {
                             BSONObj pattern,
                             bool justOne,
                             bool logop,
-                            bool god) {
+                            bool god,
+                            bool fromMigrate) {
         NamespaceString nsString(ns);
         DeleteRequest request(txn, nsString);
         request.setQuery(pattern);
         request.setMulti(!justOne);
         request.setUpdateOpLog(logop);
         request.setGod(god);
+        request.setFromMigrate(fromMigrate);
         DeleteExecutor executor(&request);
         return executor.execute(db);
     }

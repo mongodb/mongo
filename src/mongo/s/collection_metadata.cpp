@@ -607,6 +607,7 @@ namespace mongo {
             // bounds of the surrounding ranges in both maps.
             //
 
+            range->keyPattern = _keyPattern;
             range->minKey = getMinKey();
             range->maxKey = maxKey;
 

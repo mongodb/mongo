@@ -719,7 +719,7 @@ ReplSetTest.prototype.restart = function( n , options, signal, wait ){
         signal = undefined
     }
     
-    this.stop( n, signal, wait && wait.toFixed ? wait : true, options )
+    this.stop(n, signal, options);
     started = this.start( n , options , true, wait );
 
     if (jsTestOptions().keyFile || jsTestOptions().useX509) {
@@ -735,21 +735,20 @@ ReplSetTest.prototype.restart = function( n , options, signal, wait ){
     return started;
 }
 
-ReplSetTest.prototype.stopMaster = function( signal , wait, opts ) {
+ReplSetTest.prototype.stopMaster = function(signal, opts) {
     var master = this.getMaster();
     var master_id = this.getNodeId( master );
-    return this.stop( master_id , signal , wait, opts );
+    return this.stop(master_id, signal, opts);
 }
 
 /**
  * Stops a particular node or nodes, specified by conn or id
  *
- * @param {number} n the index of the replica set member to stop
+ * @param {number|Mongo} n the index or connection object of the replica set member to stop.
  * @param {number} signal the signal number to use for killing
- * @param {boolean} wait
  * @param {Object} opts @see MongoRunner.stopMongod
  */
-ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */, opts ){
+ReplSetTest.prototype.stop = function(n, signal, opts) {
         
     // Flatten array of nodes to stop
     if( n.length ){
@@ -757,7 +756,7 @@ ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */, opt
         
         var stopped = []
         for( var i = 0; i < nodes.length; i++ ){
-            if( this.stop( nodes[i], signal, wait, opts ) )
+            if (this.stop(nodes[i], signal, opts))
                 stopped.push( nodes[i] )
         }
         
@@ -766,31 +765,18 @@ ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */, opt
     
     // Can specify wait as second parameter, if using default signal
     if( signal == true || signal == false ){
-        wait = signal
         signal = undefined
-    }
-    
-    wait = wait || false
-    if( ! wait.toFixed ){
-        if( wait ) wait = 0
-        else wait = -1
     }
     
     var port = this.getPort( n );
     print('ReplSetTest stop *** Shutting down mongod in port ' + port + ' ***');
     var ret = MongoRunner.stopMongod( port , signal, opts );
-    
-    if( ! ret || wait < 0 ) {
-        print('ReplSetTest stop *** Mongod in port ' + port + ' shutdown with code (' 
-                    + ret + '), wait (' + wait + ') ***');
-        return ret;
-    }
-    
-    // Wait for shutdown
-    this.waitForHealth( n, this.DOWN, wait )
 
-    return true
-}
+    print('ReplSetTest stop *** Mongod in port ' + port +
+          ' shutdown with code (' + ret + ') ***');
+
+    return ret;
+};
 
 /**
  * Kill all members of this replica set.
@@ -802,7 +788,7 @@ ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */, opt
  */
 ReplSetTest.prototype.stopSet = function( signal , forRestart, opts ) {
     for(var i=0; i < this.ports.length; i++) {
-        this.stop( i, signal, false, opts );
+        this.stop(i, signal, opts);
     }
     if ( forRestart ) { return; }
     if ( this._alldbpaths ){
@@ -845,8 +831,9 @@ ReplSetTest.prototype.waitForMaster = function( timeout ){
  * Wait for a health indicator to go to a particular state or states.
  * 
  * @param node is a single node or list of nodes, by id or conn
- * @param state is a single state or list of states
- * 
+ * @param state is a single state or list of states. ReplSetTest.Health.DOWN can
+ *     only be used in cases when there is a primary available or slave[0] can
+ *     respond to the isMaster command.
  */
 ReplSetTest.prototype.waitForHealth = function( node, state, timeout ){
     this.waitForIndicator( node, state, "health", timeout )    
@@ -987,7 +974,7 @@ ReplSetTest.prototype.overflow = function( secondaries ){
     overflowColl.insert({ replicated : "value" })
     this.awaitReplication()
     
-    this.stop( secondaries, undefined, 5 * 60 * 1000 )
+    this.stop(secondaries);
         
     var count = master.getDB("local").oplog.rs.count();
     var prevCount = -1;

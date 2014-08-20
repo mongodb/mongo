@@ -40,4 +40,14 @@ namespace mongo {
      */
     void setupSynchronousSignalHandlers();
 
+    /**
+     * Report out of memory error with a stack trace and exit.
+     *
+     * Called when any of the following functions fails to allocate memory:
+     *     operator new
+     *     mongoMalloc
+     *     mongoRealloc
+     */
+    void reportOutOfMemoryErrorAndExit();
+
 }  // namespace mongo

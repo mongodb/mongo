@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/user_management_commands.h"
@@ -397,7 +399,8 @@ namespace mongo {
 #ifdef MONGO_SSL
             if (args.userName.getDB() == "$external" &&
                 getSSLManager() && 
-                getSSLManager()->getServerSubjectName() == args.userName.getUser()) {
+                getSSLManager()->getSSLConfiguration()
+                    .serverSubjectName == args.userName.getUser()) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::BadValue,

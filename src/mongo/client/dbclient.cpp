@@ -646,8 +646,8 @@ namespace mongo {
             uassert(ErrorCodes::AuthenticationFailed,
                     "Username \"" + user + 
                     "\" does not match the provided client certificate user \"" +
-                    getSSLManager()->getClientSubjectName() + "\"",
-                    user ==  getSSLManager()->getClientSubjectName());
+                    getSSLManager()->getSSLConfiguration().clientSubjectName + "\"",
+                    user ==  getSSLManager()->getSSLConfiguration().clientSubjectName);
 
             BSONObj result;
             uassert(result["code"].Int(),

@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/state_box.h"
 
+#include "mongo/db/repl/rslog.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

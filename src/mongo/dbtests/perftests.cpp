@@ -50,6 +50,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
 #include "mongo/util/concurrency/qlock.h"
@@ -896,7 +897,7 @@ namespace PerfTests {
         virtual bool showDurStats() { return false; }
         virtual int howLongMillis() { return 4000; }
         void prep() {
-            p = malloc(sz);
+            p = mongoMalloc(sz);
             // this isn't a fair test as it is mostly rands but we just want a rough perf check
             static int last;
             for (unsigned i = 0; i<sz; i++) {

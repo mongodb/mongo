@@ -63,7 +63,7 @@ jsTest.log("Stopping primary of third shard...");
 
 mongosConnIdle = new Mongo( mongos.host );
 
-st.rs2.stop(st.rs2.getPrimary(), true /*wait for stop*/ );
+st.rs2.stop(st.rs2.getPrimary());
 
 jsTest.log("Testing active connection with third primary down...");
 
@@ -110,7 +110,7 @@ mongosConnIdle = new Mongo( mongos.host );
 // Need to save this node for later
 var rs1Secondary = st.rs1.getSecondary();
 
-st.rs1.stop(st.rs1.getPrimary(), true /* wait for stop */);
+st.rs1.stop(st.rs1.getPrimary());
 
 jsTest.log("Testing active connection with second primary down...");
 
@@ -309,7 +309,7 @@ jsTest.log("Stopping primary of first shard...");
 
 mongosConnIdle = new Mongo( mongos.host );
 
-st.rs0.stop(st.rs0.getPrimary(), true /*wait for stop*/ );
+st.rs0.stop(st.rs0.getPrimary());
 
 jsTest.log("Testing active connection with first primary down...");
 
@@ -358,7 +358,7 @@ jsTest.log("Stopping second shard...");
 
 mongosConnIdle = new Mongo( mongos.host );
 
-st.rs1.stop(rs1Secondary, true /* wait for stop */);
+st.rs1.stop(rs1Secondary);
 
 jsTest.log("Testing active connection with second shard down...");
 

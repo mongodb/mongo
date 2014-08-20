@@ -59,24 +59,51 @@ namespace mongo {
     class MONGO_CLIENT_API BSONObjBuilder : boost::noncopyable {
     public:
         /** @param initsize this is just a hint as to the final size of the object */
-        BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize + sizeof(unsigned)), _offset( sizeof(unsigned) ), _s( this ) , _tracker(0) , _doneCalled(false) {
-            _b.appendNum((unsigned)0); // ref-count
-            _b.skip(4); /*leave room for size field and ref-count*/
+        BSONObjBuilder(int initsize=512)
+            : _b(_buf)
+            , _buf(sizeof(BSONObj::Holder) + initsize)
+            , _offset(sizeof(BSONObj::Holder))
+            , _s(this)
+            , _tracker(0)
+            , _doneCalled(false) {
+            // Reserve space for a holder object at the beginning of the buffer, followed by
+            // space for the object length. The length is filled in by _done.
+            _b.skip(sizeof(BSONObj::Holder));
+            _b.skip(sizeof(int));
         }
 
         /** @param baseBuilder construct a BSONObjBuilder using an existing BufBuilder
          *  This is for more efficient adding of subobjects/arrays. See docs for subobjStart for example.
          */
-        BSONObjBuilder( BufBuilder &baseBuilder ) : _b( baseBuilder ), _buf( 0 ), _offset( baseBuilder.len() ), _s( this ) , _tracker(0) , _doneCalled(false) {
-            _b.skip( 4 );
+        BSONObjBuilder(BufBuilder &baseBuilder)
+            : _b(baseBuilder)
+            , _buf(0)
+            , _offset(baseBuilder.len())
+            , _s(this)
+            , _tracker(0)
+            , _doneCalled(false) {
+            // Reserve space for the object length, which is filled in by _done. We don't need a holder
+            // since we are a sub-builder, and some parent builder has already made the reservation.
+            _b.skip(sizeof(int));
         }
 
-        BSONObjBuilder( const BSONSizeTracker & tracker ) : _b(_buf) , _buf(tracker.getSize() + sizeof(unsigned) ), _offset( sizeof(unsigned) ), _s( this ) , _tracker( (BSONSizeTracker*)(&tracker) ) , _doneCalled(false) {
-            _b.appendNum((unsigned)0); // ref-count
-            _b.skip(4);
+        BSONObjBuilder( const BSONSizeTracker & tracker )
+            : _b(_buf)
+            , _buf(sizeof(BSONObj::Holder) + tracker.getSize())
+            , _offset(sizeof(BSONObj::Holder))
+            , _s(this)
+            , _tracker(const_cast<BSONSizeTracker*>(&tracker))
+            , _doneCalled(false) {
+            // See the comments in the first constructor for details.
+            _b.skip(sizeof(BSONObj::Holder));
+            _b.skip(sizeof(int));
         }
 
         ~BSONObjBuilder() {
+            // If 'done' has not already been called, and we have a reference to an owning
+            // BufBuilder but do not own it ourselves, then we must call _done to write in the
+            // length. Otherwise, we own this memory and its lifetime ends with us, therefore
+            // we can elide the write.
             if ( !_doneCalled && _b.buf() && _buf.getSize() == 0 ) {
                 _done();
             }
@@ -565,12 +592,11 @@ namespace mongo {
          * @return owned BSONObj
         */
         BSONObj obj() {
-            bool own = owned();
-            massert( 10335 , "builder does not own memory", own );
+            massert( 10335 , "builder does not own memory", owned() );
             doneFast();
-            BSONObj::Holder* h = (BSONObj::Holder*)_b.buf();
-            decouple(); // sets _b.buf() to NULL
-            return BSONObj(h);
+            char* buf = _b.buf();
+            decouple();
+            return BSONObj::takeOwnership(buf);
         }
 
         /** Fetch the object we have built.

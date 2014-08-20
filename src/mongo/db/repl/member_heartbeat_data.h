@@ -91,6 +91,12 @@ namespace repl {
          */
         void setDownValues(Date_t now, const std::string& heartbeatMessage);
 
+        /**
+         * Sets values in this object that indicate there was an auth issue on the last heartbeat
+         * command.
+         */
+        void setAuthIssue();
+
     private:
         // This member's index into the ReplicaSetConfig
         int _configIndex;

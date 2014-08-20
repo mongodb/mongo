@@ -35,6 +35,7 @@
 #include "mongo/platform/cstdint.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/encoded_value_storage.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
@@ -379,7 +380,7 @@ namespace mongo {
                  i != _data.end(); ++i) {
                 totalSize += i->second;
             }
-            char *buf = (char*)malloc( totalSize );
+            char *buf = (char*)mongoMalloc( totalSize );
             char *p = buf;
             for (std::vector< std::pair< char *, int > >::const_iterator i = _data.begin();
                  i != _data.end(); ++i) {
@@ -451,7 +452,7 @@ namespace mongo {
         void setData(int operation, const char *msgdata, size_t len) {
             verify( empty() );
             size_t dataLen = len + sizeof(MsgData::Value) - 4;
-            MsgData::View d = reinterpret_cast<char *>(malloc(dataLen));
+            MsgData::View d = reinterpret_cast<char *>(mongoMalloc(dataLen));
             memcpy(d.data(), msgdata, len);
             d.setLen(dataLen);
             d.setOperation(operation);

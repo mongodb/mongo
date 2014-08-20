@@ -33,6 +33,7 @@
 #include "mongo/db/repl/health.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rslog.h"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -120,7 +121,7 @@ namespace repl {
                 catch(...) { s << "error summarizing replset status\n"; }
             }
             s << p("Recent replset log activity:");
-            fillRsLog(s);
+            fillRsLog(&s);
             s << _end();
             return s.str();
         }

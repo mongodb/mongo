@@ -52,6 +52,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/rs_initiate.h"
+#include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/write_concern_options.h"
@@ -389,12 +390,13 @@ namespace {
             if (rid != getMyRID(txn)) {
                 BSONObj config;
                 if (getReplicationMode() == modeReplSet) {
+                    invariant(_ridMemberMap.count(rid));
                     Member* mem = _ridMemberMap[rid];
                     invariant(mem);
                     config = BSON("_id" << mem->id());
                 }
                 LOG(2) << "received notification that node with RID " << rid << " and config "
-                       << config << " has reached optime: " << ts.toStringPretty();
+                       << config << " has reached optime: " << ts;
 
                 // This is what updates the progress information used for satisfying write concern
                 // and wakes up threads waiting for replication.

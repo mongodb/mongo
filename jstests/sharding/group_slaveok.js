@@ -32,7 +32,7 @@ var primary = rst.getPrimary()
 var sec = rst.getSecondary()
 
 // Data now inserted... stop the master, since only two in set, other will still be secondary
-rst.stop( rst.getMaster(), undefined, true )
+rst.stop(rst.getMaster());
 printjson( rst.status() )
 
 // Wait for the mongos to recognize the slave

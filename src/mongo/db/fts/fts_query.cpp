@@ -42,9 +42,10 @@ namespace mongo {
 
         using namespace mongoutils;
 
-        Status FTSQuery::parse(const string& query, const StringData& language) {
+        Status FTSQuery::parse(const string& query, const StringData& language,
+                               TextIndexVersion textIndexVersion) {
             _search = query;
-            StatusWithFTSLanguage swl = FTSLanguage::make( language, TEXT_INDEX_VERSION_2 );
+            StatusWithFTSLanguage swl = FTSLanguage::make( language, textIndexVersion );
             if ( !swl.getStatus().isOK() ) {
                 return swl.getStatus();
             }
