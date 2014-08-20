@@ -28,6 +28,7 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
 #pragma once

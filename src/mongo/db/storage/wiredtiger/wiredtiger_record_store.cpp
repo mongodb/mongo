@@ -66,6 +66,18 @@ namespace mongo {
             invariant(_cappedMaxSize == -1);
             invariant(_cappedMaxDocs == -1);
         }
+
+#if 0
+        iter->SeekToLast();
+        if (iter->Valid()) {
+            rocksdb::Slice lastSlice = iter->key();
+            DiskLoc lastLoc = _makeDiskLoc( lastSlice );
+            _nextIdNum.store( lastLoc.getOfs() + ( uint64_t( lastLoc.a() ) << 32 ) + 1) ;
+        }
+        else {
+#endif
+        // Need to start at 1 so we are always higher than minDiskLoc
+        _nextIdNum.store( 1 );
     }
 
     WiredTigerRecordStore::~WiredTigerRecordStore() { }
@@ -179,6 +191,7 @@ namespace mongo {
         DiskLoc loc = _nextId();
         c->set_key(c, _makeKey(loc).Get());
         c->set_value(c, WiredTigerItem(data, len).Get());
+	fprintf(stderr, "inserting into record store, loc %s\n", loc.toString().c_str());
         int ret = c->insert(c);
         invariant(ret == 0);
 
@@ -209,6 +222,7 @@ namespace mongo {
         DiskLoc loc = _nextId();
         c->set_key(c, _makeKey(loc).Get());
         c->set_value(c, WiredTigerItem(buf.get(), len).Get());
+	fprintf(stderr, "inserting into record store, loc %s\n", loc.toString().c_str());
         int ret = c->insert(c);
         invariant(ret == 0);
 
@@ -362,7 +376,6 @@ namespace mongo {
     }
 
 
-    // AFB: is there a way to force column families to be cached in rocks?
     Status WiredTigerRecordStore::touch( OperationContext* txn, BSONObjBuilder* output ) const {
         return Status::OK();
     }
@@ -384,11 +397,11 @@ namespace mongo {
     }
 
     DiskLoc WiredTigerRecordStore::_nextId() {
-        boost::mutex::scoped_lock lk( _idLock );
-        int ofs = _nextIdNum >> 32;
-        int a = (_nextIdNum << 32 ) >> 32;
+        const uint64_t myId = _nextIdNum.fetchAndAdd(1);
+        int a = myId >> 32;
+        // This masks the lowest 4 bytes of myId
+        int ofs = myId & 0x00000000FFFFFFFF;
         DiskLoc loc( a, ofs );
-        _nextIdNum++;
         return loc;
     }
 
@@ -461,6 +474,7 @@ namespace mongo {
         int ret = c->reset(c);
         invariant(ret == 0);
         _eof = true;
+	printf("invalidated!\n");
     }
 
     void WiredTigerRecordStore::Iterator::saveState() {

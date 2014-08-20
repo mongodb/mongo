@@ -101,7 +101,7 @@ namespace mongo {
             if ( !exists( dbpath ) )
                 MONGO_ASSERT_ON_EXCEPTION(boost::filesystem::create_directory(dbpath));
             WT_CONNECTION *conn;
-            int ret = wiredtiger_open(dbpath.string().c_str(), NULL, "create", &conn);
+            int ret = wiredtiger_open(dbpath.string().c_str(), NULL, "create,extensions=[local=(entry=index_collator_extension)]", &conn);
             invariant(ret == 0);
             // The WiredTigerDatabase lifespan is currently tied to a
             // WiredTigerDatabaseCatalogEntry. In future we may want to split

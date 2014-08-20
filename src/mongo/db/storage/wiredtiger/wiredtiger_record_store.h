@@ -34,6 +34,8 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/capped_callback.h"
+#include "mongo/platform/atomic_word.h"
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
 
 namespace mongo {
@@ -189,7 +191,7 @@ namespace mongo {
         const int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
 
-        uint64_t _nextIdNum;
+        AtomicUInt64 _nextIdNum;
         long long _dataSize;
         long long _numRecords;
         mutable boost::mutex _idLock;
