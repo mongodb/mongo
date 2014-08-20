@@ -24,15 +24,20 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, int *startp)
 	conn = S2C(session);
 
 	/*
-	 * The checkpoint configuration requires a wait time -- if it's not set,
-	 * we're not running at all.
+	 * The checkpoint configuration requires a wait time and/or a log
+	 * size -- if one is not set, we're not running at all.
+	 * Checkpoints based on log size also require logging be enabled.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.wait", &cval));
-	if (cval.val == 0) {
+	conn->ckpt_usecs = (long)cval.val * 1000000;
+	WT_RET(__wt_config_gets(session, cfg, "checkpoint.log_size", &cval));
+	conn->ckpt_logsize = (off_t)cval.val;
+	__wt_log_written_reset(session);
+	if ((conn->ckpt_usecs == 0 && conn->ckpt_logsize == 0) ||
+	    (conn->ckpt_logsize && !conn->logging && conn->ckpt_usecs == 0)) {
 		*startp = 0;
 		return (0);
 	}
-	conn->ckpt_usecs = (long)cval.val * 1000000;
 	*startp = 1;
 
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.name", &cval));
@@ -71,7 +76,14 @@ __ckpt_server(void *arg)
 		/* Checkpoint the database. */
 		WT_ERR(wt_session->checkpoint(wt_session, conn->ckpt_config));
 
-		/* Wait... */
+		/* Reset. */
+		if (conn->ckpt_logsize)
+			__wt_log_written_reset(session);
+		/*
+		 * Wait...
+		 * NOTE: If the user only configured logsize, then usecs
+		 * will be 0 and this wait won't return until signalled.
+		 */
 		WT_ERR_TIMEDOUT_OK(
 		    __wt_cond_wait(session, conn->ckpt_cond, conn->ckpt_usecs));
 	}

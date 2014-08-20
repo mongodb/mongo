@@ -27,6 +27,26 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 }
 
 /*
+ * __wt_log_written_reset --
+ *	Interface to reset the amount of log written during this
+ *	during this checkpoint period.  Called from the checkpoint code.
+ */
+void
+__wt_log_written_reset(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	if (!conn->logging)
+		return;
+	log = conn->log;
+	log->log_written = 0;
+	log->log_ckpt_signalled = 0;
+	return;
+}
+
+/*
  * __wt_log_get_files --
  *	Retrieve the list of all existing log files.
  */
@@ -446,6 +466,27 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 		if (log->log_close_fh != NULL)
 			F_SET(slot, SLOT_CLOSEFH);
 	}
+	/*
+	 * Checkpoints can be configured based on amount of log written.
+	 * Add in this log record to the sum and if needed, signal the
+	 * checkpoint condition.  The logging subsystem manages the
+	 * accumulated field.  There is a bit of layering violation
+	 * here checking the connection ckpt field and using its
+	 * condition.
+	 */
+	if (conn->ckpt_logsize != 0) {
+		log->log_written += recsize;
+		/*
+		 * It is okay if two or more threads signal, but we
+		 * don't want to be signalling the entire time a
+		 * checkpoint is in progress.  So try to signal only
+		 * once, but we don't want to take a lock.
+		 */
+		if (log->log_written >= conn->ckpt_logsize &&
+		    !log->log_ckpt_signalled++)
+			WT_RET(__wt_cond_signal(session, conn->ckpt_cond));
+	}
+
 	/*
 	 * Need to minimally fill in slot info here.  Our slot start LSN
 	 * comes after any potential new log file creations.
