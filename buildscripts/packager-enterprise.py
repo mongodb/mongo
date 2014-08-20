@@ -49,7 +49,7 @@ REPOPATH="/var/www/repo"
 ARCHES=["x86_64"]
 
 # Made up names for the flavors of distribution we package for.
-DISTROS=["debian","redhat","ubuntu"]
+DISTROS=["suse", "debian","redhat","ubuntu"]
 
 
 class Spec(object):
@@ -93,7 +93,7 @@ class Spec(object):
         # our upstream version too).
         if re.search("^(debian|ubuntu)", distro.name()):
             return re.sub("-", "~", self.ver)
-        elif re.search("(redhat|fedora|centos)", distro.name()):
+        elif re.search("(suse|redhat|fedora|centos)", distro.name()):
             return re.sub("\\d+-", "", self.ver)
         else:
             raise Exception("BUG: unsupported platform?")
@@ -122,7 +122,7 @@ class Distro(object):
     def archname(self, arch):
         if re.search("^(debian|ubuntu)", self.n):
             return "i386" if arch.endswith("86") else "amd64"
-        elif re.search("^(centos|redhat|fedora)", self.n):
+        elif re.search("^(suse|centos|redhat|fedora)", self.n):
             return "i686" if arch.endswith("86") else "x86_64"
         else:
             raise Exception("BUG: unsupported platform?")
@@ -147,12 +147,17 @@ class Distro(object):
         repo/yum/redhat/6/mongodb-enterprise/2.5/x86_64
         yum/redhat/6/mongodb-enterprise/2.5/i386
 
+        repo/zypper/suse/11/mongodb-enterprise/2.5/x86_64
+        zypper/suse/11/mongodb-enterprise/2.5/i386
+
         """
 
         if re.search("^(debian|ubuntu)", self.n):
             return "repo/apt/%s/dists/%s/mongodb-enterprise/%s/%s/binary-%s/" % (self.n, self.repo_os_version(build_os), spec.branch(), self.repo_component(), self.archname(arch))
         elif re.search("(redhat|fedora|centos)", self.n):
             return "repo/yum/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), spec.branch(), self.archname(arch))
+        elif re.search("(suse)", self.n):
+            return "repo/zypper/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), spec.branch(), self.archname(arch))
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -169,7 +174,9 @@ class Distro(object):
     def repo_os_version(self, build_os):
         """Return an OS version suitable for package repo directory
         naming - e.g. 5, 6 or 7 for redhat/centos, "precise," "wheezy," etc.
-        for Ubuntu/Debian"""
+        for Ubuntu/Debian, 11 for suse"""
+        if self.n == 'suse':
+            return re.sub(r'^suse(\d+)$', r'\1', build_os)
         if self.n == 'redhat':
             return re.sub(r'^rhel(\d).*$', r'\1', build_os)
         elif self.n == 'ubuntu':
@@ -190,15 +197,18 @@ class Distro(object):
     def make_pkg(self, build_os, arch, spec, srcdir):
         if re.search("^(debian|ubuntu)", self.n):
             return make_deb(self, build_os, arch, spec, srcdir)
-        elif re.search("^(centos|redhat|fedora)", self.n):
+        elif re.search("^(suse|centos|redhat|fedora)", self.n):
             return make_rpm(self, build_os, arch, spec, srcdir)
         else:
             raise Exception("BUG: unsupported platform?")
 
     def build_os(self):
         """Return the build os label in the binary package to download ("rhel57", "rhel62" and "rhel70"
-        for redhat, "ubuntu1204" and "ubuntu1404" for Ubuntu and "debian71" for Debian)"""
+        for redhat, "ubuntu1204" and "ubuntu1404" for Ubuntu, "debian71" for Debian), and "suse11"
+        for SUSE)"""
 
+        if re.search("(suse)", self.n):
+            return [ "suse11" ]
         if re.search("(redhat|fedora|centos)", self.n):
             return [ "rhel70", "rhel62", "rhel57" ]
         elif self.n == 'ubuntu':
@@ -391,7 +401,7 @@ def make_package(distro, build_os, arch, spec, srcdir):
 def make_repo(repodir, distro, build_os, spec):
     if re.search("(debian|ubuntu)", repodir):
         make_deb_repo(repodir, distro, build_os, spec)
-    elif re.search("(centos|redhat|fedora)", repodir):
+    elif re.search("(suse|centos|redhat|fedora)", repodir):
         make_rpm_repo(repodir)
     else:
         raise Exception("BUG: unsupported platform?")
@@ -601,6 +611,13 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
     # Create the specfile.
     suffix=spec.suffix()
     sdir=setupdir(distro, build_os, arch, spec)
+
+    # Use special suse init script if we're building for SUSE 
+    #
+    if distro.name() == "suse":
+        os.unlink(sdir+"rpm/init.d-mongod")
+        os.link(sdir+"rpm/init.d-mongod.suse", sdir+"rpm/init.d-mongod")
+
     specfile=srcdir+"rpm/mongodb%s.spec" % suffix
     topdir=ensure_dir('%s/rpmbuild/%s/' % (os.getcwd(), build_os))
     for subdir in ["BUILD", "RPMS", "SOURCES", "SPECS", "SRPMS"]:

@@ -48,13 +48,13 @@ REPOPATH="/var/www/repo"
 ARCHES=["i686", "x86_64"]
 
 # Made up names for the flavors of distribution we package for.
-DISTROS=["debian-sysvinit", "ubuntu-upstart", "redhat"]
+DISTROS=["suse", "debian-sysvinit", "ubuntu-upstart", "redhat"]
 
 # When we're preparing a directory containing packaging tool inputs
 # and our binaries, use this relative subdirectory for placing the
 # binaries.
 BINARYDIR="BINARIES"
-
+
 class Spec(object):
     def __init__(self, specstr):
         tup = specstr.split(":")
@@ -96,7 +96,7 @@ class Spec(object):
         # our upstream version too).
         if re.search("^(debian|ubuntu)", distro.name()):
             return re.sub("-", "~", self.ver)                
-        elif re.search("(redhat|fedora|centos)", distro.name()):
+        elif re.search("(suse|redhat|fedora|centos)", distro.name()):
             return re.sub("\\d+-", "", self.ver)
         else:
             raise Exception("BUG: unsupported platform?")
@@ -116,13 +116,13 @@ class Distro(object):
     def pkgbase(self):
         # pkgbase is the first part of the package's name on
         # this distro (pre-2.5.3 was "mongo" for redhat and 
-        # "mongodb" for debian"
+        # "mongodb" for debian")
         return "mongodb"
 
     def archname(self, arch):
         if re.search("^(debian|ubuntu)", self.n):
             return "i386" if arch.endswith("86") else "amd64"
-        elif re.search("^(centos|redhat|fedora)", self.n):
+        elif re.search("^(suse|centos|redhat|fedora)", self.n):
             return "i686" if arch.endswith("86") else "x86_64"
         else:
             raise Exception("BUG: unsupported platform?")
@@ -134,7 +134,7 @@ class Distro(object):
         tools place the package files)."""
         if re.search("^(debian|ubuntu)", self.n):
             return "repo/%s/dists/dist/10gen/binary-%s/" % (self.n, self.archname(arch))
-        elif re.search("(redhat|fedora|centos)", self.n):
+        elif re.search("(suse|redhat|fedora|centos)", self.n):
             return "repo/%s/os/%s/RPMS/" % (self.n, self.archname(arch))
         else:
             raise Exception("BUG: unsupported platform?")
@@ -142,7 +142,7 @@ class Distro(object):
     def make_pkg(self, arch, spec, srcdir):
         if re.search("^(debian|ubuntu)", self.n):
             return make_deb(self, arch, spec, srcdir)
-        elif re.search("^(centos|redhat|fedora)", self.n):
+        elif re.search("^(suse|centos|redhat|fedora)", self.n):
             return make_rpm(self, arch, spec, srcdir)
         else:
             raise Exception("BUG: unsupported platform?")
@@ -346,7 +346,7 @@ def make_package(distro, arch, spec, srcdir):
 def make_repo(repodir):
     if re.search("(debian|ubuntu)", repodir):
         make_deb_repo(repodir)
-    elif re.search("(centos|redhat|fedora)", repodir):
+    elif re.search("(suse|centos|redhat|fedora)", repodir):
         make_rpm_repo(repodir)
     else:
         raise Exception("BUG: unsupported platform?")
@@ -557,6 +557,13 @@ def make_rpm(distro, arch, spec, srcdir):
     # Create the specfile.
     suffix=spec.suffix()
     sdir=setupdir(distro, arch, spec)
+
+    # Use special suse init script if we're building for SUSE 
+    #
+    if distro.name() == "suse":
+        os.unlink(sdir+"rpm/init.d-mongod")
+        os.link(sdir+"rpm/init.d-mongod.suse", sdir+"rpm/init.d-mongod")
+
     specfile=srcdir+"rpm/mongodb%s.spec" % suffix
     topdir=ensure_dir(os.getcwd()+'/rpmbuild/')
     for subdir in ["BUILD", "RPMS", "SOURCES", "SPECS", "SRPMS"]:

@@ -133,9 +133,9 @@ do
   fi
 done
 
-for redhat_dir in $(find "$repodir"/yum/redhat -type d -name x86_64 -o -name i386)
+for rpm_dir in $(find "$repodir"/yum/redhat "$repodir"/zypper/suse -type d -name x86_64 -o -name i386)
 do
-  echo "Generating redhat repo metadata under $redhat_dir"
-  cd "$redhat_dir"
+  echo "Generating redhat repo metadata under $rpm_dir"
+  cd "$rpm_dir"
   createrepo .
 done
