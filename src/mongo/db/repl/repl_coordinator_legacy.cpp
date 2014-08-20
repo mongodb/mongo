@@ -949,11 +949,11 @@ namespace {
         return Status::OK();
     }
 
-    Status LegacyReplicationCoordinator::processReplSetSyncFrom(const std::string& target,
+    Status LegacyReplicationCoordinator::processReplSetSyncFrom(const HostAndPort& target,
                                                                 BSONObjBuilder* resultObj) {
-        resultObj->append("syncFromRequested", target);
+        resultObj->append("syncFromRequested", target.toString());
 
-        return theReplSet->forceSyncFrom(target, resultObj);
+        return theReplSet->forceSyncFrom(target.toString(), resultObj);
     }
 
     Status LegacyReplicationCoordinator::processReplSetUpdatePosition(

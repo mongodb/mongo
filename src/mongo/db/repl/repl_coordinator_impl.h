@@ -129,7 +129,7 @@ namespace repl {
                                                  bool activate,
                                                  BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetSyncFrom(const std::string& target,
+        virtual Status processReplSetSyncFrom(const HostAndPort& target,
                                               BSONObjBuilder* resultObj);
 
         virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj);

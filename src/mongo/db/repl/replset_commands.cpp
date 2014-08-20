@@ -340,10 +340,14 @@ namespace repl {
             if (!status.isOK())
                 return appendCommandStatus(result, status);
 
-            string newTarget = cmdObj["replSetSyncFrom"].valuestrsafe();
+            HostAndPort targetHostAndPort;
+            status = targetHostAndPort.initialize(cmdObj["replSetSyncFrom"].valuestrsafe());
+            if (!status.isOK())
+                return appendCommandStatus(result, status);
+
             return appendCommandStatus(
                     result,
-                    getGlobalReplicationCoordinator()->processReplSetSyncFrom(newTarget,
+                    getGlobalReplicationCoordinator()->processReplSetSyncFrom(targetHostAndPort,
                                                                               &result));
         }
     } cmdReplSetSyncFrom;

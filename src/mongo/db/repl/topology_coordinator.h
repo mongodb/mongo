@@ -90,7 +90,7 @@ namespace repl {
 
         // produces a reply to a replSetSyncFrom command
         virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackData& data,
-                                             int targetIndex,
+                                             const HostAndPort& target,
                                              const OpTime& lastOpApplied,
                                              BSONObjBuilder* response,
                                              Status* result) = 0;

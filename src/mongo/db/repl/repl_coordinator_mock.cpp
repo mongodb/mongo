@@ -154,7 +154,7 @@ namespace repl {
         return false;
     }
 
-    Status ReplicationCoordinatorMock::processReplSetSyncFrom(const std::string& target,
+    Status ReplicationCoordinatorMock::processReplSetSyncFrom(const HostAndPort& target,
                                                               BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();

@@ -278,7 +278,7 @@ namespace repl {
 
     void TopologyCoordinatorImpl::prepareSyncFromResponse(
             const ReplicationExecutor::CallbackData& data,
-            int targetIndex,
+            const HostAndPort& target,
             const OpTime& lastOpApplied,
             BSONObjBuilder* response,
             Status* result) {
@@ -287,28 +287,72 @@ namespace repl {
             return;
         }
 
-        const MemberConfig& targetConfig = _currentConfig.getMemberAt(targetIndex);
+        response->append("syncFromRequested", target.toString());
+
+        const MemberConfig& selfConfig = _selfConfig();
+        if (selfConfig.isArbiter()) {
+            *result = Status(ErrorCodes::NotSecondary, "arbiters don't sync");
+            return;
+        }
+        if (_selfIndex == _currentPrimaryIndex) {
+            *result = Status(ErrorCodes::NotSecondary, "primaries don't sync");
+            return;
+        }
+
+        ReplicaSetConfig::MemberIterator targetConfig = _currentConfig.membersEnd();
+        int targetIndex = 0;
+        for (ReplicaSetConfig::MemberIterator it = _currentConfig.membersBegin();
+                it != _currentConfig.membersEnd(); ++it) {
+            if (it->getHostAndPort() == target) {
+                targetConfig = it;
+                break;
+            }
+            ++targetIndex;
+        }
+        if (targetConfig == _currentConfig.membersEnd()) {
+            *result = Status(ErrorCodes::NodeNotFound,
+                             str::stream() << "Could not find member \"" << target.toString() <<
+                                     "\" in replica set");
+            return;
+        }
+        if (targetIndex == _selfIndex) {
+            *result = Status(ErrorCodes::InvalidOptions, "I cannot sync from myself");
+            return;
+        }
+        if (targetConfig->isArbiter()) {
+            *result = Status(ErrorCodes::InvalidOptions,
+                             str::stream() << "Cannot sync from \"" << target.toString() <<
+                                     "\" because it is an arbiter");
+            return;
+        }
+        if (!targetConfig->shouldBuildIndexes() && selfConfig.shouldBuildIndexes()) {
+            *result = Status(ErrorCodes::InvalidOptions,
+                             str::stream() << "Cannot sync from \"" << target.toString() <<
+                                     "\" because it does not build indexes");
+            return;
+        }
+
         const MemberHeartbeatData& hbdata = _hbdata[targetIndex];
-        const std::string targetHostAndPort = targetConfig.getHostAndPort().toString();
         if (hbdata.hasAuthIssue()) {
             *result = Status(ErrorCodes::Unauthorized,
-                             "not authorized to communicate with " + targetHostAndPort);
+                             str::stream() << "not authorized to communicate with " <<
+                                     target.toString());
             return;
         }
         if (hbdata.getHealth() == 0) {
             *result = Status(ErrorCodes::HostUnreachable,
-                             str::stream() << "I cannot reach the requested member: \"" <<
-                                     targetHostAndPort << "\"");
+                             str::stream() << "I cannot reach the requested member: " <<
+                                     target.toString());
             return;
         }
         if (hbdata.getOpTime().getSecs()+10 < lastOpApplied.getSecs()) {
-            warning() << "attempting to sync from " << targetHostAndPort
+            warning() << "attempting to sync from " << target
                       << ", but its latest opTime is " << hbdata.getOpTime().getSecs()
                       << " and ours is " << lastOpApplied.getSecs() << " so this may not work"
                       << rsLog;
             response->append("warning",
-                             "requested member \"" + targetHostAndPort + "\" is more than 10 "
-                                     "seconds behind us");
+                             str::stream() << "requested member \"" << target.toString() <<
+                                     "\" is more than 10 seconds behind us");
             // not returning bad Status, just warning
         }
 

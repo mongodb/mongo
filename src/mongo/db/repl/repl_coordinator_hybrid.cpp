@@ -283,7 +283,7 @@ namespace repl {
         return legacyStatus;
     }
 
-    Status HybridReplicationCoordinator::processReplSetSyncFrom(const std::string& target,
+    Status HybridReplicationCoordinator::processReplSetSyncFrom(const HostAndPort& target,
                                                                 BSONObjBuilder* resultObj) {
         Status legacyStatus = _legacy.processReplSetSyncFrom(target, resultObj);
         BSONObjBuilder implResult;
